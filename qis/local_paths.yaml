@@ -1,0 +1,12 @@
+# pc/developer specific paths
+
+RESOURCE_PATH:
+  "C:\\Users\\artur\\OneDrive\\analytics\\resources\\"
+LOCAL_RESOURCE_PATH:
+  "C:\\Users\\artur\\OneDrive\\analytics\\cd\\qis\\resources\\"
+UNIVERSE_PATH:
+  "C:\\Users\\artur\\OneDrive\\analytics\\resources\\"
+OUTPUT_PATH:
+  "C:\\Users\\artur\\OneDrive\\analytics\\outputs\\"
+
+
