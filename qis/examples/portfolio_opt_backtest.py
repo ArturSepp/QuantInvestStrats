@@ -1,0 +1,83 @@
+# built in
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from typing import Tuple, List, Dict
+from enum import Enum
+
+# qis
+import qis.utils.dates as da
+import qis.perfstats.returns as ret
+import qis.plots.time_series as pts
+
+# models
+import qis.models.linear.ewm as ewm
+import qis.models.stats.gaussian_mixture as gm
+from qis.models.linear.corr_cov_matrix import compute_masked_covar_corr, matrix_regularization
+
+# portfolio
+from qis.perfstats import returns as ret
+from qis.portfolio.optimization.qp_solvers import PortfolioObjective, max_portfolio_sharpe_qp
+import qis.portfolio.backtester as bp
+
+
+import qis.portfolio.optimization.rolling_portfolios as rlp
+from qis.portfolio.portfolio_data import PortfolioData
+from qis.utils import dates as da
+
+
+from qis.data.yf_data import load_etf_data
+
+
+
+
+class UnitTests(Enum):
+    MAX_DIVERSIFICATION = 1
+
+
+def run_unit_test(unit_test: UnitTests):
+
+    # data
+    prices = load_etf_data()
+
+
+    import qis.plots.stackplot as pst
+
+    kwargs = dict(is_add_mean_levels=True,
+                  is_yaxis_limit_01=True,
+                  baseline='zero',
+                  bbox_to_anchor=(0.4, 1.1),
+                  legend_line_type=pst.LegendLineType.AVG_STD_LAST,
+                  ncol=len(prices.columns)//3,
+                  var_format='{:.0%}')
+
+    if unit_test == UnitTests.MAX_DIVERSIFICATION:
+        weights = rlp.solve_optimal_weights_ewm_covar(prices=prices,
+                                                      portfolio_objective=PortfolioObjective.MAX_DIVERSIFICATION,
+                                                      weight_mins=np.zeros(len(prices.columns)),
+                                                      weight_maxs=np.ones(len(prices.columns)),
+                                                      rebalancing_freq='Q',
+                                                      ewm_lambda=0.97)
+
+        portfolio_out = bp.backtest_model_portfolio(prices=prices,
+                                                    weights=weights,
+                                                    is_rebalanced_at_first_date=True,
+                                                    ticker='MaxDiversification',
+                                                    is_output_portfolio_data=True)
+
+
+        portfolio_out.plot_nav()
+    plt.show()
+
+
+if __name__ == '__main__':
+
+    unit_test = UnitTests.MAX_DIVERSIFICATION
+
+    is_run_all_tests = False
+    if is_run_all_tests:
+        for unit_test in UnitTests:
+            run_unit_test(unit_test=unit_test)
+    else:
+        run_unit_test(unit_test=unit_test)

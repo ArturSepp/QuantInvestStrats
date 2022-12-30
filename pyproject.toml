@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "qis"
+version = "1.0.1"
+description = "Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
+license = "LICENSE.txt"
+authors = ["Artur Sepp <artursepp@gmail.com>"]
+maintainers = ["Artur Sepp <artursepp@gmail.com>"]
+readme = "README.md"
+repository = "https://github.com/ArturSepp/QuantInvestStrats"
+documentation = "https://github.com/ArturSepp/QuantInvestStrats"
+keywords= ["quantitative", "investing", "portfolio optimization", "systematic strategies", "volatility"]
+classifiers=[
+        "Development Status :: 1 - Beta",
+        "Environment :: Console",
+        "Intended Audience :: Financial and Insurance Industry",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: MIT License",
+        "Natural Language :: English",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3 :: Only",
+        "Topic :: Office/Business :: Financial :: Investment",
+    ]
+packages = [ {include = "qis"} ]
+
+[tool.poetry.urls]
+"Issues" = "https://github.com/ArturSepp/QuantInvestStrats/issues"
+"Personal website" = "https://artursepp.com"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+numba = ">=0.55"
+numpy = ">=1.22.4"
+scipy = ">=1.3"
+statsmodels = ">=0.13.0"
+pandas = ">=0.19"
+matplotlib = ">=3.5.2"
+seaborn = ">=0.11.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

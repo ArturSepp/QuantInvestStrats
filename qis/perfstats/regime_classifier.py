@@ -1,0 +1,628 @@
+"""
+implementation of abstract
+"""
+from __future__ import annotations
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from abc import ABC, abstractmethod
+from matplotlib._color_data import CSS4_COLORS as mcolors
+from typing import NamedTuple, Union, Dict, List, Tuple, Optional, Any
+from enum import Enum
+
+import qis.plots.bars
+import qis.utils.dates as da
+import qis.utils.df_cut as dfc
+import qis.perfstats.perf_table as pt
+import qis.perfstats.returns as ret
+from qis.perfstats.config import ReturnTypes, RegimeData, PerfParams, PerfStat
+
+# plotting
+import qis.plots.bars as pba
+import qis.plots.utils as put
+import qis.plots.boxplot as bxp
+from qis.plots.derived.perf_table import plot_ra_perf_table
+
+
+def compute_mean_freq_regimes(sampled_returns_with_regime_id: pd.DataFrame):
+    regime_groups = sampled_returns_with_regime_id.groupby([RegimeClassifier.REGIME_COLUMN])
+    regime_means = regime_groups.mean()
+    regime_dims = regime_groups.count().iloc[:, 0]  # count regimes
+    # replace nans
+    regime_dims[np.isnan(regime_dims)] = 0.0
+    norm_sum = np.sum(regime_dims)
+    if np.isclose(np.sum(regime_dims), 0.0):
+        norm_q = np.zeros_like(regime_dims)
+    else:
+        norm_q = regime_dims / norm_sum
+    return regime_means, norm_q
+
+
+def compute_regime_avg(sampled_returns_with_regime_id: pd.DataFrame,
+                       freq: str,
+                       is_report_pa_returns: bool = True,
+                       regime_ids: List[str] = None,
+                       **kwargs
+                       ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+
+    """
+    compute conditional means by the regime ids
+    compute normalized prices attributions = af*freq*cvar
+    """
+    # compute mean by regimes
+    regime_means, norm_q = compute_mean_freq_regimes(sampled_returns_with_regime_id=sampled_returns_with_regime_id)
+    _, af_mult = da.get_period_days(freq=freq)
+
+    if is_report_pa_returns:
+        regime_pa = np.expm1(regime_means.multiply(af_mult * norm_q, axis=0))
+    else:
+        regime_pa = regime_means.multiply(af_mult * norm_q, axis=0)
+
+    # transpose: index = regime, column = assets return
+    regime_means = regime_means.T
+    regime_pa = regime_pa.T
+
+    # arrange columns according to given labels
+    if regime_ids is not None:
+        regime_means = regime_means[regime_ids]
+        regime_pa = regime_pa[regime_ids]
+
+    return regime_means, regime_pa, norm_q
+
+
+def compute_regimes_pa_perf_table(sampled_returns_with_regime_id: pd.DataFrame,
+                                  prices: pd.DataFrame,
+                                  benchmark: str,
+                                  perf_params: PerfParams,
+                                  freq: str,
+                                  is_use_benchmark_means: bool = False,
+                                  is_add_ra_perf_table: bool = True,
+                                  drop_benchmark: bool = False,
+                                  additive_pa_returns_to_pa_total: bool = True,
+                                  regime_ids: List[str] = None,  # define regime order
+                                  **kwargs
+                                  ) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
+
+    """
+    compute regime conditional returns, regime conditional Sharpes and total performance
+    """
+    regime_avg, regime_pa, norm_q = compute_regime_avg(sampled_returns_with_regime_id=sampled_returns_with_regime_id,
+                                                       regime_ids=regime_ids,
+                                                       freq=freq,
+                                                       **kwargs)
+
+    # align data by regime labels for consitent colors
+    given_columns = regime_avg.columns.to_list()
+    regime_avg = regime_avg[given_columns]
+    regime_avg.columns = [f"{x} {RegimeData.REGIME_AVG.value}" for x in given_columns]
+
+    # average regime returns
+    regime_pa = regime_pa[given_columns]
+    regime_pa.columns = [f"{x} {RegimeData.REGIME_PA.value}" for x in given_columns]
+    regime_pa_columns = regime_pa.columns
+
+    # compute stadradized ra _ perf table
+    ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params, is_compute_sharpe_only=True)
+    if additive_pa_returns_to_pa_total:  # use pa return to normalize conditional an returns
+
+        total_sum = regime_pa[regime_pa_columns].sum(1)
+        total_to_match = ra_perf_table[PerfStat.PA_RETURN.to_str()]
+
+        # adjust regimes to add to total
+        total_pa_diff = (total_to_match - total_sum)
+        weighted_diff = pd.DataFrame(np.tile(total_pa_diff, (len(norm_q.to_numpy()), 1)).T,
+                                     index=total_pa_diff.index, columns=norm_q.index) # = matrix[rows[c by asset]]
+        regime_pa_diff = weighted_diff.multiply(norm_q, axis=1)  # each row is regime freq [number of regime] * adjustment[asset]
+        regime_pa1 = regime_pa[regime_pa_columns].add(regime_pa_diff.to_numpy(), axis=0)
+
+    else:  # need regime_pa1 for level benchmarks
+        regime_pa1 = regime_pa
+
+    if is_use_benchmark_means and benchmark is not None:
+        regime_pa1.loc[benchmark][regime_pa_columns] = regime_avg.loc[benchmark]
+
+    # compute simple norm sharpes, using vols from pa returns
+    vols_for_sharpe_pa = ra_perf_table[PerfStat.VOL.to_str()]
+    regime_sharpe = regime_pa1.divide(vols_for_sharpe_pa, axis=0)[regime_pa_columns]
+
+    regime_sharpe.columns = [f"{x} {RegimeData.REGIME_SHARPE.value}" for x in regime_sharpe.columns]
+    if is_add_ra_perf_table:
+        cond_perf_table = pd.concat([regime_avg, regime_pa1, regime_sharpe, ra_perf_table], axis=1)
+    else:
+        cond_perf_table = pd.concat([regime_avg, regime_pa1, regime_sharpe], axis=1)
+
+    regime_datas = {RegimeData.REGIME_AVG: regime_avg,
+                    RegimeData.REGIME_PA: regime_pa1,
+                    RegimeData.REGIME_SHARPE: regime_sharpe}
+
+    if drop_benchmark:
+        cond_perf_table = cond_perf_table.drop(benchmark, axis=0)
+
+    return cond_perf_table, regime_datas
+
+
+class RegimeClassifier(ABC):
+    """
+    Abstract class for regime classification which is part of performance params
+    and regime-conditional performance attribution
+    """
+    REGIME_COLUMN = 'regime'
+
+    def __init__(self):
+        super().__init__()
+
+    @abstractmethod
+    def compute_sampled_returns_with_regime_id(self, **kwargs) -> pd.DataFrame:
+        """
+        abstract method for getting df with params and regime ids
+        """
+        pass
+
+    @abstractmethod
+    def get_regime_ids_colors(self) -> Dict[str, str]:
+        """
+        important for proper visualizations
+        """
+
+    def compute_regimes_pa_perf_table(self,
+                                      regime_id_func_kwargs: Dict[str, Any],
+                                      prices: pd.DataFrame,
+                                      benchmark: str,
+                                      freq: str,
+                                      perf_params: PerfParams,
+                                      is_use_benchmark_means: bool = False,
+                                      is_add_ra_perf_table: bool = True,
+                                      drop_benchmark: bool = False,
+                                      additive_pa_returns_to_pa_total: bool = True,
+                                      regime_ids: List[str] = None,  # define regime order
+                                      **kwargs
+                                      ) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
+
+        """
+        compute regime conditional returns, regime conditional Sharpes and total performance
+        """
+        sampled_returns_with_regime_id = self.compute_sampled_returns_with_regime_id(**regime_id_func_kwargs)
+        cond_perf_table, regime_datas = compute_regimes_pa_perf_table(sampled_returns_with_regime_id=sampled_returns_with_regime_id,
+                                                                      prices=prices,
+                                                                      benchmark=benchmark,
+                                                                      perf_params=perf_params,
+                                                                      freq=freq,
+                                                                      is_use_benchmark_means=is_use_benchmark_means,
+                                                                      is_add_ra_perf_table=is_add_ra_perf_table,
+                                                                      drop_benchmark=drop_benchmark,
+                                                                      regime_ids=regime_ids)
+        return cond_perf_table, regime_datas
+
+    def class_data_to_colors(self,
+                             regime_data: pd.Series
+                             ) -> pd.Series:
+        map_id_into_color = self.get_regime_ids_colors()
+        regime_id_color = regime_data.map(map_id_into_color)
+        regime_id_color = regime_id_color.astype(str)  # change category index
+        regime_id_color.loc[np.in1d(regime_id_color.to_numpy(), 'nan')] = '#FFFFFF'  #just in case put white for non-mapped data
+        return regime_id_color
+    
+    def get_regime_ids(self) -> List[str]:
+        return list(self.get_regime_ids_colors().keys())
+
+
+####################################
+###   Implementation of returns quantile regime
+###################################
+
+
+class BenchmarkReturnsQuantileRegimeSpecs(NamedTuple):
+    freq: str = 'Q'  # frequency of returns
+    return_type: ReturnTypes = ReturnTypes.RELATIVE  # return type
+    q: Union[np.ndarray, int] = np.array([0.0, 0.17, 0.83, 1.0])  # quantiles = q[1:] - q[:-1]
+    regime_ids_colors: Dict[str, str] = {'Bear': mcolors['salmon'], 'Normal': mcolors['yellowgreen'], 'Bull': mcolors['darkgreen']}
+
+    def get_regime_ids_colors(self) -> Dict[str, str]:
+        return self.regime_ids_colors
+
+
+class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
+
+    def __init__(self,
+                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs()
+                 ):
+        self.regime_params = regime_params
+        super().__init__()
+
+    def compute_sampled_returns_with_regime_id(self,
+                                               prices: Union[pd.DataFrame, pd.Series],
+                                               benchmark: str,
+                                               include_start_date: bool = True,
+                                               include_end_date: bool = True,
+                                               **kwargs
+                                               ) -> pd.DataFrame:
+        """
+        implementation of abstract method for getting df with params and regime ids
+        """
+        if isinstance(prices, pd.Series):
+            prices = prices.to_frame()
+        sampled_returns_with_regime_id = ret.to_returns(prices=prices,
+                                                        freq=self.regime_params.freq,
+                                                        return_type=self.regime_params.return_type,
+                                                        include_start_date=include_start_date,
+                                                        include_end_date=include_end_date)
+        x = sampled_returns_with_regime_id[benchmark]
+        quant0 = pd.qcut(x=x, q=self.regime_params.q, labels=self.get_regime_ids())
+        sampled_returns_with_regime_id[self.REGIME_COLUMN] = quant0
+        return sampled_returns_with_regime_id
+
+    def get_regime_ids_colors(self) -> Dict[str, str]:
+        return self.regime_params.get_regime_ids_colors()
+
+    def compute_regimes_pa_perf_table(self,
+                                      prices: pd.DataFrame,
+                                      benchmark: str,
+                                      perf_params: PerfParams,
+                                      **kwargs
+                                      ) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
+
+        regime_id_func_kwargs = dict(prices=prices, benchmark=benchmark,
+                                     include_start_date=True, include_end_date=True)
+
+        return super().compute_regimes_pa_perf_table(regime_id_func_kwargs=regime_id_func_kwargs,
+                                                     prices=prices,
+                                                     benchmark=benchmark,
+                                                     perf_params=perf_params,
+                                                     freq=self.regime_params.freq,
+                                                     is_report_pa_returns=True,
+                                                     is_use_benchmark_means=False,
+                                                     regime_ids=self.get_regime_ids())
+
+
+####################################
+### Implementation of vols quantile regime
+###################################
+
+
+class VolQuantileRegimeSpecs(NamedTuple):
+    freq: str = 'Q'  # frequency of vol sampling
+    return_type: ReturnTypes = ReturnTypes.RELATIVE  # return type
+    q: int = 4  # 4 qiantiles
+
+
+class BenchmarkVolsQuantilesRegime(RegimeClassifier):
+
+    def __init__(self,
+                 regime_params: VolQuantileRegimeSpecs = VolQuantileRegimeSpecs()
+                 ):
+        self.regime_params = regime_params
+        self.regime_colors: Dict[str, str]  # will be computed in the call compute_sampled_returns_with_regime_id
+        super().__init__()
+
+    def compute_sampled_returns_with_regime_id(self,
+                                               prices: pd.DataFrame,
+                                               benchmark: str,
+                                               include_start_date: bool = True,
+                                               include_end_date: bool = True,
+                                               **kwargs
+                                               ) -> pd.DataFrame:
+        """
+        implementation of abstract method for getting df with params and regime ids
+        """
+        vols = ret.compute_sampled_vols(prices=prices[benchmark],
+                                        freq_vol=self.regime_params.freq,
+                                        include_start_date=include_start_date, include_end_date=include_end_date)
+
+        hue_name = f"{benchmark} vol"
+        classificator, labels = dfc.add_quantile_classification(df=vols.to_frame(), x_column=benchmark,
+                                                                num_buckets=self.regime_params.q,
+                                                                hue_name=hue_name,
+                                                                xvar_format='{:.0%}',
+                                                                bucket_prefix=hue_name)
+        classificator = classificator.sort_index()
+        sampled_returns_with_regime_id = ret.to_returns(prices=prices,
+                                                        freq=self.regime_params.freq,
+                                                        return_type=self.regime_params.return_type,
+                                                        include_start_date=include_start_date,
+                                                        include_end_date=include_end_date)
+        sampled_returns_with_regime_id[self.REGIME_COLUMN] = classificator[hue_name]
+        self.regime_colors = dict(zip(labels, put.get_n_colors(n=len(labels))))
+
+        return sampled_returns_with_regime_id
+    
+    def get_regime_ids_colors(self) -> Dict[str, str]:
+        return self.regime_colors
+    
+    def compute_regimes_pa_perf_table(self,
+                                      prices: pd.DataFrame,
+                                      benchmark: str,
+                                      perf_params: PerfParams,
+                                      **kwargs
+                                      ) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
+
+        regime_id_func_kwargs = dict(prices=prices, benchmark=benchmark,
+                                     include_start_date=True, include_end_date=True)
+
+        return super().compute_regimes_pa_perf_table(regime_id_func_kwargs=regime_id_func_kwargs,
+                                                     prices=prices,
+                                                     benchmark=benchmark,
+                                                     perf_params=perf_params,
+                                                     freq=self.regime_params.freq,
+                                                     is_report_pa_returns=True,
+                                                     is_use_benchmark_means=False,
+                                                     regime_ids=self.get_regime_ids())
+
+    def get_regime_colors(self) -> List[str]:
+        return list(self.regime_colors.values())
+
+
+####################################
+###   Implementation of plotting figs
+###################################
+def plot_regime_data(regime_classifier: RegimeClassifier,
+                     regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
+                     x_rotation: int = 0,
+                     is_add_bar_values: bool = True,
+                     title: Optional[str] = 'Conditional Excess Sharpe ratio',
+                     var_format: str = '{:.1f}',
+                     fontsize: int = 10,
+                     is_top_totals: bool = True,
+                     is_add_totals: bool = True,
+                     is_use_vbar: bool = False,
+                     legend_loc: Optional[str] = 'upper right',
+                     ax: plt.Subplot = None,
+                     **kwargs
+                     ) -> plt.Figure:
+
+    regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(**kwargs)
+    data = regime_datas[regime_data_to_plot]
+    regime_colors = list(regime_classifier.get_regime_ids_colors().values())
+
+    if is_add_totals:
+        totals = np.nansum(data.to_numpy(), axis=1)
+    else:
+        totals = None
+
+    if is_use_vbar:
+        fig = qis.plots.bars.plot_vbars(df=data,
+                                        x_rotation=x_rotation,
+                                        colors=regime_colors,
+                                        var_format=var_format,
+                                        is_add_bar_values=is_add_bar_values,
+                                        title=title,
+                                        totals=totals,
+                                        fontsize=fontsize,
+                                        xmin_shift=-0.05,
+                                        x_step=0.5,
+                                        ax=ax,
+                                        **kwargs)
+    else:
+        fig = pba.plot_bars(df=data,
+                            x_rotation=x_rotation,
+                            colors=regime_colors,
+                            var_format=var_format,
+                            is_add_bar_values=is_add_bar_values,
+                            title=title,
+                            totals=totals,
+                            is_top_totals=is_top_totals,
+                            fontsize=fontsize,
+                            legend_loc=legend_loc,
+                            is_reversed=True,
+                            ax=ax,
+                            **kwargs)
+    return fig
+
+
+def plot_regime_boxplot(regime_classifier: RegimeClassifier,
+                        prices: pd.DataFrame,
+                        benchmark: str,
+                        hue_var_name: str = 'Asset',
+                        x_index_var_name: str = 'Regime',
+                        ylabel: str = 'avg regime return',
+                        x_rotation: int = 0,
+                        legend_loc: Optional[str] = 'upper left',
+                        yvar_format: str = '{:.0%}',
+                        ax: plt.Subplot = None,
+                        **kwargs
+                        ) -> plt.Figure:
+
+    df = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices, benchmark=benchmark).iloc[1:, :]
+    regime_ids_colors = regime_classifier.get_regime_ids_colors()
+    df = df.set_index(regime_classifier.REGIME_COLUMN, drop=True) # boxplot b regime as hue
+    df = dfc.sort_index_by_hue(df=df, hue_order=list(regime_ids_colors.keys()))
+    fig = bxp.df_boxplot_by_hue_var(df=df,
+                                    hue_var_name=hue_var_name,
+                                    x_index_var_name=x_index_var_name,
+                                    y_var_name=ylabel,
+                                    add_zero_line=True,
+                                    meanline=True,
+                                    is_heatmap_colors=False,
+                                    labels=prices.columns,
+                                    legend_loc=legend_loc,
+                                    x_rotation=x_rotation,
+                                    yvar_format=yvar_format,
+                                    ax=ax,
+                                    **kwargs)
+    return fig
+
+
+def add_bnb_regime_shadows(ax: plt.Subplot,
+                           data_df: pd.DataFrame = None,
+                           benchmark: str = None,
+                           pivot_prices: pd.Series = None,
+                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                           is_force_lim: bool = True,
+                           alpha: float = 0.3,
+                           **kwargs
+                           ) -> None:
+    
+    if regime_params is None:
+        regime_params = BenchmarkReturnsQuantileRegimeSpecs()
+    regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
+
+    if pivot_prices is not None:
+        benchmark = pivot_prices.name
+    elif benchmark is not None and data_df is not None:
+        if benchmark in data_df.columns:
+            pivot_prices = data_df[benchmark]
+        else:
+            raise KeyError(f"{benchmark} not in {data_df.columns}")
+    else:
+        raise ValueError(f"need pivot_prices or benchmark")
+
+    regime_ids = regime_classifier.compute_sampled_returns_with_regime_id(prices=pivot_prices,
+                                                                          benchmark=benchmark,
+                                                                          **regime_params._asdict())
+
+    regime_id_color = regime_classifier.class_data_to_colors(regime_data=regime_ids[RegimeClassifier.REGIME_COLUMN])
+
+    # fill in the first date before the class date
+    price_data_index = pivot_prices.index
+
+    ax.axvspan(xmin=price_data_index[0],
+               xmax=regime_ids.index[0],
+               alpha=alpha,
+               color=regime_id_color.loc[regime_id_color.index[0]], lw=0)
+    for date_1, date in zip(regime_ids.index[:-1], regime_ids.index[1:]):
+        ax.axvspan(xmin=date_1, xmax=date, alpha=alpha, color=regime_id_color[date], lw=0)
+    if is_force_lim:
+        ax.set_xlim([price_data_index[0], regime_ids.index[-1]])
+
+
+def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
+                                      benchmark: str,
+                                      regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                                      perf_params: PerfParams = None,
+                                      **kwargs
+                                      ) -> pd.DataFrame:
+
+        """
+        compute regime conditional returns, regime conditional Sharpes and total performance
+        """
+        if regime_params is None:
+            regime_params = BenchmarkReturnsQuantileRegimeSpecs()
+        regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
+
+        regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(prices=prices,
+                                                                                              benchmark=benchmark,
+                                                                                              perf_params=perf_params,
+                                                                                              **regime_params._asdict())
+        return regimes_pa_perf_table
+
+
+class UnitTests(Enum):
+    BNB_REGIME = 1
+    VOL_REGIME = 2
+    BNB_REGIME_SHADOWS = 3
+    BNB_PERF_TABLE = 4
+    AVG_PLOT = 5
+
+
+def run_unit_test(unit_test: UnitTests):
+
+    from qis.data.yf_data import load_etf_data
+    prices = load_etf_data().dropna()
+
+    kwargs = dict(var_format='{:.2f}')
+
+    perf_params = PerfParams()
+    plot_ra_perf_table(prices=prices,
+                       perf_params=perf_params,
+                       **kwargs)
+
+    if unit_test == UnitTests.BNB_REGIME:
+        regime_params = BenchmarkReturnsQuantileRegimeSpecs()
+        regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
+        regime_ids = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices, benchmark='SPY')
+        print(f"regime_ids:\n{regime_ids}")
+
+        cond_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(prices=prices,
+                                                                                        benchmark='SPY',
+                                                                                        perf_params=perf_params)
+        print(f"regime_means:\n{cond_perf_table}")
+        print(f"regime_pa:\n{regime_datas}")
+
+        plot_regime_data(regime_classifier=regime_classifier,
+                         prices=prices,
+                         benchmark='SPY',
+                         perf_params=perf_params,
+                         is_use_vbar=True,
+                         **kwargs)
+
+        plot_regime_data(regime_classifier=regime_classifier,
+                         prices=prices,
+                         benchmark='SPY',
+                         perf_params=perf_params,
+                         is_use_vbar=False,
+                         **kwargs)
+
+    elif unit_test == UnitTests.VOL_REGIME:
+        regime_params = VolQuantileRegimeSpecs()
+        perf_params = PerfParams()
+        regime_classifier = BenchmarkVolsQuantilesRegime(regime_params=regime_params)
+        regime_ids = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices, benchmark='SPY')
+        print(f"regime_ids:\n{regime_ids}")
+
+        cond_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(prices=prices,
+                                                                                   benchmark='SPY',
+                                                                                   perf_params=perf_params)
+        print(f"regime_means:\n{cond_perf_table}")
+        print(f"regime_pa:\n{regime_datas}")
+
+        plot_regime_data(regime_classifier=regime_classifier,
+                         prices=prices,
+                         benchmark='SPY',
+                         perf_params=perf_params,
+                         is_use_vbar=True,
+                         **kwargs)
+
+        plot_regime_data(regime_classifier=regime_classifier,
+                         prices=prices,
+                         benchmark='SPY',
+                         perf_params=perf_params,
+                         is_use_vbar=False,
+                         **kwargs)
+
+    elif unit_test == UnitTests.BNB_REGIME_SHADOWS:
+        import qis.plots.time_series as pts
+        with sns.axes_style('white'):
+            fig, ax = plt.subplots(1, 1, figsize=(10, 10), constrained_layout=True)
+            pts.plot_time_series(df=prices, ax=ax)
+
+            add_bnb_regime_shadows(ax=ax,
+                                   data_df=prices,
+                                   benchmark='SPY',
+                                   regime_params=BenchmarkReturnsQuantileRegimeSpecs(),
+                                   perf_params=PerfParams())
+
+    elif unit_test == UnitTests.BNB_PERF_TABLE:
+        df = compute_bnb_regimes_pa_perf_table(prices=prices,
+                                               benchmark='SPY',
+                                               regime_params=BenchmarkReturnsQuantileRegimeSpecs(),
+                                               perf_params=PerfParams())
+        print(df)
+
+    elif unit_test == UnitTests.AVG_PLOT:
+        regime_params = VolQuantileRegimeSpecs()
+        perf_params = PerfParams()
+        regime_classifier = BenchmarkVolsQuantilesRegime(regime_params=regime_params)
+
+        with sns.axes_style('white'):
+            fig, ax = plt.subplots(1, 1, figsize=(7, 7), constrained_layout=True)
+            plot_regime_boxplot(regime_classifier=regime_classifier,
+                                prices=prices,
+                                benchmark='SPY',
+                                perf_params=perf_params,
+                                ax=ax,
+                                **kwargs)
+
+    plt.show()
+
+
+if __name__ == '__main__':
+
+    unit_test = UnitTests.AVG_PLOT
+
+    is_run_all_tests = False
+    if is_run_all_tests:
+        for unit_test in UnitTests:
+            run_unit_test(unit_test=unit_test)
+    else:
+        run_unit_test(unit_test=unit_test)
