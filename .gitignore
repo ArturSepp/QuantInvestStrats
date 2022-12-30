@@ -2,7 +2,7 @@
 Lib/
 Scripts/
 backtester/
-data/
+#data/
 my_projects/
 my_strategies/
 stochvolmodels/
@@ -24,6 +24,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.idea/
 build/
 develop-eggs/
 dist/
