@@ -7,26 +7,26 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy import stats
-from typing import Union, List, Optional, Tuple
+from typing import Optional
 from enum import Enum
 
 # qis
 import qis.plots.utils as put
 
 
-def plot_hist_plot2d(df: pd.DataFrame,
-                     title: str = None,
-                     a_min: float = None,
-                     a_max: float = None,
-                     xvar_format: str = '{:.1f}',
-                     yvar_format: str = '{:.1f}',
-                     add_corr_legend: bool = True,
-                     legend_loc: Optional[str] = 'upper left',
-                     color: str = 'navy',
-                     fontsize: int = 10,
-                     ax: plt.Subplot = None,
-                     **kwargs
-                     ) -> plt.Figure:
+def plot_histplot2d(df: pd.DataFrame,
+                    title: str = None,
+                    a_min: float = None,
+                    a_max: float = None,
+                    xvar_format: str = '{:.1f}',
+                    yvar_format: str = '{:.1f}',
+                    add_corr_legend: bool = True,
+                    legend_loc: Optional[str] = 'upper left',
+                    color: str = 'navy',
+                    fontsize: int = 10,
+                    ax: plt.Subplot = None,
+                    **kwargs
+                    ) -> plt.Figure:
 
     if len(df.columns) != 2:
         raise ValueError(f"should be 2 columns")
@@ -83,7 +83,7 @@ def run_unit_test(unit_test: UnitTests):
 
         fig, ax = plt.subplots(1, 1, figsize=(3.9, 3.4), tight_layout=True)
         global_kwargs = dict(fontsize=6, linewidth=0.5, weight='normal', first_color_fixed=True)
-        plot_hist_plot2d(df=data, ax=ax, **global_kwargs)
+        plot_histplot2d(df=data, ax=ax, **global_kwargs)
 
     plt.show()
 

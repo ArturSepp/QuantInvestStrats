@@ -11,8 +11,8 @@ from typing import Union, Tuple, Dict
 from statsmodels.tsa.ar_model import AutoReg
 
 # qis
-import qis.perfstats.returns as ret
 import qis.utils.np_ops as npo
+import qis.perfstats.returns as ret
 
 
 class BootsrapType(Enum):

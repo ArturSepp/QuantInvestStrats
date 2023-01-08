@@ -2,12 +2,13 @@
 Lib/
 Scripts/
 backtester/
-# data/
+data/
 my_projects/
 my_strategies/
 stochvolmodels/
 testing/
 volanalytics/
+/lp_model/
 
 # YAML
 *.yaml

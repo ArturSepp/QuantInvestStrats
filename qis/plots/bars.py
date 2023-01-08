@@ -12,10 +12,9 @@ from typing import List, Tuple, Optional, Union
 from enum import Enum
 
 # qis
-import qis.plots.utils as put
 import qis.utils.struct_ops as sop
-import qis.plots.table as ptb
-from qis.plots.utils import LegendLineType
+import qis.plots.utils as put
+from qis.plots.utils import LegendStats
 
 
 def plot_bars(df: Union[pd.DataFrame, pd.Series],
@@ -27,7 +26,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               min_max_for_bars_values: float = None,
               is_add_bar_values: bool = False,
               is_add_top_bar_values: bool = False,
-              legend_line_type: LegendLineType = LegendLineType.NONE,
+              legend_stats: LegendStats = LegendStats.NONE,
               var_format: str = '{:.1%}',
               yvar_format: str = '{:,.2f}',
               x_rotation: int = 0,
@@ -132,7 +131,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         labels = legend_labels
     else:
         # handles, labels = ax.get_legend_handles_labels()
-        labels = put.get_legend_lines(data=df, legend_line_type=legend_line_type, var_format=yvar_format)
+        labels = put.get_legend_lines(data=df, legend_stats=legend_stats, var_format=yvar_format)
 
     if legend_colors is not None:
         colors = legend_colors
@@ -229,7 +228,7 @@ def plot_vbars(df: pd.DataFrame,
         colors = np.tile(colors, len(category_names))
 
     if ax is None:
-        height = ptb.calc_table_height(num_rows=len(df.index), scale=0.30)
+        height = put.calc_table_height(num_rows=len(df.index), scale=0.30)
         fig, ax = plt.subplots(figsize=(9.2, height))
     else:
         fig = None

@@ -4,7 +4,6 @@ implementation of core dates analytics and frequency with TimePeriod method
 
 from __future__ import annotations  # to allow class method annotations
 
-import time
 import datetime as dt
 import pandas as pd
 import numpy as np
@@ -12,7 +11,6 @@ from typing import List, Union, Tuple, Optional, NamedTuple, Dict
 from enum import Enum
 
 import qis.utils.np_ops as npo
-from qis.utils.generic.enum_map import EnumMap
 from qis.utils.struct_ops import separate_number_from_string
 
 DATE_FORMAT = '%d%b%Y'  # 31Jan2020 - common across all reporting meta
@@ -32,11 +30,10 @@ def get_today_str(format: str = DATE_FORMAT) -> str:
     return dt.datetime.now().date().strftime(format)
 
 
-def get_today_eod_with_tz(tz: str, days_offset: int = None) -> pd.Timestamp:
+def get_today_eod_with_tz(tz: str = 'UTC', days_offset: int = None) -> pd.Timestamp:
     eod = pd.Timestamp.today(tz=tz).normalize()  # normalize to eod date
     if days_offset is not None:
         eod = eod + pd.DateOffset(days=days_offset)
-
     return eod
 
 
@@ -48,7 +45,7 @@ def get_current_date(day_offset: int = 0) -> pd.Timestamp:
     current_date = pd.Timestamp(dt.datetime(year=current_date_time.year,
                                             month=current_date_time.month,
                                             day=current_date_time.day))
-    current_date = shift_date_by_day(date=current_date, num_days=day_offset)
+    current_date = shift_date_by_day(date=current_date, num_days=day_offset, backward=False)
     return current_date
 
 
@@ -77,16 +74,6 @@ class FreqData(NamedTuple):
     def print(self):
         print(f"{self.cap}, {self.freq_cap}, n_bus={self.n_bus}, n_cal={self.n_cal}")
 
-    def to_span_lambda(self, is_bus: bool = True) -> float:
-        if is_bus:
-            n = self.n_bus
-        else:
-            n = self.n_cal
-        if n == 1:
-            n = 1.5
-        span_lambda = 1.0 - 2.0/(n+1.0)
-        return span_lambda
-
     def to_n_bus_days(self):
         return self.n_bus
 
@@ -97,7 +84,7 @@ class FreqData(NamedTuple):
         return self.freq_cap
 
 
-class FreqMap(FreqData, EnumMap):
+class FreqMap(FreqData, Enum):
     """
     name is linked to python aliases, value have extra data
     """
@@ -140,24 +127,21 @@ class FreqMap(FreqData, EnumMap):
         return cls.map_to_value(freq)
 
     @classmethod
+    def map_to_value(cls, name):
+        """
+        given name return value
+        """
+        for k, v in cls.__members__.items():
+            if k == name:
+                return v
+        raise ValueError(f"nit in enum {name}")
+
+    @classmethod
     def map_n_days(cls, n_days):
         for freq in cls:
             if freq.n_cal == n_days:
                 return freq
         raise ValueError(f"cannot map {n_days}")
-
-
-def get_freq_span_lambda(freq: str = 'B') -> float:
-    """
-    map python freq to
-    """
-    freq_data = FreqMap.to_value(freq)
-    return freq_data.to_span_lambda(is_bus=True)
-
-
-def infer_data_frequency(data: Union[pd.DataFrame, pd.Series]) -> str:
-    freq = FreqMap.map_n_days(compute_median_data_frequency(data.index))
-    return freq.name
 
 
 def get_period_days(freq: str = 'B',
@@ -484,10 +468,7 @@ def get_time_period(df: Union[pd.Series, pd.DataFrame]) -> TimePeriod:
     return output
 
 
-def get_time_period_shift(time_period: TimePeriod,
-                              is_increase_by_one_day: bool = True
-                              ) -> TimePeriod:
-
+def shift_time_period_by_days(time_period: TimePeriod, is_increase_by_one_day: bool = True) -> TimePeriod:
     if is_increase_by_one_day:
         start_date = shift_date_by_day(time_period.start, backward=False)
     else:
@@ -537,8 +518,11 @@ def generate_dates_schedule(time_period: TimePeriod,
         return dates_schedule
 
     end_date = time_period.end
-    if freq == 'H': # need to do offset so the end of the day will be at 23:00:00 end date
-        end_date = time_period.end + pd.offsets.Hour(24)
+    is_24_hour_offset = False
+    if freq == 'H':  # need to do offset so the end of the day will be at 23:00:00 end date
+        if end_date.hour == 0:
+            is_24_hour_offset = True
+            end_date = time_period.end + pd.offsets.Hour(24)
 
     def create_range(freq_: str) -> pd.DatetimeIndex:
         if is_business_dates:
@@ -582,10 +566,12 @@ def generate_dates_schedule(time_period: TimePeriod,
                 dates_schedule = dates_schedule.append(pd.DatetimeIndex([time_period.end]))
 
     if freq == 'H':
-        # check:
-        print(time_period.end)
         dates_schedule = dates_schedule[dates_schedule >= time_period.start]
-        dates_schedule = dates_schedule[dates_schedule <= time_period.end]
+        if is_24_hour_offset:
+            dates_schedule = dates_schedule[:-1]  # drop the next dat at 00:00:00
+        else:
+            dates_schedule = dates_schedule[dates_schedule <= time_period.end]
+
     if hours is not None and len(dates_schedule) > 0:
         dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hours) for x in dates_schedule])
 
@@ -847,36 +833,6 @@ def split_df_by_freq(df: pd.DataFrame,
     return df_split
 
 
-def extend_date_index(time_series_index: pd.DatetimeIndex, backward: bool = True) -> pd.DatetimeIndex:
-    """
-    extended date index
-    """
-    median_dates_schedule = compute_median_data_frequency(time_series_index)
-    if median_dates_schedule == 1:
-        extra_date = shift_date_by_day(date=time_series_index[0], backward=backward)
-    elif median_dates_schedule in [30, 31]:
-        extra_date = shift_date_by_month(date=time_series_index[0], backward=backward)
-    elif median_dates_schedule in [365]:
-        extra_date = shift_dates_by_year(dates=time_series_index[0], backward=backward)
-    else:
-        raise TypeError('not implemented freq in extend_date_index_backwards')
-
-    if backward:
-        loc = 0
-    else:
-        loc = -1
-
-    time_series_index1 = time_series_index.copy()
-    time_series_index1 = time_series_index1.insert(loc=loc, item=extra_date)
-    return time_series_index1
-
-
-def compute_median_data_frequency(index: Union[pd.DatetimeIndex, pd.Index]) -> np.ndarray:
-    delta = index[1:] - index[:-1]
-    median_frequency = np.median(delta.days)
-    return median_frequency
-
-
 def rebase_model_dates(model_dates: pd.DatetimeIndex,
                        observation_dates: pd.DatetimeIndex,
                        model_dates_name: str = 'model_dates'
@@ -953,10 +909,9 @@ class UnitTests(Enum):
     SAMPLE_DATES_IDX = 3
     PERIOD_WITH_HOLIDAYS = 4
     FREQ_HOUR = 5
-    FREQ_SPAN = 6
-    FREQS = 7
-    REBALANCING_INDICATORS = 8
-    WEEKEND_INDICATORS = 9
+    FREQS = 6
+    REBALANCING_INDICATORS = 7
+    WEEKEND_INDICATORS = 8
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -1008,19 +963,14 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.FREQ_HOUR:
 
-        time_period = TimePeriod(pd.Timestamp('2022-11-10', tz='UTC'),
-                                      pd.Timestamp('2022-11-16', tz='UTC'))
-        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
+        # hour frequency with timestamp with no hour
+        time_period = TimePeriod(pd.Timestamp('2022-11-10', tz='UTC'), pd.Timestamp('2022-11-16', tz='UTC'))
+        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='8H')
         print(rebalancing_times)
 
-        time_period = TimePeriod(pd.Timestamp('2022-11-10 8:00:00+00:00', tz='UTC'),
-                                      pd.Timestamp('2022-11-16 8:00:00+00:00', tz='UTC'))
-        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
-        print(rebalancing_times)
-
-    elif unit_test == UnitTests.FREQ_SPAN:
-        freq_span_lambda = get_freq_span_lambda(freq='B')
-        print(freq_span_lambda)
+        #time_period = TimePeriod(pd.Timestamp('2022-11-10 8:00:00+00:00', tz='UTC'), pd.Timestamp('2022-11-16 8:00:00+00:00', tz='UTC'))
+        #rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
+        #print(rebalancing_times)
 
     elif unit_test == UnitTests.FREQS:
         freq_map = FreqMap.BQ
@@ -1029,8 +979,6 @@ def run_unit_test(unit_test: UnitTests):
         print(freq)
         n_bus_days = freq_map.to_n_bus_days()
         print(n_bus_days)
-        span_lambda = freq_map.to_span_lambda()
-        print(span_lambda)
 
     elif unit_test == UnitTests.REBALANCING_INDICATORS:
         pd_index = pd.date_range(start='31Dec2020', end='31Dec2021', freq='W-MON')

@@ -58,7 +58,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                        digits_to_show=1, sharpe_digits=2,
                        weight='normal',
                        markersize=1,
-                       legend_alpha=0.75)
+                       framealpha=0.75)
     kwargs = sop.update_kwargs(kwargs, plot_kwargs)
 
     fig = plt.figure(figsize=FIG_SIZE, constrained_layout=True)

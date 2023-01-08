@@ -11,7 +11,7 @@ from typing import List, Tuple, Optional, Literal
 
 # qis
 import qis.plots.utils as put
-import qis.utils.df_to_str as dfs
+import qis.utils.df_str as dfs
 
 ROW_HIGHT = 0.625  # cm
 COLUMN_WIDTH = 2.0  # cm ?
@@ -213,59 +213,9 @@ def plot_df_table(df: pd.DataFrame,
             # set_column_edge_color(mpl_table, column=columns_edge_line[0], color=columns_edge_line[1])
 
     if title is not None:
-        ax.set_title(label=title, fontsize=fontsize, color=put.TITLE_COLOR)
+        put.set_title(ax=ax, title=title, fontsize=fontsize, **kwargs)
 
     return fig
-
-
-def calc_table_height(num_rows: int,
-                      row_height: float = ROW_HIGHT,
-                      first_row_height: float = None,
-                      scale: float = 0.225
-                      ) -> float:
-    """
-    core function for sizing of table and heatmaplot
-    """
-    if first_row_height is None:
-        first_row_height = row_height
-    height = (scale*num_rows*row_height + scale*first_row_height)
-    return height
-
-
-def calc_table_width(num_col: int,
-                     column_width: float = COLUMN_WIDTH,
-                     first_column_width: Optional[float] = FIRST_COLUMN_WIDTH,
-                     scale: float = 0.225
-                     ) -> float:
-    """
-    core function for sizing of table and heatmaplot
-    """
-    if first_column_width is None:
-        first_column_width = first_column_width
-    width = (scale*num_col*column_width + scale*first_column_width)
-    return width
-
-
-def calc_df_table_size(df: pd.DataFrame,
-                       min_rows: Optional[int] = None,
-                       min_cols: Optional[int] = None,
-                       scale_rows: float = 0.225,
-                       scale_cols: float = 0.225
-                       ) -> Tuple[float, float, int, int]:
-    """
-    calc optimal table size
-    """
-    if min_rows is not None:
-        num_rows = np.minimum(len(df.index), min_rows)
-    else:
-        num_rows = len(df.index)
-    if min_cols is not None:
-        num_cols = np.minimum(len(df.columns), min_cols)
-    else:
-        num_cols = len(df.columns)
-    width = calc_table_width(num_col=num_cols, scale=scale_cols)
-    height = calc_table_height(num_rows=num_rows, scale=scale_rows)
-    return width, height, num_cols, num_rows
 
 
 def plot_df_table_with_ci(df: pd.DataFrame,

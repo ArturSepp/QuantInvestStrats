@@ -6,8 +6,8 @@ from typing import Optional, Union
 from enum import Enum
 
 # qis
-import qis.perfstats.returns as ret
 from qis.utils.df_melt import melt_scatter_data_with_xvar
+import qis.perfstats.returns as ret
 from qis.plots.scatter import plot_scatter
 
 
@@ -71,7 +71,6 @@ def plot_returns_scatter(prices: pd.DataFrame,
                        hue=hue_name,
                        xvar_format=var_format,
                        yvar_format=var_format,
-                       use_regplot=True,
                        add_universe_model_label=False,
                        add_universe_model_prediction=False,
                        add_universe_model_ci=False,

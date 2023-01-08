@@ -8,36 +8,36 @@ from typing import List, Optional, Tuple
 
 # qis
 import qis.plots.utils as put
-from qis.plots.utils import LegendLineType
+from qis.plots.utils import LegendStats
 
 
-def stackplot_timeseries(df: pd.DataFrame,
-                         is_use_bar_plot: bool = False,
-                         is_yaxis_limit_01: bool = False,
-                         is_add_mean_levels: bool = False,
-                         is_add_cum_levels: bool = False,
-                         is_add_total_line: bool = False,
-                         colors: List[str] = None,
-                         step: Optional[str] = None,  # 'mid
-                         title: Optional[str] = None,
-                         baseline: str = 'zero',  # "zero", "sym", "wiggle", "weighted_wiggle"
-                         ncol: int = 1,
-                         legend_loc: Optional[str] = 'upper center',
-                         legend_labels: Optional[List[str]] = None,
-                         legend_line_type: LegendLineType = LegendLineType.NONE,
-                         var_format: str = '{:.0%}',
-                         fontsize: int = 10,
-                         linewidth: float = 1.5,
-                         x_date_freq: str = 'A',
-                         x_rotation: int = 90,
-                         is_reversed: bool = False,
-                         date_format: str = '%b-%y',
-                         bbox_to_anchor: Optional[Tuple[float, float]] = None,
-                         xlabel: str = None,
-                         ylabel: str = None,
-                         ax: plt.Subplot = None,
-                         **kwargs
-                         ) -> plt.Figure:
+def plot_stack(df: pd.DataFrame,
+               is_use_bar_plot: bool = False,
+               is_yaxis_limit_01: bool = False,
+               is_add_mean_levels: bool = False,
+               is_add_cum_levels: bool = False,
+               is_add_total_line: bool = False,
+               colors: List[str] = None,
+               step: Optional[str] = None,  # 'mid
+               title: Optional[str] = None,
+               baseline: str = 'zero',  # "zero", "sym", "wiggle", "weighted_wiggle"
+               ncol: int = 1,
+               legend_loc: Optional[str] = 'upper center',
+               legend_labels: Optional[List[str]] = None,
+               legend_stats: LegendStats = LegendStats.NONE,
+               var_format: str = '{:.0%}',
+               fontsize: int = 10,
+               linewidth: float = 1.5,
+               x_date_freq: str = 'A',
+               x_rotation: int = 90,
+               is_reversed: bool = False,
+               date_format: str = '%b-%y',
+               bbox_to_anchor: Optional[Tuple[float, float]] = None,
+               xlabel: str = None,
+               ylabel: str = None,
+               ax: plt.Subplot = None,
+               **kwargs
+               ) -> plt.Figure:
 
     if ax is None:
         fig, ax = plt.subplots()
@@ -117,9 +117,9 @@ def stackplot_timeseries(df: pd.DataFrame,
         legend_title = None
         if legend_labels is None:
             legend_labels = put.get_legend_lines(data=re_indexed_data,
-                                                 legend_line_type=legend_line_type,
+                                                 legend_stats=legend_stats,
                                                  var_format=var_format)
-            if legend_line_type in [put.LegendLineType.LAST, put.LegendLineType.FIRST_LAST_NON_ZERO]:
+            if legend_stats in [put.LegendStats.LAST, put.LegendStats.FIRST_LAST_NON_ZERO]:
                 legend_title = f"Total: last={var_format.format(re_indexed_data.sum(axis=1).iloc[-1])}"
 
         put.set_legend(ax=ax,

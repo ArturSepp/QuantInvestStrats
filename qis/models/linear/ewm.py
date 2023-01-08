@@ -335,7 +335,7 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     """
     ewm for pandas or series
     data dimension = t*n
-    use generic data of pandas and np and call ewm_np with numa
+    use gen data of pandas and np and call ewm_np with numa
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 
@@ -542,7 +542,7 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                           init_type=init_type,
                                           is_nan_deflating=is_nan_deflating)
 
-    # 2  take generic arrays and convert to ndarray to use with numbas
+    # 2  take gen arrays and convert to ndarray to use with numbas
     if isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.DataFrame):
         # should be same dimensions
         x = npo.to_finite_np(data=x_data, fill_value=np.nan)
@@ -652,7 +652,7 @@ def compute_ewm_beta_resid(x_data: pd.DataFrame,
                                           init_type=init_type,
                                           is_nan_deflating=is_nan_deflating)
 
-    # 2  take generic arrays and convert to ndarray to use with numbdas
+    # 2  take gen arrays and convert to ndarray to use with numbdas
     if isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.DataFrame):
         # should be same dimensions
         x = npo.to_finite_np(data=x_data, fill_value=np.nan)

@@ -10,7 +10,7 @@ from enum import Enum
 
 # qis
 import qis.utils.df_cut as dfc
-import qis.utils.df_to_str as dfs
+import qis.utils.df_str as dfs
 import qis.plots.table as ptb
 
 

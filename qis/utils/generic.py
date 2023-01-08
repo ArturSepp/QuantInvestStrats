@@ -1,19 +1,21 @@
-"""
-column var is a enumeration to create meta and aggregate data
-"""
+
+
+
 # built in
-import numpy as np
-import pandas as pd
+
+# qis
+
+
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple, Optional, Callable, Dict, List
 
-# qis
-import qis.utils.df_agg as dfa
-import qis.utils.df_groups as dfg
-import qis.utils.df_to_str as dff
-import qis.utils.struct_ops as sop
+import numpy as np
+import pandas as pd
 
+from qis import file_utils as fu
+from qis.utils import df_groups as dfg, df_agg as dfa, struct_ops as sop, df_to_str as dff
 
 DATE_FORMAT = '%d%b%y' # short y for meta
 
@@ -219,3 +221,111 @@ def column_datas_to_df(column_datas: Dict[str, ColumnData],
                 ds=agg_table_data[column_data.column.to_str()],
                 var_format=column_data.column.to_format(digits_to_show=2))
     return agg_table_data
+
+
+@dataclass
+class DfOutDict:
+    df_out_dict: Dict[str, pd.DataFrame] = None
+    last_data: Optional[pd.DataFrame] = None
+
+    def __post_init__(self):
+        self.df_out_dict = {}
+
+    def __getitem__(self, key: str) -> pd.DataFrame:
+        # for df_out_dict[key]
+        return self.df_out_dict[key]
+
+    def append(self, df: pd.DataFrame, name: str) -> None:
+        if name not in self.df_out_dict.keys():
+            self.df_out_dict[name] = df
+        else:
+            raise ValueError(f"{name} exist in {self.df_out_dict.keys()}")
+
+    def set_last_df(self, data: pd.DataFrame) -> None:
+        # way to first make a placement and then append it
+        self.last_data = data
+
+    def append_last_df(self, name: str) -> None:
+        # way to first make a placement and then append it
+        if self.last_data is None:
+            raise ValueError(f"self.last_data is None")
+        self.append(df=self.last_data, name=name)
+        self.last_data = None
+
+    def print(self):
+        for key, df in self.df_out_dict.items():
+            print(f"{key}")
+            print(df)
+
+    def save(self, file_name: str) -> None:
+        if len(self.df_out_dict.keys()) > 0:
+            file_path = fu.save_df_to_excel(data=self.df_out_dict, file_name=file_name)
+            print(f"saved output data to excel:\n {file_path}")
+
+
+class EnumMap(Enum):
+    """
+    abstract enum with a map function
+    """
+    @classmethod
+    def map_to_value(cls, name):
+        """
+        given name return value
+        """
+        for k, v in cls.__members__.items():
+            if k == name:
+                return v
+        raise ValueError(f"nit in enum {name}")
+
+
+class DotDict(dict):
+    """
+    dot.notation access to dictionary attributes
+    """
+    def __getattr__(self, attr):
+        return self.get(attr)
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+    def __getstate__(self):
+        return self
+
+    def __setstate__(self, state):
+        self.update(state)
+        self.__dict__ = self
+
+    # def __setattr__(self, name, value):
+    #    self._data[name] = value
+
+
+class UnitTests(Enum):
+    DOT_DICT = 1
+
+
+def run_unit_test(unit_test: UnitTests):
+
+    if unit_test == UnitTests.DOT_DICT:
+        this = DotDict({'me': 3, 'you': 10})
+        print(this)
+        print(this.me)
+        print(this.you)
+
+        for k, v in this.items():
+            print(f"{k}: {v}")
+
+        this['me1'] = 6
+        this.me2 = 12
+        for k, v in this.items():
+            print(f"{k}: {v}")
+
+
+if __name__ == '__main__':
+
+    unit_test = UnitTests.DOT_DICT
+
+    is_run_all_tests = False
+    if is_run_all_tests:
+        for unit_test in UnitTests:
+            run_unit_test(unit_test=unit_test)
+    else:
+        run_unit_test(unit_test=unit_test)

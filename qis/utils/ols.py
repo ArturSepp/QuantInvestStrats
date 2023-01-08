@@ -41,15 +41,6 @@ def estimate_ols_alpha_beta(x: np.ndarray,
     return alpha, beta, r2
 
 
-def estimate_price_ols_alpha_beta(price_x: np.ndarray,
-                                  price_y: np.ndarray,
-                                  fit_intercept: bool = True
-                                  ) -> Tuple[float, float, float]:
-    x = price_x[1:] / price_x[:-1] - 1.0
-    y = price_y[1:] / price_y[:-1] - 1.0
-    return estimate_ols_alpha_beta(x=x, y=y, fit_intercept=fit_intercept)
-
-
 def estimate_alpha_beta_paired_dfs(x: pd.DataFrame,
                                    y: pd.DataFrame,
                                    fit_intercept: bool = True
@@ -109,12 +100,12 @@ def reg_model_params_to_str(reg_model: RegModel,
                             **kwargs
                             ) -> str:
     try:
-        r2 = f', R\N{SUPERSCRIPT TWO}=' + '{0:.0%}'.format(reg_model.rsquared)
+        r2 = f", R\N{SUPERSCRIPT TWO}={reg_model.rsquared:.0%}"
     except:
-        r2 = f', R\N{SUPERSCRIPT TWO}=0.0%'
+        r2 = f", R\N{SUPERSCRIPT TWO}=0.0%"
 
     if is_r2_only:
-        text_str = f' R\N{SUPERSCRIPT TWO}=' + '{0:.0%}'.format(reg_model.rsquared)
+        text_str = f" R\N{SUPERSCRIPT TWO}={reg_model.rsquared:.0%}"
     else:
         if fit_intercept:
             if alpha_an_factor is not None:

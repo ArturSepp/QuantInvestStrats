@@ -8,8 +8,8 @@ from typing import Union, List, Dict, Callable
 from enum import Enum
 
 # qis
-from qis.utils import struct_ops as sop
-from qis.utils.df_agg import nansum, nanmean
+import qis.utils.struct_ops as sop
+import qis.utils.df_agg as dfa
 
 
 def get_group_dict(group_data: pd.Series,
@@ -88,7 +88,7 @@ def split_df_by_groups(df: pd.DataFrame,
 
 def agg_df_by_groups_ax1(df: pd.DataFrame,
                          group_data: pd.Series,
-                         agg_func: Callable[[pd.DataFrame], pd.Series] = nansum,
+                         agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.nansum,
                          total_column: Union[str, None] = None,
                          group_order: List[str] = None
                          ) -> pd.DataFrame:
@@ -114,7 +114,7 @@ def agg_df_by_groups_ax1(df: pd.DataFrame,
 def agg_df_by_groups(df: pd.DataFrame,
                      group_data: pd.Series,
                      group: str = None,
-                     agg_func: Callable[[pd.DataFrame], pd.Series] = nansum,
+                     agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.nansum,
                      total_column: Union[str, None] = None,
                      is_total_first: bool = True,
                      group_order: List[str] = None
@@ -158,7 +158,7 @@ def agg_df_by_groups(df: pd.DataFrame,
 def agg_df_by_group_with_avg(df: pd.DataFrame,
                              group_data: pd.Series,
                              group_order: List[str] = None,
-                             agg_func: Callable = nanmean,
+                             agg_func: Callable = dfa.nanmean,
                              agg_func_id: str = 'mean',
                              total_column: str = 'Universe mean'
                              ) -> Dict[str, pd.DataFrame]:
@@ -188,7 +188,7 @@ def agg_df_by_group_with_avg(df: pd.DataFrame,
 
 def fill_df_with_group_avg(df: pd.DataFrame,
                            group_data: pd.Series,
-                           agg_func: Callable[[pd.DataFrame], pd.Series] = nanmean,
+                           agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.nanmean,
                            group_order: List[str] = None
                            ) -> pd.DataFrame:
     """

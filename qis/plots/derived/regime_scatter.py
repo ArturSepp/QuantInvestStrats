@@ -10,8 +10,8 @@ from matplotlib.ticker import FuncFormatter
 from typing import Optional
 
 # qis
-import qis.perfstats.cond_regression as cre
 import qis.plots.utils as put
+import qis.perfstats.cond_regression as cre
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs, BenchmarkReturnsQuantilesRegime
 
 
@@ -113,7 +113,7 @@ def plot_scatter_regression(prices: pd.DataFrame,
     put.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, **kwargs)
 
     if title is not None:
-        ax.set_title(label=title, **kwargs)
+        put.set_title(ax=ax, title=title, **kwargs)
 
     put.set_spines(ax=ax, **kwargs)
 

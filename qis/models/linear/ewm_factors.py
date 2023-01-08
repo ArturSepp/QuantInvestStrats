@@ -10,9 +10,9 @@ from enum import Enum
 
 # qis
 import qis.utils.df_ops as dfo
+import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
 from qis.models.linear.ewm import MeanAdjType, InitType
-import qis.plots.time_series as pts
 
 
 class LinearModel:

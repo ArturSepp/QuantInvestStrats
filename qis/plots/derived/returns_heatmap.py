@@ -10,12 +10,13 @@ from typing import Union, List, Optional, Tuple, Dict
 from enum import Enum
 
 # qis
-import qis.perfstats.returns as ret
 import qis.utils.struct_ops as sop
+import qis.utils.dates as da
+import qis.perfstats.returns as ret
+import qis.plots.utils
 import qis.plots.utils as put
 import qis.plots.heatmap as phe
 import qis.plots.table as ptb
-import qis.utils.dates as da
 from qis.plots.heatmap import plot_heatmap
 
 MONTH_MAP = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
@@ -155,7 +156,7 @@ def plot_returns_heatmap(prices: Union[pd.Series, pd.DataFrame],
 
     if ax is None:
         if figsize is not None:
-            height = ptb.calc_table_height(num_rows=len(periodic_returns_table.index), scale=0.225)
+            height = qis.plots.utils.calc_table_height(num_rows=len(periodic_returns_table.index), scale=0.225)
             fig, ax = plt.subplots(1, 1, figsize=(figsize[0], height))
         else:
             fig, ax = plt.subplots()

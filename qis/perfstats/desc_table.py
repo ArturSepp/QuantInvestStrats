@@ -9,12 +9,8 @@ from scipy.stats import skew, kurtosis, percentileofscore, normaltest
 from enum import Enum
 
 # qis
-import qis.utils.dates as da
+import qis.utils as qu
 from qis.perfstats.config import PerfStat
-
-
-class TableColumns(Enum):
-    pass
 
 
 class DescTableType(Enum):
@@ -55,7 +51,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     descriptive_table[PerfStat.AVG.to_str()] = [var_format.format(x) for x in mean]
 
     if annualize_vol:
-        an_factor = da.infer_an_from_data(data=df)
+        an_factor = qu.infer_an_from_data(data=df)
         vol = std * np.sqrt(an_factor)
         descriptive_table[PerfStat.STD_AN.to_str()] = [var_format.format(x) for x in vol]
     else:
@@ -88,8 +84,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     elif desc_table_type == desc_table_type.WITH_KURTOSIS:
         descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in skew(data_np, axis=0, nan_policy=nan_policy)]
         descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in kurtosis(data_np, axis=0, nan_policy=nan_policy)]
-        #k2, ps = normaltest(a=data_np, axis=0, nan_policy='omit')
-        #descriptive_table[PerfStat.NORMTEST.to_str(short=True, short_n=True)] = ['{:.2f}'.format(x) for x in ps]
+        k2, ps = normaltest(a=data_np, axis=0, nan_policy='omit')
+        descriptive_table[PerfStat.NORMTEST.to_str(short=True, short_n=True)] = ['{:.2f}'.format(x) for x in ps]
 
     elif desc_table_type == desc_table_type.WITH_SCORE:
         column_data = [df[column].dropna() for column in df.columns]
@@ -147,4 +143,3 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-

@@ -1,10 +1,11 @@
+# built in
 import numpy as np
 import pandas as pd
-from typing import Union, List
-
+from typing import Union
 from numba import njit
 from statsmodels.tsa.stattools import pacf, acf
 
+# qis
 from qis.models.linear.ewm import MeanAdjType, compute_rolling_mean_adj
 
 

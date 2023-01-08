@@ -22,11 +22,10 @@ from typing import List, Union, Tuple, Optional, Type, Dict
 
 # qis
 import qis.utils.df_ops as dfo
-import qis.utils.df_to_str as dfs
+import qis.utils.df_str as dfs
 import qis.utils.df_freq as dff
 import qis.utils.struct_ops as sop
-
-TITLE_COLOR = mcolors['navy']
+from qis.plots.table import ROW_HIGHT, COLUMN_WIDTH, FIRST_COLUMN_WIDTH
 
 
 class FixedColors(Enum):
@@ -34,8 +33,8 @@ class FixedColors(Enum):
     DARKGREEN = mcolors['darkgreen']
     DARKRED = mcolors['darkred']
     CHOCOLATE = mcolors['chocolate']
-    DIMGRAY = mcolors['dimgray']
     DODGERBLUE = mcolors['slateblue']
+    DIMGRAY = mcolors['dimgray']
     SANDYBROWN = mcolors['deepskyblue']
     SADDLEBROWN = mcolors['saddlebrown']
     PURPLE = mcolors['purple']
@@ -248,27 +247,6 @@ def validate_returns_plot(prices: Union[pd.DataFrame, pd.Series],
         is_good = True
 
     return is_good, fig
-
-
-def get_empty_fig(text: str = 'empty figure',
-                  fontsize: int = 8,
-                  ax: plt.Figure = None,
-                  **kwargs
-                  ) -> Optional[plt.Figure]:
-    if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(8, 4))
-    else:
-        fig = None
-
-    ax.text(0.1, 0.5, text,
-            transform=ax.transAxes,
-            style='italic',
-            fontsize=fontsize,
-            bbox={'facecolor': 'red', 'alpha': 0.5, 'pad': 10})
-    ax.axes.get_xaxis().set_visible(False)
-    ax.axes.get_yaxis().set_visible(False)
-
-    return fig
 
 
 def set_spines(ax: plt.Subplot,
@@ -638,7 +616,7 @@ def set_legend(ax: plt.Subplot,
                legend_title: Optional[str] = None,
                fontsize: int = 12,
                ncol: int = 1,
-               legend_alpha: float = 0.0,
+               framealpha: float = 0.0,
                handlelength: float = 1.0,
                facecolor: str = None,
                numpoints: int = None,
@@ -684,7 +662,7 @@ def set_legend(ax: plt.Subplot,
         labelspacing=0.2,  # The vertical space between the legend entries.
         prop={'size': fontsize},
         bbox_to_anchor=bbox_to_anchor,
-        framealpha=legend_alpha,
+        framealpha=framealpha,
         handlelength=handlelength,
         title=legend_title,
         ncol=ncol,
@@ -743,7 +721,7 @@ def set_linestyles(ax: plt.Subplot,
         leg_lines[idx].set_linestyle(linestyle)
 
 
-class LegendLineType(Enum):
+class LegendStats(Enum):
     NONE = 1
     LAST = 2
     AVG = 3
@@ -753,22 +731,23 @@ class LegendLineType(Enum):
     AVG_STD_LAST = 7
     AVG_NONNAN_LAST = 8
     MEDIAN_NONNAN_LAST = 9
-    AVG_LAST_SCORE = 10
-    AVG_STD_LAST_SCORE = 11
-    FIRST_LAST = 12
-    FIRST_LAST_NON_ZERO = 13
-    FIRST_AVG_LAST = 14
-    FIRST_MEDIAN_LAST = 15
-    FIRST_AVG_LAST_SHORT = 16
-    AVG_STD_MISSING_ZERO = 17
-    MISSING_AVG_LAST = 18
+    AVG_MEDIAN_STD_NONNAN_LAST = 10
+    AVG_LAST_SCORE = 11
+    AVG_STD_LAST_SCORE = 12
+    FIRST_LAST = 13
+    FIRST_LAST_NON_ZERO = 14
+    FIRST_AVG_LAST = 15
+    FIRST_MEDIAN_LAST = 16
+    FIRST_AVG_LAST_SHORT = 17
+    AVG_STD_MISSING_ZERO = 18
+    MISSING_AVG_LAST = 19
     TOTAL = 20
     MEDIAN = 21
     MEDIAN_MAD = 22
 
 
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
-                     legend_line_type: LegendLineType = LegendLineType.NONE,
+                     legend_stats: LegendStats = LegendStats.NONE,
                      var_format: str = '{:.0f}',
                      nan_display: float = np.nan  # or zero
                      ) -> List[str]:
@@ -782,15 +761,15 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
         print(data)
         raise ValueError(f"dataframe with dublicated columns not supported:\n{print(data.columns)}")
 
-    if legend_line_type == LegendLineType.NONE:
+    if legend_stats == LegendStats.NONE:
         legend_lines = data.columns.to_list()
 
-    elif legend_line_type == LegendLineType.LAST:
+    elif legend_stats == LegendStats.LAST:
         legend_lines = []
         for column in data.columns:
             legend_lines.append(f"{column}: last={var_format.format(data[column].iloc[-1])}")
 
-    elif legend_line_type == LegendLineType.AVG:
+    elif legend_stats == LegendStats.AVG:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -800,7 +779,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 avg = np.nanmean(data_column)
             legend_lines.append(f"{column}: avg={var_format.format(avg)}")
 
-    elif legend_line_type == LegendLineType.MEDIAN:  # specific for fx amm
+    elif legend_stats == LegendStats.MEDIAN:  # specific for fx amm
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -810,7 +789,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 median = np.nanmedian(data_column)
             legend_lines.append(f"{column}: {var_format.format(median)}")
 
-    elif legend_line_type == LegendLineType.MEDIAN_MAD:
+    elif legend_stats == LegendStats.MEDIAN_MAD:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -822,7 +801,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 mad = stats.median_abs_deviation(data_column.dropna().to_numpy(), scale='normal')
             legend_lines.append(f"{column}: median={var_format.format(median)}, mad={var_format.format(mad)}")
 
-    elif legend_line_type == LegendLineType.AVG_LAST:
+    elif legend_stats == LegendStats.AVG_LAST:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -834,7 +813,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 last = data_column.iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, last={var_format.format(last)}")
 
-    elif legend_line_type == LegendLineType.AVG_STD:
+    elif legend_stats == LegendStats.AVG_STD:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -846,7 +825,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 std = np.nanstd(data_column, ddof=1)
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, std={var_format.format(std)}")
 
-    elif legend_line_type == LegendLineType.AVG_STD_SKEW_KURT:
+    elif legend_stats == LegendStats.AVG_STD_SKEW_KURT:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -862,7 +841,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, std={var_format.format(std)}, "
                                 f"skew={'{:.2f}'.format(skw)}, kurtosis={'{:.2f}'.format(krt)}")
 
-    elif legend_line_type == LegendLineType.AVG_STD_LAST:
+    elif legend_stats == LegendStats.AVG_STD_LAST:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -878,7 +857,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                                 f"std={var_format.format(std)}, "
                                 f"last={var_format.format(last)}")
 
-    elif legend_line_type == LegendLineType.AVG_NONNAN_LAST:
+    elif legend_stats == LegendStats.AVG_NONNAN_LAST:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -890,7 +869,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 last = data_column.dropna().iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, last={var_format.format(last)}")
 
-    elif legend_line_type == LegendLineType.MEDIAN_NONNAN_LAST:
+    elif legend_stats == LegendStats.MEDIAN_NONNAN_LAST:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -902,7 +881,23 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 last = data_column.dropna().iloc[-1]
             legend_lines.append(f"{column}: median={var_format.format(med)}, last={var_format.format(last)}")
 
-    elif legend_line_type == LegendLineType.AVG_LAST_SCORE:
+    elif legend_stats == LegendStats.AVG_MEDIAN_STD_NONNAN_LAST:
+        legend_lines = []
+        for column in data.columns:
+            data_column = data[column]
+            if np.all(np.isnan(data_column)):
+                avg = nan_display
+                med = nan_display
+                std = nan_display
+                last = nan_display
+            else:
+                avg = np.nanmean(data_column)
+                med = np.nanmedian(data_column)
+                std = np.nanstd(data_column)
+                last = data_column.dropna().iloc[-1]
+            legend_lines.append(f"{column}: avg={var_format.format(avg)}, median={var_format.format(med)}, std={var_format.format(std)}, last={var_format.format(last)}")
+
+    elif legend_stats == LegendStats.AVG_LAST_SCORE:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -920,7 +915,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                                 f" last={var_format.format(last)}, "
                                 f"last score={'{:.0%}'.format(score)}")
 
-    elif legend_line_type == LegendLineType.AVG_STD_LAST_SCORE:
+    elif legend_stats == LegendStats.AVG_STD_LAST_SCORE:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -941,7 +936,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                                 f" last={var_format.format(last)}, "
                                 f"last score={'{:.0%}'.format(score)}")
 
-    elif legend_line_type == LegendLineType.FIRST_LAST:
+    elif legend_stats == LegendStats.FIRST_LAST:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -954,7 +949,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 last = nonnan_data.iloc[-1]
             legend_lines.append(f"{column}: first={var_format.format(first)}, last={var_format.format(last)}")
 
-    elif legend_line_type == LegendLineType.FIRST_LAST_NON_ZERO:
+    elif legend_stats == LegendStats.FIRST_LAST_NON_ZERO:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -968,7 +963,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 last = nonnan_data.iloc[-1]
             legend_lines.append(f"{column}: first={var_format.format(first)}, last={var_format.format(last)}")
 
-    elif legend_line_type in [LegendLineType.FIRST_AVG_LAST, LegendLineType.FIRST_AVG_LAST_SHORT]:
+    elif legend_stats in [LegendStats.FIRST_AVG_LAST, LegendStats.FIRST_AVG_LAST_SHORT]:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -981,7 +976,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 first = nonnan_data.iloc[0]
                 avg = np.nanmean(nonnan_data)
                 last = nonnan_data.iloc[-1]
-            if legend_line_type == LegendLineType.FIRST_AVG_LAST_SHORT:
+            if legend_stats == LegendStats.FIRST_AVG_LAST_SHORT:
                 legend_lines.append(f"{column}: [{var_format.format(first)}, "
                                     f"{var_format.format(avg)}, "
                                     f"{var_format.format(last)}]")
@@ -990,7 +985,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                                     f"avg={var_format.format(avg)}, "
                                     f"last={var_format.format(last)}")
 
-    elif legend_line_type == LegendLineType.FIRST_MEDIAN_LAST:
+    elif legend_stats == LegendStats.FIRST_MEDIAN_LAST:
         legend_lines = []
         for column in data.columns:
             data_column = data[column]
@@ -1007,7 +1002,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                                 f"median={var_format.format(med)}, "
                                 f"last={var_format.format(last)}")
 
-    elif legend_line_type == LegendLineType.AVG_STD_MISSING_ZERO:
+    elif legend_stats == LegendStats.AVG_STD_MISSING_ZERO:
         legend_lines = []
         missing_ratio, zeros_ratio = dfo.missing_zero_ratios_after_first_non_nan(df=data)
         for idx, column in enumerate(data.columns):
@@ -1027,7 +1022,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                                 # f"missing%={'{:0.2%}'.format(missing)}, "
                                 f"missing%={'{:0.2%}'.format(zeros)}")
 
-    elif legend_line_type == LegendLineType.MISSING_AVG_LAST:
+    elif legend_stats == LegendStats.MISSING_AVG_LAST:
         legend_lines = []
         missing_ratio, zeros_ratio = dfo.missing_zero_ratios_after_first_non_nan(df=data)
         for idx, column in enumerate(data.columns):
@@ -1046,7 +1041,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                                 f"avg={var_format.format(avg)}, "
                                 f"last={var_format.format(last)}")
 
-    elif legend_line_type == LegendLineType.TOTAL:
+    elif legend_stats == LegendStats.TOTAL:
         legend_lines = []
         for column in data.columns:
             column_data = data[column]
@@ -1057,7 +1052,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             legend_lines.append(f"{column}: total={var_format.format(total)}")
 
     else:
-        raise TypeError(f"{legend_line_type} not implemented")
+        raise TypeError(f"{legend_stats} not implemented")
 
     return legend_lines
 
@@ -1243,55 +1238,10 @@ def rand_cmap(nlabels: int,
     return random_colormap
 
 
-def plot_mcolors() -> plt.Figure:
-
-    colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
-
-    # Sort colors by hue, saturation, value and name.
-    by_hsv = sorted((tuple(mcolors.rgb_to_hsv(mcolors.to_rgba(color)[:3])), name)
-                    for name, color in colors.items())
-    sorted_names = [name for hsv, name in by_hsv]
-
-    n = len(sorted_names)
-    ncols = 4
-    nrows = n // ncols
-
-    fig, ax = plt.subplots(figsize=(12, 10))
-
-    # Get height and width
-    X, Y = fig.get_dpi() * fig.get_size_inches()
-    h = Y / (nrows + 1)
-    w = X / ncols
-
-    for i, name in enumerate(sorted_names):
-        row = i % nrows
-        col = i // nrows
-        y = Y - (row * h) - h
-
-        xi_line = w * (col + 0.05)
-        xf_line = w * (col + 0.25)
-        xi_text = w * (col + 0.3)
-
-        ax.text(xi_text, y, name, fontsize=(h * 0.8),
-                horizontalalignment='left',
-                color=colors[name],
-                verticalalignment='center')
-
-        ax.hlines(y + h * 0.1, xi_line, xf_line,
-                  color=colors[name], linewidth=(h * 0.8))
-
-    ax.set_xlim(0, X)
-    ax.set_ylim(0, Y)
-    ax.set_axis_off()
-
-    fig.subplots_adjust(left=0, right=1,
-                        top=1, bottom=0,
-                        hspace=0, wspace=0)
-    return fig
-
-
-def plot_colors_enum(colors_enum: Type[Enum]) -> plt.Figure:
-
+def plot_colors_rgb(colors_enum: Type[Enum]) -> plt.Figure:
+    """
+    plot colors and their RGB numbers
+    """
     colors = [color for color in colors_enum]
     sorted_names = [color.name for color in colors]
     sorted_colors = [color.value for color in colors]
@@ -1415,15 +1365,64 @@ def add_scatter_points(ax: plt.Subplot,
         ax.scatter(x=x, y=y, marker='*', color=color, s=3, linewidth=3)
 
 
+def calc_table_height(num_rows: int,
+                      row_height: float = ROW_HIGHT,
+                      first_row_height: float = None,
+                      scale: float = 0.225
+                      ) -> float:
+    """
+    core function for sizing of table and heatmaplot
+    """
+    if first_row_height is None:
+        first_row_height = row_height
+    height = (scale*num_rows*row_height + scale*first_row_height)
+    return height
+
+
+def calc_table_width(num_col: int,
+                     column_width: float = COLUMN_WIDTH,
+                     first_column_width: Optional[float] = FIRST_COLUMN_WIDTH,
+                     scale: float = 0.225
+                     ) -> float:
+    """
+    core function for sizing of table and heatmaplot
+    """
+    if first_column_width is None:
+        first_column_width = first_column_width
+    width = (scale*num_col*column_width + scale*first_column_width)
+    return width
+
+
+def calc_df_table_size(df: pd.DataFrame,
+                       min_rows: Optional[int] = None,
+                       min_cols: Optional[int] = None,
+                       scale_rows: float = 0.225,
+                       scale_cols: float = 0.225
+                       ) -> Tuple[float, float, int, int]:
+    """
+    calc optimal table size
+    """
+    if min_rows is not None:
+        num_rows = np.minimum(len(df.index), min_rows)
+    else:
+        num_rows = len(df.index)
+    if min_cols is not None:
+        num_cols = np.minimum(len(df.columns), min_cols)
+    else:
+        num_cols = len(df.columns)
+    width = calc_table_width(num_col=num_cols, scale=scale_cols)
+    height = calc_table_height(num_rows=num_rows, scale=scale_rows)
+    return width, height, num_cols, num_rows
+
+
 class UnitTests(Enum):
     DUMMY_LINE = 1
     LEGEND_LINES = 2
-    MCOLORS = 3
-    FIXED_COLORS = 4
-    CMAP_COLORS = 5
-    SNS_COLORS = 6
-    HEATMAP_COLORS = 7
-    GET_COLORS = 8
+    FIXED_COLORS = 3
+    CMAP_COLORS = 4
+    SNS_COLORS = 5
+    HEATMAP_COLORS = 6
+    GET_COLORS = 7
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -1435,15 +1434,12 @@ def run_unit_test(unit_test: UnitTests):
         from qis.data.yf_data import load_etf_data
         prices = load_etf_data().dropna()
 
-        for legend_line_type in LegendLineType:
-            legend_lines = get_legend_lines(data=prices, legend_line_type=legend_line_type)
+        for legend_stats in LegendStats:
+            legend_lines = get_legend_lines(data=prices, legend_stats=legend_stats)
             print(legend_lines)
 
-    elif unit_test == UnitTests.MCOLORS:
-        plot_mcolors()
-
     elif unit_test == UnitTests.FIXED_COLORS:
-        plot_colors_enum(colors_enum=FixedColors)
+        plot_colors_rgb(colors_enum=FixedColors)
 
     elif unit_test == UnitTests.CMAP_COLORS:
         cmap_colors = get_cmap_colors(n=100)
@@ -1473,7 +1469,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.HEATMAP_COLORS
+    unit_test = UnitTests.FIXED_COLORS
 
     is_run_all_tests = False
     if is_run_all_tests:

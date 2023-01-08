@@ -12,12 +12,13 @@ import qis.utils.df_ops as dfo
 import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_table as pt
-import qis.perfstats.drawdowns as dra
+from qis.perfstats.config import PerfStat, PerfParams
+from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
+
+import qis.plots.derived.drawdowns as dra
 import qis.plots.time_series as pts
 import qis.plots.utils as put
-
-from qis.perfstats.config import PerfStat, PerfParams
-from qis.perfstats.regime_classifier import add_bnb_regime_shadows, BenchmarkReturnsQuantileRegimeSpecs
+from qis.plots.derived.regime_data import add_bnb_regime_shadows
 
 
 class PerformanceLabel(Enum):
@@ -344,7 +345,7 @@ def plot_rolling_sharpe(prices: pd.DataFrame,
                         time_period: da.TimePeriod = None,
                         roll_periods: int = 260,
                         freq: str = None,
-                        legend_line_type: pts.LegendLineType = pts.LegendLineType.AVG_LAST,
+                        legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                         var_format: str = '{:.2f}',
                         title: Optional[str] = None,
                         regime_benchmark_str: str = None,
@@ -368,7 +369,7 @@ def plot_rolling_sharpe(prices: pd.DataFrame,
         df = time_period.locate(df)
 
     fig = pts.plot_time_series(df=df,
-                               legend_line_type=legend_line_type,
+                               legend_stats=legend_stats,
                                var_format=var_format,
                                title=title,
                                ax=ax,

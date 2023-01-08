@@ -4,10 +4,11 @@ import seaborn as sns
 from enum import Enum
 
 # qis
-import qis.utils.dates as da
-from qis.perfstats.config import PerfParams
-import qis.perfstats.returns as ret
-import qis.models.stats.gaussian_mixture as gm
+import qis.utils as qu
+import qis.perfstats as qs
+import qis.models as qm
+
+# data
 from qis.data.yf_data import fetch_prices
 
 
@@ -17,13 +18,13 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    perf_params = PerfParams(freq='W-WED')
+    perf_params = qs.PerfParams(freq='W-WED')
     kwargs = dict(fontsize=12, digits_to_show=1, sharpe_digits=2,
                   alpha_format='{0:+0.0%}',
                   beta_format='{:0.1f}',
                   alpha_an_factor=12)
 
-    time_periods = [da.TimePeriod('31Aug2002', '31Dec2019'), da.TimePeriod('31Dec2019', '16Dec2022')]
+    time_periods = [qu.TimePeriod('31Aug2002', '31Dec2019'), qu.TimePeriod('31Dec2019', '16Dec2022')]
 
     if unit_test == UnitTests.PLOT_MIXURE:
 
@@ -35,9 +36,9 @@ def run_unit_test(unit_test: UnitTests):
 
         for idx, time_period in enumerate(time_periods):
             prices_ = time_period.locate(prices)
-            rets = ret.to_returns(prices=prices_, is_log_returns=True, drop_first=True, freq=perf_params.freq)
-            params = gm.fit_gaussian_mixture(x=rets.to_numpy(), n_components=n_components, idx=1)
-            gm.plot_mixure2(x=rets.to_numpy(),
+            rets = qs.to_returns(prices=prices_, is_log_returns=True, drop_first=True, freq=perf_params.freq)
+            params = qm.fit_gaussian_mixture(x=rets.to_numpy(), n_components=n_components, idx=1)
+            qm.plot_mixure2(x=rets.to_numpy(),
                             n_components=n_components,
                             columns=prices.columns,
                             title=f"({idx+1}) Returns and ellipsoids of Gaussian clusters for period {time_period.to_str()}",

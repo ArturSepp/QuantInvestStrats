@@ -8,28 +8,33 @@ from typing import Optional
 # qis
 import qis.utils.dates as da
 import qis.utils.np_ops as npn
+
 import qis.perfstats.returns as ret
+from qis.perfstats.config import PerfParams, ReturnTypes
+from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
+
 import qis.plots.time_series as pts
 import qis.plots.utils as put
 import qis.plots.heatmap as phe
+from qis.plots.derived.regime_data import add_bnb_regime_shadows
+
 import qis.models.linear.corr_cov_matrix as ccm
 import qis.models.linear.ewm as ewm
 from qis.models.linear.corr_cov_matrix import CorrMatrixOutput
 from qis.models.linear.ewm import InitType
-from qis.perfstats.config import PerfParams
-
-from qis.perfstats.regime_classifier import add_bnb_regime_shadows, BenchmarkReturnsQuantileRegimeSpecs
 
 
 def plot_corr_table(prices: pd.DataFrame,
                     var_format: str = '{:.0%}',
                     freq: Optional[str] = None,
                     cmap: str = 'PiYG',
+                    return_type: ReturnTypes = ReturnTypes.RELATIVE,
+                    is_log_returns: bool = True,
                     ax: plt.Subplot = None,
                     **kwargs
-                    ) -> plt.Figure:
+                    ) -> Optional[plt.Figure]:
 
-    returns = ret.to_returns(prices=prices, is_log_returns=True, freq=freq)
+    returns = ret.to_returns(prices=prices, is_log_returns=is_log_returns, freq=freq, return_type=return_type)
     corr = ccm.compute_masked_covar_corr(returns=returns, is_covar=False)
     fig = phe.plot_heatmap(df=corr,
                            var_format=var_format,
@@ -78,10 +83,10 @@ def plot_corr_matrix_time_series(prices: pd.DataFrame,
                                  ewm_lambda: float = 0.97,
                                  init_type: InitType = InitType.X0,
                                  var_format: str = '{:.0%}',
-                                 legend_line_type: pts.LegendLineType = pts.LegendLineType.AVG_LAST,
+                                 legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                                  trend_line: put.TrendLine = put.TrendLine.AVERAGE,
                                  regime_benchmark_str: str = None,
-                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
+                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
                                  perf_params: PerfParams = None,
                                  ax: plt.Subplot = None,
                                  **kwargs
@@ -99,7 +104,7 @@ def plot_corr_matrix_time_series(prices: pd.DataFrame,
         corr_pandas = time_period.locate(corr_pandas)
 
     pts.plot_time_series(df=corr_pandas,
-                         legend_line_type=legend_line_type,
+                         legend_stats=legend_stats,
                          trend_line=trend_line,
                          var_format=var_format,
                          ax=ax,

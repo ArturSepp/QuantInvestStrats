@@ -10,7 +10,6 @@ from enum import Enum
 
 # qis
 import qis.plots.utils as put
-from qis.plots.utils import LegendLineType
 
 
 def plot_pie(df: [pd.Series, pd.DataFrame],

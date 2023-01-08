@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 
 # qis
 import qis.utils.dates as da
+from qis.perfstats.config import PerfParams
 import qis.plots.time_series as pts
 import qis.plots.derived.prices as ppd
-from qis.perfstats.config import PerfParams
 
 
 PERF_PARAMS = PerfParams(freq_reg='B', freq_vol='B', freq_drawdown='B')
@@ -17,7 +17,7 @@ PERF_PARAMS = PerfParams(freq_reg='B', freq_vol='B', freq_drawdown='B')
 
 def plot_data_timeseries(data: Union[pd.DataFrame, pd.Series],
                          is_price_data: bool = False,
-                         legend_line_type: pts.LegendLineType = pts.LegendLineType.FIRST_AVG_LAST,
+                         legend_stats: pts.LegendStats = pts.LegendStats.FIRST_AVG_LAST,
                          var_format: Optional[str] = None,
                          time_period: da.TimePeriod = None,
                          title: str = '',
@@ -57,7 +57,7 @@ def plot_data_timeseries(data: Union[pd.DataFrame, pd.Series],
     else:
         pts.plot_time_series(df=data,
                              title=title,
-                             legend_line_type=legend_line_type,
+                             legend_stats=legend_stats,
                              var_format=var_format,
                              ax=ax,
                              **kwargs)

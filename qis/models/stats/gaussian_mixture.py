@@ -1,4 +1,4 @@
-
+# built in
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -11,6 +11,7 @@ from enum import Enum
 from matplotlib.patches import Ellipse
 from typing import List, Tuple, Union, Dict
 
+# qis
 import qis.plots.utils as put
 import qis.utils.np_ops as nop
 

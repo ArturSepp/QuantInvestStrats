@@ -13,21 +13,21 @@ from enum import Enum
 import qis.plots.utils as put
 
 
-def contour(x: np.ndarray,
-            y: np.ndarray,
-            z: np.ndarray,
-            xvar_format: str = '{:.0%}',
-            yvar_format: str = '{:.0%}',
-            zvar_format: str = '{:.1f}',
-            fontsize: int = 10,
-            num_ranges: int = 7,
-            cmap: str = 'RdYlGn',
-            xlabel: str = 'x',
-            ylabel: str = 'y',
-            title: str = None,
-            fig: plt.Figure = None,
-            **kwargs
-            ) -> Optional[plt.Figure]:
+def plot_contour(x: np.ndarray,
+                 y: np.ndarray,
+                 z: np.ndarray,
+                 xvar_format: str = '{:.0%}',
+                 yvar_format: str = '{:.0%}',
+                 zvar_format: str = '{:.1f}',
+                 fontsize: int = 10,
+                 num_ranges: int = 7,
+                 cmap: str = 'RdYlGn',
+                 xlabel: str = 'x',
+                 ylabel: str = 'y',
+                 title: str = None,
+                 fig: plt.Figure = None,
+                 **kwargs
+                 ) -> Optional[plt.Figure]:
 
     if fig is None:
         fig, ax = plt.subplots()
@@ -106,11 +106,11 @@ def run_unit_test(unit_test: UnitTests):
                 sharpes[n1, n2] = (2.0*vol_xy*vol_xy-0.25*vol_p*vol_p)/vol_p
 
         fig, ax = plt.subplots(1, 1, figsize=(10, 10), tight_layout=True)
-        contour(x=vol_ps,
-                y=vol_xys,
-                z=sharpes,
-                fig=fig,
-                **global_kwargs)
+        plot_contour(x=vol_ps,
+                     y=vol_xys,
+                     z=sharpes,
+                     fig=fig,
+                     **global_kwargs)
 
     plt.show()
 

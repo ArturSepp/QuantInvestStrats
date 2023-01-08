@@ -13,27 +13,27 @@ from enum import Enum
 # qis
 import qis.perfstats.returns as ret
 import qis.plots.utils as put
-from qis.utils.desc_table import compute_desc_table, DescTableType
+import qis.perfstats.desc_table as dsc
 
 
-def qqplot(df: Union[pd.DataFrame, pd.Series],
-           colors: List[str] = None,
-           markers: List[str] = None,
-           legend_loc: str = 'upper left',
-           var_format: str = '{:.2f}',
-           is_drop_na: bool = True,
-           fontsize: int = 10,
-           markersize: int = 2,
-           title: str = None,
-           xlabel: str = 'Theoretical quantiles',
-           ylabel: str = 'Empirical quantiles',
-           desc_table_type: DescTableType = DescTableType.SHORT,
-           legend_line_type: put.LegendLineType = put.LegendLineType.NONE,
-           x_limits: Tuple[Optional[float], Optional[float]] = None,
-           y_limits: Tuple[Optional[float], Optional[float]] = None,
-           ax: plt.Subplot = None,
-           **kwargs
-           ) -> plt.Figure:
+def plot_qq(df: Union[pd.DataFrame, pd.Series],
+            colors: List[str] = None,
+            markers: List[str] = None,
+            legend_loc: str = 'upper left',
+            var_format: str = '{:.2f}',
+            is_drop_na: bool = True,
+            fontsize: int = 10,
+            markersize: int = 2,
+            title: str = None,
+            xlabel: str = 'Theoretical quantiles',
+            ylabel: str = 'Empirical quantiles',
+            desc_table_type: dsc.DescTableType = dsc.DescTableType.SHORT,
+            legend_stats: put.LegendStats = put.LegendStats.NONE,
+            x_limits: Tuple[Optional[float], Optional[float]] = None,
+            y_limits: Tuple[Optional[float], Optional[float]] = None,
+            ax: plt.Subplot = None,
+            **kwargs
+            ) -> plt.Figure:
 
     if ax is None:
         fig, ax = plt.subplots()
@@ -61,8 +61,8 @@ def qqplot(df: Union[pd.DataFrame, pd.Series],
     if line is None:
         sm.qqline(ax, line='45', fmt='-', color='red')
 
-    if desc_table_type != DescTableType.NONE:
-        stats_table = compute_desc_table(df=df,
+    if desc_table_type != dsc.DescTableType.NONE:
+        stats_table = dsc.compute_desc_table(df=df,
                                          desc_table_type=desc_table_type,
                                          var_format=var_format)
         put.set_legend_with_stats_table(stats_table=stats_table,
@@ -73,7 +73,7 @@ def qqplot(df: Union[pd.DataFrame, pd.Series],
                                         **kwargs)
     else:
         legend_labels = put.get_legend_lines(data=df,
-                                             legend_line_type=legend_line_type,
+                                             legend_stats=legend_stats,
                                              var_format=var_format)
         put.set_legend(ax=ax,
                        labels=legend_labels,
@@ -97,16 +97,16 @@ def qqplot(df: Union[pd.DataFrame, pd.Series],
     return fig
 
 
-def qqplot_xy(x: pd.Series,
-              y: pd.Series,
-              colors: List[str] = None,
-              markers: List[str] = None,
-              labels: List[str] = None,
-              legend_loc: str = 'upper left',
-              is_drop_na: bool = True,
-              ax: plt.Subplot = None,
-              **kwargs
-              ) -> plt.Figure:
+def plot_xy_qq(x: pd.Series,
+               y: pd.Series,
+               colors: List[str] = None,
+               markers: List[str] = None,
+               labels: List[str] = None,
+               legend_loc: str = 'upper left',
+               is_drop_na: bool = True,
+               ax: plt.Subplot = None,
+               **kwargs
+               ) -> plt.Figure:
 
     if ax is None:
         fig, ax = plt.subplots()
@@ -157,17 +157,17 @@ def run_unit_test(unit_test: UnitTests):
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
         global_kwargs = dict(fontsize=8, linewidth=0.5, weight='normal', markersize=1)
 
-        qqplot(df=df,
-               ax=ax,
-               **global_kwargs)
+        plot_qq(df=df,
+                ax=ax,
+                **global_kwargs)
 
     elif unit_test == UnitTests.XY_PLOT:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
         global_kwargs = dict(fontsize=8, linewidth=0.5, weight='normal', markersize=1)
-        qqplot_xy(x=df.iloc[:, 1],
-                  y=df.iloc[:, 0],
-                  ax=ax,
-                  **global_kwargs)
+        plot_xy_qq(x=df.iloc[:, 1],
+                   y=df.iloc[:, 0],
+                   ax=ax,
+                   **global_kwargs)
 
     plt.show()
 

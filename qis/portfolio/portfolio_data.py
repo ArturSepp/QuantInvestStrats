@@ -13,10 +13,11 @@ from enum import Enum
 
 # qis
 import qis.file_utils as fu
+import qis.plots.derived.regime_data
 import qis.utils.dates as da
 import qis.utils.df_groups as dfg
 import qis.utils.struct_ops as sop
-from qis.utils.generic.enum_map import EnumMap
+from qis.utils import EnumMap
 from qis.perfstats.config import PerfParams, RegimeData
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_table as rpt
@@ -545,17 +546,17 @@ class PortfolioData:
         prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
 
         regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
-        fig = rcl.plot_regime_data(regime_classifier=regime_classifier,
-                                   prices=prices,
-                                   benchmark=str(benchmark_price.name),
-                                   is_conditional_sharpe=is_conditional_sharpe,
-                                   regime_data_to_plot=regime_data_to_plot,
-                                   var_format=var_format or '{:.2f}',
-                                   legend_loc=legend_loc,
-                                   perf_params=perf_params,
-                                   title=title,
-                                   ax=ax,
-                                   **kwargs)
+        fig = qis.plots.derived.regime_data.plot_regime_data(regime_classifier=regime_classifier,
+                                                             prices=prices,
+                                                             benchmark=str(benchmark_price.name),
+                                                             is_conditional_sharpe=is_conditional_sharpe,
+                                                             regime_data_to_plot=regime_data_to_plot,
+                                                             var_format=var_format or '{:.2f}',
+                                                             legend_loc=legend_loc,
+                                                             perf_params=perf_params,
+                                                             title=title,
+                                                             ax=ax,
+                                                             **kwargs)
         return fig
 
     def plot_vol_regimes(self,
@@ -577,12 +578,12 @@ class PortfolioData:
         prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
 
         regime_classifier = rcl.BenchmarkVolsQuantilesRegime(regime_params=rcl.VolQuantileRegimeSpecs(freq=regime_params.freq))
-        fig = rcl.plot_regime_boxplot(regime_classifier=regime_classifier,
-                                      prices=prices,
-                                      benchmark=str(benchmark_price.name),
-                                      title=title,
-                                      ax=ax,
-                                      **kwargs)
+        fig = qis.plots.derived.regime_data.plot_regime_boxplot(regime_classifier=regime_classifier,
+                                                                prices=prices,
+                                                                benchmark=str(benchmark_price.name),
+                                                                title=title,
+                                                                ax=ax,
+                                                                **kwargs)
         return fig
 
     def plot_contributors(self,
@@ -601,11 +602,11 @@ class PortfolioData:
             prices = time_period.locate(prices)
         with sns.axes_style('darkgrid'):
             fig, axs = plt.subplots(5, 1, figsize=(10, 16), tight_layout=True)
-            pts.plot_time_series(df=prices, legend_line_type=pts.LegendLineType.FIRST_AVG_LAST, title='prices', ax=axs[0])
-            pts.plot_time_series(df=avg_costs, legend_line_type=pts.LegendLineType.FIRST_AVG_LAST, title='avg_costs', ax=axs[1])
-            pts.plot_time_series(df=realized_pnl, legend_line_type=pts.LegendLineType.FIRST_AVG_LAST, title='realized_pnl', ax=axs[2])
-            pts.plot_time_series(df=mtm_pnl, legend_line_type=pts.LegendLineType.FIRST_AVG_LAST, title='mtm_pnl', ax=axs[3])
-            pts.plot_time_series(df=total_pnl, legend_line_type=pts.LegendLineType.FIRST_AVG_LAST, title='total_pnl', ax=axs[4])
+            pts.plot_time_series(df=prices, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='prices', ax=axs[0])
+            pts.plot_time_series(df=avg_costs, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='avg_costs', ax=axs[1])
+            pts.plot_time_series(df=realized_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='realized_pnl', ax=axs[2])
+            pts.plot_time_series(df=mtm_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='mtm_pnl', ax=axs[3])
+            pts.plot_time_series(df=total_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='total_pnl', ax=axs[4])
 
     def plot_weights(self,
                      is_input_weights: bool = True,
@@ -623,17 +624,17 @@ class PortfolioData:
         if columns is not None:
             weights = weights[columns]
         weights = weights.resample(freq).last().fillna(method='ffill')
-        pst.stackplot_timeseries(df=weights,
-                                 is_add_mean_levels=False,
-                                 is_use_bar_plot=True,
-                                 # is_yaxis_limit_01=True,
-                                 baseline='zero',
-                                 bbox_to_anchor=bbox_to_anchor,
-                                 title=title,
-                                 legend_line_type=pst.LegendLineType.FIRST_AVG_LAST,
-                                 var_format='{:.1%}',
-                                 ax=ax,
-                                 **kwargs)
+        pst.plot_stack(df=weights,
+                       is_add_mean_levels=False,
+                       is_use_bar_plot=True,
+                       # is_yaxis_limit_01=True,
+                       baseline='zero',
+                       bbox_to_anchor=bbox_to_anchor,
+                       title=title,
+                       legend_stats=pst.LegendStats.FIRST_AVG_LAST,
+                       var_format='{:.1%}',
+                       ax=ax,
+                       **kwargs)
 
 
 @njit

@@ -11,8 +11,8 @@ from statsmodels.tsa.ar_model import AutoReg
 from statsmodels.graphics.tsaplots import plot_pacf, acf
 
 # qis
-import qis.perfstats.returns as ret
 import qis.file_utils as fu
+import qis.perfstats.returns as ret
 import qis.plots.time_series as pts
 from qis.plots.derived.prices import plot_prices
 
@@ -78,7 +78,7 @@ def estimate_ar_model(data: pd.Series,
     print(out)
 
     pts.plot_time_series(df=joint_data,
-                         legend_line_type=pts.LegendLineType.AVG_STD,
+                         legend_stats=pts.LegendStats.AVG_STD,
                          var_format='{:,.0f}',
                          title=f"{title}: One-Day Prediction",
                          ax=axs[1],
@@ -101,7 +101,7 @@ def plot_ar_bootstrap(data: pd.Series,
     df_bts.index = data.index
     joint_data = pd.concat([data.rename('realized'), df_bts], axis=1)
     pts.plot_time_series(df=joint_data,
-                         legend_line_type=pts.LegendLineType.AVG_STD,
+                         legend_stats=pts.LegendStats.AVG_STD,
                          var_format='{:,.0f}',
                          title=title,
                          y_limits=(0.0, None),
@@ -132,7 +132,7 @@ def plot_joint_bootstrap():
         fig, axs = plt.subplots(2, 1, figsize=(12, 10), tight_layout=True)
 
         pts.plot_time_series(df=joint_fund_data,
-                             legend_line_type=pts.LegendLineType.AVG_STD,
+                             legend_stats=pts.LegendStats.AVG_STD,
                              var_format='{:,.0f}',
                              first_color_fixed=True,
                              ax=axs[0])
@@ -185,7 +185,7 @@ def run_unit_test(unit_test: UnitTests):
         residuals, intercept, beta = bts.compute_ar_residuals(data=fund_data)
         residuals = pd.DataFrame(residuals, index=fund_data.index, columns=fund_data.columns)
         pts.plot_time_series(residuals,
-                             legend_line_type=pts.LegendLineType.AVG_STD,
+                             legend_stats=pts.LegendStats.AVG_STD,
                              var_format='{:,.0f}')
 
     elif unit_test == UnitTests.PLOT_AR_BOOTSTRAP:

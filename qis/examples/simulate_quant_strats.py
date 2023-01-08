@@ -9,17 +9,10 @@ from enum import Enum
 
 # qis
 import qis.file_utils as fu
-import qis.utils.dates as da
-import qis.utils.struct_ops as sop
-import qis.perfstats.returns as ret
-from qis.perfstats.config import PerfParams
-import qis.models.linear.ewm as ewm
-import qis.plots.time_series as pts
-import qis.plots.utils as put
-import qis.plots.derived.returns_scatter as prs
-import qis.plots.histogram as pdf
-from qis.plots.derived.prices import plot_prices, PerformanceLabel
-from qis.plots.qqplot import qqplot
+import qis.utils as qu
+import qis.perfstats as qs
+import qis.plots as qp
+import qis.models as qm
 
 
 # strats
@@ -27,11 +20,11 @@ from qis.portfolio.strats.quant_strats_delta1 import simulate_vol_target_strats_
 
 FIG_SIZE = (8.3, 11.7)  # A4 for portrait
 
-PERF_PARAMS = PerfParams(freq='B')
+PERF_PARAMS = qs.PerfParams(freq='B')
 
 
 def create_time_series_report(prices: Union[pd.Series, pd.DataFrame],
-                              time_period: da.TimePeriod,
+                              time_period: qu.TimePeriod,
                               spans: List[int] = (7, 14, 21, 30, 60, 130, 260, 520),
                               vol_span: int = 31,
                               vol_target: float = 0.15,
@@ -55,9 +48,9 @@ def create_time_series_report(prices: Union[pd.Series, pd.DataFrame],
     axs2 = [fig1.add_subplot(gs[row, 1]) for row in range(nrows)]
     fig1.suptitle(f"{strat_name} Volatility-target strats with vol_target={vol_target:0.0%}", fontweight="bold", fontsize=8, color='blue')
 
-    global_kwargs = dict(fontsize=5, linewidth=0.5, first_color_fixed=True, legend_alpha=0.8,
+    global_kwargs = dict(fontsize=5, linewidth=0.5, first_color_fixed=True, framealpha=0.8,
                          digits_to_show=1)
-    scatter_kwargs = sop.update_kwargs(kwargs=global_kwargs,
+    scatter_kwargs = qu.update_kwargs(kwargs=global_kwargs,
                                        new_kwargs=dict(fontsize=5, var_format='{:.0%}', xvar_numticks=7,
                                                        markersize=1))
 
@@ -110,15 +103,15 @@ def create_time_series_report(prices: Union[pd.Series, pd.DataFrame],
 
 def plot_strategies_prices(nav_data: pd.DataFrame,
                            nav_weights: pd.DataFrame,
-                           time_period: da.TimePeriod,
+                           time_period: qu.TimePeriod,
                            axs: List[plt.Subplot],
                            vol_span: int = 31,
                            vol_af: float = 260.0,
                            **kwargs
                            ) -> None:
 
-    nav_returns = ret.to_returns(prices=nav_data)
-    eod_ewm_vol = ewm.compute_ewm_vol(data=nav_returns, span=vol_span, mean_adj_type=ewm.MeanAdjType.NONE, af=vol_af)
+    nav_returns = qs.to_returns(prices=nav_data)
+    eod_ewm_vol = qm.compute_ewm_vol(data=nav_returns, span=vol_span, mean_adj_type=qm.MeanAdjType.NONE, af=vol_af)
 
     # trim plot data
     nav_data = time_period.locate(nav_data)
@@ -126,48 +119,48 @@ def plot_strategies_prices(nav_data: pd.DataFrame,
     nav_returns = time_period.locate(nav_returns)
     eod_ewm_vol = time_period.locate(eod_ewm_vol)
 
-    plot_prices(prices=nav_data,
+    qp.plot_prices(prices=nav_data,
                 var_format='{:.2f}',
                 title='Logarithm of nav',
-                performance_label=PerformanceLabel.WITH_SKEW,
+                performance_label=qp.PerformanceLabel.WITH_SKEW,
                 is_log=True,
                 perf_params=PERF_PARAMS,
                 start_to_one=True,
                 ax=axs[0],
                 **kwargs)
 
-    pts.plot_time_series(df=nav_weights,
-                         var_format='{:.0%}',
-                         title='Strategy weights',
-                         legend_line_type=put.LegendLineType.AVG_STD_LAST,
-                         ax=axs[1],
-                         **kwargs)
+    qp.plot_time_series(df=nav_weights,
+                        var_format='{:.0%}',
+                        title='Strategy weights',
+                        legend_stats=qp.LegendStats.AVG_STD_LAST,
+                        ax=axs[1],
+                        **kwargs)
 
     turnover = nav_weights.diff(1).abs().rolling(int(vol_af)).sum()
-    pts.plot_time_series(df=turnover,
-                         var_format='{:.0%}',
-                         title='1y rolling daily Turnover',
-                         legend_line_type=put.LegendLineType.AVG_STD_LAST,
-                         ax=axs[2],
-                         **kwargs)
+    qp.plot_time_series(df=turnover,
+                        var_format='{:.0%}',
+                        title='1y rolling daily Turnover',
+                        legend_stats=qp.LegendStats.AVG_STD_LAST,
+                        ax=axs[2],
+                        **kwargs)
 
-    pts.plot_time_series(df=nav_returns,
-                         var_format='{:.2%}',
-                         title='Daily returns',
-                         legend_line_type=put.LegendLineType.AVG_STD_LAST,
-                         ax=axs[3],
-                         **kwargs)
+    qp.plot_time_series(df=nav_returns,
+                        var_format='{:.2%}',
+                        title='Daily returns',
+                        legend_stats=qp.LegendStats.AVG_STD_LAST,
+                        ax=axs[3],
+                        **kwargs)
 
-    pts.plot_time_series(df=eod_ewm_vol,
-                         var_format='{:.2%}',
-                         title=f"Annualized EWMA-{vol_span} vol of daily returns",
-                         legend_line_type=put.LegendLineType.AVG_STD_LAST,
-                         ax=axs[4],
-                         **kwargs)
+    qp.plot_time_series(df=eod_ewm_vol,
+                        var_format='{:.2%}',
+                        title=f"Annualized EWMA-{vol_span} vol of daily returns",
+                        legend_stats=qp.LegendStats.AVG_STD_LAST,
+                        ax=axs[4],
+                        **kwargs)
 
 
 def plot_strategies_returns_pdf(nav_data: pd.DataFrame,
-                                time_period: da.TimePeriod,
+                                time_period: qu.TimePeriod,
                                 **kwargs
                                 ) -> plt.Figure:
 
@@ -178,32 +171,32 @@ def plot_strategies_returns_pdf(nav_data: pd.DataFrame,
 
     numticks = 7
     major_ticks = np.linspace(-4.5, 4.5, numticks)
-    pdf_kwargs = sop.update_kwargs(kwargs=kwargs, new_kwargs={'fontsize': 7, 'var_format': '{:.0%}',
+    pdf_kwargs = qu.update_kwargs(kwargs=kwargs, new_kwargs={'fontsize': 7, 'var_format': '{:.0%}',
                                                               'xvar_numticks': numticks})
 
-    qq_kwargs = sop.update_kwargs(kwargs=kwargs, new_kwargs={'fontsize': 7, 'var_format': '{:.1f}',
+    qq_kwargs = qu.update_kwargs(kwargs=kwargs, new_kwargs={'fontsize': 7, 'var_format': '{:.1f}',
                                                              'yvar_numticks': numticks,
                                                              'xvar_major_ticks': major_ticks})
 
     with sns.axes_style("darkgrid"):
         fig, axs = plt.subplots(len(freqs.keys()), 2, figsize=FIG_SIZE, tight_layout=True)
         for idx, (title, freq) in enumerate(freqs.items()):
-            returns = ret.to_returns(prices=nav_data, freq=freq, drop_first=True)
-            pdf.plot_histogram(df=returns,
+            returns = qs.to_returns(prices=nav_data, freq=freq, drop_first=True)
+            qp.plot_histogram(df=returns,
                                x_min_max_quantiles=(0.0001, 0.9999),
                                title=f"{title}",
                                is_add_data_std_pdf=True,
                                ax=axs[idx][0],
                                **pdf_kwargs)
-            qqplot(df=returns,
-                   title=f"{title}",
-                   ax=axs[idx][1],
-                   **qq_kwargs)
+            qp.plot_qq(df=returns,
+                    title=f"{title}",
+                    ax=axs[idx][1],
+                    **qq_kwargs)
     return fig
 
 
 def plot_strategies_returns_scatter(nav_data: pd.DataFrame,
-                                    time_period: da.TimePeriod,
+                                    time_period: qu.TimePeriod,
                                     axs: List[plt.Subplot],
                                     **kwargs
                                     ) -> None:
@@ -214,9 +207,9 @@ def plot_strategies_returns_scatter(nav_data: pd.DataFrame,
         new_kwargs = dict(alpha_format='{0:+0.0%}',
                           beta_format='{:+0.1f}',
                           alpha_an_factor=freq[1],
-                          legend_alpha=0.9)
-        kwargs = sop.update_kwargs(kwargs, new_kwargs)
-        prs.plot_returns_scatter(prices=nav_data,
+                          framealpha=0.9)
+        kwargs = qu.update_kwargs(kwargs, new_kwargs)
+        qp.plot_returns_scatter(prices=nav_data,
                                  benchmark=nav_data.columns[0],
                                  ylabel=f"Strategy return",
                                  title=f"{title}",
@@ -238,12 +231,12 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.BTC_SIMULATION:
         prices = ya.fetch_prices(tickers=['BTC-USD'])['close'].rename('BTC').dropna()
-        time_period = da.TimePeriod('31Dec2015', '29Dec2022')
+        time_period = qu.TimePeriod('31Dec2015', '29Dec2022')
         create_time_series_report(prices=prices, time_period=time_period, vol_target=0.5, vol_af=360, file_name='btc_analysis')
 
     elif unit_test == UnitTests.SPY_SIMULATION:
         prices = ya.fetch_prices(tickers=['SPY'])['close'].rename('SPY').dropna()
-        time_period = da.TimePeriod('31Dec1999', '29Dec2022')
+        time_period = qu.TimePeriod('31Dec1999', '29Dec2022')
         create_time_series_report(prices=prices, time_period=time_period, vol_target=0.15, vol_af=260, file_name='spy_analysis')
 
     plt.show()

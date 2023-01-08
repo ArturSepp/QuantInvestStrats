@@ -10,13 +10,14 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 # qis
+import qis.plots.derived.regime_data
 import qis.utils.dates as da
 import qis.utils.struct_ops as sop
-import qis.utils.df_to_str as dfs
+import qis.utils.df_str as dfs
 import qis.utils.df_groups as dfg
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_table as rpt
-import qis.perfstats.drawdowns as cdr
+import qis.plots.derived.drawdowns as cdr
 from qis.perfstats.config import PerfParams, PerfStat, RegimeData
 import qis.perfstats.regime_classifier as rcl
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
@@ -28,7 +29,7 @@ import qis.plots.derived.prices as ppd
 import qis.plots.derived.returns_heatmap as rhe
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
-import qis.plots.derived.correlations as pco
+import qis.models.linear.plot_correlations as pco
 from qis.plots.bars import plot_bars
 
 # internal
@@ -113,7 +114,7 @@ class MultiPortfolioData:
         pivot_prices = self.benchmark_prices[benchmark]
         if index is not None:
             pivot_prices = pivot_prices.reindex(index=index, method='ffill')
-        rcl.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
 
     def plot_nav(self,
                  time_period: da.TimePeriod = None,
@@ -270,7 +271,7 @@ class MultiPortfolioData:
         exposures = pd.concat(exposures, axis=1)
         pts.plot_time_series(df=exposures,
                              var_format=var_format,
-                             legend_line_type=pts.LegendLineType.AVG_NONNAN_LAST,
+                             legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
                              title='Portfolio net exposures',
                              ax=ax,
                              **kwargs)
@@ -305,7 +306,7 @@ class MultiPortfolioData:
 
         pts.plot_time_series(df=diff,
                              var_format=var_format,
-                             legend_line_type=pts.LegendLineType.LAST,
+                             legend_stats=pts.LegendStats.LAST,
                              title=f"Cumulative p&l diff {self.portfolio_datas[portfolio_idx1].nav.name}-{self.portfolio_datas[portfolio_idx2].nav.name}",
                              ax=ax,
                              **sop.update_kwargs(kwargs, dict(legend_loc='lower left')))
@@ -326,7 +327,7 @@ class MultiPortfolioData:
         diff = exposures1.subtract(exposures2)
         pts.plot_time_series(df=diff,
                              var_format=var_format,
-                             legend_line_type=pts.LegendLineType.AVG_NONNAN_LAST,
+                             legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
                              title=f"Net exposure diff {self.portfolio_datas[portfolio_idx1].nav.name}-{self.portfolio_datas[portfolio_idx2].nav.name}",
                              ax=ax,
                              **kwargs)
@@ -354,7 +355,7 @@ class MultiPortfolioData:
         pts.plot_time_series(df=turnover,
                              var_format=var_format,
                              y_limits=(0.0, None),
-                             legend_line_type=pts.LegendLineType.AVG_NONNAN_LAST,
+                             legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
                              title='Annualized daily Turnover',
                              ax=ax,
                              **kwargs)
@@ -380,7 +381,7 @@ class MultiPortfolioData:
         pts.plot_time_series(df=costs,
                              var_format=var_format,
                              y_limits=(0.0, None),
-                             legend_line_type=pts.LegendLineType.AVG_NONNAN_LAST,
+                             legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
                              title='Annualized daily Costs %',
                              ax=ax,
                              **kwargs)
@@ -405,7 +406,7 @@ class MultiPortfolioData:
         factor_exposures = pd.concat(factor_exposures, axis=1)
         pts.plot_time_series(df=factor_exposures,
                              var_format=var_format,
-                             legend_line_type=pts.LegendLineType.AVG_NONNAN_LAST,
+                             legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
                              title='Factor betas',
                              ax=ax,
                              **kwargs)
@@ -568,15 +569,15 @@ class MultiPortfolioData:
             else:
                 var_format = '{:.2%}'
         regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
-        rcl.plot_regime_data(regime_classifier=regime_classifier,
-                             prices=prices,
-                             benchmark=benchmark,
-                             is_conditional_sharpe=is_conditional_sharpe,
-                             regime_data_to_plot=regime_data_to_plot,
-                             var_format=var_format,
-                             regime_params=regime_params,
-                             legend_loc=legend_loc,
-                             perf_params=perf_params,
-                             title=title,
-                             ax=ax,
-                             **kwargs)
+        qis.plots.derived.regime_data.plot_regime_data(regime_classifier=regime_classifier,
+                                                       prices=prices,
+                                                       benchmark=benchmark,
+                                                       is_conditional_sharpe=is_conditional_sharpe,
+                                                       regime_data_to_plot=regime_data_to_plot,
+                                                       var_format=var_format,
+                                                       regime_params=regime_params,
+                                                       legend_loc=legend_loc,
+                                                       perf_params=perf_params,
+                                                       title=title,
+                                                       ax=ax,
+                                                       **kwargs)

@@ -14,23 +14,23 @@ from enum import Enum
 import qis.plots.utils as put
 
 
-def errorbar(df: Union[pd.Series, pd.DataFrame],
-             y_std_errors: Union[float, pd.Series, pd.DataFrame] = 0.5,
-             legend_title: str = None,
-             legend_loc: Optional[Union[str, bool]] = 'upper left',
-             xlabel: str = None,
-             ylabel: str = None,
-             var_format: Optional[str] = '{:.0f}',
-             title: Union[str, bool] = None,
-             fontsize: int = 10,
-             capsize: int = 10,
-             colors: List[str] = None,
-             first_color_fixed: bool = False,
-             last_color_fixed: bool = False,
-             y_limits: Tuple[Optional[float], Optional[float]] = None,
-             ax: plt.Subplot = None,
-             **kwargs
-             ) -> Optional[plt.Figure]:
+def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
+                  y_std_errors: Union[float, pd.Series, pd.DataFrame] = 0.5,
+                  legend_title: str = None,
+                  legend_loc: Optional[Union[str, bool]] = 'upper left',
+                  xlabel: str = None,
+                  ylabel: str = None,
+                  var_format: Optional[str] = '{:.0f}',
+                  title: Union[str, bool] = None,
+                  fontsize: int = 10,
+                  capsize: int = 10,
+                  colors: List[str] = None,
+                  first_color_fixed: bool = False,
+                  last_color_fixed: bool = False,
+                  y_limits: Tuple[Optional[float], Optional[float]] = None,
+                  ax: plt.Subplot = None,
+                  **kwargs
+                  ) -> Optional[plt.Figure]:
 
     df = df.copy()
     if isinstance(df, pd.DataFrame):
@@ -113,9 +113,9 @@ def run_unit_test(unit_test: UnitTests):
 
         with sns.axes_style('darkgrid'):
             fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-            errorbar(df=data,
-                     ax=ax,
-                     **global_kwargs)
+            plot_errorbar(df=data,
+                          ax=ax,
+                          **global_kwargs)
 
     plt.show()
 

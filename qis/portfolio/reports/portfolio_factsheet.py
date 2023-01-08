@@ -6,17 +6,16 @@ with comparision to 1-2 cash benchmarks
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from typing import Union, Optional, Tuple, Literal
 from enum import Enum
 
 # qis
 import qis.file_utils as fu
+import qis.plots.derived.regime_data
 import qis.utils.struct_ops as sop
 import qis.utils.dates as da
 from qis.utils.dates import TimePeriod
 from qis.perfstats.config import PerfParams
-import qis.perfstats.drawdowns as cdr
+import qis.plots.derived.drawdowns as cdr
 import qis.perfstats.regime_classifier as rcl
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
 
@@ -28,8 +27,7 @@ import qis.plots.stackplot as pst
 
 # portfolio
 import qis.portfolio.backtester as bp
-from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
-
+from qis.portfolio.portfolio_data import PortfolioData
 
 PERF_PARAMS = PerfParams(freq='W-WED')
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='Q')
@@ -69,7 +67,7 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                        digits_to_show=1, sharpe_digits=2,
                        weight='normal',
                        markersize=1,
-                       legend_alpha=0.75)
+                       framealpha=0.75)
     kwargs = sop.update_kwargs(kwargs, plot_kwargs)
     fig.suptitle(f"{portfolio_data.nav.name} portfolio factsheet",
                  fontweight="bold", fontsize=8, color='blue')
@@ -83,7 +81,7 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                     title='Performance',
                     ax=ax,
                     **kwargs)
-    rcl.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # dd
@@ -92,7 +90,7 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                       title='Running Drawdowns',
                       dd_legend_type=cdr.DdLegendType.SIMPLE,
                       ax=ax, **kwargs)
-    rcl.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # exposures
@@ -101,15 +99,15 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
     else:
         exposures = portfolio_data.get_exposures(is_grouped=False, time_period=time_period)
     ax = fig.add_subplot(gs[4:6, :2])
-    pst.stackplot_timeseries(df=exposures.resample('W-WED').last(),
-                             is_add_mean_levels=False,
-                             is_use_bar_plot=True,
-                             baseline='zero',
-                             title='Exposures',
-                             legend_line_type=pst.LegendLineType.AVG_LAST,
-                             var_format='{:.1%}',
-                             ax=ax,
-                             **sop.update_kwargs(kwargs,
+    pst.plot_stack(df=exposures.resample('W-WED').last(),
+                   is_add_mean_levels=False,
+                   is_use_bar_plot=True,
+                   baseline='zero',
+                   title='Exposures',
+                   legend_stats=pst.LegendStats.AVG_LAST,
+                   var_format='{:.1%}',
+                   ax=ax,
+                   **sop.update_kwargs(kwargs,
                                                  dict(bbox_to_anchor=(0.5, 1.05), ncol=2)))
     put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
@@ -120,7 +118,7 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
     pts.plot_time_series(df=turnover,
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
-                         legend_line_type=pts.LegendLineType.AVG_LAST,
+                         legend_stats=pts.LegendStats.AVG_LAST,
                          title='1y rolling average Turnover',
                          ax=ax,
                          **kwargs)
@@ -129,12 +127,12 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                              df2=turnover[portfolio_data.nav.name],
                              var_format='{:,.2%}',
                              # y_limits=(0.0, None),
-                             legend_line_type=pts.LegendLineType.AVG_LAST,
+                             legend_stats=pts.LegendStats.AVG_LAST,
                              title='1y rolling average Turnover',
                              ax=ax,
                              **kwargs)
     """
-    rcl.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
     
     # benchmark betas
@@ -144,11 +142,11 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
     pts.plot_time_series(df=factor_exposures,
                          var_format='{:,.2f}',
                          # y_limits=(0.0, None),
-                         legend_line_type=pts.LegendLineType.FIRST_LAST,
+                         legend_stats=pts.LegendStats.AVG_LAST,
                          title='Portfolio Benchmark betas',
                          ax=ax,
                          **kwargs)
-    rcl.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # attribution
@@ -158,11 +156,11 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
     pts.plot_time_series(df=factor_attribution,
                          var_format='{:,.0%}',
                          # y_limits=(0.0, None),
-                         legend_line_type=pts.LegendLineType.LAST,
+                         legend_stats=pts.LegendStats.LAST,
                          title='Portfolio Cumulative return attribution to benchmark betas',
                          ax=ax,
                          **kwargs)
-    rcl.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # constituents
@@ -170,11 +168,11 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
     num_investable_instruments=portfolio_data.get_num_investable_instruments(time_period=time_period)
     pts.plot_time_series(df=num_investable_instruments,
                          var_format='{:,.0f}',
-                         legend_line_type=pts.LegendLineType.FIRST_AVG_LAST,
+                         legend_stats=pts.LegendStats.FIRST_AVG_LAST,
                          title='Number of investable instruments',
                          ax=ax,
                          **kwargs)
-    rcl.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # ra perf table

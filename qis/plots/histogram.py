@@ -14,7 +14,7 @@ from enum import Enum
 
 # qis
 import qis.plots.utils as put
-from qis.utils.desc_table import compute_desc_table, DescTableType
+import qis.perfstats.desc_table as dsc
 
 
 class PdfType(Enum):
@@ -29,7 +29,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    is_drop_na: bool = True,
                    title: str = None,
                    colors: List[str] = None,
-                   legend_line_type: put.LegendLineType = put.LegendLineType.NONE,
+                   legend_stats: put.LegendStats = put.LegendStats.NONE,
                    is_add_norm_std_pdf: bool = False,
                    is_add_data_std_pdf: bool = False,
                    bbox_to_anchor: Optional[Tuple[float, float]] = (0.0, 1.0),
@@ -48,7 +48,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    add_total_sample_pdf: bool = False,  # concat total
                    total_sample_name: str = 'Universe',
                    annualize_vol: bool = False,
-                   desc_table_type: DescTableType = DescTableType.SHORT,
+                   desc_table_type: dsc.DescTableType = dsc.DescTableType.SHORT,
                    first_color_fixed: bool = False,
                    fill: bool = False,
                    bins: Optional[Union[np.ndarray, int]] = None,
@@ -161,8 +161,8 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
     if x_limits is not None:
         put.set_x_limits(ax=ax, x_limits=x_limits)
 
-    if desc_table_type != DescTableType.NONE:
-        stats_table = compute_desc_table(df=df,
+    if desc_table_type != dsc.DescTableType.NONE:
+        stats_table = dsc.compute_desc_table(df=df,
                                          annualize_vol=annualize_vol,
                                          desc_table_type=desc_table_type,
                                          var_format=xvar_format,
@@ -176,7 +176,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                                         **kwargs)
     else:
         legend_labels = put.get_legend_lines(data=df,
-                                             legend_line_type=legend_line_type,
+                                             legend_stats=legend_stats,
                                              var_format=xvar_format)
         put.set_legend(ax=ax,
                        labels=legend_labels,
@@ -225,7 +225,7 @@ def trunc_dens(x: np.ndarray, bandwidth: float = 0.5) -> Tuple[np.ndarray, np.nd
     d = d.fit(bw=h, weights=w / len(x), fft=False)
     d_support = d.support
     d_dens = d.density
-    d_dens[d_support<0] = 0
+    d_dens[d_support < 0] = 0
     d_dens = d_dens / np.nansum(d_dens)
     return d_support, d_dens
 

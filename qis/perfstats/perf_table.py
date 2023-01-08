@@ -13,7 +13,6 @@ from enum import Enum
 import qis.utils.dates as da
 import qis.utils.ols as ols
 import qis.perfstats.returns as ret
-import qis.perfstats.drawdowns as spd
 from qis.perfstats.config import PerfStat, PerfParams
 
 
@@ -183,7 +182,7 @@ def compute_risk_table(prices: pd.DataFrame,
                           }
             if not is_compute_vol_only:
                 # compute max dd on business day schedule
-                max_dd = spd.compute_max_dd(prices=dd_sampled_prices[asset].dropna())
+                max_dd = compute_max_dd(prices=dd_sampled_prices[asset].dropna())
                 rel_returns = sampled_price.pct_change().dropna()
                 asset_dict.update({
                     PerfStat.MAX_DD.to_str(): max_dd,
@@ -321,8 +320,128 @@ def compute_info_ratio_table(return_diffs_dict: Dict[str, pd.DataFrame]) -> Tupl
     return te_table, ir_table
 
 
+def compute_drawdown(prices: pd.Series) -> pd.Series:
+
+    if not isinstance(prices, pd.Series):
+        print(prices)
+        raise TypeError(f"in compute_max_dd: path_data must be series")
+
+    max_dd = np.zeros_like(prices)
+    last_peak = -np.inf
+
+    for idx, price in enumerate(prices):
+        if not np.isnan(price):
+            if price > last_peak:
+                last_peak = price
+            if not np.isclose(last_peak, 0.0):
+                max_dd[idx] = price / last_peak - 1.0
+        else:
+            max_dd[idx] = np.nan
+
+    max_dd = pd.Series(data=max_dd, index=prices.index, name=prices.name)
+
+    return max_dd
+
+
+def compute_time_under_water(prices: pd.Series) -> Tuple[pd.Series, pd.Series]:
+
+    if not isinstance(prices, pd.Series):
+        raise TypeError(f"in compute_time_under_water: path_data must be series")
+
+    max_dd = np.zeros_like(prices)
+    dd_times = np.zeros_like(prices.index)
+
+    last_peak = -np.inf
+    last_dd_time = prices.index[0]
+    dd_times[0] = last_dd_time
+    for idx, (index, price) in enumerate(prices.items()):
+        if not np.isnan(price):
+            if price > last_peak:
+                last_peak = price
+                last_dd_time = index
+            max_dd[idx] = price / last_peak - 1.0
+            dd_times[idx] = last_dd_time
+        else:
+            max_dd[idx] = 0.0
+            dd_times[idx] = index
+
+    max_dd = pd.Series(data=max_dd, index=prices.index, name=prices.name)
+    dd_times = (prices.index - pd.DatetimeIndex(dd_times)).days
+    time_under_water = pd.Series(data=dd_times, index=prices.index, name=prices.name)
+
+    return max_dd, time_under_water
+
+
+def compute_drawdown_data(prices: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
+    if isinstance(prices, pd.Series):
+        drawdown = compute_drawdown(prices=prices)
+    elif isinstance(prices, pd.DataFrame):
+        if len(prices.columns) > 1 and prices.columns.duplicated().any():
+            raise ValueError(f"dublicated columns = {prices[prices.columns.duplicated()]}")
+        drawdowns = []
+        for asset_ in prices:
+            drawdowns.append(compute_drawdown(prices=prices[asset_]))
+        drawdown = pd.concat(drawdowns, axis=1)
+    else:
+        raise ValueError(f"unsuported type {type(prices)}")
+    return drawdown
+
+
+def compute_drawdown_time_data(prices: Union[pd.DataFrame, pd.Series]
+                               ) -> Tuple[Union[pd.DataFrame, pd.Series], Union[pd.DataFrame, pd.Series]]:
+
+    if isinstance(prices, pd.Series):
+        drawdown, time_under_water = compute_time_under_water(prices=prices)
+
+    else:
+        drawdowns = []
+        time_under_waters = []
+        for asset in prices:
+            drawdown, time_under_water = compute_time_under_water(prices=prices[asset])
+            drawdowns.append(drawdown)
+            time_under_waters.append(time_under_water)
+
+        drawdown = pd.concat(drawdowns, axis=1)
+        time_under_water = pd.concat(time_under_waters, axis=1)
+
+    return drawdown, time_under_water
+
+
+def compute_max_dd(prices: Union[pd.DataFrame, pd.Series]
+                   ) -> np.ndarray:
+    max_dd_data = compute_drawdown_data(prices=prices)
+    max_dds = np.min(max_dd_data.to_numpy(), axis=0)
+    return max_dds
+
+
+def compute_avg_max(ds: pd.Series,
+                    is_max: bool = True,
+                    q: float = 0.1
+                    ) -> (float, float, float, float):
+    """
+    compute dd statistics
+    """
+    if is_max:
+        nan_data = np.where(ds.to_numpy() >= 0, ds.to_numpy(), np.nan)
+    else:
+        nan_data = np.where(ds.to_numpy() <= 0, ds.to_numpy(), np.nan)
+
+    avg = np.nanmean(nan_data)
+    if is_max:
+        quant = np.nanquantile(nan_data, 1.0-q)
+        nmax = np.nanmax(nan_data)
+    else:
+        quant = np.nanquantile(nan_data, q)
+        nmax = np.nanmin(nan_data)
+
+    last = ds.iloc[-1]
+
+    return avg, quant, nmax, last
+
+
 class UnitTests(Enum):
     RA_PERF_TABLE = 1
+    DD_DATA = 2
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -337,6 +456,12 @@ def run_unit_test(unit_test: UnitTests):
         print(table)
         print(table.columns)
 
+    elif unit_test == UnitTests.DD_DATA:
+        prices = prices.iloc[:, 0]
+        max_dd, time_under_water = compute_time_under_water(prices=prices)
+        print(max_dd)
+        print(time_under_water)
+
 
 if __name__ == '__main__':
 
@@ -348,3 +473,4 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
+

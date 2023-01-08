@@ -7,29 +7,12 @@ from typing import Tuple, List, Dict
 from enum import Enum
 
 # qis
-import qis.utils.dates as da
-import qis.perfstats.returns as ret
-import qis.plots.time_series as pts
-
-# models
-import qis.models.linear.ewm as ewm
-import qis.models.stats.gaussian_mixture as gm
-from qis.models.linear.corr_cov_matrix import compute_masked_covar_corr, matrix_regularization
-
-# portfolio
-from qis.perfstats import returns as ret
 from qis.portfolio.optimization.qp_solvers import PortfolioObjective, max_portfolio_sharpe_qp
 import qis.portfolio.backtester as bp
-
-
 import qis.portfolio.optimization.rolling_portfolios as rlp
-from qis.portfolio.portfolio_data import PortfolioData
-from qis.utils import dates as da
 
-
+# data
 from qis.data.yf_data import load_etf_data
-
-
 
 
 class UnitTests(Enum):
@@ -48,7 +31,7 @@ def run_unit_test(unit_test: UnitTests):
                   is_yaxis_limit_01=True,
                   baseline='zero',
                   bbox_to_anchor=(0.4, 1.1),
-                  legend_line_type=pst.LegendLineType.AVG_STD_LAST,
+                  legend_stats=pst.LegendStats.AVG_STD_LAST,
                   ncol=len(prices.columns)//3,
                   var_format='{:.0%}')
 

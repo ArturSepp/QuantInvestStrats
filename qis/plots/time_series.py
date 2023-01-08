@@ -4,14 +4,13 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from typing import List, Union, Tuple, Optional, Dict
-from pandas.core.indexes.base import Index
 from enum import Enum
 
 # qis
-import qis.plots.utils as put
 import qis.utils.struct_ops as sop
-from qis.plots.utils import LegendLineType, TrendLine, LastLabel
-from qis.utils.desc_table import compute_desc_table, DescTableType
+import qis.plots.utils as put
+from qis.plots.utils import LegendStats, TrendLine, LastLabel
+from qis.perfstats.desc_table import compute_desc_table, DescTableType
 
 
 def plot_time_series(df: Union[pd.Series, pd.DataFrame],
@@ -23,9 +22,9 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      legend_title: str = None,
                      legend_loc: Optional[Union[str, bool]] = 'upper left',
                      last_label: LastLabel = LastLabel.NONE,
-                     sort_by_value_stretch_factor: float = 0.5,
+                     sort_by_value_stretch_factor: float = 1.0,
                      trend_line: TrendLine = TrendLine.NONE,
-                     legend_line_type: LegendLineType = LegendLineType.AVG_LAST,
+                     legend_stats: LegendStats = LegendStats.AVG_LAST,
                      desc_table_type: DescTableType = DescTableType.NONE,
                      legend_labels: List[str] = None,
                      indices_for_shaded_areas: Dict[str, Tuple[int, int]] = None,
@@ -78,6 +77,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     else:
         data1.plot(ax=ax, color=colors, linewidth=linewidth)
 
+    # add tredlines
     if trend_line == TrendLine.ZERO_SHADOWS:
         for column, color in zip(columns, colors):
             x0 = data1.index[0]
@@ -128,8 +128,31 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                 ax.fill_between(data2.index, y, y_line, where=y_line >= y,
                                 facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
 
+    elif trend_line in [TrendLine.TREND_LINE, TrendLine.TREND_LINE_SHADOWS]:
+        for column, color in zip(columns, colors):
+            y = data1[column].dropna()
+            x0 = y.first_valid_index() or y.index[0]  # if all are nons
+            x1 = y.index[-1]
+            y0 = y[x0]
+            y1 = y[-1]
+            x = [x0, x1]
+            y = [y0, y1]
+            ax.plot(x, y,
+                    color=color,
+                    linestyle='--',
+                    transform=ax.transData,
+                    linewidth=linewidth)
+
+            if trend_line == TrendLine.TREND_LINE_SHADOWS:
+                x_ = (data1.index - data1.index[0]).days
+                slope = (y1 - y0) / (x_[-1] - x_[0])
+                y_line = [slope * x + y0 for x in x_]
+                y = data1[column]
+                ax.fill_between(data1.index, y, y_line, where=y_line >= y,
+                                facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
+
     # add last labels
-    if last_label in [LastLabel.AVERAGE_VALUE, TrendLine.AVERAGE, TrendLine.AVERAGE_SHADOWS]:
+    if last_label in [LastLabel.AVERAGE_VALUE, LastLabel.AVERAGE_VALUE_SORTED]:
         average_dict = {}
         for column, color in zip(columns, colors):
             data2 = data1[column].dropna()  # exclude nans from showing the average lines
@@ -139,36 +162,33 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
             else:
                 average = np.nanmean(data2.to_numpy())
 
-            if last_label== LastLabel.AVERAGE_VALUE:
-                if var_format is not None:
-                    average_str = var_format.format(average)
-                else:
-                    average_str = average
-                y1 = average
-                variable_label = f"{column}, average={average_str}"
-                average_dict.update({y1: [variable_label, color]})
-
-        if last_label in [LastLabel.AVERAGE_VALUE, LastLabel.AVERAGE_VALUE_SORTED]:
-            x1 = data1.index[-1]
-            ymin, ymax = ax.get_ylim()
-            mid = sort_by_value_stretch_factor * (ymax - ymin)
-            if last_label == LastLabel.AVERAGE_VALUE_SORTED:
-                pivot_dict = sorted(average_dict)
-                locs = np.linspace(pivot_dict[0], sort_by_value_stretch_factor*mid, len(pivot_dict), endpoint=True)
-
+            if var_format is not None:
+                average_str = var_format.format(average)
             else:
-                pivot_dict = average_dict
-                locs = [dict for dict in pivot_dict]
+                average_str = average
+            y1 = average
+            variable_label = f"{column}, average={average_str}"
+            average_dict.update({y1: [variable_label, color]})
 
-            for key, loc in zip(pivot_dict, locs):
-                ax.annotate(average_dict[key][0],
-                            xy=(x1, key), xytext=(x1, loc),
-                            fontsize=fontsize, weight='normal', color=average_dict[key][1],
-                            textcoords='data', ha='left', va='bottom',
-                            bbox={'boxstyle': 'round,pad=0.5', 'fc': average_dict[key][1], 'alpha': 0.1},
-                            arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+        x1 = data1.index[-1]
+        ymin, ymax = ax.get_ylim()
+        mid = sort_by_value_stretch_factor * (ymax - ymin)
+        if last_label == LastLabel.AVERAGE_VALUE_SORTED:
+            pivot_dict = sorted(average_dict)
+            locs = np.linspace(pivot_dict[0], sort_by_value_stretch_factor*mid, len(pivot_dict), endpoint=True)
+        else:
+            pivot_dict = average_dict
+            locs = [dict for dict in pivot_dict]
 
-    if last_label != LastLabel.NONE or trend_line in [TrendLine.TREND_LINE, TrendLine.TREND_LINE_SHADOWS]:
+        for key, loc in zip(pivot_dict, locs):
+            ax.annotate(average_dict[key][0],
+                        xy=(x1, key), xytext=(x1, loc),
+                        fontsize=fontsize, weight='normal', color=average_dict[key][1],
+                        textcoords='data', ha='left', va='bottom',
+                        bbox={'boxstyle': 'round,pad=0.5', 'fc': average_dict[key][1], 'alpha': 0.1},
+                        arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
+
+    elif last_label in [LastLabel.LAST_VALUE, LastLabel.LAST_VALUE_SORTED]:
         last_dict = {}
         for column, color in zip(columns, colors):
             y = data1[column].dropna()
@@ -188,34 +208,12 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                     y1 = np.nan
                 last_dict.update({y1: [variable_label, color]})
 
-            if trend_line in [TrendLine.TREND_LINE, TrendLine.TREND_LINE_SHADOWS]:
-                x0 = y.first_valid_index() or y.index[0] # if all are nons
-                x1 = y.index[-1]
-                y0 = y[x0]
-                y1 = y[-1]
-
-                x = [x0, x1]
-                y = [y0, y1]
-                ax.plot(x, y,
-                        color=color,
-                        linestyle='--',
-                        transform=ax.transData,
-                        linewidth=linewidth)
-
-                if trend_line == TrendLine.TREND_LINE_SHADOWS:
-                    x_ = (data1.index - data1.index[0]).days
-                    slope = (y1 - y0) / (x_[-1] - x_[0])
-                    y_line = [slope * x + y0 for x in x_]
-                    y = data1[column]
-                    ax.fill_between(data1.index, y, y_line, where=y_line >= y,
-                                    facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
-
         # plot dicts sorted by last value
         x1 = data1.index[-1]
         ymin, ymax = ax.get_ylim()
         mid = sort_by_value_stretch_factor * (ymax - ymin)
 
-        if last_label== LastLabel.LAST_VALUE_SORTED:
+        if last_label == LastLabel.LAST_VALUE_SORTED:
             pivot_dict = sorted(last_dict)
             locs = np.linspace(pivot_dict[0], sort_by_value_stretch_factor*mid, len(pivot_dict), endpoint=True)
         else:
@@ -251,7 +249,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                                                 fontsize=fontsize,
                                                 **kwargs)
             else:  # generate legend_labels
-                legend_labels = put.get_legend_lines(data=data1, legend_line_type=legend_line_type, var_format=var_format)
+                legend_labels = put.get_legend_lines(data=data1, legend_stats=legend_stats, var_format=var_format)
 
         if legend_labels is not None:
             put.set_legend(ax=ax,
@@ -288,7 +286,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     if isinstance(data1.index, pd.DatetimeIndex):
         put.set_ax_tick_labels(ax=ax, skip_y_axis=True, fontsize=fontsize, **kwargs)
 
-    elif isinstance(data1.index, Index):
+    elif isinstance(data1.index, pd.Index):
         if x_labels is None:
             put.set_ax_ticks_format(ax=ax, fontsize=fontsize, **kwargs)
 
@@ -307,8 +305,8 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
 def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
                          df2: Union[pd.Series, pd.DataFrame],
                          legend_loc: Optional[str] = 'upper left',
-                         legend_line_type: LegendLineType = LegendLineType.NONE,
-                         legend_line_type2: LegendLineType = LegendLineType.NONE,
+                         legend_stats: LegendStats = LegendStats.NONE,
+                         legend_stats2: LegendStats = LegendStats.NONE,
                          first_color_fixed: bool = False,
                          last_color_fixed: bool = False,
                          title: Optional[str] = None,
@@ -379,10 +377,10 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
             df1.columns = [f"{x} (left)" for x in df1.columns]
             df2.columns = [f"{x} (right)" for x in df2.columns]
             legend_labels1 = put.get_legend_lines(data=df1,
-                                                  legend_line_type=legend_line_type,
+                                                  legend_stats=legend_stats,
                                                   var_format=var_format)
             legend_labels2 = put.get_legend_lines(data=df2,
-                                                  legend_line_type=legend_line_type2,
+                                                  legend_stats=legend_stats2,
                                                   var_format=var_format_yax2)
             legend_labels = sop.to_flat_list(legend_labels1 + legend_labels2)
         put.set_legend(ax=ax,
@@ -485,15 +483,22 @@ def run_unit_test(unit_test: UnitTests):
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.PRICES:
-        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        fig, axs = plt.subplots(2, 1, figsize=(8, 6))
         global_kwargs = {'fontsize': 8,
                          'linewidth': 0.5,
                          'weight': 'normal',
                          'markersize': 1}
         plot_time_series(df=prices,
-                         legend_line_type=put.LegendLineType.AVG_LAST,
-                         ax=ax,
+                         legend_stats=put.LegendStats.AVG_LAST,
+                         last_label=LastLabel.AVERAGE_VALUE_SORTED,
                          trend_line=TrendLine.AVERAGE_SHADOWS,
+                         ax=axs[0],
+                         **global_kwargs)
+        plot_time_series(df=prices,
+                         legend_stats=put.LegendStats.AVG_LAST,
+                         last_label=LastLabel.LAST_VALUE,
+                         trend_line=TrendLine.AVERAGE_SHADOWS,
+                         ax=axs[1],
                          **global_kwargs)
 
     elif unit_test == UnitTests.PRICES_2AX:
@@ -505,7 +510,7 @@ def run_unit_test(unit_test: UnitTests):
 
         plot_time_series_2ax(df1=prices.iloc[:, -1],
                              df2=prices.iloc[:, :-1],
-                             legend_line_type=put.LegendLineType.AVG_LAST,
+                             legend_stats=put.LegendStats.AVG_LAST,
                              var_format_yax2='{:.0f}',
                              ax=ax,
                              **global_kwargs)

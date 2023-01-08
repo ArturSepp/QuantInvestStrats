@@ -1,5 +1,5 @@
 """
-generic to generate strategy factsheet report
+gen to generate strategy factsheet report
 with comparision to 1-2 benchmarks
 """
 # built in
@@ -10,13 +10,14 @@ from enum import Enum
 
 # qis
 import qis.file_utils as fu
+import qis.plots.derived.regime_data
 import qis.utils.dates as da
 import qis.utils.struct_ops as sop
-from qis.utils.df_to_str import series_to_str
+from qis.utils.df_str import series_to_str
 
 import qis.perfstats.perf_table as rpt
 import qis.perfstats.returns as ret
-import qis.perfstats.drawdowns as cdr
+import qis.plots.derived.drawdowns as cdr
 from qis.perfstats.config import PerfStat, PerfParams, RegimeData
 import qis.plots.derived.returns_scatter as prs
 import qis.perfstats.regime_classifier as rcl
@@ -28,8 +29,7 @@ import qis.plots.derived.prices as ppd
 import qis.plots.derived.perf_table as ppt
 import qis.plots.table as ptb
 import qis.plots.derived.returns_heatmap as rhe
-import qis.plots.derived.regime_scatter as drc
-import qis.plots.derived.correlations as pco
+import qis.models.linear.plot_correlations as pco
 
 
 FIG_SIZE = (8.3, 11.7)  # A4 for portrait
@@ -92,11 +92,11 @@ class MultiAssetReport:
                 regime_benchmark_str = self.benchmark_prices.columns[0]
             pivot_prices = self.benchmark_prices[regime_benchmark_str]
         pivot_prices = pivot_prices.reindex(index=data_df.index, method='ffill')
-        rcl.add_bnb_regime_shadows(ax=ax,
-                                   data_df=data_df,
-                                   pivot_prices=pivot_prices,
-                                   benchmark=regime_benchmark_str,
-                                   regime_params=self.regime_params)
+        qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax,
+                                                             data_df=data_df,
+                                                             pivot_prices=pivot_prices,
+                                                             benchmark=regime_benchmark_str,
+                                                             regime_params=self.regime_params)
 
     def plot_ra_perf_table(self,
                            benchmark: str,
@@ -263,17 +263,17 @@ class MultiAssetReport:
         prices = self.get_prices()
         title = f"Sharpe ratio decomposition by Strategies to {benchmark} Bear/Normal/Bull regimes"
         regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=REGIME_PARAMS)
-        fig = rcl.plot_regime_data(regime_classifier=regime_classifier,
-                                   prices=prices,
-                                   benchmark=benchmark,
-                                   is_conditional_sharpe=is_conditional_sharpe,
-                                   regime_data_to_plot=regime_data_to_plot,
-                                   var_format=var_format or '{:.2f}',
-                                   legend_loc=legend_loc,
-                                   perf_params=self.perf_params,
-                                   title=title,
-                                   ax=ax,
-                                   **kwargs)
+        fig = qis.plots.derived.regime_data.plot_regime_data(regime_classifier=regime_classifier,
+                                                             prices=prices,
+                                                             benchmark=benchmark,
+                                                             is_conditional_sharpe=is_conditional_sharpe,
+                                                             regime_data_to_plot=regime_data_to_plot,
+                                                             var_format=var_format or '{:.2f}',
+                                                             legend_loc=legend_loc,
+                                                             perf_params=self.perf_params,
+                                                             title=title,
+                                                             ax=ax,
+                                                             **kwargs)
         return fig
 
 
@@ -313,7 +313,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                         linewidth=0.5,
                         weight='normal',
                         markersize=1,
-                        legend_alpha=0.75)
+                        framealpha=0.75)
     kwargs = sop.update_kwargs(local_kwargs, kwargs)
 
     # create 5*2 figure

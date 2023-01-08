@@ -229,7 +229,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.NAN_MEAN
+    unit_test = UnitTests.STACK
 
     is_run_all_tests = False
     if is_run_all_tests:

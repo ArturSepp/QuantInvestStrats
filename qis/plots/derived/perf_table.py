@@ -7,10 +7,12 @@ from enum import Enum
 
 # qis
 import qis.utils.dates as da
-import qis.utils.df_to_str as dfs
+import qis.utils.df_str as dfs
+
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfStat, PerfParams
 import qis.perfstats.perf_table as rpt
+
 import qis.plots.scatter as psc
 import qis.plots.table as ptb
 import qis.plots.utils as put

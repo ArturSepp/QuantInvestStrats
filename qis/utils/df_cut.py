@@ -57,7 +57,7 @@ def x_bins_cut(a: np.ndarray,
 
     # Decide all boundary symbols based on traditional cut() parameters
     symbol_lower = "<=" if include_lowest and right else "<"
-    left_bracket = u"\u2208" + "(" if right else "["
+    left_bracket = u"=" + "(" if right else "["
     right_bracket = "]" if right else ")"
     symbol_upper = ">" if right else ">="
 
@@ -150,6 +150,28 @@ def sort_index_by_hue(df: pd.DataFrame, hue_order: List[str]) -> pd.DataFrame:
     name_sort = {key: idx for idx, key in enumerate(hue_order)}
     df[sort_column] = df.index.map(name_sort)
     df = df.sort_values(by=sort_column).drop(sort_column, axis=1)
+    return df
+
+
+def add_hue_fixed_years(df: pd.DataFrame,
+                        hue: str,
+                        fixed_years: List[int] = (2001, 2006, 2010, 2018, 2021, 2022)
+                        ) -> pd.DataFrame:
+    """
+    map sequence of years into hue = (fixed_years[i-1], fixed_years[i]]
+    """
+    pd_idx = pd.IntervalIndex.from_breaks(fixed_years, closed='right')
+    mapper = {idx: f"{p.left+1}-{p.right}" for idx, p in enumerate(pd_idx)}
+    hue_vals = pd.Series([pd_idx.get_loc(x.year) for x in df.index]).map(mapper)
+    df[hue] = hue_vals.to_list()
+    return df
+
+
+def add_hue_years(df: pd.DataFrame, hue: str) -> pd.DataFrame:
+    """
+    add hue in years
+    """
+    df[hue] = [x.year for x in df.index]
     return df
 
 

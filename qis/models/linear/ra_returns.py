@@ -10,8 +10,8 @@ from enum import Enum
 
 # qis
 import qis.utils.dates as da
-import qis.models.linear.ewm as ewm
 import qis.utils.np_ops as npo
+import qis.models.linear.ewm as ewm
 
 PD_UNION = Union[pd.Series, pd.DataFrame]
 

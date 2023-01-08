@@ -9,9 +9,9 @@ from enum import Enum
 from typing import Tuple, List, Union, Optional
 
 # qis
+import qis.utils.dates as da
 import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
-import qis.utils.dates as da
 
 
 def compute_masked_covar_corr(returns: Union[np.ndarray, pd.DataFrame],
@@ -241,7 +241,7 @@ def run_unit_test(unit_test: UnitTests):
         print(corrs)
 
         pts.plot_time_series(df=corrs,
-                             legend_line_type=pts.LegendLineType.AVG_LAST,
+                             legend_stats=pts.LegendStats.AVG_LAST,
                              trend_line=pts.TrendLine.AVERAGE)
 
     elif unit_test == UnitTests.MATRIX_REGULARIZATION:

@@ -10,8 +10,8 @@ import pandas as pd
 from enum import Enum
 
 # qis
-import qis.models.linear.ewm as ewm
 import qis.utils.dates as da
+import qis.models.linear.ewm as ewm
 
 
 class ConvolutionType(Enum):

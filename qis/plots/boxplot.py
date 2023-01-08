@@ -10,47 +10,47 @@ from typing import Union, List, Dict, Optional, Tuple
 from enum import Enum
 
 # qis
-import qis.plots.utils as put
 import qis.utils.df_cut as dfc
-from qis.utils.df_melt import melt_df_by_columns
+import qis.utils.df_melt as dfm
+import qis.plots.utils as put
 
 
-def boxplot(df: Union[pd.Series, pd.DataFrame],
-            x: str,
-            y: str,
-            xlabel: Optional[Union[str, bool]] = True,
-            ylabel: Optional[Union[str, bool]] = True,
-            hue: Optional[str] = None,
-            hue_order: List[str] = None,
-            xvar_format: str = '{:.2f}',
-            yvar_format: str = '{:.2f}',
-            colors: Union[List[str], List[Tuple[float, float, float]]] = None,
-            title: str = None,
-            meanline: bool = False,
-            showfliers: bool = False,
-            showmeans: bool = False,
-            showmedians: bool = False,
-            add_xy_mean_labels: bool = False,
-            add_xy_med_labels: bool = False,
-            add_y_med_labels: bool = False,
-            x_rotation: Optional[int] = 0,
-            legend_loc: Optional[str] = 'upper right',
-            fontsize: int = 10,
-            linewidth: float = 1.0,
-            y_lines: List[Dict] = None,
-            labels: List[str] = None,
-            original_index: Union[pd.DatetimeIndex, pd.Index] = None,
-            x_date_freq: Union[str, None] = 'A',
-            date_format: str = '%b-%y',
-            num_obs_for_ci: np.ndarray = None,
-            add_zero_line: bool = False,
-            add_mean_std_bound: bool = False,
-            add_autocorr_std_bound: bool = False,
-            continuous_x_col: str = None,
-            y_limits: Tuple[Optional[float], Optional[float]] = None,
-            ax: plt.Subplot = None,
-            **kwargs
-            ) -> Optional[plt.Figure]:
+def plot_box(df: Union[pd.Series, pd.DataFrame],
+             x: str,
+             y: str,
+             xlabel: Optional[Union[str, bool]] = True,
+             ylabel: Optional[Union[str, bool]] = True,
+             hue: Optional[str] = None,
+             hue_order: List[str] = None,
+             xvar_format: str = '{:.2f}',
+             yvar_format: str = '{:.2f}',
+             colors: Union[List[str], List[Tuple[float, float, float]]] = None,
+             title: str = None,
+             meanline: bool = False,
+             showfliers: bool = False,
+             showmeans: bool = False,
+             showmedians: bool = False,
+             add_xy_mean_labels: bool = False,
+             add_xy_med_labels: bool = False,
+             add_y_med_labels: bool = False,
+             x_rotation: Optional[int] = 0,
+             legend_loc: Optional[str] = 'upper right',
+             fontsize: int = 10,
+             linewidth: float = 1.0,
+             y_lines: List[Dict] = None,
+             labels: List[str] = None,
+             original_index: Union[pd.DatetimeIndex, pd.Index] = None,
+             x_date_freq: Union[str, None] = 'A',
+             date_format: str = '%b-%y',
+             num_obs_for_ci: np.ndarray = None,
+             add_zero_line: bool = False,
+             add_mean_std_bound: bool = False,
+             add_autocorr_std_bound: bool = False,
+             continuous_x_col: str = None,
+             y_limits: Tuple[Optional[float], Optional[float]] = None,
+             ax: plt.Subplot = None,
+             **kwargs
+             ) -> Optional[plt.Figure]:
 
     if ax is None:
         fig, ax = plt.subplots()
@@ -218,21 +218,21 @@ def df_boxplot_by_index(df: Union[pd.Series, pd.DataFrame],
     """
     # make sure it is given
     df.index.name = index_var_name
-    box_data = melt_df_by_columns(df=df, x_index_var_name=index_var_name, y_var_name=ylabel)
+    box_data = dfm.melt_df_by_columns(df=df, x_index_var_name=index_var_name, y_var_name=ylabel)
     if colors is None:
         colors = put.compute_heatmap_colors(a=np.nanmean(df.to_numpy(), axis=1))
 
-    fig = boxplot(df=box_data,
-                  x=index_var_name,
-                  y=ylabel,
-                  continuous_x_col=ylabel,
-                  ylabel=ylabel if show_ylabel else None,
-                  original_index=df.index,
-                  colors=colors,
-                  xlabel=False,
-                  title=title,
-                  ax=ax,
-                  **kwargs)
+    fig = plot_box(df=box_data,
+                   x=index_var_name,
+                   y=ylabel,
+                   continuous_x_col=ylabel,
+                   ylabel=ylabel if show_ylabel else None,
+                   original_index=df.index,
+                   colors=colors,
+                   xlabel=False,
+                   title=title,
+                   ax=ax,
+                   **kwargs)
 
     return fig
 
@@ -252,7 +252,7 @@ def df_boxplot_by_hue_var(df: Union[pd.Series, pd.DataFrame],
     plot time series of data frame by melting columns
     hue_var_name is hue index
     """
-    box_data = melt_df_by_columns(df=df,
+    box_data = dfm.melt_df_by_columns(df=df,
                                   x_index_var_name=x_index_var_name,
                                   y_var_name=y_var_name,
                                   hue_var_name=hue_var_name,
@@ -265,14 +265,14 @@ def df_boxplot_by_hue_var(df: Union[pd.Series, pd.DataFrame],
             n = len(df.columns) if isinstance(df, pd.DataFrame) else 1
             colors = put.get_n_colors(n=n, **kwargs)
 
-    fig = boxplot(df=box_data,
-                  x=x_index_var_name,
-                  y=y_var_name,
-                  hue=hue_var_name,
-                  colors=colors,
-                  title=title,
-                  ax=ax,
-                  **kwargs)
+    fig = plot_box(df=box_data,
+                   x=x_index_var_name,
+                   y=y_var_name,
+                   hue=hue_var_name,
+                   colors=colors,
+                   title=title,
+                   ax=ax,
+                   **kwargs)
 
     return fig
 
@@ -309,25 +309,25 @@ def df_boxplot_by_classification_var(df: pd.DataFrame,
                                                    xvar_format=xvar_format,
                                                    is_value_labels=is_value_labels)
 
-    boxplot(df=scatter_data,
-            x=x_hue_name,
-            y=y,
-            hue=hue,
-            continuous_x_col=x,
-            xlabel=x_hue_name if is_add_xlabel else None,
-            hue_order=hue_order,
-            title=title,
-            xvar_format=xvar_format,
-            yvar_format=yvar_format,
-            showfliers=showfliers,
-            showmeans=showmeans,
-            meanline=meanline,
-            medianline=medianline,
-            add_xy_mean_labels=add_xy_mean_labels,
-            add_xy_med_labels=add_xy_med_labels,
-            colors=colors,
-            ax=ax,
-            **kwargs)
+    plot_box(df=scatter_data,
+             x=x_hue_name,
+             y=y,
+             hue=hue,
+             continuous_x_col=x,
+             xlabel=x_hue_name if is_add_xlabel else None,
+             hue_order=hue_order,
+             title=title,
+             xvar_format=xvar_format,
+             yvar_format=yvar_format,
+             showfliers=showfliers,
+             showmeans=showmeans,
+             meanline=meanline,
+             medianline=medianline,
+             add_xy_mean_labels=add_xy_mean_labels,
+             add_xy_med_labels=add_xy_med_labels,
+             colors=colors,
+             ax=ax,
+             **kwargs)
 
 
 def df_dict_boxplot_by_classification_var(data_dict: Dict[Tuple[str, str], pd.DataFrame],
@@ -373,25 +373,25 @@ def df_dict_boxplot_by_classification_var(data_dict: Dict[Tuple[str, str], pd.Da
         else:
             scatter_datas = pd.concat([scatter_datas, scatter_data], axis=0)
         hue_order.append(key[1])
-    boxplot(df=scatter_datas,
-            x=x_hue_name,
-            y=y_var_name,
-            hue=var_hue_name,
-            xlabel=x_hue_name if is_add_xlabel else None,
-            hue_order=hue_order,
-            title=title,
-            xvar_format=xvar_format,
-            yvar_format=yvar_format,
-            showfliers=showfliers,
-            showmeans=showmeans,
-            meanline=meanline,
-            medianline=medianline,
-            add_xy_mean_labels=add_xy_mean_labels,
-            add_xy_med_labels=add_xy_med_labels,
-            labels=hue_order,
-            colors=colors,
-            ax=ax,
-            **kwargs)
+    plot_box(df=scatter_datas,
+             x=x_hue_name,
+             y=y_var_name,
+             hue=var_hue_name,
+             xlabel=x_hue_name if is_add_xlabel else None,
+             hue_order=hue_order,
+             title=title,
+             xvar_format=xvar_format,
+             yvar_format=yvar_format,
+             showfliers=showfliers,
+             showmeans=showmeans,
+             meanline=meanline,
+             medianline=medianline,
+             add_xy_mean_labels=add_xy_mean_labels,
+             add_xy_med_labels=add_xy_med_labels,
+             labels=hue_order,
+             colors=colors,
+             ax=ax,
+             **kwargs)
     if is_add_last_value:
         scatter_datas = scatter_datas.sort_index().fillna(method='ffill')
         last = scatter_datas.iloc[-1, :]
@@ -422,18 +422,18 @@ def run_unit_test(unit_test: UnitTests):
         index_name = 'date'
         value_name = 'returns'
 
-        box_data = melt_df_by_columns(df=returns, x_index_var_name=index_name, y_var_name=value_name)
+        box_data = dfm.melt_df_by_columns(df=returns, x_index_var_name=index_name, y_var_name=value_name)
         print(box_data)
         colors = put.compute_heatmap_colors(a=np.nanmean(returns.to_numpy(), axis=1))
 
-        boxplot(df=box_data,
-                x=index_name,
-                y=value_name,
-                original_index=returns.index,
-                colors=colors,
-                xlabel=False,
-                ax=ax,
-                **global_kwargs)
+        plot_box(df=box_data,
+                 x=index_name,
+                 y=value_name,
+                 original_index=returns.index,
+                 colors=colors,
+                 xlabel=False,
+                 ax=ax,
+                 **global_kwargs)
 
     elif unit_test == UnitTests.DF_BOXPLOT:
         # returns by the quantiles of the first variable

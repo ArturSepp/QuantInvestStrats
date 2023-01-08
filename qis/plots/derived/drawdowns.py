@@ -6,127 +6,9 @@ from typing import Union, Tuple, Optional
 from enum import Enum
 
 # qis
-import qis.plots.time_series as pts
 import qis.plots.utils as put
-
-
-def compute_drawdown(prices: pd.Series) -> pd.Series:
-
-    if not isinstance(prices, pd.Series):
-        print(prices)
-        raise TypeError(f"in compute_max_dd: path_data must be series")
-
-    max_dd = np.zeros_like(prices)
-    last_peak = -np.inf
-
-    for idx, price in enumerate(prices):
-        if not np.isnan(price):
-            if price > last_peak:
-                last_peak = price
-            if not np.isclose(last_peak, 0.0):
-                max_dd[idx] = price / last_peak - 1.0
-        else:
-            max_dd[idx] = np.nan
-
-    max_dd = pd.Series(data=max_dd, index=prices.index, name=prices.name)
-
-    return max_dd
-
-
-def compute_time_under_water(prices: pd.Series) -> Tuple[pd.Series, pd.Series]:
-
-    if not isinstance(prices, pd.Series):
-        raise TypeError(f"in compute_time_under_water: path_data must be series")
-
-    max_dd = np.zeros_like(prices)
-    dd_times = np.zeros_like(prices.index)
-
-    last_peak = -np.inf
-    last_dd_time = prices.index[0]
-    dd_times[0] = last_dd_time
-    for idx, (index, price) in enumerate(prices.items()):
-        if not np.isnan(price):
-            if price > last_peak:
-                last_peak = price
-                last_dd_time = index
-            max_dd[idx] = price / last_peak - 1.0
-            dd_times[idx] = last_dd_time
-        else:
-            max_dd[idx] = 0.0
-            dd_times[idx] = index
-
-    max_dd = pd.Series(data=max_dd, index=prices.index, name=prices.name)
-    dd_times = (prices.index - pd.DatetimeIndex(dd_times)).days
-    time_under_water = pd.Series(data=dd_times, index=prices.index, name=prices.name)
-
-    return max_dd, time_under_water
-
-
-def compute_drawdown_data(prices: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
-    if isinstance(prices, pd.Series):
-        drawdown = compute_drawdown(prices=prices)
-    elif isinstance(prices, pd.DataFrame):
-        if len(prices.columns) > 1 and prices.columns.duplicated().any():
-            raise ValueError(f"dublicated columns = {prices[prices.columns.duplicated()]}")
-        drawdowns = []
-        for asset_ in prices:
-            drawdowns.append(compute_drawdown(prices=prices[asset_]))
-        drawdown = pd.concat(drawdowns, axis=1)
-    else:
-        raise ValueError(f"unsuported type {type(prices)}")
-    return drawdown
-
-
-def compute_drawdown_time_data(prices: Union[pd.DataFrame, pd.Series]
-                               ) -> Tuple[Union[pd.DataFrame, pd.Series], Union[pd.DataFrame, pd.Series]]:
-
-    if isinstance(prices, pd.Series):
-        drawdown, time_under_water = compute_time_under_water(prices=prices)
-
-    else:
-        drawdowns = []
-        time_under_waters = []
-        for asset in prices:
-            drawdown, time_under_water = compute_time_under_water(prices=prices[asset])
-            drawdowns.append(drawdown)
-            time_under_waters.append(time_under_water)
-
-        drawdown = pd.concat(drawdowns, axis=1)
-        time_under_water = pd.concat(time_under_waters, axis=1)
-
-    return drawdown, time_under_water
-
-
-def compute_max_dd(prices: Union[pd.DataFrame, pd.Series]
-                   ) -> np.ndarray:
-    max_dd_data = compute_drawdown_data(prices=prices)
-    max_dds = np.min(max_dd_data.to_numpy(), axis=0)
-    return max_dds
-
-
-def compute_avg_max(ds: pd.Series,
-                    is_max: bool = True,
-                    q: float = 0.1
-                    ) -> (float, float, float, float):
-    """
-    compute dd statistics
-    """
-    if is_max:
-        nan_data = np.where(ds.to_numpy() >= 0, ds.to_numpy(), np.nan)
-    else:
-        nan_data = np.where(ds.to_numpy() <= 0, ds.to_numpy(), np.nan)
-
-    avg = np.nanmean(nan_data)
-    if is_max:
-        quant = np.nanquantile(nan_data, 1.0-q)
-        nmax = np.nanmax(nan_data)
-    else:
-        quant = np.nanquantile(nan_data, q)
-        nmax = np.nanmin(nan_data)
-
-    last = ds.iloc[-1]
-
-    return avg, quant, nmax, last
+import qis.plots.time_series as pts
+import qis.perfstats.perf_table as pt
 
 
 class DdLegendType(Enum):
@@ -145,7 +27,7 @@ def plot_drawdown(prices: pd.DataFrame,
                   **kwargs
                   ) -> plt.Figure:
 
-    max_dd_data = compute_drawdown_data(prices=prices)
+    max_dd_data = pt.compute_drawdown_data(prices=prices)
 
     if dd_legend_type == DdLegendType.NONE:
         legend_loc = None
@@ -153,7 +35,7 @@ def plot_drawdown(prices: pd.DataFrame,
     else:
         legend_labels = []
         for column in max_dd_data.columns:
-            avg, quant, nmax, last = compute_avg_max(ds=max_dd_data[column], is_max=False)
+            avg, quant, nmax, last = pt.compute_avg_max(ds=max_dd_data[column], is_max=False)
             if dd_legend_type == DdLegendType.SIMPLE:
                 legend_labels.append(f"{column}, max dd={var_format.format(nmax)}")
             elif dd_legend_type == DdLegendType.DETAILED:
@@ -184,11 +66,11 @@ def plot_rolling_time_under_water(prices: pd.DataFrame,
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
 
-    max_dd_data, time_under_water = compute_drawdown_time_data(prices=prices)
+    max_dd_data, time_under_water = pt.compute_drawdown_time_data(prices=prices)
 
     legend_labels = []
     for column in time_under_water.columns:
-        avg, quant, nmax, last = compute_avg_max(ds=time_under_water[column], is_max=True)
+        avg, quant, nmax, last = pt.compute_avg_max(ds=time_under_water[column], is_max=True)
         legend_labels.append(f"{column}, mean={var_format.format(avg)}, "
                              f"quantile_10%={var_format.format(quant)}, max={var_format.format(nmax)},"
                              f" last={var_format.format(last)}")
@@ -218,7 +100,7 @@ def plot_drawdown_lengths(price: pd.Series,
     """
     plot drowdowns with x-being the days in dd
     """
-    max_dd, time_under_water = compute_time_under_water(prices=price)
+    max_dd, time_under_water = pt.compute_time_under_water(prices=price)
 
     # compute_run_data
     val0 = 0
@@ -262,7 +144,7 @@ def plot_drawdown_lengths(price: pd.Series,
                                var_format=var_format,
                                legend_loc=legend_loc,
                                linestyles=linestyles,
-                               legend_line_type=pts.LegendLineType.NONE,
+                               legend_stats=pts.LegendStats.NONE,
                                x_limits=x_limits,
                                y_limits=y_limits,
                                xlabel='Days in drawdown',
@@ -275,10 +157,9 @@ def plot_drawdown_lengths(price: pd.Series,
 
 
 class UnitTests(Enum):
-    DD_DATA = 1
-    DRAWDOWN_TS = 2
-    ROLLING_TIME = 3
-    PLOT_DD_LENTHS = 4
+    DRAWDOWN_TS = 1
+    ROLLING_TIME = 2
+    PLOT_DD_LENTHS = 3
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -286,13 +167,7 @@ def run_unit_test(unit_test: UnitTests):
     from qis.data.yf_data import load_etf_data
     prices = load_etf_data().dropna()
 
-    if unit_test == UnitTests.DD_DATA:
-        prices = prices.iloc[:, 0]
-        max_dd, time_under_water = compute_time_under_water(prices=prices)
-        print(max_dd)
-        print(time_under_water)
-
-    elif unit_test == UnitTests.DRAWDOWN_TS:
+    if unit_test == UnitTests.DRAWDOWN_TS:
         plot_drawdown(prices=prices)
 
     elif unit_test == UnitTests.ROLLING_TIME:

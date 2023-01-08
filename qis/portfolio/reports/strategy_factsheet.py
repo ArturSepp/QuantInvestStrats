@@ -62,7 +62,7 @@ def generate_strategy_factsheet(multi_portfolio_data: MultiPortfolioData,
                        digits_to_show=1, sharpe_digits=2,
                        weight='normal',
                        markersize=1,
-                       legend_alpha=0.75)
+                       framealpha=0.75)
     kwargs = sop.update_kwargs(kwargs, plot_kwargs)
     fig = plt.figure(figsize=FIG_SIZE, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)

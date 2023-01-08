@@ -3,8 +3,8 @@ import pandas as pd
 from enum import Enum
 
 # qis
-import qis.perfstats.returns as ret
 import qis.utils.dates as da
+import qis.perfstats.returns as ret
 import qis.models.linear.ewm as ewm
 
 

@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional, Union, Callable
 
 import qis.utils.dates as da
-from qis.utils.df_to_str import df_index_to_str
+from qis.utils.df_str import df_index_to_str
 
 
 def df_asfreq(df: Union[pd.DataFrame, pd.Series],

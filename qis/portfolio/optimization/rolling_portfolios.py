@@ -330,24 +330,24 @@ def run_unit_test(unit_test: UnitTests):
                   is_yaxis_limit_01=True,
                   baseline='zero',
                   bbox_to_anchor=(0.4, 1.1),
-                  legend_line_type=pst.LegendLineType.AVG_STD_LAST,
+                  legend_stats=pst.LegendStats.AVG_STD_LAST,
                   ncol=len(prices.columns)//3,
                   var_format='{:.0%}')
 
     if unit_test == UnitTests.MIN_VAR:
         weights = solve_optimal_weights_ewm_covar(prices=prices,
                                                   portfolio_objective=PortfolioObjective.MIN_VAR)
-        pst.stackplot_timeseries(df=weights, **kwargs)
+        pst.plot_stack(df=weights, **kwargs)
 
     elif unit_test == UnitTests.MIN_VAR_OVERLAY:
         fixed_weights = {'SPY': 0.6}
         weights = solve_optimal_weights_ewm_covar(prices=prices, fixed_weights=fixed_weights)
-        pst.stackplot_timeseries(df=weights, **kwargs)
+        pst.plot_stack(df=weights, **kwargs)
 
     elif unit_test == UnitTests.RISK_PARITY:
         weights = solve_optimal_weights_ewm_covar(prices=prices,
                                                   portfolio_objective=PortfolioObjective.EQUAL_RISK_CONTRIBUTION)
-        pst.stackplot_timeseries(df=weights, **kwargs)
+        pst.plot_stack(df=weights, **kwargs)
 
     elif unit_test == UnitTests.ROLLING_MEANS_COVAR:
         prices = prices[['SPY', 'TLT']].dropna()
@@ -370,17 +370,17 @@ def run_unit_test(unit_test: UnitTests):
             pts.plot_time_series(df=means,
                                  var_format='{:.0%}',
                                  trend_line=pts.TrendLine.AVERAGE,
-                                 legend_line_type=pts.LegendLineType.FIRST_AVG_LAST,
+                                 legend_stats=pts.LegendStats.FIRST_AVG_LAST,
                                  ax=axs[0])
             pts.plot_time_series(df=vols,
                                  var_format='{:.0%}',
                                  trend_line=pts.TrendLine.AVERAGE,
-                                 legend_line_type=pts.LegendLineType.FIRST_AVG_LAST,
+                                 legend_stats=pts.LegendStats.FIRST_AVG_LAST,
                                  ax=axs[1])
             pts.plot_time_series(df=covs,
                                  var_format='{:.0%}',
                                  trend_line=pts.TrendLine.AVERAGE,
-                                 legend_line_type=pts.LegendLineType.FIRST_AVG_LAST,
+                                 legend_stats=pts.LegendStats.FIRST_AVG_LAST,
                                  ax=axs[2])
 
     elif unit_test == UnitTests.ROLLING_PORTFOLIOS:
@@ -391,7 +391,7 @@ def run_unit_test(unit_test: UnitTests):
             fig, ax = plt.subplots(1, 1, figsize=(7, 12))
             pts.plot_time_series(df=port_data.weights,
                                  var_format='{:.0%}',
-                                 legend_line_type=pts.LegendLineType.FIRST_AVG_LAST,
+                                 legend_stats=pts.LegendStats.FIRST_AVG_LAST,
                                  ax=ax)
 
     elif unit_test == UnitTests.ROLLING_MIXTURES:
@@ -406,7 +406,7 @@ def run_unit_test(unit_test: UnitTests):
             fig, ax = plt.subplots(1, 1, figsize=(7, 12))
             pts.plot_time_series(df=port_data.weights,
                                  var_format='{:.0%}',
-                                 legend_line_type=pts.LegendLineType.FIRST_AVG_LAST,
+                                 legend_stats=pts.LegendStats.FIRST_AVG_LAST,
                                  ax=ax)
     plt.show()
 

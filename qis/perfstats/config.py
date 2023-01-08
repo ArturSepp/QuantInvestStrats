@@ -6,7 +6,7 @@ import pandas as pd
 from dataclasses import dataclass
 from enum import Enum
 
-from qis.utils.generic.col_var_data import ValueType, ColVar
+from qis.utils.generic import ColVar, ValueType
 
 
 class ReturnTypes(Enum):
