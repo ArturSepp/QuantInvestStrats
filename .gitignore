@@ -13,6 +13,7 @@ option_chain_data/
 
 # YAML
 *.yaml
+settings.yaml
 
 # Byte-compiled / optimized / DLL files
 docs/figures/
