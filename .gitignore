@@ -151,3 +151,4 @@ dmypy.json
 
 !/option_chain_data/
 !/option_chain_data/
+!/qis/settings.yaml
