@@ -1,0 +1,18 @@
+# set pc/developer local paths
+# add to gitignore afterwards
+
+RESOURCE_PATH:
+  "C:\\Users\\...\\"
+
+LOCAL_RESOURCE_PATH:
+  "C:\\Users\\...\\"
+
+UNIVERSE_PATH:
+  "C:\\Users\\...\\"
+
+OUTPUT_PATH:
+  "C:\\Users\\...\\"
+
+AWS_POSTGRES:
+  "postgresql://user:password@database:port"
+  
