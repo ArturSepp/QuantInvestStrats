@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import Optional
+from typing import Optional, Tuple
 from enum import Enum
 
 # qis
@@ -22,6 +22,7 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                      is_add_bar_values: bool = True,
                      title: Optional[str] = 'Conditional Excess Sharpe ratio',
                      var_format: str = '{:.1f}',
+                     bbox_to_anchor: Optional[Tuple[float, float]] = (1.0, 0.95),
                      fontsize: int = 10,
                      is_top_totals: bool = True,
                      is_add_totals: bool = True,
@@ -49,6 +50,7 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                              title=title,
                              totals=totals,
                              fontsize=fontsize,
+                             bbox_to_anchor=bbox_to_anchor,
                              xmin_shift=-0.05,
                              x_step=0.5,
                              ax=ax,
@@ -63,6 +65,7 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                             totals=totals,
                             is_top_totals=is_top_totals,
                             fontsize=fontsize,
+                            bbox_to_anchor=bbox_to_anchor,
                             legend_loc=legend_loc,
                             is_reversed=True,
                             ax=ax,

@@ -19,10 +19,9 @@ from qis.plots.utils import LegendStats
 
 def plot_bars(df: Union[pd.DataFrame, pd.Series],
               stacked: bool = True,
-              is_map_index_to_strftime: bool = False,
-              date_format: str = '%Y',
+              date_format: str = '%d-%b-%y',
               title: str = None,
-              fontsize: int = 12,
+              fontsize: int = 10,
               min_max_for_bars_values: float = None,
               is_add_bar_values: bool = False,
               is_add_top_bar_values: bool = False,
@@ -31,7 +30,8 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               yvar_format: str = '{:,.2f}',
               x_rotation: int = 0,
               show_y_axis: bool = False,
-              bbox_to_anchor: Optional[Tuple[float, float]] = (1.0, 0.95),
+              legend_loc: str = 'upper center',
+              bbox_to_anchor: Optional[Tuple[float, float]] = None,
               y_limits: Tuple[Optional[float], Optional[float]] = None,
               totals: List[float] = None,
               is_top_totals: bool = False,
@@ -63,16 +63,19 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                 n = len(df.index)
         colors = put.get_n_colors(n=n, **kwargs)
 
-    if is_map_index_to_strftime:
-        if isinstance(df.index[0], pd.Timestamp):
-            new_index = [date.strftime(date_format) for date in df.index]
-            df.index = new_index
+    if isinstance(df.index[0], pd.Timestamp):
+        df.index = [date.strftime(date_format) for date in df.index]
 
     if isinstance(df, pd.Series):
         sns.barplot(x=df.index, y=df, palette=colors, ax=ax)
     else:
-        #sns.barplot(x=df.index, y=df, palette=colors, ax=ax)
-        df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+        value_name = ylabel or 'y'
+        var_name = xlabel or 'x'
+        df1 = df.melt(ignore_index=False, var_name=var_name, value_name=value_name)
+        sns.barplot(x=df1.index, y=value_name, data=df1, hue=var_name,
+                    palette=colors, edgecolor='none',
+                    ax=ax)
+        # df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
 
     # put totals to bar and store locations
     x_locs = []
@@ -141,6 +144,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                    colors=colors,
                    is_reversed=is_reversed,
                    bbox_to_anchor=bbox_to_anchor,
+                   legend_loc=legend_loc,
                    fontsize=fontsize,
                    **kwargs)
 
@@ -385,6 +389,7 @@ class UnitTests(Enum):
     BARS2 = 1
     TOP_BOTTOM_RETURNS = 2
     VBAR_WEIGHTS = 3
+    MONTHLY_RETURNS_BARS = 4
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -410,8 +415,10 @@ def run_unit_test(unit_test: UnitTests):
         put.align_y_limits_ax12(ax1=axs[0], ax2=axs[1], is_invisible_y_ax2=True)
 
     elif unit_test == UnitTests.TOP_BOTTOM_RETURNS:
+
         from qis.data.yf_data import load_etf_data
         import qis.perfstats.returns as ret
+
         prices = load_etf_data().dropna().loc['2021', :]
         returns = ret.to_total_returns(prices=prices).sort_values()
         print(returns)
@@ -441,12 +448,29 @@ def run_unit_test(unit_test: UnitTests):
                    add_bar_value_at_mid=False,
                    add_total_bar=False)
 
+    elif unit_test == UnitTests.MONTHLY_RETURNS_BARS:
+        from qis.data.yf_data import load_etf_data
+        import qis.perfstats.returns as ret
+
+        prices = load_etf_data().dropna().loc['2020':, :].iloc[:, :3]
+        returns = ret.to_returns(prices=prices, freq='M', drop_first=True)
+        print(returns)
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6), tight_layout=True)
+
+        plot_bars(df=returns,
+                  stacked=False,
+                  show_y_axis=True,
+                  x_rotation=90,
+                  yvar_format='{:,.0%}',
+                  date_format='%b-%y',
+                  fontsize=6,
+                  ax=ax)
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.TOP_BOTTOM_RETURNS
+    unit_test = UnitTests.MONTHLY_RETURNS_BARS
 
     is_run_all_tests = False
     if is_run_all_tests:

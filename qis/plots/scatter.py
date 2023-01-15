@@ -97,10 +97,7 @@ def plot_scatter(df: pd.DataFrame,
             estimated_reg_models[hue_id] = reg_model
 
             # plot data points
-            #try:
             sns.scatterplot(x=x_column, y=y_column, data=data_hue, color=palette[idx], s=markersize, ax=ax)
-            #except:
-            #    print(f"scatter plot problem with {data_hue}")
 
             if order > 0:  # plot prediction
                 if ci is not None: # not possible to control reg equation in regplot, only use for ci

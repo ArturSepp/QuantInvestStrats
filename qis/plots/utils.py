@@ -9,7 +9,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import seaborn as sns
-from colormap import hex2rgb
 from matplotlib import colors as mcolors, colorbar
 from matplotlib._color_data import CSS4_COLORS as mcolors
 from matplotlib.colors import rgb2hex, LinearSegmentedColormap
@@ -744,12 +743,16 @@ class LegendStats(Enum):
     TOTAL = 20
     MEDIAN = 21
     MEDIAN_MAD = 22
+    TSTAT = 23
+    AVG_STD_TSTAT = 24
 
 
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                      legend_stats: LegendStats = LegendStats.NONE,
                      var_format: str = '{:.0f}',
-                     nan_display: float = np.nan  # or zero
+                     tstat_format: str = '{:,.2f}',
+                     nan_display: float = np.nan,  # or zero
+                     **kwargs
                      ) -> List[str]:
 
     data = data.copy()
@@ -846,9 +849,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
         for column in data.columns:
             data_column = data[column]
             if np.all(np.isnan(data_column)):
-                avg = nan_display
-                std = nan_display
-                last = nan_display
+                avg, std, last = nan_display, nan_display, nan_display
             else:
                 avg = np.nanmean(data_column)
                 std = np.nanstd(data_column, ddof=1)
@@ -856,6 +857,32 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, "
                                 f"std={var_format.format(std)}, "
                                 f"last={var_format.format(last)}")
+
+    elif legend_stats == LegendStats.TSTAT:
+        legend_lines = []
+        for column in data.columns:
+            data_column = data[column]
+            if np.all(np.isnan(data_column)):
+                tstat = nan_display
+            else:
+                avg = np.nanmean(data_column)
+                std = np.nanstd(data_column, ddof=1)
+                tstat = avg / std
+            legend_lines.append(f"{column}: t-stat={tstat_format.format(tstat)}")
+
+    elif legend_stats == LegendStats.AVG_STD_TSTAT:
+        legend_lines = []
+        for column in data.columns:
+            data_column = data[column]
+            if np.all(np.isnan(data_column)):
+                avg, std, tstat = nan_display, nan_display, nan_display
+            else:
+                avg = np.nanmean(data_column)
+                std = np.nanstd(data_column, ddof=1)
+                tstat = avg / std
+            legend_lines.append(f"{column}: avg={var_format.format(avg)}, "
+                                f"std={var_format.format(std)}, "
+                                f"t-stat={tstat_format.format(tstat)}")
 
     elif legend_stats == LegendStats.AVG_NONNAN_LAST:
         legend_lines = []
@@ -1238,50 +1265,6 @@ def rand_cmap(nlabels: int,
     return random_colormap
 
 
-def plot_colors_rgb(colors_enum: Type[Enum]) -> plt.Figure:
-    """
-    plot colors and their RGB numbers
-    """
-    colors = [color for color in colors_enum]
-    sorted_names = [color.name for color in colors]
-    sorted_colors = [color.value for color in colors]
-
-    n = len(sorted_names)
-    ncols = 1
-    nrows = n // ncols
-
-    fig, ax = plt.subplots(figsize=(12, 10))
-
-    X, Y = fig.get_dpi() * fig.get_size_inches()  # Get height and width
-    h = Y / (nrows + 1)
-    w = X / ncols
-    for i, name in enumerate(sorted_names):
-        row = i % nrows
-        col = i // nrows
-        y = Y - (row * h) - h
-        xi_line = w * (col + 0.05)
-        xf_line = w * (col + 0.25)
-        xi_text = w * (col + 0.3)
-        rgb = hex2rgb(sorted_colors[i])
-        label = name + '=' + 'R'+str(rgb[0]) + ' G'+str(rgb[1]) + ' B'+str(rgb[2]) + '=' + str(sorted_colors[i])
-        ax.text(xi_text, y, label, fontsize=(h * 0.8),
-                color=sorted_colors[i],
-                horizontalalignment='left',
-                verticalalignment='center')
-
-        ax.hlines(y + h * 0.1, xi_line, xf_line, color=sorted_colors[i], linewidth=(h * 0.8))
-
-    ax.set_xlim(0, X)
-    ax.set_ylim(0, Y)
-    ax.set_axis_off()
-
-    fig.subplots_adjust(left=0, right=1,
-                        top=1, bottom=0,
-                        hspace=0, wspace=0)
-
-    return fig
-
-
 def get_cmap_colors(n: int, name: str = 'RdYlGn') -> List[str]:
     """
     Returns a list of matplotlib cmap colors
@@ -1418,11 +1401,10 @@ def calc_df_table_size(df: pd.DataFrame,
 class UnitTests(Enum):
     DUMMY_LINE = 1
     LEGEND_LINES = 2
-    FIXED_COLORS = 3
-    CMAP_COLORS = 4
-    SNS_COLORS = 5
-    HEATMAP_COLORS = 6
-    GET_COLORS = 7
+    CMAP_COLORS = 3
+    SNS_COLORS = 4
+    HEATMAP_COLORS = 5
+    GET_COLORS = 6
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -1437,9 +1419,6 @@ def run_unit_test(unit_test: UnitTests):
         for legend_stats in LegendStats:
             legend_lines = get_legend_lines(data=prices, legend_stats=legend_stats)
             print(legend_lines)
-
-    elif unit_test == UnitTests.FIXED_COLORS:
-        plot_colors_rgb(colors_enum=FixedColors)
 
     elif unit_test == UnitTests.CMAP_COLORS:
         cmap_colors = get_cmap_colors(n=100)
@@ -1469,7 +1448,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.FIXED_COLORS
+    unit_test = UnitTests.GET_COLORS
 
     is_run_all_tests = False
     if is_run_all_tests:

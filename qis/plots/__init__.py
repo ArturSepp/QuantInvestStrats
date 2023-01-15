@@ -23,7 +23,6 @@ from qis.plots.utils import (
     get_n_mlt_colors,
     get_n_sns_colors,
     map_dates_index_to_str,
-    plot_colors_rgb,
     rand_cmap,
     remove_spines,
     set_ax_tick_labels,

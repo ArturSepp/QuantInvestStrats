@@ -32,7 +32,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    legend_stats: put.LegendStats = put.LegendStats.NONE,
                    is_add_norm_std_pdf: bool = False,
                    is_add_data_std_pdf: bool = False,
-                   bbox_to_anchor: Optional[Tuple[float, float]] = (0.0, 1.0),
+                   bbox_to_anchor: Optional[Tuple[float, float]] = None,
                    legend_loc: Optional[str] = 'upper left',
                    xlabel: str = None,
                    ylabel: str = None,
@@ -48,7 +48,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    add_total_sample_pdf: bool = False,  # concat total
                    total_sample_name: str = 'Universe',
                    annualize_vol: bool = False,
-                   desc_table_type: dsc.DescTableType = dsc.DescTableType.SHORT,
+                   desc_table_type: Optional[dsc.DescTableType] = dsc.DescTableType.SHORT,
                    first_color_fixed: bool = False,
                    fill: bool = False,
                    bins: Optional[Union[np.ndarray, int]] = None,
@@ -161,7 +161,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
     if x_limits is not None:
         put.set_x_limits(ax=ax, x_limits=x_limits)
 
-    if desc_table_type != dsc.DescTableType.NONE:
+    if desc_table_type is not None and desc_table_type != dsc.DescTableType.NONE:
         stats_table = dsc.compute_desc_table(df=df,
                                          annualize_vol=annualize_vol,
                                          desc_table_type=desc_table_type,

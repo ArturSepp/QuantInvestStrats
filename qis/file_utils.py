@@ -1,8 +1,8 @@
 """
 path management for saving and reading from local drive
-use local_paths.yaml to set local directories
+use settings.yaml to set local directories
 
-Content of local_paths.yaml:
+Content of settings.yaml:
 RESOURCE_PATH:
   'C:/your_folder'
 UNIVERSE_PATH:
@@ -11,41 +11,33 @@ OUTPUT_PATH:
   'C:/your_folder'
 """
 import datetime
+import functools
 import platform
-import yaml
+import time
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from pathlib import Path
 from os import listdir
 from os.path import isfile, join
 from typing import Dict, List, NamedTuple, Optional, Union
 from matplotlib.backends.backend_pdf import PdfPages
+from sqlalchemy.engine.base import Engine
 from enum import Enum
 
 
-DATE_FORMAT = '%Y%m%d_%H%M'
-
-
-def get_local_paths() -> Dict[str, str]:
-    """
-    read path specs in local_paths.yaml
-    """
-    full_file_path = Path(__file__).parent.joinpath('local_paths.yaml')
-    with open(full_file_path) as settings:
-        settings_data = yaml.load(settings, Loader=yaml.Loader)
-    return settings_data
-
-
-LOCAL_PATHS = get_local_paths()
+""""
+Path specifications
+"""
+from qis.local_path import get_paths
+LOCAL_PATHS = get_paths()
 RESOURCE_PATH = LOCAL_PATHS['RESOURCE_PATH']
 UNIVERSE_PATH = LOCAL_PATHS['UNIVERSE_PATH']
 OUTPUT_PATH = LOCAL_PATHS['OUTPUT_PATH']
 LOCAL_RESOURCE_PATH = LOCAL_PATHS['LOCAL_RESOURCE_PATH']
 
 
-""""
-Path specifications
-"""
+DATE_FORMAT = '%Y%m%d_%H%M'
+INDEX_COLUMN= 'Time'  # for Postresql
 
 
 class FileData(NamedTuple):
@@ -228,7 +220,24 @@ def get_param_file_path(file_name: Optional[str] = None,
     return file_path
 
 
-
+def timer(func):
+    """
+    Print the runtime of the decorated function
+    """
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        start_time = time.perf_counter()    # 1
+        value = func(*args, **kwargs)
+        end_time = time.perf_counter()      # 2
+        run_time = end_time - start_time    # 3
+        if run_time < 60.0:
+            print(f"Finished {func.__name__!r} in {run_time:.4f} secs")
+        else:
+            minuts = np.floor(run_time/60.0)
+            secs = run_time - 60.0*minuts
+            print(f"Finished {func.__name__!r} in {minuts:.0f}m {secs:.0f}secs")
+        return value
+    return wrapper_timer
 
 
 """
@@ -539,17 +548,59 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
     return pandas_dict
 
 
-"""
-Pandas to/from feather
-"""
+#############################################################
+###  Pandas to/from feather
+#############################################################
 
+@timer
+def save_df_dict_to_sql(engine: Engine,
+                        table_name: str,
+                        dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
+                        schema: Optional[str] = None,
+                        index_col: Optional[str] = INDEX_COLUMN
+                        ) -> None:
+    """
+    save pandas dict to sql engine
+    """
+    for key, df in dfs.items():
+        if df is not None:
+            df = df.reset_index(names=index_col)
+            if len(df.columns) > 1600:
+                df = df[df.columns[:1600]]
+            df.to_sql(f"{table_name}_{key}", engine, schema=schema, if_exists='replace')
+
+
+@timer
+def load_df_dict_from_sql(engine: Engine,
+                          table_name: str,
+                          dataset_keys: List[Union[str, Enum, NamedTuple]],
+                          schema: Optional[str] = None,
+                          index_col: Optional[str] = INDEX_COLUMN
+                          ) -> Dict[str, pd.DataFrame]:
+    """
+    pandas dict from csv files
+    """
+    pandas_dict = {}
+    for key in dataset_keys:
+        df = pd.read_sql_table(table_name=f"{table_name}_{key}", con=engine, schema=schema, index_col=index_col)
+        if index_col is not None:
+            df[index_col] = pd.to_datetime(df[index_col])
+            df = df.set_index(index_col)
+        pandas_dict[key] = df
+    return pandas_dict
+
+
+#############################################################
+###  Pandas to/from feather
+#############################################################
 
 def save_df_to_feather(df: pd.DataFrame,
                        file_name: Optional[str] = None,
                        local_path: Optional[str] = None,
                        subfolder_name: str = None,
                        subsubfolder_name: str = None,
-                       is_output_file: bool = False
+                       is_output_file: bool = False,
+                       index_col: Optional[str] = INDEX_COLUMN
                        ) -> None:
     """
     pandas dict to csv files
@@ -560,7 +611,7 @@ def save_df_to_feather(df: pd.DataFrame,
                                     subfolder_name=subfolder_name,
                                     subsubfolder_name=subsubfolder_name,
                                     is_output_file=is_output_file)
-    df = df.reset_index(names='index')
+    df = df.reset_index(names=index_col)
     df.to_feather(path=file_path)
 
 
@@ -568,7 +619,8 @@ def load_df_from_feather(file_name: Optional[str] = None,
                          local_path: Optional[str] = None,
                          subfolder_name: str = None,
                          subsubfolder_name: str = None,
-                         key: str = None
+                         key: str = None,
+                         index_col: Optional[str] = INDEX_COLUMN
                          ) -> pd.DataFrame:
     """
     pandas from csv
@@ -584,13 +636,15 @@ def load_df_from_feather(file_name: Optional[str] = None,
     except:
         raise FileNotFoundError(f"not found {file_name} with file_path={file_path}")
 
-    df.index = pd.to_datetime(df['index'])
-    df = df.set_index('index')
+    if index_col is not None:
+        df.index = pd.to_datetime(df['index'])
+        df = df.set_index('index')
 
     return df
 
 
-def save_df_dict_to_feather(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
+@timer
+def save_df_dict_to_feather(dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
                             file_name: Optional[str] = None,
                             local_path: Optional[str] = None,
                             subfolder_name: str = None,
@@ -600,7 +654,7 @@ def save_df_dict_to_feather(datasets: Dict[Union[str, Enum, NamedTuple], pd.Data
     """
     pandas dict to csv files
     """
-    for key, df in datasets.items():
+    for key, df in dfs.items():
         if df is not None:
             file_path = get_local_file_path(file_name=file_name,
                                             file_type=FileTypes.FEATHER,
@@ -613,6 +667,7 @@ def save_df_dict_to_feather(datasets: Dict[Union[str, Enum, NamedTuple], pd.Data
             df.to_feather(path=file_path)
 
 
+@timer
 def load_df_dict_from_feather(dataset_keys: List[Union[str, Enum, NamedTuple]],
                               file_name: Optional[str],
                               local_path: Optional[str] = None,
@@ -875,7 +930,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.LOCAL_PATHS:
-        print(get_local_paths())
+        print(get_paths())
         print(platform.system())
         print(OUTPUT_PATH)
 
@@ -900,7 +955,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.UNIVERSE
+    unit_test = UnitTests.LOCAL_PATHS
 
     is_run_all_tests = False
     if is_run_all_tests:
@@ -908,3 +963,4 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
+

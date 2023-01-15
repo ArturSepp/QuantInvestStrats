@@ -8,6 +8,7 @@ my_strategies/
 stochvolmodels/
 testing/
 volanalytics/
+option_chain_data/
 /lp_model/
 
 # YAML
@@ -147,3 +148,5 @@ dmypy.json
 .pyre/
 
 
+!/option_chain_data/
+!/option_chain_data/

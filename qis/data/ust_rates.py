@@ -7,8 +7,9 @@ from enum import Enum
 import pandas as pd
 
 import qis.file_utils as fu
+import qis.local_path
 
-LOCAL_RESOURCE_PATH = fu.get_local_paths()['LOCAL_RESOURCE_PATH']
+LOCAL_RESOURCE_PATH = qis.get_local_path.get_paths()['LOCAL_RESOURCE_PATH']
 UST_FILE_NAME = 'ust_rates'
 
 

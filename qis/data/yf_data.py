@@ -8,10 +8,11 @@ from typing import List
 from enum import Enum
 
 import qis.file_utils as fu
+import qis.local_path
 from qis.utils.dates import TimePeriod
 
 
-LOCAL_RESOURCE_PATH = fu.get_local_paths()['LOCAL_RESOURCE_PATH']
+LOCAL_RESOURCE_PATH = qis.local_path.get_paths()['LOCAL_RESOURCE_PATH']
 
 
 def fetch_prices(tickers: List[str] = ('BTC-USD', ),

@@ -222,8 +222,6 @@ from qis.utils.struct_ops import (
     update_kwargs
 )
 
-from qis.utils.timer import (
-    timer
-)
+from qis.file_utils import timer
 
 

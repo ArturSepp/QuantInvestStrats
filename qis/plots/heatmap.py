@@ -15,9 +15,8 @@ import qis.plots.utils as put
 
 def plot_heatmap(df: pd.DataFrame,
                  is_transpose: bool = False,
-                 is_map_index_to_strftime: bool = True,
                  is_inverse: bool = False,
-                 date_format: str = '%Y',
+                 date_format: Optional[str] = '%Y',
                  cmap: str = 'RdYlGn',
                  var_format: Optional[str] = '{:.1%}',
                  alpha: float = 1.0,
@@ -40,15 +39,9 @@ def plot_heatmap(df: pd.DataFrame,
         fig = None
 
     df = df.copy()
-    if is_map_index_to_strftime:
-        new_index = []
-        for date in df.index:
-            if isinstance(date, pd.Timestamp):
-                new_index.append(date.strftime(date_format))
-            else:
-                new_index.append(date)
-        df['new_id'] = new_index
-        df = df.set_index(keys='new_id', drop=True)  # change index to year for merging
+
+    if date_format is not None:  # index may include 'Total'
+        df.index = [date.strftime(date_format) if isinstance(date, pd.Timestamp) else date for date in df.index]
 
     if is_transpose:
         df = df.T
