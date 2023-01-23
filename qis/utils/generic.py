@@ -1,21 +1,17 @@
 
-
-
 # built in
-
-# qis
-
-
-
+import numpy as np
+import pandas as pd
 from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple, Optional, Callable, Dict, List
 
-import numpy as np
-import pandas as pd
-
-from qis import file_utils as fu
-from qis.utils import df_groups as dfg, df_agg as dfa, struct_ops as sop, df_to_str as dff
+# qis
+import qis.file_utils as fu
+import qis.utils.df_groups as dfg
+import qis.utils.df_agg as dfa
+import qis.utils.struct_ops as sop
+import qis.utils.df_str as dff
 
 DATE_FORMAT = '%d%b%y' # short y for meta
 

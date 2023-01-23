@@ -42,7 +42,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      is_log: bool = False,
                      ax: plt.Subplot = None,
                      **kwargs
-                     ) -> plt.Figure:
+                     ) -> Optional[plt.Figure]:
 
     if trend_line in [TrendLine.AVERAGE, TrendLine.AVERAGE_SHADOWS, TrendLine.ZERO_SHADOWS,
                       TrendLine.TREND_LINE, TrendLine.TREND_LINE_SHADOWS]:  # these features are only available with sns
