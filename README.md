@@ -6,19 +6,14 @@ reporting, analysis of quantitative strategies.
 
 # Table of contents
 1. [Installation](#installation)
-
 2. [Analytics](#analytics)
-   1. [Disclaimer](#disclaimer)    
-   2. [Contributions](#contributions) 
-
-3. [Examples](#examples)
+3. [Disclaimer](#disclaimer)    
+4. [Contributions](#contributions)
+5. [Examples](#examples)
    1. [Visualization of price data](#price)
-
-4. [ToDos](#todos)
-
+6. [ToDos](#todos)
 
 ## **Installation** <a name="installation"></a>
-
 ```python 
 pip install qis
 ```
