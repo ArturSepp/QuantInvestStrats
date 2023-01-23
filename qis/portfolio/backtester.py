@@ -10,11 +10,8 @@ from enum import Enum
 from typing import Union, Dict, Tuple
 
 # qis
-import qis.utils.dates as da
-import qis.utils.df_ops as dfo
-import qis.utils.struct_ops as sop
+import qis.utils as qu
 from qis.portfolio.portfolio_data import PortfolioData
-from qis.utils.np_ops import repeat_by_columns, repeat_by_rows
 
 
 def backtest_model_portfolio(prices: pd.DataFrame,
@@ -36,7 +33,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
 
     if isinstance(weights, np.ndarray) or isinstance(weights, Dict):
         if isinstance(weights, Dict):
-            sop.assert_list_subset(large_list=prices.columns.to_list(),
+            qu.assert_list_subset(large_list=prices.columns.to_list(),
                                    list_sample=list(weights.keys()),
                                    message=f"weights columns must be aligned with price columns")
             weights = prices.columns.map(weights).to_numpy()
@@ -45,19 +42,19 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         if len(weights.shape) > 1:
             raise ValueError(f"only single aray is allowed")
 
-        is_rebalancing = da.generate_rebalancing_indicators(df=prices,
+        is_rebalancing = qu.generate_rebalancing_indicators(df=prices,
                                                             freq=rebalance_freq,
                                                             include_start_date=is_rebalanced_at_first_date)
 
         portfolio_rebalance_dates = is_rebalancing[is_rebalancing == True]
-        portfolio_weights = pd.DataFrame(data=repeat_by_rows(weights, n=len(portfolio_rebalance_dates)),
+        portfolio_weights = pd.DataFrame(data=qu.repeat_by_rows(weights, n=len(portfolio_rebalance_dates)),
                                          index=portfolio_rebalance_dates,
                                          columns=prices.columns)
 
     elif isinstance(weights, pd.DataFrame):
-        sop.assert_list_subset(large_list=prices.columns.to_list(),
-                               list_sample=weights.columns.to_list(),
-                               message=f"weights columns must be aligned with price columns")
+        qu.assert_list_subset(large_list=prices.columns.to_list(),
+                              list_sample=weights.columns.to_list(),
+                              message=f"weights columns must be aligned with price columns")
         if prices.index[0] > weights.index[0]:
             raise ValueError(f"price dates {prices.index[0]} are after weights start date {weights.index[0]}")
         portfolio_weights = weights[prices.columns]  # alighn
@@ -68,11 +65,11 @@ def backtest_model_portfolio(prices: pd.DataFrame,
 
     # adjust rates at rebealncing
     if funding_rate is not None:
-        funding_rate_dt = dfo.multiply_df_by_dt(df=funding_rate, dates=prices.index, lag=0)
+        funding_rate_dt = qu.multiply_df_by_dt(df=funding_rate, dates=prices.index, lag=0)
     else:
         funding_rate_dt = pd.Series(0.0, index=prices.index)
     if instruments_carry is not None:
-        instruments_carry_dt = dfo.multiply_df_by_dt(df=instruments_carry, dates=prices.index, lag=0)
+        instruments_carry_dt = qu.multiply_df_by_dt(df=instruments_carry, dates=prices.index, lag=0)
     else:
         instruments_carry_dt = pd.Series(0.0, index=prices.index)
     nav, units, effective_weights, realized_costs = backtest_rebalanced_portfolio(prices=prices.to_numpy(),
@@ -175,7 +172,7 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
         nav[t] = np.nansum(current_units * current_prices) + current_cash_balance
         cash_balances[t] = current_cash_balance
 
-    effective_weights = np.divide(units * prices, repeat_by_columns(a=nav, n=prices.shape[1]))
+    effective_weights = np.divide(units * prices, qu.repeat_by_columns(a=nav, n=prices.shape[1]))
 
     return nav, units, effective_weights, realized_costs
 
@@ -190,7 +187,7 @@ def run_unit_test(unit_test: UnitTests):
     import matplotlib.pyplot as plt
     import qis.plots.derived.prices as ppd
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
     prices = prices[['SPY', 'TLT']]

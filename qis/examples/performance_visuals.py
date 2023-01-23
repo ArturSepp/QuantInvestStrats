@@ -2,57 +2,52 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import yfinance as yf
 from enum import Enum
 
-import qis.utils as qu
-import qis.plots as qp
-import qis.perfstats as qs
-
-
-# data
-from qis.data.yf_data import load_etf_data, fetch_prices
-from qis.data.ust_rates import load_ust_3m_rate
+# qis
+import qis
 
 
 def generate_performances(prices: pd.DataFrame,
                           regime_benchmark_str: str,
-                          perf_params: qs.PerfParams = None,
-                          performance_label: qp.PerformanceLabel = qp.PerformanceLabel.WITH_DD,
+                          perf_params: qis.PerfParams = None,
+                          performance_label: qis.PerformanceLabel = qis.PerformanceLabel.WITH_DD,
                           ) -> None:
 
     kwargs = dict(digits_to_show=1, framealpha=0.75, performance_label=performance_label)
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 4), tight_layout=True)
-    qp.plot_ra_perf_table(prices=prices,
-                          perf_columns=qs.EXTENDED_TABLE_COLUMNS,
+    qis.plot_ra_perf_table(prices=prices,
+                          perf_columns=qis.EXTENDED_TABLE_COLUMNS,
                           perf_params=perf_params,
                           ax=ax)
 
-    fig, ax = plt.subplots(1, 1, figsize=(6, qp.calc_table_height(num_rows=len(prices.columns), scale=0.4)), tight_layout=True)
-    qp.plot_periodic_returns_table_from_prices(prices=prices,
+    fig, ax = plt.subplots(1, 1, figsize=(6, qis.calc_table_height(num_rows=len(prices.columns), scale=0.4)), tight_layout=True)
+    qis.plot_periodic_returns_table(prices=prices,
                                                 freq='A',
                                                 ax=ax,
-                                                title=f"Monthly Performance: {qu.get_time_period_label(prices, date_separator='-')}",
+                                                title=f"Monthly Performance: {qis.get_time_period_label(prices, date_separator='-')}",
                                                 total_name='YTD',
                                                 **{'square': False, 'x_rotation': 90})
 
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-        qp.plot_prices(prices=prices,
+        qis.plot_prices(prices=prices,
                         regime_benchmark_str=regime_benchmark_str,
                         perf_params=perf_params,
                         ax=ax,
                         **kwargs)
 
         fig, axs = plt.subplots(2, 1, figsize=(7, 7))
-        qp.plot_prices_with_dd(prices=prices,
+        qis.plot_prices_with_dd(prices=prices,
                                 regime_benchmark_str=regime_benchmark_str,
                                 perf_params=perf_params,
                                 axs=axs,
                                 **kwargs)
 
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-        qp.plot_scatter_regression(prices=prices,
+        qis.plot_scatter_regression(prices=prices,
                                     regime_benchmark_str=regime_benchmark_str,
                                     perf_params=perf_params,
                                     title='Regime Conditional Regression',
@@ -66,10 +61,13 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    prices = load_etf_data().dropna()
-    ust_3m_rate = load_ust_3m_rate()
+    tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
+    prices = yf.download(tickers, start=None, end=None)['Adj Close'].dropna()
+    print(prices)
 
-    perf_params = qs.PerfParams(freq='W-WED', freq_reg='M', freq_drawdown='B', rates_data=ust_3m_rate)
+    ust_3m_rate = yf.download('^IRX', start=None, end=None)['Adj Close'].dropna()
+    print(ust_3m_rate)
+    perf_params = qis.PerfParams(freq='W-WED', freq_reg='M', freq_drawdown='B', rates_data=ust_3m_rate)
 
     if unit_test == UnitTests.ETF_DATA:
         generate_performances(prices=prices,

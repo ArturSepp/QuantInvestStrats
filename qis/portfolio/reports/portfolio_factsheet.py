@@ -10,20 +10,11 @@ from enum import Enum
 
 # qis
 import qis.file_utils as fu
-import qis.plots.derived.regime_data
-import qis.utils.struct_ops as sop
-import qis.utils.dates as da
+import qis.utils as qu
+import qis.plots as qp
 from qis.utils.dates import TimePeriod
 from qis.perfstats.config import PerfParams
-import qis.plots.derived.drawdowns as cdr
-import qis.perfstats.regime_classifier as rcl
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
-
-# plots
-import qis.plots.utils as put
-import qis.plots.derived.prices as ppd
-import qis.plots.time_series as pts
-import qis.plots.stackplot as pst
 
 # portfolio
 import qis.portfolio.backtester as bp
@@ -68,7 +59,7 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                        weight='normal',
                        markersize=1,
                        framealpha=0.75)
-    kwargs = sop.update_kwargs(kwargs, plot_kwargs)
+    kwargs = qu.update_kwargs(kwargs, plot_kwargs)
     fig.suptitle(f"{portfolio_data.nav.name} portfolio factsheet",
                  fontweight="bold", fontsize=8, color='blue')
 
@@ -76,22 +67,22 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
     joint_prices = pd.concat([portfolio_data.get_portfolio_nav(time_period=time_period), benchmark_prices], axis=1).dropna()
     pivot_prices = joint_prices[regime_benchmark]
     ax = fig.add_subplot(gs[0:2, :2])
-    ppd.plot_prices(prices=joint_prices,
+    qp.plot_prices(prices=joint_prices,
                     perf_params=perf_params,
                     title='Performance',
                     ax=ax,
                     **kwargs)
-    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-    put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    qp.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # dd
     ax = fig.add_subplot(gs[2:4, :2])
-    cdr.plot_drawdown(prices=joint_prices,
+    qp.plot_drawdown(prices=joint_prices,
                       title='Running Drawdowns',
-                      dd_legend_type=cdr.DdLegendType.SIMPLE,
+                      dd_legend_type=qp.DdLegendType.SIMPLE,
                       ax=ax, **kwargs)
-    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-    put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    qp.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # exposures
     if len(portfolio_data.weights.columns) > 10:
@@ -99,31 +90,30 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
     else:
         exposures = portfolio_data.get_exposures(is_grouped=False, time_period=time_period)
     ax = fig.add_subplot(gs[4:6, :2])
-    pst.plot_stack(df=exposures.resample('W-WED').last(),
-                   is_add_mean_levels=False,
-                   is_use_bar_plot=True,
-                   baseline='zero',
-                   title='Exposures',
-                   legend_stats=pst.LegendStats.AVG_LAST,
-                   var_format='{:.1%}',
-                   ax=ax,
-                   **sop.update_kwargs(kwargs,
-                                                 dict(bbox_to_anchor=(0.5, 1.05), ncol=2)))
-    put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    qp.plot_stack(df=exposures.resample('W-WED').last(),
+                  add_mean_levels=False,
+                  is_use_bar_plot=True,
+                  baseline='zero',
+                  title='Exposures',
+                  legend_stats=qp.LegendStats.AVG_LAST,
+                  var_format='{:.1%}',
+                  ax=ax,
+                  **qu.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncol=2)))
+    qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # turnover
     ax = fig.add_subplot(gs[6:8, :2])
     turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=260)
 
-    pts.plot_time_series(df=turnover,
+    qp.plot_time_series(df=turnover,
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
-                         legend_stats=pts.LegendStats.AVG_LAST,
+                         legend_stats=qp.LegendStats.AVG_LAST,
                          title='1y rolling average Turnover',
                          ax=ax,
                          **kwargs)
     """
-    pts.plot_time_series_2ax(df1=turnover.drop(portfolio_data.nav.name, axis=1),
+    qp.plot_time_series_2ax(df1=turnover.drop(portfolio_data.nav.name, axis=1),
                              df2=turnover[portfolio_data.nav.name],
                              var_format='{:,.2%}',
                              # y_limits=(0.0, None),
@@ -132,48 +122,48 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                              ax=ax,
                              **kwargs)
     """
-    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-    put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    qp.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
     
     # benchmark betas
     ax = fig.add_subplot(gs[8:10, :2])
     factor_exposures = portfolio_data.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                         time_period=time_period)
-    pts.plot_time_series(df=factor_exposures,
+    qp.plot_time_series(df=factor_exposures,
                          var_format='{:,.2f}',
                          # y_limits=(0.0, None),
-                         legend_stats=pts.LegendStats.AVG_LAST,
+                         legend_stats=qp.LegendStats.AVG_LAST,
                          title='Portfolio Benchmark betas',
                          ax=ax,
                          **kwargs)
-    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-    put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    qp.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # attribution
     ax = fig.add_subplot(gs[10:12, :2])
     factor_attribution = portfolio_data.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
                                                                                 time_period=time_period)
-    pts.plot_time_series(df=factor_attribution,
+    qp.plot_time_series(df=factor_attribution,
                          var_format='{:,.0%}',
                          # y_limits=(0.0, None),
-                         legend_stats=pts.LegendStats.LAST,
+                         legend_stats=qp.LegendStats.LAST,
                          title='Portfolio Cumulative return attribution to benchmark betas',
                          ax=ax,
                          **kwargs)
-    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-    put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    qp.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # constituents
     ax = fig.add_subplot(gs[12:, :2])
     num_investable_instruments=portfolio_data.get_num_investable_instruments(time_period=time_period)
-    pts.plot_time_series(df=num_investable_instruments,
+    qp.plot_time_series(df=num_investable_instruments,
                          var_format='{:,.0f}',
-                         legend_stats=pts.LegendStats.FIRST_AVG_LAST,
+                         legend_stats=qp.LegendStats.FIRST_AVG_LAST,
                          title='Number of investable instruments',
                          ax=ax,
                          **kwargs)
-    qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-    put.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    qp.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # ra perf table
     ax = fig.add_subplot(gs[0, 2:])
@@ -181,30 +171,30 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                                       benchmark_price=benchmark_prices.iloc[:, 0],
                                       time_period=time_period,
                                       perf_params=perf_params,
-                                      **sop.update_kwargs(kwargs, dict(fontsize=4)))
+                                      **qu.update_kwargs(kwargs, dict(fontsize=4)))
     ax = fig.add_subplot(gs[1, 2:])
     portfolio_data.plot_ra_perf_table(ax=ax,
                                       benchmark_price=benchmark_prices.iloc[:, 0],
-                                      time_period=da.get_time_period_shifted_by_years(time_period=time_period),
+                                      time_period=qu.get_time_period_shifted_by_years(time_period=time_period),
                                       perf_params=perf_params,
-                                      **sop.update_kwargs(kwargs, dict(fontsize=4)))
+                                      **qu.update_kwargs(kwargs, dict(fontsize=4)))
 
     # heatmap
     ax = fig.add_subplot(gs[2:4, 2:])
     portfolio_data.plot_monthly_returns_heatmap(ax=ax,
                                                 time_period=time_period,
                                                 title='Monthly Returns',
-                                                **sop.update_kwargs(kwargs, dict(fontsize=4)))
+                                                **qu.update_kwargs(kwargs, dict(fontsize=4)))
 
     # periodic returns
     ax = fig.add_subplot(gs[4:6, 2:])
-    local_kwargs = sop.update_kwargs(kwargs=kwargs,
-                                     new_kwargs=dict(fontsize=4, square=False, x_rotation=90, is_transpose=True))
+    local_kwargs = qu.update_kwargs(kwargs=kwargs,
+                                     new_kwargs=dict(fontsize=4, square=False, x_rotation=90, transpose=True))
     portfolio_data.plot_periodic_returns(ax=ax,
                                          benchmark_prices=benchmark_prices,
                                          heatmap_freq='A',
                                          time_period=time_period,
-                                         **sop.update_kwargs(local_kwargs, dict(date_format='%Y')))
+                                         **qu.update_kwargs(local_kwargs, dict(date_format='%Y')))
 
     # perf contributors
     ax = fig.add_subplot(gs[6:8, 2])
@@ -214,7 +204,7 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                                      **kwargs)
 
     ax = fig.add_subplot(gs[6:8, 3])
-    time_period_1y = da.get_time_period_shifted_by_years(time_period=time_period)
+    time_period_1y = qu.get_time_period_shifted_by_years(time_period=time_period)
     portfolio_data.plot_contributors(ax=ax,
                                      time_period=time_period_1y,
                                      title=f"Performance Contributors {time_period_1y.to_str()}",
@@ -255,7 +245,7 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                                             **kwargs)
 
     if file_name_to_save is not None:
-        fu.figs_to_pdf(figs=[fig], file_name=file_name_to_save, orientation='landscape')
+        fu.save_figs_to_pdf(figs=[fig], file_name=file_name_to_save, orientation='landscape')
     return fig
 
 
@@ -266,7 +256,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data()#.dropna()
     time_period = TimePeriod('31Dec2001', '31Dec2022')
     prices = time_period.locate(prices)

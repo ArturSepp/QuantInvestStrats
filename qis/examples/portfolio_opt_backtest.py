@@ -3,16 +3,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import yfinance as yf
 from typing import Tuple, List, Dict
 from enum import Enum
 
 # qis
+import qis
 from qis.portfolio.optimization.qp_solvers import PortfolioObjective, max_portfolio_sharpe_qp
 import qis.portfolio.backtester as bp
 import qis.portfolio.optimization.rolling_portfolios as rlp
-
-# data
-from qis.data.yf_data import load_etf_data
 
 
 class UnitTests(Enum):
@@ -22,16 +21,14 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     # data
-    prices = load_etf_data()
+    tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
+    prices = yf.download(tickers, start=None, end=None)['Adj Close'].dropna()
 
-
-    import qis.plots.stackplot as pst
-
-    kwargs = dict(is_add_mean_levels=True,
+    kwargs = dict(add_mean_levels=True,
                   is_yaxis_limit_01=True,
                   baseline='zero',
                   bbox_to_anchor=(0.4, 1.1),
-                  legend_stats=pst.LegendStats.AVG_STD_LAST,
+                  legend_stats=qis.LegendStats.AVG_STD_LAST,
                   ncol=len(prices.columns)//3,
                   var_format='{:.0%}')
 

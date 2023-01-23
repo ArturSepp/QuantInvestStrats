@@ -519,31 +519,41 @@ def generate_dates_schedule(time_period: TimePeriod,
 
     end_date = time_period.end
     is_24_hour_offset = False
-    if freq == 'H':  # need to do offset so the end of the day will be at 23:00:00 end date
+    if freq == 'H':  # need to do offset so the end of the day will be at 22:00:00 end date
         if end_date.hour == 0:
             is_24_hour_offset = True
-            end_date = time_period.end + pd.offsets.Hour(24)
+        end_date = time_period.end + pd.offsets.Hour(24)
 
-    def create_range(freq_: str) -> pd.DatetimeIndex:
+    def create_range(freq_: str, tz: Optional[str] = time_period.tz) -> pd.DatetimeIndex:
         if is_business_dates:
             return pd.bdate_range(start=time_period.start,
                                   end=end_date,
                                   freq=freq_,
-                                  tz=time_period.tz)
+                                  tz=tz)
         else:
             return pd.date_range(start=time_period.start,
                                  end=end_date,
                                  freq=freq_,
-                                 tz=time_period.tz)
+                                 tz=tz)
 
     if freq == 'M-FRI':  # last friday of month
         # create weekly fridays
-        dates_schedule_ = create_range(freq_='W-FRI')
+        dates_schedule_ = create_range(freq_='W-FRI', tz=None)
         # filter last Friday per month periods
         dates_schedule = dates_schedule_.to_series().groupby(dates_schedule_.to_period('M')).last()
         dates_schedule = pd.DatetimeIndex(dates_schedule)  # back to DatetimeIndex type
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
+
+    elif freq == 'Q-FRI':  # last friday of quarter
+        # create weekly fridays
+        dates_schedule_ = create_range(freq_='W-FRI', tz=None)
+        # filter last Friday per quarter periods
+        dates_schedule = dates_schedule_.to_series().groupby(dates_schedule_.to_period('Q')).last()
+        dates_schedule = pd.DatetimeIndex(dates_schedule)  # back to DatetimeIndex type
+        if include_end_date is False:
+            dates_schedule = dates_schedule[:-1]
+
     else:
         dates_schedule = create_range(freq_=freq)
 
@@ -903,6 +913,39 @@ def generate_is_weekend(df: Union[pd.DataFrame, pd.Series],
     return indicators_full
 
 
+def generate_fixed_maturity_rolls(time_period: TimePeriod,
+                                  freq: str = 'H',
+                                  roll_freq: str = 'W-FRI',
+                                  roll_hour: int = 8,
+                                  min_days_to_next_roll: int = 6
+                                  ) -> pd.Series:
+    """
+    for given time_period generate fixed maturity rolls
+    rolls occur when (current_roll - value_time).days < min_days_to_next_roll
+    """
+    observed_times = generate_dates_schedule(time_period,
+                                             freq=freq,
+                                             include_start_date=True,
+                                             include_end_date=True)
+    # use large day shift to cover at least next quarter
+    roll_days = generate_dates_schedule(time_period.shift_end_date_by_days(num_days=180, backward=False),
+                                        freq=roll_freq,
+                                        hours=roll_hour)
+    roll_days_ = iter(roll_days)
+    next_roll = next(roll_days_)
+    roll_schedule = {}
+    for observed_time in observed_times:
+        diff = (next_roll - observed_time).days
+        if diff < min_days_to_next_roll:
+            try:
+                next_roll = next(roll_days_)
+            except StopIteration:
+                raise ValueError(f"increase end dat for {time_period.print()}")
+        roll_schedule[observed_time] = next_roll
+    roll_schedule = pd.Series(roll_schedule)
+    return roll_schedule
+
+
 class UnitTests(Enum):
     DATES = 1
     WEEK_DAY = 2
@@ -912,6 +955,7 @@ class UnitTests(Enum):
     FREQS = 6
     REBALANCING_INDICATORS = 7
     WEEKEND_INDICATORS = 8
+    FIXED_MATURITY_ROLLS = 9
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -983,7 +1027,7 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.REBALANCING_INDICATORS:
         pd_index = pd.date_range(start='31Dec2020', end='31Dec2021', freq='W-MON')
         data = pd.DataFrame(range(len(pd_index)), index=pd_index, columns=['aaa'])
-        rebalancing_schedule = generate_rebalancing_indicators(df=data, freq='Q')
+        rebalancing_schedule = generate_rebalancing_indicators(df=data, freq='M-FRI')
         print(rebalancing_schedule)
         print(rebalancing_schedule[rebalancing_schedule==True])
 
@@ -994,10 +1038,27 @@ def run_unit_test(unit_test: UnitTests):
         print(rebalancing_schedule)
         print(rebalancing_schedule[rebalancing_schedule==True])
 
+    elif unit_test == UnitTests.FIXED_MATURITY_ROLLS:
+        time_period = TimePeriod('01Oct2022', '18Jan2023')
+        weekly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='W-FRI',
+                                                     roll_hour=8,
+                                                     min_days_to_next_roll=6)
+        print(f"weekly_rolls:\n{weekly_rolls}")
+
+        monthly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='M-FRI',
+                                                      roll_hour=8,
+                                                      min_days_to_next_roll=28)  # 4 weeks before
+        print(f"monthly_rolls:\n{monthly_rolls}")
+
+        quarterly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='Q-FRI',
+                                                        roll_hour=8,
+                                                        min_days_to_next_roll=56)  # 8 weeks before
+        print(f"quarterly_rolls:\n{quarterly_rolls}")
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.FREQ_HOUR
+    unit_test = UnitTests.FIXED_MATURITY_ROLLS
 
     is_run_all_tests = False
     if is_run_all_tests:

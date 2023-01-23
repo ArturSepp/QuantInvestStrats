@@ -44,10 +44,9 @@ def plot_scatter(df: pd.DataFrame,
                  fontsize: int = 10,
                  linewidth: float = 1.5,
                  markersize: int = 4,
-                 first_color_fixed: bool = False,
                  full_sample_label: str = 'Full sample: ',
-                 is_add_45line: bool = False,
-                 is_r2_only: bool = False,
+                 add_45line: bool = False,
+                 r2_only: bool = False,
                  legend_loc: str = 'upper left',
                  value_name: str = 'value_name',
                  ax: plt.Subplot = None,
@@ -83,7 +82,7 @@ def plot_scatter(df: pd.DataFrame,
     estimated_reg_models = {}
     if hue is not None:
         if colors is None:
-            colors = qp.get_n_colors(n=len(df[hue].unique()), first_color_fixed=first_color_fixed)
+            colors = qp.get_n_colors(n=len(df[hue].unique()), **kwargs)
         palette = colors
 
         hue_ids = df[hue].unique()
@@ -148,7 +147,7 @@ def plot_scatter(df: pd.DataFrame,
 
             if add_universe_model_label:
                 text_str = f"{full_sample_label} " \
-                           f"{qu.reg_model_params_to_str(reg_model=reg_model, order=full_sample_order, is_r2_only=False, fit_intercept=fit_intercept, **kwargs)}"
+                           f"{qu.reg_model_params_to_str(reg_model=reg_model, order=full_sample_order, r2_only=False, fit_intercept=fit_intercept, **kwargs)}"
                 legend_labels.append(text_str)
                 legend_colors.append(color0)
 
@@ -162,7 +161,7 @@ def plot_scatter(df: pd.DataFrame,
                 if add_hue_model_label:
                     reg_model = estimated_reg_models[hue_id]
                     text_str = (f"{hue_id}: " 
-                                f"{qu.reg_model_params_to_str(reg_model=reg_model, order=order, is_r2_only=is_r2_only, fit_intercept=fit_intercept, **kwargs)}")
+                                f"{qu.reg_model_params_to_str(reg_model=reg_model, order=order, r2_only=r2_only, fit_intercept=fit_intercept, **kwargs)}")
                 else:
                     text_str = hue_id
                 legend_labels.append(text_str)
@@ -191,7 +190,7 @@ def plot_scatter(df: pd.DataFrame,
             if label != '':
                 ax.scatter(x=x, y=y, c=color, s=20)
 
-    if is_add_45line:  # make equal:
+    if add_45line:  # make equal:
         ymin, ymax = ax.get_ylim()
         xmin, xmax = ax.get_xlim()
         min = ymin if ymin < xmin else xmin

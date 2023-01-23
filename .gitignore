@@ -9,11 +9,10 @@ stochvolmodels/
 testing/
 volanalytics/
 option_chain_data/
-/lp_model/
 
 # YAML
 *.yaml
-settings.yaml
+!/qis/settings.yaml
 
 # Byte-compiled / optimized / DLL files
 docs/figures/
@@ -149,6 +148,4 @@ dmypy.json
 .pyre/
 
 
-!/option_chain_data/
-!/option_chain_data/
-!/qis/settings.yaml
+

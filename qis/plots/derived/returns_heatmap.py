@@ -183,7 +183,7 @@ def plot_returns_table(prices: pd.DataFrame,
                        time_period_dict: Dict[str, da.TimePeriod],
                        vline_columns: List[int] = None,
                        hline_rows: List[int] = None,
-                       is_transpose: bool = False,
+                       transpose: bool = False,
                        var_format: str = '{:.1%}',
                        ax: plt.Subplot = None,
                        **kwargs
@@ -201,7 +201,7 @@ def plot_returns_table(prices: pd.DataFrame,
     fig = plot_heatmap(df=data,
                        vline_columns=vline_columns,
                        hline_rows=hline_rows,
-                       is_transpose=is_transpose,
+                       transpose=transpose,
                        var_format=var_format,
                        ax=ax,
                        **kwargs)
@@ -210,7 +210,7 @@ def plot_returns_table(prices: pd.DataFrame,
 
 def plot_periodic_returns_table(returns: pd.DataFrame,
                                 freq: str = 'M',
-                                is_transpose: bool = True,
+                                transpose: bool = True,
                                 var_format: str = '{:.0%}',
                                 total_name: str = None,
                                 ax: plt.Subplot = None,
@@ -233,7 +233,7 @@ def plot_periodic_returns_table(returns: pd.DataFrame,
     fig = plot_heatmap(df=data,
                        vline_columns=[len(data.index)-1],
                        hline_rows=[len(data.columns)-2],
-                       is_transpose=is_transpose,
+                       transpose=transpose,
                        var_format=var_format,
                        vmin=np.nanmin(np_data),
                        vmax=np.nanmax(np_data),
@@ -242,16 +242,16 @@ def plot_periodic_returns_table(returns: pd.DataFrame,
     return fig
 
 
-def plot_periodic_returns_table_from_prices(prices: pd.DataFrame,
-                                            freq: str = 'M',
-                                            date_format: str = None,
-                                            time_period: da.TimePeriod = None,
-                                            is_transpose: bool = True,
-                                            var_format: str = '{:.0%}',
-                                            total_name: str = None,
-                                            ax: plt.Subplot = None,
-                                            **kwargs
-                                            ) -> plt.Figure:
+def plot_periodic_returns_table(prices: pd.DataFrame,
+                                freq: str = 'M',
+                                date_format: str = None,
+                                time_period: da.TimePeriod = None,
+                                transpose: bool = True,
+                                var_format: str = '{:.0%}',
+                                total_name: str = None,
+                                ax: plt.Subplot = None,
+                                **kwargs
+                                ) -> plt.Figure:
     """
     plot returns at specified frequency
     """
@@ -273,7 +273,7 @@ def plot_periodic_returns_table_from_prices(prices: pd.DataFrame,
     np_data = data.to_numpy()[:-1, :-1]  # exclude last row from cmap
     fig = plot_heatmap(df=data,
                        vline_columns=[len(data.index)-1],
-                       is_transpose=is_transpose,
+                       transpose=transpose,
                        date_format=date_format,
                        var_format=var_format,
                        vmin=np.nanmin(np_data),
@@ -287,7 +287,7 @@ def plot_sorted_periodic_returns(prices: pd.DataFrame,
                                  freq: str = 'M',
                                  date_format: str = '%d%b%Y',
                                  time_period: da.TimePeriod = None,
-                                 is_transpose: bool = True,
+                                 transpose: bool = True,
                                  var_format: str = '{:.0%}',
                                  total_name: str = None,
                                  ax: plt.Subplot = None,
@@ -350,7 +350,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.PERIODIC_RETURNS_BY_ROW:
@@ -382,14 +382,14 @@ def run_unit_test(unit_test: UnitTests):
                            time_period_dict=time_period_dict,
                            vline_columns=[2],
                            hline_rows=[1],
-                           is_transpose=False,
+                           transpose=False,
                            is_inverse_order=True)
 
     elif unit_test == UnitTests.PERIODIC_RETURNS_TABLE:
 
         time_period = None
 
-        plot_periodic_returns_table_from_prices(prices=prices,
+        plot_periodic_returns_table(prices=prices,
                                                 time_period=time_period,
                                                 date_format='%b-%y',
                                                 freq='A',
@@ -399,7 +399,7 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.PERIODIC_RETURNS_TABLE_A:
 
         time_period = da.TimePeriod(start='28Feb2010', end='31Jan2021')
-        plot_periodic_returns_table_from_prices(prices=prices,
+        plot_periodic_returns_table(prices=prices,
                                                 time_period=time_period,
                                                 date_format='%b-%y',
                                                 freq='A',

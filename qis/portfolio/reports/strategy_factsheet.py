@@ -11,9 +11,7 @@ from enum import Enum
 
 # qis
 import qis.file_utils as fu
-import qis.utils.struct_ops as sop
-import qis.utils.dates as da
-from qis.utils.dates import TimePeriod
+import qis.utils as qu
 from qis.perfstats.config import PerfParams
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
 
@@ -42,7 +40,7 @@ KWARG_SHORT = dict(perf_params=PerfParams(freq='W-WED', freq_reg='M'),
 
 
 def generate_strategy_factsheet(multi_portfolio_data: MultiPortfolioData,
-                                time_period: da.TimePeriod = None,
+                                time_period: qu.TimePeriod = None,
                                 perf_params: PerfParams = PERF_PARAMS,
                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                 backtest_name: str = None,
@@ -63,7 +61,7 @@ def generate_strategy_factsheet(multi_portfolio_data: MultiPortfolioData,
                        weight='normal',
                        markersize=1,
                        framealpha=0.75)
-    kwargs = sop.update_kwargs(kwargs, plot_kwargs)
+    kwargs = qu.update_kwargs(kwargs, plot_kwargs)
     fig = plt.figure(figsize=FIG_SIZE, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
 
@@ -129,27 +127,27 @@ def generate_strategy_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                benchmark_price=benchmark_price,
                                                time_period=time_period,
                                                perf_params=perf_params,
-                                               **sop.update_kwargs(kwargs, dict(fontsize=4)))
+                                               **qu.update_kwargs(kwargs, dict(fontsize=4)))
     ax = fig.add_subplot(gs[2:4, 2:])
     multi_portfolio_data.plot_ac_ra_perf_table(ax=ax,
                                                benchmark_price=benchmark_price,
-                                               time_period=da.get_time_period_shifted_by_years(time_period=time_period),
+                                               time_period=qu.get_time_period_shifted_by_years(time_period=time_period),
                                                perf_params=perf_params,
-                                               **sop.update_kwargs(kwargs, dict(fontsize=4)))
+                                               **qu.update_kwargs(kwargs, dict(fontsize=4)))
 
     # periodic returns
     ax = fig.add_subplot(gs[4:6, 2])
-    local_kwargs = sop.update_kwargs(kwargs=kwargs,
-                                     new_kwargs=dict(fontsize=4, square=False, x_rotation=90, is_transpose=False))
+    local_kwargs = qu.update_kwargs(kwargs=kwargs,
+                                     new_kwargs=dict(fontsize=4, square=False, x_rotation=90, transpose=False))
     multi_portfolio_data.portfolio_datas[0].plot_periodic_returns(ax=ax,
                                                                   heatmap_freq='A',
                                                                   time_period=time_period,
-                                                                  **sop.update_kwargs(local_kwargs, dict(date_format='%Y')))
+                                                                  **qu.update_kwargs(local_kwargs, dict(date_format='%Y')))
     ax = fig.add_subplot(gs[4:6, 3])
     multi_portfolio_data.portfolio_datas[1].plot_periodic_returns(ax=ax,
                                                                   heatmap_freq='A',
                                                                   time_period=time_period,
-                                                                  **sop.update_kwargs(local_kwargs, dict(date_format='%Y')))
+                                                                  **qu.update_kwargs(local_kwargs, dict(date_format='%Y')))
 
     ax = fig.add_subplot(gs[6:8, 2])
     multi_portfolio_data.portfolio_datas[0].plot_regime_data(ax=ax,
@@ -158,7 +156,7 @@ def generate_strategy_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                              title=f"{multi_portfolio_data.portfolio_datas[0].nav.name}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
-                                                             **sop.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
+                                                             **qu.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
     ax = fig.add_subplot(gs[6:8, 3])
     multi_portfolio_data.portfolio_datas[1].plot_regime_data(ax=ax,
                                                              benchmark_price=benchmark_price,
@@ -166,7 +164,7 @@ def generate_strategy_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                              title=f"{multi_portfolio_data.portfolio_datas[1].nav.name}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
-                                                             **sop.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
+                                                             **qu.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
 
     # vol regimes
     """
@@ -176,14 +174,14 @@ def generate_strategy_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                              time_period=time_period,
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
-                                                             **sop.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
+                                                             **qu.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
     ax = fig.add_subplot(gs[8:10, 3])
     multi_portfolio_data.portfolio_datas[1].plot_vol_regimes(ax=ax,
                                                              benchmark_price=benchmark_price,
                                                              time_period=time_period,
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
-                                                             **sop.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
+                                                             **qu.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
     """
     ax = fig.add_subplot(gs[8:10, 2:])
     multi_portfolio_data.plot_instrument_pnl_diff(ax=ax,
@@ -217,13 +215,13 @@ def generate_strategy_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                      file_name_to_save=None))
 
     if file_name_to_save is not None:
-        fu.figs_to_pdf(figs=figs, file_name=file_name_to_save, orientation='landscape')
+        fu.save_figs_to_pdf(figs=figs, file_name=file_name_to_save, orientation='landscape')
 
     return fig
 
 
 def generate_performance_attribution_report(multi_portfolio_data: MultiPortfolioData,
-                                            time_period: da.TimePeriod = None,
+                                            time_period: qu.TimePeriod = None,
                                             file_name: str = 'paired_report',
                                             **kwargs
                                             ):
@@ -269,7 +267,7 @@ def generate_performance_attribution_report(multi_portfolio_data: MultiPortfolio
         figs.append(fig)
         multi_portfolio_data.plot_composite_table(ax=ax, **kwargs)
 
-    fu.figs_to_pdf(figs=figs, file_name=file_name, orientation='landscape', is_add_current_date=True)
+    fu.save_figs_to_pdf(figs=figs, file_name=file_name, orientation='landscape', add_current_date=True)
     return figs
 
 
@@ -279,14 +277,14 @@ class UnitTests(Enum):
 
 
 def run_unit_test(unit_test: UnitTests):
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     import qis.models.linear.ra_returns as rar
 
     prices = load_etf_data()  # .dropna()
     ra_returns, weights, ewm_vol = rar.compute_ra_returns(returns=prices.pct_change(), span=60, vol_target=0.15)
     weights = weights.divide(weights.sum(1), axis=0)
 
-    time_period = TimePeriod('31Dec2003', '31Dec2022')
+    time_period = qu.TimePeriod('31Dec2003', '31Dec2022')
     prices = time_period.locate(prices)
     group_data = pd.Series(
         dict(SPY='Equities', QQQ='Equities', EEM='Equities', TLT='Bonds', IEF='Bonds', SHY='Bonds', LQD='Credit',
@@ -312,13 +310,13 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.PERF_ATTRIBUTION:
 
         generate_performance_attribution_report(multi_portfolio_data=multi_portfolio_data,
-                                                time_period=TimePeriod('31Dec2021', '31Dec2022'),
+                                                time_period=qu.TimePeriod('31Dec2021', '31Dec2022'),
                                                 **KWARG_SHORT)
 
     if unit_test == UnitTests.FACTSHEET:
         generate_strategy_factsheet(multi_portfolio_data=multi_portfolio_data,
                                     backtest_name='Vol Parity Portfolio vs Equal Weight',
-                                    time_period=TimePeriod('31Dec2006', '31Dec2022'),
+                                    time_period=qu.TimePeriod('31Dec2006', '31Dec2022'),
                                     file_name_to_save=f"strategy_factsheet",
                                     **KWARG_LONG)
 

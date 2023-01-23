@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from enum import Enum
 
 from qis.data.ust_rates import load_ust_rates
-import qis.plots as qp
+import qis
 
 
 def plot_ust_rates_data():
@@ -13,14 +13,14 @@ def plot_ust_rates_data():
 
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 10), tight_layout=True)
-        qp.plot_time_series(df=df,
-                             legend_stats=qp.LegendStats.FIRST_AVG_LAST,
+        qis.plot_time_series(df=df,
+                             legend_stats=qis.LegendStats.FIRST_AVG_LAST,
                              var_format='{:,.2f}',
                              ax=ax)
 
         fig, ax = plt.subplots(1, 1, figsize=(10, 10), tight_layout=True)
-        qp.plot_time_series(df=df[['3m', '10y']],
-                             legend_stats=qp.LegendStats.FIRST_AVG_LAST,
+        qis.plot_time_series(df=df[['3m', '10y']],
+                             legend_stats=qis.LegendStats.FIRST_AVG_LAST,
                              var_format='{:,.2f}',
                              ax=ax)
 

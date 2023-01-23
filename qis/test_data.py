@@ -4,35 +4,13 @@ generate and load test data using yf library
 
 import pandas as pd
 import yfinance as yf
-from typing import List
 from enum import Enum
 
 import qis.file_utils as fu
 import qis.local_path
-from qis.utils.dates import TimePeriod
 
 
 LOCAL_RESOURCE_PATH = qis.local_path.get_paths()['LOCAL_RESOURCE_PATH']
-
-
-def fetch_prices(tickers: List[str] = ('BTC-USD', ),
-                 time_period: TimePeriod = None,
-                 freq: str = None
-                 ) -> pd.DataFrame:
-
-    if len(tickers) == 1:
-        prices = yf.download(tickers[0], start=None, end=None)
-        prices = prices.rename({'Adj Close': 'close'}, axis=1)
-    else:
-        prices = {}
-        for ticker in tickers:
-            prices[ticker] = yf.download(ticker, start=None, end=None)['Adj Close']
-        prices = pd.DataFrame.from_dict(prices, orient='columns')
-    if time_period is not None:
-        prices = time_period.locate(prices)
-    if freq is not None:
-        prices = prices.resample(freq).last().fillna(method='ffill')
-    return prices
 
 
 def load_etf_data() -> pd.DataFrame:
@@ -48,7 +26,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.ETF_PRICES:
-        prices = fetch_prices(tickers=['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD'])
+        prices = yf.download(tickers=['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD'], start=None, end=None)['Adj Close']
         print(prices)
         fu.save_df_to_csv(df=prices, file_name='etf_prices', local_path=LOCAL_RESOURCE_PATH)
 
@@ -59,7 +37,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.TEST_LOADING
+    unit_test = UnitTests.ETF_PRICES
 
     is_run_all_tests = False
     if is_run_all_tests:

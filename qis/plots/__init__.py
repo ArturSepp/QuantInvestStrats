@@ -133,10 +133,24 @@ from qis.plots.derived.returns_heatmap import (
     compute_periodic_returns_by_row_table,
     get_periodic_returns_table,
     plot_periodic_returns_table,
-    plot_periodic_returns_table_from_prices,
+    plot_periodic_returns_table,
     plot_returns_heatmap,
     plot_returns_table,
     plot_sorted_periodic_returns
 )
 
 from qis.plots.derived.returns_scatter import plot_returns_scatter
+
+
+from qis.plots.derived.drawdowns import (
+    DdLegendType,
+    plot_drawdown,
+    plot_rolling_time_under_water,
+    plot_drawdown_lengths
+)
+
+from qis.plots.derived.regime_data import (
+plot_regime_data,
+plot_regime_boxplot,
+add_bnb_regime_shadows
+)

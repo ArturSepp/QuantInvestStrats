@@ -37,7 +37,7 @@ from qis.models.linear.ewm import (
     ewm_vol_assymetric,
     ewm_vol_assymetric_np,
     set_init_dim1,
-    set_init_dim2,
+    set_init_dim2
 )
 
 
@@ -66,19 +66,6 @@ from qis.models.linear.ra_returns import(
     compute_sum_freq_ra_returns,
     compute_sum_rolling_ra_returns,
     get_paired_rareturns_signals
-)
-
-
-from qis.models.ml.regression_predictor import RegressionPredictor, estimate_y_prediction
-
-from qis.models.ml.var_data import (
-    DataType,
-    NormalizationType,
-    SmoothingType,
-    TransformType,
-    VarData,
-    validate_asset_returns,
-    validate_vardata
 )
 
 from qis.models.stats.bootstrap import (

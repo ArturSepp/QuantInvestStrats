@@ -4,7 +4,6 @@ and generating sensetivities to param reports
 """
 # built in
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 from enum import Enum
 
@@ -175,7 +174,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                          freq='W-WED',
                                          **sop.update_kwargs(kwargs, dict(fontsize=4)))
 
-    fu.figs_to_pdf(figs=[fig], file_name=file_name_to_save, orientation='landscape')
+    fu.save_figs_to_pdf(figs=[fig], file_name=file_name_to_save, orientation='landscape')
 
     return fig
 
@@ -187,7 +186,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     import qis.models.linear.ra_returns as rar
     prices = load_etf_data()
 

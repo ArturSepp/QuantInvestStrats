@@ -125,7 +125,7 @@ def df_to_numeric(df: pd.DataFrame) -> np.ndarray:
 
 def df_to_str(df: pd.DataFrame,
               var_format: str = '{:.2f}',
-              var_formats: List[str] = None,  # specific for each column
+              var_formats: List[Optional[str]] = None,  # specific for each column
               is_exclude_nans: bool = True
               ) -> pd.DataFrame:
     """
@@ -137,7 +137,8 @@ def df_to_str(df: pd.DataFrame,
         var_formats = [var_format]*len(df.columns)
     df = df.copy()
     for column, var_format in zip(df.columns, var_formats):
-        df[column] = series_to_str(ds=df[column], var_format=var_format, is_exclude_nans=is_exclude_nans)
+        if var_format is not None:
+            df[column] = series_to_str(ds=df[column], var_format=var_format, is_exclude_nans=is_exclude_nans)
     return df
 
 
@@ -146,7 +147,7 @@ def timeseries_df_to_str(df: pd.DataFrame,
                          date_format: str = '%b-%y',
                          var_format: str = '{:.0%}',
                          var_formats: List[str] = None,  # specific for each column
-                         is_transpose: bool = True
+                         transpose: bool = True
                          ) -> pd.DataFrame:
     """
     time series df to table str
@@ -154,7 +155,7 @@ def timeseries_df_to_str(df: pd.DataFrame,
     if freq is not None:
         df = df.resample(freq).last()
     df.index = df.index.strftime(date_format)
-    if is_transpose:
+    if transpose:
         df = df.T
     df = df_to_str(df, var_format=var_format, var_formats=var_formats)
     return df

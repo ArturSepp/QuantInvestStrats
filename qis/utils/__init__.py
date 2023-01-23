@@ -34,7 +34,8 @@ from qis.utils.dates import (
     shift_dates_by_year,
     shift_time_period_by_days,
     split_df_by_freq,
-    tz_localize_dates
+    tz_localize_dates,
+    generate_fixed_maturity_rolls
 )
 
 
@@ -119,12 +120,12 @@ from qis.utils.df_ops import (
     get_first_last_non_nan_date,
     get_first_non_nan_values,
     get_last_non_nan_values,
+    get_last_non_nan,
     merge_on_column,
     missing_zero_ratios_after_first_non_nan,
     multiply_df_by_dt,
     norm_df_by_ax_mean,
     np_txy_tensor_to_pd_dict,
-    rename_column_names,
     series_to_dict
 )
 
@@ -187,7 +188,9 @@ from qis.utils.np_ops import (
     running_mean,
     to_finite_np,
     to_finite_ratio,
-    to_finite_reciprocal
+    to_finite_reciprocal,
+    repeat_by_columns,
+    repeat_by_rows
 )
 
 from qis.utils.ols import (

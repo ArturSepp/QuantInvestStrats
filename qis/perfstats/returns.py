@@ -660,7 +660,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     import qis.plots.time_series as pts
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.TO_ZERO_NONNAN:

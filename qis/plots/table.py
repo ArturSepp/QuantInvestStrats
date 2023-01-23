@@ -36,7 +36,7 @@ def plot_df_table(df: pd.DataFrame,
                   bbox: Tuple[float] = (0, 0, 1, 1),
                   header_column_id: int = 0,
                   header_row_id: int = 0,
-                  is_left_aligned_first_col: bool = False,
+                  left_aligned_first_col: bool = False,
                   var_format: str = None,  # '{:.2f}' to convert numerical data to str
                   title: str = None,
                   heatmap_columns: List[int] = None,
@@ -49,7 +49,7 @@ def plot_df_table(df: pd.DataFrame,
                   diagonal_color: str = None,
                   rows_edge_lines: List[int] = None,
                   columns_edge_lines: List[Tuple[int, str]] = None,
-                  is_set_bold_font: bool = False,
+                  bold_font: bool = False,
                   alpha: float = 1.0,
                   is_emply_column_names: bool = False,
                   ax: plt.Subplot = None,
@@ -107,7 +107,7 @@ def plot_df_table(df: pd.DataFrame,
     mpl_table.auto_set_font_size(False)
     mpl_table.set_fontsize(fontsize)
 
-    weight = 'bold' if is_set_bold_font else 'normal'
+    weight = 'bold' if bold_font else 'normal'
     for k, cell in mpl_table._cells.items():
         if k[0] == header_row_id or k[1] < header_column_id:
             cell.set_edgecolor(edge_color)
@@ -175,7 +175,7 @@ def plot_df_table(df: pd.DataFrame,
                                 row=special_rows_color[0],
                                 color=special_rows_color[1],
                                 alpha=0.5*alpha,
-                                is_set_bold_font=is_set_bold_font)
+                                bold_font=bold_font)
 
     if special_columns_colors is not None:
         for special_columns_color in special_columns_colors:
@@ -183,7 +183,7 @@ def plot_df_table(df: pd.DataFrame,
                                 column=special_columns_color[0],
                                 color=special_columns_color[1],
                                 alpha=0.5*alpha,
-                                is_set_bold_font=is_set_bold_font,
+                                bold_font=bold_font,
                                 header_row_id=header_row_id)
 
     if diagonal_color is not None:
@@ -195,7 +195,7 @@ def plot_df_table(df: pd.DataFrame,
 
     set_row_edge_color(mpl_table, row=None, color='lightgray')
 
-    if is_left_aligned_first_col:
+    if left_aligned_first_col:
         set_align_for_column(mpl_table, col=0, align='left')
     else:
         set_align_for_column(mpl_table, col=0, align='right')
@@ -275,20 +275,20 @@ def set_cells_facecolor(table: Table,
                         column: int = None,
                         color: str = 'slategray',
                         alpha: float = 1.0,
-                        is_set_bold_font: bool = False
+                        bold_font: bool = False
                         ) -> None:
 
     for k, cell in table._cells.items():
         if row is None and column is None:
             cell.set_facecolor(color)
-            if is_set_bold_font:
+            if bold_font:
                 txt = cell.get_text()
                 txt.set_fontweight("bold")
 
         elif column is None:  # set solor to row
             if k[0] == row:
                 cell.set_facecolor(color)
-                if is_set_bold_font:
+                if bold_font:
                     txt = cell.get_text()
                     txt.set_fontweight("bold")
 
@@ -296,19 +296,19 @@ def set_cells_facecolor(table: Table,
             if k[1] == column and k[0] > header_row_id:
                 cell.set_facecolor(color)
                 cell.set_alpha(alpha)
-                if is_set_bold_font:
+                if bold_font:
                     txt = cell.get_text()
                     txt.set_fontweight("bold")
 
 
 def set_diag_cells_facecolor(table: Table,
                              color: str = 'slategray',
-                             is_set_bold_font: bool = False
+                             bold_font: bool = False
                              ) -> None:
     for k, cell in table._cells.items():
         if k[0] == k[1] and k[0] > 0:
             cell.set_facecolor(color)
-            if is_set_bold_font:
+            if bold_font:
                 txt = cell.get_text()
                 txt.set_fontweight("bold")
 
@@ -317,12 +317,12 @@ def set_data_colors(table: Table,
                     data_colors: np.ndarray,
                     header_row_id: int = 0,
                     header_column_id = 0,
-                    is_set_bold_font: bool = False
+                    bold_font: bool = False
                     ) -> None:
     for k, cell in table._cells.items():
         if k[1] > header_column_id and k[0] > header_row_id:
             cell.set_facecolor(data_colors[k[0]-1][k[1]-1])
-            if is_set_bold_font:
+            if bold_font:
                 txt = cell.get_text()
                 txt.set_fontweight("bold")
 
@@ -354,7 +354,7 @@ def run_unit_test(unit_test: UnitTests):
         print(data)
         data['Price'] = data['Price']
         data['Engine'] = data['Engine']
-        plot_df_table(df=data, heatmap_columns=[2], is_set_bold_font=False)
+        plot_df_table(df=data, heatmap_columns=[2], bold_font=False)
         plot_df_table(df=data, heatmap_rows_columns=((0, len(data.index)), (3, 4)))
 
     plt.show()

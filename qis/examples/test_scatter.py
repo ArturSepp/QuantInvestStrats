@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import plotly.express as px
-import plotly.graph_objs as go
 
 import qis.plots as qp
 
@@ -47,9 +45,5 @@ with sns.axes_style('darkgrid'):
     qp.align_y_limits_ax12(ax1=axs[0], ax2=axs[1])
     qp.set_suptitle(fig, 'Estimation of noisy regression: y=beta*abs(x)*x + noise, beta=Normal(1, 1), x=Normal(0, 1), noise=Normal(0, 1)')
 
-
-#fig = px.scatter(x=df.iloc[:, 0], y=df.iloc[:, 1],  title='Figure 2: Statsmodels fit to generated data')
-#fig.add_trace(go.Scatter(x=df.iloc[:, 0], y=df.iloc[:, 1], name='Statsmodels fit',  mode='lines'))
-#fig.show()
 
 plt.show()

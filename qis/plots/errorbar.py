@@ -25,8 +25,6 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   fontsize: int = 10,
                   capsize: int = 10,
                   colors: List[str] = None,
-                  first_color_fixed: bool = False,
-                  last_color_fixed: bool = False,
                   y_limits: Tuple[Optional[float], Optional[float]] = None,
                   ax: plt.Subplot = None,
                   **kwargs

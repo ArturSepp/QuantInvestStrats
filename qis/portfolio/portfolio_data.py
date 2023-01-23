@@ -496,7 +496,7 @@ class PortfolioData:
                               time_period: da.TimePeriod = None,
                               heatmap_freq: str = 'A',
                               date_format: str = '%Y',
-                              is_transpose: bool = True,
+                              transpose: bool = True,
                               title: str = None,
                               ax: plt.Subplot = None,
                               **kwargs
@@ -513,12 +513,12 @@ class PortfolioData:
         else:
             hline_rows = None
 
-        rhe.plot_periodic_returns_table_from_prices(prices=prices,
+        rhe.plot_periodic_returns_table(prices=prices,
                                                     freq=heatmap_freq,
                                                     ax=ax,
                                                     title=title,
                                                     date_format=date_format,
-                                                    is_transpose=is_transpose,
+                                                    transpose=transpose,
                                                     hline_rows=hline_rows,
                                                     **kwargs)
 
@@ -625,7 +625,7 @@ class PortfolioData:
             weights = weights[columns]
         weights = weights.resample(freq).last().fillna(method='ffill')
         pst.plot_stack(df=weights,
-                       is_add_mean_levels=False,
+                       add_mean_levels=False,
                        is_use_bar_plot=True,
                        # is_yaxis_limit_01=True,
                        baseline='zero',

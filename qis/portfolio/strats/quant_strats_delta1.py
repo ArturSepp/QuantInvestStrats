@@ -5,7 +5,7 @@ import pandas as pd
 from typing import Tuple, Union, List
 
 # qis
-import qis.utils.np_ops as npo
+import qis.utils as qu
 import qis.perfstats.returns as ret
 import qis.models.linear.ewm as ewm
 
@@ -26,7 +26,7 @@ def simulate_vol_target_strats(prices: Union[pd.DataFrame, pd.Series],
                                   mean_adj_type=ewm.MeanAdjType.NONE,
                                   af=vol_af)
     # vol target weights
-    weights_100 = npo.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
+    weights_100 = qu.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
     nav_weights = weights_100.multiply(vol_target)
     vt_returns = returns.multiply(nav_weights.shift(1))
     vt_navs = ret.returns_to_nav(returns=vt_returns, constant_trade_level=constant_trade_level)
@@ -75,7 +75,7 @@ def simulate_trend_starts(prices: Union[pd.DataFrame, pd.Series],
                                   annualize=False)
 
     # vol target weights
-    weights_100 = npo.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
+    weights_100 = qu.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
     vt_return_100 = returns.multiply(weights_100.shift(1))
     # signal is unit var
     signals = ewm.compute_ewm(data=vt_return_100, span=tf_span, is_unit_vol_scaling=True)

@@ -9,9 +9,9 @@ from enum import Enum
 
 # qis
 import qis.utils.df_cut as dfc
-from qis.perfstats.config import RegimeData
+from qis.perfstats.config import RegimeData, PerfParams
 from qis.perfstats.regime_classifier import RegimeClassifier, BenchmarkReturnsQuantileRegimeSpecs, \
-    BenchmarkReturnsQuantilesRegime
+    BenchmarkReturnsQuantilesRegime, VolQuantileRegimeSpecs, BenchmarkVolsQuantilesRegime, compute_bnb_regimes_pa_perf_table
 import qis.plots.bars as pba
 import qis.plots.boxplot as bxp
 
@@ -19,7 +19,7 @@ import qis.plots.boxplot as bxp
 def plot_regime_data(regime_classifier: RegimeClassifier,
                      regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
                      x_rotation: int = 0,
-                     is_add_bar_values: bool = True,
+                     add_bar_values: bool = True,
                      title: Optional[str] = 'Conditional Excess Sharpe ratio',
                      var_format: str = '{:.1f}',
                      bbox_to_anchor: Optional[Tuple[float, float]] = (1.0, 0.95),
@@ -46,7 +46,7 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                              x_rotation=x_rotation,
                              colors=regime_colors,
                              var_format=var_format,
-                             is_add_bar_values=is_add_bar_values,
+                             add_bar_values=add_bar_values,
                              title=title,
                              totals=totals,
                              fontsize=fontsize,
@@ -60,14 +60,14 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                             x_rotation=x_rotation,
                             colors=regime_colors,
                             var_format=var_format,
-                            is_add_bar_values=is_add_bar_values,
+                            add_bar_values=add_bar_values,
                             title=title,
                             totals=totals,
                             is_top_totals=is_top_totals,
                             fontsize=fontsize,
                             bbox_to_anchor=bbox_to_anchor,
                             legend_loc=legend_loc,
-                            is_reversed=True,
+                            reversed=True,
                             ax=ax,
                             **kwargs)
     return fig
@@ -149,7 +149,6 @@ def add_bnb_regime_shadows(ax: plt.Subplot,
         ax.set_xlim([price_data_index[0], regime_ids.index[-1]])
 
 
-
 class UnitTests(Enum):
     BNB_REGIME = 1
     VOL_REGIME = 2
@@ -160,7 +159,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
     kwargs = dict(var_format='{:.2f}')

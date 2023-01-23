@@ -30,8 +30,8 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    title: str = None,
                    colors: List[str] = None,
                    legend_stats: put.LegendStats = put.LegendStats.NONE,
-                   is_add_norm_std_pdf: bool = False,
-                   is_add_data_std_pdf: bool = False,
+                   add_norm_std_pdf: bool = False,
+                   add_data_std_pdf: bool = False,
                    bbox_to_anchor: Optional[Tuple[float, float]] = None,
                    legend_loc: Optional[str] = 'upper left',
                    xlabel: str = None,
@@ -138,9 +138,9 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
             label = f"{label}\nrank={'{:.0%}'.format(0.01*percentile)}"
             put.autolabel(ax=ax, rects=rects, xpos='right', label0=label, color=colors[idx], fontsize=fontsize)
 
-    if is_add_norm_std_pdf or is_add_data_std_pdf:
+    if add_norm_std_pdf or add_data_std_pdf:
         xmin, xmax = ax.get_xlim()
-        if is_add_data_std_pdf:
+        if add_data_std_pdf:
             norm_mean = np.mean(np.nanmean(df.to_numpy(), axis=0))
             norm_std = np.sqrt(np.mean(np.nanvar(df.to_numpy(), axis=0)))
         else:
@@ -247,7 +247,7 @@ def run_unit_test(unit_test: UnitTests):
         global_kwargs = dict(fontsize=6, linewidth=0.5, weight='normal', first_color_fixed=True)
 
         plot_histogram(df=data,
-                       is_add_data_std_pdf=True,
+                       add_data_std_pdf=True,
                        add_last_value=True,
                        ax=ax,
                        **global_kwargs)

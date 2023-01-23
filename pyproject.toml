@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qis"
-version = "1.0.5"
+version = "1.0.8"
 description = "Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
 license = "LICENSE.txt"
 authors = ["Artur Sepp <artursepp@gmail.com>"]
@@ -35,13 +35,16 @@ numba = ">=0.56.4"
 numpy = ">=1.22.4"
 scipy = ">=1.10"
 statsmodels = ">=0.13.5"
-pandas = ">=1.5.5"
-matplotlib = ">=3.6.2"
+pandas = ">=1.5.2"
+matplotlib = ">=3.2.2"
 seaborn = ">=0.12.2"
 tabulate = ">=0.9.0"
 PyYAML = ">=6.0"
 easydev = ">=0.12.0"
 psycopg2 = ">=2.9.5"
+SQLAlchemy = ">=1.4.46"
+pyarrow = ">=10.0.1"
+fsspec = ">=2022.11.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

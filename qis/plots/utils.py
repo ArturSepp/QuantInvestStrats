@@ -17,7 +17,7 @@ from matplotlib.lines import Line2D
 from scipy import stats as stats
 from scipy.stats import skew, kurtosis
 from enum import Enum
-from typing import List, Union, Tuple, Optional, Type, Dict
+from typing import List, Union, Tuple, Optional, Dict
 
 # qis
 import qis.utils.df_ops as dfo
@@ -609,7 +609,7 @@ def set_legend(ax: plt.Subplot,
                lines: List[Tuple] = None,
                colors: Optional[List[str]] = None,
                legend_loc: str = 'upper left',
-               is_reversed: bool = False,
+               reversed: bool = False,
                bbox_to_anchor: Tuple[float, float] = None,
                text_weight: str = 'light',
                legend_title: Optional[str] = None,
@@ -650,7 +650,7 @@ def set_legend(ax: plt.Subplot,
             for label, color in zip(labels, colors):
                 lines.append((label, {'color': color}))
 
-    if is_reversed:
+    if reversed:
         lines = lines[::-1]
 
     # new legend
@@ -1413,7 +1413,7 @@ def run_unit_test(unit_test: UnitTests):
         print(create_dummy_line())
 
     elif unit_test == UnitTests.LEGEND_LINES:
-        from qis.data.yf_data import load_etf_data
+        from qis.test_data import load_etf_data
         prices = load_etf_data().dropna()
 
         for legend_stats in LegendStats:

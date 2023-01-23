@@ -17,7 +17,7 @@ def plot_returns_scatter(prices: pd.DataFrame,
                          freq: str = 'Q',
                          order: int = 2,
                          ci: Optional[int] = 95,
-                         is_add_45line: bool = False,
+                         add_45line: bool = False,
                          is_vol_norm: bool = False,
                          y_column: str = 'Strategy returns',
                          xlabel: str = None,
@@ -74,7 +74,7 @@ def plot_returns_scatter(prices: pd.DataFrame,
                        add_universe_model_prediction=False,
                        add_universe_model_ci=False,
                        add_hue_model_label=add_hue_model_label,
-                       is_add_45line=is_add_45line,
+                       add_45line=add_45line,
                        title=title,
                        order=order,
                        ci=ci,
@@ -90,7 +90,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.RETURNS:

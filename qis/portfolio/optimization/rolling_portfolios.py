@@ -322,11 +322,11 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     # data
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data()
     import qis.plots.stackplot as pst
 
-    kwargs = dict(is_add_mean_levels=True,
+    kwargs = dict(add_mean_levels=True,
                   is_yaxis_limit_01=True,
                   baseline='zero',
                   bbox_to_anchor=(0.4, 1.1),

@@ -139,18 +139,18 @@ class MultiPortfolioData:
                               time_period: da.TimePeriod = None,
                               heatmap_freq: str = 'A',
                               date_format: str = '%Y',
-                              is_transpose: bool = True,
+                              transpose: bool = True,
                               title: str = None,
                               ax: plt.Subplot = None,
                               **kwargs
                               ) -> None:
         prices = self.get_navs(time_period=time_period)
-        rhe.plot_periodic_returns_table_from_prices(prices=prices,
+        rhe.plot_periodic_returns_table(prices=prices,
                                                     freq=heatmap_freq,
                                                     ax=ax,
                                                     title=title,
                                                     date_format=date_format,
-                                                    is_transpose=is_transpose,
+                                                    transpose=transpose,
                                                     **kwargs)
 
     def plot_performance_bars(self,
@@ -533,7 +533,7 @@ class MultiPortfolioData:
                                              freq='Q',
                                              var_format='{:.2%}',
                                              date_format=date_format,
-                                             is_transpose=True)
+                                             transpose=True)
         joint = pd.concat([data, exposures], axis=1)
 
         fig = ptb.plot_df_table(df=joint,

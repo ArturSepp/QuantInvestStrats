@@ -121,7 +121,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     returns = load_etf_data().dropna().asfreq('Q').pct_change()
 
     if unit_test == UnitTests.TABLE:

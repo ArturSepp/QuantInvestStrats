@@ -25,7 +25,7 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
               xlabel: str = None,
               ylabel: str = None,
               title: str = None,
-              xvar_format: Optional[str] = '{:,.2f}',
+              xvar_format: Optional[str] = None,  # '{:,.2f}', # unless data is numerical
               yvar_format: Optional[str] = '{:,.2f}',
               markers: Union[str, List[str]] = False,
               fontsize: int = 10,
@@ -110,7 +110,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.MOVE_DATA:
         with sns.axes_style("darkgrid"):
-            fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+            fig, axs = plt.subplots(2, 1, figsize=(12, 6))
             global_kwargs = dict(fontsize=12, linewidth=2.0, weight='normal', markersize=2)
             index = ['06-07JUN22', '10-17JUN22', '17-24JUN22', '24JUN-01JUL22', '26JUN-30SEP22', '30SEP-30DEC22']
             data = [0.7644, 0.7602, 0.7306, 0.7524, 0.8192, 0.8204]
@@ -123,8 +123,17 @@ def run_unit_test(unit_test: UnitTests):
                       yvar_format='{:.0%}',
                       xvar_format=None,
                       markers=markers,
-                      ax=ax,
+                      ax=axs[0],
                       **global_kwargs)
+
+            plot_line(df=df,
+                      title='ATM forward volatilities Implied from BTC MOVE contracts on 06-Jun-2022',
+                      legend_stats=put.LegendStats.NONE,
+                      yvar_format='{:.0%}',
+                      xvar_format=None,
+                      linewidth=0.,
+                      markers=['s'] * len(df.columns),
+                      ax=axs[1])
 
     plt.show()
 

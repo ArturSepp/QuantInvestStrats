@@ -4,11 +4,14 @@ use settings.yaml to set local directories
 
 Content of settings.yaml:
 RESOURCE_PATH:
-  'C:/your_folder'
+  'C:\\your_folder\\'
 UNIVERSE_PATH:
-  'C:/your_folder'
+  'C:\\your_folder\\'
 OUTPUT_PATH:
-  'C:/your_folder'
+  'C:\\your_folder\\'
+# optional
+POSTGRES:
+  "postgresql://user:password@database:port"
 """
 import datetime
 import functools
@@ -257,15 +260,15 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
                      subfolder_name: str = None,
                      subsubfolder_name: str = None,
                      key: str = None,
-                     is_add_current_date: bool = True,
+                     add_current_date: bool = True,
                      sheet_names: List[str] = None,
-                     is_transpose: bool = False,
+                     transpose: bool = False,
                      is_output_file: bool = False
                      ) -> str:
     """
     pandas or list of pandas to one excel
     """
-    if is_output_file and is_add_current_date:
+    if is_output_file and add_current_date:
         file_name = f"{file_name}_{datetime.datetime.now().strftime(DATE_FORMAT)}"
 
     file_path = get_local_file_path(file_name=file_name,
@@ -282,17 +285,17 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
             sheet_names = [f"Sheet {n+1}" for n, _ in enumerate(data)]
         for df, name in zip(data, sheet_names):
             df = delocalize_df(df, is_delocalize=True)
-            if is_transpose:
+            if transpose:
                 df = df.T
             df.to_excel(excel_writer=excel_writer, sheet_name=name)
     elif isinstance(data, dict):  # publish with sheet names
         for key, df in data.items():
             df = delocalize_df(df, is_delocalize=True)
-            if is_transpose:
+            if transpose:
                 df = df.T
             df.to_excel(excel_writer=excel_writer, sheet_name=key)
     else:
-        if is_transpose:
+        if transpose:
             data = data.T
         data = delocalize_df(data, is_delocalize=True)
         data.to_excel(excel_writer=excel_writer)
@@ -340,14 +343,14 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
                           subfolder_name: str = None,
                           subsubfolder_name: str = None,
                           key: str = None,
-                          is_add_current_date: bool = False,
+                          add_current_date: bool = False,
                           is_output_file: bool = False,
                           is_delocalize: bool = False
                           ) -> str:
     """
     dictionary of pandas to same Excel
     """
-    if is_output_file and is_add_current_date:
+    if is_output_file and add_current_date:
         file_name = f"{file_name}_{datetime.datetime.now().strftime(DATE_FORMAT)}"
 
     file_path = get_local_file_path(file_name=file_name,
@@ -564,9 +567,10 @@ def save_df_dict_to_sql(engine: Engine,
     """
     for key, df in dfs.items():
         if df is not None:
-            df = df.reset_index(names=index_col)
-            if len(df.columns) > 1600:
-                df = df[df.columns[:1600]]
+            if index_col is not None:
+                df = df.reset_index(names=index_col)
+            if len(df.columns) > 1500:
+                df = df[df.columns[:1500]]
             df.to_sql(f"{table_name}_{key}", engine, schema=schema, if_exists='replace')
 
 
@@ -575,14 +579,17 @@ def load_df_dict_from_sql(engine: Engine,
                           table_name: str,
                           dataset_keys: List[Union[str, Enum, NamedTuple]],
                           schema: Optional[str] = None,
-                          index_col: Optional[str] = INDEX_COLUMN
+                          index_col: Optional[str] = INDEX_COLUMN,
+                          columns: list[str] | None = None
                           ) -> Dict[str, pd.DataFrame]:
     """
     pandas dict from csv files
     """
     pandas_dict = {}
     for key in dataset_keys:
-        df = pd.read_sql_table(table_name=f"{table_name}_{key}", con=engine, schema=schema, index_col=index_col)
+        df = pd.read_sql_table(table_name=f"{table_name}_{key}", con=engine, schema=schema,
+                               index_col=index_col,
+                               columns=columns)
         if index_col is not None:
             df[index_col] = pd.to_datetime(df[index_col])
             df = df.set_index(index_col)
@@ -819,10 +826,10 @@ For pdfs
 
 def get_pdf_path(file_name: str,
                  local_path: Union[None, str] = None,
-                 is_add_current_date: bool = True
+                 add_current_date: bool = True
                  ) -> str:
 
-    if is_add_current_date:
+    if add_current_date:
         file_name = join_file_name_parts([file_name, datetime.datetime.now().strftime(DATE_FORMAT)])
 
     file_path = get_output_file_path(file_name=file_name, file_type=FileTypes.PDF, local_path=local_path)
@@ -846,13 +853,13 @@ def save_fig(fig: plt.Figure,
              local_path: Optional[str] = None,
              dpi: int = 300,
              file_type=FileTypes.PNG,
-             is_add_current_date: bool = False,
+             add_current_date: bool = False,
              **kwargs
              ) -> str:
     """
     save matplotlib figure
     """
-    if is_add_current_date:
+    if add_current_date:
         file_name = join_file_name_parts([file_name, datetime.datetime.now().strftime(DATE_FORMAT)])
     file_path = get_output_file_path(file_name=file_name,
                                      file_type=file_type,
@@ -874,7 +881,7 @@ def save_figs(figs: Dict[str, plt.Figure],
               local_path: Optional[str] = None,
               dpi: int = 300,
               file_type=FileTypes.PNG,
-              is_add_current_date: bool = False,
+              add_current_date: bool = False,
               **kwargs
               ) -> None:
     """
@@ -886,21 +893,21 @@ def save_figs(figs: Dict[str, plt.Figure],
                              local_path=local_path,
                              dpi=dpi,
                              file_type=file_type,
-                             is_add_current_date=is_add_current_date,
+                             add_current_date=add_current_date,
                              **kwargs)
         print(file_path)
 
 
-def figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
-                file_name: str,
-                orientation: str = 'portrait',
-                local_path: Optional[str] = None,
-                is_add_current_date: bool = True
-                ) -> str:
+def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
+                     file_name: str,
+                     orientation: str = 'portrait',
+                     local_path: Optional[str] = None,
+                     add_current_date: bool = True
+                     ) -> str:
     """
     create PDF of list of plf figures
     """
-    if is_add_current_date:
+    if add_current_date:
         file_name = join_file_name_parts([file_name, datetime.datetime.now().strftime(DATE_FORMAT)])
 
     file_path = get_output_file_path(file_name=file_name, file_type=FileTypes.PDF, local_path=local_path)

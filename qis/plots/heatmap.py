@@ -14,15 +14,15 @@ import qis.plots.utils as put
 
 
 def plot_heatmap(df: pd.DataFrame,
-                 is_transpose: bool = False,
-                 is_inverse: bool = False,
+                 transpose: bool = False,
+                 inverse: bool = False,
                  date_format: Optional[str] = '%Y',
                  cmap: str = 'RdYlGn',
                  var_format: Optional[str] = '{:.1%}',
                  alpha: float = 1.0,
                  fontsize: int = 10,
                  title: Optional[str] = None,
-                 is_top_x_label: bool = True,
+                 top_x_label: bool = True,
                  square: bool = False,
                  vline_columns: List[int] = None,
                  hline_rows: List[int] = None,
@@ -43,11 +43,11 @@ def plot_heatmap(df: pd.DataFrame,
     if date_format is not None:  # index may include 'Total'
         df.index = [date.strftime(date_format) if isinstance(date, pd.Timestamp) else date for date in df.index]
 
-    if is_transpose:
+    if transpose:
         df = df.T
-        is_inverse = False
+        inverse = False
 
-    if is_inverse:
+    if inverse:
         df = df.reindex(index=df.index[::-1])
 
     if var_format is not None:
@@ -69,17 +69,17 @@ def plot_heatmap(df: pd.DataFrame,
                 vmax=vmax,
                 ax=ax)  # ,"ha": 'right' #cbar_kws={'format': '%0.2f%%'}
 
-    if is_top_x_label:
+    if top_x_label:
         ax.xaxis.tick_top()
 
-    if not is_transpose:
+    if not transpose:
         pass
         # bottom, top = ax.get_ylim()
         # ax.set_ylim(bottom + 0.5, top - 0.5)
     else:
         ax.xaxis.labelpad = labelpad
 
-    put.set_ax_tick_params(ax=ax, fontsize=fontsize, labelbottom=not is_top_x_label, labeltop=is_top_x_label, **kwargs)
+    put.set_ax_tick_params(ax=ax, fontsize=fontsize, labelbottom=not top_x_label, labeltop=top_x_label, **kwargs)
     put.set_ax_tick_labels(ax=ax, fontsize=fontsize, **kwargs)
 
     if vline_columns is not None:
@@ -105,12 +105,12 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.HEATMAP:
         corrs = prices.pct_change().corr()
-        plot_heatmap(corrs, is_inverse=False, x_rotation=90)
+        plot_heatmap(corrs, inverse=False, x_rotation=90)
 
     plt.show()
 

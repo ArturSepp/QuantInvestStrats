@@ -92,7 +92,7 @@ def get_ols_x(x: np.ndarray, order: int, fit_intercept: bool = True) -> np.ndarr
 
 def reg_model_params_to_str(reg_model: RegModel,
                             order: int,
-                            is_r2_only: bool = False,
+                            r2_only: bool = False,
                             beta_format: str = '{0:+0.2f}',
                             alpha_format: str = '{0:+0.2f}',
                             fit_intercept: bool = True,
@@ -104,7 +104,7 @@ def reg_model_params_to_str(reg_model: RegModel,
     except:
         r2 = f", R\N{SUPERSCRIPT TWO}=0.0%"
 
-    if is_r2_only:
+    if r2_only:
         text_str = f" R\N{SUPERSCRIPT TWO}={reg_model.rsquared:.0%}"
     else:
         if fit_intercept:

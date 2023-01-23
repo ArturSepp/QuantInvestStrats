@@ -31,14 +31,12 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      x_labels: List[str] = None,
                      xlabel: str = None,
                      ylabel: str = None,
-                     var_format: Optional[str] = '{:,.0f}',
+                     var_format: Optional[str] = '{:,.2f}',
                      markers: List[str] = False,
                      title: Union[str, bool] = None,
                      fontsize: int = 10,
                      markersize: int = None,
                      colors: List[str] = None,
-                     first_color_fixed: bool = False,
-                     last_color_fixed: bool = False,
                      x_limits: Tuple[Union[float, None], Union[float, None]] = None,
                      y_limits: Tuple[Optional[float], Optional[float]] = None,
                      is_log: bool = False,
@@ -65,10 +63,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
         fig = None
 
     if colors is None:
-        colors = put.get_n_colors(n=len(columns),
-                                  first_color_fixed=first_color_fixed,
-                                  last_color_fixed=last_color_fixed,
-                                  **kwargs)
+        colors = put.get_n_colors(n=len(columns), **kwargs)
 
     if is_use_sns_lineplot:
         sns.lineplot(data=data1, palette=colors, dashes=False, markers=markers,
@@ -307,8 +302,6 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
                          legend_loc: Optional[str] = 'upper left',
                          legend_stats: LegendStats = LegendStats.NONE,
                          legend_stats2: LegendStats = LegendStats.NONE,
-                         first_color_fixed: bool = False,
-                         last_color_fixed: bool = False,
                          title: Optional[str] = None,
                          var_format: str = '{:,.0f}',
                          var_format_yax2: str = '{:,.0f}',
@@ -340,7 +333,7 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
     ncol1 = len(df1.columns)
     ncol2 = len(df2.columns)
     if colors is None:
-        colors = put.get_n_colors(n=ncol1 + ncol2, first_color_fixed=first_color_fixed, last_color_fixed=last_color_fixed)
+        colors = put.get_n_colors(n=ncol1 + ncol2, **kwargs)
 
     ax_twin = ax.twinx()
     plot_time_series(df=df1,
@@ -479,7 +472,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    from qis.data.yf_data import load_etf_data
+    from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.PRICES:

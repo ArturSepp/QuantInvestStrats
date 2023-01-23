@@ -86,14 +86,14 @@ def df_indicator_like_other(indicator: pd.DataFrame,
     return pd.DataFrame(data=data, index=other.index, columns=other.columns)
 
 
-def series_to_dict(ds: pd.Series, is_inverse: bool = False) -> Dict:
+def series_to_dict(ds: pd.Series, inverse: bool = False) -> Dict:
     """
     convert pd series to dict {index: value} and reverse
     important only uniue values
     """
     sop.assert_list_unique(lsdata=ds.index.to_list())
     data_dict = ds.to_dict()
-    if is_inverse:
+    if inverse:
         sop.assert_list_unique(lsdata=ds.to_list())  # values need to be unique
         data_dict = {v: k for k, v in data_dict.items()}
     return data_dict
@@ -286,12 +286,12 @@ def get_last_non_nan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndar
 
     def get_non_nan_values_series(ds: pd.Series) -> float:
         x1 = ds.iloc[-1]
-        if not np.isnan(x1):
+        if not pd.isna(x1):
             values = x1
         else:
             nonnan_column_data = ds[~ds.isnull()]
             if nonnan_column_data.empty:
-                print(f"in get_last_non_nan_values: all nans in {ds}")
+                # print(f"in get_last_non_nan_values: all nans in {ds}")
                 values = np.nan
             else:
                 values = nonnan_column_data[-1]
@@ -299,7 +299,7 @@ def get_last_non_nan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndar
 
     if isinstance(df, pd.DataFrame):
         x1 = df.iloc[-1, :].to_numpy()
-        if np.all(np.isnan(x1) == False):  # first entries are non nan -> most expected
+        if np.all(pd.isna(x1) == False):  # first entries are non nan -> most expected
             values = x1
         else:
             values = []
@@ -314,6 +314,15 @@ def get_last_non_nan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndar
         raise ValueError(f"unsupported data type = {type(df)}")
 
     return values
+
+
+def get_last_non_nan(df: Union[pd.Series, pd.DataFrame]) -> pd.Series:
+    values = get_last_non_nan_values(df=df)
+    if isinstance(df, pd.DataFrame):
+        ds = pd.Series(values, index=df.columns)
+    else:
+        ds = pd.Series(values, index=df.name)
+    return ds
 
 
 def get_df_subset_index(df: pd.DataFrame,
@@ -358,14 +367,6 @@ def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
         warnings.warn(f"in adjust_data_with_dt: lengh of data index is one - cannot adjust by dt")
         return df
 
-    return df
-
-
-def rename_column_names(df: pd.DataFrame, columns_map: pd.Series) -> pd.DataFrame:
-    """
-    rename columns according to given map
-    """
-    df.columns = pd.Series(df.columns).map(columns_map).to_list()
     return df
 
 

@@ -23,14 +23,14 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               title: str = None,
               fontsize: int = 10,
               min_max_for_bars_values: float = None,
-              is_add_bar_values: bool = False,
-              is_add_top_bar_values: bool = False,
+              add_bar_values: bool = False,
+              add_top_bar_values: bool = False,
               legend_stats: LegendStats = LegendStats.NONE,
               var_format: str = '{:.1%}',
               yvar_format: str = '{:,.2f}',
               x_rotation: int = 0,
               show_y_axis: bool = False,
-              legend_loc: str = 'upper center',
+              legend_loc: Optional[str] = 'upper center',
               bbox_to_anchor: Optional[Tuple[float, float]] = None,
               y_limits: Tuple[Optional[float], Optional[float]] = None,
               totals: List[float] = None,
@@ -42,8 +42,8 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               vline_columns: List[int] = None,
               xlabel: str = None,
               ylabel: str = None,
-              is_reversed: bool = False,
-              is_add_avg_line: bool = False,
+              reversed: bool = False,
+              add_avg_line: bool = False,
               ax: plt.Subplot = None,
               **kwargs
               ) -> Optional[plt.Figure]:
@@ -93,15 +93,15 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
 
         x_loc = x+.2*width
         y_loc = y+.3*height if height > 0.0 else y+0.8*height
-        if is_add_bar_values:
+        if add_bar_values:
             if is_put_label:
                 if height != 0:
-                    ax.annotate(text=var_format.format(height), xy=(x_loc, y_loc), fontsize=fontsize, weight='normal')
-        elif is_add_top_bar_values:
+                    ax.annotate(text=yvar_format.format(height), xy=(x_loc, y_loc), fontsize=fontsize, weight='normal')
+        elif add_top_bar_values:
             if is_put_label:
                 if height != 0:
                     ymin, ymax = ax.get_ylim()
-                    ax.annotate(text=var_format.format(height), xy=(x_loc, 0.95*ymax), fontsize=fontsize, weight='normal')
+                    ax.annotate(text=yvar_format.format(height), xy=(x_loc, 0.95*ymax), fontsize=fontsize, weight='normal')
 
         if x not in x_locs:
             x_locs.append(x)  # take only one location per asset
@@ -142,7 +142,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
     put.set_legend(ax=ax,
                    labels=labels,
                    colors=colors,
-                   is_reversed=is_reversed,
+                   reversed=reversed,
                    bbox_to_anchor=bbox_to_anchor,
                    legend_loc=legend_loc,
                    fontsize=fontsize,
@@ -151,7 +151,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
     for line in ax.get_legend().get_lines():
         line.set_linewidth(4.0)
 
-    if is_add_avg_line:
+    if add_avg_line:
         avg = np.nanmean(df)
         ax.axhline(avg, color='coral', linewidth=2, linestyle='--', label='Average')
         xmin, xmax = ax.get_xlim()
@@ -184,7 +184,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
 def plot_vbars(df: pd.DataFrame,
                title: Optional[str] = None,
                fontsize: int = 10,
-               is_add_bar_values: bool = True,
+               add_bar_values: bool = True,
                add_bar_perc_values: bool = False,
                var_format: str = '{:.1%}',
                legend_loc: Optional[str] = 'upper center',
@@ -261,7 +261,7 @@ def plot_vbars(df: pd.DataFrame,
         last_starts = last_starts + np.abs(widths)
         ax.barh(labels, np.abs(widths), left=starts, height=0.5, label=colname, color=col_colors)
 
-        if is_add_bar_values:
+        if add_bar_values:
             xcenters = starts + np.abs(widths) / 2
             text_color = 'black'
             for y, (x, c) in enumerate(zip(xcenters, widths)):
@@ -294,7 +294,7 @@ def plot_vbars(df: pd.DataFrame,
             last_starts = last_starts + widths
         ax.barh(labels, widths, left=starts, height=0.5, label=colname, color=col_colors)
 
-        if is_add_bar_values:
+        if add_bar_values:
             xcenters = starts + widths / 2
             text_color = 'black'
             for y, (x, c) in enumerate(zip(xcenters, widths)):
@@ -344,7 +344,7 @@ def plot_vbars(df: pd.DataFrame,
                    labels=legend_labels,
                    colors=legend_colors,
                    legend_loc=legend_loc,
-                   is_reversed=True,
+                   reversed=True,
                    bbox_to_anchor=bbox_to_anchor,
                    fontsize=fontsize,
                    **kwargs)
@@ -416,7 +416,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.TOP_BOTTOM_RETURNS:
 
-        from qis.data.yf_data import load_etf_data
+        from qis.test_data import load_etf_data
         import qis.perfstats.returns as ret
 
         prices = load_etf_data().dropna().loc['2021', :]
@@ -444,12 +444,12 @@ def run_unit_test(unit_test: UnitTests):
         plot_vbars(df=df,
                    colors=put.get_n_colors(n=len(df.columns)),
                    bbox_to_anchor=(0.5, 1.25),
-                   is_add_bar_values=False,
+                   add_bar_values=False,
                    add_bar_value_at_mid=False,
                    add_total_bar=False)
 
     elif unit_test == UnitTests.MONTHLY_RETURNS_BARS:
-        from qis.data.yf_data import load_etf_data
+        from qis.test_data import load_etf_data
         import qis.perfstats.returns as ret
 
         prices = load_etf_data().dropna().loc['2020':, :].iloc[:, :3]

@@ -14,9 +14,9 @@ from qis.plots.utils import LegendStats
 def plot_stack(df: pd.DataFrame,
                is_use_bar_plot: bool = False,
                is_yaxis_limit_01: bool = False,
-               is_add_mean_levels: bool = False,
-               is_add_cum_levels: bool = False,
-               is_add_total_line: bool = False,
+               add_mean_levels: bool = False,
+               add_cum_levels: bool = False,
+               add_total_line: bool = False,
                colors: List[str] = None,
                step: Optional[str] = None,  # 'mid
                title: Optional[str] = None,
@@ -30,7 +30,7 @@ def plot_stack(df: pd.DataFrame,
                linewidth: float = 1.5,
                x_date_freq: str = 'A',
                x_rotation: int = 90,
-               is_reversed: bool = False,
+               reversed: bool = False,
                date_format: str = '%b-%y',
                bbox_to_anchor: Optional[Tuple[float, float]] = None,
                xlabel: str = None,
@@ -61,7 +61,7 @@ def plot_stack(df: pd.DataFrame,
     # set x axes to nearest years
     ax.set_xlim(re_indexed_data.index[0], re_indexed_data.index[-1])
 
-    if is_add_total_line:  # add total as line
+    if add_total_line:  # add total as line
         totals = re_indexed_data.sum(1)
         sns.lineplot(x=re_indexed_data.index, y=totals, marker='None', color='black', ax=ax)
         # legend_labels.append('Total')
@@ -75,7 +75,7 @@ def plot_stack(df: pd.DataFrame,
     if is_yaxis_limit_01:
         ax.set_ylim(0, 1)
 
-    if is_add_mean_levels or is_add_cum_levels:
+    if add_mean_levels or add_cum_levels:
         xmin, xmax = ax.get_xlim()
         ymin, ymax = ax.get_ylim()
         cum_mean = 0.0
@@ -86,12 +86,12 @@ def plot_stack(df: pd.DataFrame,
             mean = np.mean(re_indexed_data[column].values)
             cum_mean = cum_mean + mean
 
-            if is_add_mean_levels:
+            if add_mean_levels:
                 vlabel = var_format.format(mean)
             else:
                 vlabel = var_format.format(cum_mean)
 
-            if is_add_mean_levels and is_yaxis_limit_01 is False:  # show absolute effect
+            if add_mean_levels and is_yaxis_limit_01 is False:  # show absolute effect
                 y_loc = mean
             else: # show cumulative effect
                 if column == re_indexed_data.columns[-1]:  # make it vidsiblae
@@ -105,7 +105,7 @@ def plot_stack(df: pd.DataFrame,
             color = mpl.colors.to_rgb(handle.get_facecolors()[0])
             ax.annotate(text=f"{label}={vlabel}", xy=(xmax, y_loc), fontsize=fontsize, weight='normal', color=color)
 
-        y_annotation = 'Avg' if is_add_mean_levels else 'Total'
+        y_annotation = 'Avg' if add_mean_levels else 'Total'
         ax.annotate(y_annotation, xy=(xmax, ymax), xytext=(1, 2), fontsize=fontsize, weight='normal',
                     textcoords='offset points', ha='left', va='bottom')
 
@@ -126,7 +126,7 @@ def plot_stack(df: pd.DataFrame,
                        labels=legend_labels,
                        colors=colors,
                        legend_loc=legend_loc,
-                       is_reversed=is_reversed,
+                       reversed=reversed,
                        ncol=ncol,
                        bbox_to_anchor=bbox_to_anchor,
                        fontsize=fontsize,
