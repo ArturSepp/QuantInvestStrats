@@ -45,6 +45,7 @@ psycopg2 = ">=2.9.5"
 SQLAlchemy = ">=1.4.46"
 pyarrow = ">=10.0.1"
 fsspec = ">=2022.11.0"
+yfinance = "> 0.1.38"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

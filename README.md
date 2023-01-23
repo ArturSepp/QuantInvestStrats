@@ -22,14 +22,15 @@ pip install qis --upgrade
 ```
 
 Core dependencies:
-    Python >= 3.8+,
-    pandas >=1.0.0,
-    numpy >= 1.15.0,
-    numba >= 1.2.0,
-    matplotlib >= 3.0.0,
-    seaborn >= 0.9.0,
-    yfinance >= 0.1.38 (optional for getting test price data)
-
+    python = ">=3.8,<3.11",
+    numba = ">=0.56.4",
+    numpy = ">=1.22.4",
+    scipy = ">=1.10",
+    statsmodels = ">=0.13.5",
+    pandas = ">=1.5.2",
+    matplotlib = ">=3.2.2",
+    seaborn = ">=0.12.2",
+    yfinance >= 0.1.38 (optional for getting test price data).
 
 ## **Analytics** <a name="analytics"></a>
 
