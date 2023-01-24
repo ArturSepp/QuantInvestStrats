@@ -81,9 +81,9 @@ with sns.axes_style("darkgrid"):
     fig, ax = plt.subplots(1, 1, figsize=(9, 7), tight_layout=True)
     qis.plot_returns_scatter(prices=prices,
                              benchmark=prices.columns[0],
-                             freq='B',
+                             freq='W-MON',
                              return_type=qis.ReturnTypes.DIFFERENCE,  # cannot use log and relative returns
-                             title='Scatterplot of daily P&L relative to buy-and-hold',
+                             title='Scatterplot of weekly P&L relative to buy-and-hold',
                              ylabel='Daily P&L of short strategies',
                              xlabel='Daily P&L of buy-and-hold',
                              var_format='{:,.0%}',
