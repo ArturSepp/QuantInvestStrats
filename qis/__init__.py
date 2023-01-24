@@ -43,3 +43,4 @@ from qis.plots.__init__ import *
 
 from qis.models.__init__ import *
 
+from qis.portfolio.__init__ import *

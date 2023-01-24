@@ -134,18 +134,15 @@ def compute_performance_table(prices: Union[pd.DataFrame, pd.Series],
     dict_data = OrderedDict()
     for asset in prices:
         asset_data = prices[asset].dropna()  # force drop na
-        return_dict = ret.compute_returns_dict(prices=asset_data,
-                                               perf_params=perf_params)
+        return_dict = ret.compute_returns_dict(prices=asset_data, perf_params=perf_params)
         dict_data[asset] = return_dict
-
     # keys will be rows = asset, column = keys in return_dict
     data = pd.DataFrame.from_dict(data=dict_data, orient='index')
     return data
 
 
 def compute_risk_table(prices: pd.DataFrame,
-                       perf_params: PerfParams = None,
-                       is_compute_vol_only: bool = False
+                       perf_params: PerfParams = None
                        ) -> pd.DataFrame:
     """
     compute price data for returns statistics
@@ -180,18 +177,17 @@ def compute_risk_table(prices: pd.DataFrame,
                           PerfStat.END_DATE.to_str(): sampled_price.index[-1],
                           PerfStat.NUM_OBS.to_str(): len(nd_sampled_returns)
                           }
-            if not is_compute_vol_only:
-                # compute max dd on business day schedule
-                max_dd = compute_max_dd(prices=dd_sampled_prices[asset].dropna())
-                rel_returns = sampled_price.pct_change().dropna()
-                asset_dict.update({
-                    PerfStat.MAX_DD.to_str(): max_dd,
-                    PerfStat.MAX_DD_VOL.to_str(): max_dd / vol if vol > 0.0 else 0.0,
-                    PerfStat.WORST.to_str(): np.min(rel_returns),
-                    PerfStat.BEST.to_str(): np.max(rel_returns),
-                    PerfStat.SKEWNESS.to_str(): skew(nd_sampled_returns, bias=False),
-                    PerfStat.KURTOSIS.to_str(): kurtosis(nd_sampled_returns, bias=False)
-                })
+            # compute max dd on business day schedule
+            max_dd = compute_max_dd(prices=dd_sampled_prices[asset].dropna())
+            rel_returns = sampled_price.pct_change().dropna()
+            asset_dict.update({
+                PerfStat.MAX_DD.to_str(): max_dd,
+                PerfStat.MAX_DD_VOL.to_str(): max_dd / vol if vol > 0.0 else 0.0,
+                PerfStat.WORST.to_str(): np.min(rel_returns),
+                PerfStat.BEST.to_str(): np.max(rel_returns),
+                PerfStat.SKEWNESS.to_str(): skew(nd_sampled_returns, bias=False),
+                PerfStat.KURTOSIS.to_str(): kurtosis(nd_sampled_returns, bias=False)
+            })
         else:  # no required data
             asset_dict = {PerfStat.VOL.to_str(): np.nan,
                           PerfStat.AVG_LOG_RETURN.to_str(): np.nan,
@@ -208,8 +204,7 @@ def compute_risk_table(prices: pd.DataFrame,
 
 
 def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
-                          perf_params: PerfParams = None,
-                          is_compute_sharpe_only: bool = False
+                          perf_params: PerfParams = None
                           ) -> pd.DataFrame:
 
     if perf_params is None:
@@ -221,9 +216,7 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     perf_table = compute_performance_table(prices=prices, perf_params=perf_params)
 
     # is we only need sharpe we only comptute vol without higher order risk
-    risk_table = compute_risk_table(prices=prices,
-                                    perf_params=perf_params,
-                                    is_compute_vol_only=is_compute_sharpe_only)
+    risk_table = compute_risk_table(prices=prices, perf_params=perf_params)
 
     # get vol and compute risk adjusted performance
     vol = risk_table[PerfStat.VOL.to_str()]

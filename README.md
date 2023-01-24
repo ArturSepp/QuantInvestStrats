@@ -18,7 +18,7 @@ reporting, analysis of quantitative strategies.
 pip install qis
 ```
 ```python 
-pip install qis --upgrade
+pip install --upgrade qis
 ```
 
 Core dependencies:

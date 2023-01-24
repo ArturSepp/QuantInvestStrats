@@ -43,14 +43,14 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
                             include_end_date=include_end_date,
                             ffill_nans=ffill_nans)
 
-    ind_good = np.logical_and(
-        np.logical_and(np.isnan(prices)==False, np.isnan(prices)==False),
-        np.logical_and(np.greater(prices, 0.0), np.greater(prices, 0.0)))
-
     if return_type == ReturnTypes.LOG or is_log_returns:
+        ind_good = np.logical_and(
+            np.logical_and(np.isnan(prices) == False, np.isnan(prices) == False),
+            np.logical_and(np.greater(prices, 0.0), np.greater(prices, 0.0)))
         returns = np.log(np.divide(prices, prices.shift(1)), where=ind_good)
+
     elif return_type == ReturnTypes.RELATIVE:
-        returns = np.divide(prices, prices.shift(1), where=ind_good).add(-1.0)
+        returns = np.divide(prices, prices.shift(1)).add(-1.0)
 
     elif return_type == ReturnTypes.DIFFERENCE:
         returns = prices - prices.shift(1)
@@ -139,14 +139,15 @@ def compute_pa_return(prices: Union[pd.DataFrame, pd.Series],
 
     if num_years > 0.0:
         ratio = total_return + 1.0
-
+        ratio = np.where(np.greater(ratio, 0.0), ratio, np.nan)
         if num_years > 1.0:
-            compounded_return_pa = ratio ** (1.0 / num_years) - 1
+            compounded_return_pa = np.power(ratio, 1.0 / num_years, where=np.isfinite(ratio)) - 1
         else:
             if annualize_less_1y:  # annualize to 1y, not compound
                 compounded_return_pa = total_return / num_years
             else:  # use ytd return
                 compounded_return_pa = ratio - 1.0
+
     else:
         n = len(prices.columns) if isinstance(prices, pd.DataFrame) else 1
         compounded_return_pa = np.zeros_like(n)
@@ -197,7 +198,7 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
     return_dict = {PerfStat.TOTAL_RETURN.to_str(): total_return,
                    PerfStat.PA_RETURN.to_str(): compounded_return_pa,
                    PerfStat.PA_EXCESS_RETURN.to_str(): excess_return,
-                   PerfStat.AN_LOG_RETURN.to_str(): np.log(1.0 + compounded_return_pa),
+                   PerfStat.AN_LOG_RETURN.to_str(): np.log(1.0 + compounded_return_pa, where=np.greater(compounded_return_pa, -1.0)),
                    PerfStat.AVG_AN_RETURN.to_str(): np.divide(total_return, num_years),
                    PerfStat.NAV1.to_str(): (1.0+total_return),
                    PerfStat.NUM_YEARS.to_str(): num_years,

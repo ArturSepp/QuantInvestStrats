@@ -9,6 +9,7 @@ from enum import Enum
 from qis.utils.df_melt import melt_scatter_data_with_xvar
 import qis.perfstats.returns as ret
 from qis.plots.scatter import plot_scatter
+from qis.perfstats.config import ReturnTypes
 
 
 def plot_returns_scatter(prices: pd.DataFrame,
@@ -26,6 +27,7 @@ def plot_returns_scatter(prices: pd.DataFrame,
                          title: Union[str, None] = None,
                          add_hue_model_label: bool = True,
                          hue_name: str = 'hue',
+                         return_type: ReturnTypes = ReturnTypes.RELATIVE,
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> plt.Figure:
@@ -45,6 +47,7 @@ def plot_returns_scatter(prices: pd.DataFrame,
     returns = ret.to_returns(prices=price_data_full,
                              include_start_date=True,
                              include_end_date=True,
+                             return_type=return_type,
                              freq=freq)
     if is_vol_norm:
         returns = returns.divide(np.nanstd(returns, axis=0), axis=1)

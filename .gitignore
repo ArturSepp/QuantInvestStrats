@@ -1,14 +1,6 @@
 # created by virtualenv automatically
 Lib/
 Scripts/
-backtester/
-data/
-my_projects/
-my_strategies/
-stochvolmodels/
-testing/
-volanalytics/
-option_chain_data/
 
 # YAML
 *.yaml
@@ -45,6 +37,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.*xml
+.*iml
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -147,5 +141,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-
-
+backtester/
+data/
+my_projects/
+my_strategies/
+stochvolmodels/
+testing/
+sigma_strats/
+option_chain_analytics/

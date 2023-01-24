@@ -96,7 +96,7 @@ def compute_regimes_pa_perf_table(sampled_returns_with_regime_id: pd.DataFrame,
     regime_pa_columns = regime_pa.columns
 
     # compute stadradized ra _ perf table
-    ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params, is_compute_sharpe_only=True)
+    ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
     if additive_pa_returns_to_pa_total:  # use pa return to normalize conditional an returns
 
         total_sum = regime_pa[regime_pa_columns].sum(1)

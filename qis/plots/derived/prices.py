@@ -32,6 +32,8 @@ class PerformanceLabel(Enum):
     WITH_DDVOL = 8
     PA_DETAILED = 9
     TOTAL_DETAILED = 10
+    ARITHMETIC = 11
+    TOTAL_ARITHMETIC = 12
 
 
 def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
@@ -94,6 +96,14 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
                      f"MaxDD/vol={vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD_VOL.to_str()])}, "
                      f"Skew={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SKEWNESS.to_str()])}")
         elif performance_label == PerformanceLabel.TOTAL_DETAILED:
+            label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
+                     f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])} ")
+        elif performance_label == PerformanceLabel.ARITHMETIC:
+            label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
+                     f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])} ")
+        elif performance_label == PerformanceLabel.TOTAL_ARITHMETIC:
             label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
                      f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
@@ -174,7 +184,7 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                         x_date_freq: str = 'A',
                         performance_label: PerformanceLabel = PerformanceLabel.WITH_DD,
                         is_log: bool = False,
-                        is_remove_xticklabels_ax1: bool = True,
+                        remove_xticklabels_ax1: bool = True,
                         title: str = 'Performance',
                         dd_title: str = 'Running Drawdown',
                         dd_legend_type: dra.DdLegendType = dra.DdLegendType.NONE,
@@ -210,7 +220,7 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                       ax=axs[1],
                       **kwargs)
 
-    if is_remove_xticklabels_ax1:
+    if remove_xticklabels_ax1:
         axs[0].set_xticklabels('')
 
     if regime_benchmark_str is not None and regime_params is not None:
