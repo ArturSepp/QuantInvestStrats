@@ -48,21 +48,21 @@ constant_notional_cum_nav = pd.Series(constant_notional_cum_nav, index=price.ind
 short_etf_cum_nav = pd.Series(short_etf_cum_nav, index=price.index, name='short_etf_cum_nav')
 
 # add simple byu and hold starts
-byu_and_hold_units = np.ones_like(price_np) * constant_notional / price_np[0]
-byu_and_hold_cum_nav = pd.Series(constant_notional + byu_and_hold_units*(price_np-price_np[0]), index=price.index, name='byu_and_hold_cum_nav')
+buy_and_hold_units = np.ones_like(price_np) * constant_notional / price_np[0]
+buy_and_hold_cum_nav = pd.Series(constant_notional + buy_and_hold_units*(price_np-price_np[0]), index=price.index, name='buy_and_hold_cum_nav')
 
 sell_and_hold_units = - np.ones_like(price_np) * constant_notional / price_np[0]
 sell_and_hold_cum_nav = pd.Series(constant_notional + sell_and_hold_units*(price_np-price_np[0]), index=price.index, name='sell_and_hold_cum_nav')
 
 # prices
-prices = pd.concat([byu_and_hold_cum_nav, sell_and_hold_cum_nav, constant_notional_cum_nav, short_etf_cum_nav], axis=1)
+prices = pd.concat([buy_and_hold_cum_nav, sell_and_hold_cum_nav, constant_notional_cum_nav, short_etf_cum_nav], axis=1)
 
 # portfolio units
 constant_notional_units = pd.Series(constant_notional_units, index=price.index, name='constant_notional_units')
 short_etf_units = pd.Series(short_etf_units, index=price.index, name='short_etf_units')
-byu_and_hold_units = pd.Series(byu_and_hold_units, index=price.index, name='short_etf_units')
+buy_and_hold_units = pd.Series(buy_and_hold_units, index=price.index, name='short_etf_units')
 sell_and_hold_units = pd.Series(sell_and_hold_units, index=price.index, name='sell_and_hold_units')
-portfolio_units = pd.concat([byu_and_hold_cum_nav, sell_and_hold_cum_nav, constant_notional_cum_nav, short_etf_cum_nav], axis=1)
+portfolio_units = pd.concat([buy_and_hold_cum_nav, sell_and_hold_cum_nav, constant_notional_cum_nav, short_etf_cum_nav], axis=1)
 
 
 with sns.axes_style("darkgrid"):
