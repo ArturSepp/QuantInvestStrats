@@ -86,7 +86,7 @@ with sns.axes_style("darkgrid"):
                              title='Scatterplot of daily P&L relative to buy-and-hold',
                              ylabel='Daily P&L of short strategies',
                              xlabel='Daily P&L of buy-and-hold',
-                             var_format='{:,.2f}',
+                             var_format='{:,.0%}',
                              ax=ax)
 
 
