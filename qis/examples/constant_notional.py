@@ -58,11 +58,11 @@ sell_and_hold_cum_nav = pd.Series(constant_notional + sell_and_hold_units*(price
 prices = pd.concat([buy_and_hold_cum_nav, sell_and_hold_cum_nav, constant_notional_cum_nav, short_etf_cum_nav], axis=1)
 
 # portfolio units
+buy_and_hold_units = pd.Series(buy_and_hold_units, index=price.index, name='buy_and_hold_units')
+sell_and_hold_units = pd.Series(sell_and_hold_units, index=price.index, name='sell_and_hold_units')
 constant_notional_units = pd.Series(constant_notional_units, index=price.index, name='constant_notional_units')
 short_etf_units = pd.Series(short_etf_units, index=price.index, name='short_etf_units')
-buy_and_hold_units = pd.Series(buy_and_hold_units, index=price.index, name='short_etf_units')
-sell_and_hold_units = pd.Series(sell_and_hold_units, index=price.index, name='sell_and_hold_units')
-portfolio_units = pd.concat([buy_and_hold_cum_nav, sell_and_hold_cum_nav, constant_notional_cum_nav, short_etf_cum_nav], axis=1)
+portfolio_units = pd.concat([buy_and_hold_units, sell_and_hold_units, constant_notional_units, short_etf_units], axis=1)
 
 
 with sns.axes_style("darkgrid"):
@@ -76,7 +76,9 @@ with sns.axes_style("darkgrid"):
 
     # plot units
     fig, ax = plt.subplots(1, 1, figsize=(9, 7), tight_layout=True)
-    qis.plot_time_series(df=portfolio_units, ax=ax)
+    qis.plot_time_series(df=portfolio_units,
+                         title='Portfolio Units',
+                         ax=ax)
 
     fig, ax = plt.subplots(1, 1, figsize=(9, 7), tight_layout=True)
     qis.plot_returns_scatter(prices=prices,
