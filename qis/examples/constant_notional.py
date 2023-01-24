@@ -1,3 +1,11 @@
+"""
+run simulation of short exposure strategies
+follow the discussion in
+https://twitter.com/ArturSepp/status/1614551490093359104
+to run the code, install qis package (Quantitative Investment Strategies):
+pip install qis
+"""
+
 # imports
 import matplotlib.pyplot as plt
 import numpy as np
