@@ -1,17 +1,17 @@
-# python
+"""
+illustrations for paper
+"""
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-# qis
 import qis
 import yfinance as yf
 
 
 FIG_SIZE21 = (15, 12)
 FIG_SIZE12 = (15, 7)
-LOCAL_PATH = "C://Users//artur//OneDrive//analytics//LognormalStochVol//cheyette//draft//figures//"
+LOCAL_PATH = "..//draft//figures//"
 
 MOVE_NAME = 'Move volatility index'
 fixed_tenor = '10y'

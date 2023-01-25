@@ -91,5 +91,4 @@ with sns.axes_style("darkgrid"):
                              var_format='{:,.0%}',
                              ax=ax)
 
-
 plt.show()
