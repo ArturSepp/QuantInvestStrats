@@ -569,8 +569,6 @@ def save_df_dict_to_sql(engine: Engine,
         if df is not None:
             if index_col is not None:
                 df = df.reset_index(names=index_col)
-            if len(df.columns) > 1500:
-                df = df[df.columns[:1500]]
             df.to_sql(f"{table_name}_{key}", engine, schema=schema, if_exists='replace')
 
 
@@ -580,7 +578,7 @@ def load_df_dict_from_sql(engine: Engine,
                           dataset_keys: List[Union[str, Enum, NamedTuple]],
                           schema: Optional[str] = None,
                           index_col: Optional[str] = INDEX_COLUMN,
-                          columns: List[str] | None = None
+                          columns: Optional[List[str]] = None
                           ) -> Dict[str, pd.DataFrame]:
     """
     pandas dict from csv files

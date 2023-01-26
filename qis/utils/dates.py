@@ -538,19 +538,23 @@ def generate_dates_schedule(time_period: TimePeriod,
 
     if freq == 'M-FRI':  # last friday of month
         # create weekly fridays
-        dates_schedule_ = create_range(freq_='W-FRI', tz=None)
+        dates_schedule_ = create_range(freq_='W-FRI', tz=time_period.tz)
+        w_dates_schedule_ = create_range(freq_='W', tz=time_period.tz)
         # filter last Friday per month periods
-        dates_schedule = dates_schedule_.to_series().groupby(dates_schedule_.to_period('M')).last()
-        dates_schedule = pd.DatetimeIndex(dates_schedule)  # back to DatetimeIndex type
+        dates_schedule = pd.Series(dates_schedule_, index=dates_schedule_).reindex(index=dates_schedule_, method='ffill')
+        #dates_schedule = dates_schedule_.to_series().groupby(dates_schedule_.to_period('M')).last()
+        dates_schedule = dates_schedule.to_numpy()  # back to DatetimeIndex type
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
 
     elif freq == 'Q-FRI':  # last friday of quarter
         # create weekly fridays
-        dates_schedule_ = create_range(freq_='W-FRI', tz=None)
+        dates_schedule_ = create_range(freq_='W-FRI', tz=time_period.tz)
         # filter last Friday per quarter periods
-        dates_schedule = dates_schedule_.to_series().groupby(dates_schedule_.to_period('Q')).last()
-        dates_schedule = pd.DatetimeIndex(dates_schedule)  # back to DatetimeIndex type
+        q_dates_schedule_ = create_range(freq_='Q', tz=time_period.tz)
+        dates_schedule = pd.Series(dates_schedule_, index=dates_schedule_).reindex(index=q_dates_schedule_, method='ffill')
+        # dates_schedule = dates_schedule_.to_series().groupby(dates_schedule_.to_period('Q')).last()
+        dates_schedule = dates_schedule.to_numpy()  # back to DatetimeIndex type
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
 
@@ -1039,7 +1043,7 @@ def run_unit_test(unit_test: UnitTests):
         print(rebalancing_schedule[rebalancing_schedule==True])
 
     elif unit_test == UnitTests.FIXED_MATURITY_ROLLS:
-        time_period = TimePeriod('01Oct2022', '18Jan2023')
+        time_period = TimePeriod('01Oct2022', '18Jan2023', tz='UTC')
         weekly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='W-FRI',
                                                      roll_hour=8,
                                                      min_days_to_next_roll=6)
