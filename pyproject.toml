@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qis"
-version = "1.0.14"
+version = "1.0.15"
 description = "Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
 license = "LICENSE.txt"
 authors = ["Artur Sepp <artursepp@gmail.com>"]
@@ -46,6 +46,8 @@ SQLAlchemy = ">=1.4.46"
 pyarrow = ">=10.0.1"
 fsspec = ">=2022.11.0"
 yfinance = "> 0.1.38"
+cvxpy = ">=1.2.0"
+scikit-learn = ">=1.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

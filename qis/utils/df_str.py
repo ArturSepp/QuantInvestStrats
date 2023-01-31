@@ -6,7 +6,7 @@ from enum import Enum
 from pandas.core.dtypes.common import is_datetime64_any_dtype as is_datetime
 from pandas.api.types import is_string_dtype
 from tabulate import tabulate
-from typing import List, Optional
+from typing import List, Optional, Union, Dict
 
 from qis.utils.dates import DATE_FORMAT
 
@@ -125,14 +125,26 @@ def df_to_numeric(df: pd.DataFrame) -> np.ndarray:
 
 def df_to_str(df: pd.DataFrame,
               var_format: str = '{:.2f}',
-              var_formats: List[Optional[str]] = None,  # specific for each column
+              var_formats: Union[List[Optional[str]], Dict[str, str]] = None,  # specific for each column
               is_exclude_nans: bool = True
               ) -> pd.DataFrame:
     """
     pd.DataFrame to string using float_to_str
     """
     if var_formats is not None:
-        assert len(var_formats) == len(df.columns)
+        if isinstance(var_formats, list):
+            if not len(var_formats) == len(df.columns):
+                raise ValueError(f"match len of var_formats {var_formats} with {df.columns}")
+        elif isinstance(var_formats, dict):
+            var_formats_ = []
+            for column in df.columns:
+                if column in var_formats.keys():
+                    var_formats_.append(var_formats[column])
+                else:
+                    var_formats_.append(None)
+            var_formats = var_formats_
+        else:
+            raise ValueError(var_formats = f"{var_formats} is not supported")
     else:
         var_formats = [var_format]*len(df.columns)
     df = df.copy()

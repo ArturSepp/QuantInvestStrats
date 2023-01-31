@@ -122,7 +122,7 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                              ax=ax,
                              **kwargs)
     """
-    qp.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qp.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
     
     # benchmark betas

@@ -585,6 +585,8 @@ def generate_dates_schedule(time_period: TimePeriod,
             dates_schedule = dates_schedule[:-1]  # drop the next dat at 00:00:00
         else:
             dates_schedule = dates_schedule[dates_schedule <= time_period.end]
+        if include_end_date and dates_schedule[-1] < time_period.end:  # append date scedule with last elemnt
+            dates_schedule = dates_schedule.append(pd.DatetimeIndex([time_period.end]))
 
     if hours is not None and len(dates_schedule) > 0:
         dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hours) for x in dates_schedule])
@@ -921,7 +923,8 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
                                   freq: str = 'H',
                                   roll_freq: str = 'W-FRI',
                                   roll_hour: int = 8,
-                                  min_days_to_next_roll: int = 6
+                                  min_days_to_next_roll: int = 6,
+                                  include_end_date: bool = False
                                   ) -> pd.Series:
     """
     for given time_period generate fixed maturity rolls
@@ -930,7 +933,7 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
     observed_times = generate_dates_schedule(time_period,
                                              freq=freq,
                                              include_start_date=True,
-                                             include_end_date=True)
+                                             include_end_date=include_end_date)
     # use large day shift to cover at least next quarter
     roll_days = generate_dates_schedule(time_period.shift_end_date_by_days(num_days=180, backward=False),
                                         freq=roll_freq,
@@ -956,10 +959,11 @@ class UnitTests(Enum):
     SAMPLE_DATES_IDX = 3
     PERIOD_WITH_HOLIDAYS = 4
     FREQ_HOUR = 5
-    FREQS = 6
-    REBALANCING_INDICATORS = 7
-    WEEKEND_INDICATORS = 8
-    FIXED_MATURITY_ROLLS = 9
+    FREQ_REB = 6
+    FREQS = 7
+    REBALANCING_INDICATORS = 8
+    WEEKEND_INDICATORS = 9
+    FIXED_MATURITY_ROLLS = 10
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -1019,6 +1023,18 @@ def run_unit_test(unit_test: UnitTests):
         #time_period = TimePeriod(pd.Timestamp('2022-11-10 8:00:00+00:00', tz='UTC'), pd.Timestamp('2022-11-16 8:00:00+00:00', tz='UTC'))
         #rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
         #print(rebalancing_times)
+
+    elif unit_test == UnitTests.FREQ_REB:
+        dates_schedule = generate_dates_schedule(time_period=TimePeriod('2022-04-08 08:00:00', '2022-04-10 10:00:00', tz='UTC'),
+                                                 freq='D', hours=8,
+                                                 include_start_date=True,
+                                                 include_end_date=True)
+        print(dates_schedule)
+        dates_schedule = generate_dates_schedule(time_period=TimePeriod('2022-04-08 08:00:00', '2022-04-10 10:00:00', tz='UTC'),
+                                                 freq='D', hours=8,
+                                                 include_start_date=False,
+                                                 include_end_date=False)
+        print(dates_schedule)
 
     elif unit_test == UnitTests.FREQS:
         freq_map = FreqMap.BQ

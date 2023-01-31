@@ -448,7 +448,7 @@ def load_df_from_csv(file_name: Optional[str] = None,
                      delocalize: bool = False,  # excel data may have local time which are unwanted
                      dayfirst: Optional[bool] = None,
                      tz: str = None,
-                     is_remove_dubpicated: bool = False
+                     drop_duplicated: bool = False
                      ) -> pd.DataFrame:
     """
     pandas from csv
@@ -475,7 +475,7 @@ def load_df_from_csv(file_name: Optional[str] = None,
     except:
         raise FileNotFoundError(f"not found {file_name} with file_path={file_path}")
 
-    if is_remove_dubpicated:
+    if drop_duplicated:
         df = df.loc[~df.index.duplicated(keep='first')]
 
     if not df.empty:

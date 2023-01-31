@@ -150,7 +150,7 @@ from qis.plots.derived.drawdowns import (
 )
 
 from qis.plots.derived.regime_data import (
-plot_regime_data,
-plot_regime_boxplot,
-add_bnb_regime_shadows
+    plot_regime_data,
+    plot_regime_boxplot,
+    add_bnb_regime_shadows
 )
