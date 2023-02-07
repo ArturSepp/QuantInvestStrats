@@ -11,7 +11,6 @@ from qis.models.linear.corr_cov_matrix import (
     compute_ewm_corr_df,
     compute_ewm_corr_single,
     compute_masked_covar_corr,
-    compute_vol_scalers,
     corr_to_pivot_row,
     matrix_regularization
 )

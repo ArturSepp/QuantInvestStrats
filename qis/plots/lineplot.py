@@ -16,6 +16,7 @@ import qis.plots.utils as put
 
 def plot_line(df: Union[pd.Series, pd.DataFrame],
               linestyles: List[str] = None,
+              linestyle: Any = '-',
               linewidth: float = 1.0,
               legend_title: str = None,
               legend_loc: Optional[Union[str, bool]] = 'upper left',
@@ -29,7 +30,6 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
               yvar_format: Optional[str] = '{:,.2f}',
               markers: Union[str, List[str]] = False,
               fontsize: int = 10,
-              linestyle: Any = '-',
               colors: List[str] = None,
               x_limits: Tuple[Optional[float], Optional[float]] = None,
               y_limits: Tuple[Optional[float], Optional[float]] = None,
@@ -65,6 +65,7 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
                        colors=colors,
                        legend_loc=legend_loc,
                        legend_title=legend_title,
+                       markers=markers,
                        fontsize=fontsize,
                        **kwargs)
 

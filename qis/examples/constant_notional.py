@@ -7,10 +7,10 @@ pip install qis
 """
 
 # imports
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 import yfinance as yf
 import qis
 

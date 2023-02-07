@@ -56,7 +56,8 @@ def plot_qq(df: Union[pd.DataFrame, pd.Series],
         data0 = df[column]
         if is_drop_na:
             data0 = data0.dropna()
-        sm.qqplot(data0, stats.norm, fit=True, line=line, ax=ax,  fmt=colors[idx], marker=markers[idx],
+        sm.qqplot(data0, stats.norm, fit=True, line=line, ax=ax,  fmt=colors[idx],
+                  markerfacecolor=colors[idx], markeredgecolor=colors[idx], marker=markers[idx],
                   markersize=markersize)
     if line is None:
         sm.qqline(ax, line='45', fmt='-', color='red')
@@ -151,6 +152,7 @@ def run_unit_test(unit_test: UnitTests):
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
+
     df = ret.to_returns(prices=prices, drop_first=True)
 
     if unit_test == UnitTests.RETURNS:
@@ -158,6 +160,7 @@ def run_unit_test(unit_test: UnitTests):
         global_kwargs = dict(fontsize=8, linewidth=0.5, weight='normal', markersize=1)
 
         plot_qq(df=df,
+                desc_table_type=dsc.DescTableType.SKEW_KURTOSIS,
                 ax=ax,
                 **global_kwargs)
 

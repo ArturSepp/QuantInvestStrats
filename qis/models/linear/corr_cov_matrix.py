@@ -46,28 +46,6 @@ def compute_masked_covar_corr(returns: Union[np.ndarray, pd.DataFrame],
     return covar
 
 
-def compute_vol_scalers(returns: pd.DataFrame,
-                        benchmark: str
-                        ) -> List[Tuple[float, float]]:
-    """
-    find scaler so that var is consistent with pivot var
-    for example: vol_scalers applied in the corr_to_pivot_row
-    """
-    pivot = returns[benchmark].to_numpy()
-    vol_scalers = []
-    for column in returns:
-        column_data = returns[column].to_numpy()
-        cross = pivot * column_data
-        cond = np.isnan(cross) == False
-        clean_pivot = pivot[cond]
-        clean_column = column_data[cond]
-
-        vol_becnhmark = np.sqrt(np.nanmean(np.power(clean_pivot, 2)))
-        vol = np.sqrt(np.nanmean(np.power(clean_column, 2)))
-        vol_scalers.append((vol_becnhmark, vol))
-    return vol_scalers
-
-
 def corr_to_pivot_row(pivot: np.ndarray,
                       data: np.ndarray,
                       is_normalized: bool = True,
@@ -231,7 +209,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.PLOT_CORR_MATRIX:
 
-        dates = pd.date_range(start='12/31/2018', end='12/31/2019', freq='B')
+        dates = pd.date_range(start='31Dec2020', end='31Dec2021', freq='B')
         n = 3
         mean = [-2.0, -1.0, 0.0]
         returns = pd.DataFrame(data=np.random.normal(mean, 1.0, (len(dates), n)),

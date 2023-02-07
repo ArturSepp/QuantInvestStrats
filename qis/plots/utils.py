@@ -607,6 +607,7 @@ def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
 def set_legend(ax: plt.Subplot,
                labels: Union[List[str], pd.Index] = None,
                lines: List[Tuple] = None,
+               markers: List[str] = None,
                colors: Optional[List[str]] = None,
                legend_loc: str = 'upper left',
                reversed: bool = False,
@@ -638,17 +639,21 @@ def set_legend(ax: plt.Subplot,
         leg = ax.get_legend()
         if leg is not None:
             colors = [line.get_color() for line in leg.get_lines()]
-        #else:
-        #    colors = ['black']*len(labels)
 
     if lines is None:
         lines = []
+        is_markers_list = False
+        if markers is not None and isinstance(markers, list):
+            is_markers_list = True
         if colors is None:
             for label in labels:
                 lines.append((label, {}))
-        else:
+        elif colors is not None and not is_markers_list:
             for label, color in zip(labels, colors):
                 lines.append((label, {'color': color}))
+        elif colors is not None and is_markers_list:
+            for label, color, marker in zip(labels, colors, markers):
+                lines.append((label, {'color': color, 'marker': marker}))
 
     if reversed:
         lines = lines[::-1]
@@ -692,11 +697,7 @@ def set_legend_with_stats_table(stats_table: pd.DataFrame,
     """
     # stats_str = stats.to_string(index_names=False)
     stats_str = dfs.df_all_to_str(df=stats_table)
-    if len(stats_table.index) > 1:
-        max_n = max([len(x) for x in stats_table.index])  # add extra space for max index
-    else:
-        max_n = 1
-    legend_title = " " * max_n + stats_str.splitlines()[0]  # column names will be titles
+    legend_title = stats_str.splitlines()[0]  # column names will be titles
     lines = []
     for line, color in zip(stats_str.splitlines()[2:], colors):  # var data is from 2-nd line
         lines.append((line, {'color': color}))
@@ -1334,6 +1335,7 @@ def add_scatter_points(ax: plt.Subplot,
                        fontsize: int = 12,
                        color: str = 'steelblue',
                        colors: List[str] = None,
+                       linewidth: int = 3,
                        **kwargs
                        ) -> None:
 
@@ -1345,7 +1347,7 @@ def add_scatter_points(ax: plt.Subplot,
                     textcoords='offset points', ha='left', va='bottom',
                     color=color,
                     fontsize=fontsize)
-        ax.scatter(x=x, y=y, marker='*', color=color, s=3, linewidth=3)
+        ax.scatter(x=x, y=y, marker='*', color=color, s=3, linewidth=linewidth)
 
 
 def calc_table_height(num_rows: int,

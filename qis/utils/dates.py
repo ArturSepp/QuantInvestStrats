@@ -355,7 +355,10 @@ class TimePeriod:
             # print(f"df index type is {type(df.index)}")
         return df
 
-    def fill_outside(self, df: Union[pd.DataFrame, pd.Series], fill_value: float = np.nan) -> Union[pd.DataFrame, pd.Series]:
+    def fill_outside(self,
+                     df: Union[pd.DataFrame, pd.Series],
+                     fill_value: float = np.nan
+                     ) -> Union[pd.DataFrame, pd.Series]:
         if isinstance(df.index, pd.DatetimeIndex):
             tz = df.index.tz
             if tz is not None:
@@ -938,18 +941,24 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
     roll_days = generate_dates_schedule(time_period.shift_end_date_by_days(num_days=180, backward=False),
                                         freq=roll_freq,
                                         hours=roll_hour)
-    roll_days_ = iter(roll_days)
-    next_roll = next(roll_days_)
-    roll_schedule = {}
-    for observed_time in observed_times:
-        diff = (next_roll - observed_time).days
-        if diff < min_days_to_next_roll:
-            try:
-                next_roll = next(roll_days_)
-            except StopIteration:
-                raise ValueError(f"increase end dat for {time_period.print()}")
-        roll_schedule[observed_time] = next_roll
-    roll_schedule = pd.Series(roll_schedule)
+
+    if len(roll_days) == 1:
+        roll_schedule = pd.Series(roll_days[0], index=observed_times)
+    else:
+        roll_schedule = {}
+        starting_roll_idx = 0
+        next_roll = roll_days[starting_roll_idx]
+        for observed_time in observed_times:
+            diff = (next_roll - observed_time).days
+            if diff < min_days_to_next_roll:
+                if starting_roll_idx + 1 < len(roll_days):
+                    starting_roll_idx += 1
+                    next_roll = roll_days[starting_roll_idx]
+                else:
+                    print(f"increase end date for {time_period.end} to extend to next roll, "
+                          f"meanwhile using last available roll={next_roll} @ {observed_time}")
+            roll_schedule[observed_time] = next_roll
+        roll_schedule = pd.Series(roll_schedule)
     return roll_schedule
 
 
@@ -1059,7 +1068,7 @@ def run_unit_test(unit_test: UnitTests):
         print(rebalancing_schedule[rebalancing_schedule==True])
 
     elif unit_test == UnitTests.FIXED_MATURITY_ROLLS:
-        time_period = TimePeriod('01Oct2022', '18Jan2023', tz='UTC')
+        time_period = TimePeriod('01Oct2022', '03Feb2023', tz='UTC')
         weekly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='W-FRI',
                                                      roll_hour=8,
                                                      min_days_to_next_roll=6)

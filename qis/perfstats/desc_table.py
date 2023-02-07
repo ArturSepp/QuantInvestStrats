@@ -21,6 +21,7 @@ class DescTableType(Enum):
     WITH_KURTOSIS = 4
     WITH_SCORE = 5
     EXTENSIVE = 6
+    SKEW_KURTOSIS = 7
 
 
 def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
@@ -87,6 +88,11 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         k2, ps = normaltest(a=data_np, axis=0, nan_policy='omit')
         descriptive_table[PerfStat.NORMTEST.to_str(short=True, short_n=True)] = ['{:.2f}'.format(x) for x in ps]
 
+    elif desc_table_type == desc_table_type.SKEW_KURTOSIS:
+        descriptive_table = descriptive_table.drop(PerfStat.AVG.to_str(), axis=1)
+        descriptive_table = descriptive_table.drop(PerfStat.STD.to_str(), axis=1)
+        descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in skew(data_np, axis=0, nan_policy=nan_policy)]
+        descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in kurtosis(data_np, axis=0, nan_policy=nan_policy)]
     elif desc_table_type == desc_table_type.WITH_SCORE:
         column_data = [df[column].dropna() for column in df.columns]
         percentiles = [percentileofscore(a=x, score=x.iloc[-1], kind='rank') for x in column_data]

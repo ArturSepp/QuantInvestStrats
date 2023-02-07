@@ -176,6 +176,7 @@ from qis.utils.np_ops import (
     compute_histogram_data,
     compute_paired_signs,
     find_nearest,
+    to_nearest_values,
     np_array_to_df_columns,
     np_array_to_df_index,
     np_array_to_matrix,

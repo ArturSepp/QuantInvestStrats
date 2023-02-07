@@ -392,10 +392,36 @@ def tensor_mean(a: np.ndarray) -> np.ndarray:
     return output
 
 
-def find_nearest(array: np.ndarray, value: float) -> float:
-    array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
+def find_nearest(array: np.ndarray,
+                 value: float,
+                 is_sorted: bool = True
+                 ) -> float:
+    """
+    find closes element
+    https://stackoverflow.com/questions/2566412/find-nearest-value-in-numpy-array
+    """
+    if is_sorted:
+        idx = np.searchsorted(array, value, side="left")
+        if idx > 0 and (idx == len(array) or np.abs(value-array[idx-1]) < np.abs(value-array[idx])):
+            return array[idx - 1]
+        else:
+            return array[idx]
+    else:
+        array = np.asarray(array)
+        idx = (np.abs(array - value)).argmin()
     return array[idx]
+
+
+def to_nearest_values(array: np.ndarray,
+                      values: np.ndarray,
+                      is_sorted: bool = True
+                      ) -> np.ndarray:
+    """
+    """
+    values_ = np.zeros_like(values)
+    for idx, value in enumerate(values):
+        values_[idx] = find_nearest(array=array, value=value, is_sorted=is_sorted)
+    return values_
 
 
 def compute_histogram_data(data: np.ndarray,

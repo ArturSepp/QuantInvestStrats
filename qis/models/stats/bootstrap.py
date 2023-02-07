@@ -385,7 +385,7 @@ def run_unit_test(unit_test: UnitTests):
         print(bt_data)
 
     elif unit_test == UnitTests.BTC:
-        from data.apis.coinmetric import load_btc_price
+        from data.apis.coinmetric_ import load_btc_price
         pivot_prices = load_btc_price().dropna()
         bt_data = bootstrap_price_data(prices=pivot_prices,
                                        bootsrap_type=BootsrapType.STATIONARY,

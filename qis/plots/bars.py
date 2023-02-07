@@ -22,7 +22,6 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               date_format: str = '%d-%b-%y',
               title: str = None,
               fontsize: int = 10,
-              min_max_for_bars_values: float = None,
               add_bar_values: bool = False,
               add_top_bar_values: bool = False,
               legend_stats: LegendStats = LegendStats.NONE,
@@ -86,22 +85,15 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         y = p.get_y()
         x = p.get_x()
 
-        is_put_label = True
-        if min_max_for_bars_values is not None:
-            if np.abs(height) <= min_max_for_bars_values:
-                is_put_label = False
-
         x_loc = x+.2*width
         y_loc = y+.3*height if height > 0.0 else y+0.8*height
         if add_bar_values:
-            if is_put_label:
-                if height != 0:
-                    ax.annotate(text=yvar_format.format(height), xy=(x_loc, y_loc), fontsize=fontsize, weight='normal')
+            if height != 0:
+                ax.annotate(text=yvar_format.format(height), xy=(x_loc, y_loc), fontsize=fontsize, weight='normal')
         elif add_top_bar_values:
-            if is_put_label:
-                if height != 0:
-                    ymin, ymax = ax.get_ylim()
-                    ax.annotate(text=yvar_format.format(height), xy=(x_loc, 0.95*ymax), fontsize=fontsize, weight='normal')
+            if height != 0:
+                ymin, ymax = ax.get_ylim()
+                ax.annotate(text=yvar_format.format(height), xy=(x_loc, 0.95*ymax), fontsize=fontsize, weight='normal')
 
         if x not in x_locs:
             x_locs.append(x)  # take only one location per asset
@@ -124,7 +116,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                 ax.annotate(text=label, xytext=totals_offset, textcoords='offset points',
                             xy=(x_max, total),
                             fontsize=fontsize,
-                            ha='left', va='top', weight='bold')
+                            ha='left', va='top')
 
     if vline_columns is not None:
         for vline_column in vline_columns:
