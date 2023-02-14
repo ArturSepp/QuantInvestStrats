@@ -40,7 +40,7 @@ LOCAL_RESOURCE_PATH = LOCAL_PATHS['LOCAL_RESOURCE_PATH']
 
 
 DATE_FORMAT = '%Y%m%d_%H%M'
-INDEX_COLUMN= 'Time'  # for Postresql
+INDEX_COLUMN = 'timestamp'  # for Postresql
 
 
 class FileData(NamedTuple):
@@ -620,7 +620,8 @@ def save_df_to_feather(df: pd.DataFrame,
                                     subfolder_name=subfolder_name,
                                     subsubfolder_name=subsubfolder_name,
                                     is_output_file=is_output_file)
-    df = df.reset_index(names=index_col)
+    if index_col not in df.columns:
+        df = df.reset_index(names=index_col)
     df.to_feather(path=file_path)
 
 
