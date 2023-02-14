@@ -16,7 +16,7 @@ import qis.utils.struct_ops as sop
 import qis.utils.df_str as dfs
 import qis.utils.df_groups as dfg
 import qis.perfstats.returns as ret
-import qis.perfstats.perf_table as rpt
+import qis.perfstats.perf_stats as rpt
 import qis.plots.derived.drawdowns as cdr
 from qis.perfstats.config import PerfParams, PerfStat, RegimeData
 import qis.perfstats.regime_classifier as rcl
@@ -472,7 +472,7 @@ class MultiPortfolioData:
                                                      'x_rotation': 90})
         data = data.replace({0.0: np.nan}).dropna()
         plot_bars(df=data,
-                  show_y_axis=True,
+                  skip_y_axis=True,
                   title=f"{attribution_metric.title}",
                   stacked=False,
                   ax=ax,

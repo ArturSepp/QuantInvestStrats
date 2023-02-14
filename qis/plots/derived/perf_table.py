@@ -11,7 +11,7 @@ import qis.utils.df_str as dfs
 
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfStat, PerfParams
-import qis.perfstats.perf_table as rpt
+import qis.perfstats.perf_stats as rpt
 
 import qis.plots.scatter as psc
 import qis.plots.table as ptb
@@ -301,7 +301,7 @@ def plot_top_bottom_performers(prices: pd.DataFrame,
 
     fig = plot_bars(df=returns,
                     stacked=False,
-                    show_y_axis=True,
+                    skip_y_axis=True,
                     legend_loc=None,
                     x_rotation=90,
                     yvar_format=yvar_format,

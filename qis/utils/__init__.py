@@ -7,7 +7,6 @@ from qis.utils.dates import (
     generate_rebalancing_indicators,
     generate_sample_dates,
     get_an_factor,
-    get_current_date,
     get_data_at_date,
     get_month_days,
     get_period_days,
@@ -16,8 +15,7 @@ from qis.utils.dates import (
     get_time_period,
     get_time_period_label,
     get_time_period_shifted_by_years,
-    get_today_eod_with_tz,
-    get_today_str,
+    get_current_time_with_tz,
     get_vol_an,
     get_weekday,
     get_year_quarter,
@@ -96,17 +94,11 @@ from qis.utils.df_melt import (
 )
 
 from qis.utils.df_ops import (
-    align_column_to_index,
     align_df1_to_df2,
     align_dfs_dict_with_df,
-    align_index_to_index,
     compute_last_score,
-    concat_at_start_date,
     df12_merge_with_tz,
-    df_concat_with_tz,
-    df_filter_like,
     df_indicator_like,
-    df_indicator_like_other,
     df_joint_indicator,
     df_ones_like,
     df_time_dict_to_pd,
@@ -115,18 +107,16 @@ from qis.utils.df_ops import (
     dfs_to_upper_lower_diag,
     drop_first_nan_data,
     factor_dict_to_asset_dict,
-    get_df_subset_index,
-    get_first_before_non_nan_index,
-    get_first_last_non_nan_date,
-    get_first_non_nan_values,
-    get_last_non_nan_values,
-    get_last_non_nan,
+    get_first_before_nonnan_index,
+    get_first_last_nonnan_index,
+    get_first_nonnan_values,
+    get_last_nonnan_values,
+    get_last_nonnan,
     merge_on_column,
-    missing_zero_ratios_after_first_non_nan,
+    compute_nans_zeros_ratio_after_first_non_nan,
     multiply_df_by_dt,
     norm_df_by_ax_mean,
-    np_txy_tensor_to_pd_dict,
-    series_to_dict
+    np_txy_tensor_to_pd_dict
 )
 
 from qis.utils.df_str import (

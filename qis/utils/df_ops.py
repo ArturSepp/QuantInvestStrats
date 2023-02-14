@@ -43,17 +43,6 @@ def dfs_indicators(dfs: List[pd.DataFrame], type: Type = bool) -> pd.DataFrame:
     return pd.DataFrame(data=indicators, index=dfs[0].index, columns=dfs[0].columns).astype(type)
 
 
-def df_filter_like(df: pd.DataFrame,
-                   df_filter: pd.DataFrame
-                   ) -> pd.DataFrame:
-    """
-    take a subset of set with data conditioned on non nans in
-    """
-    df_filter = df_filter[df.columns].reindex(index=df.index)
-    df_out = df.where(cond=df_indicator_like(df=df_filter), other=np.nan)
-    return df_out
-
-
 def df_joint_indicator(indicator1: pd.DataFrame,
                        indicator2: Union[np.ndarray, pd.DataFrame],
                        to_float: bool = False
@@ -74,29 +63,6 @@ def df_joint_indicator(indicator1: pd.DataFrame,
         data = data.astype(np.float64)
 
     return pd.DataFrame(data=data, index=indicator1.index, columns=indicator1.columns)
-
-
-def df_indicator_like_other(indicator: pd.DataFrame,
-                            other: pd.DataFrame
-                            ) -> pd.DataFrame:
-    """
-    return set = other if indicator is True and np.nan otherwise
-    """
-    data = np.where(indicator.to_numpy(dtype=bool), other.to_numpy(), np.nan)
-    return pd.DataFrame(data=data, index=other.index, columns=other.columns)
-
-
-def series_to_dict(ds: pd.Series, inverse: bool = False) -> Dict:
-    """
-    convert pd series to dict {index: value} and reverse
-    important only uniue values
-    """
-    sop.assert_list_unique(lsdata=ds.index.to_list())
-    data_dict = ds.to_dict()
-    if inverse:
-        sop.assert_list_unique(lsdata=ds.to_list())  # values need to be unique
-        data_dict = {v: k for k, v in data_dict.items()}
-    return data_dict
 
 
 def norm_df_by_ax_mean(data: Union[np.ndarray, pd.DataFrame],
@@ -132,34 +98,34 @@ def norm_df_by_ax_mean(data: Union[np.ndarray, pd.DataFrame],
     return norm_data
 
 
-def get_first_before_non_nan_index(df: Union[pd.Series, pd.DataFrame],
-                                   return_index_for_all_nans: int = -1  # last = -1, first = 0
-                                   ) -> Union[pd.Timestamp, List[pd.Timestamp]]:
+def get_first_before_nonnan_index(df: Union[pd.Series, pd.DataFrame],
+                                  return_index_for_all_nans: int = -1  # last = -1, first = 0
+                                  ) -> Union[pd.Timestamp, List[pd.Timestamp]]:
     """
     return first index if no nans in pandas
     """
     if isinstance(df, pd.DataFrame):
-        first_before_non_nan_index = []
+        first_before_nonnan_index = []
         for column in df:
             column_data = df[column]
             non_nan_data = column_data.loc[np.isnan(column_data.to_numpy()) == False]
             if not non_nan_data.empty:  # returns first index of nan
-                fist_non_nan_index = non_nan_data.index[0]
+                fist_nonnan_index = non_nan_data.index[0]
             else:  # all values are nans so return the last index of original data
-                fist_non_nan_index = df.index[return_index_for_all_nans]
+                fist_nonnan_index = df.index[return_index_for_all_nans]
 
-            first_before_non_nan_index.append(fist_non_nan_index)
+            first_before_nonnan_index.append(fist_nonnan_index)
 
     elif isinstance(df, pd.Series):
         non_nan_data = df.loc[np.isnan(df.to_numpy()) == False]
         if not non_nan_data.empty:
-            first_before_non_nan_index = non_nan_data.index[0]
+            first_before_nonnan_index = non_nan_data.index[0]
         else:
-            first_before_non_nan_index = df.index[return_index_for_all_nans]
+            first_before_nonnan_index = df.index[return_index_for_all_nans]
     else:
         raise ValueError(f"unsoported data type = {type(df)}")
 
-    return first_before_non_nan_index
+    return first_before_nonnan_index
 
 
 def drop_first_nan_data(df: Union[pd.Series, pd.DataFrame],
@@ -169,22 +135,27 @@ def drop_first_nan_data(df: Union[pd.Series, pd.DataFrame],
     drop data before first nonnan either at max or at min for pandas
     the rest of data can still contain occasional nans
     """
-    first_non_nan_index = get_first_before_non_nan_index(df=df)
+    first_nonnan_index = get_first_before_nonnan_index(df=df)
 
     if isinstance(df, pd.DataFrame):
         if is_oldest:
-            joint_start = min(first_non_nan_index)
+            joint_start = min(first_nonnan_index)
         else:
-            joint_start = max(first_non_nan_index)
+            joint_start = max(first_nonnan_index)
         new_data = df[joint_start:].copy()
     else:
-        new_data = df.loc[first_non_nan_index:].copy()
+        new_data = df.loc[first_nonnan_index:].copy()
 
     return new_data
 
 
-def get_first_last_non_nan_date(df: Union[pd.Series, pd.DataFrame], is_first: bool = True) -> Union[pd.Timestamp, np.ndarray]:
+def get_first_last_nonnan_index(df: Union[pd.Series, pd.DataFrame],
+                                is_first: bool = True
+                                ) -> Union[pd.Timestamp, np.ndarray]:
     """
+    for given time series df or series:
+    find the first date of non-nan value if  is_first=True
+    find the last date of non-nan value
     return pd.Timestamp or np.nan
     """
     def get_series_non_nan(ds: pd.Series) -> pd.Timestamp:
@@ -192,39 +163,39 @@ def get_first_last_non_nan_date(df: Union[pd.Series, pd.DataFrame], is_first: bo
         good_ind = null_ind == False
         if np.all(good_ind):
             if is_first:  # no nans nans return first:
-                fist_non_nan_index = ds.index[0]
+                fist_nonnan_index = ds.index[0]
             else:  # last
-                fist_non_nan_index = ds.index[-1]
+                fist_nonnan_index = ds.index[-1]
         elif np.all(null_ind):
             if is_first:  # all nans return last:
-                fist_non_nan_index = ds.index[-1]
+                fist_nonnan_index = ds.index[-1]
             else:
-                fist_non_nan_index = ds.index[0]
+                fist_nonnan_index = ds.index[0]
         else:
             if is_first:
-                fist_non_nan_index = ds[good_ind].index[0]
+                fist_nonnan_index = ds[good_ind].index[0]
             else:
-                fist_non_nan_index = ds[good_ind].index[-1]
-        return fist_non_nan_index
+                fist_nonnan_index = ds[good_ind].index[-1]
+        return fist_nonnan_index
 
     if isinstance(df, pd.Series):
-        fist_non_nan_index = get_series_non_nan(df)
+        fist_nonnan_index = get_series_non_nan(df)
     elif isinstance(df, pd.DataFrame):
         values = []
         for column in df:
             values.append(get_series_non_nan(df[column]))
-        fist_non_nan_index = np.array(values)
+        fist_nonnan_index = np.array(values)
     else:
         raise ValueError(f"unsupported data type = {type(df)}")
 
-    return fist_non_nan_index
+    return fist_nonnan_index
 
 
-def missing_zero_ratios_after_first_non_nan(df: Union[pd.Series, pd.DataFrame],
-                                            zero_cutoff: float = 1e-12
-                                            ) -> Tuple[np.ndarray, np.ndarray]:
+def compute_nans_zeros_ratio_after_first_non_nan(df: Union[pd.Series, pd.DataFrame],
+                                                 zero_cutoff: float = 1e-12
+                                                 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-   compute ration of missing data
+   compute ratio  of missing data
     """
     if isinstance(df, pd.Series):
         df = df.to_frame()
@@ -234,8 +205,8 @@ def missing_zero_ratios_after_first_non_nan(df: Union[pd.Series, pd.DataFrame],
     for column in df:
         column_data = df[column]
         nonnan_cond = column_data.isnull() == False
-        fist_non_nan_index = column_data.loc[nonnan_cond].index[0]
-        after_data = column_data.loc[fist_non_nan_index:]
+        fist_nonnan_index = column_data.loc[nonnan_cond].index[0]
+        after_data = column_data.loc[fist_nonnan_index:]
         missing.append(after_data.isnull().sum() / len(after_data))
         zeros.append(after_data.abs().lt(zero_cutoff).sum() / len(after_data))
 
@@ -245,7 +216,7 @@ def missing_zero_ratios_after_first_non_nan(df: Union[pd.Series, pd.DataFrame],
     return missing_ratio, zeros_ratio
 
 
-def get_first_non_nan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndarray, float]:
+def get_first_nonnan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndarray, float]:
 
     if df.empty:
         raise ValueError(f"data is empty:\n {df}")
@@ -280,7 +251,7 @@ def get_first_non_nan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.nda
     return values
 
 
-def get_last_non_nan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndarray, float]:
+def get_last_nonnan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndarray, float]:
     if df.empty:
         raise ValueError(f"data is empty:\n {df}")
 
@@ -316,22 +287,13 @@ def get_last_non_nan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndar
     return values
 
 
-def get_last_non_nan(df: Union[pd.Series, pd.DataFrame]) -> pd.Series:
-    values = get_last_non_nan_values(df=df)
+def get_last_nonnan(df: Union[pd.Series, pd.DataFrame]) -> pd.Series:
+    values = get_last_nonnan_values(df=df)
     if isinstance(df, pd.DataFrame):
         ds = pd.Series(values, index=df.columns)
     else:
         ds = pd.Series(values, index=df.name)
     return ds
-
-
-def get_df_subset_index(df: pd.DataFrame,
-                        sub_index_data: Union[pd.Series, pd.DataFrame]
-                        ) -> pd.DataFrame:
-    """
-    get subset of pandas based on smaller index in sub_index_data
-    """
-    return df.iloc[np.in1d(df.index.to_list(), sub_index_data.index.to_list())]
 
 
 def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
@@ -479,30 +441,6 @@ def dfs_to_upper_lower_diag(df_upper: pd.DataFrame,
     return out
 
 
-def df_concat_with_tz(dfs: List[pd.DataFrame]) -> pd.DataFrame:
-    """
-    can only do if common tz is found
-    """
-    # find common tz
-    tz = None
-    for df in dfs:
-        tz1 = df.index.tz
-        if tz is not None:
-            if tz1 != tz:
-                raise ValueError(f"{tz1} {tz}")
-            else:
-                tz = tz1
-        else:
-            tz = tz1
-
-    # localize
-    for df in dfs:
-        if df.index.tz is None:
-            df.index = df.index.tz_localize(tz)
-
-    return pd.concat(dfs, axis=1)
-
-
 def compute_last_score(df: Union[pd.DataFrame, pd.Series], is_percent: bool = True) -> pd.Series:
     """
     columnwise score for last value in data
@@ -538,77 +476,6 @@ def align_dfs_dict_with_df(dfd: Dict[Any, pd.DataFrame],
         else:
             aligned_dfd[key] = None
     return aligned_dfd
-
-
-def align_column_to_index(df_column: pd.DataFrame,
-                          df_index: pd.DataFrame,
-                          join: str = 'inner',
-                          is_strict_join: bool = True
-                          ) -> pd.DataFrame:
-    """
-    align dataframe columns to data_index
-    join='inner' with strict match
-    join='outer' without strict match so missing data has na
-    return is df = data_index with columns matched to data_column
-    important is that columns in data_column (narrower) correspond to data_index index
-    """
-    # 1 - make pd. Series indeexd by columns of data_column
-    data_columns0 = pd.Series(data=df_column.columns, index=df_column.columns)
-
-    # 2-align data columns to the index
-    data_index1, data_columns1 = df_index.align(other=data_columns0, join=join, axis=0)
-
-    if join == 'inner' and is_strict_join:
-        if len(df_column.columns) != len(data_index1.index):
-            print(df_column.columns)
-            print(data_index1.index)
-            raise ValueError(f"columns in data_column and index are not matched")
-
-    return data_index1
-
-
-def align_index_to_index(df1: Union[pd.DataFrame, pd.Series],
-                         df2: Union[pd.DataFrame, pd.Series],
-                         join: Literal['inner', 'outer', 'left', 'right'] = 'inner'
-                         ) -> Tuple[Union[pd.DataFrame, pd.Series], Union[pd.DataFrame, pd.Series]]:
-    """
-    align dataframes
-    join='inner' with strict match
-    join='outer' without strict match so missing data has na
-    """
-    data_index1_, data_index2_ = df1.align(other=df2, join=join, axis=0)
-
-    if join == 'inner':
-
-        if isinstance(df1, pd.Series) and isinstance(df2, pd.Series):
-            if len(df1.index) != len(data_index1_.index) \
-                    or len(df2.index) != len(data_index2_.index):
-                raise ValueError(f"Series1.index{df1.index} and Series2.index{df2.index} are not matched")
-
-        elif isinstance(df1, pd.DataFrame) and isinstance(df2, pd.DataFrame):
-            if len(df1.index) != len(data_index1_.index) \
-                    or len(df1.columns) != len(data_index1_.columns) \
-                    or len(df2.index) != len(data_index2_.index) \
-                    or len(df2.columns) != len(data_index2_.columns):
-                raise ValueError(f"data1{df1} and data2 index{df2}"
-                                 f"or columns are not matched:")
-
-        elif isinstance(df1, pd.DataFrame) and isinstance(df2, pd.Series):
-            if len(df1.index) != len(data_index1_.index) \
-                    or len(df1.columns) != len(data_index1_.columns) \
-                    or len(df2.index) != len(data_index2_.index):
-                raise ValueError(f"data1{df1} and data2{df2} index are not matched")
-
-        elif isinstance(df1, pd.Series) and isinstance(df2, pd.DataFrame):
-            if len(df2.index) != len(data_index2_.index) \
-                    or len(df2.columns) != len(data_index2_.columns) \
-                    or len(df1.index) != len(data_index1_.index):
-                raise ValueError(f"data1{df1} and data2{df2} index are not matched")
-
-        else:
-            raise TypeError('unimplemented type')
-
-    return data_index1_, data_index2_
 
 
 def align_df1_to_df2(df1: pd.DataFrame,
@@ -675,16 +542,29 @@ def merge_on_column(df1: pd.DataFrame,
     return joint_data
 
 
-def concat_at_start_date(dfs: List[Union[pd.Series, pd.DataFrame]],
-                         start_date: pd.Timestamp
-                         ) -> pd.DataFrame:
-    data = pd.concat(dfs, axis=1).loc[start_date:]
-    return data
+def reindex_upto_last_nonnan(ds: pd.Series,
+                             index: pd.DatetimeIndex,
+                             method: str = 'ffill'
+                             ) -> pd.Series:
+    """
+    apply ffill up to the last value
+    """
+    filled_ds = ds.reindex(index=index, method=method)
+    last_non_nan = get_first_last_nonnan_index(df=ds, is_first=False)
+    if filled_ds.index[-1] > last_non_nan:
+        if last_non_nan in filled_ds.index:
+            idx = filled_ds.index.get_loc(last_non_nan)  # find idx
+            filled_ds.iloc[idx+1:] = np.nan
+        else:
+            filled_ds.loc[last_non_nan:] = np.nan
+    return filled_ds
 
 
 class UnitTests(Enum):
     ALIGN = 1
     SCORES = 2
+    NONNANINDEX = 3
+    REINDEX_UPTO_LAST_NONAN = 4
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -717,10 +597,33 @@ def run_unit_test(unit_test: UnitTests):
         percentiles = compute_last_score(df=df)
         print(percentiles)
 
+    elif unit_test == UnitTests.NONNANINDEX:
+
+        values = [1.0, np.nan, 3.0, 4.0, np.nan, 6.0, np.nan, np.nan]
+        dates = pd.date_range(start='1Jan2020', periods=len(values))
+        df = pd.Series({d: v for d, v in zip(dates, values)})
+        print(df)
+        last_non_nan = get_first_last_nonnan_index(df=df, is_first=False)
+        print(last_non_nan)
+
+    elif unit_test == UnitTests.REINDEX_UPTO_LAST_NONAN:
+
+        values = [1.0, np.nan, 3.0, 4.0, np.nan, 6.0, np.nan, 1.0]
+        dates = pd.date_range(start='1Jan2020', periods=len(values))
+        ds = pd.Series({d: v for d, v in zip(dates, values)})
+        print(ds)
+
+        dates1 = pd.date_range(start='1Jan2020', periods=len(values)+2)
+        post_filled = ds.reindex(index=dates1, method='ffill')
+        print(post_filled)
+
+        post_filled_up_nan = reindex_upto_last_nonnan(ds=ds, index=dates1, method='ffill')
+        print(post_filled_up_nan)
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.ALIGN
+    unit_test = UnitTests.REINDEX_UPTO_LAST_NONAN
 
     is_run_all_tests = False
     if is_run_all_tests:

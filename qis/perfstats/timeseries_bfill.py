@@ -38,9 +38,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         is_series_out = True
 
     if is_prices:
-        terminal_value = dfo.get_last_non_nan_values(df_newer)
+        terminal_value = dfo.get_last_nonnan_values(df_newer)
         if np.any(np.isnan(terminal_value)):
-            terminal_value_old = dfo.get_last_non_nan_values(df_older[df_newer.columns])
+            terminal_value_old = dfo.get_last_nonnan_values(df_older[df_newer.columns])
             terminal_value = np.where(np.isnan(terminal_value), terminal_value_old, terminal_value)
 
         df_newer = ret.to_returns(df_newer)
@@ -56,8 +56,8 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             if np.all(newer.isna()): # all new data is none, use old
                 bfill_data = older
             else:
-                older_start = dfo.get_first_last_non_nan_date(older)
-                newer_start = dfo.get_first_last_non_nan_date(newer)
+                older_start = dfo.get_first_last_nonnan_index(older)
+                newer_start = dfo.get_first_last_nonnan_index(newer)
                 # print(f"{column}\n{older_start}\n{newer_start}")
                 if older_start < newer_start:  # bffill
                     bffill_part = older[:newer_start].iloc[:-1]  # first filerr to newer start and out of last overlap
@@ -72,7 +72,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             bfill_data = bfill_data.iloc[bfill_data.index.duplicated(keep='last') == False]
 
         if fill_method is not None:
-            start = dfo.get_first_last_non_nan_date(bfill_data)
+            start = dfo.get_first_last_nonnan_index(bfill_data)
             if fill_method == 'to_zero':
                 bfill_data[start:] = bfill_data[start:].fillna(value=0.0)
             else:
@@ -166,13 +166,13 @@ def df_fill_first_nan_by_cross_median(df: pd.DataFrame,
         df = df.replace({0.0, np.nan})
 
     # for each column find first nonan
-    first_non_nan_index = dfo.get_first_before_non_nan_index(df)
+    first_nonnan_index = dfo.get_first_before_nonnan_index(df)
     merged_data = pd.DataFrame(index=df.index, columns=df.columns)
     for idx, column in enumerate(df.columns):
-        its_first_non_nan_index = first_non_nan_index[idx]
-        median_backfill = np.nanmedian(df.loc[:its_first_non_nan_index, :].to_numpy(), axis=1)
-        merged_data.loc[:its_first_non_nan_index, column] = median_backfill
-        merged_data.loc[its_first_non_nan_index:, column] = df.loc[its_first_non_nan_index:, column].to_numpy()
+        its_first_nonnan_index = first_nonnan_index[idx]
+        median_backfill = np.nanmedian(df.loc[:its_first_nonnan_index, :].to_numpy(), axis=1)
+        merged_data.loc[:its_first_nonnan_index, column] = median_backfill
+        merged_data.loc[its_first_nonnan_index:, column] = df.loc[its_first_nonnan_index:, column].to_numpy()
 
     # fillnans with ffill in data after
     merged_data = merged_data.fillna(method='ffill')
@@ -196,8 +196,8 @@ def df_price_ffill_between_nans(prices: pd.DataFrame, method: Optional[str] = 'f
     """
     fill prices between nans
     """
-    first_date = dfo.get_first_last_non_nan_date(df=prices, is_first=True)
-    last_date = dfo.get_first_last_non_nan_date(df=prices, is_first=False)
+    first_date = dfo.get_first_last_nonnan_index(df=prices, is_first=True)
+    last_date = dfo.get_first_last_nonnan_index(df=prices, is_first=False)
     good_parts = []
     for idx, column in enumerate(prices.columns):
         good_price = prices.loc[first_date[idx]:last_date[idx], column]

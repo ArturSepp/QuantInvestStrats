@@ -28,7 +28,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               var_format: str = '{:.1%}',
               yvar_format: str = '{:,.2f}',
               x_rotation: int = 0,
-              show_y_axis: bool = False,
+              skip_y_axis: bool = False,
               legend_loc: Optional[str] = 'upper center',
               bbox_to_anchor: Optional[Tuple[float, float]] = None,
               y_limits: Tuple[Optional[float], Optional[float]] = None,
@@ -158,7 +158,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                          **kwargs)
 
     put.set_ax_tick_params(ax=ax)
-    put.set_ax_tick_labels(ax=ax, fontsize=fontsize, skip_y_axis=show_y_axis, **kwargs)
+    put.set_ax_tick_labels(ax=ax, fontsize=fontsize, skip_y_axis=skip_y_axis, **kwargs)
     local_kwargs = sop.update_kwargs(dict(yvar_format=yvar_format, fontsize=fontsize), kwargs)
     put.set_ax_ticks_format(ax=ax, x_rotation=x_rotation, **local_kwargs)
 
@@ -399,7 +399,7 @@ def run_unit_test(unit_test: UnitTests):
         for data, ax, title in zip(datas, axs, titles):
             plot_bars(df=data,
                       stacked=False,
-                      show_y_axis=True,
+                      skip_y_axis=True,
                       title=title,
                       legend_loc=None,
                       x_rotation=90,
@@ -418,7 +418,7 @@ def run_unit_test(unit_test: UnitTests):
 
         plot_bars(df=returns,
                   stacked=False,
-                  show_y_axis=True,
+                  skip_y_axis=True,
                   legend_loc=None,
                   x_rotation=90,
                   ax=ax)
@@ -451,7 +451,7 @@ def run_unit_test(unit_test: UnitTests):
 
         plot_bars(df=returns,
                   stacked=False,
-                  show_y_axis=True,
+                  skip_y_axis=True,
                   x_rotation=90,
                   yvar_format='{:,.0%}',
                   date_format='%b-%y',

@@ -20,7 +20,7 @@ import qis.utils.struct_ops as sop
 from qis.utils import EnumMap
 from qis.perfstats.config import PerfParams, RegimeData
 import qis.perfstats.returns as ret
-import qis.perfstats.perf_table as rpt
+import qis.perfstats.perf_stats as rpt
 import qis.perfstats.regime_classifier as rcl
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
 

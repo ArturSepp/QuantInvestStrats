@@ -17,7 +17,7 @@ from qis.perfstats.cond_regression import estimate_cond_regression, get_regime_r
 
 from qis.perfstats.desc_table import DescTableType, compute_desc_table
 
-from qis.perfstats.perf_table import (
+from qis.perfstats.perf_stats import (
     STANDARD_TABLE_COLUMNS,
     LN_TABLE_COLUMNS,
     LN_BENCHMARK_TABLE_COLUMNS,
@@ -26,11 +26,11 @@ from qis.perfstats.perf_table import (
     COMPACT_TABLE_COLUMNS,
     BENCHMARK_TABLE_COLUMNS,
     BENCHMARK_TABLE_COLUMNS2,
-    compute_avg_max,
+    compute_avg_max_dd,
     compute_desc_freq_table,
     compute_drawdown,
     compute_drawdown_data,
-    compute_drawdown_time_data,
+    compute_drawdown_time_under_water,
     compute_info_ratio_table,
     compute_max_dd,
     compute_performance_table,
@@ -79,7 +79,7 @@ from qis.perfstats.returns import (
     to_returns,
     to_scaled_nav,
     to_total_returns,
-    to_zero_first_non_nan_returns
+    to_zero_first_nonnan_returns
 )
 
 from qis.perfstats.timeseries_bfill import (

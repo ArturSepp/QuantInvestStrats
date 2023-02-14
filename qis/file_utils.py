@@ -472,7 +472,11 @@ def load_df_from_csv(file_name: Optional[str] = None,
                          index_col=index_col,
                          parse_dates=parse_dates,
                          dayfirst=dayfirst)
-    except:
+
+    except UnicodeDecodeError:  # try without index
+        df = pd.read_csv(filepath_or_buffer=file_path)
+
+    except FileNotFoundError:
         raise FileNotFoundError(f"not found {file_name} with file_path={file_path}")
 
     if drop_duplicated:
@@ -588,7 +592,7 @@ def load_df_dict_from_sql(engine: Engine,
         df = pd.read_sql_table(table_name=f"{table_name}_{key}", con=engine, schema=schema,
                                index_col=index_col,
                                columns=columns)
-        if index_col is not None:
+        if index_col is not None and index_col in df.columns:
             df[index_col] = pd.to_datetime(df[index_col])
             df = df.set_index(index_col)
         pandas_dict[key] = df
@@ -608,7 +612,7 @@ def save_df_to_feather(df: pd.DataFrame,
                        index_col: Optional[str] = INDEX_COLUMN
                        ) -> None:
     """
-    pandas dict to csv files
+    pandas dict to feather files
     """
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.FEATHER,
@@ -628,7 +632,7 @@ def load_df_from_feather(file_name: Optional[str] = None,
                          index_col: Optional[str] = INDEX_COLUMN
                          ) -> pd.DataFrame:
     """
-    pandas from csv
+    load dfs from feather files
     """
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.FEATHER,
@@ -642,9 +646,8 @@ def load_df_from_feather(file_name: Optional[str] = None,
         raise FileNotFoundError(f"not found {file_name} with file_path={file_path}")
 
     if index_col is not None:
-        df.index = pd.to_datetime(df['index'])
-        df = df.set_index('index')
-
+        df[index_col] = pd.to_datetime(df[index_col])
+        df = df.set_index(index_col)
     return df
 
 
@@ -672,7 +675,6 @@ def save_df_dict_to_feather(dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame
             df.to_feather(path=file_path)
 
 
-@timer
 def load_df_dict_from_feather(dataset_keys: List[Union[str, Enum, NamedTuple]],
                               file_name: Optional[str],
                               local_path: Optional[str] = None,

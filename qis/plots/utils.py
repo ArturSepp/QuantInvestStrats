@@ -17,7 +17,7 @@ from matplotlib.lines import Line2D
 from scipy import stats as stats
 from scipy.stats import skew, kurtosis
 from enum import Enum
-from typing import List, Union, Tuple, Optional, Dict
+from typing import List, Union, Tuple, Optional, Dict, Any
 
 # qis
 import qis.utils.df_ops as dfo
@@ -730,6 +730,7 @@ class LegendStats(Enum):
     AVG_STD_SKEW_KURT = 6
     AVG_STD_LAST = 7
     AVG_NONNAN_LAST = 8
+    AVG_NONZERO_LAST = 81
     MEDIAN_NONNAN_LAST = 9
     AVG_MEDIAN_STD_NONNAN_LAST = 10
     AVG_LAST_SCORE = 11
@@ -897,6 +898,19 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 last = data_column.dropna().iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, last={var_format.format(last)}")
 
+    elif legend_stats == LegendStats.AVG_NONZERO_LAST:
+        legend_lines = []
+        for column in data.columns:
+            data_column = data[column].replace({0.0: np.nan})
+            if np.all(np.isnan(data_column)):
+                avg = nan_display
+                last = nan_display
+            else:
+                avg = np.nanmean(data_column)
+                last = data_column.dropna().iloc[-1]
+            legend_lines.append(f"{column}: avg={var_format.format(avg)}, last={var_format.format(last)}")
+
+
     elif legend_stats == LegendStats.MEDIAN_NONNAN_LAST:
         legend_lines = []
         for column in data.columns:
@@ -1032,7 +1046,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.AVG_STD_MISSING_ZERO:
         legend_lines = []
-        missing_ratio, zeros_ratio = dfo.missing_zero_ratios_after_first_non_nan(df=data)
+        missing_ratio, zeros_ratio = dfo.compute_nans_zeros_ratio_after_first_non_nan(df=data)
         for idx, column in enumerate(data.columns):
             column_data = data[column]
             if np.all(np.isnan(column_data)):
@@ -1052,7 +1066,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.MISSING_AVG_LAST:
         legend_lines = []
-        missing_ratio, zeros_ratio = dfo.missing_zero_ratios_after_first_non_nan(df=data)
+        missing_ratio, zeros_ratio = dfo.compute_nans_zeros_ratio_after_first_non_nan(df=data)
         for idx, column in enumerate(data.columns):
             column_data = data[column]
             if np.all(np.isnan(column_data)):
@@ -1331,7 +1345,7 @@ def get_data_group_colors(df: pd.DataFrame,
 
 
 def add_scatter_points(ax: plt.Subplot,
-                       label_x_y: Dict[str, Tuple[float, float]],
+                       label_x_y: Dict[str, Tuple[Any, float]],
                        fontsize: int = 12,
                        color: str = 'steelblue',
                        colors: List[str] = None,

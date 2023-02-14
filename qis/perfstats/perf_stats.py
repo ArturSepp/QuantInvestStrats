@@ -5,7 +5,7 @@ compute risk-adjusted performance tables
 import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis, skew
-from typing import Callable, Union, Dict, Tuple
+from typing import Callable, Union, Dict, Tuple, Any, Optional
 from collections import OrderedDict
 from enum import Enum
 
@@ -14,7 +14,6 @@ import qis.utils.dates as da
 import qis.utils.ols as ols
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfStat, PerfParams
-
 
 STANDARD_TABLE_COLUMNS = (PerfStat.START_DATE,
                           PerfStat.END_DATE,
@@ -106,7 +105,6 @@ BENCHMARK_TABLE_COLUMNS = (PerfStat.PA_RETURN,
                            PerfStat.BETA,
                            PerfStat.R2)
 
-
 BENCHMARK_TABLE_COLUMNS2 = (PerfStat.TOTAL_RETURN,
                             PerfStat.PA_RETURN,
                             PerfStat.VOL,
@@ -136,7 +134,7 @@ def compute_performance_table(prices: Union[pd.DataFrame, pd.Series],
         asset_data = prices[asset].dropna()  # force drop na
         return_dict = ret.compute_returns_dict(prices=asset_data, perf_params=perf_params)
         dict_data[asset] = return_dict
-    # keys will be rows = asset, column = keys in return_dict
+        # keys will be rows = asset, column = keys in return_dict
     data = pd.DataFrame.from_dict(data=dict_data, orient='index')
     return data
 
@@ -197,7 +195,7 @@ def compute_risk_table(prices: pd.DataFrame,
                           }
         dict_data[asset] = asset_dict
 
-    # keys will be rows = asset, column = keys in return_dict
+        # keys will be rows = asset, column = keys in return_dict
     data = pd.DataFrame.from_dict(data=dict_data, orient='index')
 
     return data
@@ -206,7 +204,6 @@ def compute_risk_table(prices: pd.DataFrame,
 def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
                           perf_params: PerfParams = None
                           ) -> pd.DataFrame:
-
     if perf_params is None:
         perf_params = PerfParams(freq=pd.infer_freq(prices.index))
 
@@ -248,12 +245,13 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     alphas, betas, r2 = {}, {}, {}
     for column in returns.columns:
         joint_data = returns[[benchmark, column]].dropna()
-        if joint_data.empty or len(joint_data.index)<2:
+        if joint_data.empty or len(joint_data.index) < 2:
             alphas[column], betas[column], r2[column] = np.nan, np.nan, np.nan
         else:
-            alphas[column], betas[column], r2[column] = ols.estimate_ols_alpha_beta(x=joint_data.iloc[:, 0], y=joint_data.iloc[:, 1])
+            alphas[column], betas[column], r2[column] = ols.estimate_ols_alpha_beta(x=joint_data.iloc[:, 0],
+                                                                                    y=joint_data.iloc[:, 1])
 
-    # get vol and compute risk adjusted performance
+            # get vol and compute risk adjusted performance
     ra_perf_table[PerfStat.ALPHA.to_str()] = pd.Series(alphas)
     ra_perf_table[PerfStat.ALPHA_AN.to_str()] = pd.Series(alphas)
     ra_perf_table[PerfStat.BETA.to_str()] = pd.Series(betas)
@@ -313,104 +311,105 @@ def compute_info_ratio_table(return_diffs_dict: Dict[str, pd.DataFrame]) -> Tupl
     return te_table, ir_table
 
 
-def compute_drawdown(prices: pd.Series) -> pd.Series:
-
-    if not isinstance(prices, pd.Series):
-        print(prices)
+def compute_drawdown(price: pd.Series) -> pd.Series:
+    if not isinstance(price, pd.Series):
+        print(price)
         raise TypeError(f"in compute_max_dd: path_data must be series")
 
-    max_dd = np.zeros_like(prices)
+    max_dd = np.zeros_like(price)
     last_peak = -np.inf
 
-    for idx, price in enumerate(prices):
-        if not np.isnan(price):
-            if price > last_peak:
-                last_peak = price
+    for idx, price_ in enumerate(price):
+        if not np.isnan(price_):
+            if price_ > last_peak:
+                last_peak = price_
             if not np.isclose(last_peak, 0.0):
-                max_dd[idx] = price / last_peak - 1.0
+                max_dd[idx] = price_ / last_peak - 1.0
         else:
             max_dd[idx] = np.nan
 
-    max_dd = pd.Series(data=max_dd, index=prices.index, name=prices.name)
+    max_dd = pd.Series(data=max_dd, index=price.index, name=price.name)
 
     return max_dd
 
 
-def compute_time_under_water(prices: pd.Series) -> Tuple[pd.Series, pd.Series]:
-
-    if not isinstance(prices, pd.Series):
+def compute_time_under_water(price: pd.Series) -> Tuple[pd.Series, pd.Series]:
+    if not isinstance(price, pd.Series):
         raise TypeError(f"in compute_time_under_water: path_data must be series")
 
-    max_dd = np.zeros_like(prices)
-    dd_times = np.zeros_like(prices.index)
+    max_dd = np.zeros_like(price)
+    dd_times = np.zeros_like(price.index)
 
     last_peak = -np.inf
-    last_dd_time = prices.index[0]
+    last_dd, last_dd_time = 0.0, price.index[0]
     dd_times[0] = last_dd_time
-    for idx, (index, price) in enumerate(prices.items()):
-        if not np.isnan(price):
-            if price > last_peak:
-                last_peak = price
+    for idx, (index, price_) in enumerate(price.items()):
+        if not np.isnan(price_):
+            if price_ > last_peak:
+                last_peak = price_
                 last_dd_time = index
-            max_dd[idx] = price / last_peak - 1.0
+            last_dd = price_ / last_peak - 1.0
+            max_dd[idx] = last_dd
             dd_times[idx] = last_dd_time
         else:
-            max_dd[idx] = 0.0
-            dd_times[idx] = index
+            max_dd[idx] = last_dd
+            dd_times[idx] = last_dd_time
 
-    max_dd = pd.Series(data=max_dd, index=prices.index, name=prices.name)
-    dd_times = (prices.index - pd.DatetimeIndex(dd_times)).days
-    time_under_water = pd.Series(data=dd_times, index=prices.index, name=prices.name)
+    max_dd = pd.Series(data=max_dd, index=price.index, name=price.name)
+    dd_times = (price.index - pd.DatetimeIndex(dd_times)).days
+    time_under_water = pd.Series(data=dd_times, index=price.index, name=price.name)
 
     return max_dd, time_under_water
 
 
 def compute_drawdown_data(prices: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
     if isinstance(prices, pd.Series):
-        drawdown = compute_drawdown(prices=prices)
+        drawdown = compute_drawdown(price=prices)
     elif isinstance(prices, pd.DataFrame):
         if len(prices.columns) > 1 and prices.columns.duplicated().any():
             raise ValueError(f"dublicated columns = {prices[prices.columns.duplicated()]}")
         drawdowns = []
         for asset_ in prices:
-            drawdowns.append(compute_drawdown(prices=prices[asset_]))
+            drawdowns.append(compute_drawdown(price=prices[asset_]))
         drawdown = pd.concat(drawdowns, axis=1)
     else:
         raise ValueError(f"unsuported type {type(prices)}")
     return drawdown
 
 
-def compute_drawdown_time_data(prices: Union[pd.DataFrame, pd.Series]
-                               ) -> Tuple[Union[pd.DataFrame, pd.Series], Union[pd.DataFrame, pd.Series]]:
-
+def compute_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Series]
+                                      ) -> Tuple[Union[pd.DataFrame, pd.Series], Union[pd.DataFrame, pd.Series]]:
+    """
+    compute joint data of drawdown and time under water
+    """
     if isinstance(prices, pd.Series):
-        drawdown, time_under_water = compute_time_under_water(prices=prices)
-
+        drawdown, time_under_water = compute_time_under_water(price=prices)
     else:
         drawdowns = []
         time_under_waters = []
-        for asset in prices:
-            drawdown, time_under_water = compute_time_under_water(prices=prices[asset])
+        for asset in prices.columns:
+            drawdown, time_under_water = compute_time_under_water(price=prices[asset])
             drawdowns.append(drawdown)
             time_under_waters.append(time_under_water)
-
         drawdown = pd.concat(drawdowns, axis=1)
         time_under_water = pd.concat(time_under_waters, axis=1)
 
     return drawdown, time_under_water
 
 
-def compute_max_dd(prices: Union[pd.DataFrame, pd.Series]
-                   ) -> np.ndarray:
+def compute_max_dd(prices: Union[pd.DataFrame, pd.Series]) -> np.ndarray:
+    """
+    compute realized max drawdown
+    """
     max_dd_data = compute_drawdown_data(prices=prices)
     max_dds = np.min(max_dd_data.to_numpy(), axis=0)
     return max_dds
 
 
-def compute_avg_max(ds: pd.Series,
-                    is_max: bool = True,
-                    q: float = 0.1
-                    ) -> (float, float, float, float):
+def compute_avg_max_dd(ds: pd.Series,
+                       is_max: bool = True,
+                       q: float = 0.1
+                       ) -> (float, float, float, float):
     """
     compute dd statistics
     """
@@ -421,7 +420,7 @@ def compute_avg_max(ds: pd.Series,
 
     avg = np.nanmean(nan_data)
     if is_max:
-        quant = np.nanquantile(nan_data, 1.0-q)
+        quant = np.nanquantile(nan_data, 1.0 - q)
         nmax = np.nanmax(nan_data)
     else:
         quant = np.nanquantile(nan_data, q)
@@ -432,33 +431,84 @@ def compute_avg_max(ds: pd.Series,
     return avg, quant, nmax, last
 
 
+def compute_drawdowns_stats_table(price: pd.Series,
+                                  max_num: Optional[int] = None,
+                                  freq: Optional[str] = 'D'  # need to rebase to calendar days
+                                  ) -> pd.DataFrame:
+    """
+    compute drawdown statistics table
+    split drawdown time series into block
+    rank block by max dradown and compute stats for the n-top blocks
+    """
+    if freq is not None:
+        price = price.asfreq(freq, method='ffill')
+    max_dd, time_under_water = compute_time_under_water(price=price)
+    max_dd = max_dd.replace({0.0: np.nan})
+    time_under_water = time_under_water.replace({0.0: np.nan})
+
+    # Convert to sparse then query index to find block locations
+    joint = pd.concat([max_dd.rename('max_dd'), time_under_water.rename('days'), price], axis=1)
+
+    def process_bslice(bslice: pd.DataFrame) -> Dict[str, Any]:
+        max_idx = np.argmin(bslice['max_dd'].to_numpy())
+        out = dict(start=bslice.index[0],
+                   trough=bslice.index[max_idx],
+                   end=bslice.index[-1],
+                   max_dd=bslice['max_dd'].iloc[max_idx],
+                   days_dd=bslice['days'].iloc[-1],
+                   days_to_trough=bslice['days'].iloc[max_idx],
+                   days_recovery=bslice['days'].iloc[-1]-bslice['days'].iloc[max_idx],
+                   peak=bslice[price.name].iloc[0],
+                   bottom=bslice[price.name].iloc[max_idx],
+                   recovery=bslice[price.name].iloc[-1])
+        return out
+
+    # split max_dd to series according to nan blocs
+    sparse_ts = max_dd.astype(pd.SparseDtype('float'))
+    # we need to use .values.sp_index.to_block_index() in this version of pandas
+    outputs = {}
+    for bstart, blength in zip(sparse_ts.values.sp_index.to_block_index().blocs,
+                              sparse_ts.values.sp_index.to_block_index().blengths):
+        bslice = joint.iloc[bstart: (bstart + blength - 1)]
+        if not bslice.empty:
+            outputs[bstart] = process_bslice(bslice=bslice)
+
+    df = pd.DataFrame.from_dict(outputs, orient='index')
+    df = df.sort_values(by='max_dd')
+    if max_num is not None:
+        df = df.iloc[:max_num, :]
+    return df
+
+
 class UnitTests(Enum):
     RA_PERF_TABLE = 1
-    DD_DATA = 2
+    DRAWDOWN = 2
+    DRAWDOWN_STATS_TABLE = 3
 
 
 def run_unit_test(unit_test: UnitTests):
+
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
-    print(prices)
 
     if unit_test == UnitTests.RA_PERF_TABLE:
-
         perf_params = PerfParams(freq='B')
         table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
         print(table)
         print(table.columns)
 
-    elif unit_test == UnitTests.DD_DATA:
-        prices = prices.iloc[:, 0]
-        max_dd, time_under_water = compute_time_under_water(prices=prices)
-        print(max_dd)
-        print(time_under_water)
+    elif unit_test == UnitTests.DRAWDOWN:
+        dd_data = compute_drawdown(price=prices['SPY'])
+        print(dd_data)
+
+    elif unit_test == UnitTests.DRAWDOWN_STATS_TABLE:
+        df = compute_drawdowns_stats_table(price=prices['SPY'])
+        print(df)
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.RA_PERF_TABLE
+    unit_test = UnitTests.DRAWDOWN_STATS_TABLE
 
     is_run_all_tests = False
     if is_run_all_tests:

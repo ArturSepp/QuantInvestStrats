@@ -126,13 +126,6 @@ def df_resample_at_int_index(df: pd.DataFrame,
     resample dataframe at evenly spaced discrete index
     """
     assert isinstance(sample_size, int)
-    """
-    if sample_size == 1:
-        df = df.agg(func, axis=0)
-        if isinstance(df, pd.Series):  # if input is one columns
-            df = df.to_frame()
-        return df
-    """
     original_index = df.index
     df = df.reset_index(drop=True)  # need integer range index
     sampler = (df.index.to_series() / sample_size).astype(int)

@@ -14,7 +14,6 @@ from qis.perfstats.desc_table import compute_desc_table, DescTableType
 
 
 def plot_time_series(df: Union[pd.Series, pd.DataFrame],
-                     is_use_sns_lineplot: bool = True,
                      linestyles: List[str] = None,
                      linewidth: float = 1.0,
                      x_date_freq: Union[str, None] = 'Q',
@@ -44,10 +43,6 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      **kwargs
                      ) -> Optional[plt.Figure]:
 
-    if trend_line in [TrendLine.AVERAGE, TrendLine.AVERAGE_SHADOWS, TrendLine.ZERO_SHADOWS,
-                      TrendLine.TREND_LINE, TrendLine.TREND_LINE_SHADOWS]:  # these features are only available with sns
-        is_use_sns_lineplot = True
-
     data1 = df.copy()
     if isinstance(data1, pd.DataFrame):
         pass
@@ -65,12 +60,10 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     if colors is None:
         colors = put.get_n_colors(n=len(columns), **kwargs)
 
-    if is_use_sns_lineplot:
-        sns.lineplot(data=data1, palette=colors, dashes=False, markers=markers,
-                     markersize=markersize,
-                     linewidth=linewidth, ax=ax)
-    else:
-        data1.plot(ax=ax, color=colors, linewidth=linewidth)
+    sns.lineplot(data=data1, palette=colors, dashes=False, markers=markers,
+                 markersize=markersize,
+                 linewidth=linewidth, ax=ax)
+
 
     # add tredlines
     if trend_line == TrendLine.ZERO_SHADOWS:

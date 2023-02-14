@@ -13,7 +13,7 @@ from enum import Enum
 
 import qis.utils.dates as da
 import qis.utils.df_cut as dfc
-import qis.perfstats.perf_table as pt
+import qis.perfstats.perf_stats as pt
 import qis.perfstats.returns as ret
 from qis.perfstats.config import ReturnTypes, RegimeData, PerfParams, PerfStat
 

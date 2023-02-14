@@ -146,7 +146,7 @@ from qis.plots.derived.drawdowns import (
     DdLegendType,
     plot_drawdown,
     plot_rolling_time_under_water,
-    plot_drawdown_lengths
+    plot_top_drawdowns_paths
 )
 
 from qis.plots.derived.regime_data import (

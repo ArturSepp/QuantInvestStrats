@@ -5,6 +5,7 @@ implementation of core dates analytics and frequency with TimePeriod method
 from __future__ import annotations  # to allow class method annotations
 
 import datetime as dt
+import re
 import pandas as pd
 import numpy as np
 from typing import List, Union, Tuple, Optional, NamedTuple, Dict
@@ -26,27 +27,16 @@ CALENDAR_DAYS_IN_MONTH = 30
 CALENDAR_DAYS_PER_YEAR_SHARPE = 365.25  # for total return computations for Sharpe
 
 
-def get_today_str(format: str = DATE_FORMAT) -> str:
-    return dt.datetime.now().date().strftime(format)
-
-
-def get_today_eod_with_tz(tz: str = 'UTC', days_offset: int = None) -> pd.Timestamp:
-    eod = pd.Timestamp.today(tz=tz).normalize()  # normalize to eod date
+def get_current_time_with_tz(tz: Optional[str] = 'UTC',
+                             days_offset: int = None,
+                             normalize: bool = True
+                             ) -> pd.Timestamp:
+    t = pd.Timestamp.today(tz=tz)
+    if normalize:
+        t = t.normalize()  # normalize to eod date
     if days_offset is not None:
-        eod = eod + pd.DateOffset(days=days_offset)
-    return eod
-
-
-def get_current_date(day_offset: int = 0) -> pd.Timestamp:
-    """
-    date without time
-    """
-    current_date_time = dt.datetime.now()
-    current_date = pd.Timestamp(dt.datetime(year=current_date_time.year,
-                                            month=current_date_time.month,
-                                            day=current_date_time.day))
-    current_date = shift_date_by_day(date=current_date, num_days=day_offset, backward=False)
-    return current_date
+        t = t + pd.DateOffset(days=days_offset)
+    return t
 
 
 def find_min_time(date1: Union[str, pd.Timestamp], date2: Union[str, pd.Timestamp]) -> pd.Timestamp:
@@ -283,7 +273,7 @@ class TimePeriod:
             else:
                 raise TypeError(f"unsuported type for date {end} of {type(end)}")
         else:
-            self.end = None  # get_current_date()
+            self.end = None
 
         self.tz = tz
         if tz is not None:
@@ -428,7 +418,7 @@ class TimePeriod:
         sed.tz = tz
         if days_shift is not None:
             sed.end = shift_date_by_day(sed.end, num_days=days_shift, backward=False)
-        pd_datetime_index = generate_dates_schedule(sed, freq=freq, hours=hours,
+        pd_datetime_index = generate_dates_schedule(sed, freq=freq, hours_offset=hours,
                                                     include_start_date=include_start_date,
                                                     include_end_date=include_end_date,
                                                     is_business_dates=is_business_dates)
@@ -508,7 +498,7 @@ def get_ytd_time_period(year: int = 2020) -> TimePeriod:
 
 def generate_dates_schedule(time_period: TimePeriod,
                             freq: str = 'M',
-                            hours: Optional[int] = None,
+                            hours_offset: Optional[int] = None,
                             include_start_date: bool = False,
                             include_end_date: bool = False,
                             is_business_dates: bool = True
@@ -541,26 +531,33 @@ def generate_dates_schedule(time_period: TimePeriod,
 
     if freq == 'M-FRI':  # last friday of month
         # create weekly fridays
-        dates_schedule_ = create_range(freq_='W-FRI', tz=time_period.tz)
-        w_dates_schedule_ = create_range(freq_='W', tz=time_period.tz)
+        dates_schedule1 = create_range(freq_='W-FRI', tz=time_period.tz)
+        dates_schedule2 = create_range(freq_='M', tz=time_period.tz)
         # filter last Friday per month periods
-        dates_schedule = pd.Series(dates_schedule_, index=dates_schedule_).reindex(index=dates_schedule_, method='ffill')
-        #dates_schedule = dates_schedule_.to_series().groupby(dates_schedule_.to_period('M')).last()
-        dates_schedule = dates_schedule.to_numpy()  # back to DatetimeIndex type
+        dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill')
+        dates_schedule = pd.DatetimeIndex(dates_schedule.to_numpy())  # back to DatetimeIndex type
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
 
     elif freq == 'Q-FRI':  # last friday of quarter
         # create weekly fridays
-        dates_schedule_ = create_range(freq_='W-FRI', tz=time_period.tz)
+        dates_schedule1 = create_range(freq_='W-FRI', tz=time_period.tz)
+        dates_schedule2 = create_range(freq_='Q', tz=time_period.tz)
         # filter last Friday per quarter periods
-        q_dates_schedule_ = create_range(freq_='Q', tz=time_period.tz)
-        dates_schedule = pd.Series(dates_schedule_, index=dates_schedule_).reindex(index=q_dates_schedule_, method='ffill')
-        # dates_schedule = dates_schedule_.to_series().groupby(dates_schedule_.to_period('Q')).last()
-        dates_schedule = dates_schedule.to_numpy()  # back to DatetimeIndex type
+        dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill')
+        dates_schedule = pd.DatetimeIndex(dates_schedule.to_numpy())  # back to DatetimeIndex type
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
 
+    elif '_' in freq:
+        # support for bespoke D_8H  # daily at 8H utc
+        ss = freq.split('_')
+        freq = ss[0]
+        hours_offset = int(re.findall(r'\d+', ss[-1])[0])
+        dates_schedule1 = create_range(freq_=freq, tz=time_period.tz)
+        dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hours_offset) for x in dates_schedule1])
+        if include_end_date is False:
+            dates_schedule = dates_schedule[:-1]
     else:
         dates_schedule = create_range(freq_=freq)
 
@@ -591,8 +588,8 @@ def generate_dates_schedule(time_period: TimePeriod,
         if include_end_date and dates_schedule[-1] < time_period.end:  # append date scedule with last elemnt
             dates_schedule = dates_schedule.append(pd.DatetimeIndex([time_period.end]))
 
-    if hours is not None and len(dates_schedule) > 0:
-        dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hours) for x in dates_schedule])
+    if hours_offset is not None and len(dates_schedule) > 0:
+        dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hours_offset) for x in dates_schedule])
 
     return dates_schedule
 
@@ -940,7 +937,7 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
     # use large day shift to cover at least next quarter
     roll_days = generate_dates_schedule(time_period.shift_end_date_by_days(num_days=180, backward=False),
                                         freq=roll_freq,
-                                        hours=roll_hour)
+                                        hours_offset=roll_hour)
 
     if len(roll_days) == 1:
         roll_schedule = pd.Series(roll_days[0], index=observed_times)
@@ -1029,18 +1026,21 @@ def run_unit_test(unit_test: UnitTests):
         rebalancing_times = generate_dates_schedule(time_period=time_period, freq='8H')
         print(rebalancing_times)
 
+        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='D_8H')
+        print(rebalancing_times)
+
         #time_period = TimePeriod(pd.Timestamp('2022-11-10 8:00:00+00:00', tz='UTC'), pd.Timestamp('2022-11-16 8:00:00+00:00', tz='UTC'))
         #rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
         #print(rebalancing_times)
 
     elif unit_test == UnitTests.FREQ_REB:
         dates_schedule = generate_dates_schedule(time_period=TimePeriod('2022-04-08 08:00:00', '2022-04-10 10:00:00', tz='UTC'),
-                                                 freq='D', hours=8,
+                                                 freq='D', hours_offset=8,
                                                  include_start_date=True,
                                                  include_end_date=True)
         print(dates_schedule)
         dates_schedule = generate_dates_schedule(time_period=TimePeriod('2022-04-08 08:00:00', '2022-04-10 10:00:00', tz='UTC'),
-                                                 freq='D', hours=8,
+                                                 freq='D', hours_offset=8,
                                                  include_start_date=False,
                                                  include_end_date=False)
         print(dates_schedule)

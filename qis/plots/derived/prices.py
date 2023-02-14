@@ -11,7 +11,7 @@ import qis.utils.dates as da
 import qis.utils.df_ops as dfo
 import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
-import qis.perfstats.perf_table as pt
+import qis.perfstats.perf_stats as pt
 from qis.perfstats.config import PerfStat, PerfParams
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
 
@@ -150,10 +150,10 @@ def plot_prices(prices: Union[pd.DataFrame, pd.Series],
         prices = prices.asfreq(resample_freq, method='ffill')
 
     if end_to_one:
-        scaler = 1.0 / dfo.get_last_non_nan_values(df=prices)
+        scaler = 1.0 / dfo.get_last_nonnan_values(df=prices)
         prices = prices.multiply(scaler)
     elif start_to_one:
-        prices = prices.divide(dfo.get_first_non_nan_values(df=prices))
+        prices = prices.divide(dfo.get_first_nonnan_values(df=prices))
 
     fig = pts.plot_time_series(df=prices,
                                trend_line=trend_line,
@@ -342,7 +342,7 @@ def plot_prices_2ax(prices_ax1: Union[pd.DataFrame, pd.Series],
     legend_labels = sop.to_flat_list(legend_labels1 + legend_labels2)
 
     if start_to_one:
-        prices_ax1 = prices_ax1.divide(dfo.get_first_non_nan_values(df=prices_ax1))
+        prices_ax1 = prices_ax1.divide(dfo.get_first_nonnan_values(df=prices_ax1))
 
     fig = pts.plot_time_series_2ax(df1=prices_ax1,
                                    df2=prices_ax2,

@@ -26,7 +26,9 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.ETF_PRICES:
-        prices = yf.download(tickers=['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD'], start=None, end=None)['Adj Close']
+        prices = yf.download(tickers=['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD'],
+                             start=None, end=None,
+                             ignore_tz=True)['Adj Close']
         print(prices)
         fu.save_df_to_csv(df=prices, file_name='etf_prices', local_path=LOCAL_RESOURCE_PATH)
 
@@ -37,7 +39,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.ETF_PRICES
+    unit_test = UnitTests.TEST_LOADING
 
     is_run_all_tests = False
     if is_run_all_tests:
