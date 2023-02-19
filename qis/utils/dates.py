@@ -510,17 +510,7 @@ def generate_dates_schedule(time_period: TimePeriod,
             dates_schedule = pd.DatetimeIndex([time_period.start])
         elif include_end_date:
             dates_schedule = pd.DatetimeIndex([time_period.end])
-    else:
-        if include_start_date:
-            if dates_schedule[0] > time_period.start:
-                # create start date and append the dates schedule
-                dates_schedule = (pd.DatetimeIndex([time_period.start])).append(dates_schedule)
-
-        if include_end_date and len(dates_schedule) > 0:
-            if dates_schedule[-1] < time_period.end:  # append date scedule with last elemnt
-                dates_schedule = dates_schedule.append(pd.DatetimeIndex([time_period.end]))
-
-    if freq == 'H':
+    elif freq == 'H':
         dates_schedule = dates_schedule[dates_schedule >= time_period.start]
         if is_24_hour_offset:
             dates_schedule = dates_schedule[:-1]  # drop the next dat at 00:00:00
@@ -528,9 +518,27 @@ def generate_dates_schedule(time_period: TimePeriod,
             dates_schedule = dates_schedule[dates_schedule <= time_period.end]
         if include_end_date and dates_schedule[-1] < time_period.end:  # append date scedule with last elemnt
             dates_schedule = dates_schedule.append(pd.DatetimeIndex([time_period.end]))
+    else:
+        # hour offset should not be beyond the end period
+        if hour_offset is not None:
+            dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hour_offset) for x in dates_schedule])
 
-    if hour_offset is not None and len(dates_schedule) > 0:
-        dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hour_offset) for x in dates_schedule])
+        if include_start_date:  # irrespective of hour offset
+            #if hour_offset is not None:
+            #    this_start = time_period.start + pd.DateOffset(hours=hour_offset)
+            #else:
+            this_start = time_period.start
+            if dates_schedule[0] > this_start:
+                # create start date and append the dates schedule
+                dates_schedule = (pd.DatetimeIndex([this_start])).append(dates_schedule)
+
+        if include_end_date:
+            #if hour_offset is not None:
+            #    this_end = time_period.end + pd.DateOffset(hours=hour_offset)
+            #else:
+            this_end = time_period.end
+            if dates_schedule[-1] < this_end:  # append date scedule with last elemnt
+                dates_schedule = dates_schedule.append(pd.DatetimeIndex([this_end]))
 
     return dates_schedule
 

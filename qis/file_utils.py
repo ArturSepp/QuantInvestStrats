@@ -646,7 +646,7 @@ def load_df_from_feather(file_name: Optional[str] = None,
     except:
         raise FileNotFoundError(f"not found {file_name} with file_path={file_path}")
 
-    if index_col is not None:
+    if index_col is not None and index_col in df.columns:
         df[index_col] = pd.to_datetime(df[index_col])
         df = df.set_index(index_col)
     return df
@@ -681,7 +681,7 @@ def load_df_dict_from_feather(dataset_keys: List[Union[str, Enum, NamedTuple]],
                               local_path: Optional[str] = None,
                               subfolder_name: str = None,
                               subsubfolder_name: str = None,
-                              is_index: bool = True,
+                              index_col: Optional[str] = INDEX_COLUMN,
                               force_not_found_error: bool = False,
                               ) -> Dict[str, pd.DataFrame]:
     """
@@ -696,11 +696,11 @@ def load_df_dict_from_feather(dataset_keys: List[Union[str, Enum, NamedTuple]],
                                         subsubfolder_name=subsubfolder_name,
                                         key=key)
         try:
-            data = pd.read_feather(file_path)
-            if is_index:
-                data.index = pd.to_datetime(data['index'])
-                data = data.set_index('index')
-            pandas_dict[key] = data
+            df = pd.read_feather(file_path)
+            if index_col is not None and index_col in df.columns:
+                df.index = pd.to_datetime(df[index_col])
+                df = df.set_index(index_col)
+            pandas_dict[key] = df
         except:
             message = f"file data {file_path}, {key} not found"
             if force_not_found_error:

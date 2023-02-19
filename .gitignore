@@ -152,3 +152,6 @@ sigma_strats/option_chain_analytics/
 get_local_keys.py
 read_qis_modules.py
 TODOs.md
+qis/examples/figures/perf1.PNG
+qis/examples/figures/perf2.PNG
+qis/examples/figures/perf3.PNG
