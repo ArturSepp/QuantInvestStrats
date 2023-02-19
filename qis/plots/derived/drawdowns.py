@@ -1,5 +1,4 @@
-# built in
-import numpy as np
+# packages
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Union, Tuple, Optional

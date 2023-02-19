@@ -1,5 +1,5 @@
 
-# built in
+# packages
 import pandas as pd
 import matplotlib.pyplot as plt
 from enum import Enum

@@ -1,4 +1,4 @@
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -27,7 +27,6 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      desc_table_type: DescTableType = DescTableType.NONE,
                      legend_labels: List[str] = None,
                      indices_for_shaded_areas: Dict[str, Tuple[int, int]] = None,
-                     x_labels: List[str] = None,
                      xlabel: str = None,
                      ylabel: str = None,
                      var_format: Optional[str] = '{:,.2f}',
@@ -63,7 +62,6 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     sns.lineplot(data=data1, palette=colors, dashes=False, markers=markers,
                  markersize=markersize,
                  linewidth=linewidth, ax=ax)
-
 
     # add tredlines
     if trend_line == TrendLine.ZERO_SHADOWS:
@@ -274,10 +272,6 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     if isinstance(data1.index, pd.DatetimeIndex):
         put.set_ax_tick_labels(ax=ax, skip_y_axis=True, fontsize=fontsize, **kwargs)
 
-    elif isinstance(data1.index, pd.Index):
-        if x_labels is None:
-            put.set_ax_ticks_format(ax=ax, fontsize=fontsize, **kwargs)
-
     put.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, fontsize=fontsize, **kwargs)
     put.set_spines(ax=ax, **kwargs)
 
@@ -298,6 +292,7 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
                          title: Optional[str] = None,
                          var_format: str = '{:,.0f}',
                          var_format_yax2: str = '{:,.0f}',
+                         x_date_freq: Union[str, None] = 'Q',
                          legend_labels: List[str] = None,
                          linestyles: List[str] = None,
                          linestyles_ax2: List[str] = None,
@@ -309,6 +304,7 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
                          yvar_major_ticks2: np.ndarray = None,
                          colors: List[str] = None,
                          fontsize: int = 10,
+                         x_rotation: int = 90,
                          is_logs: Tuple[bool, bool] = (False, False),
                          ax: plt.Subplot = None,
                          **kwargs
@@ -335,6 +331,7 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
                      var_format=None,
                      linestyles=linestyles,
                      trend_line=trend_line1,
+                     x_date_freq=x_date_freq,
                      is_log=is_logs[0],
                      y_limits=y_limits,
                      ax=ax,
@@ -346,15 +343,16 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
                      var_format=None,
                      linestyles=linestyles_ax2,
                      trend_line=trend_line2,
+                     x_date_freq=x_date_freq,
                      is_log=is_logs[1],
                      y_limits=y_limits_ax2,
                      ax=ax_twin,
                      **kwargs)
 
     put.set_ax_ticks_format(ax=ax, fontsize=fontsize, xvar_format=None, yvar_format=var_format, set_ticks=False,
-                            yvar_major_ticks=yvar_major_ticks1, **kwargs)
+                            yvar_major_ticks=yvar_major_ticks1, x_rotation=x_rotation, **kwargs)
     put.set_ax_ticks_format(ax=ax_twin, fontsize=fontsize, xvar_format=None, yvar_format=var_format_yax2, set_ticks=False,
-                            yvar_major_ticks=yvar_major_ticks2, **kwargs)
+                            yvar_major_ticks=yvar_major_ticks2, x_rotation=x_rotation, **kwargs)
 
     ax.tick_params(axis='x', which='both', bottom=False)
 

@@ -29,7 +29,9 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     elif freq == pd.infer_freq(df.index):
         return df
 
-    freq_index = pd.date_range(start=df.index[0], end=df.index[-1], freq=freq, inclusive=inclusive, tz=tz)
+    freq_index = da.generate_dates_schedule(time_period=da.get_time_period(df=df, tz=tz), freq=freq,
+                                             include_start_date=include_start_date,
+                                             include_end_date=include_end_date)
     if freq_index.empty:
         print(f"in df_asfreq: cannot resample with freq={freq} with start={df.index[0]}, end={df.index[-1]} - using start/end")
         freq_index = freq_index.insert(0, df.index[0])

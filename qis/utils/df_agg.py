@@ -1,5 +1,5 @@
 """
-core for pandas aggregation
+analytics for dataframe aggregation
 """
 import numpy as np
 import pandas as pd
@@ -168,15 +168,6 @@ def agg_dfs(dfs: List[pd.DataFrame],
     return avg_data
 
 
-def pd_agg_func(df: pd.DataFrame,
-                func: Callable[[np.ndarray], np.ndarray] = npo.np_nanmean
-                ) -> pd.Series:
-
-    agg_func_data = pd.Series(data=npo.nan_func_to_data(a=df.to_numpy(), func=func, axis=1),
-                              index=df.index, name='nanmean')
-    return agg_func_data
-
-
 class UnitTests(Enum):
     STACK = 1
     NAN_MEAN = 4
@@ -214,13 +205,9 @@ def run_unit_test(unit_test: UnitTests):
         pd_a = pd.DataFrame(a)
         print(f"pd_a={pd_a};")
 
-        print(f"agg_mean(axis=1)=\n{pd_agg_func(df=pd_a, func=npo.np_nanmean)};")
-
         lambda_mean = pd_a.apply(lambda x: x.mean(), axis=1)
         # pd_a_pd = pd_a.apply(lambda x: np.nanmean(x), axis=1)
         print(f"lambda_mean\n{lambda_mean};")
-
-        print(f"agg_std(axis=1)=\n{pd_agg_func(df=pd_a, func=npo.np_nanstd)};")
 
         lambda_std = pd_a.apply(lambda x: x.std(), axis=1)
         # pd_a_pd = pd_a.apply(lambda x: np.nanstd(x), axis=1)

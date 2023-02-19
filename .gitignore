@@ -149,3 +149,6 @@ stochvolmodels/
 testing/
 sigma_strats/
 sigma_strats/option_chain_analytics/
+get_local_keys.py
+read_qis_modules.py
+TODOs.md

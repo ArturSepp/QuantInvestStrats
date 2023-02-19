@@ -2,7 +2,7 @@
 2-d countrur plot
 """
 
-# built in
+# packages
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter

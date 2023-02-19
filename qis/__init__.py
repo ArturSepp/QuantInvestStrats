@@ -1,4 +1,6 @@
 
+import qis.local_path
+
 from qis.file_utils import (
     delocalize_df,
     save_figs_to_pdf,

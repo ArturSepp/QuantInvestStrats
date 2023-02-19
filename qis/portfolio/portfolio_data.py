@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import seaborn as sns

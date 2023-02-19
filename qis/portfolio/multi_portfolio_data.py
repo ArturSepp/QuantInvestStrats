@@ -2,7 +2,7 @@
 core implementation of baktest report focus on strategy and comparison vs benchmark stategy
 """
 
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -180,7 +180,8 @@ class MultiPortfolioData:
                                 x_rotation=90,
                                 freq=freq,
                                 title=f'Correlation of {freq} returns',
-                                ax=ax, **kwargs)
+                                ax=ax,
+                                **kwargs)
 
     def plot_drawdowns(self,
                        time_period: da.TimePeriod = None,

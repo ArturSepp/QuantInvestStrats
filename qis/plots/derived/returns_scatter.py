@@ -1,4 +1,4 @@
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -66,8 +66,8 @@ def plot_returns_scatter(prices: pd.DataFrame,
         y_column = str(prices.name)
 
     fig = plot_scatter(df=scatter_data,
-                       x_column=benchmark,
-                       y_column=y_column,
+                       x=benchmark,
+                       y=y_column,
                        xlabel=xlabel or benchmark,
                        ylabel=ylabel,
                        hue=hue_name,

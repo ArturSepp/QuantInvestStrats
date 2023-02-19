@@ -23,17 +23,18 @@ from qis.plots.derived.regime_data import add_bnb_regime_shadows
 
 class PerformanceLabel(Enum):
     NONE = 1
-    TOTAL = 2
-    SHARPE = 3
-    DETAILED = 4
-    WITH_SKEW = 5
-    DETAILED_LOG = 6
-    WITH_DD = 7
-    WITH_DDVOL = 8
-    PA_DETAILED = 9
-    TOTAL_DETAILED = 10
-    ARITHMETIC = 11
-    TOTAL_ARITHMETIC = 12
+    SHARPE = 2
+    DETAILED = 3
+    WITH_SKEW = 4
+    DETAILED_LOG = 5
+    WITH_DD = 6
+    WITH_DDVOL = 7
+    PA_DETAILED = 8
+    TOTAL = 9
+    TOTAL_YTD = 10
+    TOTAL_DETAILED = 11
+    ARITHMETIC = 12
+    TOTAL_ARITHMETIC = 13
 
 
 def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
@@ -60,8 +61,6 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
         name = index if isinstance(index, str) else str(index)
         if performance_label == PerformanceLabel.NONE:
             label = f"{name}"
-        elif performance_label == PerformanceLabel.TOTAL:
-            label = f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}"
         elif performance_label == PerformanceLabel.SHARPE:
             label = f"{name}: Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}"
         elif performance_label == PerformanceLabel.DETAILED:
@@ -95,6 +94,13 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
                      f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])}, "
                      f"MaxDD/vol={vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD_VOL.to_str()])}, "
                      f"Skew={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SKEWNESS.to_str()])}")
+        elif performance_label == PerformanceLabel.TOTAL:
+            label = f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}"
+        elif performance_label == PerformanceLabel.TOTAL_YTD:
+            label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
+                     f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])} ")
         elif performance_label == PerformanceLabel.TOTAL_DETAILED:
             label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
                      f"p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
@@ -124,7 +130,7 @@ def plot_prices(prices: Union[pd.DataFrame, pd.Series],
                 var_format: str = '{:,.1f}',
                 digits_to_show: int = 1,
                 sharpe_format: str = '{:.2f}',
-                x_date_freq: str = 'A',
+                x_date_freq: str = 'Q',
                 trend_line: put.TrendLine = put.TrendLine.NONE,
                 is_log: bool = False,
                 resample_freq: str = None,

@@ -1,7 +1,7 @@
 """
 plot returns heatmap table by monthly and annual
 """
-# built in
+# packages
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns

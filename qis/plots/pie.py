@@ -1,7 +1,7 @@
 """
 pieplot
 """
-# built in
+# packages
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt

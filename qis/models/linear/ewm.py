@@ -1,7 +1,7 @@
 """
 implementation of exponentially weighted mean (ewm) filter using numpy and lambda
 """
-# built in
+# packages
 import warnings
 import numpy as np
 import pandas as pd

@@ -16,7 +16,7 @@ requirements = read_requirements("requirements.txt")
 
 setup(
     name='qis',
-    version='1.0.19',
+    version='1.0.20',
     author='Artur Sepp',
     author_email='artursepp@gmail.com',
     url='https://github.com/ArturSepp/QuantInvestStrats',

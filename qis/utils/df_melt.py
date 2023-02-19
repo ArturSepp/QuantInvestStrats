@@ -1,7 +1,7 @@
 """
 analytic for melting of pandas
 """
-# built in
+# packages
 import pandas as pd
 from enum import Enum
 from typing import Dict, Optional, List

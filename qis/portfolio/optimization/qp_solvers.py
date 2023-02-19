@@ -1,4 +1,4 @@
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import cvxpy as cvx

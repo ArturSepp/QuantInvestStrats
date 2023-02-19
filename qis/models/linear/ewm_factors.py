@@ -1,7 +1,7 @@
 """
 implementation of multi factor ewm model
 """
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,6 +13,7 @@ import qis.utils.df_ops as dfo
 import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
 from qis.models.linear.ewm import MeanAdjType, InitType
+from qis import TimePeriod
 
 
 class LinearModel:
@@ -51,9 +52,12 @@ class LinearModel:
     def plot_factor_loadings(self,
                              factor: str,
                              var_format: str = '{:,.2f}',
+                             time_period: TimePeriod = None,
                              ax: plt.Subplot = None,
                              **kwargs):
         df = self.loadings[factor]
+        if time_period is not None:
+            df = time_period.locate(df)
         pts.plot_time_series(df=df,
                              var_format=var_format,
                              ax=ax, **kwargs)

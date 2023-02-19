@@ -2,7 +2,7 @@
 create total return blended portfolios based on weights
 """
 
-# built in
+# packages
 import numpy as np
 import pandas as pd
 from numba import njit

@@ -1,7 +1,7 @@
 """
 scatter plot core
 """
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -17,8 +17,8 @@ import qis.utils as qu
 
 
 def plot_scatter(df: pd.DataFrame,
-                 x_column: str = None,
-                 y_column: str = None,
+                 x: str = None,
+                 y: str = None,
                  hue: str = None,
                  xlabel: Union[str, bool, None] = True,
                  ylabel: Union[str, bool, None] = True,
@@ -57,18 +57,18 @@ def plot_scatter(df: pd.DataFrame,
     """
     df = df.copy().dropna()
 
-    if x_column is None:
+    if x is None:
         if len(df.columns) == 2 or (len(df.columns) == 3 and hue is not None):
-            x_column = df.columns[0]
+            x = df.columns[0]
         else:
             raise ValueError(f"x_column is not defined for more than on columns")
-    if y_column is None:
+    if y is None:
         if len(df.columns) == 2 or (len(df.columns) == 3 and hue is not None):  # x and y
-            y_column = df.columns[1]
+            y = df.columns[1]
         else:  # melting to column value_name with hue = all columns ba t x
             hue = 'hue'
-            y_column = value_name
-            df = pd.melt(df, id_vars=[x_column], value_vars=df.columns.drop(x_column), var_name=hue,
+            y = value_name
+            df = pd.melt(df, id_vars=[x], value_vars=df.columns.drop(x), var_name=hue,
                          value_name=value_name)
 
     if hue is not None and add_hue_model_label is None:  # override to true unless false
@@ -88,19 +88,19 @@ def plot_scatter(df: pd.DataFrame,
         hue_ids = df[hue].unique()
         for idx, hue_id in enumerate(hue_ids):
             # estimate model equation
-            data_hue = df[df[hue] == hue_id].sort_values(by=x_column)
-            x = data_hue[x_column].to_numpy()
-            y = data_hue[y_column].to_numpy()
-            x1 = qu.get_ols_x(x=x, order=order, fit_intercept=fit_intercept)
-            reg_model = sm.OLS(y, x1).fit()
+            data_hue = df[df[hue] == hue_id].sort_values(by=x)
+            x_ = data_hue[x].to_numpy()
+            y_ = data_hue[y].to_numpy()
+            x1 = qu.get_ols_x(x=x_, order=order, fit_intercept=fit_intercept)
+            reg_model = sm.OLS(y_, x1).fit()
             estimated_reg_models[hue_id] = reg_model
 
             # plot data points
-            sns.scatterplot(x=x_column, y=y_column, data=data_hue, color=palette[idx], s=markersize, ax=ax)
+            sns.scatterplot(x=x, y=y, data=data_hue, color=palette[idx], s=markersize, ax=ax)
 
             if order > 0:  # plot prediction
                 if ci is not None: # not possible to control reg equation in regplot, only use for ci
-                    sns.regplot(x=x_column, y=y_column, data=data_hue,
+                    sns.regplot(x=x, y=y, data=data_hue,
                                 ci=ci,
                                 order=order, truncate=True,
                                 color=palette[idx],
@@ -109,17 +109,17 @@ def plot_scatter(df: pd.DataFrame,
                                 ax=ax)
                 else:
                     prediction = reg_model.predict(x1)
-                    ax.plot(x, prediction, color=palette[idx], lw=linewidth, linestyle='-')
+                    ax.plot(x_, prediction, color=palette[idx], lw=linewidth, linestyle='-')
 
     else:
         if full_sample_order is None:
             pass
         elif full_sample_order == 0:  # just scatter plot
-            sns.scatterplot(x=x_column, y=y_column, data=df,
+            sns.scatterplot(x=x, y=y, data=df,
                             # ci=ci,
                             s=markersize, color=color0, ax=ax)
         else:  # regplot add scatter and ml lines even if order is == 0
-            sns.regplot(x=x_column, y=y_column, data=df, ci=ci, order=full_sample_order, color=color0,
+            sns.regplot(x=x, y=y, data=df, ci=ci, order=full_sample_order, color=color0,
                         scatter_kws={'s': markersize},
                         line_kws={'linewidth': linewidth}, ax=ax)
 
@@ -128,11 +128,11 @@ def plot_scatter(df: pd.DataFrame,
     legend_colors = []
     if full_sample_order is not None:
         if (add_universe_model_prediction or add_universe_model_label or add_universe_model_ci) and full_sample_order > 0:
-            xy = df[[x_column, y_column]].sort_values(by=x_column)
-            x = xy[x_column].to_numpy()
-            y = xy[y_column].to_numpy()
-            x1 = qu.get_ols_x(x=x, order=full_sample_order, fit_intercept=fit_intercept)
-            reg_model = sm.OLS(y, x1).fit()
+            xy = df[[x, y]].sort_values(by=x)
+            x_ = xy[x].to_numpy()
+            y_ = xy[y].to_numpy()
+            x1 = qu.get_ols_x(x=x_, order=full_sample_order, fit_intercept=fit_intercept)
+            reg_model = sm.OLS(y_, x1).fit()
 
             if add_universe_model_prediction:
                 prediction = reg_model.predict(x1)
@@ -181,14 +181,14 @@ def plot_scatter(df: pd.DataFrame,
             colors = len(df.index) * [annotation_color]
         else:
             colors = df['color']
-        for label, x, y, color in zip(annotation_labels, df[x_column], df[y_column], colors):
+        for label, x_, y_, color in zip(annotation_labels, df[x], df[y], colors):
             ax.annotate(label,
-                        xy=(x, y), xytext=(1, 1),
+                        xy=(x_, y_), xytext=(1, 1),
                         textcoords='offset points', ha='left', va='bottom',
                         color=color,
                         fontsize=fontsize)
             if label != '':
-                ax.scatter(x=x, y=y, c=color, s=20)
+                ax.scatter(x=x_, y=y_, c=color, s=20)
 
     if add_45line:  # make equal:
         ymin, ymax = ax.get_ylim()
@@ -206,19 +206,19 @@ def plot_scatter(df: pd.DataFrame,
         qp.set_y_limits(ax=ax, y_limits=y_limits)
 
     if xticks is not None:
-        qp.set_ax_tick_labels(ax=ax, x_rotation=0, xticks=df[x_column].to_numpy(), x_labels=xticks,
-                               fontsize=fontsize)
+        qp.set_ax_tick_labels(ax=ax, x_rotation=0, xticks=df[x].to_numpy(), x_labels=xticks,
+                              fontsize=fontsize)
     else:
         qp.set_ax_tick_labels(ax=ax, x_rotation=0, fontsize=fontsize)
 
     if isinstance(xlabel, bool):
         if xlabel is True:
-            xlabel = 'x = ' + x_column
+            xlabel = f"x={x}"
         else:
             xlabel = ''
     if isinstance(ylabel, bool):
         if ylabel is True:
-            ylabel = 'y = ' + y_column
+            ylabel = f"y={y}"
         else:
             ylabel = ''
     qp.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, fontsize=fontsize, **kwargs)
@@ -241,8 +241,8 @@ def plot_scatter(df: pd.DataFrame,
 
 
 def plot_classification_scatter(df: pd.DataFrame,
-                                x_column: Optional[str] = None,
-                                y_column: Optional[str] = None,
+                                x: Optional[str] = None,
+                                y: Optional[str] = None,
                                 hue_name: str = 'hue',
                                 num_buckets: Optional[int] = None,
                                 bins: np.ndarray = np.array([-3.0, -1.5, 0.0, 1.5, 3.0]),
@@ -259,22 +259,22 @@ def plot_classification_scatter(df: pd.DataFrame,
     """
     add bin classification using x_column
     """
-    if x_column is None:
+    if x is None:
         if len(df.columns) == 2:
-            x_column = df.columns[0]
+            x = df.columns[0]
         else:
             raise ValueError(f"x_column is not defined for more than on columns")
-    if y_column is None:
+    if y is None:
         if len(df.columns) == 2:  # x and y
-            y_column = df.columns[1]
+            y = df.columns[1]
         else:
             raise ValueError(f"y_column is not defined for more than on columns")
 
-    df, _ = qu.add_quantile_classification(df=df, x_column=x_column, hue_name=hue_name, num_buckets=num_buckets, bins=bins)
+    df, _ = qu.add_quantile_classification(df=df, x_column=x, hue_name=hue_name, num_buckets=num_buckets, bins=bins)
 
     fig = plot_scatter(df=df,
-                       x_column=x_column,
-                       y_column=y_column,
+                       x=x,
+                       y=y,
                        hue=hue_name,
                        fit_intercept=fit_intercept,
                        title=title,
@@ -339,7 +339,7 @@ def run_unit_test(unit_test: UnitTests):
         plot_scatter(df=df)
 
     elif unit_test == UnitTests.CLASSIFICATION_SCATTER:
-        plot_classification_scatter(df=df, x_column='x', y_column='y')
+        plot_classification_scatter(df=df, x='x', y='y')
 
     plt.show()
 

@@ -4,7 +4,7 @@ implement winsorizing of time series data using ewm
 2. select x% of outliers defined by normalized score (x_t-mean_t) / vol_t
 3. replace or trim outliers as specified
 """
-# built in
+# packages
 import numpy as np
 import pandas as pd
 from enum import Enum

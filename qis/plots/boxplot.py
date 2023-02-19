@@ -1,7 +1,7 @@
 """
 boxplot
 """
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -253,10 +253,10 @@ def df_boxplot_by_hue_var(df: Union[pd.Series, pd.DataFrame],
     hue_var_name is hue index
     """
     box_data = dfm.melt_df_by_columns(df=df,
-                                  x_index_var_name=x_index_var_name,
-                                  y_var_name=y_var_name,
-                                  hue_var_name=hue_var_name,
-                                  hue_order=hue_order)
+                                      x_index_var_name=x_index_var_name,
+                                      y_var_name=y_var_name,
+                                      hue_var_name=hue_var_name,
+                                      hue_order=hue_order)
     if colors is None:
         if is_heatmap_colors:
             a = np.nanmedian(df.to_numpy(), axis=0)

@@ -7,10 +7,10 @@ import yfinance as yf
 from enum import Enum
 
 import qis.file_utils as fu
-import qis.local_path
+import qis.local_path as local_path
 
 
-LOCAL_RESOURCE_PATH = qis.local_path.get_paths()['LOCAL_RESOURCE_PATH']
+LOCAL_RESOURCE_PATH = local_path.get_paths()['LOCAL_RESOURCE_PATH']
 
 
 def load_etf_data() -> pd.DataFrame:
@@ -39,7 +39,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.TEST_LOADING
+    unit_test = UnitTests.ETF_PRICES
 
     is_run_all_tests = False
     if is_run_all_tests:

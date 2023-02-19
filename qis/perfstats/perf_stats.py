@@ -1,7 +1,7 @@
 """
 compute risk-adjusted performance tables
 """
-# built in
+# packages
 import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis, skew
@@ -287,7 +287,7 @@ def compute_te_ir_errors(return_diffs: pd.DataFrame) -> Tuple[pd.Series, pd.Seri
     """
     compute information ratio from return diffs
     """
-    vol_dt = da.get_vol_an(pd.infer_freq(return_diffs.index))
+    vol_dt = np.sqrt(da.infer_an_from_data(return_diffs))
     avg = np.nanmean(return_diffs, axis=0)
     vol = np.nanstd(return_diffs, axis=0, ddof=1)
     ir = vol_dt * np.divide(avg, vol, where=np.greater(vol, 0.0))

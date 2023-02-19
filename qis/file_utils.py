@@ -866,13 +866,13 @@ def save_fig(fig: plt.Figure,
                                      file_type=file_type,
                                      local_path=local_path)
     if file_type == FileTypes.PNG:
-        fig.savefig(file_path, dpi=dpi)  # , bbox_inches=bbox_inches
+        fig.savefig(file_path, dpi=dpi)
     elif file_type == FileTypes.EPS:
-        fig.savefig(file_path, dpi=dpi, format='eps')  # , bbox_inches=bbox_inches
+        fig.savefig(file_path, dpi=dpi, format='eps')
     elif file_type == FileTypes.SVG:
-        fig.savefig(file_path, dpi=dpi, format='svg')  # , bbox_inches=bbox_inches
+        fig.savefig(file_path, dpi=dpi, format='svg')
     elif file_type == FileTypes.PDF:
-        fig.savefig(file_path, dpi=dpi, format='pdf')  # , bbox_inches=bbox_inches
+        fig.savefig(file_path, dpi=dpi, format='pdf')
     else:
         raise NotImplementedError(f"{file_type}")
     return file_path

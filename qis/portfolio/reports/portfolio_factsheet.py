@@ -2,14 +2,15 @@
 generate portfolio factsheet report using PortfolioData data object
 with comparision to 1-2 cash benchmarks
 """
-# built in
+# packages
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import Tuple
 from enum import Enum
 
 # qis
-import qis.file_utils as fu
+import qis
 import qis.utils as qu
 import qis.plots as qp
 from qis.utils.dates import TimePeriod
@@ -22,8 +23,6 @@ from qis.portfolio.portfolio_data import PortfolioData
 
 PERF_PARAMS = PerfParams(freq='W-WED')
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='Q')
-
-FIG_SIZE = (8.3, 11.7)  # A4 for portrait
 
 # use for number years > 5
 KWARG_LONG = dict(perf_params=PerfParams(freq='W-WED', freq_reg='Q'),
@@ -43,14 +42,14 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                                  time_period: TimePeriod = None,
                                  perf_params: PerfParams = PERF_PARAMS,
                                  regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                                 file_name_to_save: str = None,
+                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                  **kwargs
                                  ) -> plt.Figure:
     # align
     benchmark_prices = benchmark_prices.reindex(index=portfolio_data.nav.index, method='ffill')
     regime_benchmark = benchmark_prices.columns[0]
 
-    fig = plt.figure(figsize=FIG_SIZE, constrained_layout=True)
+    fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
 
     plot_kwargs = dict(fontsize=5,
@@ -68,10 +67,10 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
     pivot_prices = joint_prices[regime_benchmark]
     ax = fig.add_subplot(gs[0:2, :2])
     qp.plot_prices(prices=joint_prices,
-                    perf_params=perf_params,
-                    title='Performance',
-                    ax=ax,
-                    **kwargs)
+                   perf_params=perf_params,
+                   title='Performance',
+                   ax=ax,
+                   **kwargs)
     qp.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qp.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
@@ -244,8 +243,6 @@ def generate_portfolio_factsheet(portfolio_data: PortfolioData,
                                             time_period=time_period,
                                             **kwargs)
 
-    if file_name_to_save is not None:
-        fu.save_figs_to_pdf(figs=[fig], file_name=file_name_to_save, orientation='landscape')
     return fig
 
 
@@ -271,20 +268,26 @@ def run_unit_test(unit_test: UnitTests):
     portfolio_data._set_group_data(group_data=group_data, group_order=list(group_data.unique()))
 
     if unit_test == UnitTests.TEST1:
-        generate_portfolio_factsheet(portfolio_data=portfolio_data,
+        fig = generate_portfolio_factsheet(portfolio_data=portfolio_data,
                                      benchmark_prices=benchmark_prices,
                                      time_period=TimePeriod('31Dec2005', '31Dec2022'),
-                                     file_name_to_save=f"{portfolio_data.nav.name}_portfolio_factsheet",
                                      **KWARG_LONG)
+        qis.save_figs_to_pdf(figs=[fig],
+                             file_name=f"{portfolio_data.nav.name}_portfolio_factsheet",
+                             orientation='landscape',
+                             local_path=qis.local_path.get_output_path())
 
     if unit_test == UnitTests.TEST2:
-        generate_portfolio_factsheet(portfolio_data=portfolio_data,
-                                     benchmark_prices=benchmark_prices,
-                                     time_period=TimePeriod('31Dec2019', '31Dec2022'),
-                                     file_name_to_save=f"{portfolio_data.nav.name}_portfolio_factsheet",
-                                     **KWARG_SHORT)
+        fig = generate_portfolio_factsheet(portfolio_data=portfolio_data,
+                                           benchmark_prices=benchmark_prices,
+                                           time_period=TimePeriod('31Dec2019', '31Dec2022'),
+                                           **KWARG_SHORT)
+        qis.save_figs_to_pdf(figs=[fig],
+                             file_name=f"{portfolio_data.nav.name}_portfolio_factsheet",
+                             orientation='landscape',
+                             local_path=qis.local_path.get_output_path())
 
-    plt.show()
+        plt.show()
 
 
 if __name__ == '__main__':

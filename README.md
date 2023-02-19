@@ -1,16 +1,33 @@
 
-<strong>QIS: Quantitative Investment Strategies</strong>
+## **Quantitative Investment Strategies: QIS** <a name="analytics"></a>
 
-The package implements analytics for visualisation of financial data, performance
+qis package implements analytics for visualisation of financial data, performance
 reporting, analysis of quantitative strategies. 
 
+qis package is split into 5 main modules with the 
+dependecy path increasing sequentially as follows.
+
+1. ```qis.utils``` is module containing low level utilities for operations with pandas, numpy, and datetimes.
+
+2. ```qis.perfstats``` is module for computing performance statistics and performance attribution including returns, volatilities, etc.
+
+3. ```qis.plots``` is module for plotting and visualization apis.
+
+4. ```qis.models``` is module containing statistical models including filtering and regressions.
+
+5. ```qis.portfolio``` is high level module for analysis, simulation, backtesting, and reporting of quant strategies.
+
+```qis.examples``` contains scripts with illustrations of QIS analytics.
+
+
 # Table of contents
-1. [Installation](#installation)
-2. [Analytics](#analytics)
+1. [Analytics](#analytics)
+2. [Installation](#installation)
 3. [Disclaimer](#disclaimer)    
 4. [Contributions](#contributions)
 5. [Examples](#examples)
    1. [Visualization of price data](#price)
+   2. [Notebooks](#notebooks)
 6. [ToDos](#todos)
 
 ## **Installation** <a name="installation"></a>
@@ -31,23 +48,6 @@ Core dependencies:
     matplotlib = ">=3.2.2",
     seaborn = ">=0.12.2",
     yfinance >= 0.1.38 (optional for getting test price data).
-
-## **Analytics** <a name="analytics"></a>
-
-The QIS package is split into 5 main modules with the 
-dependecy path increasing sequentially as follows.
-
-1. ```qis.utils``` is module containing low level utilities for operations with pandas, numpy, and datetimes.
-
-2. ```qis.perfstats``` is module for computing performance statistics and performance attribution including returns, volatilities, etc.
-
-3. ```qis.plots``` is module for plotting and visualization apis.
-
-4. ```qis.models``` is module containing statistical models including filtering and regressions.
-
-5. ```qis.portfolio``` is high level module for analysis, simulation, backtesting, and reporting of quant strategies.
-
-```qis.examples``` contains scripts with illustrations of QIS analytics.
 
 ## **Disclaimer** <a name="disclaimer"></a>
 
@@ -117,6 +117,19 @@ fig = qis.plot_ra_perf_table(prices=prices,
                              perf_params=perf_params)
 ```
 ![image info](qis/examples/figures/perf3.PNG)
+
+
+### Notebooks <a name="notebooks"></a>
+
+Recommended package to work with notebooks:  
+```python 
+pip install notebook
+```
+Starting local server
+```python 
+jupyter notebook
+```
+
 
 ## **ToDos and Contributions** <a name="todos"></a>
 

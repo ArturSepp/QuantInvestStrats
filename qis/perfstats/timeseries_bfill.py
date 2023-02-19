@@ -1,7 +1,7 @@
 """
 Implement core for contacenation of time series
 """
-# built in
+# packages
 import numpy as np
 import pandas as pd
 from enum import Enum

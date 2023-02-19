@@ -38,7 +38,9 @@ from qis.perfstats.perf_stats import (
     compute_ra_perf_table_with_benchmark,
     compute_risk_table,
     compute_te_ir_errors,
-    compute_time_under_water)
+    compute_time_under_water,
+    compute_drawdowns_stats_table
+)
 
 from qis.perfstats.regime_classifier import (
     BenchmarkReturnsQuantileRegimeSpecs,

@@ -2,12 +2,14 @@
 factsheet for multi strategy report for cross sectional comparision of strategies
 and generating sensetivities to param reports
 """
-# built in
+# packages
 import pandas as pd
 import matplotlib.pyplot as plt
+from typing import Tuple
 from enum import Enum
 
 # qis
+import qis
 import qis.file_utils as fu
 import qis.utils.dates as da
 import qis.utils.struct_ops as sop
@@ -21,9 +23,6 @@ from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 
 PERF_PARAMS = PerfParams(freq='W-WED')
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='Q')
-
-FIG_SIZE = (8.3, 11.7)  # A4 for portrait
-
 
 # use for number years > 5
 KWARG_LONG = dict(perf_params=PerfParams(freq='W-WED', freq_reg='Q'),
@@ -43,7 +42,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        perf_params: PerfParams = PERF_PARAMS,
                                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                        backtest_name: str = None,
-                                       file_name_to_save: str = 'multistrategy_factsheet',
+                                       figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                        **kwargs
                                        ):
     """
@@ -60,14 +59,13 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                        framealpha=0.75)
     kwargs = sop.update_kwargs(kwargs, plot_kwargs)
 
-    fig = plt.figure(figsize=FIG_SIZE, constrained_layout=True)
+    fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=7, ncols=4, wspace=0.0, hspace=0.0)
 
     if backtest_name is not None:
         fig.suptitle(backtest_name, fontweight="bold", fontsize=8, color='blue')
 
-    ax11 = fig.add_subplot(gs[0, :2])
-    multi_portfolio_data.plot_nav(ax=ax11,
+    multi_portfolio_data.plot_nav(ax=fig.add_subplot(gs[0, :2]),
                                   time_period=time_period,
                                   benchmark=regime_benchmark,
                                   perf_params=perf_params,
@@ -75,86 +73,74 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                   title='Cumulative performance',
                                   **kwargs)
 
-    ax31 = fig.add_subplot(gs[1, :2])
-    multi_portfolio_data.plot_drawdowns(ax=ax31,
+    multi_portfolio_data.plot_drawdowns(ax=fig.add_subplot(gs[1, :2]),
                                         time_period=time_period,
                                         benchmark=regime_benchmark,
                                         regime_params=regime_params,
                                         title='Running Drawdowns',
                                         **kwargs)
 
-    ax41 = fig.add_subplot(gs[2, :2])
-    multi_portfolio_data.plot_rolling_time_under_water(ax=ax41,
+    multi_portfolio_data.plot_rolling_time_under_water(ax=fig.add_subplot(gs[2, :2]),
                                                        time_period=time_period,
                                                        benchmark=regime_benchmark,
                                                        regime_params=regime_params,
                                                        title='Rolling time under water',
                                                        **kwargs)
 
-    ax51 = fig.add_subplot(gs[3, :2])
-    multi_portfolio_data.plot_exposures(ax=ax51,
+    multi_portfolio_data.plot_exposures(ax=fig.add_subplot(gs[3, :2]),
                                         portfolio_idx=0,
                                         time_period=time_period,
                                         benchmark=regime_benchmark,
                                         regime_params=regime_params,
                                         **kwargs)
 
-    ax = fig.add_subplot(gs[4, :2])
-    multi_portfolio_data.plot_turnover(ax=ax,
+    multi_portfolio_data.plot_turnover(ax=fig.add_subplot(gs[4, :2]),
                                        time_period=time_period,
                                        benchmark=regime_benchmark,
                                        regime_params=regime_params,
                                        **kwargs)
 
-    ax = fig.add_subplot(gs[5, :2])
-    multi_portfolio_data.plot_costs(ax=ax,
+    multi_portfolio_data.plot_costs(ax=fig.add_subplot(gs[5, :2]),
                                     time_period=time_period,
                                     benchmark=regime_benchmark,
                                     regime_params=regime_params,
                                     **kwargs)
 
-    ax = fig.add_subplot(gs[6, :2])
-    multi_portfolio_data.plot_factor_betas(ax=ax,
+    multi_portfolio_data.plot_factor_betas(ax=fig.add_subplot(gs[6, :2]),
                                            benchmark_prices=multi_portfolio_data.benchmark_prices,
                                            time_period=time_period,
                                            benchmark=regime_benchmark,
                                            regime_params=regime_params,
                                            **kwargs)
 
-    ax = fig.add_subplot(gs[0, 2])
-    multi_portfolio_data.plot_performance_bars(ax=ax,
+    multi_portfolio_data.plot_performance_bars(ax=fig.add_subplot(gs[0, 2]),
                                                perf_params=perf_params,
                                                perf_column=PerfStat.SHARPE,
                                                time_period=time_period,
                                                **sop.update_kwargs(kwargs, dict(fontsize=5)))
 
-    ax = fig.add_subplot(gs[0, 3])
-    multi_portfolio_data.plot_performance_bars(ax=ax,
+    multi_portfolio_data.plot_performance_bars(ax=fig.add_subplot(gs[0, 3]),
                                                perf_params=perf_params,
                                                perf_column=PerfStat.MAX_DD,
                                                time_period=time_period,
                                                **sop.update_kwargs(kwargs, dict(fontsize=5)))
 
-    ax = fig.add_subplot(gs[1, 2:])
-    multi_portfolio_data.plot_periodic_returns(ax=ax,
+    multi_portfolio_data.plot_periodic_returns(ax=fig.add_subplot(gs[1, 2:]),
                                                heatmap_freq='A',
                                                time_period=time_period,
                                                **sop.update_kwargs(kwargs, dict(date_format='%Y', fontsize=5)))
 
-    ax = fig.add_subplot(gs[2, 2:])
-    multi_portfolio_data.plot_ra_perf_table(ax=ax,
+    multi_portfolio_data.plot_ra_perf_table(ax=fig.add_subplot(gs[2, 2:]),
                                             perf_params=perf_params,
                                             time_period=time_period,
                                             **sop.update_kwargs(kwargs, dict(fontsize=5)))
 
-    ax = fig.add_subplot(gs[3, 2:])
-    multi_portfolio_data.plot_ra_perf_table(ax=ax,
+    multi_portfolio_data.plot_ra_perf_table(ax=fig.add_subplot(gs[3, 2:]),
                                             perf_params=perf_params,
                                             time_period=da.get_time_period_shifted_by_years(time_period=time_period),
                                             **sop.update_kwargs(kwargs, dict(fontsize=5)))
 
-    ax = fig.add_subplot(gs[4, 2:])
-    multi_portfolio_data.plot_regime_data(ax=ax,
+    multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 2:]),
                                           is_grouped=False,
                                           time_period=time_period,
                                           perf_params=perf_params,
@@ -162,19 +148,15 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                           benchmark=regime_benchmark,
                                           **kwargs)
 
-    ax = fig.add_subplot(gs[5, 2:])
-    multi_portfolio_data.plot_returns_scatter(ax=ax,
+    multi_portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[5, 2:]),
                                               time_period=time_period,
                                               benchmark=regime_benchmark,
                                               **kwargs)
 
-    ax = fig.add_subplot(gs[6, 2:])
-    multi_portfolio_data.plot_corr_table(ax=ax,
+    multi_portfolio_data.plot_corr_table(ax=fig.add_subplot(gs[6, 2:]),
                                          time_period=time_period,
                                          freq='W-WED',
                                          **sop.update_kwargs(kwargs, dict(fontsize=4)))
-
-    fu.save_figs_to_pdf(figs=[fig], file_name=file_name_to_save, orientation='landscape')
 
     return fig
 
@@ -214,11 +196,15 @@ def run_unit_test(unit_test: UnitTests):
                                               benchmark_prices=benchmark_prices)
 
     if unit_test == UnitTests.FACTSHEET:
-        generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
-                                           backtest_name='Vol Parity Portfolio vs Equal Weight',
-                                           file_name_to_save='multistrategy_factsheet',
-                                           time_period=TimePeriod('31Dec2006', '31Dec2022'),
-                                           **KWARG_LONG)
+        fig = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
+                                                 backtest_name='Vol Parity Portfolio vs Equal Weight',
+                                                 time_period=TimePeriod('31Dec2006', '31Dec2022'),
+                                                 **KWARG_LONG)
+
+        fu.save_figs_to_pdf(figs=[fig],
+                            file_name=f"multistrategy_factsheet",
+                            orientation='landscape',
+                            local_path=qis.local_path.get_output_path())
 
     plt.show()
 

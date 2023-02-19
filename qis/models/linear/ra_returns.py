@@ -2,7 +2,7 @@
 define transform for ra returns
 """
 
-# built in
+# packages
 import numpy as np
 import pandas as pd
 from typing import Union, Optional, Tuple

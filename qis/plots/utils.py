@@ -2,7 +2,7 @@
 import qis.plots.derived as put
 """
 
-# built in
+# packages
 import colorsys
 import numpy as np
 import pandas as pd

@@ -1,7 +1,7 @@
 """
 statsmodels wrappers for ols analysis
 """
-# built in
+# packages
 import warnings
 import numpy as np
 import pandas as pd
@@ -15,6 +15,9 @@ def fit_ols(x: np.ndarray,
             order: int = 1,
             fit_intercept: bool = True
             ) -> RegModel:
+    """
+    fit regression model
+    """
     cond = np.logical_and(np.isfinite(x), np.isfinite(y))
     x, y = x[cond], y[cond]
     x1 = get_ols_x(x=x, order=order, fit_intercept=fit_intercept)

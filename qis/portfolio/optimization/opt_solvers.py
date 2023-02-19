@@ -86,13 +86,13 @@ def long_only_constraint(x):
     return x
 
 
-def portfolio_volatility_min(x, covar, target_vol, freq_vol):
-    vol_dt = da.get_vol_an(freq_vol)
+def portfolio_volatility_min(x, covar, target_vol, freq_vol, af: float = 12.0):
+    vol_dt = np.sqrt(af)
     return vol_dt * np.sqrt(calculate_portfolio_var(x, covar)) - (target_vol - 0.001)
 
 
-def portfolio_volatility_max(x, V, target_vol, freq_vol):
-    vol_dt = da.get_vol_an(freq_vol)
+def portfolio_volatility_max(x, V, target_vol, freq_vol, af: float = 12.0):
+    vol_dt = np.sqrt(af)
     return - (vol_dt * np.sqrt(calculate_portfolio_var(x, V)) - (target_vol + 0.001))
 
 

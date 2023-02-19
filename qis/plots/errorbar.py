@@ -2,7 +2,7 @@
 errorbar plot
 """
 
-# built in
+# packages
 import numpy as np
 import pandas as pd
 import seaborn as sns
