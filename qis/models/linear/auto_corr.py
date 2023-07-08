@@ -49,7 +49,7 @@ def compute_autocorr(x: Union[np.ndarray, pd.Series],
     if len(x) == 1:
         corr = np.zeros(num_lags)
     else:
-        corr = auto_corr(num_lags=num_lags)
+        corr = auto_corr(a=x, num_lags=num_lags)
     if num_lags == 1:
         return corr[0]
     else:

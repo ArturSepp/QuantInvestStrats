@@ -301,6 +301,7 @@ def autolabel(ax: plt.Subplot,
               color: str = None,
               shapecolor: str = None,
               fontsize: int = 10,
+              y_offset: int = 8,
               **kwargs
               ) -> None:
     """
@@ -314,7 +315,7 @@ def autolabel(ax: plt.Subplot,
 
     for rect in rects:
         height = rect.get_height()
-        y_offset = 8 if height > 0.0 else -20
+        y_offset = y_offset if height > 0.0 else -2.0*y_offset
 
         if shapecolor is not None:
             bbox = dict(boxstyle='round,pad=0.5', fc=shapecolor, alpha=0.5)
@@ -328,7 +329,7 @@ def autolabel(ax: plt.Subplot,
 
         ax.annotate(label,
                     xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(offset[xpos]*3, y_offset),  # use 3 points offset
+                    xytext=(offset[xpos], y_offset),
                     textcoords="offset points",  # in both directions
                     fontsize=fontsize,
                     color=color,
@@ -519,7 +520,7 @@ def set_date_on_axis(data: Union[pd.DataFrame, pd.Series],
 
 
 def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
-                           x_date_freq: str ='A',
+                           x_date_freq: str = 'A',
                            date_format: str = '%b-%y'
                            ) -> Tuple[pd.DataFrame, List[str]]:
     """
@@ -730,7 +731,8 @@ class LegendStats(Enum):
     AVG_STD_SKEW_KURT = 6
     AVG_STD_LAST = 7
     AVG_NONNAN_LAST = 8
-    AVG_NONZERO_LAST = 81
+    NONZERO_AVG_LAST = 81
+    NONZERO_AVG_STD_LAST = 82
     MEDIAN_NONNAN_LAST = 9
     AVG_MEDIAN_STD_NONNAN_LAST = 10
     AVG_LAST_SCORE = 11
@@ -747,6 +749,7 @@ class LegendStats(Enum):
     MEDIAN_MAD = 22
     TSTAT = 23
     AVG_STD_TSTAT = 24
+    LAST_VALUE_ONLY = 25
 
 
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
@@ -773,6 +776,11 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
         legend_lines = []
         for column in data.columns:
             legend_lines.append(f"{column}: last={var_format.format(data[column].iloc[-1])}")
+
+    elif legend_stats == LegendStats.LAST_VALUE_ONLY:
+        legend_lines = []
+        for column in data.columns:
+            legend_lines.append(f"{column} = {var_format.format(data[column].iloc[-1])}")
 
     elif legend_stats == LegendStats.AVG:
         legend_lines = []
@@ -898,7 +906,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 last = data_column.dropna().iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, last={var_format.format(last)}")
 
-    elif legend_stats == LegendStats.AVG_NONZERO_LAST:
+    elif legend_stats == LegendStats.NONZERO_AVG_LAST:
         legend_lines = []
         for column in data.columns:
             data_column = data[column].replace({0.0: np.nan})
@@ -910,6 +918,17 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 last = data_column.dropna().iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, last={var_format.format(last)}")
 
+    elif legend_stats == LegendStats.NONZERO_AVG_STD_LAST:
+        legend_lines = []
+        for column in data.columns:
+            data_column = data[column].replace({0.0: np.nan})
+            if np.all(np.isnan(data_column)):
+                avg, std, last = nan_display, nan_display, nan_display
+            else:
+                avg = np.nanmean(data_column)
+                std = np.nanstd(data_column)
+                last = data_column.dropna().iloc[-1]
+            legend_lines.append(f"{column}: avg={var_format.format(avg)}, std={var_format.format(std)}, last={var_format.format(last)}")
 
     elif legend_stats == LegendStats.MEDIAN_NONNAN_LAST:
         legend_lines = []
@@ -1212,7 +1231,7 @@ def rand_cmap(nlabels: int,
               first_color_fixed: bool = True,
               last_color_black: bool = False,
               verbose: bool = False
-              ) -> LinearSegmentedColormap:
+              ) -> Optional[LinearSegmentedColormap]:
     """
     Creates a random colormap to be used together with matplotlib. Useful for segmentation tasks
     :param nlabels: Number of labels (size of colormap)
@@ -1297,6 +1316,7 @@ def compute_heatmap_colors(a: np.ndarray,
                            axis: int = None,
                            cmap: str = 'RdYlGn',
                            alpha: float = 0.75,  # color scaler
+                           exclude_max: bool = False,
                            **kwargs
                            ) -> List[Tuple[float, float, float]]:
     """
@@ -1305,6 +1325,12 @@ def compute_heatmap_colors(a: np.ndarray,
     """
     lower = np.nanmin(a, axis=axis, keepdims=True)
     upper = np.nanmax(a, axis=axis, keepdims=True)
+    if exclude_max:  # avoid too extreeme values
+        max_idx = a.argmax()
+        a[max_idx] = np.nan
+        upper = np.nanmax(a, axis=axis, keepdims=True)
+        a[max_idx] = upper
+
     diffs = upper - lower
     scaler = np.reciprocal(diffs, where=np.greater(diffs, 0.0))
     cond = np.logical_and(np.isfinite(scaler), np.isfinite(scaler))
@@ -1402,16 +1428,33 @@ def calc_df_table_size(df: pd.DataFrame,
     calc optimal table size
     """
     if min_rows is not None:
-        num_rows = np.minimum(len(df.index), min_rows)
+        num_rows = np.maximum(len(df.index), min_rows)
     else:
         num_rows = len(df.index)
     if min_cols is not None:
-        num_cols = np.minimum(len(df.columns), min_cols)
+        num_cols = np.maximum(len(df.columns), min_cols)
     else:
         num_cols = len(df.columns)
     width = calc_table_width(num_col=num_cols, scale=scale_cols)
     height = calc_table_height(num_rows=num_rows, scale=scale_rows)
     return width, height, num_cols, num_rows
+
+
+def get_df_table_size(df: pd.DataFrame,
+                      min_rows: Optional[int] = None,
+                      min_cols: Optional[int] = None,
+                      scale_rows: float = 0.225,
+                      scale_cols: float = 0.225
+                      ) -> Tuple[float, float]:
+    """
+    calc optimal table size
+    """
+    width, height, num_cols, num_rows = calc_df_table_size(df=df,
+                                                           min_rows=min_rows,
+                                                           min_cols=min_cols,
+                                                           scale_rows=scale_rows,
+                                                           scale_cols=scale_cols)
+    return width, height
 
 
 class UnitTests(Enum):

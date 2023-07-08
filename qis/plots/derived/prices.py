@@ -186,9 +186,10 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                         pivot_prices: pd.Series = None,
                         regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
                         var_format: str = '{:,.1f}',
+                        dd_format: str = '{:.0%}',
                         digits_to_show: int = 1,
                         sharpe_format: str = '{:.2f}',
-                        x_date_freq: str = 'A',
+                        x_date_freq: str = 'Q',
                         performance_label: PerformanceLabel = PerformanceLabel.WITH_DD,
                         is_log: bool = False,
                         remove_xticklabels_ax1: bool = True,
@@ -223,6 +224,7 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                       perf_params=perf_params,
                       dd_legend_type=dd_legend_type,
                       x_date_freq=x_date_freq,
+                      var_format=dd_format,
                       title=dd_title,
                       ax=axs[1],
                       **kwargs)
@@ -230,7 +232,7 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
     if remove_xticklabels_ax1:
         axs[0].set_xticklabels('')
 
-    if regime_benchmark_str is not None and regime_params is not None:
+    if (regime_benchmark_str is not None or pivot_prices is not None) and regime_params is not None:
         for ax in axs:
             add_bnb_regime_shadows(ax=ax,
                                    data_df=prices,

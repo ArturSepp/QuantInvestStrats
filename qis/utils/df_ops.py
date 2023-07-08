@@ -216,10 +216,11 @@ def compute_nans_zeros_ratio_after_first_non_nan(df: Union[pd.Series, pd.DataFra
     return missing_ratio, zeros_ratio
 
 
-def get_first_nonnan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndarray, float]:
+def get_first_nonnan_values(df: Union[np.ndarray, pd.Series, pd.DataFrame]) -> Union[np.ndarray, float]:
 
-    if df.empty:
-        raise ValueError(f"data is empty:\n {df}")
+    if isinstance(df, pd.DataFrame) or isinstance(df, pd.Series):
+        if df.empty:
+            raise ValueError(f"data is empty:\n {df}")
 
     def get_non_nan_values_series(sdata: pd.Series) -> float:
         x0 = sdata.iloc[0]
@@ -244,6 +245,16 @@ def get_first_nonnan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndar
 
     elif isinstance(df, pd.Series):
             values = get_non_nan_values_series(sdata=df)
+
+    elif isinstance(df, np.ndarray):
+        x0 = df[0, :]
+        if np.all(np.isnan(x0) == False):  # first entries are non nan -> most expected
+            values = x0
+        else:
+            values = []
+            for idx in enumerate(df.shape[1]):
+                values.append(get_non_nan_values_series(sdata=pd.Series(df[:, idx])))
+            values = np.array(values)
 
     else:
         raise ValueError(f"unsupported data type = {type(df)}")

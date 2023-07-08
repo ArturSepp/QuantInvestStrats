@@ -26,7 +26,8 @@ def plot_df_table(df: pd.DataFrame,
                   first_row_height: float = None,
                   col_widths: List[float] = None,  # can pass as cols
                   rotation_for_columns_headers: int = None,
-                  is_transposed: bool = False,
+                  rotation_for_text: int = None,
+                  transpose: bool = False,
                   index_column_name: str = ' ',
                   fontsize: int = 10,
                   header_color: str = '#40466e',
@@ -51,7 +52,7 @@ def plot_df_table(df: pd.DataFrame,
                   columns_edge_lines: List[Tuple[int, str]] = None,
                   bold_font: bool = False,
                   alpha: float = 1.0,
-                  is_emply_column_names: bool = False,
+                  emply_column_names: bool = False,
                   ax: plt.Subplot = None,
                   **kwargs
                   ) -> Optional[plt.Figure]:
@@ -59,7 +60,7 @@ def plot_df_table(df: pd.DataFrame,
     plot dataframe as maotplotlib table
     """
     df = df.copy()  # data object will be changed
-    if is_transposed:
+    if transpose:
         t_data = df.T
         if add_index_as_column:
             t_data.columns = t_data.iloc[0, :]  # rename columns by original index
@@ -94,7 +95,7 @@ def plot_df_table(df: pd.DataFrame,
     if var_format is not None:
         df = dfs.df_to_str(df=df, var_format=var_format)
 
-    if is_emply_column_names is False:
+    if emply_column_names is False:
         col_labels = df.columns.to_list()
     else:
         col_labels = [df.columns[0]] + [''] * (len(df.columns) - 1)
@@ -130,6 +131,9 @@ def plot_df_table(df: pd.DataFrame,
         else:
             width = col_widths[k[1]]
         cell.set_width(width)
+        if rotation_for_text is not None:
+            cell.get_text().set_rotation(rotation_for_text)  # set rotation
+
     if heatmap_columns is not None:
         for heatmap_column in heatmap_columns:
             column_data = df[df.columns[heatmap_column]]

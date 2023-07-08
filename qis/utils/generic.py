@@ -43,7 +43,7 @@ class ColVar(NamedTuple):
     value_type: ValueType = ValueType.FLOAT
     agg_func: Optional[Callable] = None
 
-    def to_str(self, short: bool = False, short_n: bool = False) -> str:
+    def to_str(self, short: bool = False, short_n: bool = False, **kwargs) -> str:
         if short and self.short is not None:
             name = self.short
         elif short_n and self.short_n is not None:
@@ -56,7 +56,7 @@ class ColVar(NamedTuple):
                   digits_to_show: int = 2,
                   sharpe_digits: int = 2,
                   price_format: Optional[str] = None,
-                  date_format: str = DATE_FORMAT,
+                  # date_format: str = DATE_FORMAT,
                   **kwargs
                   ) -> str:
 
@@ -95,7 +95,7 @@ class ColVar(NamedTuple):
             var_format = '{:,.0%}'
 
         elif self.value_type == ValueType.DATE:
-             var_format = date_format
+             var_format = DATE_FORMAT  # independent
 
         elif self.value_type == ValueType.INT:
              var_format = '{:.0f}'

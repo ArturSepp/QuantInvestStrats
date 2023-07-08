@@ -19,6 +19,31 @@ import qis.plots.utils as put
 from qis.plots.bars import plot_bars, plot_vbars
 
 
+def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
+                        perf_params: PerfParams = None,
+                        perf_columns: List[PerfStat] = rpt.STANDARD_TABLE_COLUMNS,
+                        column_header: str = 'Asset',
+                        df_to_add: pd.DataFrame = None,
+                        **kwargs
+                        ) -> pd.DataFrame:
+    """
+    compute ra perf table and get ra performance columns with data as string for tables
+    """
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame()
+    ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
+    data = pd.DataFrame(index=ra_perf_table.index)
+    for perf_column in perf_columns:
+        data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
+                                                       var_format=perf_column.to_format(**kwargs))
+
+    if df_to_add is not None:
+        for idx, column in enumerate(df_to_add.columns):
+            data.insert(idx+1, column=column, value=df_to_add[column].to_numpy())
+    data.index.name = column_header
+    return data
+
+
 def plot_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
                        perf_params: PerfParams = None,
                        perf_columns: List[PerfStat] = rpt.STANDARD_TABLE_COLUMNS,
@@ -27,26 +52,23 @@ def plot_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
                        special_rows_colors: List[Tuple[int, str]] = None,
                        column_header: str = 'Asset',
                        fontsize: int = 10,
-                       is_transposed: bool = False,
+                       transpose: bool = False,
                        df_to_add: pd.DataFrame = None,
                        ax: plt.Subplot = None,
                        **kwargs
                        ) -> Optional[plt.Figure]:
-
-    if isinstance(prices, pd.Series):
-        prices = prices.to_frame()
-    ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
-    data = pd.DataFrame(data=prices.columns, index=ra_perf_table.index, columns=[column_header])
-    for perf_column in perf_columns:
-        data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
-                                                   var_format=perf_column.to_format(**kwargs))
-
-    if df_to_add is not None:
-        for idx, column in enumerate(df_to_add.columns):
-            data.insert(idx+1, column=column, value=df_to_add[column].to_numpy())
-    fig = ptb.plot_df_table(df=data,
-                            add_index_as_column=True if is_transposed else False,
-                            is_transposed=is_transposed,
+    """
+    plot ra perf table columns
+    """
+    df = get_ra_perf_columns(prices=prices,
+                             perf_params=perf_params,
+                             perf_columns=perf_columns,
+                             column_header=column_header,
+                             df_to_add=df_to_add,
+                             **kwargs)
+    fig = ptb.plot_df_table(df=df,
+                            add_index_as_column=True,
+                            transpose=transpose,
                             special_columns_colors=special_columns_colors,
                             special_rows_colors=special_rows_colors,
                             rows_edge_lines=rows_edge_lines,
@@ -56,49 +78,64 @@ def plot_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     return fig
 
 
+def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
+                                  benchmark: str,
+                                  drop_benchmark: bool = False,
+                                  perf_params: PerfParams = None,
+                                  perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+                                  column_header: str = 'Asset',
+                                  alpha_an_factor: float = None,
+                                  **kwargs
+                                  ) -> pd.DataFrame:
+    """
+    compute ra perf table and get ra performance columns with data as string for tables
+    """
+    ra_perf_table = rpt.compute_ra_perf_table_with_benchmark(prices=prices,
+                                                             benchmark=benchmark,
+                                                             perf_params=perf_params,
+                                                             alpha_an_factor=alpha_an_factor,
+                                                             **kwargs)
+    df = pd.DataFrame(index=ra_perf_table.index)
+    for perf_column in perf_columns:
+        # here we can shorten the performance var for outputs
+        df[perf_column.to_str(**kwargs)] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
+                                                             var_format=perf_column.to_format(**kwargs))
+    if drop_benchmark:
+        df = df.drop(benchmark, axis=0)
+    df.index.name = column_header
+    return df
+
+
 def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  benchmark: str,
                                  drop_benchmark: bool = False,
                                  perf_params: PerfParams = None,
                                  perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                                  special_columns_colors: List[Tuple[int, str]] = ((0, 'blue'),),
-                                 rows_edge_lines: List[int] = None,
-                                 special_rows_colors: List[Tuple[int, str]] = None,
                                  column_header: str = 'Asset',
                                  fontsize: int = 10,
-                                 is_transposed: bool = False,
+                                 transpose: bool = False,
                                  alpha_an_factor: float = None,
                                  ax: plt.Subplot = None,
                                  **kwargs
                                  ) -> plt.Figure:
-
-    ra_perf_table = rpt.compute_ra_perf_table_with_benchmark(prices=prices,
-                                                             benchmark=benchmark,
-                                                             perf_params=perf_params,
-                                                             **kwargs)
-    if alpha_an_factor is not None:
-        if PerfStat.ALPHA_AN.to_str() in ra_perf_table.columns:
-            ra_perf_table[PerfStat.ALPHA_AN.to_str()] *= alpha_an_factor
-
-    data = pd.DataFrame(data=prices.columns, index=ra_perf_table.index, columns=[column_header])
-
-    for perf_column in perf_columns:
-        data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
-                                                       var_format=perf_column.to_format(**kwargs))
-
-    if drop_benchmark:
-        data = data.drop(benchmark, axis=0)
-
-    fig = ptb.plot_df_table(df=data,
-                            add_index_as_column=True if is_transposed else False,
-                            is_transposed=is_transposed,
+    """
+    plot ra perf table and get ra performance columns with data as string for tables
+    """
+    ra_perf_table = get_ra_perf_benchmark_columns(prices=prices,
+                                                  benchmark=benchmark,
+                                                  drop_benchmark=drop_benchmark,
+                                                  perf_params=perf_params,
+                                                  perf_columns=perf_columns,
+                                                  column_header=column_header,
+                                                  alpha_an_factor=alpha_an_factor,
+                                                  **kwargs)
+    fig = ptb.plot_df_table(df=ra_perf_table,
+                            transpose=transpose,
                             special_columns_colors=special_columns_colors,
-                            special_rows_colors=special_rows_colors,
-                            rows_edge_lines=rows_edge_lines,
                             fontsize=fontsize,
                             ax=ax,
                             **kwargs)
-
     return fig
 
 
@@ -116,7 +153,9 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> plt.Figure:
-
+    """
+    scatter plot of performance stats
+    """
     if benchmark is not None:
         ra_perf_table = rpt.compute_ra_perf_table_with_benchmark(prices=prices,
                                                                  benchmark=benchmark,
@@ -346,7 +385,7 @@ def run_unit_test(unit_test: UnitTests):
         plot_ra_perf_table_benchmark(prices=prices,
                                      benchmark='es1_index',
                                      perf_params=perf_params,
-                                     is_transposed=False)
+                                     transpose=False)
 
     elif unit_test == UnitTests.PLOT_DESC_FREQ_TABLE:
         freq_data = plot_desc_freq_table(df=prices,

@@ -11,7 +11,8 @@ import yfinance as yf
 
 FIG_SIZE21 = (15, 12)
 FIG_SIZE12 = (15, 7)
-LOCAL_PATH = "..//draft//figures//"
+# LOCAL_PATH = "C://Users//artur//OneDrive//analytics//github//LognormalStochVol//cheyette//draft//figures//"
+LOCAL_PATH = "C://Users//artur//OneDrive//analytics//outputs//"
 
 MOVE_NAME = 'Move volatility index'
 fixed_tenor = '10y'
@@ -26,12 +27,22 @@ rates = yf.download(tickers=list(tickers.keys()), start=None, end=None)['Adj Clo
 
 rates = rates.reindex(index=move.index, method='ffill')*100.0
 
-move = move.loc[:'2022']
-rates = rates.loc[:'2022', :]
-
 freq = 'W-MON'
-move_change = move.resample(freq).last().diff(1).loc[:'2022']
-rates_change = rates.resample(freq).last().diff(1).loc[:'2022', :]
+is_to_2022 = False
+if is_to_2022:
+    move = move.loc[:'2022']
+    rates = rates.loc[:'2022', :]
+    move_change = move.resample(freq).last().diff(1).loc[:'2022']
+    rates_change = rates.resample(freq).last().diff(1).loc[:'2022', :]
+    fixed_years = [2001, 2007, 2010, 2017, 2020, 2022]
+else:
+    move = move.loc[:'06Jul2023']
+    rates = rates.loc[:'06Jul2023', :]
+    move_change = move.resample(freq).last().diff(1)
+    rates_change = rates.resample(freq).last().diff(1)
+    fixed_years = [2001, 2007, 2010, 2017, 2020, 2023]
+colors = ['orchid', 'green', 'grey', 'olive', 'red']
+
 real_vol = np.sqrt(52.0*qis.compute_ewm(data=np.square(rates_change[fixed_tenor]), span=26)).rename(RVOL)
 real_vol_change = real_vol.diff(1)
 
@@ -44,8 +55,7 @@ vol_vol = np.sqrt(260.0*qis.compute_ewm(data=np.square(joint_change[MOVE_NAME]),
                   ).rename('Realized Volatility-of-Volatility')
 
 hue = 'year'
-fixed_years = [2001, 2007, 2010, 2017, 2020, 2022]
-colors = ['orchid', 'green', 'grey', 'olive', 'red']
+
 
 with sns.axes_style('darkgrid'):
 
@@ -254,6 +264,7 @@ with sns.axes_style('darkgrid'):
                      **kwargs)
 
     qis.save_fig(fig=fig, file_name='a_move_b_change_vs_rate', local_path=LOCAL_PATH)
+    qis.save_fig(fig=fig, file_name='a_move_b_change_vs_rate', file_type=qis.FileTypes.EPS, local_path=LOCAL_PATH)
 
     #################################
     # realized vol-vol and vol-beta vs move index for article

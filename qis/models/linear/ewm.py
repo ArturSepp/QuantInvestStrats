@@ -76,8 +76,9 @@ def ewm_recursion(a: np.ndarray,
                   init_value: Union[float, np.ndarray],
                   span: Union[int, np.ndarray] = None,
                   ewm_lambda: Union[float, np.ndarray] = 0.94,
+                  is_start_from_first_nonan: bool = True,
                   is_unit_vol_scaling: bool = False,
-                  is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                  is_nan_deflating: bool = False
                   ) -> np.ndarray:
 
     """
@@ -89,22 +90,49 @@ def ewm_recursion(a: np.ndarray,
     data: numpy with dimension = t*n
     ewm_lambda: float or ndarray of dimension n
     init_value: initial value of dimension n
+    start_from_first_nonan: start filling nans only from the first non-nan in underlying data: recomended because
+                            it avoids backfilling of init_value
+    is_unit_vol_scaling: outputs are scaled to have var(ewm)=1 (for gaussian data with zero corrs)
+    is_nan_deflating: equivalent to setting nans to zero, the series of nans will pull ewm to zero
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
     ewm_lambda_1 = 1.0 - ewm_lambda
 
-    # initialize all
-    ewm = np.zeros_like(a, dtype=np.double)
-    ewm[0] = last_ewm = init_value
-
     is_1d = (a.ndim == 1)  # or a.shape[1] == 1)
 
+    # initialize all
+    ewm = np.full_like(a, fill_value=np.nan, dtype=np.double)
+
+    if is_start_from_first_nonan:
+        if is_1d:  # cannot use np.where
+            last_ewm = init_value if np.isfinite(a[0]) else np.nan
+        else:
+            last_ewm = np.where(np.isfinite(a[0]), init_value, np.nan)
+    else:
+        last_ewm = init_value
+    ewm[0] = last_ewm
+
+    # recurse from 1
     for t in np.arange(1, a.shape[0]):
-        current_ewm = ewm_lambda * last_ewm + ewm_lambda_1 * a[t]
+        a_t = a[t]
+
+        if is_start_from_first_nonan:
+            # detect starting nonnans for when last ewma was np.nan and a_t is finite
+            if is_1d:  # cannot use np.where
+                if np.isfinite(last_ewm)==False and np.isfinite(a_t)==True:  # trick: if last_ewm is nan
+                    last_ewm = init_value
+            else:
+                new_nonnans = np.logical_and(np.isfinite(last_ewm)==False, np.isfinite(a_t)==True)
+                if np.any(new_nonnans):
+                    last_ewm = np.where(new_nonnans, init_value, last_ewm)
+
+        # do the step
+        current_ewm = ewm_lambda * last_ewm + ewm_lambda_1 * a_t
+
         # fill nan-values
-        if is_1d:
-            if not np.isfinite(current_ewm):  # np.where cannot be used
+        if is_1d:   # np.where cannot be used
+            if not np.isfinite(current_ewm):
                 if is_nan_deflating:
                     current_ewm = ewm_lambda*last_ewm
                 else:

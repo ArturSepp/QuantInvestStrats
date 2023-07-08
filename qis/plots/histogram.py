@@ -13,6 +13,7 @@ from typing import Union, List, Optional, Tuple
 from enum import Enum
 
 # qis
+import qis
 import qis.plots.utils as put
 import qis.perfstats.desc_table as dsc
 
@@ -120,7 +121,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                          ax=ax)
 
         elif pdf_type == PdfType.TRUNCETED_PDF:
-            x, y = trunc_dens(column_data)
+            x, y = trunc_dens(column_data, **kwargs)
             ax.plot(x, y, color=color, linewidth=linewidth)
 
     if add_last_value:
@@ -165,8 +166,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
         stats_table = dsc.compute_desc_table(df=df,
                                          annualize_vol=annualize_vol,
                                          desc_table_type=desc_table_type,
-                                         var_format=xvar_format,
-                                         **kwargs)
+                                         **qis.update_kwargs(kwargs, dict(var_format=xvar_format)))
         put.set_legend_with_stats_table(stats_table=stats_table,
                                         ax=ax,
                                         colors=colors,
@@ -212,7 +212,11 @@ def kde_dens(x: np.ndarray, bandwidth: float = 0.5) -> Tuple[np.ndarray, np.ndar
     return d_support, d_dens
 
 
-def trunc_dens(x: np.ndarray, bandwidth: float = 0.5) -> Tuple[np.ndarray, np.ndarray]:
+def trunc_dens(x: np.ndarray,
+               bandwidth: float = 0.5,
+               truncate_below_zero: bool = True,
+               **kwargs
+               ) -> Tuple[np.ndarray, np.ndarray]:
     """
     with truncation at zero:
     """
@@ -220,12 +224,18 @@ def trunc_dens(x: np.ndarray, bandwidth: float = 0.5) -> Tuple[np.ndarray, np.nd
     kde = sm.nonparametric.KDEUnivariate(x)
     kde.fit(bw=bandwidth)
     h = kde.bw
-    w = 1/(1-norm.cdf(0, loc=x, scale=h))
+    if truncate_below_zero:
+        w = 1/(1-norm.cdf(0, loc=x, scale=h))
+    else:
+        w = 1 / norm.cdf(0, loc=x, scale=h)
     d = sm.nonparametric.KDEUnivariate(x)
     d = d.fit(bw=h, weights=w / len(x), fft=False)
     d_support = d.support
     d_dens = d.density
-    d_dens[d_support < 0] = 0
+    if truncate_below_zero:
+        d_dens[d_support < 0] = 0
+    else:
+        d_dens[d_support > 0] = 0
     d_dens = d_dens / np.nansum(d_dens)
     return d_support, d_dens
 

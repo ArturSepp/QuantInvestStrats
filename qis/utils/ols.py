@@ -128,7 +128,6 @@ def reg_model_params_to_str(reg_model: RegModel,
 
         elif order == 2:
             if fit_intercept:  # with intercept
-
                 text_str = 'y=' + beta_format.format(reg_model.params[idx1+1]) + 'X' + f'\N{SUPERSCRIPT TWO}' \
                             + beta_format.format(reg_model.params[idx1]) + 'X' \
                             + alpha + r2

@@ -139,6 +139,9 @@ def get_period_days(freq: str = 'B',
     elif freq in ['5M']:
         days = 1.0 / 24.0 / 12.0
         an_f = an_days * 24.0 * 12.0
+    elif freq in ['15M', '15T']:
+        days = 1.0 / 24.0 / 12.0
+        an_f = an_days * 24.0 * 4.0
     elif freq in ['H']:
         days = 1.0 / 24.0
         an_f = an_days * 24.0
@@ -258,7 +261,7 @@ class TimePeriod:
             self.start, self.end = tz_localize_dates(start_date=self.start, end_date=self.end, tz=tz)
 
     def print(self) -> None:
-        print(self.to_str())
+        print(f"start={self.start}, end={self.end}")
 
     def copy(self) -> TimePeriod:
         return TimePeriod(start=self.start, end=self.end)
@@ -388,6 +391,31 @@ class TimePeriod:
                           end=self.end)
 
 
+def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],
+                            start: pd.Timestamp
+                            ) -> Union[pd.DataFrame, pd.Series]:
+    """
+    truncate timeseries data from start with a data point including or prior to the star
+    """
+    if isinstance(df, pd.DataFrame):
+        df_ = df.loc[start:, :]
+        if df_.index[0] != start:
+            # take last row before cutoff date
+            row_before = df.loc[:start, :].iloc[-1, :].to_frame().T
+            df_ = pd.concat([row_before, df_], axis=0)
+
+    elif isinstance(df, pd.Series):
+        df_ = df.loc[start:]
+        if df_.index[0] != start:
+            # take last row before cutoff date
+            ds_before = df.loc[:start]
+            row_before = pd.Series(ds_before.iloc[-1], index=[ds_before.index[-1]], name=df.name)
+            df_ = row_before.append(df_)
+    else:
+        raise NotImplementedError(f"{type(df)}")
+    return df_
+
+
 def get_time_period(df: Union[pd.Series, pd.DataFrame], tz: str = None) -> TimePeriod:
     """
     get tz-aware start end dates
@@ -426,8 +454,12 @@ def get_time_period_shifted_by_years(time_period: TimePeriod,
                                      backward: bool = True
                                      ) -> TimePeriod:
     end_date = time_period.end
-    start_date = shift_dates_by_n_years(dates=end_date, n_years=n_years, backward=backward)
-    return TimePeriod(start_date, end_date)
+    if end_date is not None:
+        start_date = shift_dates_by_n_years(dates=end_date, n_years=n_years, backward=backward)
+        time_period = TimePeriod(start_date, end_date)
+    else:
+        time_period = time_period
+    return time_period
 
 
 def get_ytd_time_period(year: int = 2023) -> TimePeriod:
@@ -475,7 +507,7 @@ def generate_dates_schedule(time_period: TimePeriod,
         dates_schedule1 = create_range(freq_='W-FRI', tz=time_period.tz)
         dates_schedule2 = create_range(freq_='M', tz=time_period.tz)
         # filter last Friday per month periods
-        dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill')
+        dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill').dropna()
         dates_schedule = pd.DatetimeIndex(dates_schedule.to_numpy())  # back to DatetimeIndex type
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
@@ -485,7 +517,7 @@ def generate_dates_schedule(time_period: TimePeriod,
         dates_schedule1 = create_range(freq_='W-FRI', tz=time_period.tz)
         dates_schedule2 = create_range(freq_='Q', tz=time_period.tz)
         # filter last Friday per quarter periods
-        dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill')
+        dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill').dropna()
         dates_schedule = pd.DatetimeIndex(dates_schedule.to_numpy())  # back to DatetimeIndex type
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
@@ -666,43 +698,19 @@ def get_month_days(month: int, year: int) -> int:
 
 def shift_date_by_day(date: pd.Timestamp, backward: bool = True, num_days: int = 1) -> pd.Timestamp:
     if backward:
-        date1 = date - dt.timedelta(days=num_days)
+        date1 = date - pd.offsets.Day(num_days)
     else:
-        date1 = date + dt.timedelta(days=num_days)
+        date1 = date + pd.offsets.Day(num_days)
 
     return date1
-
-
-def shift_date_by_month(date: pd.DatetimeIndex, backward: bool = True) -> pd.Timestamp:
-    """
-    Checks the month of the given date
-    Selects the number of days it needs to add one month
-    return the date with one month added
-    """
-    current_month_days = get_month_days(date.month, date.year)
-    if backward:
-        next_month_days = get_month_days(date.month - 1, date.year)
-    else:
-        next_month_days = get_month_days(date.month + 1, date.year)
-
-    delta = dt.timedelta(days=current_month_days)
-
-    if backward:
-        if date.day < next_month_days:
-            delta = -(delta - dt.timedelta(days=(date.day - next_month_days) + 1))
-        else:
-            delta = - delta
-    else:
-        if date.day > next_month_days:
-            delta = delta - dt.timedelta(days=(date.day - next_month_days) - 1)
-
-    return date + delta
 
 
 def shift_dates_by_year(dates: Union[pd.Timestamp, pd.DatetimeIndex],
                         backward: bool = True
                         ) -> Union[pd.Timestamp, pd.DatetimeIndex]:
-
+    """
+    shift dates by 365 for non leap year and 366 for leap year
+    """
     if isinstance(dates, pd.Timestamp):
         dates1 = [dates]
     else:
@@ -819,28 +827,29 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
                                   roll_freq: str = 'W-FRI',
                                   roll_hour: Optional[int] = 8,
                                   min_days_to_next_roll: int = 6,
-                                  include_end_date: bool = False
+                                  include_end_date: bool = False,
+                                  future_days_offset: int = 360
                                   ) -> pd.Series:
     """
     for given time_period generate fixed maturity rolls
     rolls occur when (current_roll - value_time).days < min_days_to_next_roll
     """
-    observed_times = generate_dates_schedule(time_period,
+    observation_times = generate_dates_schedule(time_period,
                                              freq=freq,
                                              include_start_date=True,
                                              include_end_date=include_end_date)
     # use large day shift to cover at least next quarter
-    roll_days = generate_dates_schedule(time_period.shift_end_date_by_days(num_days=180, backward=False),
+    roll_days = generate_dates_schedule(time_period.shift_end_date_by_days(num_days=future_days_offset, backward=False),
                                         freq=roll_freq,
                                         hour_offset=roll_hour)
 
     if len(roll_days) == 1:
-        roll_schedule = pd.Series(roll_days[0], index=observed_times)
+        roll_schedule = pd.Series(roll_days[0], index=observation_times)
     else:
         roll_schedule = {}
         starting_roll_idx = 0
         next_roll = roll_days[starting_roll_idx]
-        for observed_time in observed_times:
+        for observed_time in observation_times:
             diff = (next_roll - observed_time).days
             if diff < min_days_to_next_roll:
                 if starting_roll_idx + 1 < len(roll_days):
@@ -854,16 +863,33 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
     return roll_schedule
 
 
+def min_timestamp(timestamp1: Union[str, pd.Timestamp],
+                  timestamp2: Union[str, pd.Timestamp],
+                  tz: str = 'UTC'
+                  ) -> pd.Timestamp:
+    """
+    find min timespamp
+    """
+    if isinstance(timestamp1, str):
+        timestamp1 = pd.Timestamp(timestamp1, tz=tz)
+    if isinstance(timestamp2, str):
+        timestamp2 = pd.Timestamp(timestamp2, tz=tz)
+    min_date = timestamp1 if timestamp1 < timestamp2 else timestamp2
+    return min_date
+
+
 class UnitTests(Enum):
-    DATES = 1
+    DATES = 0
+    OFFSETS = 1
     WEEK_DAY = 2
     SAMPLE_DATES_IDX = 3
     PERIOD_WITH_HOLIDAYS = 4
-    FREQ_HOUR = 5
-    FREQ_REB = 6
-    FREQS = 7
-    REBALANCING_INDICATORS = 8
-    FIXED_MATURITY_ROLLS = 9
+    EOD_FREQ_HOUR = 5
+    FREQ_HOUR = 6
+    FREQ_REB = 7
+    FREQS = 8
+    REBALANCING_INDICATORS = 9
+    FIXED_MATURITY_ROLLS = 10
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -882,6 +908,15 @@ def run_unit_test(unit_test: UnitTests):
         print(time_period.to_pd_datetime_index(freq='M', tz='America/New_York'))
         print("time_period.get_period_dates_str(freq='M', tz='America/New_York') = ")
         print(time_period.to_period_dates_str(freq='M'))
+
+    elif unit_test == UnitTests.OFFSETS:
+        date = pd.Timestamp('28Feb2023')
+        print(date-pd.offsets.Day(30))
+        print(date-pd.offsets.MonthEnd(1))
+
+        print(shift_dates_by_year(date))
+        print(date-pd.offsets.Day(365))
+        print(date-pd.offsets.BYearBegin(1))
 
     elif unit_test == UnitTests.WEEK_DAY:
         time_period = TimePeriod(start='01Jun2022', end='22Jun2022')
@@ -913,6 +948,11 @@ def run_unit_test(unit_test: UnitTests):
         dates = time_period.to_period_dates_str(freq='B', holidays=holidays)
         print(dates)
 
+    elif unit_test == UnitTests.EOD_FREQ_HOUR:
+        time_period = TimePeriod(pd.Timestamp('2022-11-10', tz='UTC'), pd.Timestamp('2023-03-03', tz='UTC'))
+        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
+        print(rebalancing_times)
+
     elif unit_test == UnitTests.FREQ_HOUR:
 
         # hour frequency with timestamp with no hour
@@ -923,18 +963,14 @@ def run_unit_test(unit_test: UnitTests):
         rebalancing_times = generate_dates_schedule(time_period=time_period, freq='D_8H')
         print(rebalancing_times)
 
-        # time_period = TimePeriod(pd.Timestamp('2022-11-10 8:00:00+00:00', tz='UTC'), pd.Timestamp('2022-11-16 8:00:00+00:00', tz='UTC'))
-        # rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
-        # print(rebalancing_times)
-
     elif unit_test == UnitTests.FREQ_REB:
-        dates_schedule = generate_dates_schedule(time_period=TimePeriod('2022-04-08 08:00:00', '2022-04-10 10:00:00', tz='UTC'),
-                                                 freq='D', hour_offset=8,
+        dates_schedule = generate_dates_schedule(time_period=TimePeriod('2023-05-01 08:00:00', '2023-05-30 10:00:00', tz='UTC'),
+                                                 freq='2W-FRI', hour_offset=8,
                                                  include_start_date=True,
                                                  include_end_date=True)
         print(dates_schedule)
-        dates_schedule = generate_dates_schedule(time_period=TimePeriod('2022-04-08 08:00:00', '2022-04-10 10:00:00', tz='UTC'),
-                                                 freq='D', hour_offset=8,
+        dates_schedule = generate_dates_schedule(time_period=TimePeriod('2023-05-01 08:00:00', '2023-05-30 10:00:00', tz='UTC'),
+                                                 freq='2W-FRI', hour_offset=8,
                                                  include_start_date=False,
                                                  include_end_date=False)
         print(dates_schedule)
@@ -955,7 +991,8 @@ def run_unit_test(unit_test: UnitTests):
         print(rebalancing_schedule[rebalancing_schedule == True])
 
     elif unit_test == UnitTests.FIXED_MATURITY_ROLLS:
-        time_period = TimePeriod('01Oct2022', '03Feb2023', tz='UTC')
+        time_period = TimePeriod('01Oct2022', '21Feb2023', tz='UTC')
+        """
         weekly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='W-FRI',
                                                      roll_hour=8,
                                                      min_days_to_next_roll=6)
@@ -965,7 +1002,11 @@ def run_unit_test(unit_test: UnitTests):
                                                       roll_hour=8,
                                                       min_days_to_next_roll=28)  # 4 weeks before
         print(f"monthly_rolls:\n{monthly_rolls}")
-
+        """
+        quarterly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='Q-FRI',
+                                                        roll_hour=8,
+                                                        min_days_to_next_roll=28)  # 4 weeks before
+        print(f"quarterly_rolls:\n{quarterly_rolls}")
         quarterly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='Q-FRI',
                                                         roll_hour=8,
                                                         min_days_to_next_roll=56)  # 8 weeks before
@@ -974,7 +1015,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.FIXED_MATURITY_ROLLS
+    unit_test = UnitTests.FREQ_REB
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -324,9 +324,54 @@ def get_random_data(is_random_beta: bool = True,
     return df
 
 
+def estimate_classification_scatter(df: pd.DataFrame,
+                                    x: Optional[str] = None,
+                                    y: Optional[str] = None,
+                                    hue_name: str = 'hue',
+                                    num_buckets: Optional[int] = None,
+                                    bins: np.ndarray = np.array([-3.0, -1.5, 0.0, 1.5, 3.0]),
+                                    order: int = 1,
+                                    fit_intercept: bool = False,
+                                    ) -> pd.Series:
+    """
+    add bin classification using x_column
+    """
+    if x is None:
+        if len(df.columns) == 2:
+            x = df.columns[0]
+        else:
+            raise ValueError(f"x_column is not defined for more than on columns")
+    if y is None:
+        if len(df.columns) == 2:  # x and y
+            y = df.columns[1]
+        else:
+            raise ValueError(f"y_column is not defined for more than on columns")
+
+    df, _ = qu.add_quantile_classification(df=df, x_column=x, hue_name=hue_name, num_buckets=num_buckets, bins=bins)
+
+    x_np = df[x].to_numpy()
+    x_range = np.linspace(np.min(x_np), np.max(x_np), 200)
+
+    dfs = df.groupby(hue_name)
+    y_rpeds = []
+    for hue, df in dfs:
+        # estimate model equation
+        data_hue = df.sort_values(by=x)
+        x_ = data_hue[x].to_numpy()
+        y_ = data_hue[y].to_numpy()
+        x1 = qu.get_ols_x(x=x_, order=order, fit_intercept=fit_intercept)
+        reg_model = sm.OLS(y_, x1).fit()
+        x_hue = np.extract(np.logical_and(x_range>=np.min(x_), x_range<np.max(x_)), x_range)
+        y_hue = reg_model.predict(x_hue)
+        y_rpeds.append(pd.Series(y_hue, index=x_hue))
+    y_rpeds = pd.concat(y_rpeds).sort_index()
+    return y_rpeds
+
+
 class UnitTests(Enum):
     SCATTER = 1
     CLASSIFICATION_SCATTER = 2
+    CLASSIFICATION_REGRESSION = 3
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -341,12 +386,18 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.CLASSIFICATION_SCATTER:
         plot_classification_scatter(df=df, x='x', y='y')
 
+    elif unit_test == UnitTests.CLASSIFICATION_REGRESSION:
+        y_rpeds = estimate_classification_scatter(df=df, x='x', y='y')
+        plot_classification_scatter(df=df, x='x', y='y')
+        print(y_rpeds)
+        y_rpeds.plot()
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.SCATTER
+    unit_test = UnitTests.CLASSIFICATION_REGRESSION
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -11,17 +11,23 @@ from typing import Union, Dict, Optional
 
 # qis
 import qis.utils.dates as da
-import qis.utils.df_ops as dfo
 import qis.utils.np_ops as npo
 import qis.utils.df_freq as dff
+from qis.utils import df_ops as dfo
 from qis.utils.dates import CALENDAR_DAYS_PER_YEAR_SHARPE
 from qis.perfstats.config import PerfStat, ReturnTypes, PerfParams
+
+
+def compute_num_days(prices: Union[pd.DataFrame, pd.Series]) -> int:
+    if prices.index[0] > prices.index[-1]:
+        raise ValueError(f"inconsistent dates t0={prices.index[0]} t1={prices.index[-1]}")
+    return np.maximum((prices.index[-1] - prices.index[0]).days, 1)
 
 
 def compute_num_years(prices: Union[pd.DataFrame, pd.Series],
                       days_per_year: float = CALENDAR_DAYS_PER_YEAR_SHARPE
                       ) -> float:
-    return (prices.index[-1] - prices.index[0]).days / days_per_year
+    return compute_num_days(prices=prices) / days_per_year
 
 
 def to_returns(prices: Union[pd.Series, pd.DataFrame],
@@ -64,9 +70,15 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
         raise NotImplementedError (f"{return_type}")
 
     if is_first_zero:
-        returns = set_zero_first(returns=returns)
+        if isinstance(returns, pd.DataFrame):
+            returns.iloc[0, :] = 0
+        else:
+            returns.iloc[0] = 0
     elif drop_first:
-        returns = drop_first_row(returns=returns)
+        if isinstance(returns, pd.DataFrame):
+            returns = returns.iloc[1:, :]
+        else:
+            returns = returns.iloc[1:]
 
     return returns
 
@@ -100,7 +112,7 @@ def compute_total_return(prices: Union[pd.DataFrame, pd.Series]) -> Union[np.nda
         price_0 = prices.iloc[0, :].to_numpy()
         if np.any(np.isnan(price_0)):
             price_0 = dfo.get_first_nonnan_values(df=prices)
-            print(f"detected nan price for prices = {prices.iloc[0, :]},"
+            print(f"detected nan price for prices = {prices.iloc[0, np.isnan(price_0)]},"
                   f" using first non nan price = {price_0} for {prices.columns}")
 
         price_end = prices.iloc[-1, :].to_numpy()
@@ -168,7 +180,8 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
         return_dict = {PerfStat.TOTAL_RETURN.to_str(): np.full(n, fill_value=np.nan),
                        PerfStat.PA_RETURN.to_str(): np.full(n, fill_value=np.nan),
                        PerfStat.AN_LOG_RETURN.to_str(): np.full(n, fill_value=np.nan),
-                       PerfStat.AVG_AN_RETURN.to_str(): np.full(n, fill_value=np.nan),
+                       PerfStat.AN_LOG_RETURN_EXCESS.to_str(): np.full(n, fill_value=np.nan),
+                       PerfStat.APR.to_str(): np.full(n, fill_value=np.nan),
                        PerfStat.NUM_YEARS.to_str(): np.full(n, fill_value=np.nan)}
         return return_dict
 
@@ -178,14 +191,17 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
     compounded_return_pa = compute_pa_return(prices=prices, annualize_less_1y=annualize_less_1y)
     total_return = compute_total_return(prices=prices)
     num_years = compute_num_years(prices=prices)
+    num_days = compute_num_days(prices=prices)
 
     if perf_params.rates_data is not None:
-        excess_return = compute_pa_excess_returns(returns=to_returns(prices),
+        excess_return_pa = compute_pa_excess_returns(returns=to_returns(prices,
+                                                                     return_type=ReturnTypes.RELATIVE,
+                                                                     is_first_zero=True),
                                                   rates_data=perf_params.rates_data,
                                                   first_date=prices.index[0],
                                                   annualize_less_1y=annualize_less_1y)
     else:
-        excess_return = compounded_return_pa
+        excess_return_pa = compounded_return_pa
 
     if isinstance(prices, pd.DataFrame):
         start_value = prices.iloc[0, :].to_numpy()
@@ -197,9 +213,11 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
     # make dictionary output
     return_dict = {PerfStat.TOTAL_RETURN.to_str(): total_return,
                    PerfStat.PA_RETURN.to_str(): compounded_return_pa,
-                   PerfStat.PA_EXCESS_RETURN.to_str(): excess_return,
+                   PerfStat.PA_EXCESS_RETURN.to_str(): excess_return_pa,
                    PerfStat.AN_LOG_RETURN.to_str(): np.log(1.0 + compounded_return_pa, where=np.greater(compounded_return_pa, -1.0)),
+                   PerfStat.AN_LOG_RETURN_EXCESS.to_str(): np.log(1.0 + excess_return_pa, where=np.greater(excess_return_pa, -1.0)),
                    PerfStat.AVG_AN_RETURN.to_str(): np.divide(total_return, num_years),
+                   PerfStat.APR.to_str(): CALENDAR_DAYS_PER_YEAR_SHARPE*total_return/num_days if num_days > 0 else CALENDAR_DAYS_PER_YEAR_SHARPE*total_return,
                    PerfStat.NAV1.to_str(): (1.0+total_return),
                    PerfStat.NUM_YEARS.to_str(): num_years,
                    PerfStat.START_DATE.to_str(): prices.index[0]}
@@ -231,7 +249,7 @@ def compute_pa_excess_returns(returns: Union[pd.Series, pd.DataFrame],
                               annualize_less_1y: bool = False
                               ) -> Union[np.ndarray, float]:
     excess_returns = compute_excess_returns(returns=returns, rates_data=rates_data)
-    prices = create_nav_from_returns(returns=excess_returns, first_date=first_date)
+    prices = returns_to_nav(returns=excess_returns, first_date=first_date)
     compounded_return_pa = compute_pa_return(prices=prices, annualize_less_1y=annualize_less_1y)
     if isinstance(returns, pd.Series):
         compounded_return_pa = compounded_return_pa[0]
@@ -387,12 +405,14 @@ def get_net_navs(navs: Union[pd.Series, pd.DataFrame],
     return net_nav
 
 
-def returns_to_nav(returns: Union[pd.Series, pd.DataFrame],
+def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
                    init_period: Optional[int] = 1,
                    terminal_value: np.ndarray = None,
                    init_value: Union[np.ndarray, float] = None,
+                   first_date: pd.Timestamp = None,
                    freq: Optional[str] = None,
-                   constant_trade_level: bool = False
+                   constant_trade_level: bool = False,
+                   ffill_between_nans: bool = True   # for nan returns fill between nans
                    ) -> Union[pd.Series, pd.DataFrame]:
     """
     instrument returns to nav
@@ -400,6 +420,13 @@ def returns_to_nav(returns: Union[pd.Series, pd.DataFrame],
     """
     if init_period is not None and isinstance(returns, np.ndarray) is False:
         returns = to_zero_first_nonnan_returns(returns=returns, init_period=init_period)
+    elif first_date is not None:
+        # the nav=100 will start from the first date if given
+        # if returns[0] is not zero then first nav will be discounted from 100
+        if isinstance(returns, pd.DataFrame):
+            returns.loc[:first_date, :] = 0.0
+        elif isinstance(returns, pd.Series):
+            returns.loc[:first_date] = 0.0
 
     if constant_trade_level:
         strategy_nav = returns.cumsum(skipna=True, axis=0).add(1.0)
@@ -411,18 +438,21 @@ def returns_to_nav(returns: Union[pd.Series, pd.DataFrame],
 
     if terminal_value is not None:
         terminal_value_last = dfo.get_last_nonnan_values(strategy_nav)
-        strategy_nav = strategy_nav.multiply(terminal_value/terminal_value_last)
+        strategy_nav = strategy_nav*(terminal_value/terminal_value_last)
     elif init_value is not None:
         initial_value_first = dfo.get_first_nonnan_values(df=strategy_nav)
-        strategy_nav = strategy_nav.multiply(init_value / initial_value_first)
+        strategy_nav = strategy_nav*(init_value / initial_value_first)
 
-    if freq is not None:  # when it is important to have fixed frequency ffill prices
+    if freq is not None and isinstance(returns, np.ndarray) is False:  # when it is important to have fixed frequency ffill prices
         strategy_nav = strategy_nav.asfreq(freq, method='ffill').fillna(method='ffill')
+
+    if ffill_between_nans and isinstance(returns, np.ndarray) is False:
+        strategy_nav = df_price_ffill_between_nans(prices=strategy_nav, method='ffill')
 
     return strategy_nav
 
 
-def to_scaled_nav(prices: Union[pd.Series, pd.DataFrame], scale=0.5):
+def prices_to_scaled_nav(prices: Union[pd.Series, pd.DataFrame], scale=0.5):
     returns = scale * to_returns(prices=prices, is_log_returns=False, is_first_zero=True)
     navs = returns_to_nav(returns=returns)
     return navs
@@ -432,21 +462,23 @@ def prices_at_freq(prices: Union[pd.Series, pd.DataFrame],
                    freq: Optional[str] = None,
                    include_start_date: bool = False,
                    include_end_date: bool = False,
-                   ffill_nans: bool = True
+                   ffill_nans: bool = True,
+                   method: str = 'ffill'
                    ) -> Union[pd.Series, pd.DataFrame]:
     """
     get prices at freq
     """
-    if ffill_nans:
-        method = 'ffill'
-    else:
-        method = None
     if freq is not None:
+        if ffill_nans:
+            fill_na_method = 'ffill'
+        else:
+            fill_na_method = None
         prices = dff.df_asfreq(df=prices,
                                freq=freq,
                                include_start_date=include_start_date,
                                include_end_date=include_end_date,
-                               method=method)
+                               method=method,
+                               fill_na_method=fill_na_method)
     else:
         if method is not None:
             prices = prices.fillna(method=method)
@@ -459,7 +491,7 @@ def log_returns_to_nav(log_returns: Union[np.ndarray, pd.Series, pd.DataFrame],
                        init_value: Union[np.ndarray, float] = None
                        ) -> Union[pd.Series, pd.DataFrame]:
     """
-    instrument returns to nav
+    instrument log_return returns to nav
     init_period of one by default will exlude the first day of returns for compunded nav
     """
     if init_period is not None and isinstance(log_returns, np.ndarray) is False:
@@ -468,34 +500,18 @@ def log_returns_to_nav(log_returns: Union[np.ndarray, pd.Series, pd.DataFrame],
     strategy_nav = np.exp(log_returns.cumsum(axis=0, skipna=True))
 
     if terminal_value is not None:
-        strategy_nav = strategy_nav.multiply(terminal_value/strategy_nav.iloc[-1])
+        strategy_nav = strategy_nav.multiply(terminal_value/dfo.get_last_nonnan_values(df=strategy_nav))
     elif init_value is not None:
         strategy_nav = strategy_nav.divide(dfo.get_first_nonnan_values(df=strategy_nav) / init_value)
 
     return strategy_nav
 
 
-def to_relative_nav(price1: pd.Series, price2: pd.Series) -> pd.Series:
+def long_short_to_relative_nav(price1: pd.Series, price2: pd.Series) -> pd.Series:
     returns = to_returns(pd.concat([price1, price2], axis=1).fillna(method='ffill'), is_first_zero=True)
     relative_returns = np.subtract(returns[price1.name], returns[price2.name])
     relative_nav = returns_to_nav(returns=relative_returns, init_period=1)
     return relative_nav
-
-
-def drop_first_row(returns: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
-    if isinstance(returns, pd.DataFrame):
-        returns = returns.iloc[1:, :]
-    else:
-        returns = returns.iloc[1:]
-    return returns
-
-
-def set_zero_first(returns: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
-    if isinstance(returns, pd.DataFrame):
-        returns.iloc[0, :] = 0
-    else:
-        returns.iloc[0] = 0
-    return returns
 
 
 def to_portfolio_returns(weights: pd.DataFrame,
@@ -547,59 +563,9 @@ def compute_grouped_nav(returns: pd.DataFrame,
     return grouped_nav
 
 
-def create_nav_from_returns(returns: Union[pd.Series, pd.DataFrame],
-                            init_value: float = 100.0,
-                            terminal_value: float = None,
-                            first_date: pd.Timestamp = None,
-                            nav_limit: Union[float, None] = 10e-8
-                            ) -> Union[pd.Series, pd.DataFrame]:
-
-    """
-    take returns of several instruments and compute nav with filtering out nansn
-    """
-    returns = returns.copy()  # just in case create local copy
-
-    if first_date is not None:
-        # the nav=100 will start from the first date if given
-        # if returns[0] is not zero then first nav will be discounted from 100
-
-        if isinstance(returns, pd.DataFrame):
-            first_return = pd.DataFrame(data=0.0, columns=returns.columns, index=[first_date])
-
-        elif isinstance(returns, pd.Series):
-            first_return = pd.Series(data=0.0, name=returns.name, index=[first_date])
-
-        else:
-            raise TypeError('unsuported returns type')
-
-        returns = pd.concat([first_return, returns])
-
-    if returns.index.is_unique is False:  # check if index is uniques
-        returns = returns[~returns.index.duplicated(keep='first')]
-
-    #  remove -+ inf and nans
-    returns.replace([np.inf, -np.inf], np.nan, inplace=True)
-    returns = returns.fillna(0.0)
-
-    nav = returns.add(1).cumprod()
-
-    if nav_limit is not None:  # fill nan for very small returns
-        nav = nav.clip(lower=nav_limit)
-
-    if init_value is not None:
-        nav = np.multiply(nav, init_value)
-
-    elif terminal_value is not None:
-        ratio = terminal_value / nav.iloc[-1].values
-        nav = np.multiply(nav, ratio)
-
-    return nav
-
-
 def to_zero_first_nonnan_returns(returns: Union[pd.Series, pd.DataFrame],
                                  init_period: Union[int, None] = 1
                                  ) -> Union[pd.Series, pd.DataFrame]:
-
     """
     replace first nonnan return with zero
     """
@@ -649,6 +615,33 @@ def get_excess_returns_nav(prices: Union[pd.DataFrame, pd.Series],
                                     terminal_value=terminal_value,
                                     init_period=1)
     return excess_nav
+
+
+def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
+                                method: Optional[str] = 'ffill'
+                                ) -> Union[pd.Series, pd.DataFrame]:
+    """
+    fill prices between nans for date0 = first_nonnan_dte to date1 = last_nonnan_date
+    """
+    is_series_out = False
+    if isinstance(prices, pd.Series):
+        is_series_out = True
+        prices = prices.to_frame()
+
+    first_date = dfo.get_first_last_nonnan_index(df=prices, is_first=True)
+    last_date = dfo.get_first_last_nonnan_index(df=prices, is_first=False)
+    good_parts = []
+    for idx, column in enumerate(prices.columns):
+        good_price = prices.loc[first_date[idx]:last_date[idx], column]
+        if method is not None:
+            good_price = good_price.fillna(method='ffill')
+        good_parts.append(good_price)
+    bfilled_data = pd.concat(good_parts, axis=1)
+    if bfilled_data.index[0] > prices.index[0]:
+        bfilled_data = bfilled_data.reindex(index=prices.index)
+    if is_series_out:
+        bfilled_data = bfilled_data.iloc[:, 0]
+    return bfilled_data
 
 
 class UnitTests(Enum):
@@ -734,3 +727,5 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
+
+

@@ -12,10 +12,12 @@ from numba import njit
 @njit
 def np_apply_along_axis(func, axis: int, a: np.ndarray) -> np.ndarray:
     """
+    numba function to apply func for 2-d array
     https://github.com/numba/numba/issues/1269
     """
     assert a.ndim == 2
     assert axis in [0, 1]
+
     if axis == 0:
         result = np.zeros((1, a.shape[1]))
         for i in range(a.shape[1]):
@@ -29,35 +31,37 @@ def np_apply_along_axis(func, axis: int, a: np.ndarray) -> np.ndarray:
 
 @njit
 def np_min(a: np.ndarray, axis: int = 1) -> np.ndarray:
+    """
+    min of 2-d array along axis
+    """
     return np_apply_along_axis(func=np.min, axis=axis, a=a)
 
 
 @njit
 def np_nanmean(a: np.ndarray, axis: int = 1) -> np.ndarray:
+    """
+    nanmean of 2-d array along axis
+    """
     return np_apply_along_axis(func=np.nanmean, axis=axis, a=a)
 
 
 @njit
 def np_nansum(a: np.ndarray, axis: int = 1) -> np.ndarray:
+    """
+    nansum of 2-d array along axis
+    """
     return np_apply_along_axis(func=np.nansum, axis=axis, a=a)
 
 
 @njit
-def np_std(a: np.ndarray, axis: int = 1) -> np.ndarray:
-    return np_apply_along_axis(func=np.std, axis=axis, a=a)
-
-
-@njit
 def np_nanstd(a: np.ndarray, axis: int = 1, ddof: int = 1) -> np.ndarray:
+    """
+    nan std of 2-d array along axis
+    """
     avg_std = np_apply_along_axis(func=np.nanstd, axis=axis, a=a)
     if ddof == 1:  # numbda does not recognise ddof as param to nanstd
-        n = np.count_nonzero(~np.isnan(a), axis=axis)
-        if n > 1.0:
-            adj = np.sqrt(n / (n - 1.0))
-            avg_std = adj * avg_std
-        else:
-            avg_std = np.nan
-
+        n = np_apply_along_axis(func=np.count_nonzero, axis=axis, a=~np.isnan(a))
+        avg_std = np.where(n > 1, avg_std*np.sqrt(n / (n - 1.0)), np.nan)
     return avg_std
 
 
@@ -392,7 +396,7 @@ def tensor_mean(a: np.ndarray) -> np.ndarray:
     return output
 
 
-def find_nearest(array: np.ndarray,
+def find_nearest(a: np.ndarray,
                  value: float,
                  is_sorted: bool = True
                  ) -> float:
@@ -401,18 +405,18 @@ def find_nearest(array: np.ndarray,
     https://stackoverflow.com/questions/2566412/find-nearest-value-in-numpy-array
     """
     if is_sorted:
-        idx = np.searchsorted(array, value, side="left")
-        if idx > 0 and (idx == len(array) or np.abs(value-array[idx-1]) < np.abs(value-array[idx])):
-            return array[idx - 1]
+        idx = np.searchsorted(a, value, side="left")
+        if idx > 0 and (idx == len(a) or np.abs(value - a[idx - 1]) < np.abs(value - a[idx])):
+            return a[idx - 1]
         else:
-            return array[idx]
+            return a[idx]
     else:
-        array = np.asarray(array)
-        idx = (np.abs(array - value)).argmin()
-    return array[idx]
+        a = np.asarray(a)
+        idx = (np.abs(a - value)).argmin()
+    return a[idx]
 
 
-def to_nearest_values(array: np.ndarray,
+def to_nearest_values(a: np.ndarray,
                       values: np.ndarray,
                       is_sorted: bool = True
                       ) -> np.ndarray:
@@ -420,30 +424,35 @@ def to_nearest_values(array: np.ndarray,
     """
     values_ = np.zeros_like(values)
     for idx, value in enumerate(values):
-        values_[idx] = find_nearest(array=array, value=value, is_sorted=is_sorted)
+        values_[idx] = find_nearest(a=a, value=value, is_sorted=is_sorted)
     return values_
 
 
-def compute_histogram_data(data: np.ndarray,
+def compute_histogram_data(a: np.ndarray,
                            x_grid: np.ndarray,
                            name: str = 'Histogram'
                            ) -> pd.Series:
     """
     compute histogram on defined discrete grid
     """
-    hist_data, bin_edges = np.histogram(a=data,
+    hist_data, bin_edges = np.histogram(a=a,
                                         bins=len(x_grid)-1,
                                         range=(x_grid[0], x_grid[-1]))
     hist_data = np.append(np.array(x_grid[0]), hist_data)
-    hist_data = hist_data / len(data)
+    hist_data = hist_data / len(a)
     hist_data = pd.Series(hist_data, index=bin_edges, name=name)
     return hist_data
 
 
 def np_nonan_weighted_avg(a: np.ndarray, weights: np.ndarray) -> float:
+    """
+    compute weighted average of a using weights by masking nans in a
+    """
     a = np.where(np.isfinite(a), a, np.nan)
     if np.all(np.isnan(a)):
         va = np.nan
+    elif np.all(np.isclose(weights, 0.0)):
+        va = 0.0
     else:
         ma = np.ma.MaskedArray(a, mask=np.isnan(a))
         va = np.ma.average(ma, weights=weights)
@@ -505,5 +514,3 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-
-

@@ -145,13 +145,13 @@ def compute_sum_freq_ra_returns(returns: Union[pd.Series, pd.DataFrame],
     return sum_rolling_ra_returns
 
 
-def compute_ewm_ra_returns_momentum(returns: pd.DataFrame,
-                                     momentum_span: int = 63,
-                                     momentum_lambda: Optional[Union[float, np.ndarray]] = None,
-                                     vol_span: int = 31,
-                                     vol_lambda: Optional[Union[float, np.ndarray]] = None,
-                                     weight_shift: Optional[int] = 1
-                                     ) -> pd.DataFrame:
+def compute_ewm_ra_returns_momentum(returns: Union[pd.Series, pd.DataFrame],
+                                    momentum_span: int = 63,
+                                    momentum_lambda: Optional[Union[float, np.ndarray]] = None,
+                                    vol_span: int = 31,
+                                    vol_lambda: Optional[Union[float, np.ndarray]] = None,
+                                    weight_shift: Optional[int] = 1
+                                    ) -> Union[pd.Series, pd.DataFrame]:
     """
     span = 1: daily ra returns
     """
@@ -166,11 +166,14 @@ def compute_ewm_ra_returns_momentum(returns: pd.DataFrame,
                                           weight_shift=weight_shift)
 
     ewm_signal = ewm.ewm_recursion(a=ra_returns.to_numpy(),
-                                      ewm_lambda=momentum_lambda,
-                                      init_value=np.zeros(len(returns.columns)),
-                                      is_unit_vol_scaling=True)
+                                   ewm_lambda=momentum_lambda,
+                                   init_value=0.0 if isinstance(returns, pd.Series) else np.zeros(len(returns.columns)),
+                                   is_unit_vol_scaling=True)
 
-    ewm_ra_returns_momentum = pd.DataFrame(data=ewm_signal, index=returns.index, columns=returns.columns)
+    if isinstance(returns, pd.DataFrame):
+        ewm_ra_returns_momentum = pd.DataFrame(data=ewm_signal, index=returns.index, columns=returns.columns)
+    else:
+        ewm_ra_returns_momentum = pd.Series(data=ewm_signal, index=returns.index, name=returns.name)
 
     return ewm_ra_returns_momentum
 

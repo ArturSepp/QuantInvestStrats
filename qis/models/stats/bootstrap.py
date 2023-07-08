@@ -252,7 +252,7 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                          is_log_returns: bool = False,
                          seed: int = 1,
                          bootstrapped_indices: np.ndarray = None
-                         ) -> Union[List, pd.DataFrame]:
+                         ) -> Union[List[np.ndarray], pd.DataFrame]:
 
     returns = ret.to_returns(prices=prices, is_log_returns=is_log_returns, drop_first=True)
 
@@ -270,18 +270,16 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
         bootstrap_sample = List()
         for returns in bootstrap_returns:
             if is_log_returns:
-                bootstrap_sample.append(
-                    qis.finance.returns.log_returns_to_nav(log_returns=returns, init_value=init_value))
+                bootstrap_sample.append(ret.log_returns_to_nav(log_returns=returns, init_value=init_value))
             else:
-                bootstrap_sample.append(
-                    qis.finance.returns.returns_to_nav(returns=returns, init_value=init_value))
+                bootstrap_sample.append(ret.returns_to_nav(returns=returns, init_value=init_value))
 
     elif bootsrap_output == BootsrapOutput.SERIES_TO_DF:
         init_value = prices[-1]*np.ones(num_samples)
         if is_log_returns:
-            bootstrap_sample = qis.finance.returns.log_returns_to_nav(log_returns=bootstrap_returns, init_value=init_value)
+            bootstrap_sample = ret.log_returns_to_nav(log_returns=bootstrap_returns, init_value=init_value)
         else:
-            bootstrap_sample = qis.finance.returns.returns_to_nav(returns=bootstrap_returns, init_value=init_value)
+            bootstrap_sample = ret.returns_to_nav(returns=bootstrap_returns, init_value=init_value)
     else:
         raise ValueError(f"not implemented")
 

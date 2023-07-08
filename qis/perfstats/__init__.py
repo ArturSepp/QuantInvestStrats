@@ -65,8 +65,6 @@ from qis.perfstats.returns import (
     compute_returns_dict,
     compute_sampled_vols,
     compute_total_return,
-    create_nav_from_returns,
-    drop_first_row,
     estimate_vol,
     get_excess_returns_nav,
     get_net_navs,
@@ -75,13 +73,12 @@ from qis.perfstats.returns import (
     portfolio_returns_to_nav,
     prices_at_freq,
     returns_to_nav,
-    set_zero_first,
     to_portfolio_returns,
-    to_relative_nav,
+    long_short_to_relative_nav,
     to_returns,
-    to_scaled_nav,
+    prices_to_scaled_nav,
     to_total_returns,
-    to_zero_first_nonnan_returns
+    to_zero_first_nonnan_returns, df_price_ffill_between_nans
 )
 
 from qis.perfstats.timeseries_bfill import (
@@ -89,7 +86,6 @@ from qis.perfstats.timeseries_bfill import (
     append_time_series,
     bfill_timeseries,
     df_fill_first_nan_by_cross_median,
-    df_price_ffill_between_nans,
     df_price_fill_first_nan_by_cross_median,
     replace_nan_by_median
 )

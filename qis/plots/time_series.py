@@ -17,12 +17,13 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      linestyles: List[str] = None,
                      linewidth: float = 1.0,
                      x_date_freq: Union[str, None] = 'Q',
-                     date_format: str = '%b-%y',
+                     date_format: str = '%d-%b-%y',
                      legend_title: str = None,
                      legend_loc: Optional[Union[str, bool]] = 'upper left',
                      last_label: LastLabel = LastLabel.NONE,
                      sort_by_value_stretch_factor: float = 1.0,
                      trend_line: TrendLine = TrendLine.NONE,
+                     trend_line_colors: List[str] = None,
                      legend_stats: LegendStats = LegendStats.AVG_LAST,
                      desc_table_type: DescTableType = DescTableType.NONE,
                      legend_labels: List[str] = None,
@@ -64,8 +65,10 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                  linewidth=linewidth, ax=ax)
 
     # add tredlines
+    if trend_line_colors is None:
+        trend_line_colors = colors
     if trend_line == TrendLine.ZERO_SHADOWS:
-        for column, color in zip(columns, colors):
+        for column, color in zip(columns, trend_line_colors):
             x0 = data1.index[0]
             x1 = data1.index[-1]
             y0 = 0
@@ -86,7 +89,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                             facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
 
     elif trend_line in [TrendLine.AVERAGE, TrendLine.AVERAGE_SHADOWS]:
-        for column, color in zip(columns, colors):
+        for column, color in zip(columns, trend_line_colors):
             data2 = data1[column].dropna()  # exclude nans from showing the average lines
             if data2.empty:  # skip this columns from ere
                 continue
@@ -115,7 +118,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                                 facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
 
     elif trend_line in [TrendLine.TREND_LINE, TrendLine.TREND_LINE_SHADOWS]:
-        for column, color in zip(columns, colors):
+        for column, color in zip(columns, trend_line_colors):
             y = data1[column].dropna()
             x0 = y.first_valid_index() or y.index[0]  # if all are nons
             x1 = y.index[-1]

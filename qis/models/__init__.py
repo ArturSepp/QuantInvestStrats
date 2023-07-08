@@ -8,6 +8,7 @@ from qis.models.linear.auto_corr import (
 )
 
 from qis.models.linear.corr_cov_matrix import (
+    CorrMatrixOutput,
     compute_ewm_corr_df,
     compute_ewm_corr_single,
     compute_masked_covar_corr,
@@ -76,14 +77,6 @@ from qis.models.stats.bootstrap import (
     bootstrap_price_fundamental_data,
     compute_ar_residuals,
     generate_bootstrapped_indices
-)
-
-from qis.models.stats.gaussian_mixture import (
-    Params,
-    draw_ellipse,
-    fit_gaussian_mixture,
-    plot_mixure1,
-    plot_mixure2,
 )
 
 from qis.models.stats.ohlc_vol import (

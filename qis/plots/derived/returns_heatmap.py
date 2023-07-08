@@ -208,40 +208,6 @@ def plot_returns_table(prices: pd.DataFrame,
     return fig
 
 
-def plot_periodic_returns_table(returns: pd.DataFrame,
-                                freq: str = 'M',
-                                transpose: bool = True,
-                                var_format: str = '{:.0%}',
-                                total_name: str = None,
-                                ax: plt.Subplot = None,
-                                **kwargs
-                                ) -> plt.Figure:
-    """
-    plot returns at specified frequency
-    """
-    if freq == 'M':
-        date_format = '%b'
-        total_name = total_name or '1y'
-    elif freq == 'A':
-        date_format = '%Y'
-        total_name = total_name or 'Total'
-    else:
-        raise NotImplementedError(f"{freq}")
-
-    data = returns
-    np_data = data.to_numpy()[:-2, :-2] # exclude last row from cmap
-    fig = plot_heatmap(df=data,
-                       vline_columns=[len(data.index)-1],
-                       hline_rows=[len(data.columns)-2],
-                       transpose=transpose,
-                       var_format=var_format,
-                       vmin=np.nanmin(np_data),
-                       vmax=np.nanmax(np_data),
-                       ax=ax,
-                       **sop.update_kwargs(kwargs, dict(date_format=date_format)))
-    return fig
-
-
 def plot_periodic_returns_table(prices: pd.DataFrame,
                                 freq: str = 'M',
                                 date_format: str = None,
@@ -265,7 +231,8 @@ def plot_periodic_returns_table(prices: pd.DataFrame,
         date_format = date_format or '%Y'
         total_name = total_name or 'Total'
     else:
-        raise NotImplementedError(f"{freq}")
+        date_format = date_format or '%d%b%Y'
+        total_name = total_name or 'total'
 
     data = ret.to_returns(prices=prices, freq=freq, include_start_date=True, include_end_date=True, drop_first=True)
     total_return = ret.to_total_returns(prices=prices).rename(total_name).to_frame().T

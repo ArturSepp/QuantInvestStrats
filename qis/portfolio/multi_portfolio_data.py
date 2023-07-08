@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 # qis
+import qis
 import qis.plots.derived.regime_data
 import qis.utils.dates as da
 import qis.utils.struct_ops as sop
-import qis.utils.df_str as dfs
 import qis.utils.df_groups as dfg
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
@@ -482,67 +482,20 @@ class MultiPortfolioData:
     def plot_performance_periodic_table(self,
                                         portfolio_id: int = 0,
                                         time_period: da.TimePeriod = None,
-                                        attribution_metric: AttributionMetric = AttributionMetric.INST_PNL,
-                                        freq: str = 'M',
+                                        freq: str = 'A',
                                         ax: plt.Subplot = None,
                                         **kwargs
                                         ) -> None:
 
         inst_returns = self.portfolio_datas[portfolio_id].get_attribution_table_by_instrument(time_period=time_period)
-
-        total_return = inst_returns.sum(axis=1).rename('Sum Total')
-
+        inst_navs = ret.returns_to_nav(returns=inst_returns, init_period=None)
         strategy_nav = self.portfolio_datas[portfolio_id].get_portfolio_nav(time_period=time_period)
-        nav_return = ret.to_returns(prices=strategy_nav, freq=freq, drop_first=True).rename('Nav Total')
-        returns = pd.concat([inst_returns, total_return, nav_return], axis=1)
-        total_returns = ((1.0+returns).cumprod(axis=0).iloc[-1, :]-1.0).rename('Period Total')
-        returns = returns.append(total_returns)
-
-        rhe.plot_periodic_returns_table(returns=returns,
+        prices = pd.concat([inst_navs, strategy_nav], axis=1).dropna()
+        rhe.plot_periodic_returns_table(prices=prices,
                                         title=f"{strategy_nav.name} Attribution by Instrument",
                                         freq=freq,
                                         ax=ax,
                                         **kwargs)
-
-    def plot_composite_table(self,
-                             portfolio_id: int = 0,
-                             date_format: str = '%b-%y',
-                             time_period: da.TimePeriod = None,
-                             perf_params: PerfParams = PERF_PARAMS,
-                             ax: plt.Subplot = None,
-                             **kwargs
-                             ) -> plt.Figure:
-        """
-        plot performqances with weights
-        """
-        perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS
-        strategy_nav = self.portfolio_datas[portfolio_id].get_portfolio_nav(time_period=time_period)
-        prices = pd.concat([strategy_nav, self.portfolio_datas[portfolio_id].get_instruments_navs(time_period=time_period)], axis=1)
-        ra_perf_table = rpt.compute_ra_perf_table_with_benchmark(prices=prices,
-                                                                 benchmark=str(strategy_nav.name),
-                                                                 perf_params=perf_params)
-        data = pd.DataFrame(data=prices.columns, index=ra_perf_table.index, columns=['Assets'])
-        for perf_column in perf_columns:
-            data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
-                                                           var_format=perf_column.to_format(**kwargs))
-
-        df = self.portfolio_datas[portfolio_id].weights
-        if time_period is not None:
-            df = time_period.locate(df)
-
-        exposures = dfs.timeseries_df_to_str(df=df,
-                                             freq='Q',
-                                             var_format='{:.2%}',
-                                             date_format=date_format,
-                                             transpose=True)
-        joint = pd.concat([data, exposures], axis=1)
-
-        fig = ptb.plot_df_table(df=joint,
-                                add_index_as_column=False,
-                                is_transposed=False,
-                                ax=ax,
-                                **kwargs)
-        return fig
 
     def plot_regime_data(self,
                          benchmark: str,
@@ -570,15 +523,15 @@ class MultiPortfolioData:
             else:
                 var_format = '{:.2%}'
         regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
-        qis.plots.derived.regime_data.plot_regime_data(regime_classifier=regime_classifier,
-                                                       prices=prices,
-                                                       benchmark=benchmark,
-                                                       is_conditional_sharpe=is_conditional_sharpe,
-                                                       regime_data_to_plot=regime_data_to_plot,
-                                                       var_format=var_format,
-                                                       regime_params=regime_params,
-                                                       legend_loc=legend_loc,
-                                                       perf_params=perf_params,
-                                                       title=title,
-                                                       ax=ax,
-                                                       **kwargs)
+        qis.plot_regime_data(regime_classifier=regime_classifier,
+                             prices=prices,
+                             benchmark=benchmark,
+                             is_conditional_sharpe=is_conditional_sharpe,
+                             regime_data_to_plot=regime_data_to_plot,
+                             var_format=var_format,
+                             regime_params=regime_params,
+                             legend_loc=legend_loc,
+                             perf_params=perf_params,
+                             title=title,
+                             ax=ax,
+                             **kwargs)

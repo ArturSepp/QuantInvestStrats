@@ -44,7 +44,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             terminal_value = np.where(np.isnan(terminal_value), terminal_value_old, terminal_value)
 
         df_newer = ret.to_returns(df_newer)
-        df_older = ret.to_returns(df_older)
+        df_older = ret.to_returns(df_older, is_first_zero=True)  # the time series will start from first day of df_older
     else:
         terminal_value = None
 
@@ -98,15 +98,20 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
 def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent data
                        df_older: Union[pd.DataFrame, pd.Series],  # older price is preserved to the end
                        numerical_check_columns: List[str] = None
-                       ) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
+                       ) -> Tuple[Union[pd.DataFrame, pd.Series], Optional[pd.Series]]:
     """
     append time series by colomns
     force alignment of columns
     """
-    if isinstance(df_newer, pd.Series):
+    is_series = False
+    if isinstance(df_newer, pd.Series) and isinstance(df_older, pd.Series):
+        is_series = True
         df_newer = df_newer.to_frame()
-    if isinstance(df_older, pd.Series):
         df_older = df_older.to_frame()
+    elif isinstance(df_newer, pd.DataFrame) and isinstance(df_older, pd.DataFrame):
+        pass
+    else:
+        raise ValueError(f"{type(df_older)} not aligned with {type(df_newer)}")
 
     sop.assert_list_subset(large_list=df_newer.columns.to_list(),
                            list_sample=df_older.columns.to_list())
@@ -134,7 +139,10 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
 
     # just in case
     if new_df.index.is_unique is False:  # check if index is unique
-        new_df = new_df.iloc[new_df.index.duplicated(keep='last') == False]
+        new_df = new_df.iloc[new_df.index.duplicated(keep='last')==False]
+
+    if is_series:
+        new_df = new_df.iloc[:, 0]
 
     return new_df, diff
 
@@ -192,19 +200,3 @@ def df_price_fill_first_nan_by_cross_median(prices: pd.DataFrame) -> pd.DataFram
     return bfilled_data
 
 
-def df_price_ffill_between_nans(prices: pd.DataFrame, method: Optional[str] = 'ffill') -> pd.DataFrame:
-    """
-    fill prices between nans
-    """
-    first_date = dfo.get_first_last_nonnan_index(df=prices, is_first=True)
-    last_date = dfo.get_first_last_nonnan_index(df=prices, is_first=False)
-    good_parts = []
-    for idx, column in enumerate(prices.columns):
-        good_price = prices.loc[first_date[idx]:last_date[idx], column]
-        if method is not None:
-            good_price = good_price.fillna(method='ffill')
-        good_parts.append(good_price)
-    bfilled_data = pd.concat(good_parts, axis=1)
-    if bfilled_data.index[0] > prices.index[0]:
-        bfilled_data = bfilled_data.reindex(index=prices.index)
-    return bfilled_data

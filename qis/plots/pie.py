@@ -14,6 +14,9 @@ import qis.plots.utils as put
 
 def plot_pie(df: [pd.Series, pd.DataFrame],
              y_column: str = None,
+             ylabel: str = '',
+             title: str = None,
+             autopct: Optional[str] = '%.0f%%',
              ax: plt.Subplot = None,
              **kwargs
              ) -> Optional[plt.Figure]:
@@ -26,7 +29,12 @@ def plot_pie(df: [pd.Series, pd.DataFrame],
     if y_column is None and isinstance(df, pd.DataFrame):
         y_column = df.columns[0]
 
-    df.plot.pie(y=y_column, ax=ax)
+    df.plot.pie(y=y_column, autopct=autopct, ax=ax)
+
+    if title is not None:
+        put.set_title(ax=ax, title=title, **kwargs)
+
+    ax.set_ylabel(ylabel)
 
     return fig
 

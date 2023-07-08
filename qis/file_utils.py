@@ -13,7 +13,7 @@ OUTPUT_PATH:
 POSTGRES:
   "postgresql://user:password@database:port"
 """
-import datetime
+import os
 import functools
 import platform
 import time
@@ -22,7 +22,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from os import listdir
 from os.path import isfile, join
-from typing import Dict, List, NamedTuple, Optional, Union
+from typing import Dict, List, NamedTuple, Optional, Union, Literal
 from matplotlib.backends.backend_pdf import PdfPages
 from sqlalchemy.engine.base import Engine
 from enum import Enum
@@ -36,7 +36,6 @@ LOCAL_PATHS = get_paths()
 RESOURCE_PATH = LOCAL_PATHS['RESOURCE_PATH']
 UNIVERSE_PATH = LOCAL_PATHS['UNIVERSE_PATH']
 OUTPUT_PATH = LOCAL_PATHS['OUTPUT_PATH']
-LOCAL_RESOURCE_PATH = LOCAL_PATHS['LOCAL_RESOURCE_PATH']
 
 
 DATE_FORMAT = '%Y%m%d_%H%M'
@@ -115,34 +114,36 @@ def join_file_name_parts(parts: List[str]) -> str:
     return '_'.join(parts)
 
 
-def get_resource_file_path(file_name: Optional[str],
-                           subfolder_name: Optional[str] = None,
-                           subsubfolder_name: Optional[str] = None,
-                           key: Optional[str] = None,
-                           local_path: str = None,
-                           file_type: Optional[FileTypes] = FileTypes.CSV
-                           ) -> str:
+def get_local_file_path(file_name: Optional[str],
+                        file_type: Optional[FileTypes] = None,
+                        local_path: Optional[str] = None,
+                        subfolder_name: str = None,
+                        subsubfolder_name: str = None,
+                        key: str = None,
+                        is_output_file: bool = False
+                        ) -> str:
     """
     file data management is organised as:
-    RESOURCE_PATH/subfolder_name/subsubfolder_name/file_name+key.file_type.value
+    file_path = RESOURCE_PATH/subfolder_name/subsubfolder_name/file_name+file_type.value
     default value without optional arguments will be:
-    RESOURCE_PATH/file_name.file_type.value
+    file_path = RESOURCE_PATH/file_name.file_type.value
+
+    for datasets, we can define datasets keys so the file paths are:
+    file_path = RESOURCE_PATH/subfolder_name/subsubfolder_name/file_name+_key+file_type.value
+    or if file_name is None:
+    file_path = RESOURCE_PATH/subfolder_name/subsubfolder_name/key+file_type.value
+
+    if local_path is not None: file_path=local_path
+    if local_path in not None and file_name and file_type is passed: file_path=local_path//file_name+file_type.value
+    if local_path in not None and file_name is None and key is not None and file_type is passed: file_path=local_path//key+file_type.value
+    if local_path in not None and file_name and key and file_type is passed: file_path=local_path//file_name_key+file_type.value
     """
-
     if local_path is None:
-        if file_name is None and key is None and subfolder_name is None and subsubfolder_name is None:
-            raise ValueError(f"file_name or key or subfolder_name must be given")
 
-        local_path = RESOURCE_PATH
-
-        if key is not None:
-            if file_name is None:
-                file_name = key
-            else:
-                file_name = join_file_name_parts([file_name, key])
+        if is_output_file:
+            local_path = OUTPUT_PATH
         else:
-            if file_name is None:  # will return directory path
-                file_name = ''
+            local_path = RESOURCE_PATH
 
         if subfolder_name is not None:
             if subsubfolder_name is not None:
@@ -151,64 +152,24 @@ def get_resource_file_path(file_name: Optional[str],
                 local_path = join(local_path, subfolder_name)
 
     if file_name is not None:
-        local_path = join(local_path, file_name)
+        if key is not None:
+            if file_name is None:
+                file_name = key
+            else:
+                file_name = join_file_name_parts([file_name, key])
+        if file_type is not None:  # by convention no file folder
+            file_name = file_name + file_type.extension
+        file_path = join(local_path, file_name)
 
-    if file_type is not None:  # by convention no file folder
-        file_path = local_path + file_type.extension
+    elif file_name is None and key is not None:
+        file_name = key
+        if file_type is not None:
+            file_name = file_name + file_type.extension
+        file_path = join(local_path, file_name)
+
     else:
         file_path = local_path
 
-    return file_path
-
-
-def get_output_file_path(file_name: Optional[str],
-                         file_type: Optional[FileTypes] = None,
-                         local_path: Optional[str] = None,
-                         subfolder_name: Optional[str] = None
-                         ) -> str:
-
-    if local_path is not None:
-        path_data = local_path
-    else:
-        path_data = OUTPUT_PATH
-        if file_type is not None and file_type.folder is not None:  # append folder
-            path_data = join(path_data, file_type.folder)
-
-    if subfolder_name is not None:
-        path_data = join(path_data, subfolder_name)
-
-    if file_name is not None:
-        if file_type is not None:
-            file_path = join(path_data, file_name + file_type.extension)
-        else:
-            file_path = join(path_data, file_name)
-    else:
-        file_path = path_data
-
-    return file_path
-
-
-def get_local_file_path(file_name: Optional[str],
-                        file_type: Optional[FileTypes] = FileTypes.CSV,
-                        local_path: Optional[str] = None,
-                        subfolder_name: str = 'data',
-                        subsubfolder_name: str = None,
-                        key: str = None,
-                        is_output_file: bool = False
-                        ) -> str:
-    """
-    default path is resource_file_path/data/
-    """
-    if is_output_file:
-        file_path = get_output_file_path(file_name=file_name, file_type=file_type, subfolder_name=subfolder_name,
-                                         local_path=local_path)
-    else:
-        file_path = get_resource_file_path(file_name=file_name,
-                                           subfolder_name=subfolder_name,
-                                           subsubfolder_name=subsubfolder_name,
-                                           key=key,
-                                           file_type=file_type,
-                                           local_path=local_path)
     return file_path
 
 
@@ -260,24 +221,22 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
                      subfolder_name: str = None,
                      subsubfolder_name: str = None,
                      key: str = None,
-                     add_current_date: bool = True,
+                     add_current_date: bool = False,
                      sheet_names: List[str] = None,
                      transpose: bool = False,
-                     is_output_file: bool = False
                      ) -> str:
     """
     pandas or list of pandas to one excel
     """
-    if is_output_file and add_current_date:
-        file_name = f"{file_name}_{datetime.datetime.now().strftime(DATE_FORMAT)}"
+    if add_current_date:
+        file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
 
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.EXCEL,
                                     local_path=local_path,
                                     subfolder_name=subfolder_name,
                                     subsubfolder_name=subsubfolder_name,
-                                    key=key,
-                                    is_output_file=is_output_file)
+                                    key=key)
 
     excel_writer = pd.ExcelWriter(file_path)
     if isinstance(data, list):  # publish with sheet names
@@ -344,22 +303,20 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
                           subsubfolder_name: str = None,
                           key: str = None,
                           add_current_date: bool = False,
-                          is_output_file: bool = False,
                           delocalize: bool = False
                           ) -> str:
     """
     dictionary of pandas to same Excel
     """
-    if is_output_file and add_current_date:
-        file_name = f"{file_name}_{datetime.datetime.now().strftime(DATE_FORMAT)}"
+    if add_current_date:
+        file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
 
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.EXCEL,
                                     local_path=local_path,
                                     subfolder_name=subfolder_name,
                                     subsubfolder_name=subsubfolder_name,
-                                    key=key,
-                                    is_output_file=is_output_file)
+                                    key=key)
 
     excel_writer = pd.ExcelWriter(file_path)
     for key, data in datasets.items():
@@ -420,21 +377,21 @@ def save_df_to_csv(df: pd.DataFrame,
                    subfolder_name: str = None,
                    subsubfolder_name: str = None,
                    key: str = None,
-                   local_path: Optional[str] = None,
-                   delocalize: bool = False,
-                   is_output_file: bool = False
+                   add_current_date: bool = False,
+                   local_path: Optional[str] = None
                    ) -> None:
     """
     pandas to csv
     """
+    if add_current_date:
+        file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
+
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.CSV,
                                     local_path=local_path,
                                     subfolder_name=subfolder_name,
                                     subsubfolder_name=subsubfolder_name,
-                                    key=key,
-                                    is_output_file=is_output_file)
-    df = delocalize_df(df, delocalize=delocalize)
+                                    key=key)
     df.to_csv(path_or_buf=file_path)
 
 
@@ -445,7 +402,6 @@ def load_df_from_csv(file_name: Optional[str] = None,
                      key: str = None,
                      is_index: bool = True,
                      parse_dates: bool = True,
-                     delocalize: bool = False,  # excel data may have local time which are unwanted
                      dayfirst: Optional[bool] = None,
                      tz: str = None,
                      drop_duplicated: bool = False
@@ -488,10 +444,43 @@ def load_df_from_csv(file_name: Optional[str] = None,
                 df.index = df.index.tz_convert(tz=tz)
             else:
                 df.index = df.index.tz_localize(tz=tz)
-        elif delocalize:
-            df = delocalize_df(df, delocalize=delocalize)
 
     return df
+
+
+def append_df_to_csv(df: pd.DataFrame,
+                     file_name: str = None,
+                     subfolder_name: str = None,
+                     subsubfolder_name: str = None,
+                     key: str = None,
+                     local_path: Optional[str] = None,
+                     keep: Literal['first', 'last'] = 'last'
+                     ) -> None:
+    # check if file exist
+    file_path = get_local_file_path(file_name=file_name,
+                                    file_type=FileTypes.CSV,
+                                    local_path=local_path,
+                                    subfolder_name=subfolder_name,
+                                    subsubfolder_name=subsubfolder_name,
+                                    key=key)
+    if os.path.isfile(file_path):  # append using format of old file
+        old_df = load_df_from_csv(file_name=file_name,
+                                  local_path=local_path,
+                                  subfolder_name=subfolder_name,
+                                  subsubfolder_name=subsubfolder_name,
+                                  key=key)
+        df = pd.concat([old_df, df], axis=0)
+        df = df.loc[~df.index.duplicated(keep=keep)]
+
+    else:
+        pass
+
+    save_df_to_csv(df=df,
+                   file_name=file_name,
+                   subfolder_name=subfolder_name,
+                   subsubfolder_name=subsubfolder_name,
+                   key=key,
+                   local_path=local_path)
 
 
 def save_df_dict_to_csv(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
@@ -499,12 +488,14 @@ def save_df_dict_to_csv(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFram
                         local_path: Optional[str] = None,
                         subfolder_name: str = None,
                         subsubfolder_name: str = None,
-                        delocalize: bool = False,
-                        is_output_file: bool = False
+                        add_current_date: bool = False
                         ) -> None:
     """
     pandas dict to csv files
     """
+    if add_current_date:
+        file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
+
     for key, data in datasets.items():
         if data is not None:
             file_path = get_local_file_path(file_name=file_name,
@@ -512,9 +503,7 @@ def save_df_dict_to_csv(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFram
                                             local_path=local_path,
                                             subfolder_name=subfolder_name,
                                             subsubfolder_name=subsubfolder_name,
-                                            key=key,
-                                            is_output_file=is_output_file)
-            data = delocalize_df(data, delocalize=delocalize)
+                                            key=key)
             data.to_csv(path_or_buf=file_path)
 
 
@@ -525,7 +514,6 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
                           subsubfolder_name: str = None,
                           is_index: bool = True,
                           force_not_found_error: bool = False,
-                          delocalize: bool = False
                           ) -> Dict[str, pd.DataFrame]:
     """
     pandas dict from csv files
@@ -543,7 +531,6 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
             data = pd.read_csv(filepath_or_buffer=file_path,
                                index_col=index_col,
                                parse_dates=True)
-            data = delocalize_df(data, delocalize=delocalize)
             pandas_dict[key] = data
         except:
             message = f"file data {file_path}, {key} not found"
@@ -600,7 +587,7 @@ def load_df_dict_from_sql(engine: Engine,
 
 
 #############################################################
-###  Pandas to/from feather
+###  Dataframe to/from feather
 #############################################################
 
 def save_df_to_feather(df: pd.DataFrame,
@@ -608,7 +595,6 @@ def save_df_to_feather(df: pd.DataFrame,
                        local_path: Optional[str] = None,
                        subfolder_name: str = None,
                        subsubfolder_name: str = None,
-                       is_output_file: bool = False,
                        index_col: Optional[str] = INDEX_COLUMN
                        ) -> None:
     """
@@ -618,10 +604,11 @@ def save_df_to_feather(df: pd.DataFrame,
                                     file_type=FileTypes.FEATHER,
                                     local_path=local_path,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
-                                    is_output_file=is_output_file)
-    if index_col not in df.columns:
+                                    subsubfolder_name=subsubfolder_name)
+    if index_col is not None and index_col not in df.columns:  # index is unique and preserved
         df = df.reset_index(names=index_col)
+    else:  # always need to reset for feather
+        df = df.reset_index()
     df.to_feather(path=file_path)
 
 
@@ -658,7 +645,7 @@ def save_df_dict_to_feather(dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame
                             local_path: Optional[str] = None,
                             subfolder_name: str = None,
                             subsubfolder_name: str = None,
-                            is_output_file: bool = False
+                            index_col: Optional[str] = INDEX_COLUMN
                             ) -> None:
     """
     pandas dict to csv files
@@ -670,9 +657,9 @@ def save_df_dict_to_feather(dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame
                                             local_path=local_path,
                                             subfolder_name=subfolder_name,
                                             subsubfolder_name=subsubfolder_name,
-                                            key=key,
-                                            is_output_file=is_output_file)
-            df = df.reset_index(names='index')
+                                            key=key)
+            if index_col not in df.columns:
+                df = df.reset_index(names=index_col)
             df.to_feather(path=file_path)
 
 
@@ -681,8 +668,8 @@ def load_df_dict_from_feather(dataset_keys: List[Union[str, Enum, NamedTuple]],
                               local_path: Optional[str] = None,
                               subfolder_name: str = None,
                               subsubfolder_name: str = None,
-                              index_col: Optional[str] = INDEX_COLUMN,
                               force_not_found_error: bool = False,
+                              index_col: Optional[str] = INDEX_COLUMN
                               ) -> Dict[str, pd.DataFrame]:
     """
     pandas dict from csv files
@@ -722,7 +709,6 @@ def save_df_to_parquet(df: pd.DataFrame,
                        subsubfolder_name: str = None,
                        key: Optional[str] = None,
                        local_path: Optional[str] = None,
-                       is_output_file: bool = False,
                        delocalize: bool = False
                        ) -> None:
     """
@@ -733,8 +719,7 @@ def save_df_to_parquet(df: pd.DataFrame,
                                     local_path=local_path,
                                     subfolder_name=subfolder_name,
                                     subsubfolder_name=subsubfolder_name,
-                                    key=key,
-                                    is_output_file=is_output_file)
+                                    key=key)
     df = delocalize_df(df, delocalize=delocalize)
     df.to_parquet(path=file_path)
 
@@ -770,8 +755,7 @@ def save_df_dict_to_parquet(datasets: Dict[Union[str, Enum, NamedTuple], pd.Data
                             subfolder_name: str = None,
                             subsubfolder_name: str = None,
                             local_path: Optional[str] = None,
-                            delocalize: bool = False,
-                            is_output_file: bool = False
+                            delocalize: bool = False
                             ) -> None:
     """
     pandas dict to parquet files
@@ -783,8 +767,7 @@ def save_df_dict_to_parquet(datasets: Dict[Union[str, Enum, NamedTuple], pd.Data
                                             local_path=local_path,
                                             subfolder_name=subfolder_name,
                                             subsubfolder_name=subsubfolder_name,
-                                            key=key,
-                                            is_output_file=is_output_file)
+                                            key=key)
             data = delocalize_df(data, delocalize=delocalize)
             data.to_parquet(path=file_path)
 
@@ -831,9 +814,9 @@ def get_pdf_path(file_name: str,
                  ) -> str:
 
     if add_current_date:
-        file_name = join_file_name_parts([file_name, datetime.datetime.now().strftime(DATE_FORMAT)])
+        file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(DATE_FORMAT)])
 
-    file_path = get_output_file_path(file_name=file_name, file_type=FileTypes.PDF, local_path=local_path)
+    file_path = get_local_file_path(file_name=file_name, file_type=FileTypes.PDF, local_path=local_path, is_output_file=True)
 
     return file_path
 
@@ -861,10 +844,11 @@ def save_fig(fig: plt.Figure,
     save matplotlib figure
     """
     if add_current_date:
-        file_name = join_file_name_parts([file_name, datetime.datetime.now().strftime(DATE_FORMAT)])
-    file_path = get_output_file_path(file_name=file_name,
-                                     file_type=file_type,
-                                     local_path=local_path)
+        file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(DATE_FORMAT)])
+    file_path = get_local_file_path(file_name=file_name,
+                                    file_type=file_type,
+                                    local_path=local_path,
+                                    is_output_file=True)
     if file_type == FileTypes.PNG:
         fig.savefig(file_path, dpi=dpi)
     elif file_type == FileTypes.EPS:
@@ -909,9 +893,9 @@ def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
     create PDF of list of plf figures
     """
     if add_current_date:
-        file_name = join_file_name_parts([file_name, datetime.datetime.now().strftime(DATE_FORMAT)])
+        file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(DATE_FORMAT)])
 
-    file_path = get_output_file_path(file_name=file_name, file_type=FileTypes.PDF, local_path=local_path)
+    file_path = get_local_file_path(file_name=file_name, file_type=FileTypes.PDF, is_output_file=True, local_path=local_path)
 
     with PdfPages(file_path) as pdf:
         if isinstance(figs, Dict):
@@ -954,16 +938,16 @@ def run_unit_test(unit_test: UnitTests):
         print(file_path)
 
     elif unit_test == UnitTests.UNIVERSE:
-        file_path = get_resource_file_path(file_name='ETH',
-                                           subfolder_name='bitmex',
-                                           key='1d',
-                                           file_type=FileTypes.CSV)
+        file_path = get_local_file_path(file_name='ETH',
+                                        subfolder_name='bitmex',
+                                        key='1d',
+                                        file_type=FileTypes.CSV)
         print(file_path)
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.LOCAL_PATHS
+    unit_test = UnitTests.UNIVERSE
 
     is_run_all_tests = False
     if is_run_all_tests:
@@ -971,4 +955,3 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-

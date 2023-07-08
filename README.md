@@ -23,12 +23,19 @@ dependecy path increasing sequentially as follows.
 # Table of contents
 1. [Analytics](#analytics)
 2. [Installation](#installation)
-3. [Disclaimer](#disclaimer)    
-4. [Contributions](#contributions)
-5. [Examples](#examples)
+3. [Updates](#updates)
+4. [Examples](#examples)
    1. [Visualization of price data](#price)
-   2. [Notebooks](#notebooks)
+   2. [Multi assets factsheet](#multiassets)
+   3. [Strategy factsheet](#strategy)
+   4. [Strategy benchmark factsheet](#strategybenchmark)
+   5. [Multi strategy factsheet](#multistrategy)
+   6. [Notebooks](#notebooks)
+5. [Contributions](#contributions)
 6. [ToDos](#todos)
+7. [Disclaimer](#disclaimer)
+
+## **Updates** <a name="updates"></a>
 
 ## **Installation** <a name="installation"></a>
 ```python 
@@ -46,39 +53,48 @@ Core dependencies:
     statsmodels = ">=0.13.5",
     pandas = ">=1.5.2",
     matplotlib = ">=3.2.2",
-    seaborn = ">=0.12.2",
-    yfinance >= 0.1.38 (optional for getting test price data).
+    seaborn = ">=0.12.2"
 
-## **Disclaimer** <a name="disclaimer"></a>
+Optional dependencies:
+    yfinance ">=0.1.38" (for getting test price data),
+    pybloqs ">=1.2.13" (for producing html and pdf factsheets)
 
-QIS package is distributed FREE & WITHOUT ANY WARRANTY under the GNU GENERAL PUBLIC LICENSE.
 
-See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/master/LICENSE.txt) in the release for details.
+## **Updates** <a name="updates"></a>
 
-Please report any bugs or suggestions by opening an [issue](https://github.com/ArturSepp/QuantInvestStrats/issues).
+#### 30 December 2022,  Version 1.0.1 released
 
-## **Contributions** <a name="contributions"></a>
-If you are interested in extending and improving QIS analytics, 
-please consider contributing to the library.
+#### 08 July 2023, Version 2.0.1 released
 
-I have found it is a good practice to isolate general purpose and low level analytics and visualizations, which can be outsourced and shared, while keeping 
-the focus on developing high level commercial applications.
+Core Changes
 
-There are a number of requirements:
+1. Portfolio optimization (qis.portfolio.optimisation) layer is removed with core
+functionality moved to a stand-alone Python package: Backtesting Optimal Portfolio (bop)
+    
+* This allows to remove the dependency from cvxpy and sklearn packages and 
+thus to simplify the dependency management for qis
 
-- The code is [Pep 8 compliant](https://peps.python.org/pep-0008/)
+2.	Added factsheet reporting using pybloqs package https://github.com/man-group/PyBloqs
+* Pybloqs is a versatile tool to create customised reporting using Matplotlib figures and table
+and thus leveraging QIS visualisation analytics
 
-- Reliance on common Python data types including numpy arrays, pandas, and dataclasses.
+3. New factsheets are added
+* Examples are added for the four type of reports:
+    1. multi assets: report performance of several assets with goal of cross-sectional comparision:
+    see qis.examples.factsheets.multi_asset.py
+  2. strategy: report performance, risk, and trading statictics for either backtested or actual strategy
+    with strategy data passed as PortfolioData object: see qis.examples.factsheets.strategy.py
+  3. strategy vs benchmark: report performance and marginal comparison
+  of strategy vs a benchmark strategy (data for both are passed using individual PortfolioData object): 
+  see qis.examples.factsheets.strategy_benchmark.py
+  4. multi_strategy: report for a list of strategies with individual PortfolioData. This report is 
+  useful to examine the sensetivity of backtested strategy to a parameter or set of parameters: 
+  see qis.examples.factsheets.multi_strategy
 
-- Transparent naming of functions and data types with enough comments. Type annotations of functions and arguments is a must.
-
-- Each submodule has a unit test for core functions and a localised entry point to core functions.
-
-- Avoid "super" pythonic constructions. Readability is the priority.
 
 ## **Examples** <a name="examples"></a>
 
-### Visualization of price data <a name="price"></a>
+### 1. Visualization of price data <a name="price"></a>
 
 The script is located in ```qis.examples.performances```
 
@@ -119,7 +135,46 @@ fig = qis.plot_ra_perf_table(prices=prices,
 ![image info](qis/examples/figures/perf3.PNG)
 
 
-### Notebooks <a name="notebooks"></a>
+### 2. Multi assets factsheet <a name="multiassets"></a>
+This report is adopted for reporting the risk-adjusted performance 
+of several assets with the goal
+of cross-sectional comparision
+
+Run example in qis.examples.factsheets.multi_assets.py
+
+![image info](qis/examples/figures/multiassets.PNG)
+
+
+### 3. Strategy factsheet <a name="strategy"></a>
+This report is adopted for report performance, risk, and trading statistics
+for either backtested or actual strategy
+    with strategy data passed as PortfolioData object
+
+Run example in qis.examples.factsheets.strategy.py
+
+![image info](qis/examples/figures/strategy.PNG)
+
+
+### 4. Strategy benchmark factsheet <a name="strategybenchmark"></a>
+This report is adopted for report performance and marginal comparison
+  of strategy vs a benchmark strategy 
+(data for both are passed using individual PortfolioData object)
+
+Run example in qis.examples.factsheets.strategy_benchmark.py
+
+![image info](qis/examples/figures/strategy_benchmark.PNG)
+
+
+### 5. Multi strategy factsheet <a name="multistrategy"></a>
+This report is adopted to examine the sensitivity of 
+backtested strategy to a parameter or set of parameters:
+
+Run example in qis.examples.factsheets.multi_strategy.py
+
+![image info](qis/examples/figures/multi_strategy.PNG)
+
+
+### 6. Notebooks <a name="notebooks"></a>
 
 Recommended package to work with notebooks:  
 ```python 
@@ -131,11 +186,41 @@ jupyter notebook
 ```
 
 
-## **ToDos and Contributions** <a name="todos"></a>
+## **Contributions** <a name="contributions"></a>
+If you are interested in extending and improving QIS analytics, 
+please consider contributing to the library.
+
+I have found it is a good practice to isolate general purpose and low level analytics and visualizations, which can be outsourced and shared, while keeping 
+the focus on developing high level commercial applications.
+
+There are a number of requirements:
+
+- The code is [Pep 8 compliant](https://peps.python.org/pep-0008/)
+
+- Reliance on common Python data types including numpy arrays, pandas, and dataclasses.
+
+- Transparent naming of functions and data types with enough comments. Type annotations of functions and arguments is a must.
+
+- Each submodule has a unit test for core functions and a localised entry point to core functions.
+
+- Avoid "super" pythonic constructions. Readability is the priority.
+
+
+## **ToDos** <a name="todos"></a>
 
 1. Enhanced documentation and readme examples.
 
 2. Docstrings for key functions.
 
 3. Reporting analytics and factsheets generation enhancing to matplotlib.
+
+
+
+## **Disclaimer** <a name="disclaimer"></a>
+
+QIS package is distributed FREE & WITHOUT ANY WARRANTY under the GNU GENERAL PUBLIC LICENSE.
+
+See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/master/LICENSE.txt) in the release for details.
+
+Please report any bugs or suggestions by opening an [issue](https://github.com/ArturSepp/QuantInvestStrats/issues).
 

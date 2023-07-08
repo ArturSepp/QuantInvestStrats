@@ -10,11 +10,11 @@ import qis.file_utils as fu
 import qis.local_path as local_path
 
 
-LOCAL_RESOURCE_PATH = local_path.get_paths()['LOCAL_RESOURCE_PATH']
+RESOURCE_PATH = local_path.get_paths()['RESOURCE_PATH']
 
 
 def load_etf_data() -> pd.DataFrame:
-    prices = fu.load_df_from_csv(file_name='etf_prices', local_path=LOCAL_RESOURCE_PATH)
+    prices = fu.load_df_from_csv(file_name='etf_prices', local_path=RESOURCE_PATH)
     return prices
 
 
@@ -30,7 +30,7 @@ def run_unit_test(unit_test: UnitTests):
                              start=None, end=None,
                              ignore_tz=True)['Adj Close']
         print(prices)
-        fu.save_df_to_csv(df=prices, file_name='etf_prices', local_path=LOCAL_RESOURCE_PATH)
+        fu.save_df_to_csv(df=prices, file_name='etf_prices', local_path=RESOURCE_PATH)
 
     elif unit_test == UnitTests.TEST_LOADING:
         prices = load_etf_data()

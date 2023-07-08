@@ -27,6 +27,7 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                      is_top_totals: bool = True,
                      is_add_totals: bool = True,
                      is_use_vbar: bool = False,
+                     reversed: bool = True,
                      legend_loc: Optional[str] = 'upper right',
                      ax: plt.Subplot = None,
                      **kwargs
@@ -67,7 +68,7 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                             fontsize=fontsize,
                             bbox_to_anchor=bbox_to_anchor,
                             legend_loc=legend_loc,
-                            reversed=True,
+                            reversed=reversed,
                             ax=ax,
                             **kwargs)
     return fig

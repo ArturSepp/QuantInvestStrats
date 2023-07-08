@@ -221,6 +221,8 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     perf_table[PerfStat.SHARPE_LOG_AN.to_str()] = perf_table[PerfStat.AN_LOG_RETURN.to_str()] / vol
     perf_table[PerfStat.SHARPE_AVG.to_str()] = perf_table[PerfStat.AVG_AN_RETURN.to_str()] / vol  # computed in risk
     perf_table[PerfStat.SHARPE_EXCESS.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / vol
+    perf_table[PerfStat.SHARPE_LOG_EXCESS.to_str()] = perf_table[PerfStat.AN_LOG_RETURN_EXCESS.to_str()] / vol
+    perf_table[PerfStat.SHARPE_APR.to_str()] = perf_table[PerfStat.APR.to_str()] / vol
 
     # merge the two meta on dates
     ra_perf_table = pd.merge(left=perf_table, right=risk_table,
@@ -233,9 +235,12 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
                                          benchmark: str,
                                          perf_params: PerfParams = None,
                                          is_log_returns: bool = False,
+                                         alpha_an_factor: float = None,
                                          **kwargs
                                          ) -> pd.DataFrame:
-    assert benchmark in prices.columns
+
+    if benchmark not in prices.columns:
+        raise ValueError(f"{benchmark} is not in {prices.columns.to_list()}")
     if perf_params is None:
         perf_params = PerfParams(freq=pd.infer_freq(prices.index))
 
@@ -256,6 +261,9 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     ra_perf_table[PerfStat.ALPHA_AN.to_str()] = pd.Series(alphas)
     ra_perf_table[PerfStat.BETA.to_str()] = pd.Series(betas)
     ra_perf_table[PerfStat.R2.to_str()] = pd.Series(r2)
+
+    if alpha_an_factor is not None:
+        ra_perf_table[PerfStat.ALPHA_AN.to_str()] *= alpha_an_factor
 
     return ra_perf_table
 

@@ -12,7 +12,7 @@ from qis.plots.utils import LegendStats
 
 
 def plot_stack(df: pd.DataFrame,
-               is_use_bar_plot: bool = False,
+               use_bar_plot: bool = False,
                is_yaxis_limit_01: bool = False,
                add_mean_levels: bool = False,
                add_cum_levels: bool = False,
@@ -50,13 +50,14 @@ def plot_stack(df: pd.DataFrame,
     if colors is None:
         colors = put.get_n_colors(n=len(re_indexed_data.columns))
 
-    if is_use_bar_plot:  # plot bar apperas to look better for unconstraint plots
+    if use_bar_plot:  # plot bar apperas to look better for unconstraint plots
         re_indexed_data.plot.bar(stacked=True,
                                  color=colors, width=1.0, alpha=1.0, edgecolor='none',
                                  linewidth=0, ax=ax)
     else:
         ax.stackplot(re_indexed_data.index, re_indexed_data.T,
-                     labels=re_indexed_data.columns, step=step, colors=colors, baseline=baseline)
+                     labels=re_indexed_data.columns, step=step, colors=colors,
+                     baseline=baseline, edgecolor='none')
 
     # set x axes to nearest years
     ax.set_xlim(re_indexed_data.index[0], re_indexed_data.index[-1])

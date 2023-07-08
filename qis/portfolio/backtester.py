@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 from enum import Enum
-from typing import Union, Dict, Tuple
+from typing import Union, Dict, Tuple, List
 
 # qis
 import qis.utils as qu
@@ -15,12 +15,12 @@ from qis.portfolio.portfolio_data import PortfolioData
 
 
 def backtest_model_portfolio(prices: pd.DataFrame,
-                             weights: Union[np.ndarray, pd.DataFrame, Dict[str, float]],  # can be nan
+                             weights: Union[Dict[str, float], List[float], np.ndarray, pd.DataFrame],  # can be nan
                              rebalance_freq: str = 'Q',
                              initial_nav: float = 100,
                              funding_rate: pd.Series = None,  # on positive / negative cash balances
                              instruments_carry: pd.DataFrame = None,  # on nav
-                             rebalancing_costs: float = 0.001,  # rebalancing costs in bp
+                             rebalancing_costs: float = None,  # rebalancing costs in bp
                              constant_trade_level: float = None,
                              is_rebalanced_at_first_date: bool = False,
                              ticker: str = None,
@@ -29,14 +29,19 @@ def backtest_model_portfolio(prices: pd.DataFrame,
     """
     simulate portfolio given prices and weights
     include_start_date if index rebalanced at start date
+    the safest weight is to pass weights as Dict or pd.Dataframe - this enforces the alignment with prices
     """
 
-    if isinstance(weights, np.ndarray) or isinstance(weights, Dict):
-        if isinstance(weights, Dict):
-            qu.assert_list_subset(large_list=prices.columns.to_list(),
-                                   list_sample=list(weights.keys()),
-                                   message=f"weights columns must be aligned with price columns")
-            weights = prices.columns.map(weights).to_numpy()
+    if isinstance(weights, Dict):  # map to np
+        qu.assert_list_subset(large_list=prices.columns.to_list(),
+                              list_sample=list(weights.keys()),
+                              message=f"weights columns must be aligned with price columns")
+        weights = prices.columns.map(weights).to_numpy()
+    elif isinstance(weights, List):
+        weights = np.array(weights)
+
+    # align weights with prices
+    if isinstance(weights, np.ndarray):
         if weights.shape[0] != len(prices.columns):
             raise ValueError(f"number of weights must be aligned with number of price columns")
         if len(weights.shape) > 1:

@@ -16,11 +16,11 @@ requirements = read_requirements("requirements.txt")
 
 setup(
     name='qis',
-    version='1.0.21',
+    version='2.0.1',
     author='Artur Sepp',
     author_email='artursepp@gmail.com',
     url='https://github.com/ArturSepp/QuantInvestStrats',
-    description='Implementation of visualisation and reporting analytics for Quantitative Investment Strategies',
+    description='Implementation of statistical analytics, visualisation and reporting for Quantitative Investment Strategies',
     long_description_content_type="text/x-rst",  # If this causes a warning, upgrade your setuptools package
     long_description=long_description,
     license="MIT license",

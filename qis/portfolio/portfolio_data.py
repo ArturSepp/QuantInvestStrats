@@ -12,8 +12,8 @@ from typing import Union, Dict, Any, Optional, Tuple, List, NamedTuple
 from enum import Enum
 
 # qis
+import qis
 import qis.file_utils as fu
-import qis.plots.derived.regime_data
 import qis.utils.dates as da
 import qis.utils.df_groups as dfg
 import qis.utils.struct_ops as sop
@@ -23,8 +23,7 @@ import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.perfstats.regime_classifier as rcl
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
-
-import qis.models.linear.ewm_factors as ef
+# plots
 import qis.plots.time_series as pts
 import qis.plots.stackplot as pst
 import qis.plots.derived.prices as ppd
@@ -32,6 +31,7 @@ import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.returns_heatmap as rhe
 from qis.plots.derived.returns_heatmap import plot_returns_heatmap
+import qis.models.linear.ewm_factors as ef
 
 
 class MetricSpec(NamedTuple):
@@ -77,12 +77,12 @@ class PortfolioData:
         if self.group_order is None:
             self.group_order = list(self.group_data.unique())
 
-    def save(self, ticker: str) -> None:
+    def save(self, ticker: str, local_path: str = './') -> None:
         datasets = dict(nav=self.nav, prices=self.prices, weights=self.weights, units=self.units,
                         instrument_pnl=self.instrument_pnl, realized_costs=self.realized_costs)
         if self.group_data is not None:
             datasets['group_data'] = self.group_data
-        fu.save_df_dict_to_csv(datasets=datasets, file_name=ticker)
+        fu.save_df_dict_to_csv(datasets=datasets, file_name=ticker, local_path=local_path)
         print(f"saved portfolio data for {ticker}")
 
     @classmethod
@@ -109,22 +109,38 @@ class PortfolioData:
         return nav_
 
     def get_instruments_pnl(self,
+                            add_total: bool = False,
                             time_period: da.TimePeriod = None,
                             is_compounded: bool = False
                             ) -> pd.DataFrame:
-
-        pnl = self.instrument_pnl
-        if is_compounded:
-            pnl = np.expm1(pnl)
+        pnl = self.instrument_pnl.copy()
+        if add_total:
+            pnl.insert(loc=0, value=pnl.sum(1), column='Total')
         if time_period is not None:
             pnl = time_period.locate(pnl)
+        if is_compounded:
+            pnl = np.expm1(pnl)
         return pnl
+
+    def get_performance_attribution(self,
+                                    add_total: bool = True,
+                                    time_period: da.TimePeriod = None,
+                                    is_compounded: bool = False
+                                    ) -> pd.Series:
+        instrument_pnl = self.get_instruments_pnl(add_total=add_total,
+                                                  time_period=time_period,
+                                                  is_compounded=is_compounded)
+        if is_compounded:
+            performance_attribution = instrument_pnl.iloc[-1, :] - 1.0
+        else:
+            performance_attribution = instrument_pnl.sum(axis=0)
+        return performance_attribution
 
     def get_instruments_navs(self,
                              time_period: da.TimePeriod = None,
                              constant_trade_level: bool = False
                              ) -> pd.DataFrame:
-        pnl = self.get_instruments_pnl(time_period=time_period)
+        pnl = self.get_instruments_pnl(time_period=time_period, is_compounded=False).fillna(0.0)
         navs = ret.returns_to_nav(returns=pnl, constant_trade_level=constant_trade_level)
         return navs
 
@@ -256,7 +272,7 @@ class PortfolioData:
     def compute_portfolio_benchmark_betas(self, benchmark_prices: pd.DataFrame,
                                           time_period: da.TimePeriod = None,
                                           freq: str = None,
-                                          span: int = 65 # quarter
+                                          span: int = 65  # quarter
                                           ) -> pd.DataFrame:
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
@@ -274,7 +290,7 @@ class PortfolioData:
     def compute_portfolio_benchmark_attribution(self, benchmark_prices: pd.DataFrame,
                                                 time_period: da.TimePeriod = None,
                                                 freq: str = 'B',
-                                                span: int = 63 # quarter
+                                                span: int = 63  # quarter
                                                 ) -> pd.DataFrame:
         portfolio_benchmark_betas = self.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                            freq=freq, span=span)
@@ -546,17 +562,17 @@ class PortfolioData:
         prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
 
         regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
-        fig = qis.plots.derived.regime_data.plot_regime_data(regime_classifier=regime_classifier,
-                                                             prices=prices,
-                                                             benchmark=str(benchmark_price.name),
-                                                             is_conditional_sharpe=is_conditional_sharpe,
-                                                             regime_data_to_plot=regime_data_to_plot,
-                                                             var_format=var_format or '{:.2f}',
-                                                             legend_loc=legend_loc,
-                                                             perf_params=perf_params,
-                                                             title=title,
-                                                             ax=ax,
-                                                             **kwargs)
+        fig = qis.plot_regime_data(regime_classifier=regime_classifier,
+                                   prices=prices,
+                                   benchmark=str(benchmark_price.name),
+                                   is_conditional_sharpe=is_conditional_sharpe,
+                                   regime_data_to_plot=regime_data_to_plot,
+                                   var_format=var_format or '{:.2f}',
+                                   legend_loc=legend_loc,
+                                   perf_params=perf_params,
+                                   title=title,
+                                   ax=ax,
+                                   **kwargs)
         return fig
 
     def plot_vol_regimes(self,
@@ -578,7 +594,7 @@ class PortfolioData:
         prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
 
         regime_classifier = rcl.BenchmarkVolsQuantilesRegime(regime_params=rcl.VolQuantileRegimeSpecs(freq=regime_params.freq))
-        fig = qis.plots.derived.regime_data.plot_regime_boxplot(regime_classifier=regime_classifier,
+        fig = qis.plot_regime_boxplot(regime_classifier=regime_classifier,
                                                                 prices=prices,
                                                                 benchmark=str(benchmark_price.name),
                                                                 title=title,
@@ -608,26 +624,38 @@ class PortfolioData:
             pts.plot_time_series(df=mtm_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='mtm_pnl', ax=axs[3])
             pts.plot_time_series(df=total_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='total_pnl', ax=axs[4])
 
-    def plot_weights(self,
-                     is_input_weights: bool = True,
-                     columns: List[str] = None,
-                     freq: str = 'W-WED',
-                     bbox_to_anchor: Tuple[float, float] = (0.4, 1.14),
-                     ax: plt.Subplot = None,
-                     title: str = '',
-                     **kwargs
-                     ) -> None:
+    def get_weights(self,
+                    is_input_weights: bool = True,
+                    columns: List[str] = None,
+                    freq: Optional[str] = 'W-WED'
+                    ) -> pd.DataFrame:
         if is_input_weights:
             weights = self.input_weights.copy()
         else:
             weights = self.weights.copy()
         if columns is not None:
             weights = weights[columns]
-        weights = weights.resample(freq).last().fillna(method='ffill')
+        if freq is not None:
+            weights = weights.resample(freq).last().fillna(method='ffill')
+        return weights
+
+    def plot_weights(self,
+                     is_input_weights: bool = True,
+                     columns: List[str] = None,
+                     freq: Optional[str] = 'W-WED',
+                     is_yaxis_limit_01: bool = True,
+                     bbox_to_anchor: Tuple[float, float] = (0.4, 1.14),
+                     title: Optional[str] = None,
+                     ax: plt.Subplot = None,
+                     **kwargs
+                     ) -> None:
+        weights = self.get_weights(is_input_weights=is_input_weights,
+                                   columns=columns,
+                                   freq=freq)
         pst.plot_stack(df=weights,
                        add_mean_levels=False,
-                       is_use_bar_plot=True,
-                       # is_yaxis_limit_01=True,
+                       use_bar_plot=False,
+                       is_yaxis_limit_01=is_yaxis_limit_01,
                        baseline='zero',
                        bbox_to_anchor=bbox_to_anchor,
                        title=title,
@@ -636,6 +664,24 @@ class PortfolioData:
                        ax=ax,
                        **kwargs)
 
+    def plot_performance_attribution(self,
+                                     time_period: da.TimePeriod = None,
+                                     attribution_metric: AttributionMetric = AttributionMetric.PNL,
+                                     ax: plt.Subplot = None,
+                                     **kwargs
+                                     ) -> None:
+        data = self.get_performance_data(attribution_metric=attribution_metric, time_period=time_period)
+        kwargs = sop.update_kwargs(kwargs=kwargs,
+                                   new_kwargs={'bbox_to_anchor': (0.5, 1.05),
+                                               'x_rotation': 90})
+        data = data.replace({0.0: np.nan}).dropna()
+        qis.plot_bars(df=data,
+                      skip_y_axis=True,
+                      title=f"{attribution_metric.title}",
+                      stacked=False,
+                      yvar_format='{:,.2%}',
+                      ax=ax,
+                      **kwargs)
 
 @njit
 def compute_realized_pnl(prices: np.ndarray,

@@ -4,40 +4,55 @@ analytics for dataframe aggregation
 import numpy as np
 import pandas as pd
 from scipy import stats
-from typing import Union, Callable, List, Optional, Tuple
+from typing import Union, Callable, List, Optional, Tuple, Literal, Dict
 from enum import Enum
 
 # qis
 import qis.utils.np_ops as npo
 
 
-def nanmean(df: pd.DataFrame) -> pd.Series:
+def nanmean(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
     data_np = npo.to_finite_np(data=df, fill_value=np.nan)
-    nanmean_data = pd.Series(data=np.nanmean(data_np, axis=1), index=df.index, name='nanmean')
+    if axis == 0:
+        nanmean_data = pd.Series(data=np.nanmean(data_np, axis=0), index=df.columns, name='nanmean')
+    else:
+        nanmean_data = pd.Series(data=np.nanmean(data_np, axis=1), index=df.index, name='nanmean')
     return nanmean_data
 
 
-def nanmedian(df: pd.DataFrame) -> pd.Series:
+def nanmedian(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
     data_np = npo.to_finite_np(data=df, fill_value=np.nan)
-    nanmean_data = pd.Series(data=np.nanmedian(data_np, axis=1), index=df.index, name='nanmedian')
+    if axis == 0:
+        nanmean_data = pd.Series(data=np.nanmedian(data_np, axis=0), index=df.columns, name='nanmedian')
+    else:
+        nanmean_data = pd.Series(data=np.nanmedian(data_np, axis=1), index=df.index, name='nanmedian')
     return nanmean_data
 
 
-def nansum(df: pd.DataFrame) -> pd.Series:
+def nansum(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
     data_np = npo.to_finite_np(data=df, fill_value=np.nan)
-    nansum_data = pd.Series(data=np.nansum(data_np, axis=1), index=df.index, name='nansum')
+    if axis == 0:
+        nansum_data = pd.Series(data=np.nansum(data_np, axis=0), index=df.columns, name='nansum')
+    else:
+        nansum_data = pd.Series(data=np.nansum(data_np, axis=1), index=df.index, name='nansum')
     return nansum_data
 
 
-def nansum_positive(df: pd.DataFrame) -> pd.Series:
+def nansum_positive(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
     signed_np_data = get_signed_np_data(df=df, is_positive=True)
-    nansum_data = pd.Series(data=np.nansum(signed_np_data, axis=1), index=df.index, name='nansum_positive')
+    if axis == 0:
+        nansum_data = pd.Series(data=np.nansum(signed_np_data, axis=0), index=df.columns, name='nansum_positive')
+    else:
+        nansum_data = pd.Series(data=np.nansum(signed_np_data, axis=1), index=df.index, name='nansum_positive')
     return nansum_data
 
 
-def nanmean_positive(df: pd.DataFrame) -> pd.Series:
+def nanmean_positive(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
     signed_np_data = get_signed_np_data(df=df, is_positive=True)
-    nanmean_data = pd.Series(data=np.nanmean(signed_np_data, axis=1), index=df.index, name='nanmean_positive')
+    if axis == 0:
+        nanmean_data = pd.Series(data=np.nanmean(signed_np_data, axis=0), index=df.columns, name='nanmean_positive')
+    else:
+        nanmean_data = pd.Series(data=np.nanmean(signed_np_data, axis=1), index=df.index, name='nanmean_positive')
     return nanmean_data
 
 
@@ -61,9 +76,9 @@ def nanmean_clip(df: pd.DataFrame,
     return nanmean_data
 
 
-def nansum_negative(df: pd.DataFrame) -> pd.Series:
+def nansum_negative(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
     signed_np_data = get_signed_np_data(df=df, is_positive=False)
-    nansum_data = pd.Series(data=np.nansum(signed_np_data, axis=1), index=df.index, name='nansum_negative')
+    nansum_data = pd.Series(data=np.nansum(signed_np_data, axis=axis), index=df.index, name='nansum_negative')
     return nansum_data
 
 
@@ -168,9 +183,36 @@ def agg_dfs(dfs: List[pd.DataFrame],
     return avg_data
 
 
+def last_row(df: pd.DataFrame, axis: Literal[0, 1] = 0) -> np.ndarray:
+    if axis == 0:
+        ds = df.iloc[-1, :]
+    else:
+        ds = df.iloc[:, -1]
+    return ds.to_numpy()
+
+
+def compute_df_desc_data(df: pd.DataFrame,
+                         funcs: Dict[str, Callable] = {'avg': np.nanmean, 'min': np.nanmin, 'max': np.nanmax, 'last': last_row},
+                         axis: Literal[0, 1] = 0
+                         ) -> pd.DataFrame:
+    desc_data = {}
+    for key, func in funcs.items():
+        if axis == 0:
+            desc_data[key] = pd.Series(func(df, axis=0), index=df.columns)
+        else:
+            desc_data[key] = pd.Series(func(df, axis=1), index=df.index)
+    if axis == 0:
+        desc_data = pd.DataFrame.from_dict(desc_data, orient='index')
+    else:
+        desc_data = pd.DataFrame.from_dict(desc_data, orient='columns')
+    return desc_data
+
+
 class UnitTests(Enum):
     STACK = 1
-    NAN_MEAN = 4
+    NAN_MEAN = 2
+    TEST3 = 3
+    DESC_DF = 4
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -213,10 +255,29 @@ def run_unit_test(unit_test: UnitTests):
         # pd_a_pd = pd_a.apply(lambda x: np.nanstd(x), axis=1)
         print(f"lambda_std\n{lambda_std};")
 
+    elif unit_test == UnitTests.TEST3:
+        df = pd.DataFrame({'Date': ['2015-05-08', '2015-05-07', '2015-05-06', '2015-05-05', '2015-05-08', '2015-05-07',
+                                    '2015-05-06', '2015-05-05'],
+                           'Sym': ['aapl', 'aapl', 'aapl', 'aapl', 'aaww', 'aaww', 'aaww', 'aaww'],
+                           'Data2': [11, 8, 10, 15, 110, 60, 100, 40],
+                           'Data3': [5, 8, 6, 1, 50, 100, 60, 120]})
+        print(df)
+        df['Data4'] = df['Data3'].groupby(df['Date']).transform('sum')
+        print(df)
+
+    elif unit_test == UnitTests.DESC_DF:
+        df = pd.DataFrame({'Date': ['2015-05-08', '2015-05-07', '2015-05-06', '2015-05-05', '2015-05-08', '2015-05-07',
+                                    '2015-05-06', '2015-05-05'],
+                           'Data2': [11, 8, 10, 15, 110, 60, 100, 40],
+                           'Data3': [5, 8, 6, 1, 50, 100, 60, 120]}).set_index('Date')
+        print(df)
+        df_desc_data = compute_df_desc_data(df=df, axis=0)
+        print(df_desc_data)
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.STACK
+    unit_test = UnitTests.DESC_DF
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -43,7 +43,8 @@ from qis.plots.utils import (
     validate_returns_plot,
     calc_table_height,
     calc_table_width,
-    calc_df_table_size
+    calc_df_table_size,
+    get_df_table_size
 )
 
 from qis.plots.bars import plot_bars, plot_vbars
@@ -53,6 +54,8 @@ from qis.plots.boxplot import (
     df_boxplot_by_classification_var,
     df_boxplot_by_hue_var,
     df_boxplot_by_index,
+    df_boxplot_by_columns,
+    df_dict_boxplot_by_columns,
     df_dict_boxplot_by_classification_var
 )
 
@@ -118,9 +121,11 @@ from qis.plots.derived.perf_table import (
     plot_ra_perf_bars,
     plot_ra_perf_by_dates,
     plot_ra_perf_scatter,
+    get_ra_perf_columns,
     plot_ra_perf_table,
     plot_ra_perf_table_benchmark,
-    plot_top_bottom_performers,
+    get_ra_perf_benchmark_columns,
+    plot_top_bottom_performers
 )
 
 from qis.plots.derived.regime_class_table import get_quantile_class_table, plot_quantile_class_table
@@ -132,7 +137,6 @@ from qis.plots.derived.regime_scatter import plot_scatter_regression
 from qis.plots.derived.returns_heatmap import (
     compute_periodic_returns_by_row_table,
     get_periodic_returns_table,
-    plot_periodic_returns_table,
     plot_periodic_returns_table,
     plot_returns_heatmap,
     plot_returns_table,

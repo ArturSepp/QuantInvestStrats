@@ -11,19 +11,21 @@ from qis import PerfStat
 
 
 # define entries to show in ra perf table
-RA_TABLE_COLUMNS = [#PerfStat.START_DATE,
-    #PerfStat.END_DATE,
-    #PerfStat.START_PRICE,
-    #PerfStat.END_PRICE,
-    PerfStat.TOTAL_RETURN,
-    PerfStat.PA_RETURN,
-    PerfStat.VOL,
-    PerfStat.SHARPE,
-    PerfStat.SHARPE_EXCESS,
-    PerfStat.MAX_DD,
-    PerfStat.MAX_DD_VOL,
-    PerfStat.SKEWNESS,
-    PerfStat.KURTOSIS]
+
+RA_TABLE_COLUMNS = [PerfStat.START_DATE,
+                    PerfStat.END_DATE,
+                    PerfStat.TOTAL_RETURN,
+                    PerfStat.PA_RETURN,
+                    PerfStat.VOL,
+                    PerfStat.SHARPE,
+                    PerfStat.SHARPE_EXCESS,
+                    PerfStat.MAX_DD,
+                    PerfStat.MAX_DD_VOL,
+                    PerfStat.SKEWNESS,
+                    PerfStat.KURTOSIS,
+                    PerfStat.ALPHA,
+                    PerfStat.BETA,
+                    PerfStat.R2]
 
 
 def generate_performances(prices: pd.DataFrame,
@@ -33,16 +35,20 @@ def generate_performances(prices: pd.DataFrame,
                           **kwargs
                           ) -> None:
 
-    local_kwargs = dict(digits_to_show=1, framealpha=0.75, performance_label=qis.PerformanceLabel.WITH_DD)
+    local_kwargs = dict(digits_to_show=1,
+                        framealpha=0.75,
+                        performance_label=qis.PerformanceLabel.WITH_DD)
     kwargs = qis.update_kwargs(kwargs, local_kwargs)
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 4), tight_layout=True)
-    qis.plot_ra_perf_table(prices=prices,
-                           perf_columns=RA_TABLE_COLUMNS,
-                           perf_params=perf_params,
-                           title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')}",
-                           ax=ax,
-                           **kwargs)
+
+    qis.plot_ra_perf_table_benchmark(prices=prices,
+                                     benchmark=regime_benchmark_str,
+                                     perf_params=perf_params,
+                                     perf_columns=RA_TABLE_COLUMNS,
+                                     title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')}",
+                                     ax=ax,
+                                     **kwargs)
 
     fig, ax = plt.subplots(1, 1, figsize=(7, qis.calc_table_height(num_rows=len(prices.columns)+5, scale=0.5)), tight_layout=True)
     qis.plot_periodic_returns_table(prices=prices,
@@ -82,6 +88,8 @@ def generate_performances(prices: pd.DataFrame,
 class UnitTests(Enum):
     ETF_DATA = 1
     CRYPTO_DATA = 2
+    TF_ETF = 3
+    ETFS = 4
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -96,20 +104,30 @@ def run_unit_test(unit_test: UnitTests):
         regime_benchmark_str = 'BTC-USD'
         tickers = [regime_benchmark_str, 'ETH-USD', 'SOL-USD']
 
+    elif unit_test == UnitTests.TF_ETF:
+        regime_benchmark_str = 'SPY'
+        tickers = [regime_benchmark_str, 'DBMF', 'WTMF', 'CTA']
+
+    elif unit_test == UnitTests.ETFS:
+        regime_benchmark_str = 'AOR'
+        tickers = [regime_benchmark_str, 'SPY', 'PEX', 'PSP', 'GSG', 'COMT', 'REET', 'REZ']
+
     else:
         raise NotImplementedError
 
-    is_long_period = False
+    is_long_period = True
     if is_long_period:
         time_period = None
-        perf_params = qis.PerfParams(freq='W-WED', freq_reg='Q', freq_drawdown='B', rates_data=ust_3m_rate)
-        kwargs = dict(x_date_freq='A', heatmap_freq='A', date_format='%Y', perf_params=perf_params)
+        time_period = qis.TimePeriod('31Dec2015', '31Mar2023')
+        # time_period = qis.TimePeriod('31Dec2017', '31Mar2023')
+        perf_params = qis.PerfParams(freq='W-WED', freq_reg='M', freq_drawdown='B', rates_data=ust_3m_rate)
+        kwargs = dict(x_date_freq='A', heatmap_freq='A', date_format='%Y', perf_params=perf_params, alpha_an_factor=12)
     else:
-        time_period = qis.TimePeriod('31Dec2021', '23Jan2023')
+        time_period = qis.TimePeriod('31Dec2021', None)
         perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', freq_drawdown='B', rates_data=ust_3m_rate)
-        kwargs = dict(x_date_freq='M', heatmap_freq='M', date_format='%b-%y', perf_params=perf_params)
+        kwargs = dict(x_date_freq='M', heatmap_freq='M', date_format='%b-%y', perf_params=perf_params, alpha_an_factor=52)
 
-    prices = yf.download(tickers, start=None, end=None)['Adj Close'].dropna()
+    prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers]#.dropna()
 
     if time_period is not None:
         prices = time_period.locate(prices)
@@ -123,7 +141,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CRYPTO_DATA
+    unit_test = UnitTests.ETFS
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -51,7 +51,10 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
              ax: plt.Subplot = None,
              **kwargs
              ) -> Optional[plt.Figure]:
-
+    """
+    plot boxplot of df[[x, y]]
+    original_index use for melted df in term of original index
+    """
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -233,6 +236,81 @@ def df_boxplot_by_index(df: Union[pd.Series, pd.DataFrame],
                    title=title,
                    ax=ax,
                    **kwargs)
+    return fig
+
+
+def df_boxplot_by_columns(df: Union[pd.Series, pd.DataFrame],
+                          hue_var_name: str = 'instruments',
+                          y_var_name: str = 'weights',
+                          ylabel: str = 'weights',
+                          show_ylabel: bool = True,
+                          title: str = None,
+                          colors: Optional[List[str]] = None,
+                          ax: plt.Subplot = None,
+                          **kwargs
+                          ) -> Optional[plt.Figure]:
+    """
+    plot boxplot using data by columns
+    x-axis will be colum names
+    """
+    box_data = dfm.melt_df_by_columns(df=df, x_index_var_name=None, hue_var_name=hue_var_name, y_var_name=y_var_name)
+
+    if colors is None:
+        colors = put.compute_heatmap_colors(a=np.nanmean(df.to_numpy(), axis=0))
+
+    fig = plot_box(df=box_data,
+                   x=hue_var_name,
+                   y=y_var_name,
+                   continuous_x_col=y_var_name,
+                   ylabel=ylabel if show_ylabel else None,
+                   xlabel=hue_var_name,
+                   original_index=None,
+                   colors=colors,
+                   title=title,
+                   ax=ax,
+                   **kwargs)
+
+    return fig
+
+
+def df_dict_boxplot_by_columns(dfs: Dict[str, Union[pd.Series, pd.DataFrame]],
+                               hue_var_name: str = 'instruments',
+                               y_var_name: str = 'weights',
+                               ylabel: str = 'weights',
+                               hue: str = 'Portfolio',
+                               show_ylabel: bool = True,
+                               title: str = None,
+                               colors: Optional[List[str]] = None,
+                               ax: plt.Subplot = None,
+                               **kwargs
+                               ) -> Optional[plt.Figure]:
+    """
+    dict keys are added as hue
+    plot boxplot using data by columns
+    x-axis will be colum names
+    """
+    box_datas = []
+    for key, df in dfs.items():
+        box_data = dfm.melt_df_by_columns(df=df, x_index_var_name=None, hue_var_name=hue_var_name, y_var_name=y_var_name)
+        box_data[hue] = key
+        box_datas.append(box_data)
+    box_datas = pd.concat(box_datas, axis=0)
+    #if colors is None:
+    #    colors = put.compute_heatmap_colors(a=np.nanmean(df.to_numpy(), axis=0))
+
+    fig = plot_box(df=box_datas,
+                   x=hue_var_name,
+                   y=y_var_name,
+                   hue=hue,
+                   labels=list(dfs.keys()),
+                   continuous_x_col=y_var_name,
+                   ylabel=ylabel if show_ylabel else None,
+                   xlabel=hue_var_name,
+                   original_index=None,
+                   colors=colors,
+                   title=title,
+                   ax=ax,
+                   **kwargs)
 
     return fig
 
@@ -407,6 +485,8 @@ class UnitTests(Enum):
     RETURNS_BOXPLOT = 1
     DF_BOXPLOT = 2
     DF_BOXPLOT_INDEX = 3
+    DF_WEIGHTS = 4
+    DF_DICT = 5
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -443,12 +523,34 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.DF_BOXPLOT_INDEX:
         df_boxplot_by_index(df=returns)
 
+    elif unit_test == UnitTests.DF_WEIGHTS:
+        df_boxplot_by_columns(df=prices,
+                              hue_var_name='instruments',
+                              y_var_name='weights',
+                              ylabel='weights',
+                              showmedians=True,
+                              add_y_med_labels=True)
+
+    elif unit_test == UnitTests.DF_DICT:
+        dfs = {'alts': prices, 'bal': 0.5*prices}
+        with sns.axes_style("darkgrid"):
+            fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+            df_dict_boxplot_by_columns(dfs=dfs,
+                                       hue_var_name='instruments',
+                                       y_var_name='weights',
+                                       ylabel='weights',
+                                       legend_loc='upper center',
+                                       showmedians=True,
+                                       add_y_med_labels=True,
+                                       ncol=2,
+                                       ax=ax)
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.DF_BOXPLOT_INDEX
+    unit_test = UnitTests.DF_DICT
 
     is_run_all_tests = False
     if is_run_all_tests:

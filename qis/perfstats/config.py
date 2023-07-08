@@ -1,6 +1,7 @@
 """
 configuration of performance stats and regime params
 """
+from __future__ import annotations
 
 import pandas as pd
 from dataclasses import dataclass
@@ -41,25 +42,29 @@ class PerfStat(ColVar, Enum):
 
     # computed in compute_pa_return_dict
     TOTAL_RETURN = ColVar(name='Total', short_n='Total return', value_type=ValueType.PERCT)
-    PA_RETURN = ColVar(name='P.a.', short_n='P.a.\nreturn', value_type=ValueType.PERCT)
+    PA_RETURN = ColVar(name='P.a. return', short='P.a.', short_n='P.a.\nreturn', value_type=ValueType.PERCT)
     AN_LOG_RETURN = ColVar(name='An. log return', short_n='An. log-return', value_type=ValueType.PERCT)
+    AN_LOG_RETURN_EXCESS = ColVar(name='An. log return ex', short_n='An. log-return ex', value_type=ValueType.PERCT)
     AVG_AN_RETURN = ColVar(name='Avg. An return', short_n='Avg. An return', value_type=ValueType.PERCT)
+    APR = ColVar(name='APR', short_n='APR', value_type=ValueType.PERCT)
     PA_EXCESS_RETURN = ColVar(name='P.a. excess return', short_n='P.a.\nexcess', value_type=ValueType.PERCT)
     NAV1 = ColVar(name='1$ Invested', short_n='1$ Invested', value_type=ValueType.FLOAT)
     NUM_YEARS = ColVar(name='Num Years', short_n='Num\nYears', value_type=ValueType.FLOAT)
 
     VOL = ColVar(name='Vol', short_n='An. vol', value_type=ValueType.PERCT)
     AVG_LOG_RETURN = ColVar(name='AvgLogReturn', short_n='AvgReturn', value_type=ValueType.PERCT)
-    SHARPE = ColVar(name='Sharpe', short_n='Sharpe', value_type=ValueType.SHARPE)
-    SHARPE_LOG_AN = ColVar(name='An. Log Sharpe', short_n='An. Log Sharpe', value_type=ValueType.SHARPE)
-    SHARPE_AVG = ColVar(name='Sharpe Avg', short_n='Sharpe Avg', value_type=ValueType.SHARPE)  # to do
-    SHARPE_EXCESS = ColVar(name='Excess Sharpe', short_n='Excess\nSharpe', value_type=ValueType.SHARPE)
+    SHARPE = ColVar(name='Sharpe', short_n='Sharpe', value_type=ValueType.SHARPE)  # compunded returns w.a. rate
+    SHARPE_LOG_AN = ColVar(name='An. Log Sharpe', short_n='An. Log Sharpe', value_type=ValueType.SHARPE)  # log return
+    SHARPE_AVG = ColVar(name='Sharpe Avg', short_n='Sharpe Avg', value_type=ValueType.SHARPE)  # using avg return
+    SHARPE_EXCESS = ColVar(name='Excess Sharpe', short_n='Excess\nSharpe', value_type=ValueType.SHARPE)  # compunded with rate
+    SHARPE_LOG_EXCESS = ColVar(name='Sharpe', short_n='Sharpe', value_type=ValueType.SHARPE)
+    SHARPE_APR = ColVar(name='APR Sharpe', short_n='APR\nSharpe', value_type=ValueType.SHARPE)
     MARGINAL_SHARPE = ColVar(name='Marginal Sharpe', short_n='Marginal\nSharpe', value_type=ValueType.SHARPE)
     MARGINAL_SHARPE_RATIO = ColVar(name='Marginal Sharpe Ratio', short_n='Marginal\nSharpe Ratio', value_type=ValueType.FLOAT)
 
     MAX_DD = ColVar(name='Max DD', short_n='Max DD', value_type=ValueType.PERCT0)
     MAX_DD_VOL = ColVar(name='Max DD/Vol', short_n='Max DD\n/Vol', value_type=ValueType.FLOAT)
-    SKEWNESS = ColVar(name='Skewness', short_n='Skew', value_type=ValueType.FLOAT)
+    SKEWNESS = ColVar(name='Skewness', short='Skew', short_n='Skew', value_type=ValueType.FLOAT)
     KURTOSIS = ColVar(name='Kurtosis', short_n='Kurt', value_type=ValueType.FLOAT)
     NORMTEST = ColVar(name='P-val', short_n='P-val', value_type=ValueType.FLOAT4)
     WORST = ColVar(name='Worst', short_n='Worst', value_type=ValueType.PERCT)
@@ -101,9 +106,9 @@ class PerfStat(ColVar, Enum):
 
     # linear ml
     ALPHA = ColVar(name='Alpha', short_n='Alpha', value_type=ValueType.PERCT)
-    ALPHA_AN = ColVar(name='Alpha a.', short_n='Alpha', value_type=ValueType.PERCT)
+    ALPHA_AN = ColVar(name='Alpha', short_n='Alpha', value_type=ValueType.PERCT)
     BETA = ColVar(name='Beta', short_n='Beta', value_type=ValueType.FLOAT2)
-    R2 = ColVar(name='R2', short_n='R2', value_type=ValueType.PERCT)
+    R2 = ColVar(name='R2', short_n='R2', value_type=ValueType.PERCT0)
 
 
 """
@@ -212,17 +217,15 @@ class PerfParams:
              freq_drawdown: str = None,
              freq_excess_return: str = None,
              return_type: ReturnTypes = None,
-             rates_data: pd.DataFrame = None,
+             rates_data: pd.Series = None,
              **kwargs
-             ):
-
+             ) -> PerfParams:
         this_copy = PerfParams(freq_reg=freq_reg or self.freq_reg,
                                freq_vol=freq_vol or self.freq_vol,
                                freq_drawdown=freq_drawdown or self.freq_drawdown,
                                freq_excess_return=freq_excess_return or self.freq_excess_return,
                                return_type=return_type or self.return_type,
                                rates_data=rates_data if rates_data is not None else self.rates_data)
-
         return this_copy
 
 

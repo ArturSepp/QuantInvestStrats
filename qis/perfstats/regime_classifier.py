@@ -315,8 +315,10 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
                                                         include_start_date=include_start_date,
                                                         include_end_date=include_end_date)
         sampled_returns_with_regime_id[self.REGIME_COLUMN] = classificator[hue_name]
-        self.regime_colors = self.get_regime_ids_colors()
 
+        cmap = plt.cm.get_cmap('RdYlGn', len(labels))
+        colors = [cmap(n_) for n_ in range(len(labels))]
+        self.regime_colors = {k: v for k, v in zip(labels, colors)}
         return sampled_returns_with_regime_id
     
     def get_regime_ids_colors(self) -> Dict[str, str]:

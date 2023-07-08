@@ -13,6 +13,7 @@ from qis.utils.df_str import df_index_to_str
 def df_asfreq(df: Union[pd.DataFrame, pd.Series],
               freq: Optional[str] = 'Q',
               method: Optional[str] = 'ffill',
+              fill_na_method: Optional[str] = 'ffill',
               inclusive: Optional[str] = None,
               include_start_date: bool = False,
               include_end_date: bool = False,
@@ -44,8 +45,8 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
             freq_index = freq_index.append(df.index[-1:])
     freq_data = df.reindex(index=freq_index, method=method)
 
-    if method is not None:
-        freq_data = freq_data.fillna(method=method)
+    if fill_na_method is not None:
+        freq_data = freq_data.fillna(method=fill_na_method)
     return freq_data
 
 

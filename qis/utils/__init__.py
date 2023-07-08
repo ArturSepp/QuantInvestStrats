@@ -19,12 +19,13 @@ from qis.utils.dates import (
     months_between,
     separate_number_from_string,
     shift_date_by_day,
-    shift_date_by_month,
     shift_dates_by_n_years,
     shift_dates_by_year,
     shift_time_period_by_days,
     split_df_by_freq,
-    generate_fixed_maturity_rolls
+    generate_fixed_maturity_rolls,
+    min_timestamp,
+    truncate_prior_to_start
 )
 
 
@@ -44,7 +45,9 @@ from qis.utils.df_agg import (
     nansum_clip,
     nansum_negative,
     nansum_positive,
-    sum_weighted
+    sum_weighted,
+    last_row,
+    compute_df_desc_data
 )
 
 from qis.utils.df_cut import (
@@ -104,6 +107,7 @@ from qis.utils.df_ops import (
     get_last_nonnan,
     merge_on_column,
     compute_nans_zeros_ratio_after_first_non_nan,
+    reindex_upto_last_nonnan,
     multiply_df_by_dt,
     norm_df_by_ax_mean,
     np_txy_tensor_to_pd_dict
@@ -155,6 +159,7 @@ from qis.utils.np_ops import (
     compute_expanding_power,
     compute_histogram_data,
     compute_paired_signs,
+    covar_to_corr,
     find_nearest,
     to_nearest_values,
     np_array_to_df_columns,
@@ -162,6 +167,8 @@ from qis.utils.np_ops import (
     np_array_to_matrix,
     np_array_to_n_column_array,
     np_array_to_t_rows_array,
+    np_cumsum,
+    np_nanstd,
     np_get_sorted_idx,
     np_matrix_add_array,
     np_nonan_weighted_avg,

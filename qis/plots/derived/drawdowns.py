@@ -16,7 +16,7 @@ class DdLegendType(Enum):
     DETAILED = 3
 
 
-def plot_drawdown(prices: pd.DataFrame,
+def plot_drawdown(prices: Union[pd.Series, pd.DataFrame],
                   title: Optional[str] = None,
                   var_format: str = '{:.0%}',
                   dd_legend_type: DdLegendType = DdLegendType.DETAILED,
@@ -26,6 +26,8 @@ def plot_drawdown(prices: pd.DataFrame,
                   **kwargs
                   ) -> plt.Figure:
 
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame()
     max_dd_data = pt.compute_drawdown_data(prices=prices)
 
     if dd_legend_type == DdLegendType.NONE:

@@ -192,9 +192,9 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.EWMA_NP
+    unit_test = UnitTests.EWMA_DF
 
-    is_run_all_tests = False
+    is_run_all_tests = True
     if is_run_all_tests:
         for unit_test in UnitTests:
             run_unit_test(unit_test=unit_test)

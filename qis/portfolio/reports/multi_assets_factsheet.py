@@ -1,7 +1,8 @@
 """
-multi asset report is generated for a set of asset prices
+performance report for a universe of several assets
 with comparison to 1-2 benchmarks
 output is one-page figure with key numbers
+see example in qis.examples.multi_asset.py
 """
 # packages
 import pandas as pd
@@ -11,12 +12,9 @@ from enum import Enum
 
 # qis
 import qis
-from qis import TimePeriod
-import qis.utils as qu
-import qis.perfstats as qs
-import qis.plots as qp
-import qis.models as qm
-from qis.perfstats import PerfStat, PerfParams, BenchmarkReturnsQuantileRegimeSpecs, RegimeData
+from qis import TimePeriod, PerfStat, PerfParams, RegimeData
+
+from qis.portfolio.reports.config import KWARG_LONG, KWARG_SHORT, PERF_PARAMS, REGIME_PARAMS
 
 
 PERF_COLUMNS = (
@@ -37,18 +35,13 @@ PERF_COLUMNS = (
     PerfStat.KURTOSIS)
 
 
-# default perf and regime params
-PERF_PARAMS = PerfParams(freq='W-WED')
-REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='Q')
-
-
-class MultiAssetReport:
+class MultiAssetsReport:
 
     def __init__(self,
                  prices: pd.DataFrame,
                  benchmark_prices: Union[pd.Series, pd.DataFrame],
                  perf_params: PerfParams = PERF_PARAMS,
-                 regime_params: qs.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS
+                 regime_params: qis.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS
                  ):
 
         # make sure it is consistent
@@ -69,19 +62,25 @@ class MultiAssetReport:
             prices = time_period.locate(prices)
         return prices
 
-    def add_regime_shadows(self, ax: plt.Subplot, regime_benchmark_str: str, data_df: pd.DataFrame) -> None:
+    def add_regime_shadows(self, ax: plt.Subplot,
+                           regime_benchmark_str: str,
+                           data_df: pd.DataFrame,
+                           time_period: TimePeriod = None,
+                           ) -> None:
         if isinstance(self.benchmark_prices, pd.Series):
             pivot_prices = self.benchmark_prices
         else:
             if regime_benchmark_str is None:
                 regime_benchmark_str = self.benchmark_prices.columns[0]
             pivot_prices = self.benchmark_prices[regime_benchmark_str]
+        if time_period is not None:
+            data_df = time_period.locate(data_df)
         pivot_prices = pivot_prices.reindex(index=data_df.index, method='ffill')
-        qp.add_bnb_regime_shadows(ax=ax,
-                                  data_df=data_df,
-                                  pivot_prices=pivot_prices,
-                                  benchmark=regime_benchmark_str,
-                                  regime_params=self.regime_params)
+        qis.add_bnb_regime_shadows(ax=ax,
+                                   data_df=data_df,
+                                   pivot_prices=pivot_prices,
+                                   benchmark=regime_benchmark_str,
+                                   regime_params=self.regime_params)
 
     def plot_ra_perf_table(self,
                            benchmark: str,
@@ -89,11 +88,11 @@ class MultiAssetReport:
                            ax: plt.Subplot = None,
                            **kwargs) -> None:
         prices = self.get_prices(benchmark, time_period=time_period)
-        qp.plot_ra_perf_table_benchmark(prices=prices,
+        qis.plot_ra_perf_table_benchmark(prices=prices,
                                         benchmark=benchmark,
                                         perf_params=self.perf_params,
-                                        perf_columns=qs.BENCHMARK_TABLE_COLUMNS,
-                                        title=f"RA performance table: {qu.get_time_period(prices).to_str()}",
+                                        perf_columns=qis.BENCHMARK_TABLE_COLUMNS,
+                                        title=f"RA performance table: {qis.get_time_period(prices).to_str()}",
                                         rotation_for_columns_headers=0,
                                         ax=ax,
                                         **kwargs)
@@ -112,18 +111,18 @@ class MultiAssetReport:
         if time_period is not None:
             prices = time_period.locate(prices)
 
-        cvar_table = qs.compute_bnb_regimes_pa_perf_table(prices=prices,
+        cvar_table = qis.compute_bnb_regimes_pa_perf_table(prices=prices,
                                                           benchmark=regime_benchmark_str,
                                                           perf_params=self.perf_params,
                                                           regime_params=self.regime_params)
         table_data = pd.DataFrame(data=prices.columns, index=cvar_table.index, columns=[columns_title])
 
         for perf_column in perf_columns:
-            table_data[perf_column.to_str()] = qu.series_to_str(ds=cvar_table[perf_column.to_str()],
+            table_data[perf_column.to_str()] = qis.series_to_str(ds=cvar_table[perf_column.to_str()],
                                                              var_format=perf_column.to_format(**kwargs))
 
         special_columns_colors = [(0, 'steelblue')]
-        qp.plot_df_table(df=table_data,
+        qis.plot_df_table(df=table_data,
                          first_column_width=first_column_width,
                          add_index_as_column=False,
                          index_column_name='Strategies',
@@ -141,7 +140,7 @@ class MultiAssetReport:
                  ax: plt.Subplot = None,
                  **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark_str)
-        qp.plot_prices(prices=prices,
+        qis.plot_prices(prices=prices,
                        perf_params=self.perf_params,
                        start_to_one=True,
                        is_log=is_log,
@@ -158,7 +157,7 @@ class MultiAssetReport:
                        ax: plt.Subplot = None,
                        **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark_str)
-        qp.plot_drawdown(prices=prices, ax=ax, **kwargs)
+        qis.plot_drawdown(prices=prices, ax=ax, **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark_str=regime_benchmark_str, data_df=prices)
 
     def plot_rolling_time_under_water(self,
@@ -167,7 +166,7 @@ class MultiAssetReport:
                                       ax: plt.Subplot = None,
                                       **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark_str)
-        qp.plot_rolling_time_under_water(prices=prices, ax=ax, **kwargs)
+        qis.plot_rolling_time_under_water(prices=prices, ax=ax, **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark_str=regime_benchmark_str, data_df=prices)
 
     def plot_annual_returns(self,
@@ -176,11 +175,11 @@ class MultiAssetReport:
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,
                             **kwargs) -> None:
-        local_kwargs = qu.update_kwargs(kwargs=kwargs,
+        local_kwargs = qis.update_kwargs(kwargs=kwargs,
                                         new_kwargs=dict(fontsize=4,
                                                         square=False,
                                                         x_rotation=90))
-        qp.plot_periodic_returns_table(prices=self.get_prices(time_period=time_period),
+        qis.plot_periodic_returns_table(prices=self.get_prices(time_period=time_period),
                                        freq=heatmap_freq,
                                        ax=ax,
                                        title=f"Annual Returns",
@@ -192,30 +191,31 @@ class MultiAssetReport:
                         time_period: TimePeriod = None,
                         ax: plt.Subplot = None,
                         **kwargs) -> None:
-        local_kwargs = qu.update_kwargs(kwargs=kwargs, new_kwargs=dict(fontsize=4))
+        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(fontsize=4))
         prices = self.get_prices(time_period=time_period)
-        qm.plot_corr_table(prices=prices,
+        qis.plot_corr_table(prices=prices,
                            x_rotation=90,
                            freq=freq,
-                           title=f"Correlation {freq} returns: {qu.get_time_period(prices).to_str()}",
+                           title=f"Correlation {freq} returns: {qis.get_time_period(prices).to_str()}",
                            ax=ax,
                            **local_kwargs)
 
     def plot_returns_scatter(self,
                              benchmark: str,
                              time_period: TimePeriod = None,
+                             freq: str = 'Q',
                              ax: plt.Subplot = None,
                              **kwargs) -> None:
-        local_kwargs = qu.update_kwargs(kwargs=kwargs,
+        local_kwargs = qis.update_kwargs(kwargs=kwargs,
                                         new_kwargs=dict(weight='bold',
                                                         markersize=8,
                                                         x_rotation=0,
                                                         first_color_fixed=False,
                                                         ci=None))
-        qp.plot_returns_scatter(prices=self.get_prices(benchmark=benchmark, time_period=time_period),
+        qis.plot_returns_scatter(prices=self.get_prices(benchmark=benchmark, time_period=time_period),
                                 benchmark=benchmark,
-                                freq=self.perf_params.freq_reg,
                                 order=2,
+                                freq=freq,
                                 title=f"Scatterplot of {self.perf_params.freq_reg}-returns vs {benchmark}",
                                 ax=ax,
                                 **local_kwargs)
@@ -227,8 +227,8 @@ class MultiAssetReport:
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,
                             **kwargs) -> None:
-        returns = qs.to_returns(prices=self.get_prices(benchmark=benchmark), freq=freq)
-        ewm_linear_model = qm.estimate_ewm_linear_model(x=returns[benchmark].to_frame(),
+        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=freq)
+        ewm_linear_model = qis.estimate_ewm_linear_model(x=returns[benchmark].to_frame(),
                                                         y=returns.drop(benchmark, axis=1),
                                                         span=span,
                                                         is_x_correlated=True)
@@ -237,7 +237,7 @@ class MultiAssetReport:
                                               title=f"Rolling EWM span-{span:0.0f} beta to {benchmark}",
                                               ax=ax,
                                               **kwargs)
-        self.add_regime_shadows(ax=ax, regime_benchmark_str=benchmark, data_df=self.prices)
+        self.add_regime_shadows(ax=ax, regime_benchmark_str=benchmark, time_period=time_period, data_df=self.prices)
 
     def plot_regime_data(self,
                          benchmark: str,
@@ -250,8 +250,8 @@ class MultiAssetReport:
                          **kwargs) -> None:
         prices = self.get_prices(time_period=time_period)
         title = f"Sharpe ratio decomposition by Strategies to {benchmark} Bear/Normal/Bull regimes"
-        regime_classifier = qs.BenchmarkReturnsQuantilesRegime(regime_params=self.regime_params)
-        fig = qp.plot_regime_data(regime_classifier=regime_classifier,
+        regime_classifier = qis.BenchmarkReturnsQuantilesRegime(regime_params=self.regime_params)
+        fig = qis.plot_regime_data(regime_classifier=regime_classifier,
                                   prices=prices,
                                   benchmark=benchmark,
                                   is_conditional_sharpe=is_conditional_sharpe,
@@ -268,14 +268,14 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    benchmark_prices: Union[pd.Series, pd.DataFrame] = None,
                                    benchmark: str = None,
                                    perf_params: PerfParams = PERF_PARAMS,
-                                   regime_params: qs.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                   regime_params: qis.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                    heatmap_freq: str = 'A',
                                    time_period: TimePeriod = None,  # time period for reporting
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                    **kwargs
                                    ) -> plt.Figure:
 
-    # add default benchmark str
+    # use passed benchmark
     if benchmark is None and benchmark_prices is not None:
         if benchmark_prices is None:
             raise ValueError(f"pass either benchmark or benchmark_prices")
@@ -284,6 +284,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                 benchmark = benchmark_prices.name
             else:
                 benchmark = benchmark_prices.columns[0]
+    # use benchmark from prices
     if benchmark is not None and benchmark_prices is None:
         if benchmark in prices.columns:
             benchmark_prices = prices[benchmark]
@@ -291,10 +292,10 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
             raise ValueError(f"benchmark must be in prices")
 
     # report data
-    report = MultiAssetReport(prices=prices,
-                              benchmark_prices=benchmark_prices,
-                              perf_params=perf_params,
-                              regime_params=regime_params)
+    report = MultiAssetsReport(prices=prices,
+                               benchmark_prices=benchmark_prices,
+                               perf_params=perf_params,
+                               regime_params=regime_params)
 
     local_kwargs = dict(fontsize=5,
                         linewidth=0.5,
@@ -304,7 +305,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                         x_date_freq='A',
                         time_period=time_period)
     # overrite local_kwargs with kwargs is they are provided
-    kwargs = qu.update_kwargs(local_kwargs, kwargs)
+    kwargs = qis.update_kwargs(local_kwargs, kwargs)
 
     # figure
     fig = plt.figure(figsize=figsize, constrained_layout=True)
@@ -330,10 +331,10 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                               ax=fig.add_subplot(gs[0, 2:]),
                               **kwargs)
 
-    time_period1 = qu.get_time_period_shifted_by_years(time_period=qu.get_time_period(df=prices))
+    time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
     report.plot_ra_perf_table(benchmark=benchmark,
                               ax=fig.add_subplot(gs[1, 2:]),
-                              **qu.update_kwargs(kwargs, dict(time_period=time_period1)))
+                              **qis.update_kwargs(kwargs, dict(time_period=time_period1)))
 
     report.plot_annual_returns(ax=fig.add_subplot(gs[2:4, 2:]),
                                heatmap_freq=heatmap_freq,
@@ -344,7 +345,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                            **kwargs)
     report.plot_corr_table(freq=report.perf_params.freq,
                            ax=fig.add_subplot(gs[4, 3]),
-                           **qu.update_kwargs(kwargs, dict(time_period=time_period1)))
+                           **qis.update_kwargs(kwargs, dict(time_period=time_period1)))
 
     report.plot_regime_data(benchmark=benchmark,
                             ax=fig.add_subplot(gs[5, 2:]),
@@ -352,39 +353,6 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
 
     report.plot_returns_scatter(benchmark=benchmark,
                                 ax=fig.add_subplot(gs[6:8, 2:]),
+                                freq=perf_params.freq_reg,
                                 **kwargs)
     return fig
-
-
-class UnitTests(Enum):
-    FACTSHEET = 1
-
-
-def run_unit_test(unit_test: UnitTests):
-
-    from qis.test_data import load_etf_data
-    prices = load_etf_data().dropna()
-
-    if unit_test == UnitTests.FACTSHEET:
-        fig = generate_multi_asset_factsheet(prices=prices,
-                                             benchmark='SPY',
-                                             heatmap_freq='A',
-                                             perf_params=PERF_PARAMS,
-                                             regime_params=REGIME_PARAMS)
-        qis.save_figs_to_pdf(figs=[fig],
-                             file_name=f"multiasset_report", orientation='landscape',
-                             local_path=qis.local_path.get_output_path())
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    unit_test = UnitTests.FACTSHEET
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)

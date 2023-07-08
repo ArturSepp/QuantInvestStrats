@@ -228,7 +228,7 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.BTC_SIMULATION:
         prices = yf.download(tickers=['BTC-USD'], start=None, end=None)['Adj Close'].rename('BTC').dropna()
 
-        time_period = qis.TimePeriod('31Dec2015', '29Dec2022')
+        time_period = qis.TimePeriod('31Dec2015', '21Jun2023')
         figs = create_time_series_report(prices=prices, time_period=time_period, vol_target=0.5, vol_af=360)
         fu.save_figs_to_pdf(figs=figs, file_name='btc_analysis', orientation='landscape',
                             add_current_date=True, local_path=None)
