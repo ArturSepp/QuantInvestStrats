@@ -96,28 +96,29 @@ and thus leveraging QIS visualisation analytics
 
 ### 1. Visualization of price data <a name="price"></a>
 
-The script is located in ```qis.examples.performances```
+The script is located in ```qis.examples.performances``` (https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/performances.py)
 
 ```python 
 import matplotlib.pyplot as plt
 import seaborn as sns
 import yfinance as yf
 import qis
-from qis import PerfStat
 
 # define tickers and fetch price data
 tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'GLD']
 prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers].dropna()
 
 # plotting price data with minimum usage
-fig = qis.plot_prices(prices=prices)
+with sns.axes_style("darkgrid"):
+    fig, ax = plt.subplots(1, 1, figsize=(10, 7))
+    qis.plot_prices(prices=prices, x_date_freq='A', ax=ax)
 ```
 ![image info](qis/examples/figures/perf1.PNG)
 ```python 
 # 2-axis plot with drawdowns using sns styles
 with sns.axes_style("darkgrid"):
     fig, axs = plt.subplots(2, 1, figsize=(10, 7))
-    qis.plot_prices_with_dd(prices=prices, axs=axs)
+    qis.plot_prices_with_dd(prices=prices, x_date_freq='A', axs=axs)
 ```
 ![image info](qis/examples/figures/perf2.PNG)
 ```python 
@@ -140,7 +141,7 @@ This report is adopted for reporting the risk-adjusted performance
 of several assets with the goal
 of cross-sectional comparision
 
-Run example in qis.examples.factsheets.multi_assets.py
+Run example in ```qis.examples.factsheets.multi_assets.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/multi_assets.py
 
 ![image info](qis/examples/figures/multiassets.PNG)
 
@@ -150,7 +151,7 @@ This report is adopted for report performance, risk, and trading statistics
 for either backtested or actual strategy
     with strategy data passed as PortfolioData object
 
-Run example in qis.examples.factsheets.strategy.py
+Run example in ```qis.examples.factsheets.strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/strategy.py
 
 ![image info](qis/examples/figures/strategy.PNG)
 
@@ -160,7 +161,7 @@ This report is adopted for report performance and marginal comparison
   of strategy vs a benchmark strategy 
 (data for both are passed using individual PortfolioData object)
 
-Run example in qis.examples.factsheets.strategy_benchmark.py
+Run example in ```qis.examples.factsheets.strategy_benchmark.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/strategy_benchmark.py
 
 ![image info](qis/examples/figures/strategy_benchmark.PNG)
 
@@ -169,7 +170,7 @@ Run example in qis.examples.factsheets.strategy_benchmark.py
 This report is adopted to examine the sensitivity of 
 backtested strategy to a parameter or set of parameters:
 
-Run example in qis.examples.factsheets.multi_strategy.py
+Run example in ```qis.examples.factsheets.multi_strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/multi_strategy.py
 
 ![image info](qis/examples/figures/multi_strategy.PNG)
 

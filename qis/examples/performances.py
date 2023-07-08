@@ -12,7 +12,9 @@ tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'GLD']
 prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers].dropna()
 
 # minimum usage
-fig = qis.plot_prices(prices=prices)
+with sns.axes_style("darkgrid"):
+    fig, ax = plt.subplots(1, 1, figsize=(10, 7))
+    qis.plot_prices(prices=prices, x_date_freq='A', ax=ax)
 
 # skip
 fu.save_fig(fig, file_name='perf1', local_path="figures/")
@@ -20,7 +22,7 @@ fu.save_fig(fig, file_name='perf1', local_path="figures/")
 # with drawdowns using sns styles
 with sns.axes_style("darkgrid"):
     fig, axs = plt.subplots(2, 1, figsize=(10, 7))
-    qis.plot_prices_with_dd(prices=prices, axs=axs)
+    qis.plot_prices_with_dd(prices=prices, x_date_freq='A', axs=axs)
 
 # skip
 fu.save_fig(fig, file_name='perf2', local_path="figures/")
