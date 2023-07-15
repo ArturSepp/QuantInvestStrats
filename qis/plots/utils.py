@@ -1371,23 +1371,30 @@ def get_data_group_colors(df: pd.DataFrame,
 
 
 def add_scatter_points(ax: plt.Subplot,
-                       label_x_y: Dict[str, Tuple[Any, float]],
+                       label_x_y: Union[Dict[str, Tuple[Any, float]], List[Tuple[Any, float]]],
                        fontsize: int = 12,
                        color: str = 'steelblue',
                        colors: List[str] = None,
                        linewidth: int = 3,
+                       size: int = 3,
                        **kwargs
                        ) -> None:
-
+    """
+    add scatter points to ax
+    """
     if colors is None:
-        colors = len(label_x_y.keys()) * [color]
-    for (key, (x, y)), color in zip(label_x_y.items(), colors):
-        ax.annotate(key,
-                    xy=(x, y), xytext=(2, 2),
-                    textcoords='offset points', ha='left', va='bottom',
-                    color=color,
-                    fontsize=fontsize)
-        ax.scatter(x=x, y=y, marker='*', color=color, s=3, linewidth=linewidth)
+        if isinstance(label_x_y, dict):
+            colors = len(label_x_y.keys()) * [color]
+        else:
+            colors = len(label_x_y) * [color]
+    if isinstance(label_x_y, dict):
+        for (key, (x, y)), color in zip(label_x_y.items(), colors):
+            ax.annotate(key, xy=(x, y), xytext=(2, 2), color=color,
+                        textcoords='offset points', ha='left', va='bottom', fontsize=fontsize)
+            ax.scatter(x=x, y=y, marker='*', color=color, s=size, linewidth=linewidth)
+    else:
+        for (x, y), color in zip(label_x_y, colors):
+            ax.scatter(x=x, y=y, marker='*', color=color, s=size, linewidth=linewidth)
 
 
 def calc_table_height(num_rows: int,

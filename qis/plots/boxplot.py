@@ -191,12 +191,13 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
         for label, color in zip(labels, palette):
             lines.append((label, {'color': color}))
 
-    put.set_legend(ax=ax,
-                   legend_title=hue,
-                   legend_loc=legend_loc,
-                   fontsize=fontsize,
-                   lines=lines,
-                   **kwargs)
+    if legend_loc is not None:
+        put.set_legend(ax=ax,
+                       legend_title=hue,
+                       legend_loc=legend_loc,
+                       fontsize=fontsize,
+                       lines=lines,
+                       **kwargs)
 
     if title is not None:
         put.set_title(ax=ax, title=title, fontsize=fontsize)
@@ -208,6 +209,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
 def df_boxplot_by_index(df: Union[pd.Series, pd.DataFrame],
                         index_var_name: str = 'date',
                         ylabel: str = 'returns',
+                        xlabel: str = None,
                         show_ylabel: bool = True,
                         title: str = None,
                         colors: Optional[List[str]] = None,
@@ -232,7 +234,7 @@ def df_boxplot_by_index(df: Union[pd.Series, pd.DataFrame],
                    ylabel=ylabel if show_ylabel else None,
                    original_index=df.index,
                    colors=colors,
-                   xlabel=False,
+                   xlabel=xlabel or False,
                    title=title,
                    ax=ax,
                    **kwargs)

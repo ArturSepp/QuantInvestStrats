@@ -26,6 +26,14 @@ class BootsrapOutput(Enum):
 
 
 @njit
+def set_seed(value):
+    """
+    set seed for numba space
+    """
+    np.random.seed(value)
+
+
+@njit
 def bootstrap_indices_iid(num_data_index: int,
                           num_samples: int = 10,
                           index_length: int = 1000,
@@ -35,6 +43,7 @@ def bootstrap_indices_iid(num_data_index: int,
     generate iid bootstrap indices
     """
     np.random.seed(seed)
+    set_seed(seed)
     bootstrapped_indices = np.zeros((index_length, num_samples), dtype=np.int64)
     for idx in np.arange(num_samples):
         previous_index, next_index = 0, 0
@@ -251,9 +260,14 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                          block_size: int = 20,
                          is_log_returns: bool = False,
                          seed: int = 1,
-                         bootstrapped_indices: np.ndarray = None
+                         bootstrapped_indices: np.ndarray = None,
+                         init_to_end: bool = True
                          ) -> Union[List[np.ndarray], pd.DataFrame]:
-
+    """
+    bootstrap price data
+    for pd.Dataframe use bootsrap_output = BootsrapOutput.DF_TO_LIST_ARRAYS to get list of nd.arrays
+    block_size = 1 corresponds to iid sampling
+    """
     returns = ret.to_returns(prices=prices, is_log_returns=is_log_returns, drop_first=True)
 
     bootstrap_returns = bootstrap_data(data=returns,
@@ -266,7 +280,11 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                                        bootstrapped_indices=bootstrapped_indices)
 
     if bootsrap_output == BootsrapOutput.DF_TO_LIST_ARRAYS:
-        init_value = prices.iloc[-1, :].to_numpy()
+        if init_to_end:
+            init_value = prices.iloc[-1, :].to_numpy()
+        else:
+            init_value = prices.iloc[0, :].to_numpy()
+
         bootstrap_sample = List()
         for returns in bootstrap_returns:
             if is_log_returns:
@@ -275,7 +293,11 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                 bootstrap_sample.append(ret.returns_to_nav(returns=returns, init_value=init_value))
 
     elif bootsrap_output == BootsrapOutput.SERIES_TO_DF:
-        init_value = prices[-1]*np.ones(num_samples)
+        if init_to_end:
+            init_value = prices[-1]*np.ones(num_samples)
+        else:
+            init_value = prices[0]*np.ones(num_samples)
+
         if is_log_returns:
             bootstrap_sample = ret.log_returns_to_nav(log_returns=bootstrap_returns, init_value=init_value)
         else:

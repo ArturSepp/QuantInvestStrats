@@ -1,7 +1,7 @@
 # packages
 import numpy as np
 import pandas as pd
-from typing import Union
+from typing import Union, Tuple
 from numba import njit
 from statsmodels.tsa.stattools import pacf, acf
 
@@ -12,7 +12,7 @@ from qis.models.linear.ewm import MeanAdjType, compute_rolling_mean_adj
 def estimate_path_acf(paths: Union[np.ndarray, pd.DataFrame],
                       nlags: int = 10,
                       is_pacf: bool = True
-                      ):
+                      ) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
     if isinstance(paths, pd.DataFrame):
         columns = paths.columns
         paths = paths.to_numpy()
