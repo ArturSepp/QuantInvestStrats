@@ -1,31 +1,23 @@
 
-# buil in
+# packages
 import numpy as np
 import pandas as pd
 from enum import Enum
-from typing import NamedTuple
+from typing import Optional
+import qis
 
 
 class OhlcEstimatorType(Enum):
     PARKINSON = 'Parkinson'
     GARMAN_KLASS = 'Garman-Klass'
     ROGERS_SATCHELL = 'Rogers-Satchell'
+    CLOSE_TO_CLOSE = 'Close-to-Close'
 
 
-class FreqAn(NamedTuple):
-    freq: str
-    an: float
-
-
-class FreqAns(FreqAn, Enum):
-    HOUR = FreqAn('1h', an=24*260)
-    DAY = FreqAn('D', an=260)
-
-
-def estimate_ohlc_vol(ohlc_data: pd.DataFrame,  # must contain ohlc columnes
+def estimate_ohlc_var(ohlc_data: pd.DataFrame,  # must contain ohlc columnes
                       ohlc_estimator_type: OhlcEstimatorType = OhlcEstimatorType.PARKINSON,
                       min_size: int = 2
-                      ) -> float:
+                      ) -> pd.Series:
 
     if ohlc_data.empty or len(ohlc_data.index) < min_size:
         return np.nan
@@ -40,7 +32,11 @@ def estimate_ohlc_vol(ohlc_data: pd.DataFrame,  # must contain ohlc columnes
     hl = high - low
     co = close - open
 
-    if ohlc_estimator_type == OhlcEstimatorType.PARKINSON:
+    if ohlc_estimator_type == OhlcEstimatorType.CLOSE_TO_CLOSE:
+        sample_var = np.square(close[1:]-close[:-1])
+        sample_var = np.concatenate((np.array([np.nan]), sample_var), axis=0)
+
+    elif ohlc_estimator_type == OhlcEstimatorType.PARKINSON:
         multiplier = 1.0 / (4.0 * np.log(2.0))
         sample_var = multiplier * np.square(hl)
 
@@ -54,20 +50,29 @@ def estimate_ohlc_vol(ohlc_data: pd.DataFrame,  # must contain ohlc columnes
     else:
         raise TypeError(f"unknown ohlc_estimator_type={ohlc_estimator_type}")
 
-    vol = np.sqrt(np.nansum(sample_var))
-    return vol
+    sample_var = pd.Series(sample_var, index=ohlc_data.index)
+    return sample_var
 
 
-def estimate_intra_ohlc_vol_data(ohlc_data: pd.DataFrame,
-                                 ohlc_estimator_type: OhlcEstimatorType = OhlcEstimatorType.PARKINSON,
-                                 is_exclude_weekends: bool = True,
-                                 freq_an: FreqAn = FreqAns.DAY
-                                 ) -> pd.Series:
+def estimate_hf_ohlc_vol(ohlc_data: pd.DataFrame,
+                         ohlc_estimator_type: OhlcEstimatorType = OhlcEstimatorType.PARKINSON,
+                         af: float = None,  # annualisation factor highly recomended
+                         is_exclude_weekends: bool = False,  # for crypto
+                         agg_freq: Optional[str] = 'B'
+                         ) -> pd.Series:
     """
-    sample vol at freq and annualize at an
+
+    group hf data into daily or higher frequency bins
+    for each sample compute vol at data freq and annualize at an
     """
-    vols = ohlc_data.groupby(pd.Grouper(freq=freq_an.freq)).apply(estimate_ohlc_vol, ohlc_estimator_type)
-    vols = np.sqrt(freq_an.an) * vols  # annualize
+    sample_var = estimate_ohlc_var(ohlc_data=ohlc_data, ohlc_estimator_type=ohlc_estimator_type)
+    if agg_freq is not None:
+        sample_var = sample_var.resample(agg_freq).mean()
+
+    if af is None:
+        af = qis.infer_an_from_data(data=sample_var)
+
+    vols = np.sqrt(af*sample_var)
     if is_exclude_weekends:
         vols = vols[vols.index.dayofweek < 5]
     return vols

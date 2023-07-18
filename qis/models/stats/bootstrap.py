@@ -67,6 +67,7 @@ def bootstrap_indices_stationary(num_data_index: int,
     generate stationary bootstrap indices
     """
     np.random.seed(seed)
+    set_seed(seed)
     bootstrapped_indices = np.zeros((num_bootstrap_index, num_samples), dtype=np.int64)
     for idx in np.arange(num_samples):
         previous_index, next_index = 0, 0
@@ -76,7 +77,7 @@ def bootstrap_indices_stationary(num_data_index: int,
             end_index_in_data = np.minimum(start_index+random_block_size, num_data_index)  # end of sample
             proposed_fill = end_index_in_data-start_index  # how much we can increase based on index in data
             next_index = np.minimum(previous_index + proposed_fill, num_bootstrap_index)  # index for backfill indices
-            implemented_fill = next_index-previous_index  # how much we can increase based on index in bootstrap indices
+            implemented_fill = next_index-previous_index  # how much we will increase based on index in bootstrap indices
             bootstrapped_indices[previous_index:next_index, idx] = np.arange(start_index, start_index+implemented_fill)
             previous_index = next_index
     return bootstrapped_indices

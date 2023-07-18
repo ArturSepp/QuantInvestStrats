@@ -81,8 +81,7 @@ from qis.models.stats.bootstrap import (
 
 from qis.models.stats.ohlc_vol import (
     OhlcEstimatorType,
-    FreqAn,
-    estimate_intra_ohlc_vol_data,
-    estimate_ohlc_vol
+    estimate_hf_ohlc_vol,
+    estimate_ohlc_var
 )
 
