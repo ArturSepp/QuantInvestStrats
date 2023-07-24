@@ -14,6 +14,7 @@ from qis.utils.dates import (
     get_weekday,
     get_year_quarter,
     get_ytd_time_period,
+    get_time_to_maturity,
     infer_an_from_data,
     is_leap_year,
     months_between,

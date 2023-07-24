@@ -57,7 +57,7 @@ class PerfStat(ColVar, Enum):
     SHARPE_LOG_AN = ColVar(name='An. Log Sharpe', short_n='An. Log Sharpe', value_type=ValueType.SHARPE)  # log return
     SHARPE_AVG = ColVar(name='Sharpe Avg', short_n='Sharpe Avg', value_type=ValueType.SHARPE)  # using avg return
     SHARPE_EXCESS = ColVar(name='Excess Sharpe', short_n='Excess\nSharpe', value_type=ValueType.SHARPE)  # compunded with rate
-    SHARPE_LOG_EXCESS = ColVar(name='Sharpe', short_n='Sharpe', value_type=ValueType.SHARPE)
+    SHARPE_LOG_EXCESS = ColVar(name='Log Sharpe', short_n='Log Sharpe', value_type=ValueType.SHARPE)
     SHARPE_APR = ColVar(name='APR Sharpe', short_n='APR\nSharpe', value_type=ValueType.SHARPE)
     MARGINAL_SHARPE = ColVar(name='Marginal Sharpe', short_n='Marginal\nSharpe', value_type=ValueType.SHARPE)
     MARGINAL_SHARPE_RATIO = ColVar(name='Marginal Sharpe Ratio', short_n='Marginal\nSharpe Ratio', value_type=ValueType.FLOAT)

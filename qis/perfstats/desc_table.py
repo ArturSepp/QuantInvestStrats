@@ -19,9 +19,10 @@ class DescTableType(Enum):
     AVG_WITH_POSITIVE_PROB = 2
     WITH_POSITIVE_PROB = 3
     WITH_KURTOSIS = 4
-    WITH_SCORE = 5
-    EXTENSIVE = 6
-    SKEW_KURTOSIS = 7
+    WITH_NORMAL_PVAL = 5
+    WITH_SCORE = 6
+    EXTENSIVE = 7
+    SKEW_KURTOSIS = 8
 
 
 def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
@@ -83,6 +84,10 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_KURTOSIS:
+        descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in skew(data_np, axis=0, nan_policy=nan_policy)]
+        descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in kurtosis(data_np, axis=0, nan_policy=nan_policy)]
+
+    elif desc_table_type == desc_table_type.WITH_NORMAL_PVAL:
         descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in skew(data_np, axis=0, nan_policy=nan_policy)]
         descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in kurtosis(data_np, axis=0, nan_policy=nan_policy)]
         k2, ps = normaltest(a=data_np, axis=0, nan_policy='omit')

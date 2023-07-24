@@ -23,7 +23,7 @@ WEEKDAYS: List[str] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', '
 
 BUS_DAYS_PER_YEAR = 252  # applied for volatility normalization
 WEEK_DAYS_PER_YEAR = 260  # calendar days excluding weekends in a year
-CALENDAR_DAYS_PER_YEAR = 360
+CALENDAR_DAYS_PER_YEAR = 365
 CALENDAR_DAYS_IN_MONTH = 30
 CALENDAR_DAYS_PER_YEAR_SHARPE = 365.25  # for total return computations for Sharpe
 
@@ -38,6 +38,100 @@ def get_current_time_with_tz(tz: Optional[str] = 'UTC',
     if days_offset is not None:
         t = t + pd.DateOffset(days=days_offset)
     return t
+
+
+def get_time_to_maturity(maturity_time: pd.Timestamp,
+                         value_time: pd.Timestamp,
+                         is_floor_at_zero: bool = True,
+                         af: float = 365
+                         ) -> float:
+    """
+    return annualised difference between mat_date and value_time
+    """
+    seconds_per_year = af * 24 * 60 * 60  # days, hours, minute, seconds
+    ttm = (maturity_time - value_time).total_seconds() / seconds_per_year
+    if is_floor_at_zero and ttm < 0.0:
+        ttm = 0.0
+    return ttm
+
+
+def get_period_days(freq: str = 'B',
+                    is_calendar: bool = False
+                    ) -> Tuple[int, float]:
+    """
+    for given frequency return number of days in the period
+    is_calendar = True should return int for rolling and resample in pandas
+    an_f will return the number of period in year
+    consistent with using 252 for vol annualization
+    """
+    an_days = 365 if is_calendar else 252
+    if freq in ['1M']:
+        days = 1.0 / 24.0 / 60.0
+        an_f = an_days * 24.0 * 60.0
+    elif freq in ['5M']:
+        days = 1.0 / 24.0 / 12.0
+        an_f = an_days * 24.0 * 12.0
+    elif freq in ['15M', '15T']:
+        days = 1.0 / 24.0 / 12.0
+        an_f = an_days * 24.0 * 4.0
+    elif freq in ['H']:
+        days = 1.0 / 24.0
+        an_f = an_days * 24.0
+    elif freq in ['D']:  # for 'D' always use 365
+        days = 1
+        an_f = 365
+    elif freq in ['B', 'C']:
+        days = 1
+        an_f = an_days
+    elif freq in ['W', 'W-MON', 'W-TUE', 'W-WED', 'W-THU', 'W-FRI', 'W-SAT', 'W-SUN']:
+        days = 7 if is_calendar else 5
+        an_f = 52
+    elif freq in ['SM', '2W', '2W-MON', '2W-TUE', '2W-WED', '2W-THU', '2W-FRI', '2W-SAT', '2W-SUN']:
+        days = 14 if is_calendar else 10
+        an_f = 26
+    elif freq in ['3W', '3W-MON', '3W-TUE', '3W-WED', '3W-THU', '3W-FRI', '3W-SAT', '3W-SUN']:
+        days = 21 if is_calendar else 15
+        an_f = 17.33
+    elif freq in ['4W', '4W-MON', '4W-TUE', '4W-WED', '4W-THU', '4W-FRI', '4W-SAT', '4W-SUN']:
+        days = 28 if is_calendar else 20
+        an_f = 13
+    elif freq in ['1M', 'M', 'BM', 'MS', 'BMS']:
+        days = 30 if is_calendar else 21
+        an_f = 12
+    elif freq in ['2M', '2BM', '2MS', '2BMS']:
+        days = 60 if is_calendar else 42
+        an_f = 6
+    elif freq in ['Q', 'DQ', 'BQ', 'QS', 'BQS', 'Q-DEC', 'Q-JAN', 'Q-FEB']:
+        days = 91 if is_calendar else 63
+        an_f = 4
+    elif freq in ['2Q', '2BQ', '2QS', '2BQS']:
+        days = 182 if is_calendar else 126
+        an_f = 2
+    elif freq in ['3Q', '3BQ', '3QS', '3BQS']:
+        days = 273 if is_calendar else 189
+        an_f = 0.75
+    elif freq in ['A', 'BA', 'AS', 'BAS']:
+        days = an_days
+        an_f = 1.0
+    else:
+        raise TypeError(f'freq={freq} is not impelemnted')
+
+    return days, an_f
+
+
+def infer_an_from_data(data: Union[pd.DataFrame, pd.Series], is_calendar: bool = False) -> float:
+    """
+    infer annualization factor for vol
+    """
+    if len(data.index) < 3:
+        freq = None
+    else:
+        freq = pd.infer_freq(data.index)
+    if freq is None:
+        print(f"in infer_an_from_data: cannot infer {freq} - using 252")
+        return 252.0
+    an, an_f = get_period_days(freq, is_calendar=is_calendar)
+    return an_f
 
 
 class FreqData(NamedTuple):
@@ -121,85 +215,6 @@ class FreqMap(FreqData, Enum):
             if freq.n_cal == n_days:
                 return freq
         raise ValueError(f"cannot map {n_days}")
-
-
-def get_period_days(freq: str = 'B',
-                    is_calendar: bool = False
-                    ) -> Tuple[int, float]:
-    """
-    for given frequency return number of days in the period
-    is_calendar = True should return int for rolling and resample in pandas
-    an_f will return the number of period in year
-    consistent with using 252 for vol annualization
-    """
-    an_days = 365 if is_calendar else 252
-    if freq in ['1M']:
-        days = 1.0 / 24.0 / 60.0
-        an_f = an_days * 24.0 * 60.0
-    elif freq in ['5M']:
-        days = 1.0 / 24.0 / 12.0
-        an_f = an_days * 24.0 * 12.0
-    elif freq in ['15M', '15T']:
-        days = 1.0 / 24.0 / 12.0
-        an_f = an_days * 24.0 * 4.0
-    elif freq in ['H']:
-        days = 1.0 / 24.0
-        an_f = an_days * 24.0
-    elif freq in ['D']:
-        days = 1
-        an_f = an_days
-    elif freq in ['B', 'C']:
-        days = 1
-        an_f = an_days
-    elif freq in ['W', 'W-MON', 'W-TUE', 'W-WED', 'W-THU', 'W-FRI', 'W-SAT', 'W-SUN']:
-        days = 7 if is_calendar else 5
-        an_f = 52
-    elif freq in ['SM', '2W', '2W-MON', '2W-TUE', '2W-WED', '2W-THU', '2W-FRI', '2W-SAT', '2W-SUN']:
-        days = 14 if is_calendar else 10
-        an_f = 26
-    elif freq in ['3W', '3W-MON', '3W-TUE', '3W-WED', '3W-THU', '3W-FRI', '3W-SAT', '3W-SUN']:
-        days = 21 if is_calendar else 15
-        an_f = 17.33
-    elif freq in ['4W', '4W-MON', '4W-TUE', '4W-WED', '4W-THU', '4W-FRI', '4W-SAT', '4W-SUN']:
-        days = 28 if is_calendar else 20
-        an_f = 13
-    elif freq in ['1M', 'M', 'BM', 'MS', 'BMS']:
-        days = 30 if is_calendar else 21
-        an_f = 12
-    elif freq in ['2M', '2BM', '2MS', '2BMS']:
-        days = 60 if is_calendar else 42
-        an_f = 6
-    elif freq in ['Q', 'DQ', 'BQ', 'QS', 'BQS', 'Q-DEC', 'Q-JAN', 'Q-FEB']:
-        days = 91 if is_calendar else 63
-        an_f = 4
-    elif freq in ['2Q', '2BQ', '2QS', '2BQS']:
-        days = 182 if is_calendar else 126
-        an_f = 2
-    elif freq in ['3Q', '3BQ', '3QS', '3BQS']:
-        days = 273 if is_calendar else 189
-        an_f = 0.75
-    elif freq in ['A', 'BA', 'AS', 'BAS']:
-        days = an_days
-        an_f = 1.0
-    else:
-        raise TypeError(f'freq={freq} is not impelemnted')
-
-    return days, an_f
-
-
-def infer_an_from_data(data: Union[pd.DataFrame, pd.Series], is_calendar: bool = False) -> float:
-    """
-    infer annualization factor for vol
-    """
-    if len(data.index) < 3:
-        freq = None
-    else:
-        freq = pd.infer_freq(data.index)
-    if freq is None:
-        print(f"in infer_an_from_data: cannot infer {freq} - using 252")
-        return 252.0
-    an, an_f = get_period_days(freq, is_calendar=is_calendar)
-    return an_f
 
 
 class TimePeriod:

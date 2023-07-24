@@ -25,7 +25,7 @@ def run_unit_test(unit_test: UnitTests):
         benchmark = 'SPY'
         tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
         prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
-        time_period = qis.TimePeriod('31Dec2007', '07Jul2023')  # time period for reporting
+        time_period = qis.TimePeriod('31Dec2007', '21Jul2023')  # time period for reporting
 
         fig = generate_multi_asset_factsheet(prices=prices,
                                              benchmark=benchmark,
@@ -36,7 +36,7 @@ def run_unit_test(unit_test: UnitTests):
         qis.save_figs_to_pdf(figs=[fig],
                              file_name=f"multiasset_report", orientation='landscape',
                              local_path=qis.local_path.get_output_path())
-        qis.save_fig(fig=fig, file_name=f"multi_assets", local_path=qis.local_path.get_output_path())
+        qis.save_fig(fig=fig, file_name=f"multiassets", local_path=qis.local_path.get_output_path())
 
     plt.show()
 

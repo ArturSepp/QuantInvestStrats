@@ -4,8 +4,6 @@ import seaborn as sns
 import yfinance as yf
 import qis
 
-# skip
-import qis.file_utils as fu
 
 # define tickers and fetch price data
 tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'GLD']
@@ -17,7 +15,7 @@ with sns.axes_style("darkgrid"):
     qis.plot_prices(prices=prices, x_date_freq='A', ax=ax)
 
 # skip
-fu.save_fig(fig, file_name='perf1', local_path="figures/")
+qis.save_fig(fig, file_name='perf1', local_path="figures/")
 
 # with drawdowns using sns styles
 with sns.axes_style("darkgrid"):
@@ -25,7 +23,7 @@ with sns.axes_style("darkgrid"):
     qis.plot_prices_with_dd(prices=prices, x_date_freq='A', axs=axs)
 
 # skip
-fu.save_fig(fig, file_name='perf2', local_path="figures/")
+qis.save_fig(fig, file_name='perf2', local_path="figures/")
 
 # risk-adjusted performance table with specified data entries
 # add rates for excess Sharpe
@@ -43,7 +41,7 @@ fig = qis.plot_ra_perf_table(prices=prices,
                              perf_params=perf_params)
 
 # skip
-fu.save_fig(fig, file_name='perf3', local_path="figures/")
+qis.save_fig(fig, file_name='perf3', local_path="figures/")
 
 
 plt.show()

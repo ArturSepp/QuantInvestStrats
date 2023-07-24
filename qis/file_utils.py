@@ -885,7 +885,7 @@ def save_figs(figs: Dict[str, plt.Figure],
 
 def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
                      file_name: str,
-                     orientation: str = 'portrait',
+                     orientation: Literal['portrait', 'landscape'] = 'portrait',
                      local_path: Optional[str] = None,
                      add_current_date: bool = True
                      ) -> str:
