@@ -4,16 +4,19 @@ utilities to apply frequencies
 import numpy as np
 import pandas as pd
 from enum import Enum
-from typing import Optional, Union, Callable
+from typing import Optional, Union, Callable, Literal
 
 import qis.utils.dates as da
 from qis.utils.df_str import df_index_to_str
 
+# Arguments for fillna()
+FillnaOptions = Literal["backfill", "bfill", "ffill", "pad"]
+
 
 def df_asfreq(df: Union[pd.DataFrame, pd.Series],
               freq: Optional[str] = 'Q',
-              method: Optional[str] = 'ffill',
-              fill_na_method: Optional[str] = 'ffill',
+              method: FillnaOptions = 'ffill',
+              fill_na_method: FillnaOptions = 'ffill',
               inclusive: Optional[str] = None,
               include_start_date: bool = False,
               include_end_date: bool = False,
@@ -71,9 +74,9 @@ def agg_remained_data_on_right(df: Union[pd.DataFrame, pd.Series],
 def df_resample_at_other_index(df: Union[pd.DataFrame, pd.Series],
                                other_index: Union[pd.DatetimeIndex, pd.Index],
                                agg_func: Callable[[pd.DataFrame], pd.Series] = np.nanmean,
-                               method: Optional[str] = 'ffill',
+                               method: FillnaOptions = 'ffill',
                                include_end_date: bool = False
-                               ) -> pd.DataFrame:
+                               ) -> Union[pd.DataFrame, pd.Series]:
     """
     given the time index of another time series, aggregate data at frequency of the index
     """
@@ -97,8 +100,8 @@ def df_resample_at_other_index(df: Union[pd.DataFrame, pd.Series],
 
 def df_resample_at_freq(df: Union[pd.DataFrame, pd.Series],
                         freq: str = 'Q',
-                        method: Optional[str] = 'ffill',
-                        agg_func: Optional[Callable[[pd.DataFrame], pd.Series]] = np.nanmean,  # if nnone use last
+                        method: FillnaOptions = 'ffill',
+                        agg_func: Optional[Callable[[pd.DataFrame], pd.Series]] = np.nanmean,  # if none use last
                         include_end_date: bool = False
                         ) -> Union[pd.DataFrame, pd.Series]:
     """

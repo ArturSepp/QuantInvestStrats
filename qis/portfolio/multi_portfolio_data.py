@@ -176,12 +176,12 @@ class MultiPortfolioData:
                         **kwargs) -> None:
         prices = self.get_navs(time_period=time_period)
         if len(prices.columns) > 1:
-            pco.plot_corr_table(prices=prices,
-                                x_rotation=90,
-                                freq=freq,
-                                title=f'Correlation of {freq} returns',
-                                ax=ax,
-                                **kwargs)
+            pco.plot_returns_corr_table(prices=prices,
+                                        x_rotation=90,
+                                        freq=freq,
+                                        title=f'Correlation of {freq} returns',
+                                        ax=ax,
+                                        **kwargs)
 
     def plot_drawdowns(self,
                        time_period: da.TimePeriod = None,

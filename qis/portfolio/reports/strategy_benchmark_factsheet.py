@@ -15,7 +15,7 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs
 from qis.portfolio.portfolio_data import AttributionMetric
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
-from qis.portfolio.reports.config import KWARG_LONG, KWARG_SHORT, PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
 
 def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfolioData,

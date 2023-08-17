@@ -14,7 +14,7 @@ from enum import Enum
 import qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData
 
-from qis.portfolio.reports.config import KWARG_LONG, KWARG_SHORT, PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
 
 PERF_COLUMNS = (
@@ -193,12 +193,12 @@ class MultiAssetsReport:
                         **kwargs) -> None:
         local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(fontsize=4))
         prices = self.get_prices(time_period=time_period)
-        qis.plot_corr_table(prices=prices,
-                           x_rotation=90,
-                           freq=freq,
-                           title=f"Correlation {freq} returns: {qis.get_time_period(prices).to_str()}",
-                           ax=ax,
-                           **local_kwargs)
+        qis.plot_returns_corr_table(prices=prices,
+                                    x_rotation=90,
+                                    freq=freq,
+                                    title=f"Correlation {freq} returns: {qis.get_time_period(prices).to_str()}",
+                                    ax=ax,
+                                    **local_kwargs)
 
     def plot_returns_scatter(self,
                              benchmark: str,

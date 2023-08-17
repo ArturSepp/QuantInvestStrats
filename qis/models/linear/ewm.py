@@ -261,6 +261,7 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
     """
     compute ewm cross matrices with x*y using outer product = dim[x] * dim[y]
     the dimension of tensor is [t, x, y]
+    njit
     """
     if not x.ndim in [1, 2] or not y.ndim in [1, 2]:
         raise TypeError("Expected 1- or 2-dimensional NumPy array for x and y")

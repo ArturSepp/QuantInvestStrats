@@ -1,4 +1,6 @@
 
+from qis.portfolio.reports.config import fetch_default_perf_params, fetch_default_report_kwargs
+
 from qis.portfolio.backtester import backtest_model_portfolio
 
 from qis.portfolio.portfolio_data import PortfolioData, PortfolioInput, AttributionMetric

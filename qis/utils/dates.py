@@ -405,6 +405,10 @@ class TimePeriod:
         return TimePeriod(start=shift_date_by_day(self.start, backward=backward, num_days=num_days),
                           end=self.end)
 
+    def get_time_period_an(self) -> float:  # annualised time period
+        return get_time_to_maturity(maturity_time=self.end,
+                                    value_time=self.start)
+
 
 def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],
                             start: pd.Timestamp

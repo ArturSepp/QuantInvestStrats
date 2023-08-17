@@ -6,9 +6,7 @@ from enum import Enum
 import yfinance as yf
 import qis
 from qis import TimePeriod, PortfolioData
-
-
-from qis.portfolio.reports.config import KWARG_LONG, KWARG_SHORT, PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 
 def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -86,8 +84,10 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     time_period = qis.TimePeriod('31Dec2005', '21Jul2023')  # time period for portfolio reporting
+    time_period_short = TimePeriod('31Dec2019', time_period.end)
 
     if unit_test == UnitTests.VOLPARITY_PORTFOLIO:
+
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
         portfolio_data = generate_volparity_portfolio(prices=prices,
                                                       group_data=group_data,
@@ -97,7 +97,7 @@ def run_unit_test(unit_test: UnitTests):
         fig = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                               benchmark_prices=benchmark_prices,
                                               time_period=time_period,
-                                              **KWARG_LONG)
+                                              **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=[fig],
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_long",
                              orientation='landscape',
@@ -105,8 +105,8 @@ def run_unit_test(unit_test: UnitTests):
 
         fig = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                               benchmark_prices=benchmark_prices,
-                                              time_period=TimePeriod('31Dec2019', time_period.end),
-                                              **KWARG_SHORT)
+                                              time_period=time_period_short,
+                                              **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=[fig],
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
                              orientation='landscape',
@@ -122,7 +122,7 @@ def run_unit_test(unit_test: UnitTests):
         fig = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                               benchmark_prices=benchmark_prices,
                                               time_period=time_period,
-                                              **KWARG_LONG)
+                                              **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=[fig],
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_long",
                              orientation='landscape',
@@ -130,8 +130,8 @@ def run_unit_test(unit_test: UnitTests):
 
         fig = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                               benchmark_prices=benchmark_prices,
-                                              time_period=TimePeriod('31Dec2019', time_period.end),
-                                              **KWARG_SHORT)
+                                              time_period=TimePeriod('31Dec2019', time_period_short),
+                                              **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=[fig],
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
                              orientation='landscape',

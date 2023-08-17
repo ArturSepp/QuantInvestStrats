@@ -1,9 +1,10 @@
 
 # packages
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 
 # qis
 import qis.utils.dates as da
@@ -24,17 +25,18 @@ from qis.models.linear.corr_cov_matrix import CorrMatrixOutput
 from qis.models.linear.ewm import InitType
 
 
-def plot_corr_table(prices: pd.DataFrame,
-                    var_format: str = '{:.0%}',
-                    freq: Optional[str] = None,
-                    cmap: str = 'PiYG',
-                    return_type: ReturnTypes = ReturnTypes.RELATIVE,
-                    is_log_returns: bool = True,
-                    ax: plt.Subplot = None,
-                    **kwargs
-                    ) -> Optional[plt.Figure]:
-
-    returns = ret.to_returns(prices=prices, is_log_returns=is_log_returns, freq=freq, return_type=return_type)
+def plot_returns_corr_table(prices: pd.DataFrame,
+                            var_format: str = '{:.0%}',
+                            freq: Optional[str] = None,
+                            cmap: str = 'PiYG',
+                            return_type: ReturnTypes = ReturnTypes.RELATIVE,
+                            ax: plt.Subplot = None,
+                            **kwargs
+                            ) -> Optional[plt.Figure]:
+    """
+    plot corr table of prices
+    """
+    returns = ret.to_returns(prices=prices, return_type=return_type, freq=freq)
     corr = ccm.compute_masked_covar_corr(returns=returns, is_covar=False)
     fig = phe.plot_heatmap(df=corr,
                            var_format=var_format,
@@ -44,24 +46,28 @@ def plot_corr_table(prices: pd.DataFrame,
     return fig
 
 
-def plot_ewm_corr_table(prices: pd.DataFrame,
-                        ewm_lambda: float = 0.94,
-                        var_format: str = '{:.0%}',
-                        init_type: InitType = InitType.ZERO,
-                        freq: Optional[str] = None,
-                        cmap: str = 'PiYG',
-                        ax: plt.Subplot = None,
-                        is_average: bool = True,
-                        **kwargs
-                        ) -> plt.Figure:
-
-    returns = ret.to_returns(prices=prices, is_log_returns=True, freq=freq)
-
+def plot_returns_ewm_corr_table(prices: pd.DataFrame,
+                                span: Union[int, np.ndarray] = None,
+                                ewm_lambda: float = 0.94,
+                                var_format: str = '{:.0%}',
+                                return_type: ReturnTypes = ReturnTypes.LOG,
+                                init_type: InitType = InitType.ZERO,
+                                freq: Optional[str] = None,
+                                cmap: str = 'PiYG',
+                                ax: plt.Subplot = None,
+                                is_average: bool = True,
+                                **kwargs
+                                ) -> plt.Figure:
+    """
+     plot corr table of rices
+    """
+    returns = ret.to_returns(prices=prices, return_type=return_type, freq=freq)
     init_value = ewm.set_init_dim2(data=returns.to_numpy(), init_type=init_type)
     corr = ewm.compute_ewm_covar_tensor(a=returns.to_numpy(),
-                                          ewm_lambda=ewm_lambda,
-                                          covar0=init_value,
-                                          is_corr=True)
+                                        span=span,
+                                        ewm_lambda=ewm_lambda,
+                                        covar0=init_value,
+                                        is_corr=True)
     if is_average:
         ar = npn.tensor_mean(corr)
     else:
@@ -76,28 +82,31 @@ def plot_ewm_corr_table(prices: pd.DataFrame,
     return fig
 
 
-def plot_corr_matrix_time_series(prices: pd.DataFrame,
-                                 corr_matrix_output: CorrMatrixOutput = CorrMatrixOutput.FULL,
-                                 time_period: da.TimePeriod = None,
-                                 freq: str = 'B',
-                                 ewm_lambda: float = 0.97,
-                                 init_type: InitType = InitType.X0,
-                                 var_format: str = '{:.0%}',
-                                 legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
-                                 trend_line: put.TrendLine = put.TrendLine.AVERAGE,
-                                 regime_benchmark_str: str = None,
-                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
-                                 perf_params: PerfParams = None,
-                                 ax: plt.Subplot = None,
-                                 **kwargs
-                                 ) -> None:
+def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
+                                         corr_matrix_output: CorrMatrixOutput = CorrMatrixOutput.FULL,
+                                         return_type: ReturnTypes = ReturnTypes.LOG,
+                                         time_period: da.TimePeriod = None,
+                                         freq: Optional[str] = None,
+                                         span: Union[int, np.ndarray] = None,
+                                         ewm_lambda: float = 0.97,
+                                         init_type: InitType = InitType.X0,
+                                         var_format: str = '{:.0%}',
+                                         legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
+                                         trend_line: put.TrendLine = put.TrendLine.AVERAGE,
+                                         regime_benchmark_str: str = None,
+                                         regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                                         perf_params: PerfParams = None,
+                                         ax: plt.Subplot = None,
+                                         **kwargs
+                                         ) -> None:
 
     """
-    plot time series
+    plot time series of returns correlations infered from prices
     """
-    returns = ret.to_returns(prices=prices, is_log_returns=False, freq=freq)
-    corr_pandas = ccm.compute_ewm_corr_df(returns=returns,
+    returns = ret.to_returns(prices=prices, return_type=return_type, freq=freq)
+    corr_pandas = ccm.compute_ewm_corr_df(df=returns,
                                           corr_matrix_output=corr_matrix_output,
+                                          span=span,
                                           ewm_lambda=ewm_lambda,
                                           init_type=init_type)
     if time_period is not None:
@@ -135,14 +144,14 @@ def run_unit_test(unit_test: UnitTests):
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.CORR_TABLE:
-        plot_corr_table(prices=prices)
+        plot_returns_corr_table(prices=prices)
 
     elif unit_test == UnitTests.CORR_MATRIX:
         fig, ax = plt.subplots(1, 1, figsize=(10, 10), constrained_layout=True)
-        plot_corr_matrix_time_series(prices=prices, regime_benchmark_str='SPY', ax=ax)
+        plot_returns_corr_matrix_time_series(prices=prices, regime_benchmark_str='SPY', ax=ax)
 
     elif unit_test == UnitTests.EWMA_CORR:
-        plot_ewm_corr_table(prices=prices.iloc[:, :5])
+        plot_returns_ewm_corr_table(prices=prices.iloc[:, :5])
 
     plt.show()
 

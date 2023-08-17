@@ -16,6 +16,7 @@ from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_fa
 
 class UnitTests(Enum):
     CORE_ETFS = 1
+    BTC_SQQQ = 2
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -23,27 +24,35 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.CORE_ETFS:
 
         benchmark = 'SPY'
-        tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
-        prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
+        tickers = [benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
         time_period = qis.TimePeriod('31Dec2007', '21Jul2023')  # time period for reporting
 
-        fig = generate_multi_asset_factsheet(prices=prices,
-                                             benchmark=benchmark,
-                                             heatmap_freq='A',
-                                             perf_params=PERF_PARAMS,
-                                             time_period=time_period,
-                                             regime_params=REGIME_PARAMS)
-        qis.save_figs_to_pdf(figs=[fig],
-                             file_name=f"multiasset_report", orientation='landscape',
-                             local_path=qis.local_path.get_output_path())
-        qis.save_fig(fig=fig, file_name=f"multiassets", local_path=qis.local_path.get_output_path())
+    elif unit_test == UnitTests.BTC_SQQQ:
+        benchmark = 'QQQ'
+        tickers = [benchmark, 'BTC-USD', 'TQQQ', 'SQQQ']
+        time_period = qis.TimePeriod('31Dec2019', '16Aug2023')
+
+    else:
+        raise NotImplementedError
+
+    prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
+    fig = generate_multi_asset_factsheet(prices=prices,
+                                         benchmark=benchmark,
+                                         heatmap_freq='A',
+                                         perf_params=PERF_PARAMS,
+                                         time_period=time_period,
+                                         regime_params=REGIME_PARAMS)
+    qis.save_figs_to_pdf(figs=[fig],
+                         file_name=f"multiasset_report", orientation='landscape',
+                         local_path=qis.local_path.get_output_path())
+    qis.save_fig(fig=fig, file_name=f"multiassets", local_path=qis.local_path.get_output_path())
 
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CORE_ETFS
+    unit_test = UnitTests.BTC_SQQQ
 
     is_run_all_tests = False
     if is_run_all_tests:

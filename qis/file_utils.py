@@ -863,6 +863,7 @@ def save_fig(fig: plt.Figure,
 
 
 def save_figs(figs: Dict[str, plt.Figure],
+              file_name: str = '',
               local_path: Optional[str] = None,
               dpi: int = 300,
               file_type=FileTypes.PNG,
@@ -874,7 +875,7 @@ def save_figs(figs: Dict[str, plt.Figure],
     """
     for key, fig in figs.items():
         file_path = save_fig(fig=fig,
-                             file_name=key,
+                             file_name=f"{file_name}_{key}",
                              local_path=local_path,
                              dpi=dpi,
                              file_type=file_type,

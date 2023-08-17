@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pandas as pd
 from dataclasses import dataclass
+from typing import Optional
 from enum import Enum
 
 from qis.utils.generic import ColVar, ValueType
@@ -188,7 +189,7 @@ class PerfParams:
     freq_reg: str = 'Q'  # for quadratic/linear regressions
     freq_excess_return: str = 'M'
     return_type: ReturnTypes = ReturnTypes.LOG  # for vol computation
-    rates_data: pd.Series = None  # to compute EXCESS returns
+    rates_data: Optional[pd.Series] = None  # to compute EXCESS returns
 
     def __post_init__(self):
         if self.freq is not None:  # global parameter

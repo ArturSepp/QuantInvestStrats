@@ -10,10 +10,10 @@ from typing import Tuple
 from enum import Enum
 import yfinance as yf
 import qis
-from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs, MultiPortfolioData
+from qis import TimePeriod, MultiPortfolioData
 
 from qis.portfolio.reports.strategy_benchmark_factsheet import generate_strategy_benchmark_factsheet_plt, generate_performance_attribution_report
-from qis.portfolio.reports.config import KWARG_LONG, KWARG_SHORT, PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 
 def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -77,7 +77,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_STRATEGY:
 
-        time_period = qis.TimePeriod('31Dec2005', '21Jul2023')  # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2005', '16Aug2023')  # time period for portfolio reporting
 
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
 
@@ -91,7 +91,7 @@ def run_unit_test(unit_test: UnitTests):
         figs = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=multi_portfolio_data,
                                                          backtest_name='Vol Parity Portfolio vs Equal Weight',
                                                          time_period=time_period,
-                                                         **KWARG_LONG)
+                                                         **fetch_default_report_kwargs(time_period=time_period))
         """
         figs = generate_performance_attribution_report(multi_portfolio_data=multi_portfolio_data,
                                                        time_period=TimePeriod('31Dec2021', None),

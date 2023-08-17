@@ -104,26 +104,27 @@ class CorrMatrixOutput(Enum):
     SUB_TOP = 3
 
 
-def compute_ewm_corr_df(returns: pd.DataFrame,
-                         corr_matrix_output: CorrMatrixOutput = CorrMatrixOutput.FULL,
-                         ewm_lambda: float = 0.94,
-                         init_type: ewm.InitType = ewm.InitType.ZERO
-                         ) -> pd.DataFrame:
+def compute_ewm_corr_df(df: pd.DataFrame,
+                        corr_matrix_output: CorrMatrixOutput = CorrMatrixOutput.FULL,
+                        span: Union[int, np.ndarray] = None,
+                        ewm_lambda: float = 0.94,
+                        init_type: ewm.InitType = ewm.InitType.ZERO
+                        ) -> pd.DataFrame:
     """
     compute ewm corr as and output as xi-xj pandas j>i, i = 0,..
     """
-    init_value = ewm.set_init_dim2(data=returns.to_numpy(), init_type=init_type)
-    corr = ewm.compute_ewm_covar_tensor(a=returns.to_numpy(),
+    init_value = ewm.set_init_dim2(data=df.to_numpy(), init_type=init_type)
+    corr = ewm.compute_ewm_covar_tensor(a=df.to_numpy(),
+                                        span=span,
                                         ewm_lambda=ewm_lambda,
                                         is_corr=True,
                                         covar0=init_value)
     corr_ijs = []
-    for idx_i, column_i in enumerate(returns.columns):
+    for idx_i, column_i in enumerate(df.columns):
         if corr_matrix_output == CorrMatrixOutput.SUB_TOP and idx_i == 0:  # skip for idx_i = 0
             continue
 
-        for idx_j, column_j in enumerate(returns.columns):
-
+        for idx_j, column_j in enumerate(df.columns):
             if corr_matrix_output == CorrMatrixOutput.TOP_ROW:  # get j after i
                 if idx_j > idx_i:
                     corr_ij = pd.Series(corr[:, idx_i, idx_j], name=f"{column_i} - {column_j}")
@@ -136,26 +137,28 @@ def compute_ewm_corr_df(returns: pd.DataFrame,
             break
 
     corrs_by_column = pd.concat(corr_ijs, axis=1)
-    corrs_by_column = corrs_by_column.set_index(returns.index)
+    corrs_by_column = corrs_by_column.set_index(df.index)
 
     return corrs_by_column
 
 
 def compute_ewm_corr_single(returns: pd.DataFrame,
-                             ewm_lambda: float = 0.94,
-                             span: Optional[int] = None,
-                             time_period: da.TimePeriod = None
-                             ) -> pd.Series:
-
+                            ewm_lambda: float = 0.94,
+                            span: Optional[int] = None,
+                            time_period: da.TimePeriod = None
+                            ) -> pd.Series:
+    """
+    plot correlation all time series in correlation matrix  as row
+    """
     if len(returns.columns) != 2:
         raise ValueError("should be two columns {returns.columns}")
 
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (1.0 + span)
 
-    corr = compute_ewm_corr_df(returns=returns,
-                                corr_matrix_output=CorrMatrixOutput.SUB_TOP,
-                                ewm_lambda=ewm_lambda)
+    corr = compute_ewm_corr_df(df=returns,
+                               corr_matrix_output=CorrMatrixOutput.SUB_TOP,
+                               ewm_lambda=ewm_lambda)
 
     if time_period is not None:
         corr = time_period.locate(corr)
@@ -215,7 +218,7 @@ def run_unit_test(unit_test: UnitTests):
         returns = pd.DataFrame(data=np.random.normal(mean, 1.0, (len(dates), n)),
                                index=dates,
                                columns=['x' + str(m + 1) for m in range(n)])
-        corrs = compute_ewm_corr_df(returns=returns)
+        corrs = compute_ewm_corr_df(df=returns)
         print(corrs)
 
         pts.plot_time_series(df=corrs,

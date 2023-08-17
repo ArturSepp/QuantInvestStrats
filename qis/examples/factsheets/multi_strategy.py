@@ -10,8 +10,7 @@ import yfinance as yf
 import qis
 from qis import TimePeriod, MultiPortfolioData
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
-
-from qis.portfolio.reports.config import KWARG_LONG, KWARG_SHORT
+from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 
 def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -68,9 +67,10 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    time_period = qis.TimePeriod('31Dec2005', '21Jul2023')  # time period for portfolio reporting
-
     if unit_test == UnitTests.VOLPARITY_SPAN:
+
+        time_period = qis.TimePeriod('31Dec2005', '21Jul2023')  # time period for portfolio reporting
+
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
         multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,
                                                                  benchmark_prices=benchmark_prices,
@@ -80,15 +80,16 @@ def run_unit_test(unit_test: UnitTests):
 
         fig = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                  time_period=time_period,
-                                                 **KWARG_LONG)
+                                                 **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=[fig],
                              file_name=f"volparity_span_factsheet_long",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
+        time_period_short = TimePeriod('31Dec2019', time_period.end)
         fig = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
-                                                 time_period=TimePeriod('31Dec2019', time_period.end),
-                                                 **KWARG_SHORT)
+                                                 time_period=time_period_short,
+                                                 **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=[fig],
                              file_name=f"volparity_span_factsheet_short",
                              orientation='landscape',

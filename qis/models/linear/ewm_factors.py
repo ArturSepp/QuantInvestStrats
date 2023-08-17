@@ -49,6 +49,30 @@ class LinearModel:
         factor_exposures = pd.DataFrame.from_dict(factor_exposures)
         return factor_exposures
 
+    def get_asset_factor_betas(self, asset: str = None) -> pd.DataFrame:
+        """
+        return df of asset exposures to factors
+        """
+        if asset is None:
+            asset = self.y.columns[0]
+        exps = {}
+        for factor, factor_exp in self.loadings.items():
+            exps[factor] = factor_exp[asset]
+        exps = pd.DataFrame.from_dict(exps)
+        return exps
+
+    def get_asset_factor_attribution(self, asset: str = None, add_total: bool = True) -> pd.DataFrame:
+        """
+        return df of asset exposures to factors
+        """
+        factor_betas = self.get_asset_factor_betas(asset=asset)
+        exposures = self.x
+        attribution = exposures.multiply(factor_betas.shift(1))
+        if add_total:
+            total = attribution.sum(1).rename('Total')
+            attribution = pd.concat([total, attribution], axis=1)
+        return attribution
+
     def plot_factor_loadings(self,
                              factor: str,
                              var_format: str = '{:,.2f}',
