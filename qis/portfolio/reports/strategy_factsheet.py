@@ -7,7 +7,7 @@ PortfolioData can contain either simulated or actual portfolio data
 # packages
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Tuple
+from typing import Tuple, Optional
 
 # qis
 import qis
@@ -23,12 +23,15 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 time_period: TimePeriod = None,
                                 perf_params: PerfParams = PERF_PARAMS,
                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
+                                weight_freq: Optional[str] = None,#'W-WED',
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 **kwargs
                                 ) -> plt.Figure:
     # align
     benchmark_prices = benchmark_prices.reindex(index=portfolio_data.nav.index, method='ffill')
-    regime_benchmark = benchmark_prices.columns[0]
+    if regime_benchmark is None:
+        regime_benchmark = benchmark_prices.columns[0]
 
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
@@ -66,20 +69,22 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # exposures
-    if len(portfolio_data.weights.columns) > 10:
+    if len(portfolio_data.weights.columns) > 10:  # more than 10 use grouped exposures
         exposures = portfolio_data.get_exposures(is_grouped=True, time_period=time_period)
     else:
         exposures = portfolio_data.get_exposures(is_grouped=False, time_period=time_period)
     ax = fig.add_subplot(gs[4:6, :2])
-    qis.plot_stack(df=exposures.resample('W-WED').last(),
-                  add_mean_levels=False,
-                  use_bar_plot=True,
-                  baseline='zero',
-                  title='Exposures',
-                  legend_stats=qis.LegendStats.AVG_LAST,
-                  var_format='{:.1%}',
-                  ax=ax,
-                  **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncol=2)))
+    if weight_freq is not None:
+        exposures = exposures.resample(weight_freq).last()
+    qis.plot_stack(df=exposures,
+                   add_mean_levels=False,
+                   use_bar_plot=True,
+                   baseline='zero',
+                   title='Exposures',
+                   legend_stats=qis.LegendStats.AVG_LAST,
+                   var_format='{:.1%}',
+                   ax=ax,
+                   **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncol=2)))
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # turnover
@@ -93,26 +98,16 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                          title='1y rolling average Turnover',
                          ax=ax,
                          **kwargs)
-    """
-    qis.plot_time_series_2ax(df1=turnover.drop(portfolio_data.nav.name, axis=1),
-                             df2=turnover[portfolio_data.nav.name],
-                             var_format='{:,.2%}',
-                             # y_limits=(0.0, None),
-                             legend_stats=pts.LegendStats.AVG_LAST,
-                             title='1y rolling average Turnover',
-                             ax=ax,
-                             **kwargs)
-    """
+
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
-    
+
     # benchmark betas
     ax = fig.add_subplot(gs[8:10, :2])
     factor_exposures = portfolio_data.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                         time_period=time_period)
     qis.plot_time_series(df=factor_exposures,
                          var_format='{:,.2f}',
-                         # y_limits=(0.0, None),
                          legend_stats=qis.LegendStats.AVG_LAST,
                          title='Portfolio Benchmark betas',
                          ax=ax,
@@ -126,7 +121,6 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                                 time_period=time_period)
     qis.plot_time_series(df=factor_attribution,
                          var_format='{:,.0%}',
-                         # y_limits=(0.0, None),
                          legend_stats=qis.LegendStats.LAST,
                          title='Portfolio Cumulative return attribution to benchmark betas',
                          ax=ax,
@@ -149,13 +143,13 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # ra perf table
     ax = fig.add_subplot(gs[0, 2:])
     portfolio_data.plot_ra_perf_table(ax=ax,
-                                      benchmark_price=benchmark_prices.iloc[:, 0],
+                                      benchmark_price=benchmark_prices[regime_benchmark],
                                       time_period=time_period,
                                       perf_params=perf_params,
                                       **qis.update_kwargs(kwargs, dict(fontsize=4)))
     ax = fig.add_subplot(gs[1, 2:])
     portfolio_data.plot_ra_perf_table(ax=ax,
-                                      benchmark_price=benchmark_prices.iloc[:, 0],
+                                      benchmark_price=benchmark_prices[regime_benchmark],
                                       time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
                                       perf_params=perf_params,
                                       **qis.update_kwargs(kwargs, dict(fontsize=4)))
@@ -165,7 +159,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     portfolio_data.plot_monthly_returns_heatmap(ax=ax,
                                                 time_period=time_period,
                                                 title='Monthly Returns',
-                                                **qis.update_kwargs(kwargs, dict(fontsize=4)))
+                                                **qis.update_kwargs(kwargs, dict(fontsize=4, date_format='%Y')))
 
     # periodic returns
     ax = fig.add_subplot(gs[4:6, 2:])
@@ -227,14 +221,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                             **kwargs)
     """
     local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
-    portfolio_data.plot_performance_attribution(portfolio_ids=[0],
-                                                time_period=time_period,
+    portfolio_data.plot_performance_attribution(time_period=time_period,
                                                 attribution_metric=qis.AttributionMetric.PNL,
                                                 ax=fig.add_subplot(gs[10:12, 2:]),
                                                 **local_kwargs)
 
-    portfolio_data.plot_performance_attribution(portfolio_ids=[1],
-                                                time_period=time_period,
+    portfolio_data.plot_performance_attribution(time_period=time_period,
                                                 attribution_metric=qis.AttributionMetric.PNL_RISK,
                                                 ax=fig.add_subplot(gs[12:, 2:]),
                                                 **local_kwargs)

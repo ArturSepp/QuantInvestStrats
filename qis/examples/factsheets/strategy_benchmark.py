@@ -56,13 +56,13 @@ def generate_volparity_multiportfolio(prices: pd.DataFrame,
                                                        weights=weights,
                                                        is_output_portfolio_data=True,
                                                        ticker='VolParity')
-    volparity_portfolio._set_group_data(group_data=group_data, group_order=list(group_data.unique()))
+    volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
 
     ew_portfolio = qis.backtest_model_portfolio(prices=prices,
                                                 weights=np.ones(len(prices.columns)) / len(prices.columns),
                                                 is_output_portfolio_data=True,
                                                 ticker='EqualWeight')
-    ew_portfolio._set_group_data(group_data=group_data, group_order=list(group_data.unique()))
+    ew_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
 
     multi_portfolio_data = MultiPortfolioData(portfolio_datas=[volparity_portfolio, ew_portfolio],
                                               benchmark_prices=benchmark_prices)

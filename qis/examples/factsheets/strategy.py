@@ -60,7 +60,7 @@ def generate_volparity_portfolio(prices: pd.DataFrame,
                                                        weights=weights,
                                                        is_output_portfolio_data=True,
                                                        ticker='VolParity')
-    volparity_portfolio._set_group_data(group_data=group_data, group_order=list(group_data.unique()))
+    volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
     return volparity_portfolio
 
 
@@ -72,7 +72,7 @@ def generate_equity_bond_portfolio(prices: pd.DataFrame,
                                                        weights=weights,
                                                        is_output_portfolio_data=True,
                                                        ticker='EquityBond')
-    volparity_portfolio._set_group_data(group_data=group_data, group_order=list(group_data.unique()))
+    volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
     return volparity_portfolio
 
 

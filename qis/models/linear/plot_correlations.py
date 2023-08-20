@@ -30,20 +30,23 @@ def plot_returns_corr_table(prices: pd.DataFrame,
                             freq: Optional[str] = None,
                             cmap: str = 'PiYG',
                             return_type: ReturnTypes = ReturnTypes.RELATIVE,
+                            is_fig_out: bool = True,
                             ax: plt.Subplot = None,
                             **kwargs
-                            ) -> Optional[plt.Figure]:
+                            ) -> Union[Optional[plt.Figure], pd.DataFrame]:
     """
     plot corr table of prices
     """
     returns = ret.to_returns(prices=prices, return_type=return_type, freq=freq)
     corr = ccm.compute_masked_covar_corr(returns=returns, is_covar=False)
-    fig = phe.plot_heatmap(df=corr,
-                           var_format=var_format,
-                           cmap=cmap,
-                           ax=ax,
-                           **kwargs)
-    return fig
+    if is_fig_out:
+        return phe.plot_heatmap(df=corr,
+                               var_format=var_format,
+                               cmap=cmap,
+                               ax=ax,
+                               **kwargs)
+    else:
+        return corr
 
 
 def plot_returns_ewm_corr_table(prices: pd.DataFrame,

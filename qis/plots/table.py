@@ -33,7 +33,7 @@ def plot_df_table(df: pd.DataFrame,
                   header_color: str = '#40466e',
                   header_text_color: str = 'w',
                   row_colors: List[str] = ('#f1f1f2', 'w'),
-                  edge_color: str = 'w',
+                  edge_color: str = 'lightgray',
                   bbox: Tuple[float] = (0, 0, 1, 1),
                   header_column_id: int = 0,
                   header_row_id: int = 0,
@@ -51,6 +51,7 @@ def plot_df_table(df: pd.DataFrame,
                   rows_edge_lines: List[int] = None,
                   columns_edge_lines: List[Tuple[int, str]] = None,
                   bold_font: bool = False,
+                  linewidth: float = 0.5,  # table borders
                   alpha: float = 1.0,
                   emply_column_names: bool = False,
                   ax: plt.Subplot = None,
@@ -110,8 +111,9 @@ def plot_df_table(df: pd.DataFrame,
 
     weight = 'bold' if bold_font else 'normal'
     for k, cell in mpl_table._cells.items():
+        cell.set_linewidth(0.5)
+
         if k[0] == header_row_id or k[1] < header_column_id:
-            cell.set_edgecolor(edge_color)
             cell.set_text_props(weight=weight, color=header_text_color)
             cell.set_facecolor(header_color)
             if first_row_height is not None:
@@ -122,9 +124,7 @@ def plot_df_table(df: pd.DataFrame,
                 # cell.set_height(first_column_width / 15)  # aling widths
 
         elif k[0] > header_row_id:
-            cell.set_edgecolor(edge_color)
             cell.set_facecolor(row_colors[k[0] % len(row_colors) ])
-            cell.set_edgecolor('slategray')
 
         if k[1] == 0:
             width = first_column_width
@@ -197,7 +197,7 @@ def plot_df_table(df: pd.DataFrame,
         set_data_colors(mpl_table, header_column_id=0 if add_index_as_column else -1,
                         data_colors=data_colors)
 
-    set_row_edge_color(mpl_table, row=None, color='lightgray')
+    set_row_edge_color(mpl_table, row=None, color=edge_color)
 
     if left_aligned_first_col:
         set_align_for_column(mpl_table, col=0, align='left')

@@ -91,7 +91,7 @@ class PortfolioData:
         datasets = fu.load_df_dict_from_csv(dataset_keys=dataset_keys, file_name=ticker)
         return cls(**datasets)
 
-    def _set_group_data(self, group_data: pd.Series, group_order: List[str] = None) -> None:
+    def set_group_data(self, group_data: pd.Series, group_order: List[str] = None) -> None:
         self.group_data = group_data
         self.group_order = group_order
 
@@ -440,7 +440,8 @@ class PortfolioData:
             prices = self.get_portfolio_nav(time_period=time_period)
             title = title or f"RA performance table: {da.get_time_period(prices).to_str()}"
         if benchmark_price is not None:
-            prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
+            if benchmark_price.name not in prices.columns:
+                prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
             ppt.plot_ra_perf_table_benchmark(prices=prices,
                                              benchmark=str(benchmark_price.name),
                                              perf_params=perf_params,
@@ -559,7 +560,9 @@ class PortfolioData:
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
             title = title or f"Sharpe ratio decomposition to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
-        prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
+
+        if benchmark_price.name not in prices.columns:
+            prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
 
         regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
         fig = qis.plot_regime_data(regime_classifier=regime_classifier,
@@ -627,7 +630,7 @@ class PortfolioData:
     def get_weights(self,
                     is_input_weights: bool = True,
                     columns: List[str] = None,
-                    freq: Optional[str] = 'W-WED'
+                    freq: Optional[str] = None
                     ) -> pd.DataFrame:
         if is_input_weights:
             weights = self.input_weights.copy()
@@ -642,7 +645,7 @@ class PortfolioData:
     def plot_weights(self,
                      is_input_weights: bool = True,
                      columns: List[str] = None,
-                     freq: Optional[str] = 'W-WED',
+                     freq: Optional[str] = None,
                      is_yaxis_limit_01: bool = True,
                      bbox_to_anchor: Tuple[float, float] = (0.4, 1.14),
                      title: Optional[str] = None,
@@ -682,6 +685,7 @@ class PortfolioData:
                       yvar_format='{:,.2%}',
                       ax=ax,
                       **kwargs)
+
 
 @njit
 def compute_realized_pnl(prices: np.ndarray,

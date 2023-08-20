@@ -116,9 +116,10 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  fontsize: int = 10,
                                  transpose: bool = False,
                                  alpha_an_factor: float = None,
+                                 is_fig_out: bool = True,
                                  ax: plt.Subplot = None,
                                  **kwargs
-                                 ) -> plt.Figure:
+                                 ) -> Union[plt.Figure, pd.DataFrame]:
     """
     plot ra perf table and get ra performance columns with data as string for tables
     """
@@ -130,13 +131,15 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                                   column_header=column_header,
                                                   alpha_an_factor=alpha_an_factor,
                                                   **kwargs)
-    fig = ptb.plot_df_table(df=ra_perf_table,
-                            transpose=transpose,
-                            special_columns_colors=special_columns_colors,
-                            fontsize=fontsize,
-                            ax=ax,
-                            **kwargs)
-    return fig
+    if is_fig_out:
+        return ptb.plot_df_table(df=ra_perf_table,
+                                transpose=transpose,
+                                special_columns_colors=special_columns_colors,
+                                fontsize=fontsize,
+                                ax=ax,
+                                **kwargs)
+    else:
+        return ra_perf_table
 
 
 def plot_ra_perf_scatter(prices: pd.DataFrame,
