@@ -417,13 +417,15 @@ class PortfolioData:
     """
     plotting methods
     """
-    def plot_nav(self, time_period: da.TimePeriod = None, **kwargs) -> None:
+    def plot_nav(self,
+                 time_period: da.TimePeriod = None,
+                 ax: plt.Subplot = None,
+                 **kwargs) -> None:
         nav = self.get_portfolio_nav(time_period=time_period)
-        with sns.axes_style('darkgrid'):
-            fig, axs = plt.subplots(2, 1, figsize=(16, 12), tight_layout=True)
-            ppd.plot_prices_with_dd(prices=nav,
-                                    axs=axs,
-                                    **kwargs)
+        if ax is None:
+            with sns.axes_style('darkgrid'):
+                fig, ax = plt.subplots(1, 1, figsize=(16, 12), tight_layout=True)
+        ppd.plot_prices(prices=nav, ax=ax,**kwargs)
 
     def plot_ra_perf_table(self,
                            benchmark_price: pd.Series = None,
@@ -463,7 +465,7 @@ class PortfolioData:
                                    **kwargs)
 
     def plot_returns_scatter(self,
-                             benchmark_price: pd.Series = None,
+                             benchmark_price: pd.Series,
                              is_grouped: bool = True,
                              time_period: da.TimePeriod = None,
                              title: str = None,
@@ -630,7 +632,7 @@ class PortfolioData:
     def get_weights(self,
                     is_input_weights: bool = True,
                     columns: List[str] = None,
-                    freq: Optional[str] = None
+                    freq: Optional[str] = 'W-WED'
                     ) -> pd.DataFrame:
         if is_input_weights:
             weights = self.input_weights.copy()
@@ -647,7 +649,9 @@ class PortfolioData:
                      columns: List[str] = None,
                      freq: Optional[str] = None,
                      is_yaxis_limit_01: bool = True,
-                     bbox_to_anchor: Tuple[float, float] = (0.4, 1.14),
+                     bbox_to_anchor: Tuple[float, float] = None,
+                     legend_stats: pst.LegendStats = pst.LegendStats.FIRST_AVG_LAST,
+                     var_format: str = '{:.1%}',
                      title: Optional[str] = None,
                      ax: plt.Subplot = None,
                      **kwargs
@@ -662,8 +666,8 @@ class PortfolioData:
                        baseline='zero',
                        bbox_to_anchor=bbox_to_anchor,
                        title=title,
-                       legend_stats=pst.LegendStats.FIRST_AVG_LAST,
-                       var_format='{:.1%}',
+                       legend_stats=legend_stats,
+                       var_format=var_format,
                        ax=ax,
                        **kwargs)
 
@@ -685,7 +689,6 @@ class PortfolioData:
                       yvar_format='{:,.2%}',
                       ax=ax,
                       **kwargs)
-
 
 @njit
 def compute_realized_pnl(prices: np.ndarray,

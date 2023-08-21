@@ -23,24 +23,26 @@ dependecy path increasing sequentially as follows.
 # Table of contents
 1. [Analytics](#analytics)
 2. [Installation](#installation)
-3. [Updates](#updates)
-4. [Examples](#examples)
+3. [Examples](#examples)
    1. [Visualization of price data](#price)
    2. [Multi assets factsheet](#multiassets)
    3. [Strategy factsheet](#strategy)
    4. [Strategy benchmark factsheet](#strategybenchmark)
    5. [Multi strategy factsheet](#multistrategy)
    6. [Notebooks](#notebooks)
-5. [Contributions](#contributions)
+4. [Contributions](#contributions)
+5. [Updates](#updates)
 6. [ToDos](#todos)
 7. [Disclaimer](#disclaimer)
 
 ## **Updates** <a name="updates"></a>
 
 ## **Installation** <a name="installation"></a>
+install using
 ```python 
 pip install qis
 ```
+upgrade using
 ```python 
 pip install --upgrade qis
 ```
@@ -58,38 +60,6 @@ Core dependencies:
 Optional dependencies:
     yfinance ">=0.1.38" (for getting test price data),
     pybloqs ">=1.2.13" (for producing html and pdf factsheets)
-
-
-## **Updates** <a name="updates"></a>
-
-#### 30 December 2022,  Version 1.0.1 released
-
-#### 08 July 2023, Version 2.0.1 released
-
-Core Changes
-
-1. Portfolio optimization (qis.portfolio.optimisation) layer is removed with core
-functionality moved to a stand-alone Python package: Backtesting Optimal Portfolio (bop)
-    
-* This allows to remove the dependency from cvxpy and sklearn packages and 
-thus to simplify the dependency management for qis
-
-2.	Added factsheet reporting using pybloqs package https://github.com/man-group/PyBloqs
-* Pybloqs is a versatile tool to create customised reporting using Matplotlib figures and table
-and thus leveraging QIS visualisation analytics
-
-3. New factsheets are added
-* Examples are added for the four type of reports:
-    1. multi assets: report performance of several assets with goal of cross-sectional comparision:
-    see qis.examples.factsheets.multi_asset.py
-  2. strategy: report performance, risk, and trading statictics for either backtested or actual strategy
-    with strategy data passed as PortfolioData object: see qis.examples.factsheets.strategy.py
-  3. strategy vs benchmark: report performance and marginal comparison
-  of strategy vs a benchmark strategy (data for both are passed using individual PortfolioData object): 
-  see qis.examples.factsheets.strategy_benchmark.py
-  4. multi_strategy: report for a list of strategies with individual PortfolioData. This report is 
-  useful to examine the sensetivity of backtested strategy to a parameter or set of parameters: 
-  see qis.examples.factsheets.multi_strategy
 
 
 ## **Examples** <a name="examples"></a>
@@ -205,6 +175,39 @@ There are a number of requirements:
 - Each submodule has a unit test for core functions and a localised entry point to core functions.
 
 - Avoid "super" pythonic constructions. Readability is the priority.
+
+
+
+## **Updates** <a name="updates"></a>
+
+#### 30 December 2022,  Version 1.0.1 released
+
+#### 08 July 2023, Version 2.0.1 released
+
+Core Changes
+
+1. Portfolio optimization (qis.portfolio.optimisation) layer is removed with core
+functionality moved to a stand-alone Python package: Backtesting Optimal Portfolio (bop)
+    
+* This allows to remove the dependency from cvxpy and sklearn packages and 
+thus to simplify the dependency management for qis
+
+2.	Added factsheet reporting using pybloqs package https://github.com/man-group/PyBloqs
+* Pybloqs is a versatile tool to create customised reporting using Matplotlib figures and table
+and thus leveraging QIS visualisation analytics
+
+3. New factsheets are added
+* Examples are added for the four type of reports:
+    1. multi assets: report performance of several assets with goal of cross-sectional comparision:
+    see qis.examples.factsheets.multi_asset.py
+  2. strategy: report performance, risk, and trading statictics for either backtested or actual strategy
+    with strategy data passed as PortfolioData object: see qis.examples.factsheets.strategy.py
+  3. strategy vs benchmark: report performance and marginal comparison
+  of strategy vs a benchmark strategy (data for both are passed using individual PortfolioData object): 
+  see qis.examples.factsheets.strategy_benchmark.py
+  4. multi_strategy: report for a list of strategies with individual PortfolioData. This report is 
+  useful to examine the sensetivity of backtested strategy to a parameter or set of parameters: 
+  see qis.examples.factsheets.multi_strategy
 
 
 ## **ToDos** <a name="todos"></a>
