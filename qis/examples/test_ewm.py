@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from typing import Union
 from enum import Enum
 
+import qis
 import qis.plots as qp
 import qis.models as qm
 
@@ -59,6 +60,28 @@ def vol_comp_with_pandas_ewm(span: int = 31) -> None:
                         var_format='{:.2f}')
 
 
+def ewm_covar_tensor_nans():
+    """
+    test how nanas are treated in covar matrix estimation
+    """
+    n = 3
+    size = 2000
+    a = np.random.multivariate_normal(mean=np.zeros(n), cov=np.array([[1.0, 0.5, 0.5],
+                                                                      [0.5, 1.0, 0.5],
+                                                                      [0.5, 0.5, 1.0]]),
+                                      size=size)
+    print(a)
+
+    print('without nans')
+    covar_tensor_txy = qis.compute_ewm_covar_tensor(a=a, span=200)
+    print(covar_tensor_txy)
+
+    print('with nans')
+    a[:200, 1] = np.nan  # uptonans
+    a[size-200:, 2] = np.nan  # after nans
+    covar_tensor_txy = qis.compute_ewm_covar_tensor(a=a, span=200, nan_backfill=qis.NanBackfill.NAN_FILL)
+    print(covar_tensor_txy)
+
 class UnitTests(Enum):
     TIME_COMP_WITH_PANDAS_EWM = 1
     VOL_COMP_WITH_PANDAS_EWM = 2
@@ -69,6 +92,7 @@ class UnitTests(Enum):
     EWMA_BETA = 7
     EWMA_AUTO_CORR = 8
     EWMA_CORR_MATRIX = 9
+    EWMA_COVAR_TENSOR_NANS = 10
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -81,7 +105,10 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.VOL_COMP_WITH_PANDAS_EWM:
         vol_comp_with_pandas_ewm()
 
-    else:
+    elif unit_test == UnitTests.EWMA_COVAR_TENSOR_NANS:
+        ewm_covar_tensor_nans()
+
+    else:  # apply same data for these tests
 
         data = get_test_data(n1=10000, n2=3, means=np.array([-2.0, -1.0, 0.0]))
         ewm_lambda = 0.94
@@ -192,7 +219,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.EWMA_DF
+    unit_test = UnitTests.EWMA_COVAR_TENSOR_NANS
 
     is_run_all_tests = True
     if is_run_all_tests:

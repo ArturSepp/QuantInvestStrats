@@ -453,6 +453,9 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
 
 
 def prices_to_scaled_nav(prices: Union[pd.Series, pd.DataFrame], scale=0.5):
+    """
+    rescale price returns by scale
+    """
     returns = scale * to_returns(prices=prices, is_log_returns=False, is_first_zero=True)
     navs = returns_to_nav(returns=returns)
     return navs
@@ -492,7 +495,7 @@ def log_returns_to_nav(log_returns: Union[np.ndarray, pd.Series, pd.DataFrame],
                        ) -> Union[pd.Series, pd.DataFrame]:
     """
     instrument log_return returns to nav
-    init_period of one by default will exlude the first day of returns for compunded nav
+    init_period of one by default will exlude the first day of returns for compounded nav
     """
     if init_period is not None and isinstance(log_returns, np.ndarray) is False:
         log_returns = to_zero_first_nonnan_returns(returns=log_returns, init_period=init_period)
@@ -507,9 +510,12 @@ def log_returns_to_nav(log_returns: Union[np.ndarray, pd.Series, pd.DataFrame],
     return strategy_nav
 
 
-def long_short_to_relative_nav(price1: pd.Series, price2: pd.Series) -> pd.Series:
-    returns = to_returns(pd.concat([price1, price2], axis=1).fillna(method='ffill'), is_first_zero=True)
-    relative_returns = np.subtract(returns[price1.name], returns[price2.name])
+def long_short_to_relative_nav(long_price: pd.Series, short_price: pd.Series) -> pd.Series:
+    """
+    performance of strategy long_price - short_price
+    """
+    returns = to_returns(pd.concat([long_price, short_price], axis=1).fillna(method='ffill'), is_first_zero=True)
+    relative_returns = np.subtract(returns[long_price.name], returns[short_price.name])
     relative_nav = returns_to_nav(returns=relative_returns, init_period=1)
     return relative_nav
 
@@ -644,11 +650,22 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
     return bfilled_data
 
 
+def to_rolling_returns(prices: Union[pd.DataFrame, pd.Series],
+                       periods: int = 7
+                       ) -> Union[pd.DataFrame, pd.Series]:
+    """
+    compute rolling returns
+    """
+    returns = prices.divide(prices.shift(periods=periods)) - 1.0
+    return returns
+
+
 class UnitTests(Enum):
     TO_ZERO_NONNAN = 1
     VOL_SAMPLE = 2
     ADJUST_PORTFOLIO_PA_RETURNS = 3
     NET_RETURN = 4
+    ROLLING_RETURNS = 5
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -658,7 +675,6 @@ def run_unit_test(unit_test: UnitTests):
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.TO_ZERO_NONNAN:
-
         np.random.seed(2)  # freeze seed
         dates = pd.date_range(start='31Dec2020', end='07Jan2021', freq='B')
         n = 3
@@ -682,14 +698,12 @@ def run_unit_test(unit_test: UnitTests):
         print(f"navs with init_period = None:\n{navs}")
 
     elif unit_test == UnitTests.VOL_SAMPLE:
-
         vols = compute_sampled_vols(prices=prices,
                                     freq_return='B',
                                     freq_vol='M')
         print(vols)
 
     elif unit_test == UnitTests.ADJUST_PORTFOLIO_PA_RETURNS:
-
         returns = prices.pct_change()
 
         portfolio_price = returns_to_nav(returns=returns.sum(1)).rename('portfolio')
@@ -708,18 +722,24 @@ def run_unit_test(unit_test: UnitTests):
         print(asset_prices_adj)
 
     elif unit_test == UnitTests.NET_RETURN:
-
         nav = prices['SPY'].dropna()
         print(nav)
         net_navs = get_net_navs(navs=nav)
         print(net_navs)
+
+    elif unit_test == UnitTests.ROLLING_RETURNS:
+        returns = to_rolling_returns(prices=prices.iloc[:, 0])
+        print(returns)
+        pts.plot_time_series(df=returns,
+                             var_format='{:.2%}',
+                             title='rollling returns')
 
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.NET_RETURN
+    unit_test = UnitTests.ROLLING_RETURNS
 
     is_run_all_tests = False
     if is_run_all_tests:

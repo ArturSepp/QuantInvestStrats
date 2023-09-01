@@ -78,7 +78,9 @@ from qis.perfstats.returns import (
     to_returns,
     prices_to_scaled_nav,
     to_total_returns,
-    to_zero_first_nonnan_returns, df_price_ffill_between_nans
+    to_zero_first_nonnan_returns,
+    df_price_ffill_between_nans,
+    to_rolling_returns
 )
 
 from qis.perfstats.timeseries_bfill import (

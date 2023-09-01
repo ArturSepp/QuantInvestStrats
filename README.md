@@ -47,6 +47,11 @@ upgrade using
 pip install --upgrade qis
 ```
 
+close using
+```python 
+git clone https://github.com/ArturSepp/QuantInvestStrats
+```
+
 Core dependencies:
     python = ">=3.8,<3.11",
     numba = ">=0.56.4",

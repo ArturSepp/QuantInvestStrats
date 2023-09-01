@@ -9,7 +9,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import seaborn as sns
-from matplotlib import colors as mcolors, colorbar
 from matplotlib._color_data import CSS4_COLORS as mcolors
 from matplotlib.colors import rgb2hex, LinearSegmentedColormap
 from matplotlib.container import BarContainer
@@ -120,7 +119,7 @@ def set_ax_ticks_format(ax: plt.Subplot,
                         **kwargs
                         ) -> None:
     if set_ticks:
-        set_ax_tick_params(ax=ax, **kwargs) # always remove minor ticks
+        set_ax_tick_params(ax=ax, **kwargs)  # always remove minor ticks
     # set x - ticks
     ax.xaxis.set_minor_formatter(mticker.NullFormatter())  # always remove minor ticks
 
@@ -213,7 +212,7 @@ def set_ax_tick_labels(ax: plt.Subplot,
                                fontsize=fontsize,
                                rotation=y_rotation,
                                minor=False)
-        #else:
+        # else:
         #    ax.yaxis.set_major_formatter(plt.NullFormatter())
         #    ax.set_yticklabels([])
 
@@ -529,7 +528,6 @@ def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
     re_indexed_data = data.copy()
     datalables = data.index
 
-    is_first_date: bool = True
     if x_date_freq is None:
         # x_date_freq = None corresponds to string labelled data
         pass
@@ -559,12 +557,12 @@ def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
                               t, t0 in zip(dates_index[1:], dates_index[:-1])] + [dates_index[-1].strftime(date_format)]
         elif x_date_freq == 'A-Mar':
             re_indexed_data.index = [t.strftime(date_format) for t in dates_index]
-            datalables = [t.strftime(date_format) if t.month == 3 else '' for t in dates_index] #and t.year % 2 == 0
+            datalables = [t.strftime(date_format) if t.month == 3 else '' for t in dates_index]  # and t.year % 2 == 0
 
         elif x_date_freq == 'Q':
             re_indexed_data.index = [t.strftime(date_format) for t in dates_index]
             if pd.infer_freq(data.index) is not None:
-                datalables = [t.strftime(date_format) if t.month%3 == 0 else '' for t in dates_index]
+                datalables = [t.strftime(date_format) if t.month % 3 == 0 else '' for t in dates_index]
             else:  # uneven dates so get 1y apart
                 datalables = [t0.strftime(date_format) if t.month - t0.month == 1 and t0.month % 3 == 0 else '' for
                               t, t0 in zip(dates_index[1:], dates_index[:-1])] + [dates_index[-1].strftime(date_format)]
@@ -1121,7 +1119,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 def get_n_colors(n: int,
                  first_color_fixed: bool = False,
                  last_color_fixed: bool = False,
-                 fixed_color: str = 'orangered', #'goldenrod',
+                 fixed_color: str = 'orangered',  # 'goldenrod',
                  type: str = 'soft',
                  is_fixed_n_colors: bool = True,
                  **kwargs
@@ -1180,9 +1178,7 @@ def get_n_fixed_colors(n: int,
 def get_n_mlt_colors(n: int,
                      first_color_fixed: bool = False,
                      last_color_fixed: bool = False,
-                     fixed_color: str = '#EF5A13',  # oragne
-                     type: str = 'bright',
-                     is_hex: bool = True,
+                     fixed_color: str = '#EF5A13',  # orange
                      **kwargs
                      ) -> List[str]:
     """
@@ -1256,45 +1252,35 @@ def rand_cmap(nlabels: int,
                           np.random.uniform(low=0.9, high=1)) for _ in range(nlabels)]
 
         # Convert HSV list to RGB
-        randRGBcolors = []
+        rand_rg_bcolors = []
         for HSVcolor in randHSVcolors:
-            randRGBcolors.append(colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2]))
+            rand_rg_bcolors.append(colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2]))
 
         if first_color_fixed:
-            randRGBcolors[0] = [0, 0, 0]
+            rand_rg_bcolors[0] = [0, 0, 0]
 
         if last_color_black:
-            randRGBcolors[-1] = [0, 0, 0]
+            rand_rg_bcolors[-1] = [0, 0, 0]
 
-        random_colormap = LinearSegmentedColormap.from_list('new_map', randRGBcolors, N=nlabels)
+        random_colormap = LinearSegmentedColormap.from_list('new_map', rand_rg_bcolors, N=nlabels)
 
     # Generate soft pastel colors, by limiting the RGB spectrum
     elif type == 'soft':
         low = 0.6
         high = 0.95
-        randRGBcolors = [(np.random.uniform(low=low, high=high),
+        rand_rg_bcolors = [(np.random.uniform(low=low, high=high),
                           np.random.uniform(low=low, high=high),
-                          np.random.uniform(low=low, high=high)) for i in range(nlabels)]
+                          np.random.uniform(low=low, high=high)) for _ in range(nlabels)]
 
         if first_color_fixed:
-            randRGBcolors[0] = [0, 0, 0]
+            rand_rg_bcolors[0] = [0, 0, 0]
 
         if last_color_black:
-            randRGBcolors[-1] = [0, 0, 0]
-        random_colormap = LinearSegmentedColormap.from_list('new_map', randRGBcolors, N=nlabels)
+            rand_rg_bcolors[-1] = [0, 0, 0]
+        random_colormap = LinearSegmentedColormap.from_list('new_map', rand_rg_bcolors, N=nlabels)
 
     else:
         raise ValueError(f"unknown type = {type}")
-
-    # Display colorbar
-    if verbose:
-        fig, ax = plt.subplots(1, 1, figsize=(15, 0.5))
-
-        bounds = np.linspace(0, nlabels, nlabels + 1)
-        norm = mcolors.BoundaryNorm(bounds, nlabels)
-
-        cb = colorbar.ColorbarBase(ax, cmap=random_colormap, norm=norm, spacing='proportional', ticks=None,
-                                   boundaries=bounds, format='%1i', orientation=u'horizontal')
 
     return random_colormap
 

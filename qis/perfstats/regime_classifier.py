@@ -119,7 +119,7 @@ def compute_regimes_pa_perf_table(sampled_returns_with_regime_id: pd.DataFrame,
     vols_for_sharpe_pa = ra_perf_table[PerfStat.VOL.to_str()]
     regime_sharpe = regime_pa1.divide(vols_for_sharpe_pa, axis=0)[regime_pa_columns]
 
-    regime_sharpe.columns = [f"{x} {RegimeData.REGIME_SHARPE.value}" for x in regime_sharpe.columns]
+    regime_sharpe.columns = [f"{x} {RegimeData.REGIME_SHARPE.value}" for x in given_columns]
     if is_add_ra_perf_table:
         cond_perf_table = pd.concat([regime_avg, regime_pa1, regime_sharpe, ra_perf_table], axis=1)
     else:

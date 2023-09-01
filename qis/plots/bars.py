@@ -332,6 +332,7 @@ def plot_vbars(df: pd.DataFrame,
     if is_reverse:
         legend_labels = legend_labels[::-1]
         legend_colors = legend_colors[::-1]
+
     put.set_legend(ax=ax,
                    labels=legend_labels,
                    colors=legend_colors,

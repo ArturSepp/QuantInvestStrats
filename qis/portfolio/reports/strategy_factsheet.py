@@ -24,7 +24,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 perf_params: PerfParams = PERF_PARAMS,
                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                 regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
-                                weight_freq: Optional[str] = None,#'W-WED',
+                                weight_freq: Optional[str] = 'B', #'W-WED',
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 **kwargs
                                 ) -> plt.Figure:
@@ -62,9 +62,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # dd
     ax = fig.add_subplot(gs[2:4, :2])
     qis.plot_drawdown(prices=joint_prices,
-                     title='Running Drawdowns',
-                     dd_legend_type=qis.DdLegendType.SIMPLE,
-                     ax=ax, **kwargs)
+                      title='Running Drawdowns',
+                      dd_legend_type=qis.DdLegendType.SIMPLE,
+                      ax=ax, **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 

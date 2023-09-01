@@ -184,6 +184,8 @@ def run_unit_test(unit_test: UnitTests):
                          benchmark='SPY',
                          perf_params=perf_params,
                          is_use_vbar=True,
+                         ncol=3,
+                         bbox_to_anchor=(0.1, 1.05),
                          **kwargs)
 
         plot_regime_data(regime_classifier=regime_classifier,
@@ -191,6 +193,7 @@ def run_unit_test(unit_test: UnitTests):
                          benchmark='SPY',
                          perf_params=perf_params,
                          is_use_vbar=False,
+                         bbox_to_anchor=None,
                          **kwargs)
 
     elif unit_test == UnitTests.VOL_REGIME:
@@ -258,7 +261,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.AVG_PLOT
+    unit_test = UnitTests.BNB_REGIME
 
     is_run_all_tests = False
     if is_run_all_tests:

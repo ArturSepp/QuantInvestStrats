@@ -14,6 +14,19 @@ import qis.utils.dates as da
 import qis.utils.np_ops as npo
 
 
+class NanBackfill(Enum):
+    """
+    when you sung ewm recursion we need to treat nans
+    base case: when we assume conitnuous time series with occasional gaps we use FFILL method
+    case where outputs needs a flag that given data are nans we need to use nan fill
+    """
+    FFILL = 1   # use last nonnan value
+    DEFLATED_FFILL = 2  #  use last nonnan value * lambda
+    ZERO_FILL = 3  # use zero value: nans must be filled by zero otherwise the recursion cannot start
+    NAN_FILL = 4  # use nan value: for recursion we use ZERO_FILL then we substitute zeros with nans:
+    # it corresponds to DEFLATED_FFILL for subsequent non nans
+
+
 class InitType(Enum):
     ZERO = 1
     X0 = 2
@@ -78,7 +91,7 @@ def ewm_recursion(a: np.ndarray,
                   ewm_lambda: Union[float, np.ndarray] = 0.94,
                   is_start_from_first_nonan: bool = True,
                   is_unit_vol_scaling: bool = False,
-                  is_nan_deflating: bool = False
+                  nan_backfill: NanBackfill = NanBackfill.FFILL
                   ) -> np.ndarray:
 
     """
@@ -93,7 +106,6 @@ def ewm_recursion(a: np.ndarray,
     start_from_first_nonan: start filling nans only from the first non-nan in underlying data: recomended because
                             it avoids backfilling of init_value
     is_unit_vol_scaling: outputs are scaled to have var(ewm)=1 (for gaussian data with zero corrs)
-    is_nan_deflating: equivalent to setting nans to zero, the series of nans will pull ewm to zero
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
@@ -133,15 +145,22 @@ def ewm_recursion(a: np.ndarray,
         # fill nan-values
         if is_1d:   # np.where cannot be used
             if not np.isfinite(current_ewm):
-                if is_nan_deflating:
-                    current_ewm = ewm_lambda*last_ewm
-                else:
+                if nan_backfill == NanBackfill.FFILL:
                     current_ewm = last_ewm
+                elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+                    current_ewm = ewm_lambda*last_ewm
+                else:  # use zero fill
+                    current_ewm = 0.0
         else:
-            if is_nan_deflating:
-                current_ewm = np.where(np.isfinite(current_ewm), current_ewm, ewm_lambda*last_ewm)
-            else:
-                current_ewm = np.where(np.isfinite(current_ewm), current_ewm, last_ewm)
+            if nan_backfill == NanBackfill.FFILL:
+                fill_value = last_ewm
+            elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+                fill_value = ewm_lambda*last_ewm
+            else:  # use zero fill
+                fill_value = np.zeros_like(last_ewm)
+
+            current_ewm = np.where(np.isfinite(current_ewm), current_ewm, fill_value)
+
         ewm[t] = last_ewm = current_ewm
 
     if is_unit_vol_scaling:
@@ -156,7 +175,7 @@ def compute_ewm_covar(a: np.ndarray,
                       span: Union[int, np.ndarray] = None,
                       ewm_lambda: float = 0.94,
                       covar0: np.ndarray = None,
-                      is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                      nan_backfill: NanBackfill = NanBackfill.FFILL
                       ) -> np.ndarray:
     """
     compute ewm covariance matrix
@@ -180,10 +199,14 @@ def compute_ewm_covar(a: np.ndarray,
     if a.ndim == 1:  # ndarry array
         r_ij = np.outer(a, a)
         covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-        if is_nan_deflating:
-            covar = np.where(np.isfinite(covar), covar, ewm_lambda*last_covar)
-        else:
-            covar = np.where(np.isfinite(covar), covar, last_covar)
+        if nan_backfill == NanBackfill.FFILL:
+            fill_value = last_covar
+        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+            fill_value = ewm_lambda * last_covar
+        else:  # use zero fill
+            fill_value = np.zeros_like(last_covar)
+
+        covar = last_covar = np.where(np.isfinite(covar), covar, fill_value)
 
     else:  # loop over rows
         t = a.shape[0]
@@ -191,11 +214,15 @@ def compute_ewm_covar(a: np.ndarray,
             row = a[idx]
             r_ij = np.outer(row, row)
             covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-            if is_nan_deflating:
-                covar = np.where(np.isfinite(covar), covar, ewm_lambda*last_covar)
-            else:
-                covar = np.where(np.isfinite(covar), covar, last_covar)
-            last_covar = covar
+
+            if nan_backfill == NanBackfill.FFILL:
+                fill_value = last_covar
+            elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+                fill_value = ewm_lambda*last_covar
+            else:  # use zero fill
+                fill_value = np.zeros_like(last_covar)
+
+            covar = last_covar = np.where(np.isfinite(covar), covar, fill_value)
 
     return covar
 
@@ -206,7 +233,7 @@ def compute_ewm_covar_tensor(a: np.ndarray,
                              ewm_lambda: float = 0.94,
                              covar0: np.ndarray = None,
                              is_corr: bool = False,
-                             is_nan_deflating: bool = False
+                             nan_backfill: NanBackfill = NanBackfill.FFILL
                              ) -> np.ndarray:
     """
     compute ewm covariance matrix time series as 3-d tensor [t, x, x]
@@ -220,11 +247,13 @@ def compute_ewm_covar_tensor(a: np.ndarray,
 
     t = a.shape[0]
     n = a.shape[1]  # array of ndarray
+    zero_covar = np.zeros((n, n))
 
     if covar0 is None:
-        covar = np.zeros((n, n))
+        covar = zero_covar
     else:
-        covar = np.where(np.isfinite(covar0), covar0, np.zeros((n, n)))
+        covar = np.where(np.isfinite(covar0), covar0, zero_covar)
+
     output_covar = np.empty((t, n, n))
     last_covar = covar
     # loop over rows
@@ -232,19 +261,27 @@ def compute_ewm_covar_tensor(a: np.ndarray,
         row = a[idx]
         r_ij = np.outer(row, row)
         covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-        if is_nan_deflating:
-            last_covar = np.where(np.isfinite(covar), covar, ewm_lambda * last_covar)
-        else:
+        if nan_backfill == NanBackfill.FFILL:
             last_covar = np.where(np.isfinite(covar), covar, last_covar)
+        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+            last_covar = np.where(np.isfinite(covar), covar, ewm_lambda * last_covar)
+        else:  # use zero fill
+            last_covar = np.where(np.isfinite(covar), covar, zero_covar)
+
         if is_corr:
             if np.nansum(np.diag(last_covar)) > 1e-10:
                 inv_vol = np.reciprocal(np.sqrt(np.diag(last_covar)))
                 norm = np.outer(inv_vol, inv_vol)
             else:
                 norm = np.identity(n)
-            output_covar[idx] = norm * last_covar
+            last_covar_ = norm * last_covar
         else:
-            output_covar[idx] = last_covar
+            last_covar_ = last_covar
+
+        if nan_backfill == NanBackfill.NAN_FILL:  # fill zeros with nans
+            last_covar_ = np.where(np.equal(last_covar_, zero_covar), np.nan, last_covar_)
+
+        output_covar[idx] = last_covar_
 
     return output_covar
 
@@ -256,7 +293,7 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
                                ewm_lambda: float = 0.94,
                                warm_up_period: int = 20,  # to avoid excessive betas at start,
                                is_x_correlated: bool = True,  # computation of [x,x]
-                               is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                               nan_backfill: NanBackfill = NanBackfill.FFILL
                                ) -> np.ndarray:
     """
     compute ewm cross matrices with x*y using outer product = dim[x] * dim[y]
@@ -292,15 +329,20 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
         row_x = x[t]  # time series row
         row_y = y[t]
         cross_xy = ewm_lambda_1 * np.outer(row_x, row_y) + ewm_lambda * last_cross_xy
-        if is_nan_deflating:
-            cross_xy = np.where(np.isfinite(cross_xy), cross_xy, ewm_lambda * last_cross_xy)
-        else:
-            cross_xy = np.where(np.isfinite(cross_xy), cross_xy, last_cross_xy)
+
+        if nan_backfill == NanBackfill.FFILL:
+            fill_value = last_cross_xy
+        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+            fill_value = ewm_lambda * last_cross_xy
+        else:  # use zero fill
+            fill_value = np.zeros_like(last_cross_xy)
+
+        cross_xy = np.where(np.isfinite(cross_xy), cross_xy, fill_value)
         last_cross_xy = cross_xy
 
         # covar matrix
         covar_xx = ewm_lambda_1 * np.outer(row_x, row_x) + ewm_lambda * last_covar_xx
-        if is_nan_deflating:
+        if nan_backfill:
             covar_xx = np.where(np.isfinite(covar_xx), covar_xx, ewm_lambda * last_covar_xx)
         else:
             covar_xx = np.where(np.isfinite(covar_xx), covar_xx, last_covar_xx)
@@ -335,7 +377,7 @@ def compute_one_factor_ewm_betas(x: pd.Series,
                                  y: pd.DataFrame,
                                  span: Union[int, np.ndarray] = None,
                                  ewm_lambda: float = 0.94,
-                                 is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                                 nan_backfill: NanBackfill = NanBackfill.FFILL
                                  ) -> pd.DataFrame:
     """
     ewm betas of y wrt factor 1-d x
@@ -347,7 +389,8 @@ def compute_one_factor_ewm_betas(x: pd.Series,
     y_np = npo.to_finite_np(data=y, fill_value=np.nan)
 
     betas_ts = compute_ewm_xy_beta_tensor(x=x_np, y=y_np, span=span,
-                                          ewm_lambda=ewm_lambda, is_nan_deflating=is_nan_deflating)
+                                          ewm_lambda=ewm_lambda,
+                                          nan_backfill=nan_backfill)
     # the x factor dimension is 1, we get slice [t, y] using [:, 0, :]
     one_factor_ewm_betas = pd.DataFrame(data=betas_ts[:, 0, :], index=y.index, columns=y.columns)
     return one_factor_ewm_betas
@@ -359,7 +402,7 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                 init_value: Union[float, np.ndarray, None] = None,
                 init_type: InitType = InitType.X0,
                 is_unit_vol_scaling: bool = False,
-                is_nan_deflating: bool = False
+                nan_backfill: NanBackfill = NanBackfill.FFILL
                 ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     ewm for pandas or series
@@ -382,7 +425,7 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                         ewm_lambda=ewm_lambda,
                         init_value=init_value,
                         is_unit_vol_scaling=is_unit_vol_scaling,
-                        is_nan_deflating=is_nan_deflating)
+                        nan_backfill=nan_backfill)
 
     if isinstance(data, pd.DataFrame):  # return of data type
         ewm = pd.DataFrame(data=ewm, index=data.index, columns=data.columns)
@@ -402,7 +445,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     apply_sqrt: bool = True,
                     annualize: bool = False,
                     af: Optional[float] = None,
-                    is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                    nan_backfill: NanBackfill = NanBackfill.FFILL
                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     implementation of ewm recursion for variance/volatility computation
@@ -417,7 +460,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                      mean_adj_type=mean_adj_type,
                                      ewm_lambda=ewm_lambda,
                                      init_type=init_type,
-                                     is_nan_deflating=is_nan_deflating)
+                                     nan_backfill=nan_backfill)
 
     # initial conditions
     a = np.square(a)
@@ -429,7 +472,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         if isinstance(init_value, np.ndarray):
             init_value = float(init_value)
 
-    ewm = ewm_recursion(a=a, ewm_lambda=ewm_lambda, init_value=init_value, is_nan_deflating=is_nan_deflating)
+    ewm = ewm_recursion(a=a, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
 
     if annualize or af is not None:
         if af is None:
@@ -456,7 +499,7 @@ def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                       span: Union[int, np.ndarray] = None,
                       ewm_lambda: Union[float, np.ndarray] = 0.94,
                       init_value: Union[float, np.ndarray] = None,
-                      is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                      nan_backfill: NanBackfill = NanBackfill.FFILL
                       ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
 
     """
@@ -500,7 +543,7 @@ def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                            span=span,
                            ewm_lambda=ewm_lambda,
                            init_value=init_value,
-                           is_nan_deflating=is_nan_deflating)
+                           nan_backfill=nan_backfill)
     else:
         raise TypeError(f"mean_adj_type={mean_adj_type} is not implemented")
 
@@ -513,7 +556,7 @@ def compute_rolling_mean_adj(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                              ewm_lambda: Union[float, np.ndarray] = 0.94,
                              init_type: InitType = InitType.MEAN,
                              init_value: Union[float, np.ndarray, None] = None,
-                             is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                             nan_backfill: NanBackfill = NanBackfill.FFILL
                              ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
 
     if mean_adj_type == MeanAdjType.NONE:
@@ -527,7 +570,7 @@ def compute_rolling_mean_adj(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                  span=span,
                                  ewm_lambda=ewm_lambda,
                                  init_value=init_value,
-                                 is_nan_deflating=is_nan_deflating)
+                                 nan_backfill=nan_backfill)
         x_mean = data - mean
 
     return x_mean
@@ -541,7 +584,7 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                          mean_adj_type: MeanAdjType = MeanAdjType.NONE,
                          init_type: InitType = InitType.ZERO,
                          var_init_type: InitType = InitType.MEAN,  # to avoid overflows
-                         is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                         nan_backfill: NanBackfill = NanBackfill.FFILL
                          ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     compute cross ewm for 1-d arrays x and y
@@ -562,14 +605,14 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                           span=span,
                                           ewm_lambda=ewm_lambda,
                                           init_type=init_type,
-                                          is_nan_deflating=is_nan_deflating)
+                                          nan_backfill=nan_backfill)
 
         y_data = compute_rolling_mean_adj(data=y_data,
                                           mean_adj_type=mean_adj_type,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
                                           init_type=init_type,
-                                          is_nan_deflating=is_nan_deflating)
+                                          nan_backfill=nan_backfill)
 
     # 2  take gen arrays and convert to ndarray to use with numbas
     if isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.DataFrame):
@@ -613,7 +656,7 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                              span=span,
                              ewm_lambda=ewm_lambda,
                              init_value=init_value_xy,
-                             is_nan_deflating=is_nan_deflating)
+                             nan_backfill=nan_backfill)
 
     if cross_xy_type == CrossXyType.COVAR:
         cross_xy = xy_covar
@@ -625,17 +668,17 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                               span=span,
                               ewm_lambda=ewm_lambda,
                               init_value=init_value_x2,
-                              is_nan_deflating=is_nan_deflating)
+                              nan_backfill=nan_backfill)
         divisor = x_var
         cross_xy = np.divide(xy_covar, divisor, where=np.isclose(divisor, 0.0) == False)
 
     elif cross_xy_type == CrossXyType.CORR:
         x2 = np.square(x)
         init_value_x2 = set_init_dim1(data=x2, init_type=var_init_type)
-        x_var = ewm_recursion(a=x2, span=span, ewm_lambda=ewm_lambda, init_value=init_value_x2, is_nan_deflating=is_nan_deflating)
+        x_var = ewm_recursion(a=x2, span=span, ewm_lambda=ewm_lambda, init_value=init_value_x2, nan_backfill=nan_backfill)
         y2 = np.square(y)
         init_value_y2 = set_init_dim1(data=y2, init_type=var_init_type)
-        y_var = ewm_recursion(a=y2, span=span, ewm_lambda=ewm_lambda, init_value=init_value_y2, is_nan_deflating=is_nan_deflating)
+        y_var = ewm_recursion(a=y2, span=span, ewm_lambda=ewm_lambda, init_value=init_value_y2, nan_backfill=nan_backfill)
         divisor = np.sqrt(np.multiply(x_var, y_var))
         cross_xy = np.divide(xy_covar, divisor, where=np.isclose(divisor, 0.0) == False)
     else:
@@ -657,7 +700,7 @@ def compute_ewm_beta_resid(x_data: pd.DataFrame,
                            mean_adj_type: MeanAdjType = MeanAdjType.NONE,
                            init_type: InitType = InitType.MEAN,
                            annualize: bool = False,
-                           is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                           nan_backfill: NanBackfill = NanBackfill.FFILL
                            ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
     """
@@ -672,14 +715,14 @@ def compute_ewm_beta_resid(x_data: pd.DataFrame,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
                                           init_type=init_type,
-                                          is_nan_deflating=is_nan_deflating)
+                                          nan_backfill=nan_backfill)
 
         y_data = compute_rolling_mean_adj(data=y_data,
                                           mean_adj_type=mean_adj_type,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
                                           init_type=init_type,
-                                          is_nan_deflating=is_nan_deflating)
+                                          nan_backfill=nan_backfill)
 
     # 2  take gen arrays and convert to ndarray to use with numbdas
     if isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.DataFrame):
@@ -725,20 +768,20 @@ def compute_ewm_alpha_r2(y_data: pd.DataFrame,
                          y_prediction: pd.DataFrame,
                          span: Union[int, np.ndarray] = None,
                          ewm_lambda: Union[float, np.ndarray] = 0.94,
-                         is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                         nan_backfill: NanBackfill = NanBackfill.FFILL
                          ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     """
     # 1 - adjust by mean
     resid = y_data - y_prediction
-    ewm_alpha = compute_ewm(data=resid, span=span, ewm_lambda=ewm_lambda, is_nan_deflating=is_nan_deflating)
+    ewm_alpha = compute_ewm(data=resid, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill)
     resid0 = resid.subtract(ewm_alpha)
     resid_var = ewm_recursion(a=np.square(resid0.to_numpy()), span=span, ewm_lambda=ewm_lambda,
-                              init_value=np.zeros(len(y_data.columns)), is_nan_deflating=is_nan_deflating)
+                              init_value=np.zeros(len(y_data.columns)), nan_backfill=nan_backfill)
 
-    y_var0 = y_data.subtract(compute_ewm(data=y_data, span=span, ewm_lambda=ewm_lambda, is_nan_deflating=is_nan_deflating))
+    y_var0 = y_data.subtract(compute_ewm(data=y_data, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill))
     y_var = ewm_recursion(a=np.square(y_var0.to_numpy()), span=span, ewm_lambda=ewm_lambda,
-                          init_value=np.zeros(len(y_data.columns)), is_nan_deflating=is_nan_deflating)
+                          init_value=np.zeros(len(y_data.columns)), nan_backfill=nan_backfill)
 
     ewm_r2 = 1.0 - np.divide(resid_var, y_var, where=np.greater(y_var, 0.0))
     ewm_r2 = np.clip(ewm_r2, a_min=0.0, a_max=1.0)
@@ -785,7 +828,7 @@ def compute_portfolio_vol(returns: pd.DataFrame,
                           init_type: InitType = InitType.ZERO,
                           annualize: bool = False,
                           annualization_factor: float = None,
-                          is_nan_deflating: bool = False  # equivalent to setting nans to zero
+                          nan_backfill: NanBackfill = NanBackfill.FFILL
                           ) -> pd.Series:
 
     # align index and columns
@@ -801,7 +844,7 @@ def compute_portfolio_vol(returns: pd.DataFrame,
                                               span=span,
                                               ewm_lambda=ewm_lambda,
                                               init_type=init_type,
-                                              is_nan_deflating=is_nan_deflating)
+                                              nan_backfill=nan_backfill)
 
     portfolio_vol = compute_portfolio_vol_np(returns=returns_np,
                                              weights=weights_np,
@@ -847,7 +890,7 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
         ewm_mean = ewm_recursion(a=x,
                                  span=span,
                                  init_value=initial_mean,
-                                 is_nan_deflating=True)
+                                 nan_backfill=NanBackfill.ZERO_FILL)
         sharpe = pd.DataFrame(data=an*ewm_mean, index=returns.index, columns=returns.columns)
 
     elif norm_type == 1 or norm_type == 2:
@@ -855,7 +898,7 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
         ewm_mean = ewm_recursion(a=x,
                                  span=span,
                                  init_value=initial_mean,
-                                 is_nan_deflating=True)
+                                 nan_backfill=NanBackfill.ZERO_FILL)
         if norm_type == 2:
             v = np.square(x-ewm_mean)
         else:
@@ -863,7 +906,7 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
 
         ewm_var = ewm_recursion(a=v, span=span,
                                 init_value=initial_var,
-                                is_nan_deflating=False)
+                                nan_backfill=NanBackfill.ZERO_FILL)
         ewm_vol = np.sqrt(ewm_var)
         sharpe = pd.DataFrame(data=san * np.divide(ewm_mean, ewm_vol, where=np.greater(ewm_vol, 0.0)),
                               index=returns.index,

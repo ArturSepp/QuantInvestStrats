@@ -23,6 +23,7 @@ class PdfType(Enum):
     KDE_NORM = 2
     HISTOGRAM = 3
     TRUNCETED_PDF = 4
+    KDE_WITH_HISTOGRAM = 5
 
 
 def plot_histogram(df: Union[pd.DataFrame, pd.Series],
@@ -52,10 +53,11 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    annualize_vol: bool = False,
                    first_color_fixed: bool = False,
                    fill: bool = False,
-                   bins: Optional[Union[np.ndarray, int]] = None,
+                   cumulative: bool = False,
+                   bins: Optional[Union[np.ndarray, str]] = "auto",
                    ax: plt.Subplot = None,
                    **kwargs
-                   ) -> plt.Figure:
+                   ) -> Optional[plt.Figure]:
 
     df = df.copy()
 
@@ -115,10 +117,20 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
             ax.plot(x, y, color=color, linewidth=linewidth)
 
         elif pdf_type == PdfType.HISTOGRAM:
-            sns.distplot(a=column_data, hist=True, kde=False, color=color,
-                         norm_hist=True,
+            sns.histplot(data=column_data, kde=False, color=color,
+                         stat="probability",
+                         cumulative=cumulative,
                          bins=bins,
                          ax=ax)
+
+        elif pdf_type == PdfType.KDE_WITH_HISTOGRAM:
+            sns.histplot(data=column_data, kde=False, color=color,
+                         stat="probability",
+                         bins=bins,
+                         ax=ax)
+            sns.kdeplot(column_data, fill=fill, color=color, linewidth=linewidth,
+                        clip=clip,
+                        ax=ax)
 
         elif pdf_type == PdfType.TRUNCETED_PDF:
             x, y = trunc_dens(column_data, **kwargs)
