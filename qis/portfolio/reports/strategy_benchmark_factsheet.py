@@ -102,10 +102,12 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                **qis.update_kwargs(kwargs, dict(fontsize=4)))
 
     time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+    # change regression to weekly
     multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[2:4, 2:]),
                                                benchmark_price=benchmark_price,
                                                perf_params=perf_params,
-                                               **qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=4)))
+                                               **qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=4,
+                                                                                alpha_an_factor=52, freq_reg='W-WED')))
 
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,

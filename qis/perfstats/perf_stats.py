@@ -236,6 +236,7 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
                                          perf_params: PerfParams = None,
                                          is_log_returns: bool = False,
                                          alpha_an_factor: float = None,
+                                         freq_reg: str = None,
                                          **kwargs
                                          ) -> pd.DataFrame:
 
@@ -246,7 +247,8 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
 
     ra_perf_table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
 
-    returns = ret.to_returns(prices=prices, freq=perf_params.freq_reg, is_log_returns=is_log_returns)
+    # compute benchmark regression
+    returns = ret.to_returns(prices=prices, freq=freq_reg or perf_params.freq_reg, is_log_returns=is_log_returns)
     alphas, betas, r2 = {}, {}, {}
     for column in returns.columns:
         joint_data = returns[[benchmark, column]].dropna()

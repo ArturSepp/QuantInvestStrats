@@ -333,9 +333,12 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                               **kwargs)
 
     time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
+    # change regression to weekly
     report.plot_ra_perf_table(benchmark=benchmark,
                               ax=fig.add_subplot(gs[1, 2:]),
-                              **qis.update_kwargs(kwargs, dict(time_period=time_period1)))
+                              **qis.update_kwargs(kwargs, dict(time_period=time_period1,
+                                                               alpha_an_factor=52,
+                                                               freq_reg='W-WED')))
 
     report.plot_annual_returns(ax=fig.add_subplot(gs[2:4, 2:]),
                                heatmap_freq=heatmap_freq,

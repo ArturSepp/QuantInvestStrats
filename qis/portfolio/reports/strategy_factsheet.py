@@ -148,11 +148,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                       perf_params=perf_params,
                                       **qis.update_kwargs(kwargs, dict(fontsize=4)))
     ax = fig.add_subplot(gs[1, 2:])
+    # change regression to weekly
     portfolio_data.plot_ra_perf_table(ax=ax,
                                       benchmark_price=benchmark_prices[regime_benchmark],
                                       time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
                                       perf_params=perf_params,
-                                      **qis.update_kwargs(kwargs, dict(fontsize=4)))
+                                      **qis.update_kwargs(kwargs, dict(fontsize=4, alpha_an_factor=52, freq_reg='W-WED')))
 
     # heatmap
     ax = fig.add_subplot(gs[2:4, 2:])

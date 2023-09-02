@@ -125,7 +125,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     multi_portfolio_data.plot_ra_perf_table(ax=fig.add_subplot(gs[3, 2:]),
                                             perf_params=perf_params,
                                             time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
-                                            **qis.update_kwargs(kwargs, dict(fontsize=5)))
+                                            **qis.update_kwargs(kwargs, dict(fontsize=5, alpha_an_factor=52, freq_reg='W-WED')))
     """
     multi_portfolio_data.plot_corr_table(ax=fig.add_subplot(gs[3, 2:]),
                                          time_period=time_period,
