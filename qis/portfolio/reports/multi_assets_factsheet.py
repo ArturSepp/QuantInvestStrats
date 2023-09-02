@@ -85,17 +85,18 @@ class MultiAssetsReport:
     def plot_ra_perf_table(self,
                            benchmark: str,
                            time_period: TimePeriod = None,
+                           perf_columns: List[PerfStat] = qis.BENCHMARK_TABLE_COLUMNS,
                            ax: plt.Subplot = None,
                            **kwargs) -> None:
         prices = self.get_prices(benchmark, time_period=time_period)
         qis.plot_ra_perf_table_benchmark(prices=prices,
-                                        benchmark=benchmark,
-                                        perf_params=self.perf_params,
-                                        perf_columns=qis.BENCHMARK_TABLE_COLUMNS,
-                                        title=f"RA performance table: {qis.get_time_period(prices).to_str()}",
-                                        rotation_for_columns_headers=0,
-                                        ax=ax,
-                                        **kwargs)
+                                         benchmark=benchmark,
+                                         perf_params=self.perf_params,
+                                         perf_columns=perf_columns,
+                                         title=f"RA performance table: {qis.get_time_period(prices).to_str()}",
+                                         rotation_for_columns_headers=0,
+                                         ax=ax,
+                                         **kwargs)
 
     def plot_ra_regime_table(self,
                              regime_benchmark_str: str = None,
@@ -180,11 +181,11 @@ class MultiAssetsReport:
                                                         square=False,
                                                         x_rotation=90))
         qis.plot_periodic_returns_table(prices=self.get_prices(time_period=time_period),
-                                       freq=heatmap_freq,
-                                       ax=ax,
-                                       title=f"Annual Returns",
-                                       date_format=date_format,
-                                       **local_kwargs)
+                                        freq=heatmap_freq,
+                                        ax=ax,
+                                        title=f"{heatmap_freq} Returns",
+                                        date_format=date_format,
+                                        **local_kwargs)
 
     def plot_corr_table(self,
                         freq: str = 'W-WED',

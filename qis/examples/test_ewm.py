@@ -221,7 +221,7 @@ if __name__ == '__main__':
 
     unit_test = UnitTests.EWMA_COVAR_TENSOR_NANS
 
-    is_run_all_tests = True
+    is_run_all_tests = False
     if is_run_all_tests:
         for unit_test in UnitTests:
             run_unit_test(unit_test=unit_test)

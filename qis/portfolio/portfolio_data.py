@@ -17,12 +17,11 @@ import qis.file_utils as fu
 import qis.utils.dates as da
 import qis.utils.df_groups as dfg
 import qis.utils.struct_ops as sop
-from qis.utils import EnumMap
-from qis.perfstats.config import PerfParams, RegimeData
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.perfstats.regime_classifier as rcl
-from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
+from qis import PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantileRegimeSpecs
+
 # plots
 import qis.plots.time_series as pts
 import qis.plots.stackplot as pst
@@ -93,6 +92,8 @@ class PortfolioData:
 
     def set_group_data(self, group_data: pd.Series, group_order: List[str] = None) -> None:
         self.group_data = group_data
+        if group_order is None:
+            group_order = list(group_data.unique())
         self.group_order = group_order
 
     """
@@ -420,7 +421,8 @@ class PortfolioData:
     def plot_nav(self,
                  time_period: da.TimePeriod = None,
                  ax: plt.Subplot = None,
-                 **kwargs) -> None:
+                 **kwargs
+                 ) -> None:
         nav = self.get_portfolio_nav(time_period=time_period)
         if ax is None:
             with sns.axes_style('darkgrid'):
@@ -432,9 +434,11 @@ class PortfolioData:
                            is_grouped: bool = True,
                            time_period: da.TimePeriod = None,
                            perf_params: PerfParams = None,
+                           perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                            title: str = None,
                            ax: plt.Subplot = None,
-                           **kwargs) -> None:
+                           **kwargs
+                           ) -> None:
         if is_grouped:
             prices = self.get_ac_navs(time_period=time_period)
             title = title or f"RA performance table by groups: {da.get_time_period(prices).to_str()}"
@@ -447,7 +451,7 @@ class PortfolioData:
             ppt.plot_ra_perf_table_benchmark(prices=prices,
                                              benchmark=str(benchmark_price.name),
                                              perf_params=perf_params,
-                                             perf_columns=rpt.BENCHMARK_TABLE_COLUMNS,
+                                             perf_columns=perf_columns,
                                              title=title,
                                              rotation_for_columns_headers=0,
                                              special_rows_colors=[(1, 'deepskyblue'), (len(prices.columns), 'lavender')],
@@ -494,18 +498,17 @@ class PortfolioData:
                                  ax=ax,
                                  **local_kwargs)
 
-    def plot_monthly_returns_heatmap(self, time_period: da.TimePeriod = None,
-                                     heatmap_freq: str = 'A',
-                                     date_format: str = '%Y',
+    def plot_monthly_returns_heatmap(self,
+                                     time_period: da.TimePeriod = None,
                                      ax: plt.Subplot = None,
                                      **kwargs
                                      ) -> None:
+        # for monthly returns fix A and date_format
+        kwargs = qis.update_kwargs(kwargs, dict(heatmap_freq='A', date_format='%Y'))
         plot_returns_heatmap(prices=self.get_portfolio_nav(time_period=time_period),
                              heatmap_column_freq='M',
                              is_add_annual_column=True,
                              is_inverse_order=True,
-                             heatmap_freq=heatmap_freq,
-                             date_format=date_format,
                              ax=ax,
                              **kwargs)
 
@@ -646,6 +649,8 @@ class PortfolioData:
 
     def plot_weights(self,
                      is_input_weights: bool = True,
+                     add_mean_levels: bool = False,
+                     use_bar_plot: bool = False,
                      columns: List[str] = None,
                      freq: Optional[str] = None,
                      is_yaxis_limit_01: bool = True,
@@ -660,10 +665,9 @@ class PortfolioData:
                                    columns=columns,
                                    freq=freq)
         pst.plot_stack(df=weights,
-                       add_mean_levels=False,
-                       use_bar_plot=False,
+                       add_mean_levels=add_mean_levels,
+                       use_bar_plot=use_bar_plot,
                        is_yaxis_limit_01=is_yaxis_limit_01,
-                       baseline='zero',
                        bbox_to_anchor=bbox_to_anchor,
                        title=title,
                        legend_stats=legend_stats,

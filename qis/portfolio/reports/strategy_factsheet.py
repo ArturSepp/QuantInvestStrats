@@ -167,9 +167,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      new_kwargs=dict(fontsize=4, square=False, x_rotation=90, transpose=True))
     portfolio_data.plot_periodic_returns(ax=ax,
                                          benchmark_prices=benchmark_prices,
-                                         heatmap_freq='A',
                                          time_period=time_period,
-                                         **qis.update_kwargs(local_kwargs, dict(date_format='%Y')))
+                                         **local_kwargs)
 
     # perf contributors
     ax = fig.add_subplot(gs[6:8, 2])

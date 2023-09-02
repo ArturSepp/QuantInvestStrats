@@ -11,6 +11,7 @@ from typing import List, Optional
 
 # qis
 import qis
+from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs
 import qis.plots.derived.regime_data
 import qis.utils.dates as da
 import qis.utils.struct_ops as sop
@@ -18,19 +19,15 @@ import qis.utils.df_groups as dfg
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.plots.derived.drawdowns as cdr
-from qis.perfstats.config import PerfParams, PerfStat, RegimeData
 import qis.perfstats.regime_classifier as rcl
-from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
 
 # plots
-import qis.plots.table as ptb
 import qis.plots.time_series as pts
 import qis.plots.derived.prices as ppd
 import qis.plots.derived.returns_heatmap as rhe
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.models.linear.plot_correlations as pco
-from qis.plots.bars import plot_bars
 
 # internal
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
@@ -108,17 +105,23 @@ class MultiPortfolioData:
     """
     plot methods
     """
-    def add_regime_shadows(self, ax: plt.Subplot, benchmark: str, index: pd.Index = None,
-                           regime_params: BenchmarkReturnsQuantileRegimeSpecs=REGIME_PARAMS
+    def add_regime_shadows(self,
+                           ax: plt.Subplot,
+                           regime_benchmark: str,
+                           index: pd.Index = None,
+                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS
                            ) -> None:
-        pivot_prices = self.benchmark_prices[benchmark]
+        """
+        add regime shadows using regime_benchmark
+        """
+        pivot_prices = self.benchmark_prices[regime_benchmark]
         if index is not None:
             pivot_prices = pivot_prices.reindex(index=index, method='ffill')
         qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
 
     def plot_nav(self,
                  time_period: da.TimePeriod = None,
-                 benchmark: str = None,
+                 regime_benchmark: str = None,
                  perf_params: PerfParams = PERF_PARAMS,
                  regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                  ax: plt.Subplot = None,
@@ -132,8 +135,8 @@ class MultiPortfolioData:
                         perf_params=perf_params,
                         ax=ax,
                         **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=prices.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
     def plot_periodic_returns(self,
                               time_period: da.TimePeriod = None,
@@ -146,12 +149,12 @@ class MultiPortfolioData:
                               ) -> None:
         prices = self.get_navs(time_period=time_period)
         rhe.plot_periodic_returns_table(prices=prices,
-                                                    freq=heatmap_freq,
-                                                    ax=ax,
-                                                    title=title,
-                                                    date_format=date_format,
-                                                    transpose=transpose,
-                                                    **kwargs)
+                                        freq=heatmap_freq,
+                                        ax=ax,
+                                        title=title,
+                                        date_format=date_format,
+                                        transpose=transpose,
+                                        **kwargs)
 
     def plot_performance_bars(self,
                               time_period: da.TimePeriod = None,
@@ -186,34 +189,35 @@ class MultiPortfolioData:
     def plot_drawdowns(self,
                        time_period: da.TimePeriod = None,
                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                       benchmark: str = None,
+                       regime_benchmark: str = None,
                        ax: plt.Subplot = None,
                        **kwargs) -> None:
-        if len(self.portfolio_datas) == 1 and benchmark is not None:
-            prices = self.get_navs(time_period=time_period, benchmark=benchmark)
+        if len(self.portfolio_datas) == 1 and regime_benchmark is not None:
+            prices = self.get_navs(time_period=time_period, benchmark=regime_benchmark)
         else:
             prices = self.get_navs(time_period=time_period)
         cdr.plot_drawdown(prices=prices, ax=ax, **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=prices.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
     def plot_rolling_time_under_water(self,
                                       time_period: da.TimePeriod = None,
                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                                      benchmark: str = None,
+                                      regime_benchmark: str = None,
                                       ax: plt.Subplot = None,
                                       **kwargs) -> None:
-        if len(self.portfolio_datas) == 1 and benchmark is not None:
-            prices = self.get_navs(time_period=time_period, benchmark=benchmark)
+        if len(self.portfolio_datas) == 1 and regime_benchmark is not None:
+            prices = self.get_navs(time_period=time_period, benchmark=regime_benchmark)
         else:
             prices = self.get_navs(time_period=time_period)
         cdr.plot_rolling_time_under_water(prices=prices, ax=ax, **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=prices.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
     def plot_ra_perf_table(self,
                            time_period: da.TimePeriod = None,
                            perf_params: PerfParams = PERF_PARAMS,
+                           perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                            ax: plt.Subplot = None,
                            **kwargs) -> None:
         benchmark = self.benchmark_prices.columns[0]
@@ -221,7 +225,7 @@ class MultiPortfolioData:
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=benchmark,
                                          perf_params=perf_params,
-                                         perf_columns=rpt.BENCHMARK_TABLE_COLUMNS,
+                                         perf_columns=perf_columns,
                                          title=f"RA performance table: {da.get_time_period(prices).to_str()}",
                                          rotation_for_columns_headers=0,
                                          ax=ax,
@@ -231,6 +235,7 @@ class MultiPortfolioData:
                               benchmark_price: pd.Series,
                               time_period: da.TimePeriod = None,
                               perf_params: PerfParams = PERF_PARAMS,
+                              perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                               ax: plt.Subplot = None,
                               **kwargs) -> None:
         strategy_prices = []
@@ -250,7 +255,7 @@ class MultiPortfolioData:
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=str(benchmark_price.name),
                                          perf_params=perf_params,
-                                         perf_columns=rpt.BENCHMARK_TABLE_COLUMNS,
+                                         perf_columns=perf_columns,
                                          drop_benchmark=True,
                                          rows_edge_lines=rows_edge_lines,
                                          title=f"RA performance table by Asset Group: {da.get_time_period(prices).to_str()}",
@@ -277,7 +282,7 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=exposures.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=exposures.index, regime_params=regime_params)
 
     def plot_instrument_pnl_diff(self,
                                  portfolio_idx1: int = 0,
@@ -312,7 +317,7 @@ class MultiPortfolioData:
                              ax=ax,
                              **sop.update_kwargs(kwargs, dict(legend_loc='lower left')))
         if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=diff.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=diff.index, regime_params=regime_params)
 
     def plot_exposures_diff(self,
                             portfolio_idx1: int = 0,
@@ -333,7 +338,7 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=diff.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=diff.index, regime_params=regime_params)
 
     def plot_turnover(self,
                       roll_period: int = 260,
@@ -361,7 +366,7 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=turnover.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=turnover.index, regime_params=regime_params)
 
     def plot_costs(self,
                    roll_period: int = 260,
@@ -387,32 +392,40 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=costs.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=costs.index, regime_params=regime_params)
 
     def plot_factor_betas(self,
                           benchmark_prices: pd.DataFrame,
-                          benchmark: str = None,
+                          regime_benchmark: str = None,
                           time_period: da.TimePeriod = None,
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           var_format: str = '{:,.2f}',
-                          ax: plt.Subplot = None,
+                          axs: List[plt.Subplot] = None,
                           **kwargs
                           ) -> None:
-        factor_exposures = []
+        """
+        plot benchmarks betas by factor exposures
+        """
+        factor_exposures = {factor: [] for factor in benchmark_prices.columns}
         for portfolio in self.portfolio_datas:
             factor_exposure = portfolio.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                           time_period=time_period)
-            factor_exposure.columns = [f"{portfolio.nav.name}-{x} beta" for x in factor_exposure.columns]
-            factor_exposures.append(factor_exposure)
-        factor_exposures = pd.concat(factor_exposures, axis=1)
-        pts.plot_time_series(df=factor_exposures,
-                             var_format=var_format,
-                             legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                             title='Factor betas',
-                             ax=ax,
-                             **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, benchmark=benchmark, index=factor_exposures.index, regime_params=regime_params)
+            for factor in factor_exposure.columns:
+                factor_exposures[factor].append(factor_exposure[factor].rename(portfolio.nav.name))
+
+        if axs is None:
+            fig, axs = plt.subplots(len(benchmark_prices.columns), 1, figsize=(12, 12), tight_layout=True)
+
+        for idx, factor in enumerate(benchmark_prices.columns):
+            factor_exposure = pd.concat(factor_exposures[factor], axis=1)
+            pts.plot_time_series(df=factor_exposure,
+                                 var_format=var_format,
+                                 legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
+                                 title=f"Factor exposure to {factor}",
+                                 ax=axs[idx],
+                                 **kwargs)
+            if regime_benchmark is not None:
+                self.add_regime_shadows(ax=axs[idx], regime_benchmark=regime_benchmark, index=factor_exposure.index, regime_params=regime_params)
 
     def plot_nav_with_dd(self,
                          time_period: da.TimePeriod = None,
@@ -472,12 +485,12 @@ class MultiPortfolioData:
                                                      'bbox_to_anchor': (0.5, 1.05),
                                                      'x_rotation': 90})
         data = data.replace({0.0: np.nan}).dropna()
-        plot_bars(df=data,
-                  skip_y_axis=True,
-                  title=f"{attribution_metric.title}",
-                  stacked=False,
-                  ax=ax,
-                  **kwargs)
+        qis.plot_bars(df=data,
+                      skip_y_axis=True,
+                      title=f"{attribution_metric.title}",
+                      stacked=False,
+                      ax=ax,
+                      **kwargs)
 
     def plot_performance_periodic_table(self,
                                         portfolio_id: int = 0,

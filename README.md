@@ -49,7 +49,7 @@ pip install --upgrade qis
 
 close using
 ```python 
-git clone https://github.com/ArturSepp/QuantInvestStrats
+git clone https://github.com/ArturSepp/QuantInvestStrats.git
 ```
 
 Core dependencies:

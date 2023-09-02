@@ -25,13 +25,13 @@ def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Ser
                          EEM='Equities',
                          TLT='Bonds',
                          IEF='Bonds',
-                         SHY='Bonds',
                          LQD='Credit',
                          HYG='HighYield',
                          GLD='Gold')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
     prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
+    prices = prices.asfreq('B', method='ffill')
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, group_data
 
@@ -77,7 +77,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_STRATEGY:
 
-        time_period = qis.TimePeriod('31Dec2005', '16Aug2023')  # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2005', '01Sep2023')  # time period for portfolio reporting
 
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
 
@@ -98,7 +98,7 @@ def run_unit_test(unit_test: UnitTests):
                                                        **KWARG_SHORT)
         """
         qis.save_figs_to_pdf(figs=figs,
-                             file_name=f"strategy_factsheet", orientation='landscape',
+                             file_name=f"strategy_benchmark_factsheet", orientation='landscape',
                              local_path=qis.local_path.get_output_path())
         qis.save_fig(fig=figs[0], file_name=f"strategy_benchmark", local_path=qis.local_path.get_output_path())
 

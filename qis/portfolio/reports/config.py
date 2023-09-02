@@ -2,12 +2,23 @@
 configuration for performance reports
 """
 from typing import Dict, Any, Tuple
-from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod
+from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat, PerformanceLabel
 import yfinance as yf
 
 # default params have no risk-free rate
 PERF_PARAMS = PerfParams(freq='W-WED', freq_reg='W-WED', rates_data=None)
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='Q')
+
+PERF_COLUMNS = (PerfStat.TOTAL_RETURN,
+                PerfStat.PA_RETURN,
+                PerfStat.VOL,
+                PerfStat.SHARPE_EXCESS,
+                PerfStat.MAX_DD,
+                PerfStat.MAX_DD_VOL,
+                PerfStat.SKEWNESS,
+                PerfStat.ALPHA_AN,
+                PerfStat.BETA,
+                PerfStat.R2)
 
 
 def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileRegimeSpecs]:
@@ -23,22 +34,34 @@ def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileReg
     return perf_params, regime_params
 
 
-def fetch_default_report_kwargs(time_period: TimePeriod, long_threshold: float = 5.0) -> Dict[str, Any]:
+def fetch_default_report_kwargs(time_period: TimePeriod,
+                                long_threshold_years: float = 5.0
+                                ) -> Dict[str, Any]:
 
     rates_data = yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0
     if rates_data.empty:  # if online
         rates_data = None
 
     # use for number years > 5
-    if time_period.get_time_period_an() > long_threshold:
+    if time_period.get_time_period_an() > long_threshold_years:
         report_kwargs = dict(perf_params=PerfParams(freq='W-WED', freq_reg='Q', rates_data=rates_data),
                              regime_params=BenchmarkReturnsQuantileRegimeSpecs(freq='Q'),
+                             perf_columns=PERF_COLUMNS,
+                             alpha_an_factor=4.0,
+                             short=True,  # ra columns
+                             performance_label=PerformanceLabel.DETAILED_EXCESS_SHARPE,
+                             heatmap_freq='A',
                              x_date_freq='A',
                              date_format='%b-%y')
 
     else:
         report_kwargs = dict(perf_params=PerfParams(freq='W-WED', freq_reg='M', rates_data=rates_data),
                              regime_params=BenchmarkReturnsQuantileRegimeSpecs(freq='M'),
+                             perf_columns=PERF_COLUMNS,
+                             alpha_an_factor=12.0,
+                             short=True,  # ra columns
+                             performance_label=PerformanceLabel.DETAILED_EXCESS_SHARPE,
+                             heatmap_freq='Q',
                              x_date_freq='Q',
                              date_format='%b-%y')
 

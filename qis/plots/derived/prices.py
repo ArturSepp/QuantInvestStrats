@@ -25,16 +25,17 @@ class PerformanceLabel(Enum):
     NONE = 1
     SHARPE = 2
     DETAILED = 3
-    WITH_SKEW = 4
-    DETAILED_LOG = 5
-    WITH_DD = 6
-    WITH_DDVOL = 7
-    PA_DETAILED = 8
-    TOTAL = 9
-    TOTAL_YTD = 10
-    TOTAL_DETAILED = 11
-    ARITHMETIC = 12
-    TOTAL_ARITHMETIC = 13
+    DETAILED_EXCESS_SHARPE = 4
+    WITH_SKEW = 5
+    DETAILED_LOG = 6
+    WITH_DD = 7
+    WITH_DDVOL = 8
+    PA_DETAILED = 9
+    TOTAL = 10
+    TOTAL_YTD = 11
+    TOTAL_DETAILED = 12
+    ARITHMETIC = 13
+    TOTAL_ARITHMETIC = 14
 
 
 def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
@@ -67,6 +68,10 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
             label = (f"{name}: p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
                      f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}")
+        elif performance_label == PerformanceLabel.DETAILED_EXCESS_SHARPE:
+            label = (f"{name}: p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
+                     f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
+                     f"Ex. Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}")
         elif performance_label == PerformanceLabel.WITH_SKEW:
             label = (f"{name}: p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "

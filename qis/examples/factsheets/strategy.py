@@ -18,13 +18,13 @@ def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Ser
                          EEM='Equities',
                          TLT='Bonds',
                          IEF='Bonds',
-                         SHY='Bonds',
                          LQD='Credit',
                          HYG='HighYield',
                          GLD='Gold')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
     prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
+    prices = prices.asfreq('B', method='ffill')  # make B frequency
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, group_data
 
@@ -83,7 +83,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    time_period = qis.TimePeriod('31Dec2005', '21Jul2023')  # time period for portfolio reporting
+    time_period = qis.TimePeriod('31Dec2005', '01Sep2023')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2019', time_period.end)
 
     if unit_test == UnitTests.VOLPARITY_PORTFOLIO:
@@ -99,7 +99,7 @@ def run_unit_test(unit_test: UnitTests):
                                               time_period=time_period,
                                               **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=[fig],
-                             file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_long",
+                             file_name=f"{portfolio_data.nav.name}_strategy_factsheet_long",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
@@ -108,7 +108,7 @@ def run_unit_test(unit_test: UnitTests):
                                               time_period=time_period_short,
                                               **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=[fig],
-                             file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
+                             file_name=f"{portfolio_data.nav.name}_strategy_factsheet_short",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 

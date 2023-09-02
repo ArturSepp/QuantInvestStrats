@@ -12,6 +12,7 @@ import qis
 
 from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_factsheet
+from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 
 class UnitTests(Enum):
@@ -25,23 +26,22 @@ def run_unit_test(unit_test: UnitTests):
 
         benchmark = 'SPY'
         tickers = [benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
-        time_period = qis.TimePeriod('31Dec2007', '21Jul2023')  # time period for reporting
+        time_period = qis.TimePeriod('31Dec2007', '01Sep2023')  # time period for reporting
 
     elif unit_test == UnitTests.BTC_SQQQ:
         benchmark = 'QQQ'
         tickers = [benchmark, 'BTC-USD', 'TQQQ', 'SQQQ']
-        time_period = qis.TimePeriod('31Dec2019', '16Aug2023')
+        time_period = qis.TimePeriod('31Dec2019', '01Sep2023')
 
     else:
         raise NotImplementedError
 
     prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
+    prices = prices.asfreq('B', method='ffill')  # make B frequency
     fig = generate_multi_asset_factsheet(prices=prices,
                                          benchmark=benchmark,
-                                         heatmap_freq='A',
-                                         perf_params=PERF_PARAMS,
                                          time_period=time_period,
-                                         regime_params=REGIME_PARAMS)
+                                         **fetch_default_report_kwargs(time_period=time_period))
     qis.save_figs_to_pdf(figs=[fig],
                          file_name=f"multiasset_report", orientation='landscape',
                          local_path=qis.local_path.get_output_path())

@@ -57,14 +57,14 @@ class PerfStat(ColVar, Enum):
     SHARPE = ColVar(name='Sharpe', short_n='Sharpe', value_type=ValueType.SHARPE)  # compunded returns w.a. rate
     SHARPE_LOG_AN = ColVar(name='An. Log Sharpe', short_n='An. Log Sharpe', value_type=ValueType.SHARPE)  # log return
     SHARPE_AVG = ColVar(name='Sharpe Avg', short_n='Sharpe Avg', value_type=ValueType.SHARPE)  # using avg return
-    SHARPE_EXCESS = ColVar(name='Excess Sharpe', short_n='Excess\nSharpe', value_type=ValueType.SHARPE)  # compunded with rate
+    SHARPE_EXCESS = ColVar(name='Ex. Sharpe', short_n='Excess\nSharpe', value_type=ValueType.SHARPE)  # compunded with rate
     SHARPE_LOG_EXCESS = ColVar(name='Log Sharpe', short_n='Log Sharpe', value_type=ValueType.SHARPE)
     SHARPE_APR = ColVar(name='APR Sharpe', short_n='APR\nSharpe', value_type=ValueType.SHARPE)
     MARGINAL_SHARPE = ColVar(name='Marginal Sharpe', short_n='Marginal\nSharpe', value_type=ValueType.SHARPE)
     MARGINAL_SHARPE_RATIO = ColVar(name='Marginal Sharpe Ratio', short_n='Marginal\nSharpe Ratio', value_type=ValueType.FLOAT)
 
-    MAX_DD = ColVar(name='Max DD', short_n='Max DD', value_type=ValueType.PERCT0)
-    MAX_DD_VOL = ColVar(name='Max DD/Vol', short_n='Max DD\n/Vol', value_type=ValueType.FLOAT)
+    MAX_DD = ColVar(name='Max DD', short='MaxDD', short_n='Max DD', value_type=ValueType.PERCT0)
+    MAX_DD_VOL = ColVar(name='Max DD/Vol', short='MaxDD/Vol', short_n='Max DD\n/Vol', value_type=ValueType.FLOAT)
     SKEWNESS = ColVar(name='Skewness', short='Skew', short_n='Skew', value_type=ValueType.FLOAT)
     KURTOSIS = ColVar(name='Kurtosis', short_n='Kurt', value_type=ValueType.FLOAT)
     NORMTEST = ColVar(name='P-val', short_n='P-val', value_type=ValueType.FLOAT4)
