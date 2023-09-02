@@ -124,32 +124,32 @@ class MultiAssetsReport:
 
         special_columns_colors = [(0, 'steelblue')]
         qis.plot_df_table(df=table_data,
-                         first_column_width=first_column_width,
-                         add_index_as_column=False,
-                         index_column_name='Strategies',
-                         special_columns_colors=special_columns_colors,
-                         ax=ax,
-                         **kwargs)
+                          first_column_width=first_column_width,
+                          add_index_as_column=False,
+                          index_column_name='Strategies',
+                          special_columns_colors=special_columns_colors,
+                          ax=ax,
+                          **kwargs)
 
     def plot_nav(self,
                  regime_benchmark_str: str = None,
                  var_format: str = '{:.0%}',
                  sharpe_format: str = '{:.2f}',
                  title: str = 'Cumulative performance',
-                 is_log: bool = True,
+                 is_log: bool = False,
                  time_period: TimePeriod = None,
                  ax: plt.Subplot = None,
                  **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark_str)
         qis.plot_prices(prices=prices,
-                       perf_params=self.perf_params,
-                       start_to_one=True,
-                       is_log=is_log,
-                       var_format=var_format,
-                       sharpe_format=sharpe_format,
-                       title=title,
-                       ax=ax,
-                       **kwargs)
+                        perf_params=self.perf_params,
+                        start_to_one=True,
+                        is_log=is_log,
+                        var_format=var_format,
+                        sharpe_format=sharpe_format,
+                        title=title,
+                        ax=ax,
+                        **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark_str=regime_benchmark_str, data_df=prices)
 
     def plot_drawdowns(self,
