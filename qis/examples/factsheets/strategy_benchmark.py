@@ -12,7 +12,7 @@ import yfinance as yf
 import qis
 from qis import TimePeriod, MultiPortfolioData
 
-from qis.portfolio.reports.strategy_benchmark_factsheet import generate_strategy_benchmark_factsheet_plt, generate_performance_attribution_report
+from qis.portfolio.reports.strategy_benchmark_factsheet import generate_strategy_benchmark_factsheet_plt
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 

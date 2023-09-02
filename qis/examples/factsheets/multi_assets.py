@@ -3,14 +3,11 @@ performance report for a universe of several assets
 with comparison to 1-2 benchmarks
 output is one-page figure with key numbers
 """
-
 # packages
 import matplotlib.pyplot as plt
 from enum import Enum
 import yfinance as yf
 import qis
-
-from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_factsheet
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 
