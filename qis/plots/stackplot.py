@@ -5,6 +5,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import List, Optional, Tuple
+from enum import Enum
 
 # qis
 import qis.plots.utils as put
@@ -28,10 +29,11 @@ def plot_stack(df: pd.DataFrame,
                var_format: str = '{:.0%}',
                fontsize: int = 10,
                linewidth: float = 1.5,
-               x_date_freq: str = 'A',
                x_rotation: int = 90,
-               reversed: bool = False,
+               reverse_columns: bool = False,
+               x_date_freq: str = 'A',
                date_format: str = '%b-%y',
+               skip_y_axis: bool = True,
                bbox_to_anchor: Optional[Tuple[float, float]] = None,
                xlabel: str = None,
                ylabel: str = None,
@@ -94,7 +96,7 @@ def plot_stack(df: pd.DataFrame,
 
             if add_mean_levels and is_yaxis_limit_01 is False:  # show absolute effect
                 y_loc = mean
-            else: # show cumulative effect
+            else:  # show cumulative effect
                 if column == re_indexed_data.columns[-1]:  # make it vidsiblae
                     y_loc = 1.0 - cum_mean0 if cum_mean0 < 0.5 else cum_mean0 + 0.5 * mean
                 else:
@@ -111,7 +113,7 @@ def plot_stack(df: pd.DataFrame,
                     textcoords='offset points', ha='left', va='bottom')
 
     put.set_ax_ticks_format(ax=ax, fontsize=fontsize, xvar_format=None, yvar_format=var_format)
-    put.set_ax_tick_labels(ax=ax, x_rotation=x_rotation, fontsize=fontsize, skip_y_axis=True, **kwargs)
+    put.set_ax_tick_labels(ax=ax, x_rotation=x_rotation, fontsize=fontsize, skip_y_axis=skip_y_axis, **kwargs)
     put.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, **kwargs)
 
     if legend_loc is not None:
@@ -127,7 +129,7 @@ def plot_stack(df: pd.DataFrame,
                        labels=legend_labels,
                        colors=colors,
                        legend_loc=legend_loc,
-                       reversed=reversed,
+                       reverse_columns=reverse_columns,
                        ncol=ncol,
                        bbox_to_anchor=bbox_to_anchor,
                        fontsize=fontsize,
@@ -140,3 +142,38 @@ def plot_stack(df: pd.DataFrame,
     put.set_spines(ax=ax, **kwargs)
 
     return fig
+
+
+class UnitTests(Enum):
+    WEIGHTS = 1
+
+
+def run_unit_test(unit_test: UnitTests):
+
+    if unit_test == UnitTests.WEIGHTS:
+        from qis.test_data import load_etf_data
+
+        prices = load_etf_data().dropna().loc['2020':, :]
+        weights = prices.divide(np.sum(prices, axis=1), axis=0)
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6), tight_layout=True)
+
+        plot_stack(df=weights,
+                   stacked=False,
+                   x_rotation=90,
+                   yvar_format='{:,.0%}',
+                   date_format='%b-%y',
+                   fontsize=6,
+                   ax=ax)
+    plt.show()
+
+
+if __name__ == '__main__':
+
+    unit_test = UnitTests.WEIGHTS
+
+    is_run_all_tests = False
+    if is_run_all_tests:
+        for unit_test in UnitTests:
+            run_unit_test(unit_test=unit_test)
+    else:
+        run_unit_test(unit_test=unit_test)

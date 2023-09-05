@@ -46,10 +46,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
         fig = None
 
     if colors is None:
-        colors = put.get_n_colors(n=len(columns),
-                                  first_color_fixed=first_color_fixed,
-                                  last_color_fixed=last_color_fixed,
-                                  **kwargs)
+        colors = put.get_n_colors(n=len(columns), **kwargs)
 
     for idx, column in enumerate(columns):
         if isinstance(y_std_errors, pd.DataFrame):

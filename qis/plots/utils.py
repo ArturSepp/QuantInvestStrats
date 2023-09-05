@@ -609,7 +609,7 @@ def set_legend(ax: plt.Subplot,
                markers: List[str] = None,
                colors: Optional[List[str]] = None,
                legend_loc: str = 'upper left',
-               reversed: bool = False,
+               reverse_columns: bool = False,
                bbox_to_anchor: Tuple[float, float] = None,
                text_weight: str = 'light',
                legend_title: Optional[str] = None,
@@ -654,7 +654,7 @@ def set_legend(ax: plt.Subplot,
             for label, color, marker in zip(labels, colors, markers):
                 lines.append((label, {'color': color, 'marker': marker}))
 
-    if reversed:
+    if reverse_columns:
         lines = lines[::-1]
 
     # new legend

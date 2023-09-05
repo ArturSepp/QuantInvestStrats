@@ -20,6 +20,7 @@ from qis.plots.utils import LegendStats
 def plot_bars(df: Union[pd.DataFrame, pd.Series],
               stacked: bool = True,
               date_format: str = '%d-%b-%y',
+              x_date_freq: str = 'Q',
               title: str = None,
               fontsize: int = 10,
               add_bar_values: bool = False,
@@ -41,12 +42,14 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               vline_columns: List[int] = None,
               xlabel: str = None,
               ylabel: str = None,
-              reversed: bool = False,
+              reverse_columns: bool = False,
               add_avg_line: bool = False,
               ax: plt.Subplot = None,
               **kwargs
               ) -> Optional[plt.Figure]:
-
+    """
+    plot bars
+    """
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -62,12 +65,18 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                 n = len(df.index)
         colors = put.get_n_colors(n=n, **kwargs)
 
-    if isinstance(df.index[0], pd.Timestamp):
-        df.index = [date.strftime(date_format) for date in df.index]
+    if isinstance(df.index, pd.DatetimeIndex) and isinstance(df, pd.Series):  # we can use str for dates with plot.bar
+        # df.index = [date.strftime(date_format) for date in df.index]
+        df, datalables = put.map_dates_index_to_str(data=df,
+                                                    x_date_freq=x_date_freq,
+                                                    date_format=date_format)
+        df.index = datalables
+        df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
 
-    if isinstance(df, pd.Series):
+    elif isinstance(df, pd.Series):
         sns.barplot(x=df.index, y=df, palette=colors, ax=ax)
-    else:
+
+    else:  # need to melt for barplot
         value_name = ylabel or 'y'
         var_name = xlabel or 'x'
         df1 = df.melt(ignore_index=False, var_name=var_name, value_name=value_name)
@@ -134,7 +143,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
     put.set_legend(ax=ax,
                    labels=labels,
                    colors=colors,
-                   reversed=reversed,
+                   reverse_columns=reverse_columns,
                    bbox_to_anchor=bbox_to_anchor,
                    legend_loc=legend_loc,
                    fontsize=fontsize,
@@ -194,7 +203,7 @@ def plot_vbars(df: pd.DataFrame,
                is_category_names_colors: bool = True,
                x_step: Optional[float] = None,  # specify x-step
                x_limits: Tuple[Union[float, None], Union[float, None]] = None,
-               is_reverse: bool = True,
+               reverse_columns: bool = True,
                rows_edge_lines: List[int] = None,
                ax: plt.Subplot = None,
                **kwargs
@@ -329,7 +338,7 @@ def plot_vbars(df: pd.DataFrame,
         legend_colors = colors
 
     # reverse
-    if is_reverse:
+    if reverse_columns:
         legend_labels = legend_labels[::-1]
         legend_colors = legend_colors[::-1]
 
@@ -337,7 +346,7 @@ def plot_vbars(df: pd.DataFrame,
                    labels=legend_labels,
                    colors=legend_colors,
                    legend_loc=legend_loc,
-                   reversed=True,
+                   reverse_columns=True,
                    bbox_to_anchor=bbox_to_anchor,
                    fontsize=fontsize,
                    **kwargs)

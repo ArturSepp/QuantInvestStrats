@@ -349,14 +349,14 @@ def np_shift(a: np.ndarray,
     return result
 
 
-def compute_expanding_power(n: int, power_lambda: float, is_reverse: bool = False) -> np.ndarray:
+def compute_expanding_power(n: int, power_lambda: float, reverse_columns: bool = False) -> np.ndarray:
     """
     compute expanding power = [1, lambda, lambda^2, ...]
     """
     a = np.log(power_lambda) * np.ones(n)
     a[0] = 0.0
     b = np.exp(np.cumsum(a))
-    if is_reverse:
+    if reverse_columns:
         b = b[::-1]
     return b
 
@@ -485,7 +485,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.CUM_POWER:
         tic = time.perf_counter()
-        b = compute_expanding_power(n=10000000, power_lambda=0.97, is_reverse=True)
+        b = compute_expanding_power(n=10000000, power_lambda=0.97, reverse_columns=True)
         toc = time.perf_counter()
         print(f"{toc - tic} secs to run")
         print(b)
