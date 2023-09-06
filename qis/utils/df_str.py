@@ -144,7 +144,7 @@ def df_to_str(df: pd.DataFrame,
                     var_formats_.append(None)
             var_formats = var_formats_
         else:
-            raise ValueError(var_formats = f"{var_formats} is not supported")
+            raise ValueError(f"{var_formats} is not supported")
     else:
         var_formats = [var_format]*len(df.columns)
     df = df.copy()
@@ -239,6 +239,16 @@ def df_index_to_str(df: pd.DataFrame,
                     ) -> pd.DataFrame:
     df.index = pd.PeriodIndex(pd.to_datetime(df.index).date, freq=freq).strftime(data_str)
     return df
+
+
+def idx_to_alphabet(idx: int = 1, capitalise: bool = True) -> str:
+ """
+ map index to alphabet character
+ """
+ if capitalise:
+     return chr(ord('@') + idx)
+ else:
+    return chr(ord('`') + idx)
 
 
 class UnitTests(Enum):

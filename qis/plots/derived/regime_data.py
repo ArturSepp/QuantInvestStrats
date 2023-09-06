@@ -18,6 +18,7 @@ import qis.plots.boxplot as bxp
 
 def plot_regime_data(regime_classifier: RegimeClassifier,
                      regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
+                     drop_sharpe_from_labels: bool = False,  # only leave the regime names
                      x_rotation: int = 0,
                      add_bar_values: bool = True,
                      title: Optional[str] = 'Conditional Excess Sharpe ratio',
@@ -35,6 +36,10 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
 
     regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(**kwargs)
     data = regime_datas[regime_data_to_plot]
+
+    if drop_sharpe_from_labels:
+        data.columns = [x.replace(' Sharpe', '') for x in data.columns]
+
     regime_colors = list(regime_classifier.get_regime_ids_colors().values())
 
     if is_add_totals:
@@ -163,7 +168,7 @@ def run_unit_test(unit_test: UnitTests):
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
-    kwargs = dict(var_format='{:.2f}')
+    kwargs = dict(var_format='{:.1f}')
 
     perf_params = PerfParams()
 
@@ -179,13 +184,22 @@ def run_unit_test(unit_test: UnitTests):
         print(f"regime_means:\n{cond_perf_table}")
         print(f"regime_pa:\n{regime_datas}")
 
+        fig, ax = plt.subplots(1, 1, figsize=(2.5, 2.5), tight_layout=True)
+
         plot_regime_data(regime_classifier=regime_classifier,
+                         drop_sharpe_from_labels=True,
                          prices=prices,
                          benchmark='SPY',
                          perf_params=perf_params,
+                         title='(A) Weekly roll',
                          is_use_vbar=True,
+                         is_add_totals=False,
+                         add_bar_values=False,
+                         fontsize=8,
                          ncol=3,
-                         bbox_to_anchor=(0.1, 1.05),
+                         bbox_to_anchor=(0.5, 1.12),
+                         pad=15,
+                         ax=ax,
                          **kwargs)
 
         plot_regime_data(regime_classifier=regime_classifier,

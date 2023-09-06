@@ -267,7 +267,14 @@ def remove_spines(ax: plt.Subplot) -> None:
     ax.spines['right'].set_visible(False)
 
 
-def subplot_border(fig: plt.Figure, nrows: int = 1, ncols: int = 1) -> None:
+def subplot_border(fig: plt.Figure,
+                   nrows: int = 1,
+                   ncols: int = 1,
+                   color: str = 'navy'
+                   ) -> None:
+    """
+    draw border for a figure with multiple subplots
+    """
 
     n_ax1 = nrows
     n_ax2 = ncols
@@ -277,7 +284,7 @@ def subplot_border(fig: plt.Figure, nrows: int = 1, ncols: int = 1) -> None:
     for r in range(n_ax1):
         rects.append(plt.Rectangle((0.0, r*height), 1.0, height,  # (lower-left corner), width, height
                                    fill=False,
-                                   color=FixedColors.NAVY.value,
+                                   color=color,
                                    lw=1,
                                    zorder=1000,
                                    transform=fig.transFigure, figure=fig))
@@ -285,7 +292,7 @@ def subplot_border(fig: plt.Figure, nrows: int = 1, ncols: int = 1) -> None:
     for r in range(n_ax2):
         rects.append(plt.Rectangle((r*width, 0), width, 1.0,  # (lower-left corner), width, height
                                    fill=False,
-                                   color=FixedColors.NAVY.value,
+                                   color=color,
                                    lw=1,
                                    zorder=1000,
                                    transform=fig.transFigure, figure=fig))
@@ -747,7 +754,7 @@ class LegendStats(Enum):
     MEDIAN_MAD = 22
     TSTAT = 23
     AVG_STD_TSTAT = 24
-    LAST_VALUE_ONLY = 25
+    LAST_NONNAN = 25
 
 
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
@@ -775,10 +782,15 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
         for column in data.columns:
             legend_lines.append(f"{column}: last={var_format.format(data[column].iloc[-1])}")
 
-    elif legend_stats == LegendStats.LAST_VALUE_ONLY:
+    elif legend_stats == LegendStats.LAST_NONNAN:
         legend_lines = []
         for column in data.columns:
-            legend_lines.append(f"{column} = {var_format.format(data[column].iloc[-1])}")
+            data_column = data[column]
+            if np.all(np.isnan(data_column)):
+                last = nan_display
+            else:
+                last = data_column.dropna().iloc[-1]
+            legend_lines.append(f"{column} = {var_format.format(last)}")
 
     elif legend_stats == LegendStats.AVG:
         legend_lines = []

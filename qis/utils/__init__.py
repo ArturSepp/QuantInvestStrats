@@ -129,7 +129,8 @@ from qis.utils.df_str import (
     series_to_str,
     series_values_to_str,
     str_to_float,
-    timeseries_df_to_str
+    timeseries_df_to_str,
+    idx_to_alphabet
 )
 
 from qis.utils.df_to_weights import (
