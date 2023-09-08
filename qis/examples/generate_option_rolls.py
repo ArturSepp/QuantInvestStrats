@@ -11,7 +11,7 @@ pd.set_option('display.max_rows', 500)
 import qis
 from qis import TimePeriod
 
-# set time period
+# set time period to fill with the roll dates
 time_period = TimePeriod('01Jun2023', '08Sep2023', tz='UTC')
 
 # weekly on Friday
