@@ -23,6 +23,7 @@ class DescTableType(Enum):
     WITH_SCORE = 6
     EXTENSIVE = 7
     SKEW_KURTOSIS = 8
+    WITH_MEDIAN = 9
 
 
 def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
@@ -119,6 +120,14 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             = [var_format.format(x) for x in np.nanquantile(df.values, q=0.84, axis=0)]
         descriptive_table[PerfStat.MAX.to_str()] \
             = [var_format.format(x) for x in np.nanmax(df.values, axis=0)]
+
+    elif desc_table_type == desc_table_type.WITH_MEDIAN:
+        descriptive_table[PerfStat.MEDIAN.to_str(short=True)] \
+            = [var_format.format(x) for x in np.nanmedian(df.values, axis=0)]
+        descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] \
+            = [norm_variable_display_type.format(x) for x in skew(df.values, axis=0, nan_policy=nan_policy)]
+        descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] \
+            = [norm_variable_display_type.format(x) for x in kurtosis(df.values, axis=0, nan_policy=nan_policy)]
 
     else:
         raise TypeError(f"desc_table_type={desc_table_type} is not implemented")

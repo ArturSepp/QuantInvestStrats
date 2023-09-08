@@ -541,6 +541,16 @@ def generate_dates_schedule(time_period: TimePeriod,
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
 
+    elif freq == 'Q-3FRI':  # last friday of quarter
+        # create monthly 3rd fridays
+        dates_schedule1 = create_range(freq_='WOM-3FRI', tz=time_period.tz)
+        dates_schedule2 = create_range(freq_='Q', tz=time_period.tz)
+        # filter last Friday per quarter periods
+        dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill').dropna()
+        dates_schedule = pd.DatetimeIndex(dates_schedule.to_numpy())  # back to DatetimeIndex type
+        if include_end_date is False:
+            dates_schedule = dates_schedule[:-1]
+
     elif '_' in freq:
         # support for bespoke D_8H  # daily at 8H utc
         ss = freq.split('_')
@@ -854,9 +864,9 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
     rolls occur when (current_roll - value_time).days < min_days_to_next_roll
     """
     observation_times = generate_dates_schedule(time_period,
-                                             freq=freq,
-                                             include_start_date=True,
-                                             include_end_date=include_end_date)
+                                                freq=freq,
+                                                include_start_date=True,
+                                                include_end_date=include_end_date)
     # use large day shift to cover at least next quarter
     roll_days = generate_dates_schedule(time_period.shift_end_date_by_days(num_days=future_days_offset, backward=False),
                                         freq=roll_freq,
