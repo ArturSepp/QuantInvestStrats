@@ -148,7 +148,7 @@ from qis.plots.derived.returns_scatter import plot_returns_scatter
 
 from qis.plots.derived.drawdowns import (
     DdLegendType,
-    plot_drawdown,
+    plot_rolling_drawdowns,
     plot_rolling_time_under_water,
     plot_top_drawdowns_paths
 )

@@ -63,11 +63,11 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
         if performance_label == PerformanceLabel.NONE:
             label = f"{name}"
         elif performance_label == PerformanceLabel.SHARPE:
-            label = f"{name}: Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}"
+            label = f"{name}: Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}"
         elif performance_label == PerformanceLabel.DETAILED:
             label = (f"{name}: p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
-                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}")
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}")
         elif performance_label == PerformanceLabel.DETAILED_EXCESS_SHARPE:
             label = (f"{name}: p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
@@ -75,7 +75,7 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
         elif performance_label == PerformanceLabel.WITH_SKEW:
             label = (f"{name}: p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
-                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}, "
                      f"Skew={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SKEWNESS.to_str()])}")
         elif performance_label == PerformanceLabel.DETAILED_LOG:
             label = (f"{name}: an.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.AN_LOG_RETURN.to_str()])}, "
@@ -84,18 +84,18 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
         elif performance_label == PerformanceLabel.WITH_DD:
             label = (f"{name}: p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
-                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}, "
                      f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])}")
         elif performance_label == PerformanceLabel.WITH_DDVOL:
             label = (f"{name}: p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
-                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}, "
                      f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])}, "
                      f"MaxDD/vol={vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD_VOL.to_str()])}")
         elif performance_label == PerformanceLabel.PA_DETAILED:
             label = (f"{name}: P.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
-                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}, "
                      f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])}, "
                      f"MaxDD/vol={vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD_VOL.to_str()])}, "
                      f"Skew={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SKEWNESS.to_str()])}")
@@ -104,13 +104,13 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
         elif performance_label == PerformanceLabel.TOTAL_YTD:
             label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
-                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}, "
                      f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])} ")
         elif performance_label == PerformanceLabel.TOTAL_DETAILED:
             label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
                      f"p.a.={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.PA_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
-                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}, "
                      f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])} ")
         elif performance_label == PerformanceLabel.ARITHMETIC:
             label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
@@ -118,7 +118,7 @@ def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
         elif performance_label == PerformanceLabel.TOTAL_ARITHMETIC:
             label = (f"{name}: Total={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.TOTAL_RETURN.to_str()])}, "
                      f"vol={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.VOL.to_str()])}, "
-                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE.to_str()])}, "
+                     f"Sharpe={sharpe_format.format(ra_perf_table.loc[index, PerfStat.SHARPE_EXCESS.to_str()])}, "
                      f"MaxDD={ra_vol_vormat.format(ra_perf_table.loc[index, PerfStat.MAX_DD.to_str()])} ")
         else:
             raise NotImplementedError(f"{performance_label}")
@@ -225,14 +225,14 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                 ax=axs[0],
                 **kwargs)
 
-    dra.plot_drawdown(prices=prices,
-                      perf_params=perf_params,
-                      dd_legend_type=dd_legend_type,
-                      x_date_freq=x_date_freq,
-                      var_format=dd_format,
-                      title=dd_title,
-                      ax=axs[1],
-                      **kwargs)
+    dra.plot_rolling_drawdowns(prices=prices,
+                               perf_params=perf_params,
+                               dd_legend_type=dd_legend_type,
+                               x_date_freq=x_date_freq,
+                               var_format=dd_format,
+                               title=dd_title,
+                               ax=axs[1],
+                               **kwargs)
 
     if remove_xticklabels_ax1:
         axs[0].set_xticklabels('')
@@ -286,12 +286,12 @@ def plot_prices_with_fundamentals(prices: Union[pd.DataFrame, pd.Series],
                 ax=axs[0],
                 **kwargs)
 
-    dra.plot_drawdown(prices=prices,
-                      perf_params=perf_params,
-                      dd_legend_type=dd_legend_type,
-                      title=dd_title,
-                      ax=axs[1],
-                      **kwargs)
+    dra.plot_rolling_drawdowns(prices=prices,
+                               perf_params=perf_params,
+                               dd_legend_type=dd_legend_type,
+                               title=dd_title,
+                               ax=axs[1],
+                               **kwargs)
 
     pts.plot_time_series_2ax(df1=volumes,
                              df2=mcap,

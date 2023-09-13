@@ -486,7 +486,6 @@ class PortfolioData:
         prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
         local_kwargs = sop.update_kwargs(kwargs=kwargs,
                                          new_kwargs={'weight': 'bold',
-                                                     #'alpha_an_factor': 52.0,
                                                      'x_rotation': 0,
                                                      'first_color_fixed': False,
                                                      'ci': None})

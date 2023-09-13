@@ -17,7 +17,7 @@ RA_TABLE_COLUMNS = [PerfStat.START_DATE,
                     PerfStat.TOTAL_RETURN,
                     PerfStat.PA_RETURN,
                     PerfStat.VOL,
-                    PerfStat.SHARPE,
+                    PerfStat.SHARPE_RF0,
                     PerfStat.SHARPE_EXCESS,
                     PerfStat.MAX_DD,
                     PerfStat.MAX_DD_VOL,
@@ -120,12 +120,12 @@ def run_unit_test(unit_test: UnitTests):
         time_period = None
         time_period = qis.TimePeriod('31Dec2015', '31Mar2023')
         # time_period = qis.TimePeriod('31Dec2017', '31Mar2023')
-        perf_params = qis.PerfParams(freq='W-WED', freq_reg='M', freq_drawdown='B', rates_data=ust_3m_rate)
-        kwargs = dict(x_date_freq='A', heatmap_freq='A', date_format='%Y', perf_params=perf_params, alpha_an_factor=12)
+        perf_params = qis.PerfParams(freq='W-WED', freq_reg='M', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=12)
+        kwargs = dict(x_date_freq='A', heatmap_freq='A', date_format='%Y', perf_params=perf_params)
     else:
         time_period = qis.TimePeriod('31Dec2021', None)
-        perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', freq_drawdown='B', rates_data=ust_3m_rate)
-        kwargs = dict(x_date_freq='M', heatmap_freq='M', date_format='%b-%y', perf_params=perf_params, alpha_an_factor=52)
+        perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=12)
+        kwargs = dict(x_date_freq='M', heatmap_freq='M', date_format='%b-%y', perf_params=perf_params)
 
     prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers]#.dropna()
 

@@ -61,10 +61,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # dd
     ax = fig.add_subplot(gs[2:4, :2])
-    qis.plot_drawdown(prices=joint_prices,
-                      title='Running Drawdowns',
-                      dd_legend_type=qis.DdLegendType.SIMPLE,
-                      ax=ax, **kwargs)
+    qis.plot_rolling_drawdowns(prices=joint_prices,
+                               title='Running Drawdowns',
+                               dd_legend_type=qis.DdLegendType.SIMPLE,
+                               ax=ax, **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 

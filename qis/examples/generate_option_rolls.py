@@ -34,6 +34,12 @@ friday3_monthly_rolls = qis.generate_fixed_maturity_rolls(time_period=time_perio
                                                           roll_hour=8, min_days_to_next_roll=28)  # 4 weeks before expiry
 print(f"monthly 3rd Friday rolls:\n{friday3_monthly_rolls}")
 
+# third wednesday of a month
+wednesday3_monthly_rolls = qis.generate_fixed_maturity_rolls(time_period=time_period,
+                                                          freq='D', roll_freq='WOM-3WED',
+                                                          roll_hour=8, min_days_to_next_roll=1)  # 4 weeks before expiry
+print(f"monthly 3rd Wednesday rolls:\n{wednesday3_monthly_rolls}")
+
 
 # last Friday of quarter
 quarterly_rolls = qis.generate_fixed_maturity_rolls(time_period=time_period,

@@ -23,7 +23,7 @@ PERF_COLUMNS = (
     PerfStat.TOTAL_RETURN,
     PerfStat.PA_RETURN,
     PerfStat.VOL,
-    PerfStat.SHARPE,
+    PerfStat.SHARPE_RF0,
     PerfStat.BEAR_SHARPE,
     PerfStat.NORMAL_SHARPE,
     PerfStat.BULL_SHARPE,
@@ -158,7 +158,7 @@ class MultiAssetsReport:
                        ax: plt.Subplot = None,
                        **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark_str)
-        qis.plot_drawdown(prices=prices, ax=ax, **kwargs)
+        qis.plot_rolling_drawdowns(prices=prices, ax=ax, **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark_str=regime_benchmark_str, data_df=prices)
 
     def plot_rolling_time_under_water(self,

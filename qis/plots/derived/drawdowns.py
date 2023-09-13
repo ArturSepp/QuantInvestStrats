@@ -16,19 +16,19 @@ class DdLegendType(Enum):
     DETAILED = 3
 
 
-def plot_drawdown(prices: Union[pd.Series, pd.DataFrame],
-                  title: Optional[str] = None,
-                  var_format: str = '{:.0%}',
-                  dd_legend_type: DdLegendType = DdLegendType.DETAILED,
-                  legend_loc: str = 'lower left',
-                  y_limits: Tuple[Optional[float], Optional[float]] = (None, 0.0),
-                  ax: plt.Subplot = None,
-                  **kwargs
-                  ) -> plt.Figure:
+def plot_rolling_drawdowns(prices: Union[pd.Series, pd.DataFrame],
+                           title: Optional[str] = None,
+                           var_format: str = '{:.0%}',
+                           dd_legend_type: DdLegendType = DdLegendType.DETAILED,
+                           legend_loc: str = 'lower left',
+                           y_limits: Tuple[Optional[float], Optional[float]] = (None, 0.0),
+                           ax: plt.Subplot = None,
+                           **kwargs
+                           ) -> plt.Figure:
 
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
-    max_dd_data = pt.compute_drawdown_data(prices=prices)
+    max_dd_data = pt.compute_rolling_drawdowns(prices=prices)
 
     if dd_legend_type == DdLegendType.NONE:
         legend_loc = None
@@ -67,7 +67,7 @@ def plot_rolling_time_under_water(prices: pd.DataFrame,
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
 
-    max_dd_data, time_under_water = pt.compute_drawdown_time_under_water(prices=prices)
+    max_dd_data, time_under_water = pt.compute_rolling_drawdown_time_under_water(prices=prices)
 
     legend_labels = []
     for column in time_under_water.columns:
@@ -152,10 +152,10 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     from qis.test_data import load_etf_data
-    prices = load_etf_data().dropna()
+    prices = load_etf_data() # .dropna()
 
     if unit_test == UnitTests.DRAWDOWN_TS:
-        plot_drawdown(prices=prices)
+        plot_rolling_drawdowns(prices=prices)
 
     elif unit_test == UnitTests.ROLLING_TIME:
         plot_rolling_time_under_water(prices=prices)
@@ -169,7 +169,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PLOT_TOP_DRAWDOWNS
+    unit_test = UnitTests.DRAWDOWN_TS
 
     is_run_all_tests = False
     if is_run_all_tests:

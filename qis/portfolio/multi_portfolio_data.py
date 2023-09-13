@@ -158,7 +158,7 @@ class MultiPortfolioData:
 
     def plot_performance_bars(self,
                               time_period: da.TimePeriod = None,
-                              perf_column: PerfStat = PerfStat.SHARPE,
+                              perf_column: PerfStat = PerfStat.SHARPE_RF0,
                               perf_params: PerfParams = PERF_PARAMS,
                               ax: plt.Subplot = None,
                               **kwargs
@@ -196,7 +196,7 @@ class MultiPortfolioData:
             prices = self.get_navs(time_period=time_period, benchmark=regime_benchmark)
         else:
             prices = self.get_navs(time_period=time_period)
-        cdr.plot_drawdown(prices=prices, ax=ax, **kwargs)
+        cdr.plot_rolling_drawdowns(prices=prices, ax=ax, **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
@@ -454,7 +454,6 @@ class MultiPortfolioData:
         prices = self.get_navs(benchmark=benchmark, time_period=time_period)
         local_kwargs = sop.update_kwargs(kwargs=kwargs,
                                          new_kwargs={'weight': 'bold',
-                                                     #'alpha_an_factor': 52.0,
                                                      'x_rotation': 0,
                                                      'first_color_fixed': False,
                                                      'ci': None})

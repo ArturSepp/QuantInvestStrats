@@ -5,7 +5,7 @@ compute risk-adjusted performance tables
 import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis, skew
-from typing import Callable, Union, Dict, Tuple, Any, Optional
+from typing import Callable, Union, Dict, Tuple, Any, Optional, Literal
 from collections import OrderedDict
 from enum import Enum
 
@@ -19,7 +19,7 @@ STANDARD_TABLE_COLUMNS = (PerfStat.START_DATE,
                           PerfStat.END_DATE,
                           PerfStat.PA_RETURN,
                           PerfStat.VOL,
-                          PerfStat.SHARPE,
+                          PerfStat.SHARPE_RF0,
                           PerfStat.MAX_DD,
                           PerfStat.MAX_DD_VOL,
                           PerfStat.SKEWNESS,
@@ -31,7 +31,7 @@ LN_TABLE_COLUMNS = (PerfStat.START_DATE,
                     PerfStat.PA_RETURN,
                     PerfStat.AN_LOG_RETURN,
                     PerfStat.VOL,
-                    PerfStat.SHARPE,
+                    PerfStat.SHARPE_RF0,
                     PerfStat.SHARPE_LOG_AN,
                     PerfStat.MAX_DD,
                     PerfStat.MAX_DD_VOL,
@@ -44,7 +44,7 @@ LN_BENCHMARK_TABLE_COLUMNS = (PerfStat.START_DATE,
                               PerfStat.PA_RETURN,
                               PerfStat.AN_LOG_RETURN,
                               PerfStat.VOL,
-                              PerfStat.SHARPE,
+                              PerfStat.SHARPE_RF0,
                               PerfStat.SHARPE_LOG_AN,
                               PerfStat.MAX_DD,
                               PerfStat.MAX_DD_VOL,
@@ -58,7 +58,7 @@ LN_BENCHMARK_TABLE_COLUMNS_SHORT = (PerfStat.TOTAL_RETURN,
                                     PerfStat.PA_RETURN,
                                     PerfStat.AN_LOG_RETURN,
                                     PerfStat.VOL,
-                                    PerfStat.SHARPE,
+                                    PerfStat.SHARPE_RF0,
                                     PerfStat.SHARPE_LOG_AN,
                                     PerfStat.MAX_DD,
                                     PerfStat.MAX_DD_VOL,
@@ -74,7 +74,7 @@ EXTENDED_TABLE_COLUMNS = (PerfStat.START_DATE,
                           PerfStat.TOTAL_RETURN,
                           PerfStat.PA_RETURN,
                           PerfStat.VOL,
-                          PerfStat.SHARPE,
+                          PerfStat.SHARPE_RF0,
                           PerfStat.SHARPE_EXCESS,
                           PerfStat.MAX_DD,
                           PerfStat.MAX_DD_VOL,
@@ -84,7 +84,7 @@ EXTENDED_TABLE_COLUMNS = (PerfStat.START_DATE,
 COMPACT_TABLE_COLUMNS = (PerfStat.TOTAL_RETURN,
                          PerfStat.PA_RETURN,
                          PerfStat.VOL,
-                         PerfStat.SHARPE,
+                         PerfStat.SHARPE_RF0,
                          PerfStat.MAX_DD,
                          PerfStat.MAX_DD_VOL,
                          PerfStat.SKEWNESS)
@@ -92,14 +92,13 @@ COMPACT_TABLE_COLUMNS = (PerfStat.TOTAL_RETURN,
 SMALL_TABLE_COLUMNS = (PerfStat.TOTAL_RETURN,
                        PerfStat.PA_RETURN,
                        PerfStat.VOL,
-                       PerfStat.SHARPE,
+                       PerfStat.SHARPE_EXCESS,
                        PerfStat.MAX_DD)
 
 BENCHMARK_TABLE_COLUMNS = (PerfStat.PA_RETURN,
                            PerfStat.VOL,
-                           PerfStat.SHARPE,
+                           PerfStat.SHARPE_EXCESS,
                            PerfStat.MAX_DD,
-                           PerfStat.MAX_DD_VOL,
                            PerfStat.SKEWNESS,
                            PerfStat.ALPHA_AN,
                            PerfStat.BETA,
@@ -108,7 +107,7 @@ BENCHMARK_TABLE_COLUMNS = (PerfStat.PA_RETURN,
 BENCHMARK_TABLE_COLUMNS2 = (PerfStat.TOTAL_RETURN,
                             PerfStat.PA_RETURN,
                             PerfStat.VOL,
-                            PerfStat.SHARPE,
+                            PerfStat.SHARPE_EXCESS,
                             PerfStat.MAX_DD,
                             PerfStat.MAX_DD_VOL,
                             PerfStat.SKEWNESS,
@@ -168,8 +167,10 @@ def compute_risk_table(prices: pd.DataFrame,
             sampled_returns = ret.to_returns(prices=sampled_price, return_type=perf_params.return_type, drop_first=True)
             nd_sampled_returns = sampled_returns.to_numpy()
             vol = vol_dt * np.std(nd_sampled_returns, ddof=1)
+            downside_vol = vol_dt * np.std(nd_sampled_returns[nd_sampled_returns < 0.0], ddof=1)
 
             asset_dict = {PerfStat.VOL.to_str(): vol,
+                          PerfStat.DOWNSIDE_VOL.to_str(): downside_vol,
                           PerfStat.AVG_LOG_RETURN.to_str(): np.nanmean(sampled_returns),
                           PerfStat.START_DATE.to_str(): sampled_price.index[0],
                           PerfStat.END_DATE.to_str(): sampled_price.index[-1],
@@ -217,12 +218,15 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
 
     # get vol and compute risk adjusted performance
     vol = risk_table[PerfStat.VOL.to_str()]
-    perf_table[PerfStat.SHARPE.to_str()] = perf_table[PerfStat.PA_RETURN.to_str()] / vol
+    perf_table[PerfStat.SHARPE_RF0.to_str()] = perf_table[PerfStat.PA_RETURN.to_str()] / vol
+    perf_table[PerfStat.SHARPE_EXCESS.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / vol
     perf_table[PerfStat.SHARPE_LOG_AN.to_str()] = perf_table[PerfStat.AN_LOG_RETURN.to_str()] / vol
     perf_table[PerfStat.SHARPE_AVG.to_str()] = perf_table[PerfStat.AVG_AN_RETURN.to_str()] / vol  # computed in risk
-    perf_table[PerfStat.SHARPE_EXCESS.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / vol
     perf_table[PerfStat.SHARPE_LOG_EXCESS.to_str()] = perf_table[PerfStat.AN_LOG_RETURN_EXCESS.to_str()] / vol
     perf_table[PerfStat.SHARPE_APR.to_str()] = perf_table[PerfStat.APR.to_str()] / vol
+
+    perf_table[PerfStat.SORTINO_RATIO.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.DOWNSIDE_VOL.to_str()]
+    perf_table[PerfStat.CALMAR_RATIO.to_str()] = -1.0*perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.MAX_DD.to_str()]
 
     # merge the two meta on dates
     ra_perf_table = pd.merge(left=perf_table, right=risk_table,
@@ -249,6 +253,11 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
 
     # compute benchmark regression
     returns = ret.to_returns(prices=prices, freq=freq_reg or perf_params.freq_reg, is_log_returns=is_log_returns)
+
+    # use excess returns if rates data is given
+    if perf_params.rates_data is not None:
+        returns = ret.compute_excess_returns(returns=returns, rates_data=perf_params.rates_data)
+
     alphas, betas, r2 = {}, {}, {}
     for column in returns.columns:
         joint_data = returns[[benchmark, column]].dropna()
@@ -259,13 +268,11 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
                                                                                     y=joint_data.iloc[:, 1])
 
             # get vol and compute risk adjusted performance
+    alpha_an_factor = alpha_an_factor or perf_params.alpha_an_factor
     ra_perf_table[PerfStat.ALPHA.to_str()] = pd.Series(alphas)
-    ra_perf_table[PerfStat.ALPHA_AN.to_str()] = pd.Series(alphas)
+    ra_perf_table[PerfStat.ALPHA_AN.to_str()] = alpha_an_factor * pd.Series(alphas)
     ra_perf_table[PerfStat.BETA.to_str()] = pd.Series(betas)
     ra_perf_table[PerfStat.R2.to_str()] = pd.Series(r2)
-
-    if alpha_an_factor is not None:
-        ra_perf_table[PerfStat.ALPHA_AN.to_str()] *= alpha_an_factor
 
     return ra_perf_table
 
@@ -321,89 +328,39 @@ def compute_info_ratio_table(return_diffs_dict: Dict[str, pd.DataFrame]) -> Tupl
     return te_table, ir_table
 
 
-def compute_drawdown(price: pd.Series) -> pd.Series:
-    if not isinstance(price, pd.Series):
-        print(price)
-        raise TypeError(f"in compute_max_dd: path_data must be series")
-
-    max_dd = np.zeros_like(price)
-    last_peak = -np.inf
-
-    for idx, price_ in enumerate(price):
-        if not np.isnan(price_):
-            if price_ > last_peak:
-                last_peak = price_
-            if not np.isclose(last_peak, 0.0):
-                max_dd[idx] = price_ / last_peak - 1.0
-        else:
-            max_dd[idx] = np.nan
-
-    max_dd = pd.Series(data=max_dd, index=price.index, name=price.name)
-
+def compute_rolling_drawdowns(prices: Union[pd.DataFrame, pd.Series],
+                              min_periods: int = 1
+                              ) -> Union[pd.DataFrame, pd.Series]:
+    """
+    compute rolling drawdowns
+    """
+    if not isinstance(prices, pd.Series) and not isinstance(prices, pd.DataFrame):
+        raise ValueError(f"unsuported type {type(prices)}")
+    peak = prices.expanding(min_periods=min_periods).max()
+    max_dd = prices.divide(peak)-1.0
     return max_dd
 
 
-def compute_time_under_water(price: pd.Series) -> Tuple[pd.Series, pd.Series]:
-    if not isinstance(price, pd.Series):
-        raise TypeError(f"in compute_time_under_water: path_data must be series")
-
-    max_dd = np.zeros_like(price)
-    dd_times = np.zeros_like(price.index)
-
-    last_peak = -np.inf
-    last_dd, last_dd_time = 0.0, price.index[0]
-    dd_times[0] = last_dd_time
-    for idx, (index, price_) in enumerate(price.items()):
-        if not np.isnan(price_):
-            if price_ > last_peak:
-                last_peak = price_
-                last_dd_time = index
-            last_dd = price_ / last_peak - 1.0
-            max_dd[idx] = last_dd
-            dd_times[idx] = last_dd_time
-        else:
-            max_dd[idx] = last_dd
-            dd_times[idx] = last_dd_time
-
-    max_dd = pd.Series(data=max_dd, index=price.index, name=price.name)
-    dd_times = (price.index - pd.DatetimeIndex(dd_times)).days
-    time_under_water = pd.Series(data=dd_times, index=price.index, name=price.name)
-
-    return max_dd, time_under_water
-
-
-def compute_drawdown_data(prices: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
-    if isinstance(prices, pd.Series):
-        drawdown = compute_drawdown(price=prices)
-    elif isinstance(prices, pd.DataFrame):
-        if len(prices.columns) > 1 and prices.columns.duplicated().any():
-            raise ValueError(f"dublicated columns = {prices[prices.columns.duplicated()]}")
-        drawdowns = []
-        for asset_ in prices:
-            drawdowns.append(compute_drawdown(price=prices[asset_]))
-        drawdown = pd.concat(drawdowns, axis=1)
-    else:
-        raise ValueError(f"unsuported type {type(prices)}")
-    return drawdown
-
-
-def compute_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Series]
-                                      ) -> Tuple[Union[pd.DataFrame, pd.Series], Union[pd.DataFrame, pd.Series]]:
+def compute_rolling_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Series],
+                                              sampling_freq: Literal['B', 'D'] = 'D'
+                                              ) -> Tuple[Union[pd.DataFrame, pd.Series], Union[pd.DataFrame, pd.Series]]:
     """
     compute joint data of drawdown and time under water
+    sampling_freq: Literal['B', 'D'] = 'D'  # if we are interested in calendar or business days
     """
-    if isinstance(prices, pd.Series):
-        drawdown, time_under_water = compute_time_under_water(price=prices)
+    if not isinstance(prices, pd.Series) and not isinstance(prices, pd.DataFrame):
+        raise ValueError(f"unsuported type {type(prices)}")
+    prices = prices.asfreq(freq=sampling_freq, method='ffill')
+    # find expanding peak
+    peak = prices.expanding(min_periods=1).max()
+    drawdown = prices.divide(peak) - 1.0
+    if isinstance(prices, pd.DataFrame):
+        is_in_dd = pd.DataFrame(np.where(prices < peak, 1.0, np.nan), index=prices.index, columns=prices.columns)
     else:
-        drawdowns = []
-        time_under_waters = []
-        for asset in prices.columns:
-            drawdown, time_under_water = compute_time_under_water(price=prices[asset])
-            drawdowns.append(drawdown)
-            time_under_waters.append(time_under_water)
-        drawdown = pd.concat(drawdowns, axis=1)
-        time_under_water = pd.concat(time_under_waters, axis=1)
+        is_in_dd = pd.Series(np.where(prices < peak, 1.0, np.nan), index=prices.index, name=prices.name)
 
+    # cumsum until first nan for series
+    time_under_water = is_in_dd.apply(lambda x: x.groupby(x.isna().cumsum()).cumsum(), axis=0)
     return drawdown, time_under_water
 
 
@@ -411,7 +368,7 @@ def compute_max_dd(prices: Union[pd.DataFrame, pd.Series]) -> np.ndarray:
     """
     compute realized max drawdown
     """
-    max_dd_data = compute_drawdown_data(prices=prices)
+    max_dd_data = compute_rolling_drawdowns(prices=prices)
     max_dds = np.min(max_dd_data.to_numpy(), axis=0)
     return max_dds
 
@@ -452,7 +409,7 @@ def compute_drawdowns_stats_table(price: pd.Series,
     """
     if freq is not None:
         price = price.asfreq(freq, method='ffill')
-    max_dd, time_under_water = compute_time_under_water(price=price)
+    max_dd, time_under_water = compute_rolling_drawdown_time_under_water(prices=price)
     max_dd = max_dd.replace({0.0: np.nan})
     time_under_water = time_under_water.replace({0.0: np.nan})
 
@@ -499,7 +456,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     from qis.test_data import load_etf_data
-    prices = load_etf_data().dropna()
+    prices = load_etf_data() # .dropna()
 
     if unit_test == UnitTests.RA_PERF_TABLE:
         perf_params = PerfParams(freq='B')
@@ -508,7 +465,7 @@ def run_unit_test(unit_test: UnitTests):
         print(table.columns)
 
     elif unit_test == UnitTests.DRAWDOWN:
-        dd_data = compute_drawdown(price=prices['SPY'])
+        dd_data = compute_rolling_drawdowns(prices=prices['SPY'])
         print(dd_data)
 
     elif unit_test == UnitTests.DRAWDOWN_STATS_TABLE:
@@ -518,7 +475,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.DRAWDOWN_STATS_TABLE
+    unit_test = UnitTests.RA_PERF_TABLE
 
     is_run_all_tests = False
     if is_run_all_tests:
