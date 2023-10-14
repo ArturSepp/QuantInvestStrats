@@ -1,7 +1,6 @@
 """
 analyse rolling betas of vix to SPY and TLT ETFs
 """
-
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -10,7 +9,7 @@ import qis
 from qis import PortfolioData
 
 # load VIX ETH
-vix = yf.download(tickers=['UVXY'], start=None, end=None, ignore_tz=True)['Adj Close'].asfreq('B', method='ffill').rename('Long VIX ETF')
+vix = yf.download(tickers=['VXX'], start=None, end=None, ignore_tz=True)['Adj Close'].asfreq('B', method='ffill').rename('Long VIX ETF')
 
 # load becnhmarks benchmarks
 benchmark_prices = yf.download(tickers=['SPY', 'TLT'], start=None, end=None, ignore_tz=True)['Adj Close'].asfreq('B', method='ffill')
@@ -24,9 +23,8 @@ perf_params = qis.PerfParams(freq='W-WED', freq_reg='M', alpha_an_factor=12.0,
                              rates_data=yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0)
 regime_params = qis.BenchmarkReturnsQuantileRegimeSpecs(freq='M')
 
-# get factor attribution attribution
 with sns.axes_style("darkgrid"):
-    fig1, axs = plt.subplots(3, 1, figsize=(10, 10))
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10))
     kwargs = dict(framealpha=0.9, fontsize=12, legend_loc='lower left')
 
     # plot performances
