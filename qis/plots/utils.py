@@ -473,7 +473,7 @@ def align_x_limits_axs(axs: List[plt.Subplot],
 
     if is_invisible_xs:
         for idx, ax in enumerate(axs):
-            if idx > 0:
+            if idx < len(axs)-1:
                 ax.axes.get_xaxis().set_visible(False)
 
 

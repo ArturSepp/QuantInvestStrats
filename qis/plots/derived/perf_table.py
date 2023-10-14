@@ -111,7 +111,7 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  drop_benchmark: bool = False,
                                  perf_params: PerfParams = None,
                                  perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
-                                 special_columns_colors: List[Tuple[int, str]] = ((0, 'blue'),),
+                                 special_columns_colors: List[Tuple[int, str]] = ((0, 'skyblue'),),
                                  column_header: str = 'Asset',
                                  fontsize: int = 10,
                                  transpose: bool = False,
@@ -386,7 +386,7 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.PLOT_RA_PERF_TABLE_BENCHMARKS:
         perf_params = PerfParams(freq='M')
         plot_ra_perf_table_benchmark(prices=prices,
-                                     benchmark='es1_index',
+                                     benchmark='SPY',
                                      perf_params=perf_params,
                                      transpose=False)
 
@@ -419,7 +419,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PLOT_TOP_BOTTOM_PERFORMERS
+    unit_test = UnitTests.PLOT_RA_PERF_TABLE_BENCHMARKS
 
     is_run_all_tests = False
     if is_run_all_tests:

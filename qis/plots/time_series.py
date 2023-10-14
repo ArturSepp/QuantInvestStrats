@@ -222,8 +222,8 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
             y0 = data1.iloc[:, indxs[0]]
             y1 = data1.iloc[:, indxs[1]]
             ax.fill_between(data1.index, y0, y1, where=y0 >= y1,
-                        facecolor=col, alpha=0.2,
-                        interpolate=True)
+                            facecolor=col, alpha=0.2,
+                            interpolate=True)
 
     if legend_loc is not None:
         if legend_labels is None:

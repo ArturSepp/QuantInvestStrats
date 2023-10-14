@@ -38,11 +38,12 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     data corresponds to matrix of returns with index = time and columns = tickers
     data can contain nan in columns
     output is index = tickers, columns = descriptive data
+    data converted to str
     """
     if isinstance(df, pd.DataFrame):
         descriptive_table = pd.DataFrame(index=df.columns)
     elif isinstance(df, pd.Series):
-        descriptive_table = pd.DataFrame(index=df.name)
+        descriptive_table = pd.DataFrame(index=[df.name])
         df = df.to_frame()
     else:
         raise TypeError(f"unsupported data type = {type(df)}")
@@ -146,7 +147,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.TABLE:
         df = compute_desc_table(df=returns,
-                                desc_table_type=DescTableType.WITH_KURTOSIS,
+                                desc_table_type=DescTableType.EXTENSIVE,
                                 var_format='{:.2f}',
                                 annualize_vol=True,
                                 is_add_tstat=False)

@@ -15,7 +15,7 @@ from qis.perfstats.config import ReturnTypes
 def plot_returns_scatter(prices: pd.DataFrame,
                          benchmark: str = None,
                          benchmark_prices: Union[pd.Series, pd.DataFrame] = None,
-                         freq: str = 'Q',
+                         freq: Optional[str] = 'Q',
                          order: int = 2,
                          ci: Optional[int] = 95,
                          add_45line: bool = False,

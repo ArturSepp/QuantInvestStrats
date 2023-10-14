@@ -288,7 +288,8 @@ class PortfolioData:
             benchmark_betas = time_period.locate(benchmark_betas)
         return benchmark_betas
 
-    def compute_portfolio_benchmark_attribution(self, benchmark_prices: pd.DataFrame,
+    def compute_portfolio_benchmark_attribution(self,
+                                                benchmark_prices: pd.DataFrame,
                                                 time_period: da.TimePeriod = None,
                                                 freq: str = 'B',
                                                 span: int = 63  # quarter

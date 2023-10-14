@@ -1,5 +1,4 @@
 import pandas as pd
-import matplotlib.pyplot as plt
 from typing import Tuple, List
 from enum import Enum
 import yfinance as yf
