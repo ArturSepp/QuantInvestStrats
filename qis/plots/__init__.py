@@ -158,3 +158,5 @@ from qis.plots.derived.regime_data import (
     plot_regime_boxplot,
     add_bnb_regime_shadows
 )
+
+from qis.plots.derived.desc_table import plot_desc_table
