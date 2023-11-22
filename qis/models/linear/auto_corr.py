@@ -13,6 +13,11 @@ def estimate_path_acf(paths: Union[np.ndarray, pd.DataFrame],
                       nlags: int = 10,
                       is_pacf: bool = True
                       ) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """
+    paths data are contained in columns of dataframe
+    outputs are df with index=lags, columns = data columns
+    use statsmodels.tsa.stattools
+    """
     if isinstance(paths, pd.DataFrame):
         columns = paths.columns
         paths = paths.to_numpy()
@@ -23,7 +28,7 @@ def estimate_path_acf(paths: Union[np.ndarray, pd.DataFrame],
     acfs = np.zeros((nlags + 1, nb_path))
     for path in np.arange(nb_path):
         data = paths[:, path]
-        data = data[np.isnan(data)==False]
+        data = data[np.isnan(data) == False]
         if len(data) > 2.0*nlags:
             if is_pacf:
                 acfs[:, path] = pacf(data, nlags=nlags)
@@ -37,43 +42,51 @@ def estimate_path_acf(paths: Union[np.ndarray, pd.DataFrame],
     return acfs, m_acf, std_acf
 
 
-def compute_autocorr(x: Union[np.ndarray, pd.Series],
-                     num_lags: int = 1,
-                     axis: int = None
-                     ) -> np.ndarray:
+def compute_autocorr_df(data: pd.DataFrame,
+                        num_lags: int = 20
+                        ) -> pd.DataFrame:
     """
-    partial correlation
+    compute auto correlation columns wise and return df with lags = index
     """
-    if isinstance(x, pd.Series) or isinstance(x, pd.DataFrame):
-        x = x.to_numpy()
-    if len(x) == 1:
-        corr = np.zeros(num_lags)
-    else:
-        corr = auto_corr(a=x, num_lags=num_lags)
-    if num_lags == 1:
-        return corr[0]
-    else:
-        return np.array(corr)
+    acorrs = []
+    for column in data:
+        acorrs.append(compute_path_autocorr(a=data[column].dropna().to_numpy(), num_lags=num_lags))
+
+    data = pd.DataFrame(data=np.column_stack(acorrs),
+                        index=range(0, num_lags),
+                        columns=data.columns)
+    return data
 
 
 @njit
-def auto_corr(a: np.ndarray,
-              num_lags: int = 20
-              ) -> np.ndarray:
+def compute_path_corr(a1: np.ndarray,
+                      a2: np.ndarray,
+                      num_lags: int = 20
+                      ) -> np.ndarray:
+    """
+    compute paths lagged correlation
+    """
     acorr = np.ones(num_lags)
     for idx in range(1, num_lags):
-        acorr[idx] = np.corrcoef(a[idx:], a[:-idx], rowvar=False)[0][1]
+        acorr[idx] = np.corrcoef(a1[idx:], a2[:-idx], rowvar=False)[0][1]
     return acorr
 
 
 @njit
+def compute_path_autocorr(a: np.ndarray,
+                          num_lags: int = 20
+                          ) -> np.ndarray:
+    return compute_path_corr(a1=a, a2=a, num_lags=num_lags)
+
+
+@njit
 def compute_ewm_autocovar(a: np.ndarray,
-                           ewm_lambda: float = 0.94,
-                           covar0: np.ndarray = None,
-                           lag: int = 1,
-                           aggregation_type: str = 'mean',
-                           is_normalize: bool = True
-                           ) -> (np.ndarray, np.ndarray):
+                          ewm_lambda: float = 0.94,
+                          covar0: np.ndarray = None,
+                          lag: int = 1,
+                          aggregation_type: str = 'mean',
+                          is_normalize: bool = True
+                          ) -> (np.ndarray, np.ndarray):
     """
     x is T*N arrays
     """
@@ -114,22 +127,6 @@ def compute_ewm_autocovar(a: np.ndarray,
             trace_off[idx] = np.nanmedian(auto_covar_t)
 
     return trace_cov, trace_off
-
-
-def compute_auto_corr(data: pd.DataFrame,
-                      num_lags: int = 20
-                      ) -> pd.DataFrame:
-    """
-    compute auto correlation columns wise
-    """
-    acorrs = []
-    for column in data:
-        acorrs.append(auto_corr(a=data[column].dropna().to_numpy(), num_lags=num_lags))
-
-    data = pd.DataFrame(data=np.column_stack(acorrs),
-                        index=range(0, num_lags),
-                        columns=data.columns)
-    return data
 
 
 def compute_dynamic_auto_corr(data: pd.DataFrame,

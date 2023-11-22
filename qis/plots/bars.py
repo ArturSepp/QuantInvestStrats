@@ -74,8 +74,8 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
 
     elif isinstance(df, pd.Series):
-        sns.barplot(x=df.index, y=df, palette=colors, ax=ax)
-
+        #sns.barplot(x=df.index, y=df, palette=colors, ax=ax)
+        df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
     else:  # need to melt for barplot
         value_name = ylabel or 'y'
         var_name = xlabel or 'x'

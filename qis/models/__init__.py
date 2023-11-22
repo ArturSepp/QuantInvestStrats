@@ -1,10 +1,12 @@
 
 from qis.models.linear.auto_corr import (
-    compute_auto_corr,
-    compute_autocorr,
+    compute_path_corr,
+    compute_path_autocorr,
+    compute_autocorr_df,
+    compute_ewm_autocovar,
     compute_dynamic_auto_corr,
     compute_rolling_mean_adj,
-    estimate_path_acf
+    estimate_path_acf,
 )
 
 from qis.models.linear.corr_cov_matrix import (

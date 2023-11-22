@@ -30,13 +30,16 @@ CALENDAR_DAYS_PER_YEAR_SHARPE = 365.25  # for total return computations for Shar
 
 def get_current_time_with_tz(tz: Optional[str] = 'UTC',
                              days_offset: int = None,
-                             normalize: bool = True
+                             normalize: bool = True,
+                             hour: int = None
                              ) -> pd.Timestamp:
     t = pd.Timestamp.today(tz=tz)
     if normalize:
         t = t.normalize()  # normalize to eod date
     if days_offset is not None:
-        t = t + pd.DateOffset(days=days_offset)
+        t = t + pd.Timedelta(days=days_offset)
+    if hour is not None:
+        t = t.replace(hour=hour)
     return t
 
 
@@ -992,6 +995,12 @@ def run_unit_test(unit_test: UnitTests):
         rebalancing_times = generate_dates_schedule(time_period=time_period, freq='D_8H')
         print(rebalancing_times)
 
+        value_time = pd.Timestamp('2023-10-04 08:00:00+00:00').normalize()
+        print(value_time)
+        time_period = TimePeriod(value_time, value_time)
+        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
+        print(rebalancing_times)
+
     elif unit_test == UnitTests.FREQ_REB:
         dates_schedule = generate_dates_schedule(time_period=TimePeriod('2023-05-01 08:00:00', '2023-05-30 10:00:00', tz='UTC'),
                                                  freq='2W-FRI', hour_offset=8,
@@ -1044,7 +1053,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.FREQ_REB
+    unit_test = UnitTests.FREQ_HOUR
 
     is_run_all_tests = False
     if is_run_all_tests:

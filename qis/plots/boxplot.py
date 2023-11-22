@@ -30,6 +30,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
              showfliers: bool = False,
              showmeans: bool = False,
              showmedians: bool = False,
+             add_y_mean_labels: bool = False,
              add_xy_mean_labels: bool = False,
              add_xy_med_labels: bool = False,
              add_y_med_labels: bool = False,
@@ -48,6 +49,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
              add_autocorr_std_bound: bool = False,
              continuous_x_col: str = None,
              y_limits: Tuple[Optional[float], Optional[float]] = None,
+             whis: Optional[float] = 1.5,  # sns default
              ax: plt.Subplot = None,
              **kwargs
              ) -> Optional[plt.Figure]:
@@ -69,13 +71,15 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
             palette = put.get_n_colors(n=len(df[x].unique()))
 
     sns.boxplot(x=x, y=y, data=df,
-                hue=hue, hue_order=hue_order,
+                hue=hue,
+                hue_order=hue_order,
                 palette=palette,
                 linewidth=linewidth,
                 meanline=meanline,
                 showfliers=showfliers,
                 medianprops={'visible': showmedians, 'color': 'black'},
                 showmeans=showmeans or meanline,
+                whis=whis,
                 ax=ax)
 
     if num_obs_for_ci is not None:
@@ -118,6 +122,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
         put.set_ax_tick_labels(ax=ax, x_labels=datalables, x_rotation=x_rotation, xticks=xticks, fontsize=fontsize)
 
     else:
+
         ax.set_xticklabels(ax.get_xticklabels(),
                            fontsize=fontsize,
                            rotation=x_rotation,
@@ -130,7 +135,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
         ax.set_yticklabels([yvar_format.format(x) for x in ax.get_yticks()],
                            fontsize=fontsize, minor=False)
 
-    if add_xy_mean_labels:
+    if add_y_mean_labels or add_xy_mean_labels:
         if hue is not None:
             df_by_x = df.sort_values(hue).groupby(hue, sort=False)
             x_col = x
@@ -143,11 +148,16 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
         for x_idx, (key, g_data) in enumerate(df_by_x):
             y_val = g_data[y].mean()
             x_val = g_data[x_col].mean()
-            ax.text(x_idx, y_val, f"avg:\ny={yvar_format.format(y_val)}\nx={xvar_format.format(x_val)}",
-                    ha='center', va='center',
-                    color='black', fontsize=fontsize)
+            if add_y_mean_labels:
+                ax.text(x_idx, y_val, f"{yvar_format.format(y_val)}\n",
+                        ha='center', va='center',
+                        color='black', fontsize=fontsize)
+            else:
+                ax.text(x_idx, y_val, f"avg:\ny={yvar_format.format(y_val)}\nx={xvar_format.format(x_val)}",
+                        ha='center', va='center',
+                        color='black', fontsize=fontsize)
 
-    elif add_xy_med_labels or add_y_med_labels:
+    elif add_y_med_labels or add_xy_med_labels:
         if continuous_x_col is None:
             raise ValueError(f"continuous_x_col must be given")
         df_by_x = df.groupby(x, sort=False)
@@ -155,12 +165,12 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
         for x_idx, (key, g_data) in enumerate(df_by_x):
             y_val = g_data[y].median()
             x_val = g_data[continuous_x_col].median()
-            if add_xy_med_labels:
-                ax.text(x_idx, y_val, f"med:\ny={yvar_format.format(y_val)}\nx={xvar_format.format(x_val)}",
+            if add_y_med_labels:
+                ax.text(x_idx, y_val, f"{yvar_format.format(y_val)}\n\n",
                         ha='center', va='center',
                         color='black', fontsize=fontsize)
             else:
-                ax.text(x_idx, y_val, f"{yvar_format.format(y_val)}\n\n",
+                ax.text(x_idx, y_val, f"med:\ny={yvar_format.format(y_val)}\nx={xvar_format.format(x_val)}",
                         ha='center', va='center',
                         color='black', fontsize=fontsize)
 
@@ -258,7 +268,7 @@ def df_boxplot_by_columns(df: Union[pd.Series, pd.DataFrame],
     box_data = dfm.melt_df_by_columns(df=df, x_index_var_name=None, hue_var_name=hue_var_name, y_var_name=y_var_name)
 
     if colors is None:
-        colors = put.compute_heatmap_colors(a=np.nanmean(df.to_numpy(), axis=0))
+        colors = put.compute_heatmap_colors(a=np.nanmean(df.to_numpy(), axis=0), **kwargs)
 
     fig = plot_box(df=box_data,
                    x=hue_var_name,
@@ -383,11 +393,11 @@ def df_boxplot_by_classification_var(df: pd.DataFrame,
     use x as classification var and plod box plot relative to quatiles of x
     """
     scatter_data, _ = dfc.add_quantile_classification(df=df, x_column=x,
-                                                   hue_name=x_hue_name,
-                                                   num_buckets=num_buckets,
-                                                   bins=None,
-                                                   xvar_format=xvar_format,
-                                                   is_value_labels=is_value_labels)
+                                                      hue_name=x_hue_name,
+                                                      num_buckets=num_buckets,
+                                                      bins=None,
+                                                      xvar_format=xvar_format,
+                                                      is_value_labels=is_value_labels)
 
     plot_box(df=scatter_data,
              x=x_hue_name,

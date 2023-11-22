@@ -1336,7 +1336,7 @@ def compute_heatmap_colors(a: np.ndarray,
 
     if a.ndim == 1:
         # colorise = [(1 - x, x, left) if np.isnan(x) == False else (1, 1, 1) for x in z]
-        colorise = plt.get_cmap(cmap)(z)
+        colorise = [x for x in plt.get_cmap(cmap)(z)]
 
     elif a.ndim == 2:  # list of lists
         colors = plt.get_cmap(cmap)(z)

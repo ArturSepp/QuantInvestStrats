@@ -27,11 +27,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 from sqlalchemy.engine.base import Engine
 from enum import Enum
 
+from qis.local_path import get_paths
+
 
 """"
 Path specifications
 """
-from qis.local_path import get_paths
 LOCAL_PATHS = get_paths()
 RESOURCE_PATH = LOCAL_PATHS['RESOURCE_PATH']
 UNIVERSE_PATH = LOCAL_PATHS['UNIVERSE_PATH']
@@ -117,21 +118,21 @@ def join_file_name_parts(parts: List[str]) -> str:
 def get_local_file_path(file_name: Optional[str],
                         file_type: Optional[FileTypes] = None,
                         local_path: Optional[str] = None,
+                        folder_name: str = None,
                         subfolder_name: str = None,
-                        subsubfolder_name: str = None,
                         key: str = None,
                         is_output_file: bool = False
                         ) -> str:
     """
     file data management is organised as:
-    file_path = RESOURCE_PATH/subfolder_name/subsubfolder_name/file_name+file_type.value
+    file_path = RESOURCE_PATH/folder_name/subfolder_name/file_name+file_type.value
     default value without optional arguments will be:
     file_path = RESOURCE_PATH/file_name.file_type.value
 
     for datasets, we can define datasets keys so the file paths are:
-    file_path = RESOURCE_PATH/subfolder_name/subsubfolder_name/file_name+_key+file_type.value
+    file_path = RESOURCE_PATH/folder_name/subfolder_name/file_name+_key+file_type.value
     or if file_name is None:
-    file_path = RESOURCE_PATH/subfolder_name/subsubfolder_name/key+file_type.value
+    file_path = RESOURCE_PATH/folder_name/subfolder_name/key+file_type.value
 
     if local_path is not None: file_path=local_path
     if local_path in not None and file_name and file_type is passed: file_path=local_path//file_name+file_type.value
@@ -145,11 +146,11 @@ def get_local_file_path(file_name: Optional[str],
         else:
             local_path = RESOURCE_PATH
 
-        if subfolder_name is not None:
-            if subsubfolder_name is not None:
-                local_path = join(local_path, subfolder_name, subsubfolder_name)
+        if folder_name is not None:
+            if subfolder_name is not None:
+                local_path = join(local_path, folder_name, subfolder_name)
             else:
-                local_path = join(local_path, subfolder_name)
+                local_path = join(local_path, folder_name)
 
     if file_name is not None:
         if key is not None:
@@ -218,8 +219,8 @@ def delocalize_df(data: pd.DataFrame, delocalize: bool) -> pd.DataFrame:
 def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.DataFrame]],
                      file_name: str,
                      local_path: Optional[str] = None,
+                     folder_name: str = None,
                      subfolder_name: str = None,
-                     subsubfolder_name: str = None,
                      key: str = None,
                      add_current_date: bool = False,
                      sheet_names: List[str] = None,
@@ -234,8 +235,8 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.EXCEL,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
 
     excel_writer = pd.ExcelWriter(file_path)
@@ -267,8 +268,8 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
 def load_df_from_excel(file_name: str,
                        sheet_name: str = 'Sheet1',
                        local_path: Optional[str] = None,
+                       folder_name: str = None,
                        subfolder_name: str = None,
-                       subsubfolder_name: str = None,
                        key: str = None,
                        is_index: bool = True,
                        delocalize: bool = False  # excel data may have local time which are unwanted
@@ -279,8 +280,8 @@ def load_df_from_excel(file_name: str,
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.EXCEL,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
     try:
         excel_reader = pd.ExcelFile(file_path, engine='openpyxl')
@@ -299,8 +300,8 @@ def load_df_from_excel(file_name: str,
 def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
                           file_name: str,
                           local_path: Optional[str] = None,
+                          folder_name: str = None,
                           subfolder_name: str = None,
-                          subsubfolder_name: str = None,
                           key: str = None,
                           add_current_date: bool = False,
                           delocalize: bool = False
@@ -314,8 +315,8 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.EXCEL,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
 
     excel_writer = pd.ExcelWriter(file_path)
@@ -329,8 +330,8 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
 def load_df_dict_from_excel(file_name: str,
                             dataset_keys: Optional[List[Union[str, Enum, NamedTuple]]],
                             local_path: Optional[str] = None,
+                            folder_name: str = None,
                             subfolder_name: str = None,
-                            subsubfolder_name: str = None,
                             key: str = None,
                             is_index: bool = True,
                             delocalize: bool = False,
@@ -343,8 +344,8 @@ def load_df_dict_from_excel(file_name: str,
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.EXCEL,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
     try:
         excel_reader = pd.ExcelFile(file_path, engine='openpyxl')
@@ -374,8 +375,8 @@ Pandas to/from CSV core
 
 def save_df_to_csv(df: pd.DataFrame,
                    file_name: str = None,
+                   folder_name: str = None,
                    subfolder_name: str = None,
-                   subsubfolder_name: str = None,
                    key: str = None,
                    add_current_date: bool = False,
                    local_path: Optional[str] = None
@@ -389,16 +390,16 @@ def save_df_to_csv(df: pd.DataFrame,
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.CSV,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
     df.to_csv(path_or_buf=file_path)
 
 
 def load_df_from_csv(file_name: Optional[str] = None,
                      local_path: Optional[str] = None,
+                     folder_name: str = None,
                      subfolder_name: str = None,
-                     subsubfolder_name: str = None,
                      key: str = None,
                      is_index: bool = True,
                      parse_dates: bool = True,
@@ -412,8 +413,8 @@ def load_df_from_csv(file_name: Optional[str] = None,
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.CSV,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
 
     if is_index:
@@ -450,35 +451,39 @@ def load_df_from_csv(file_name: Optional[str] = None,
 
 def append_df_to_csv(df: pd.DataFrame,
                      file_name: str = None,
+                     folder_name: str = None,
                      subfolder_name: str = None,
-                     subsubfolder_name: str = None,
                      key: str = None,
                      local_path: Optional[str] = None,
-                     keep: Literal['first', 'last'] = 'last'
+                     keep: Optional[Literal['first', 'last']] = None
                      ) -> None:
+    """
+    append csv file
+    """
     # check if file exist
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.CSV,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
     if os.path.isfile(file_path):  # append using format of old file
         old_df = load_df_from_csv(file_name=file_name,
                                   local_path=local_path,
+                                  folder_name=folder_name,
                                   subfolder_name=subfolder_name,
-                                  subsubfolder_name=subsubfolder_name,
                                   key=key)
         df = pd.concat([old_df, df], axis=0)
-        df = df.loc[~df.index.duplicated(keep=keep)]
+        if keep is not None:
+            df = df.loc[~df.index.duplicated(keep=keep)]
 
     else:
         pass
 
     save_df_to_csv(df=df,
                    file_name=file_name,
+                   folder_name=folder_name,
                    subfolder_name=subfolder_name,
-                   subsubfolder_name=subsubfolder_name,
                    key=key,
                    local_path=local_path)
 
@@ -486,8 +491,8 @@ def append_df_to_csv(df: pd.DataFrame,
 def save_df_dict_to_csv(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
                         file_name: Optional[str] = None,
                         local_path: Optional[str] = None,
+                        folder_name: str = None,
                         subfolder_name: str = None,
-                        subsubfolder_name: str = None,
                         add_current_date: bool = False
                         ) -> None:
     """
@@ -501,8 +506,8 @@ def save_df_dict_to_csv(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFram
             file_path = get_local_file_path(file_name=file_name,
                                             file_type=FileTypes.CSV,
                                             local_path=local_path,
+                                            folder_name=folder_name,
                                             subfolder_name=subfolder_name,
-                                            subsubfolder_name=subsubfolder_name,
                                             key=key)
             data.to_csv(path_or_buf=file_path)
 
@@ -510,8 +515,8 @@ def save_df_dict_to_csv(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFram
 def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
                           file_name: Optional[str],
                           local_path: Optional[str] = None,
+                          folder_name: str = None,
                           subfolder_name: str = None,
-                          subsubfolder_name: str = None,
                           is_index: bool = True,
                           force_not_found_error: bool = False,
                           ) -> Dict[str, pd.DataFrame]:
@@ -524,8 +529,8 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
         file_path = get_local_file_path(file_name=file_name,
                                         file_type=FileTypes.CSV,
                                         local_path=local_path,
+                                        folder_name=folder_name,
                                         subfolder_name=subfolder_name,
-                                        subsubfolder_name=subsubfolder_name,
                                         key=key)
         try:
             data = pd.read_csv(filepath_or_buffer=file_path,
@@ -543,7 +548,7 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
 
 
 #############################################################
-###  Pandas to/from feather
+#  Pandas to/from feather
 #############################################################
 
 @timer
@@ -587,35 +592,80 @@ def load_df_dict_from_sql(engine: Engine,
 
 
 #############################################################
-###  Dataframe to/from feather
+#  Dataframe to/from feather
 #############################################################
 
 def save_df_to_feather(df: pd.DataFrame,
                        file_name: Optional[str] = None,
                        local_path: Optional[str] = None,
+                       folder_name: str = None,
                        subfolder_name: str = None,
-                       subsubfolder_name: str = None,
+                       key: str = None,
                        index_col: Optional[str] = INDEX_COLUMN
                        ) -> None:
     """
-    pandas dict to feather files
+    save df to feather files
+    index_col stands for the index: needs to be reset when saving and put back when loading
     """
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.FEATHER,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name)
+                                    key=key)
     if index_col is not None and index_col not in df.columns:  # index is unique and preserved
         df = df.reset_index(names=index_col)
-    else:  # always need to reset for feather
-        df = df.reset_index()
+    else:  # drop to avoid entering extra field when loading back
+        df = df.reset_index(drop=True)
     df.to_feather(path=file_path)
+
+
+def append_df_to_feather(df: pd.DataFrame,
+                         file_name: str = None,
+                         folder_name: str = None,
+                         subfolder_name: str = None,
+                         key: str = None,
+                         local_path: Optional[str] = None,
+                         keep: Optional[Literal['first', 'last']] = None,
+                         index_col: Optional[str] = INDEX_COLUMN
+                         ) -> None:
+    """
+    append csv file
+    """
+    # check if file exist
+    file_path = get_local_file_path(file_name=file_name,
+                                    file_type=FileTypes.CSV,
+                                    local_path=local_path,
+                                    folder_name=folder_name,
+                                    subfolder_name=subfolder_name,
+                                    key=key)
+    if os.path.isfile(file_path):  # append using format of old file
+        old_df = load_df_from_feather(file_name=file_name,
+                                      local_path=local_path,
+                                      folder_name=folder_name,
+                                      subfolder_name=subfolder_name,
+                                      key=key,
+                                      index_col=index_col)
+        df = pd.concat([old_df, df], axis=0)
+        if keep is not None:
+            df = df.loc[~df.index.duplicated(keep=keep)]
+
+    else:
+        pass
+
+    save_df_to_feather(df=df,
+                       file_name=file_name,
+                       folder_name=folder_name,
+                       subfolder_name=subfolder_name,
+                       key=key,
+                       local_path=local_path,
+                       index_col=index_col)
 
 
 def load_df_from_feather(file_name: Optional[str] = None,
                          local_path: Optional[str] = None,
+                         folder_name: str = None,
                          subfolder_name: str = None,
-                         subsubfolder_name: str = None,
                          key: str = None,
                          index_col: Optional[str] = INDEX_COLUMN
                          ) -> pd.DataFrame:
@@ -625,8 +675,8 @@ def load_df_from_feather(file_name: Optional[str] = None,
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.FEATHER,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
     try:
         df = pd.read_feather(file_path)
@@ -643,8 +693,8 @@ def load_df_from_feather(file_name: Optional[str] = None,
 def save_df_dict_to_feather(dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
                             file_name: Optional[str] = None,
                             local_path: Optional[str] = None,
+                            folder_name: str = None,
                             subfolder_name: str = None,
-                            subsubfolder_name: str = None,
                             index_col: Optional[str] = INDEX_COLUMN
                             ) -> None:
     """
@@ -655,8 +705,8 @@ def save_df_dict_to_feather(dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame
             file_path = get_local_file_path(file_name=file_name,
                                             file_type=FileTypes.FEATHER,
                                             local_path=local_path,
+                                            folder_name=folder_name,
                                             subfolder_name=subfolder_name,
-                                            subsubfolder_name=subsubfolder_name,
                                             key=key)
             if index_col not in df.columns:
                 df = df.reset_index(names=index_col)
@@ -666,8 +716,8 @@ def save_df_dict_to_feather(dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame
 def load_df_dict_from_feather(dataset_keys: List[Union[str, Enum, NamedTuple]],
                               file_name: Optional[str],
                               local_path: Optional[str] = None,
+                              folder_name: str = None,
                               subfolder_name: str = None,
-                              subsubfolder_name: str = None,
                               force_not_found_error: bool = False,
                               index_col: Optional[str] = INDEX_COLUMN
                               ) -> Dict[str, pd.DataFrame]:
@@ -679,8 +729,8 @@ def load_df_dict_from_feather(dataset_keys: List[Union[str, Enum, NamedTuple]],
         file_path = get_local_file_path(file_name=file_name,
                                         file_type=FileTypes.FEATHER,
                                         local_path=local_path,
+                                        folder_name=folder_name,
                                         subfolder_name=subfolder_name,
-                                        subsubfolder_name=subsubfolder_name,
                                         key=key)
         try:
             df = pd.read_feather(file_path)
@@ -705,8 +755,8 @@ Pandas to/from parquet core
 
 def save_df_to_parquet(df: pd.DataFrame,
                        file_name: str,
-                       subfolder_name: Optional[str] = None,
-                       subsubfolder_name: str = None,
+                       folder_name: Optional[str] = None,
+                       subfolder_name: str = None,
                        key: Optional[str] = None,
                        local_path: Optional[str] = None,
                        delocalize: bool = False
@@ -717,16 +767,16 @@ def save_df_to_parquet(df: pd.DataFrame,
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.PARQUET,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
     df = delocalize_df(df, delocalize=delocalize)
     df.to_parquet(path=file_path)
 
 
 def load_df_from_parquet(file_name: Optional[str],
+                         folder_name: str = None,
                          subfolder_name: str = None,
-                         subsubfolder_name: str = None,
                          key: Optional[str] = None,
                          local_path: Optional[str] = None,
                          delocalize: bool = False
@@ -737,8 +787,8 @@ def load_df_from_parquet(file_name: Optional[str],
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.PARQUET,
                                     local_path=local_path,
+                                    folder_name=folder_name,
                                     subfolder_name=subfolder_name,
-                                    subsubfolder_name=subsubfolder_name,
                                     key=key)
     try:
         df = pd.read_parquet(path=file_path)
@@ -752,8 +802,8 @@ def load_df_from_parquet(file_name: Optional[str],
 
 def save_df_dict_to_parquet(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
                             file_name: Optional[str] = None,
+                            folder_name: str = None,
                             subfolder_name: str = None,
-                            subsubfolder_name: str = None,
                             local_path: Optional[str] = None,
                             delocalize: bool = False
                             ) -> None:
@@ -765,8 +815,8 @@ def save_df_dict_to_parquet(datasets: Dict[Union[str, Enum, NamedTuple], pd.Data
             file_path = get_local_file_path(file_name=file_name,
                                             file_type=FileTypes.PARQUET,
                                             local_path=local_path,
+                                            folder_name=folder_name,
                                             subfolder_name=subfolder_name,
-                                            subsubfolder_name=subsubfolder_name,
                                             key=key)
             data = delocalize_df(data, delocalize=delocalize)
             data.to_parquet(path=file_path)
@@ -774,8 +824,8 @@ def save_df_dict_to_parquet(datasets: Dict[Union[str, Enum, NamedTuple], pd.Data
 
 def load_df_dict_from_parquet(dataset_keys: List[Union[str, Enum, NamedTuple]],
                               file_name: Optional[str],
+                              folder_name: str = None,
                               subfolder_name: str = None,
-                              subsubfolder_name: str = None,
                               local_path: Optional[str] = None,
                               force_not_found_error: bool = False
                               ) -> Dict[str, pd.DataFrame]:
@@ -787,8 +837,8 @@ def load_df_dict_from_parquet(dataset_keys: List[Union[str, Enum, NamedTuple]],
         file_path = get_local_file_path(file_name=file_name,
                                         file_type=FileTypes.PARQUET,
                                         local_path=local_path,
+                                        folder_name=folder_name,
                                         subfolder_name=subfolder_name,
-                                        subsubfolder_name=subsubfolder_name,
                                         key=key)
         try:
             pandas_dict[key] = pd.read_parquet(path=file_path)
@@ -940,7 +990,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.UNIVERSE:
         file_path = get_local_file_path(file_name='ETH',
-                                        subfolder_name='bitmex',
+                                        folder_name='bitmex',
                                         key='1d',
                                         file_type=FileTypes.CSV)
         print(file_path)

@@ -146,7 +146,7 @@ def get_test_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     price_datas = []
     fund_datas = []
     for ticker in tickers:
-        data = fu.load_df_from_csv(file_name=ticker, subfolder_name='crypto')
+        data = fu.load_df_from_csv(file_name=ticker, folder_name='crypto')
         price_datas.append(data['close'].rename(ticker))
         fund_datas.append(np.divide(data['volume'], data['close']).rename(ticker))
     prices = pd.concat(price_datas, axis=1).dropna()
@@ -176,7 +176,7 @@ def run_unit_test(unit_test: UnitTests):
         plot_ew_index_bootrstrap(prices)
 
     elif unit_test == UnitTests.FIT_AR_MODEL:
-        data = fu.load_df_from_csv(file_name='UNI_Uniswap_cmc', subfolder_name='crypto/instruments')
+        data = fu.load_df_from_csv(file_name='UNI_Uniswap_cmc', folder_name='crypto/instruments')
         unit_volume = np.divide(data['volume'], data['close']).rename('unit volume')
         estimate_ar_model(data=unit_volume)
 

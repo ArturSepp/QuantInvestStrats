@@ -4,6 +4,7 @@ import qis.local_path
 from qis.file_utils import (
     FileTypes,
     append_df_to_csv,
+    append_df_to_feather,
     save_figs_to_pdf,
     get_all_folder_files,
     get_local_file_path,

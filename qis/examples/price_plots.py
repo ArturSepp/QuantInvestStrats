@@ -103,6 +103,8 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.CRYPTO_DATA:
         regime_benchmark_str = 'BTC-USD'
         tickers = [regime_benchmark_str, 'ETH-USD', 'SOL-USD']
+        regime_benchmark_str = 'BTC-USD'
+        tickers = [regime_benchmark_str, 'SPY', 'TLT', 'ETH-USD', 'SOL-USD']
 
     elif unit_test == UnitTests.TF_ETF:
         regime_benchmark_str = 'SPY'
@@ -115,7 +117,7 @@ def run_unit_test(unit_test: UnitTests):
     else:
         raise NotImplementedError
 
-    is_long_period = True
+    is_long_period = False
     if is_long_period:
         time_period = None
         time_period = qis.TimePeriod('31Dec2015', '31Mar2023')
@@ -123,7 +125,7 @@ def run_unit_test(unit_test: UnitTests):
         perf_params = qis.PerfParams(freq='W-WED', freq_reg='M', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=12)
         kwargs = dict(x_date_freq='A', heatmap_freq='A', date_format='%Y', perf_params=perf_params)
     else:
-        time_period = qis.TimePeriod('31Dec2021', None)
+        time_period = qis.TimePeriod('31Dec2022', None)
         perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=12)
         kwargs = dict(x_date_freq='M', heatmap_freq='M', date_format='%b-%y', perf_params=perf_params)
 
@@ -141,7 +143,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.ETFS
+    unit_test = UnitTests.CRYPTO_DATA
 
     is_run_all_tests = False
     if is_run_all_tests:
