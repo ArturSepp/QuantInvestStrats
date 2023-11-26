@@ -44,7 +44,8 @@ from qis.plots.utils import (
     calc_table_height,
     calc_table_width,
     calc_df_table_size,
-    get_df_table_size
+    get_df_table_size,
+    reset_xticks
 )
 
 from qis.plots.bars import plot_bars, plot_vbars

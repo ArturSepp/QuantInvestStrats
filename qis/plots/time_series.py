@@ -67,7 +67,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     # add tredlines
     if trend_line_colors is None:
         trend_line_colors = colors
-    if trend_line == TrendLine.ZERO_SHADOWS:
+    if trend_line in [TrendLine.ZERO_SHADOWS, TrendLine.ABOVE_ZERO_SHADOWS]:
         for column, color in zip(columns, trend_line_colors):
             x0 = data1.index[0]
             x1 = data1.index[-1]
@@ -85,8 +85,12 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
             slope = (y1 - y0) / (x_[-1] - x_[0])
             y_line = [slope * x + y0 for x in x_]
             y = data1[column]
-            ax.fill_between(data1.index, y, y_line, where=y_line >= y,
+            if trend_line == TrendLine.ZERO_SHADOWS:
+                ax.fill_between(data1.index, y, y_line, where=y_line >= y,
                             facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
+            else:
+                ax.fill_between(data1.index, y, y_line, where=y_line <= y,
+                                facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
 
     elif trend_line in [TrendLine.AVERAGE, TrendLine.AVERAGE_SHADOWS]:
         for column, color in zip(columns, trend_line_colors):

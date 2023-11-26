@@ -17,6 +17,8 @@ def fetch_hf_ohlc(ticker: str = 'SPY',
                   ) -> pd.DataFrame:
     """
     fetch hf data using yf
+    for m and h frequencies we shift the data forward because yf
+    reports timestamps of bars at the start of the period: we shift it to the end of the period
     """
     asset = yf.Ticker(ticker)
     if interval == '1d':  # close to close
@@ -25,18 +27,24 @@ def fetch_hf_ohlc(ticker: str = 'SPY',
         ohlc_data.index = ohlc_data.index.tz_localize('UTC')
     elif interval == '1h':
         ohlc_data = asset.history(period="730d", interval="1h")
+        ohlc_data.index = [t + pd.Timedelta(minutes=60) for t in ohlc_data.index]
     elif interval == '30m':
         ohlc_data = asset.history(period="60d", interval="30m")
+        ohlc_data.index = [t + pd.Timedelta(minutes=30) for t in ohlc_data.index]
     elif interval == '15m':
         ohlc_data = asset.history(period="60d", interval="15m")
+        ohlc_data.index = [t + pd.Timedelta(minutes=15) for t in ohlc_data.index]
     elif interval == '5m':
         ohlc_data = asset.history(period="60d", interval="5m")
+        ohlc_data.index = [t + pd.Timedelta(minutes=5) for t in ohlc_data.index]
     elif interval == '1m':
         ohlc_data = asset.history(period="7d", interval="1m")
+        ohlc_data.index = [t + pd.Timedelta(minutes=1) for t in ohlc_data.index]
     else:
         raise NotImplementedError(f"interval={interval}")
-    ohlc_data = ohlc_data[['Open', 'High', 'Low', 'Close']].rename({'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close'}, axis=1)
+    ohlc_data = ohlc_data.rename({'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close'}, axis=1)
     ohlc_data.index = ohlc_data.index.tz_convert('UTC')
+    ohlc_data.index.name = 'timestamp'
     return ohlc_data
 
 
@@ -91,7 +99,7 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.HF_PRICES:
         intervals = ['1h', '30m', '15m', '1m']
         # 'BTC-USD'
-        df = fetch_hf_ohlc(ticker='BTC-USD', interval='1d')
+        df = fetch_hf_ohlc(ticker='SPY', interval='15m')
         print(df)
 
     elif unit_test == UnitTests.HF_VOL:
@@ -110,7 +118,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PLOT_HF_VOL
+    unit_test = UnitTests.HF_PRICES
 
     is_run_all_tests = False
     if is_run_all_tests:

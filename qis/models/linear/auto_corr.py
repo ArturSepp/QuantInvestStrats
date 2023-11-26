@@ -42,20 +42,17 @@ def estimate_path_acf(paths: Union[np.ndarray, pd.DataFrame],
     return acfs, m_acf, std_acf
 
 
-def compute_autocorr_df(data: pd.DataFrame,
+def compute_autocorr_df(df: pd.DataFrame,
                         num_lags: int = 20
                         ) -> pd.DataFrame:
     """
     compute auto correlation columns wise and return df with lags = index
     """
-    acorrs = []
-    for column in data:
-        acorrs.append(compute_path_autocorr(a=data[column].dropna().to_numpy(), num_lags=num_lags))
-
-    data = pd.DataFrame(data=np.column_stack(acorrs),
-                        index=range(0, num_lags),
-                        columns=data.columns)
-    return data
+    acf = compute_path_autocorr(a=df.to_numpy())
+    df = pd.DataFrame(data=acf,
+                      index=range(0, num_lags),
+                      columns=df.columns)
+    return df
 
 
 @njit
@@ -76,7 +73,19 @@ def compute_path_corr(a1: np.ndarray,
 def compute_path_autocorr(a: np.ndarray,
                           num_lags: int = 20
                           ) -> np.ndarray:
-    return compute_path_corr(a1=a, a2=a, num_lags=num_lags)
+    """
+    given data = df.to_numpy() of a compute column vise
+    """
+    is_1d = (a.ndim == 1)
+    if is_1d:
+        acfs = compute_path_corr(a1=a, a2=a, num_lags=num_lags)
+    else:
+        nb_path = a.shape[1]
+        acfs = np.zeros((num_lags, nb_path))
+        for path in np.arange(nb_path):
+            a_ = a[:, path]
+            acfs[:, path] = compute_path_corr(a1=a_, a2=a_, num_lags=num_lags)
+    return acfs
 
 
 @njit

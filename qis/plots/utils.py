@@ -55,6 +55,7 @@ class TrendLine(Enum):
     ZERO_SHADOWS = 4
     TREND_LINE = 5
     TREND_LINE_SHADOWS = 6
+    ABOVE_ZERO_SHADOWS = 7
 
 
 class LastLabel(Enum):
@@ -1460,6 +1461,16 @@ def get_df_table_size(df: pd.DataFrame,
                                                            scale_rows=scale_rows,
                                                            scale_cols=scale_cols)
     return width, height
+
+
+def reset_xticks(ax: plt.Axes, data: np.ndarray, nbins: int = 20, var_format: str = '{:.2%}') -> None:
+    """
+    useful for barplot to reduce the number of x ticks
+    """
+    current_ticks = ax.get_xticks()
+    ax.set_xticks(np.linspace(current_ticks[0], current_ticks[-1], nbins))
+    x_datalables = np.linspace(data[0], data[-1], nbins)
+    ax.set_xticklabels([var_format.format(x) for x in x_datalables], rotation=0, fontsize=10)
 
 
 class UnitTests(Enum):
