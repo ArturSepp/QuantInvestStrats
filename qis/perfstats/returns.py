@@ -51,9 +51,10 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
                             ffill_nans=ffill_nans)
 
     if return_type == ReturnTypes.LOG or is_log_returns:
+        prices_np = prices.to_numpy()
         ind_good = np.logical_and(
-            np.logical_and(np.isnan(prices) == False, np.isnan(prices) == False),
-            np.logical_and(np.greater(prices, 0.0), np.greater(prices, 0.0)))
+            np.logical_and(np.isnan(prices_np) == False, np.isnan(prices_np) == False),
+            np.logical_and(np.greater(prices_np, 0.0), np.greater(prices_np, 0.0)))
         returns = np.log(np.divide(prices, prices.shift(1)), where=ind_good)
 
     elif return_type == ReturnTypes.RELATIVE:
