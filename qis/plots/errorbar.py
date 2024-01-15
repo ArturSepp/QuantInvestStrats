@@ -16,6 +16,7 @@ import qis.plots.utils as put
 
 def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   y_std_errors: Union[float, pd.Series, pd.DataFrame] = 0.5,
+                  exact: pd.Series = None,  # can add exact solution
                   legend_title: str = None,
                   legend_loc: Optional[Union[str, bool]] = 'upper left',
                   xlabel: str = None,
@@ -25,12 +26,13 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   fontsize: int = 10,
                   capsize: int = 10,
                   colors: List[str] = None,
+                  exact_color: str = 'green',
+                  exact_marker: str = "v",
                   y_limits: Tuple[Optional[float], Optional[float]] = None,
                   ax: plt.Subplot = None,
                   **kwargs
                   ) -> Optional[plt.Figure]:
 
-    df = df.copy()
     if isinstance(df, pd.DataFrame):
         pass
     elif isinstance(df, pd.Series):
@@ -58,15 +60,28 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
 
         ax.errorbar(x=df.index, y=df[column].to_numpy(), yerr=yerr, color=colors[idx], fmt='o', capsize=capsize)
 
+    if exact is not None:
+        for idx, index in enumerate(df.index):
+            put.add_scatter_points(ax=ax, label_x_y=[(index, exact[index])], color=exact_color,
+                                   marker=exact_marker, **kwargs)
+        labels = columns.to_list() + [exact.name]
+        colors = colors + [exact_color]
+        markers = ['o']*len(columns) + [exact_marker]
+    else:
+        labels = columns
+        markers = ['o']*len(columns)
+
     if title is not None:
         put.set_title(ax=ax, title=title, fontsize=fontsize)
 
     if legend_loc is not None:
         put.set_legend(ax=ax,
-                       labels=columns,
+                       markers=markers,
+                       labels=labels,
                        colors=colors,
                        legend_loc=legend_loc,
                        legend_title=legend_title,
+                       handlelength=0,
                        fontsize=fontsize,
                        **kwargs)
 

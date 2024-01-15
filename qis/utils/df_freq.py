@@ -10,13 +10,13 @@ import qis.utils.dates as da
 from qis.utils.df_str import df_index_to_str
 
 # Arguments for fillna()
-FillnaOptions = Literal["backfill", "bfill", "ffill", "pad"]
+FillnaOptions = Literal["bfill", "ffill", "pad"]
 
 
 def df_asfreq(df: Union[pd.DataFrame, pd.Series],
               freq: Optional[str] = 'Q',
               method: FillnaOptions = 'ffill',
-              fill_na_method: FillnaOptions = 'ffill',
+              fill_na_method: Optional[FillnaOptions] = 'ffill',
               inclusive: Optional[str] = None,
               include_start_date: bool = False,
               include_end_date: bool = False,
@@ -49,7 +49,12 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     freq_data = df.reindex(index=freq_index, method=method)
 
     if fill_na_method is not None:
-        freq_data = freq_data.fillna(method=fill_na_method)
+        if fill_na_method == 'ffill':
+            freq_data = freq_data.ffill()
+        elif fill_na_method == 'bfill':
+            freq_data = freq_data.bfill()
+        else:
+            raise NotImplementedError(f"fill_na_method={fill_na_method}")
     return freq_data
 
 
@@ -74,7 +79,7 @@ def agg_remained_data_on_right(df: Union[pd.DataFrame, pd.Series],
 def df_resample_at_other_index(df: Union[pd.DataFrame, pd.Series],
                                other_index: Union[pd.DatetimeIndex, pd.Index],
                                agg_func: Callable[[pd.DataFrame], pd.Series] = np.nanmean,
-                               method: FillnaOptions = 'ffill',
+                               fill_na_method: FillnaOptions = 'ffill',
                                include_end_date: bool = False
                                ) -> Union[pd.DataFrame, pd.Series]:
     """
@@ -92,15 +97,20 @@ def df_resample_at_other_index(df: Union[pd.DataFrame, pd.Series],
     if include_end_date:
         data_f = agg_remained_data_on_right(df=data_f, data=df, agg_func=agg_func)
 
-    if method is not None:
-        data_f = data_f.reindex(index=other_index).fillna(method=method)  # final check
+    if fill_na_method is not None:
+        if fill_na_method == 'ffill':
+            data_f = data_f.reindex(index=other_index).ffill()
+        elif fill_na_method == 'bfill':
+            data_f = data_f.reindex(index=other_index).bfill()
+        else:
+            raise NotImplementedError(f"fill_na_method={fill_na_method}")
 
     return data_f
 
 
 def df_resample_at_freq(df: Union[pd.DataFrame, pd.Series],
                         freq: str = 'Q',
-                        method: FillnaOptions = 'ffill',
+                        fill_na_method: FillnaOptions = 'ffill',
                         agg_func: Optional[Callable[[pd.DataFrame], pd.Series]] = np.nanmean,  # if none use last
                         include_end_date: bool = False
                         ) -> Union[pd.DataFrame, pd.Series]:
@@ -119,8 +129,14 @@ def df_resample_at_freq(df: Union[pd.DataFrame, pd.Series],
     if include_end_date:
         data_f = agg_remained_data_on_right(df=data_f, data=df, agg_func=agg_func)
 
-    if method is not None:
-        data_f = data_f.fillna(method=method)  # final check
+    if fill_na_method is not None:  # final check
+        if fill_na_method == 'ffill':
+            data_f = data_f.ffill()
+        elif fill_na_method == 'bfill':
+            data_f = data_f.bfill()
+        else:
+            raise NotImplementedError(f"fill_na_method={fill_na_method}")
+
     return data_f
 
 

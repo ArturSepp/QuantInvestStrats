@@ -7,11 +7,31 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from enum import Enum
 from typing import Tuple, List, Union, Optional
+from numba import njit
 
 # qis
 import qis.utils.dates as da
 import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
+
+
+@njit
+def compute_path_corr(a1: np.ndarray,
+                      a2: np.ndarray
+                      ) -> np.ndarray:
+    """
+    compute paths correlation between columns of a1 and a2
+    """
+    is_1d = (a1.ndim == 1)
+    if not is_1d:
+        ncols = a1.shape[1]
+        acorr = np.zeros(ncols)
+        for idx in range(ncols):
+            acorr[idx] = np.corrcoef(a1[:, idx], a2[:, idx], rowvar=False)[0][1]
+    else:
+        acorr = np.corrcoef(a1, a2, rowvar=False)[0][1]
+
+    return acorr
 
 
 def compute_masked_covar_corr(returns: Union[np.ndarray, pd.DataFrame],

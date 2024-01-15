@@ -89,7 +89,7 @@ def get_data_samples_df(data: Union[pd.DataFrame, pd.Series],
     for key, kdata in data_samples_dict.items():
         data_samples[key] = kdata.reset_index(drop=True)
     data_samples_df = pd.DataFrame.from_dict(data_samples)
-    data_samples_df = data_samples_df.fillna(method='ffill')
+    data_samples_df = data_samples_df.ffill()
     return data_samples_df
 
 

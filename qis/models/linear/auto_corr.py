@@ -56,10 +56,10 @@ def compute_autocorr_df(df: pd.DataFrame,
 
 
 @njit
-def compute_path_corr(a1: np.ndarray,
-                      a2: np.ndarray,
-                      num_lags: int = 20
-                      ) -> np.ndarray:
+def compute_path_lagged_corr(a1: np.ndarray,
+                             a2: np.ndarray,
+                             num_lags: int = 20
+                             ) -> np.ndarray:
     """
     compute paths lagged correlation
     """
@@ -78,13 +78,13 @@ def compute_path_autocorr(a: np.ndarray,
     """
     is_1d = (a.ndim == 1)
     if is_1d:
-        acfs = compute_path_corr(a1=a, a2=a, num_lags=num_lags)
+        acfs = compute_path_lagged_corr(a1=a, a2=a, num_lags=num_lags)
     else:
         nb_path = a.shape[1]
         acfs = np.zeros((num_lags, nb_path))
         for path in np.arange(nb_path):
             a_ = a[:, path]
-            acfs[:, path] = compute_path_corr(a1=a_, a2=a_, num_lags=num_lags)
+            acfs[:, path] = compute_path_lagged_corr(a1=a_, a2=a_, num_lags=num_lags)
     return acfs
 
 
@@ -151,7 +151,7 @@ def compute_dynamic_auto_corr(data: pd.DataFrame,
     if len(data.index) == 1:
         raise TypeError('data must be time series')
 
-    data = data.fillna(method='ffill').dropna()
+    data = data.ffill().dropna()
     x = compute_rolling_mean_adj(data=data.to_numpy(),
                                  mean_adj_type=mean_adj_type,
                                  ewm_lambda=ewm_lambda)

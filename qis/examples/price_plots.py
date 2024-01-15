@@ -90,6 +90,7 @@ class UnitTests(Enum):
     CRYPTO_DATA = 2
     TF_ETF = 3
     ETFS = 4
+    COMMODITY_ETFS = 5
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -114,13 +115,18 @@ def run_unit_test(unit_test: UnitTests):
         regime_benchmark_str = 'AOR'
         tickers = [regime_benchmark_str, 'SPY', 'PEX', 'PSP', 'GSG', 'COMT', 'REET', 'REZ']
 
+    elif unit_test == UnitTests.COMMODITY_ETFS:
+        regime_benchmark_str = 'AOR'
+        tickers = [regime_benchmark_str, 'SPY', 'GLD', 'GSG', 'COMT', 'PDBC']
+
     else:
         raise NotImplementedError
 
-    is_long_period = False
+    is_long_period = True
     if is_long_period:
         time_period = None
-        time_period = qis.TimePeriod('31Dec2015', '31Mar2023')
+        time_period = qis.TimePeriod('31Dec2015', None)
+        time_period = qis.TimePeriod('16Oct2014', None)
         # time_period = qis.TimePeriod('31Dec2017', '31Mar2023')
         perf_params = qis.PerfParams(freq='W-WED', freq_reg='M', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=12)
         kwargs = dict(x_date_freq='A', heatmap_freq='A', date_format='%Y', perf_params=perf_params)
@@ -143,7 +149,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CRYPTO_DATA
+    unit_test = UnitTests.COMMODITY_ETFS
 
     is_run_all_tests = False
     if is_run_all_tests:

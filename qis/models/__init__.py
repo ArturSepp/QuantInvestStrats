@@ -1,6 +1,6 @@
 
 from qis.models.linear.auto_corr import (
-    compute_path_corr,
+    compute_path_lagged_corr,
     compute_path_autocorr,
     compute_autocorr_df,
     compute_ewm_autocovar,
@@ -15,7 +15,8 @@ from qis.models.linear.corr_cov_matrix import (
     compute_ewm_corr_single,
     compute_masked_covar_corr,
     corr_to_pivot_row,
-    matrix_regularization
+    matrix_regularization,
+    compute_path_corr
 )
 
 from qis.models.linear.ewm import (

@@ -234,6 +234,9 @@ def plot_periodic_returns_table(prices: pd.DataFrame,
         date_format = date_format or '%d%b%Y'
         total_name = total_name or 'total'
 
+    # make sure there are no gaps for heterogeneous price data
+    prices = prices.ffill().bfill()
+
     data = ret.to_returns(prices=prices, freq=freq, include_start_date=True, include_end_date=True, drop_first=True)
     total_return = ret.to_total_returns(prices=prices).rename(total_name).to_frame().T
     data = pd.concat([data, total_return], axis=0)

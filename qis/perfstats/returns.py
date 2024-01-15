@@ -3,19 +3,20 @@ core for computing performance
 """
 # packages
 import warnings
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 from enum import Enum
 from typing import Union, Dict, Optional
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
 # qis
 import qis.utils.dates as da
-import qis.utils.np_ops as npo
 import qis.utils.df_freq as dff
+import qis.utils.np_ops as npo
+from qis.perfstats.config import PerfStat, ReturnTypes, PerfParams
 from qis.utils import df_ops as dfo
 from qis.utils.dates import CALENDAR_DAYS_PER_YEAR_SHARPE
-from qis.perfstats.config import PerfStat, ReturnTypes, PerfParams
 
 
 def compute_num_days(prices: Union[pd.DataFrame, pd.Series]) -> int:
@@ -124,7 +125,7 @@ def compute_total_return(prices: Union[pd.DataFrame, pd.Series]) -> Union[np.nda
             print(f"detected nan price for prices = {prices.iloc[0]},"
                   f" using first non nan price = {price_0} for {prices.name}")
 
-        price_end = prices[-1]
+        price_end = prices.iloc[-1]
 
     else:
         raise TypeError(f"unsuported type={type(prices)}")
@@ -444,7 +445,7 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
         strategy_nav = strategy_nav*(init_value / initial_value_first)
 
     if freq is not None and isinstance(returns, np.ndarray) is False:  # when it is important to have fixed frequency ffill prices
-        strategy_nav = strategy_nav.asfreq(freq, method='ffill').fillna(method='ffill')
+        strategy_nav = strategy_nav.asfreq(freq, method='ffill').ffill()
 
     if ffill_between_nans and isinstance(returns, np.ndarray) is False:
         strategy_nav = df_price_ffill_between_nans(prices=strategy_nav, method='ffill')
@@ -466,7 +467,7 @@ def prices_at_freq(prices: Union[pd.Series, pd.DataFrame],
                    include_start_date: bool = False,
                    include_end_date: bool = False,
                    ffill_nans: bool = True,
-                   method: str = 'ffill'
+                   fill_na_method: Optional[str] = 'ffill'
                    ) -> Union[pd.Series, pd.DataFrame]:
     """
     get prices at freq
@@ -480,11 +481,16 @@ def prices_at_freq(prices: Union[pd.Series, pd.DataFrame],
                                freq=freq,
                                include_start_date=include_start_date,
                                include_end_date=include_end_date,
-                               method=method,
                                fill_na_method=fill_na_method)
     else:
-        if method is not None:
-            prices = prices.fillna(method=method)
+        if fill_na_method is not None:
+            if fill_na_method == 'ffill':
+                prices = prices.ffill()
+            elif fill_na_method == 'bfill':
+                prices = prices.bfill()
+            else:
+                raise NotImplementedError(f"fill_na_method={fill_na_method}")
+
     return prices
 
 
@@ -514,7 +520,7 @@ def long_short_to_relative_nav(long_price: pd.Series, short_price: pd.Series) ->
     """
     performance of strategy long_price - short_price
     """
-    returns = to_returns(pd.concat([long_price, short_price], axis=1).fillna(method='ffill'), is_first_zero=True)
+    returns = to_returns(pd.concat([long_price, short_price], axis=1).ffill(), is_first_zero=True)
     relative_returns = np.subtract(returns[long_price.name], returns[short_price.name])
     relative_nav = returns_to_nav(returns=relative_returns, init_period=1)
     return relative_nav
@@ -640,7 +646,7 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
     for idx, column in enumerate(prices.columns):
         good_price = prices.loc[first_date[idx]:last_date[idx], column]
         if method is not None:
-            good_price = good_price.fillna(method='ffill')
+            good_price = good_price.ffill()
         good_parts.append(good_price)
     bfilled_data = pd.concat(good_parts, axis=1)
     if bfilled_data.index[0] > prices.index[0]:

@@ -76,7 +76,7 @@ class MultiPortfolioData:
         """
         navs = self.navs
         if benchmark is not None:
-            navs = pd.concat([self.benchmark_prices[benchmark], navs], axis=1).fillna(method='ffill')
+            navs = pd.concat([self.benchmark_prices[benchmark], navs], axis=1).ffill()
         if time_period is not None:
             navs = time_period.locate(navs)
         return navs

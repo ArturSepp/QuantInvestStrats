@@ -483,7 +483,7 @@ def df_dict_boxplot_by_classification_var(data_dict: Dict[Tuple[str, str], pd.Da
              ax=ax,
              **kwargs)
     if is_add_last_value:
-        scatter_datas = scatter_datas.sort_index().fillna(method='ffill')
+        scatter_datas = scatter_datas.sort_index().ffill()
         last = scatter_datas.iloc[-1, :]
         for idx, key in enumerate(data_dict.keys()):
             ax.annotate('Last',

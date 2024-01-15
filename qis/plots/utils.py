@@ -1307,8 +1307,8 @@ def get_cmap_colors(n: int, name: str = 'RdYlGn') -> List[str]:
     return colors
 
 
-def get_n_sns_colors(n: int, palette: str = 'bright') -> List[str]:
-    return sns.color_palette(palette=palette, n_colors=n)
+def get_n_sns_colors(n: int, palette: str = 'bright', **kwargs) -> List[str]:
+    return sns.color_palette(palette=palette, n_colors=n, **kwargs)
 
 
 def compute_heatmap_colors(a: np.ndarray,
@@ -1370,11 +1370,12 @@ def get_data_group_colors(df: pd.DataFrame,
 
 
 def add_scatter_points(ax: plt.Subplot,
-                       label_x_y: Union[Dict[str, Tuple[Any, float]], List[Tuple[Any, float]]],
+                       label_x_y: Union[Dict[str, Tuple[float, float]], List[Tuple[float, float]]],
                        fontsize: int = 12,
                        color: str = 'steelblue',
                        colors: List[str] = None,
                        linewidth: int = 3,
+                       marker: str = '*',
                        size: int = 3,
                        **kwargs
                        ) -> None:
@@ -1390,10 +1391,10 @@ def add_scatter_points(ax: plt.Subplot,
         for (key, (x, y)), color in zip(label_x_y.items(), colors):
             ax.annotate(key, xy=(x, y), xytext=(2, 2), color=color,
                         textcoords='offset points', ha='left', va='bottom', fontsize=fontsize)
-            ax.scatter(x=x, y=y, marker='*', color=color, s=size, linewidth=linewidth)
+            ax.scatter(x=x, y=y, marker=marker, color=color, s=size, linewidth=linewidth)
     else:
         for (x, y), color in zip(label_x_y, colors):
-            ax.scatter(x=x, y=y, marker='*', color=color, s=size, linewidth=linewidth)
+            ax.scatter(x=x, y=y, marker=marker, color=color, s=size, linewidth=linewidth)
 
 
 def calc_table_height(num_rows: int,

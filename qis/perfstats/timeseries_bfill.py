@@ -183,7 +183,7 @@ def df_fill_first_nan_by_cross_median(df: pd.DataFrame,
         merged_data.loc[its_first_nonnan_index:, column] = df.loc[its_first_nonnan_index:, column].to_numpy()
 
     # fillnans with ffill in data after
-    merged_data = merged_data.fillna(method='ffill')
+    merged_data = merged_data.ffill()
     return merged_data
 
 
@@ -192,7 +192,7 @@ def df_price_fill_first_nan_by_cross_median(prices: pd.DataFrame) -> pd.DataFram
     before first non nan use median of other columns
     after that use ffill
     """
-    prices = prices.fillna(method='ffill')
+    prices = prices.ffill()
     returns = ret.to_returns(prices=prices, is_first_zero=False)
     returns_fill = df_fill_first_nan_by_cross_median(df=returns, is_replace_zeros=False)
     returns_fill = returns_fill.fillna(0.0)

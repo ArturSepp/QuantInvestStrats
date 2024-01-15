@@ -45,9 +45,14 @@ def plot_stack(df: pd.DataFrame,
         fig, ax = plt.subplots()
     else:
         fig = None
-    re_indexed_data, datalables = put.map_dates_index_to_str(data=df,
-                                                             x_date_freq=x_date_freq,
-                                                             date_format=date_format)
+
+    if isinstance(df.index, pd.DatetimeIndex):
+        re_indexed_data, datalables = put.map_dates_index_to_str(data=df,
+                                                                 x_date_freq=x_date_freq,
+                                                                 date_format=date_format)
+    else:
+        re_indexed_data = df
+        datalables = None
 
     if colors is None:
         colors = put.get_n_colors(n=len(re_indexed_data.columns))
@@ -71,9 +76,10 @@ def plot_stack(df: pd.DataFrame,
         colors.append('black')
 
     # change axes labels, positions of each tick, relative to the indices of the x-values
-    current_ticks = ax.get_xticks()
-    ax.set_xticks(np.linspace(current_ticks[0], current_ticks[-1], len(datalables)))
-    ax.set_xticklabels(datalables, rotation=90, fontsize=fontsize)
+    if datalables is not None:
+        current_ticks = ax.get_xticks()
+        ax.set_xticks(np.linspace(current_ticks[0], current_ticks[-1], len(datalables)))
+        ax.set_xticklabels(datalables, rotation=90, fontsize=fontsize)
 
     if is_yaxis_limit_01:
         ax.set_ylim(0, 1)

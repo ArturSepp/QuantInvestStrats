@@ -364,7 +364,7 @@ def compute_expanding_power(n: int, power_lambda: float, reverse_columns: bool =
 def running_mean(x: np.ndarray, n: int, fill_value: float = np.nan) -> np.ndarray:
     x = to_finite_np(data=x, fill_value=fill_value)
     rolling_s = pd.Series(x).rolling(n, min_periods=0).apply(lambda x: np.nanmean(x))
-    rolling_s = rolling_s.fillna(method='ffill')  # when x has sequence of nans longer than n
+    rolling_s = rolling_s.ffill()  # when x has sequence of nans longer than n
     return rolling_s.to_numpy()
 
 

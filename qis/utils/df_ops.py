@@ -3,11 +3,12 @@ common pandas operations
 """
 # packages
 import warnings
+from enum import Enum
+from typing import Union, List, Optional, Dict, Tuple, Type, Any, Literal
+
 import numpy as np
 import pandas as pd
 from scipy import stats
-from typing import Union, List, Optional, Dict, Tuple, Type, Any, Literal
-from enum import Enum
 
 # qis
 import qis.utils.np_ops as npo
@@ -473,17 +474,25 @@ def compute_last_score(df: Union[pd.DataFrame, pd.Series], is_percent: bool = Tr
 
 def align_dfs_dict_with_df(dfd: Dict[Any, pd.DataFrame],
                            df: pd.DataFrame,
-                           method: str = 'ffill'
+                           fill_na_method: Optional[str] = 'ffill'
                            ) -> Dict[Any, pd.DataFrame]:
     """
-    align dict of dataframes with with given df
+    align dict of dataframes with given df
     """
     alignment_columns = df.columns
     alignment_index = df.index
     aligned_dfd = {}
     for key, df in dfd.items():
         if df is not None:  # align with other pandas in dict by filtered value
-            aligned_dfd[key] = df[alignment_columns].reindex(index=alignment_index).fillna(method=method)
+            df = df[alignment_columns].reindex(index=alignment_index)
+            if fill_na_method is not None:
+                if fill_na_method == 'ffill':
+                    df = df.ffill()
+                elif fill_na_method == 'bfill':
+                    df = df.bfill()
+                else:
+                    raise NotImplementedError(f"fill_na_method={fill_na_method}")
+            aligned_dfd[key] = df
         else:
             aligned_dfd[key] = None
     return aligned_dfd
@@ -532,7 +541,7 @@ def df12_merge_with_tz(df1: pd.DataFrame,
 
     # concat
     dfs = pd.concat([df1, df2], axis=1)
-    dfs = dfs.fillna(method='ffill').asfreq(freq=freq, method='ffill')
+    dfs = dfs.ffill().asfreq(freq=freq, method='ffill')
     dfs.index = dfs.index# .tz_localize(tz=tz)
     return dfs
 

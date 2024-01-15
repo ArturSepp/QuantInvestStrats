@@ -283,7 +283,7 @@ class PortfolioData:
                                                         is_x_correlated=True)
         exposures = self.get_exposures().reindex(index=instrument_prices.index, method='ffill')
         benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(asset_exposures=exposures)
-        benchmark_betas = benchmark_betas.replace({0.0: np.nan}).fillna(method='ffill')  # fillholidays
+        benchmark_betas = benchmark_betas.replace({0.0: np.nan}).ffill()  # fillholidays
         if time_period is not None:
             benchmark_betas = time_period.locate(benchmark_betas)
         return benchmark_betas
@@ -644,7 +644,7 @@ class PortfolioData:
         if columns is not None:
             weights = weights[columns]
         if freq is not None:
-            weights = weights.resample(freq).last().fillna(method='ffill')
+            weights = weights.resample(freq).last().ffill()
         return weights
 
     def plot_weights(self,
