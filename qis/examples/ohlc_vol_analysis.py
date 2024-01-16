@@ -3,7 +3,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from enum import Enum
-from statsmodels.tsa.ar_model import AutoReg
 from typing import Literal, List
 import yfinance as yf
 import qis
@@ -93,8 +92,6 @@ class UnitTests(Enum):
 
 
 def run_unit_test(unit_test: UnitTests):
-    # to save pds
-    LOCAL_PATH = "C://Users//artur//OneDrive//analytics//outputs//"
 
     if unit_test == UnitTests.HF_PRICES:
         intervals = ['1h', '30m', '15m', '1m']

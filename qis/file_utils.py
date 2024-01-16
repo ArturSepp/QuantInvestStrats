@@ -283,10 +283,10 @@ def load_df_from_excel(file_name: str,
                                     folder_name=folder_name,
                                     subfolder_name=subfolder_name,
                                     key=key)
-    try:
+    if os.path.isfile(file_path):
         excel_reader = pd.ExcelFile(file_path, engine='openpyxl')
-    except FileNotFoundError:
-        raise TypeError(f"file data {file_path} nor found")
+    else:
+        raise FileNotFoundError(f"file data {file_path} nor found")
 
     index_col = 0 if is_index else None
     df = excel_reader.parse(sheet_name=sheet_name, index_col=index_col)
@@ -347,10 +347,11 @@ def load_df_dict_from_excel(file_name: str,
                                     folder_name=folder_name,
                                     subfolder_name=subfolder_name,
                                     key=key)
-    try:
+
+    if os.path.isfile(file_path):
         excel_reader = pd.ExcelFile(file_path, engine='openpyxl')
-    except FileNotFoundError:
-        raise TypeError(f"file data {file_path} not found")
+    else:
+        raise FileNotFoundError(f"file data {file_path} not found")
     if dataset_keys is None:
         dataset_keys = excel_reader.sheet_names
     index_col = 0 if is_index else None
@@ -424,16 +425,16 @@ def load_df_from_csv(file_name: Optional[str] = None,
         index_col = None
         parse_dates = None
 
-    try:
-        df = pd.read_csv(filepath_or_buffer=file_path,
-                         index_col=index_col,
-                         parse_dates=parse_dates,
-                         dayfirst=dayfirst)
+    if os.path.isfile(file_path):
+        try:
+            df = pd.read_csv(filepath_or_buffer=file_path,
+                             index_col=index_col,
+                             parse_dates=parse_dates,
+                             dayfirst=dayfirst)
 
-    except UnicodeDecodeError:  # try without index
-        df = pd.read_csv(filepath_or_buffer=file_path)
-
-    except FileNotFoundError:
+        except UnicodeDecodeError:  # try without index
+            df = pd.read_csv(filepath_or_buffer=file_path)
+    else:
         raise FileNotFoundError(f"not found {file_name} with file_path={file_path}")
 
     if drop_duplicated:
@@ -532,12 +533,12 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
                                         folder_name=folder_name,
                                         subfolder_name=subfolder_name,
                                         key=key)
-        try:
+        if os.path.isfile(file_path):
             data = pd.read_csv(filepath_or_buffer=file_path,
                                index_col=index_col,
                                parse_dates=True)
             pandas_dict[key] = data
-        except:
+        else:
             message = f"file data {file_path}, {key} not found"
             if force_not_found_error:
                 raise FileNotFoundError(message)
@@ -634,7 +635,7 @@ def append_df_to_feather(df: pd.DataFrame,
     """
     # check if file exist
     file_path = get_local_file_path(file_name=file_name,
-                                    file_type=FileTypes.CSV,
+                                    file_type=FileTypes.FEATHER,
                                     local_path=local_path,
                                     folder_name=folder_name,
                                     subfolder_name=subfolder_name,
@@ -678,9 +679,9 @@ def load_df_from_feather(file_name: Optional[str] = None,
                                     folder_name=folder_name,
                                     subfolder_name=subfolder_name,
                                     key=key)
-    try:
+    if os.path.isfile(file_path):  # append using format of old file
         df = pd.read_feather(file_path)
-    except:
+    else:
         raise FileNotFoundError(f"not found {file_name} with file_path={file_path}")
 
     if index_col is not None and index_col in df.columns:
@@ -732,13 +733,13 @@ def load_df_dict_from_feather(dataset_keys: List[Union[str, Enum, NamedTuple]],
                                         folder_name=folder_name,
                                         subfolder_name=subfolder_name,
                                         key=key)
-        try:
+        if os.path.isfile(file_path):
             df = pd.read_feather(file_path)
             if index_col is not None and index_col in df.columns:
                 df.index = pd.to_datetime(df[index_col])
                 df = df.set_index(index_col)
             pandas_dict[key] = df
-        except:
+        else:
             message = f"file data {file_path}, {key} not found"
             if force_not_found_error:
                 raise FileNotFoundError(message)
@@ -790,9 +791,9 @@ def load_df_from_parquet(file_name: Optional[str],
                                     folder_name=folder_name,
                                     subfolder_name=subfolder_name,
                                     key=key)
-    try:
+    if os.path.isfile(file_path):
         df = pd.read_parquet(path=file_path)
-    except:
+    else:
         raise FileNotFoundError(f"not found {file_name} with path={file_path}")
 
     df = delocalize_df(df, delocalize=delocalize)
@@ -840,10 +841,9 @@ def load_df_dict_from_parquet(dataset_keys: List[Union[str, Enum, NamedTuple]],
                                         folder_name=folder_name,
                                         subfolder_name=subfolder_name,
                                         key=key)
-        try:
+        if os.path.isfile(file_path):
             pandas_dict[key] = pd.read_parquet(path=file_path)
-
-        except:
+        else:
             message = f"file data {file_name}, {key} not found"
             if force_not_found_error:
                 raise FileNotFoundError(message)
