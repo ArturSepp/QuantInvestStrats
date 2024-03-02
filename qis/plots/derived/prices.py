@@ -135,7 +135,7 @@ def plot_prices(prices: Union[pd.DataFrame, pd.Series],
                 var_format: str = '{:,.1f}',
                 digits_to_show: int = 1,
                 sharpe_format: str = '{:.2f}',
-                x_date_freq: str = 'Q',
+                x_date_freq: str = 'QE',
                 trend_line: put.TrendLine = put.TrendLine.NONE,
                 is_log: bool = False,
                 resample_freq: str = None,
@@ -194,7 +194,7 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                         dd_format: str = '{:.0%}',
                         digits_to_show: int = 1,
                         sharpe_format: str = '{:.2f}',
-                        x_date_freq: str = 'Q',
+                        x_date_freq: str = 'QE',
                         performance_label: PerformanceLabel = PerformanceLabel.WITH_DD,
                         is_log: bool = False,
                         remove_xticklabels_ax1: bool = True,
@@ -466,7 +466,7 @@ def run_unit_test(unit_test: UnitTests):
         plot_prices(prices=prices, perf_params=perf_params)
 
     elif unit_test == UnitTests.PRICE_WITH_DD:
-        perf_params = PerfParams(freq='M')
+        perf_params = PerfParams(freq='ME')
         plot_prices_with_dd(prices=prices,
                             regime_benchmark_str=prices.columns[0],
                             perf_params=perf_params)

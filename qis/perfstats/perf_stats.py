@@ -278,7 +278,7 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
 
 
 def compute_desc_freq_table(df: pd.DataFrame,
-                            freq: str = 'A',
+                            freq: str = 'YE',
                             agg_func: Callable = np.sum
                             ) -> pd.DataFrame:
     """

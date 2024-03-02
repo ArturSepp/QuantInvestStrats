@@ -220,7 +220,7 @@ def set_ax_tick_labels(ax: plt.Subplot,
 
 def validate_returns_plot(prices: Union[pd.DataFrame, pd.Series],
                           min_number: int = 20,  # 4 years of q returns
-                          freq: str = 'Q',
+                          freq: str = 'QE',
                           fontsize: int = 8,
                           ax: plt.Figure = None,
                           **kwargs
@@ -259,6 +259,13 @@ def set_spines(ax: plt.Subplot,
     ax.spines['bottom'].set_visible(bottom_spine)
     ax.spines['left'].set_visible(left_spine)
     ax.spines['right'].set_visible(right_spine)
+
+
+def set_ax_linewidth(ax: plt.Subplot, linewidth: float = 2.0):
+    for line in ax.get_lines():
+        line.set_linewidth(linewidth)
+    for line in ax.get_legend().get_lines():
+        line.set_linewidth(linewidth)
 
 
 def remove_spines(ax: plt.Subplot) -> None:
@@ -500,7 +507,7 @@ def set_date_on_axis(data: Union[pd.DataFrame, pd.Series],
             ticks = pd.date_range(start=data.index[0], end=data.index[-1], freq=x_date_freq)
             if len(ticks) == 1:
                 # try to find optimal freq:
-                choices = ['M', 'W-WED', 'B']
+                choices = ['ME', 'W-WED', 'B']
                 for choice in choices:
                     ticks = pd.date_range(start=data.index[0], end=data.index[-1], freq=choice)
                     if len(ticks) > 1:
@@ -527,7 +534,7 @@ def set_date_on_axis(data: Union[pd.DataFrame, pd.Series],
 
 
 def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
-                           x_date_freq: str = 'A',
+                           x_date_freq: str = 'YE',
                            date_format: str = '%b-%y'
                            ) -> Tuple[pd.DataFrame, List[str]]:
     """
@@ -549,14 +556,14 @@ def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
         ticks = pd.date_range(start=data.index[0], end=data.index[-1], freq=x_date_freq)
         if len(ticks) == 1:
             # try to find optimal freq for less than annual
-            choices = ['M', 'W-WED', 'B']
+            choices = ['ME', 'W-WED', 'B']
             for choice in choices:
                 ticks = pd.date_range(start=data.index[0], end=data.index[-1], freq=choice)
                 if len(ticks) > 1:
                     x_date_freq = choice
                     break
 
-        if x_date_freq == 'A':
+        if x_date_freq == 'YE':
             re_indexed_data.index = [t.strftime(date_format) for t in dates_index]
             if pd.infer_freq(data.index) is not None:
                 datalables = [t.strftime(date_format) if t.month == 12 else '' for t in dates_index]
@@ -567,7 +574,7 @@ def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
             re_indexed_data.index = [t.strftime(date_format) for t in dates_index]
             datalables = [t.strftime(date_format) if t.month == 3 else '' for t in dates_index]  # and t.year % 2 == 0
 
-        elif x_date_freq == 'Q':
+        elif x_date_freq == 'QE':
             re_indexed_data.index = [t.strftime(date_format) for t in dates_index]
             if pd.infer_freq(data.index) is not None:
                 datalables = [t.strftime(date_format) if t.month % 3 == 0 else '' for t in dates_index]
@@ -590,14 +597,14 @@ def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
             datalables = [t.strftime('%d-%b-%y') for t in dates_index]
             re_indexed_data.index = datalables
 
-            if x_date_freq == 'M':
+            if x_date_freq == 'ME':
                 datalables = [t0.strftime(date_format) if t.month - t0.month == 1 or t.month - t0.month == -11 else '' for
                               t, t0 in zip(dates_index[1:], dates_index[:-1])] + [dates_index[-1].strftime(date_format)]
 
             elif x_date_freq == '5A':
                 datalables = [t.strftime(date_format) if t.month == 12 and t.year % 5 == 0 else '' for t in dates_index]
 
-            elif list(x_date_freq)[-1] == 'A': # frequncy of type 1A, 2A, 3A,...
+            elif list(x_date_freq)[-1] == 'YE': # frequncy of type 1A, 2A, 3A,...
                 n_years = int(sop.separate_number_from_string(x_date_freq)[0])
                 datalables = [t.strftime(date_format) if t.month == 12 and t.year % n_years == 0 else '' for t in dates_index]
 

@@ -141,10 +141,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-backtester/
-data/
+legacy/
+quant_strats/
 my_projects/
-my_strategies/
 testing/
 get_local_keys.py
 read_qis_modules.py

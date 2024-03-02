@@ -1,3 +1,15 @@
+"""
+local_path uses setting.yaml to return absolute path for file/folder paths
+example usage:
+import local_path as lp
+lp.get_resource_path()
+
+for linux use
+import os
+import sys
+sys.path.append(os.getcwd())
+"""
+
 import yaml
 from pathlib import Path
 from typing import Dict

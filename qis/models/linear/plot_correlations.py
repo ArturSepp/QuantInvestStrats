@@ -38,7 +38,7 @@ def plot_returns_corr_table(prices: pd.DataFrame,
     plot corr table of prices
     """
     returns = ret.to_returns(prices=prices, return_type=return_type, freq=freq)
-    corr = ccm.compute_masked_covar_corr(returns=returns, is_covar=False)
+    corr = ccm.compute_masked_covar_corr(data=returns, is_covar=False)
     if is_fig_out:
         return phe.plot_heatmap(df=corr,
                                var_format=var_format,

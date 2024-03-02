@@ -35,11 +35,11 @@ def estimate_ols_alpha_beta(x: np.ndarray,
         warnings.warn(f"problem with x={x}, y={y}")
         return 0.0, 0.0, 0.0
     if fit_intercept:
-        alpha = reg_model.params[0]
-        beta = reg_model.params[1]
+        alpha = reg_model.params.iloc[0]
+        beta = reg_model.params.iloc[1]
     else:
         alpha = 0.0
-        beta = reg_model.params[0]
+        beta = reg_model.params.iloc[0]
     r2 = reg_model.rsquared
     return alpha, beta, r2
 

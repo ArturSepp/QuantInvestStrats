@@ -188,14 +188,14 @@ class PerfParams:
     contain key parameters for computing risk adjusted performance
     """
     freq: str = None
-    freq_vol: str = 'M'  # volatility of Sharpe
+    freq_vol: str = 'ME'  # volatility of Sharpe
     freq_drawdown: str = 'D'
-    freq_reg: str = 'Q'  # for quadratic/linear regressions
-    freq_excess_return: str = 'M'
+    freq_reg: str = 'QE'  # for quadratic/linear regressions
+    freq_excess_return: str = 'ME'
     return_type: ReturnTypes = ReturnTypes.LOG  # for vol computation
     rates_data: Optional[pd.Series] = None  # to compute EXCESS returns
     alpha_an_factor: float = 4.0  # to annualise alpha in linear regression, linked to frequency of freq_reg
-    # alpha_an_factor = 12, 4 for freq_reg='M', 'Q' and so
+    # alpha_an_factor = 12, 4 for freq_reg='ME', 'QE' and so
 
     def __post_init__(self):
         if self.freq is not None:  # global parameter
@@ -204,7 +204,7 @@ class PerfParams:
             self.freq_drawdown = self.freq_drawdown or self.freq
             self.freq_excess_return = self.freq
         else:
-            self.freq = 'M'
+            self.freq = 'ME'
             self.freq_vol = self.freq_vol
             self.freq_drawdown = self.freq_drawdown or self.freq_vol
             self.freq_excess_return = self.freq_excess_return

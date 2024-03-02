@@ -23,15 +23,15 @@ MONTH_MAP = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun', 7: 'Jul
 
 
 def compute_periodic_returns_by_row_table(prices: pd.Series,
-                                          heatmap_freq: str = 'A',
-                                          column_period: str = 'M'
+                                          heatmap_freq: str = 'YE',
+                                          column_period: str = 'ME'
                                           ) -> pd.DataFrame:
 
     periodic_prices_by_row_period = da.split_df_by_freq(df=prices.to_frame(), freq=heatmap_freq)
     returns_table = None
     for key, prices in periodic_prices_by_row_period.items(): # fill table
         returns = ret.to_returns(prices=prices, freq=column_period, include_start_date=True, include_end_date=True, drop_first=True)
-        if column_period in ['M', 'Q']:
+        if column_period in ['ME', 'QE']:
             year_returns_by_period = pd.DataFrame(data=np.column_stack(returns.to_numpy()), columns=[returns.index.month], index=[returns.index[-1]])
         elif 'W' in column_period:  # Weeklies
             year_returns_by_period = pd.DataFrame(data=np.column_stack(returns.to_numpy()), columns=[returns.index.week], index=[returns.index[-1]])
@@ -42,7 +42,7 @@ def compute_periodic_returns_by_row_table(prices: pd.Series,
     returns_table = returns_table.reindex(sorted(returns_table.columns), axis=1)
 
     #map months column: concat create multiindex columns
-    if column_period == 'M':
+    if column_period == 'ME':
 
         returns_table.columns = returns_table.columns.get_level_values(0).map(MONTH_MAP)
 
@@ -51,7 +51,7 @@ def compute_periodic_returns_by_row_table(prices: pd.Series,
             cols = cols[3:] + cols[:3]
             returns_table = returns_table[cols]
 
-    elif column_period == 'Q':
+    elif column_period == 'QE':
         returns_table.columns = returns_table.columns.get_level_values(0).map({1: 'Q1', 2: 'Q1', 3: 'Q1',
                                                                               4: 'Q2', 5: 'Q2', 6: 'Q2',
                                                                               7: 'Q3', 8: 'Q3', 9: 'Q3',
@@ -64,8 +64,8 @@ def compute_periodic_returns_by_row_table(prices: pd.Series,
 
 def get_periodic_returns_table(prices: Union[pd.Series, pd.DataFrame],
                                pivot: str,
-                               heatmap_freq: str = 'A',
-                               column_period: Optional[str] = 'M',  # colums for pivot
+                               heatmap_freq: str = 'YE',
+                               column_period: Optional[str] = 'ME',  # colums for pivot
                                row_date_format: str = '%Y',
                                is_inverse_order: bool = False,
                                is_add_annual_column: bool = True,
@@ -120,8 +120,8 @@ def get_periodic_returns_table(prices: Union[pd.Series, pd.DataFrame],
 
 def plot_returns_heatmap(prices: Union[pd.Series, pd.DataFrame],
                          pivot: str = None,
-                         heatmap_freq: str = 'A',
-                         heatmap_column_freq: Optional[str] = 'M',  # colums for pivot
+                         heatmap_freq: str = 'YE',
+                         heatmap_column_freq: Optional[str] = 'ME',  # colums for pivot
                          date_format: str = '%Y',
                          is_inverse_order: bool = False,
                          is_add_annual_column: bool = True,
@@ -145,7 +145,7 @@ def plot_returns_heatmap(prices: Union[pd.Series, pd.DataFrame],
                                                         is_add_annual_column=is_add_annual_column,
                                                         ytd_name=ytd_name)
     if is_add_annual_column:
-        shift = 4 if heatmap_column_freq == 'Q' else 12
+        shift = 4 if heatmap_column_freq == 'QE' else 12
         vline_columns_ = [0, shift]
         if vline_columns is not None:
             vline_columns_.append(vline_columns)
@@ -209,7 +209,7 @@ def plot_returns_table(prices: pd.DataFrame,
 
 
 def plot_periodic_returns_table(prices: pd.DataFrame,
-                                freq: str = 'M',
+                                freq: str = 'ME',
                                 date_format: str = None,
                                 time_period: da.TimePeriod = None,
                                 transpose: bool = True,
@@ -224,10 +224,10 @@ def plot_periodic_returns_table(prices: pd.DataFrame,
     if time_period is not None:
         prices = time_period.locate(prices)
 
-    if freq == 'M':
+    if freq == 'ME':
         date_format = date_format or '%b'
         total_name = total_name or 'last 12m'
-    elif freq == 'A':
+    elif freq == 'YE':
         date_format = date_format or '%Y'
         total_name = total_name or 'Total'
     else:
@@ -254,12 +254,13 @@ def plot_periodic_returns_table(prices: pd.DataFrame,
 
 
 def plot_sorted_periodic_returns(prices: pd.DataFrame,
-                                 freq: str = 'M',
+                                 freq: str = 'ME',
                                  date_format: str = '%d%b%Y',
                                  time_period: da.TimePeriod = None,
                                  transpose: bool = True,
                                  var_format: str = '{:.0%}',
                                  total_name: str = None,
+                                 add_total: bool = True,
                                  ax: plt.Subplot = None,
                                  **kwargs
                                  ) -> plt.Figure:
@@ -269,10 +270,10 @@ def plot_sorted_periodic_returns(prices: pd.DataFrame,
     if time_period is not None:
         prices = time_period.locate(prices)
 
-    if freq == 'M':
+    if freq == 'ME':
         date_format = date_format or '%b'
         total_name = total_name or 'Total'
-    elif freq == 'A':
+    elif freq == 'YE':
         date_format = date_format or '%Y'
         total_name = total_name or 'Total'
     else:
@@ -280,8 +281,9 @@ def plot_sorted_periodic_returns(prices: pd.DataFrame,
 
     data = ret.to_returns(prices=prices, freq=freq, include_start_date=True, drop_first=True)
     data.index = [pd.Timestamp(x).strftime(date_format) for x in data.index]
-    total_return = ret.to_total_returns(prices=prices).rename(total_name).to_frame().T
-    data = pd.concat([data, total_return], axis=0)
+    if add_total:
+        total_return = ret.to_total_returns(prices=prices).rename(total_name).to_frame().T
+        data = pd.concat([data, total_return], axis=0)
 
     fixed_colors = pd.Series(put.get_n_colors(n=len(data.columns), is_fixed_n_colors=False), index=data.columns)
     data_colors = pd.DataFrame(index=data.index, columns=data.columns)
@@ -303,7 +305,7 @@ def plot_sorted_periodic_returns(prices: pd.DataFrame,
     fig = ptb.plot_df_table(df=sorted_returns,
                             first_column_width=None,
                             add_index_as_column=False,
-                            data_colors=sorted_colors.to_numpy(),
+                            data_colors=list(sorted_colors.to_numpy()),
                             ax=ax,
                             **kwargs)
     return fig
@@ -325,21 +327,21 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.PERIODIC_RETURNS_BY_ROW:
         periodic_returns_table = compute_periodic_returns_by_row_table(prices=prices['SPY'],
-                                                                       heatmap_freq='A',
-                                                                       column_period='M')
+                                                                       heatmap_freq='YE',
+                                                                       column_period='ME')
         print(periodic_returns_table)
 
     elif unit_test == UnitTests.RETURNS_HEATMAP:
         periodic_returns_table = get_periodic_returns_table(prices=prices['SPY'],
                                                             pivot='SPY',
-                                                            column_period='M',
+                                                            column_period='ME',
                                                             is_add_annual_column=True,
                                                             is_inverse_order=True)
         print(periodic_returns_table)
 
         plot_returns_heatmap(prices=prices['SPY'],
-                             heatmap_column_freq='M',
-                             heatmap_freq='A',
+                             heatmap_column_freq='ME',
+                             heatmap_freq='YE',
                              #date_format='%b-%Y',
                              is_add_annual_column=True,
                              is_inverse_order=True)
@@ -362,7 +364,7 @@ def run_unit_test(unit_test: UnitTests):
         plot_periodic_returns_table(prices=prices,
                                                 time_period=time_period,
                                                 date_format='%b-%y',
-                                                freq='A',
+                                                freq='YE',
                                                 x_rotation=90,
                                                 df_out_name='heatmap1y')
 
@@ -372,7 +374,7 @@ def run_unit_test(unit_test: UnitTests):
         plot_periodic_returns_table(prices=prices,
                                                 time_period=time_period,
                                                 date_format='%b-%y',
-                                                freq='A',
+                                                freq='YE',
                                                 x_rotation=90,
                                                 df_out_name='heatmap1y')
 
@@ -381,15 +383,16 @@ def run_unit_test(unit_test: UnitTests):
         plot_sorted_periodic_returns(prices=prices.iloc[:, :20],
                                      time_period=time_period,
                                      date_format='%b-%y',
-                                     freq='A',
-                                     x_rotation=90)
+                                     freq='YE',
+                                     x_rotation=90,
+                                     add_total=False)
 
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PERIODIC_RETURNS_TABLE
+    unit_test = UnitTests.SORTED_PERIODIC_RETURNS_TABLE
 
     is_run_all_tests = False
     if is_run_all_tests:

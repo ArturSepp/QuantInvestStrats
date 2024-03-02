@@ -14,7 +14,7 @@ FillnaOptions = Literal["bfill", "ffill", "pad"]
 
 
 def df_asfreq(df: Union[pd.DataFrame, pd.Series],
-              freq: Optional[str] = 'Q',
+              freq: Optional[str] = 'QE',
               method: FillnaOptions = 'ffill',
               fill_na_method: Optional[FillnaOptions] = 'ffill',
               inclusive: Optional[str] = None,
@@ -109,7 +109,7 @@ def df_resample_at_other_index(df: Union[pd.DataFrame, pd.Series],
 
 
 def df_resample_at_freq(df: Union[pd.DataFrame, pd.Series],
-                        freq: str = 'Q',
+                        freq: str = 'QE',
                         fill_na_method: FillnaOptions = 'ffill',
                         agg_func: Optional[Callable[[pd.DataFrame], pd.Series]] = np.nanmean,  # if none use last
                         include_end_date: bool = False
@@ -177,9 +177,9 @@ def run_unit_test(unit_test: UnitTests):
     print(df)
 
     if unit_test == UnitTests.AS_FREQ:
-        freq_data = df_asfreq(df=df, freq='A')
+        freq_data = df_asfreq(df=df, freq='YE')
         print(freq_data)
-        freq_data = df_asfreq(df=df, freq='A', include_end_date=True)
+        freq_data = df_asfreq(df=df, freq='YE', include_end_date=True)
         print(freq_data)
         print(type(freq_data.index))
 
@@ -190,13 +190,13 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.RESAMPLE:
 
         time_period1 = da.TimePeriod('1Jan2020', '1Jan2021')
-        other_index = time_period1.to_pd_datetime_index(freq='Q')
+        other_index = time_period1.to_pd_datetime_index(freq='QE')
         print(other_index)
         freq_data1 = df_resample_at_other_index(df=df, other_index=other_index, agg_func=np.nansum)
         print(freq_data1)
         print(freq_data1.index)
 
-        freq_data2 = df_resample_at_freq(df=df, freq='Q', agg_func=np.nansum, include_end_date=True)
+        freq_data2 = df_resample_at_freq(df=df, freq='QE', agg_func=np.nansum, include_end_date=True)
         print(freq_data2)
         print(freq_data2.index)
 

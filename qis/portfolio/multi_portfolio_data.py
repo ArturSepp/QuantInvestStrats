@@ -34,7 +34,7 @@ from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 
 
 PERF_PARAMS = PerfParams(freq='W-WED')
-REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='M')
+REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
 
 @dataclass
@@ -140,7 +140,7 @@ class MultiPortfolioData:
 
     def plot_periodic_returns(self,
                               time_period: da.TimePeriod = None,
-                              heatmap_freq: str = 'A',
+                              heatmap_freq: str = 'YE',
                               date_format: str = '%Y',
                               transpose: bool = True,
                               title: str = None,
@@ -270,7 +270,8 @@ class MultiPortfolioData:
                        time_period: da.TimePeriod = None,
                        var_format: str = '{:.0%}',
                        ax: plt.Subplot = None,
-                       **kwargs) -> None:
+                       **kwargs
+                       ) -> None:
         exposures = []
         for portfolio in self.portfolio_datas:
             exposures.append(portfolio.get_exposures(time_period=time_period).sum(axis=1).rename(portfolio.nav.name))
@@ -447,7 +448,7 @@ class MultiPortfolioData:
     def plot_returns_scatter(self,
                              benchmark: str,
                              time_period: da.TimePeriod = None,
-                             freq: str = 'Q',
+                             freq: str = 'QE',
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> None:
@@ -494,7 +495,7 @@ class MultiPortfolioData:
     def plot_performance_periodic_table(self,
                                         portfolio_id: int = 0,
                                         time_period: da.TimePeriod = None,
-                                        freq: str = 'A',
+                                        freq: str = 'YE',
                                         ax: plt.Subplot = None,
                                         **kwargs
                                         ) -> None:

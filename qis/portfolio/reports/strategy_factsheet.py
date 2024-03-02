@@ -70,9 +70,11 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # exposures
     if len(portfolio_data.weights.columns) > 10:  # more than 10 use grouped exposures
-        exposures = portfolio_data.get_exposures(is_grouped=True, time_period=time_period)
+        exposures = portfolio_data.get_exposures(is_grouped=True, time_period=time_period,
+                                                 add_total=False)
     else:
-        exposures = portfolio_data.get_exposures(is_grouped=False, time_period=time_period)
+        exposures = portfolio_data.get_exposures(is_grouped=False, time_period=time_period,
+                                                 add_total=False)
     ax = fig.add_subplot(gs[4:6, :2])
     if weight_freq is not None:
         exposures = exposures.resample(weight_freq).last()

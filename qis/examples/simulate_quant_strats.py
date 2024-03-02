@@ -45,7 +45,7 @@ def create_time_series_report(prices: Union[pd.Series, pd.DataFrame],
     fig1.suptitle(f"{strat_name} Volatility-target strats with vol_target={vol_target:0.0%}", fontweight="bold", fontsize=8, color='blue')
 
     global_kwargs = dict(fontsize=5, linewidth=0.5, first_color_fixed=True, framealpha=0.8,
-                         digits_to_show=1, x_date_freq='A')
+                         digits_to_show=1, x_date_freq='YE')
     scatter_kwargs = qis.update_kwargs(kwargs=global_kwargs,
                                        new_kwargs=dict(fontsize=5, var_format='{:.0%}', xvar_numticks=7,
                                                        markersize=1))
@@ -163,7 +163,7 @@ def plot_strategies_returns_pdf(nav_data: pd.DataFrame,
     # trim plot data
     nav_data = time_period.locate(nav_data)
 
-    freqs = {'Daily': 'B', 'Weekly': 'W-WED', 'Bi-Weekly': '2W-WED', 'Monthly': 'M'}
+    freqs = {'Daily': 'B', 'Weekly': 'W-WED', 'Bi-Weekly': '2W-WED', 'Monthly': 'ME'}
 
     numticks = 7
     major_ticks = np.linspace(-4.5, 4.5, numticks)
@@ -198,7 +198,7 @@ def plot_strategies_returns_scatter(nav_data: pd.DataFrame,
                                     ) -> None:
     # trim plot data
     nav_data = time_period.locate(nav_data)
-    freqs = {'Daily': ('B', 252), 'Weekly': ('W-WED', 52), 'Bi-Weekly': ('2W-WED', 26), 'Monthly': ('M', 12), 'Quarterly': ('Q', 4)}
+    freqs = {'Daily': ('B', 252), 'Weekly': ('W-WED', 52), 'Bi-Weekly': ('2W-WED', 26), 'Monthly': ('ME', 12), 'Quarterly': ('QE', 4)}
     for ax, (title, freq) in zip(axs, freqs.items()):
         new_kwargs = dict(alpha_format='{0:+0.0%}',
                           beta_format='{:+0.1f}',

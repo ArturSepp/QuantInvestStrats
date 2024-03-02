@@ -19,7 +19,7 @@ from qis.perfstats.config import ReturnTypes, RegimeData, PerfParams, PerfStat
 
 
 def compute_mean_freq_regimes(sampled_returns_with_regime_id: pd.DataFrame):
-    regime_groups = sampled_returns_with_regime_id.groupby([RegimeClassifier.REGIME_COLUMN])
+    regime_groups = sampled_returns_with_regime_id.groupby([RegimeClassifier.REGIME_COLUMN], observed=False)
     regime_means = regime_groups.mean()
     regime_dims = regime_groups.count().iloc[:, 0]  # count regimes
     # replace nans
@@ -206,7 +206,7 @@ class RegimeClassifier(ABC):
 
 
 class BenchmarkReturnsQuantileRegimeSpecs(NamedTuple):
-    freq: str = 'Q'  # frequency of returns
+    freq: str = 'QE'  # frequency of returns
     return_type: ReturnTypes = ReturnTypes.RELATIVE  # return type
     q: Union[np.ndarray, int] = np.array([0.0, 0.17, 0.83, 1.0])  # quantiles = q[1:] - q[:-1]
     regime_ids_colors: Dict[str, str] = {'Bear': mcolors['salmon'], 'Normal': mcolors['yellowgreen'], 'Bull': mcolors['darkgreen']}
@@ -274,7 +274,7 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
 
 
 class VolQuantileRegimeSpecs(NamedTuple):
-    freq: str = 'Q'  # frequency of vol sampling
+    freq: str = 'QE'  # frequency of vol sampling
     return_type: ReturnTypes = ReturnTypes.RELATIVE  # return type
     q: int = 4  # 4 qiantiles
 

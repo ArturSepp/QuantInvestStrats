@@ -129,7 +129,7 @@ def run_unit_test(unit_test: UnitTests):
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
-    regime_params = BenchmarkReturnsQuantileRegimeSpecs(freq='Q')
+    regime_params = BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
 
     if unit_test == UnitTests.SCATTER_ALL:
         plot_scatter_regression(prices=prices,

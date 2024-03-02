@@ -73,7 +73,7 @@ def run_unit_test(unit_test: UnitTests):
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
-    returns = prices.asfreq('Q', method='ffill').pct_change().dropna()
+    returns = prices.asfreq('QE', method='ffill').pct_change().dropna()
 
     if unit_test == UnitTests.QUANTILE_CLASS_TABLE:
         plot_quantile_class_table(data=returns, x_column='SPY', num_buckets=4, hue_name='quantile regime')

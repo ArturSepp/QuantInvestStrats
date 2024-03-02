@@ -171,7 +171,7 @@ class MultiAssetsReport:
         self.add_regime_shadows(ax=ax, regime_benchmark_str=regime_benchmark_str, data_df=prices)
 
     def plot_annual_returns(self,
-                            heatmap_freq: str = 'A',
+                            heatmap_freq: str = 'YE',
                             date_format: str = '%Y',
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,
@@ -204,7 +204,7 @@ class MultiAssetsReport:
     def plot_returns_scatter(self,
                              benchmark: str,
                              time_period: TimePeriod = None,
-                             freq: str = 'Q',
+                             freq: str = 'QE',
                              ax: plt.Subplot = None,
                              **kwargs) -> None:
         local_kwargs = qis.update_kwargs(kwargs=kwargs,
@@ -270,7 +270,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    benchmark: str = None,
                                    perf_params: PerfParams = PERF_PARAMS,
                                    regime_params: qis.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                                   heatmap_freq: str = 'A',
+                                   heatmap_freq: str = 'YE',
                                    time_period: TimePeriod = None,  # time period for reporting
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                    **kwargs
@@ -303,7 +303,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                         weight='normal',
                         markersize=1,
                         framealpha=0.75,
-                        x_date_freq='A',
+                        x_date_freq='YE',
                         time_period=time_period)
     # overrite local_kwargs with kwargs is they are provided
     kwargs = qis.update_kwargs(local_kwargs, kwargs)

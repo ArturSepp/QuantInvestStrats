@@ -34,7 +34,7 @@ def compute_path_corr(a1: np.ndarray,
     return acorr
 
 
-def compute_masked_covar_corr(returns: Union[np.ndarray, pd.DataFrame],
+def compute_masked_covar_corr(data: Union[np.ndarray, pd.DataFrame],
                               is_covar: bool = True,
                               bias: bool = False
                               ) -> Union[np.ndarray, pd.DataFrame]:
@@ -42,26 +42,26 @@ def compute_masked_covar_corr(returns: Union[np.ndarray, pd.DataFrame],
     given returns: time * assets
     compute covar by masking nans
     """
-    if isinstance(returns, pd.DataFrame):
-        returns_np = returns.to_numpy()
-    elif isinstance(returns, np.ndarray):
-        returns_np = returns
+    if isinstance(data, pd.DataFrame):
+        data_np = data.to_numpy()
+    elif isinstance(data, np.ndarray):
+        data_np = data
     else:
-        raise ValueError(f"unsuported type {type(returns)}")
+        raise ValueError(f"unsuported type {type(data)}")
 
-    if np.any(np.isnan(returns_np)):  # applay masked arrays
+    if np.any(np.isnan(data_np)):  # applay masked arrays
         if is_covar:
-            covar = np.ma.cov(np.ma.masked_invalid(returns_np), rowvar=False, bias=bias, allow_masked=True).data
+            covar = np.ma.cov(np.ma.masked_invalid(data_np), rowvar=False, bias=bias, allow_masked=True).data
         else:
-            covar = np.ma.corrcoef(np.ma.masked_invalid(returns_np), rowvar=False, bias=bias, allow_masked=True).data
+            covar = np.ma.corrcoef(np.ma.masked_invalid(data_np), rowvar=False, bias=bias, allow_masked=True).data
     else:
         if is_covar:
-            covar = np.cov(returns_np, rowvar=False, bias=bias)
+            covar = np.cov(data_np, rowvar=False, bias=bias)
         else:
-            covar = np.corrcoef(returns_np, rowvar=False, bias=bias)
+            covar = np.corrcoef(data_np, rowvar=False, bias=bias)
 
-    if isinstance(returns, pd.DataFrame):
-        covar = pd.DataFrame(data=covar, index=returns.columns, columns=returns.columns)
+    if isinstance(data, pd.DataFrame):
+        covar = pd.DataFrame(data=covar, index=data.columns, columns=data.columns)
 
     return covar
 

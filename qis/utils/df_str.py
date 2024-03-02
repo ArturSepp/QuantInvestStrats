@@ -155,7 +155,7 @@ def df_to_str(df: pd.DataFrame,
 
 
 def timeseries_df_to_str(df: pd.DataFrame,
-                         freq: Optional[str] = 'Q',
+                         freq: Optional[str] = 'QE',
                          date_format: str = '%b-%y',
                          var_format: str = '{:.0%}',
                          var_formats: List[str] = None,  # specific for each column
@@ -234,7 +234,7 @@ def series_values_to_str(ds: pd.Series, include_index: bool = True) -> str:
 
 
 def df_index_to_str(df: pd.DataFrame,
-                    freq: str = 'Q',
+                    freq: str = 'QE',
                     data_str: str = 'Q%q-%y'
                     ) -> pd.DataFrame:
     df.index = pd.PeriodIndex(pd.to_datetime(df.index).date, freq=freq).strftime(data_str)

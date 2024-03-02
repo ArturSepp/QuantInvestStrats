@@ -145,7 +145,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
     from qis.test_data import load_etf_data
-    prices = load_etf_data().dropna().asfreq('Q', method='ffill')
+    prices = load_etf_data().dropna().asfreq('QE', method='ffill')
     returns = prices.pct_change()
 
     if unit_test == UnitTests.PD_MELT:

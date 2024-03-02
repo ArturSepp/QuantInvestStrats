@@ -22,12 +22,14 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                        regime_benchmark: str = None,
                                        backtest_name: str = None,
-                                       heatmap_freq: str = 'A',
+                                       heatmap_freq: str = 'YE',
                                        figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+                                       is_grouped: bool = False,
                                        **kwargs
                                        ) -> plt.Figure:
     """
     for portfolio data with structurally different strategies
+    for portfolios with large universe use is_grouped = True to report tunrover and exposures by groups
     """
     if len(multi_portfolio_data.benchmark_prices.columns) < 2:
         raise ValueError(f"pass at least two benchmarks for benchmark_prices in multi_portfolio_data")

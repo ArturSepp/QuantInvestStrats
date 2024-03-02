@@ -271,7 +271,7 @@ def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]) ->
 
 
 def compute_sampled_vols(prices: Union[pd.DataFrame, pd.Series],
-                         freq_vol: str = 'M',
+                         freq_vol: str = 'ME',
                          freq_return: Optional[str] = None,
                          include_start_date: bool = False,
                          include_end_date: bool = False,
@@ -337,7 +337,7 @@ def adjust_navs_to_portfolio_pa(portfolio_nav: pd.Series,
 def compute_net_return(gross_return: pd.Series,
                        man_fee: float = 0.01,
                        perf_fee: float = 0.2,
-                       perf_fee_frequency: str = 'A'
+                       perf_fee_frequency: str = 'YE'
                        ) -> pd.Series:
     """
     compute fee adjusted returns from gross returns
@@ -385,7 +385,7 @@ def compute_net_return(gross_return: pd.Series,
 def get_net_navs(navs: Union[pd.Series, pd.DataFrame],
                  man_fee: float = 0.01,
                  perf_fee: float = 0.2,
-                 perf_fee_frequency: str = 'A'
+                 perf_fee_frequency: str = 'YE'
                  ) -> Union[pd.Series, pd.DataFrame]:
 
     gross_returns = navs.pct_change()
@@ -707,7 +707,7 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.VOL_SAMPLE:
         vols = compute_sampled_vols(prices=prices,
                                     freq_return='B',
-                                    freq_vol='M')
+                                    freq_vol='ME')
         print(vols)
 
     elif unit_test == UnitTests.ADJUST_PORTFOLIO_PA_RETURNS:

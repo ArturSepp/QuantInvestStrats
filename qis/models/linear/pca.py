@@ -63,7 +63,7 @@ def compute_pca_r2(cmatrix: np.ndarray, is_cumulative: bool = False) -> (np.ndar
 
 
 def compute_data_pca_r2(data: pd.DataFrame,
-                        freq: str = 'M',
+                        freq: str = 'ME',
                         time_period: da.TimePeriod = None,
                         ewm_lambda: float = 0.94,
                         is_corr: bool = True
@@ -102,7 +102,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.PCA_R2:
         pca_r2 = compute_data_pca_r2(data=returns,
-                                     freq='A',
+                                     freq='YE',
                                      ewm_lambda=0.97)
         print(pca_r2)
 

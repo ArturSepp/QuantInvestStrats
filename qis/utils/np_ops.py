@@ -507,7 +507,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.WA
+    unit_test = UnitTests.CUM_POWER
 
     is_run_all_tests = False
     if is_run_all_tests:

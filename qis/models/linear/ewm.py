@@ -930,7 +930,7 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
 
 
 def compute_ewm_sharpe_from_prices(prices: pd.DataFrame,
-                                   freq: str = 'Q',
+                                   freq: str = 'QE',
                                    span: int = 40,
                                    initial_sharpes: np.ndarray = None,
                                    norm_type: int = 2

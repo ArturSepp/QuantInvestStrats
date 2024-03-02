@@ -98,13 +98,13 @@ def get_period_days(freq: str = 'B',
     elif freq in ['4W', '4W-MON', '4W-TUE', '4W-WED', '4W-THU', '4W-FRI', '4W-SAT', '4W-SUN']:
         days = 28 if is_calendar else 20
         an_f = 13
-    elif freq in ['1M', 'M', 'BM', 'MS', 'BMS']:
+    elif freq in ['1M', 'ME', 'BM', 'MS', 'BMS']:
         days = 30 if is_calendar else 21
         an_f = 12
     elif freq in ['2M', '2BM', '2MS', '2BMS']:
         days = 60 if is_calendar else 42
         an_f = 6
-    elif freq in ['Q', 'DQ', 'BQ', 'QS', 'BQS', 'Q-DEC', 'Q-JAN', 'Q-FEB']:
+    elif freq in ['QE', 'DQ', 'BQ', 'QS', 'BQS', 'Q-DEC', 'Q-JAN', 'Q-FEB']:
         days = 91 if is_calendar else 63
         an_f = 4
     elif freq in ['2Q', '2BQ', '2QS', '2BQS']:
@@ -113,7 +113,7 @@ def get_period_days(freq: str = 'B',
     elif freq in ['3Q', '3BQ', '3QS', '3BQS']:
         days = 273 if is_calendar else 189
         an_f = 0.75
-    elif freq in ['A', 'BA', 'AS', 'BAS']:
+    elif freq in ['YE', 'BA', 'AS', 'BAS']:
         days = an_days
         an_f = 1.0
     else:
@@ -492,7 +492,7 @@ def get_ytd_time_period(year: int = 2023) -> TimePeriod:
 
 
 def generate_dates_schedule(time_period: TimePeriod,
-                            freq: str = 'M',
+                            freq: str = 'ME',
                             hour_offset: Optional[int] = None,
                             include_start_date: bool = False,
                             include_end_date: bool = False,
@@ -506,6 +506,8 @@ def generate_dates_schedule(time_period: TimePeriod,
         return dates_schedule
 
     end_date = time_period.end
+    if end_date is None:
+        raise ValueError(f"end_date must be given")
     is_24_hour_offset = False
     if freq == 'H':  # need to do offset so the end of the day will be at 22:00:00 end date
         if end_date.hour == 0:
@@ -527,7 +529,7 @@ def generate_dates_schedule(time_period: TimePeriod,
     if freq == 'M-FRI':  # last friday of month
         # create weekly fridays
         dates_schedule1 = create_range(freq_='W-FRI', tz=time_period.tz)
-        dates_schedule2 = create_range(freq_='M', tz=time_period.tz)
+        dates_schedule2 = create_range(freq_='ME', tz=time_period.tz)
         # filter last Friday per month periods
         dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill').dropna()
         dates_schedule = pd.DatetimeIndex(dates_schedule.to_numpy())  # back to DatetimeIndex type
@@ -537,7 +539,7 @@ def generate_dates_schedule(time_period: TimePeriod,
     elif freq == 'Q-FRI':  # last friday of quarter
         # create weekly fridays
         dates_schedule1 = create_range(freq_='W-FRI', tz=time_period.tz)
-        dates_schedule2 = create_range(freq_='Q', tz=time_period.tz)
+        dates_schedule2 = create_range(freq_='QE', tz=time_period.tz)
         # filter last Friday per quarter periods
         dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill').dropna()
         dates_schedule = pd.DatetimeIndex(dates_schedule.to_numpy())  # back to DatetimeIndex type
@@ -547,7 +549,7 @@ def generate_dates_schedule(time_period: TimePeriod,
     elif freq == 'Q-3FRI':  # last friday of quarter
         # create monthly 3rd fridays
         dates_schedule1 = create_range(freq_='WOM-3FRI', tz=time_period.tz)
-        dates_schedule2 = create_range(freq_='Q', tz=time_period.tz)
+        dates_schedule2 = create_range(freq_='QE', tz=time_period.tz)
         # filter last Friday per quarter periods
         dates_schedule = pd.Series(dates_schedule1, index=dates_schedule1).reindex(index=dates_schedule2, method='ffill').dropna()
         dates_schedule = pd.DatetimeIndex(dates_schedule.to_numpy())  # back to DatetimeIndex type
@@ -563,6 +565,7 @@ def generate_dates_schedule(time_period: TimePeriod,
         dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hour_offset) for x in dates_schedule1])
         if include_end_date is False:
             dates_schedule = dates_schedule[:-1]
+
     else:
         dates_schedule = create_range(freq_=freq)
 
@@ -608,7 +611,7 @@ def generate_dates_schedule(time_period: TimePeriod,
 
 
 def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series],
-                                    freq: str = 'M',
+                                    freq: str = 'ME',
                                     include_start_date: bool = False,
                                     include_end_date: bool = False
                                     ) -> pd.Series:
@@ -638,7 +641,7 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series],
 
 
 def generate_sample_dates(time_period: TimePeriod,
-                          freq: str = 'M',
+                          freq: str = 'ME',
                           overlap_frequency: str = None,
                           include_start_date: bool = False,
                           include_end_date: bool = False
@@ -661,7 +664,7 @@ def generate_sample_dates(time_period: TimePeriod,
         end_dates = py_end_dates[1:]  # from 1 up to last
         sample_dates = pd.DataFrame({'start': start_dates, 'end': end_dates}, index=end_dates)
 
-    elif overlap_frequency == 'A':
+    elif overlap_frequency == 'YE':
         start_dates = shift_dates_by_year(end_dates, backward=True)  # from 0 up to last-1
         end_dates = py_end_dates  # from 1 up to last
         # cut dates before start date
@@ -669,7 +672,7 @@ def generate_sample_dates(time_period: TimePeriod,
         sample_dates = sample_dates[sample_dates['start'] > time_period.start]
 
     # frequncy of type 1A, 2A, 3A,...
-    elif list(overlap_frequency)[-1] == 'A':
+    elif list(overlap_frequency)[-1] == 'YE':
         n_years = int(separate_number_from_string(overlap_frequency)[0])
         start_dates = shift_dates_by_n_years(dates=end_dates, n_years=n_years, backward=True)
         end_dates = py_end_dates  # from 1 up to last
@@ -814,7 +817,7 @@ def tz_localize_dates(start_date: pd.Timestamp,
 
 
 def split_df_by_freq(df: pd.DataFrame,
-                     freq: str = 'M',
+                     freq: str = 'ME',
                      overlap_frequency: str = None,
                      include_start_date: bool = True,
                      include_end_date: bool = True
@@ -934,12 +937,12 @@ def run_unit_test(unit_test: UnitTests):
         print(time_period.start_to_str())
         print("time_period.end_to_str() = ")
         print(time_period.end_to_str())
-        print("time_period.to_pd_datetime_index(freq='M') = ")
-        print(time_period.to_pd_datetime_index(freq='M'))
-        print("time_period.to_pd_datetime_index(freq='M') = ")
-        print(time_period.to_pd_datetime_index(freq='M', tz='America/New_York'))
-        print("time_period.get_period_dates_str(freq='M', tz='America/New_York') = ")
-        print(time_period.to_period_dates_str(freq='M'))
+        print("time_period.to_pd_datetime_index(freq='ME') = ")
+        print(time_period.to_pd_datetime_index(freq='ME'))
+        print("time_period.to_pd_datetime_index(freq='ME') = ")
+        print(time_period.to_pd_datetime_index(freq='ME', tz='America/New_York'))
+        print("time_period.get_period_dates_str(freq='ME', tz='America/New_York') = ")
+        print(time_period.to_period_dates_str(freq='ME'))
 
     elif unit_test == UnitTests.OFFSETS:
         date = pd.Timestamp('28Feb2023')
@@ -957,8 +960,8 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.SAMPLE_DATES_IDX:
         time_period = TimePeriod(start='31Dec2004', end='31Dec2020')
-        population_dates = time_period.to_pd_datetime_index(freq='W-WED')
-        sample_dates = time_period.to_pd_datetime_index(freq='Q')
+        population_dates = time_period.to_pd_datetime_index(freq='ME')
+        sample_dates = time_period.to_pd_datetime_index(freq='QE')
         sample_dates_idx = get_sample_dates_idx(population_dates=population_dates, sample_dates=sample_dates)
 
         print('population_dates')
@@ -1053,7 +1056,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.FREQ_HOUR
+    unit_test = UnitTests.SAMPLE_DATES_IDX
 
     is_run_all_tests = False
     if is_run_all_tests:

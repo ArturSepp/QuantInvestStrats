@@ -187,7 +187,8 @@ class PortfolioData:
         # turnover = turnover.divide(self.nav.to_numpy(), axis=0)
         turnover = turnover.divide(abs_exposure.to_numpy(), axis=0)
         if is_agg:
-            turnover = pd.Series(np.nansum(turnover, axis=1), index=self.nav.index, name=self.nav.name)
+            turnover = pd.Series(np.nansum(turnover, axis=1), index=turnover.index, name=self.nav.name)
+            turnover = turnover.reindex(index=self.nav.index)
         elif is_grouped or len(turnover.columns) > 10:  # agg by groups
             turnover = dfg.agg_df_by_groups_ax1(df=turnover,
                                                 group_data=self.group_data,
@@ -322,7 +323,7 @@ class PortfolioData:
 
     def get_instruments_periodic_returns(self,
                                          time_period: da.TimePeriod = None,
-                                         freq: str = 'M'
+                                         freq: str = 'ME'
                                          ) -> pd.DataFrame:
         returns = self.get_instruments_returns(time_period=time_period)
         prices = ret.returns_to_nav(returns=returns, init_period=None)
@@ -403,7 +404,7 @@ class PortfolioData:
 
     def get_attribution_table_by_instrument(self,
                                             time_period: da.TimePeriod = None,
-                                            freq: str = 'M',
+                                            freq: str = 'ME',
                                             ) -> pd.DataFrame:
         """
         using avg weight
@@ -474,7 +475,7 @@ class PortfolioData:
                              is_grouped: bool = True,
                              time_period: da.TimePeriod = None,
                              title: str = None,
-                             freq: str = 'Q',
+                             freq: str = 'QE',
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> None:
@@ -504,9 +505,9 @@ class PortfolioData:
                                      **kwargs
                                      ) -> None:
         # for monthly returns fix A and date_format
-        kwargs = qis.update_kwargs(kwargs, dict(heatmap_freq='A', date_format='%Y'))
+        kwargs = qis.update_kwargs(kwargs, dict(heatmap_freq='YE', date_format='%Y'))
         plot_returns_heatmap(prices=self.get_portfolio_nav(time_period=time_period),
-                             heatmap_column_freq='M',
+                             heatmap_column_freq='ME',
                              is_add_annual_column=True,
                              is_inverse_order=True,
                              ax=ax,
@@ -516,7 +517,7 @@ class PortfolioData:
                               benchmark_prices: pd.DataFrame = None,
                               is_grouped: bool = True,
                               time_period: da.TimePeriod = None,
-                              heatmap_freq: str = 'A',
+                              heatmap_freq: str = 'YE',
                               date_format: str = '%Y',
                               transpose: bool = True,
                               title: str = None,
@@ -738,9 +739,9 @@ class PortfolioInput:
     prices: pd.DataFrame = None  # mandatory but we set none for enumarators
     allocation_type: AllocationType = AllocationType.FIXED_WEIGHTS
     time_period: da.TimePeriod = None
-    rebalance_freq: str = 'Q'
-    regime_freq: str = 'M'
-    returns_freq: str = 'M'
+    rebalance_freq: str = 'QE'
+    regime_freq: str = 'ME'
+    returns_freq: str = 'ME'
     ewm_lambda: float = 0.92
     target_vol: float = None
 

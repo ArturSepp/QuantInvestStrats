@@ -629,7 +629,7 @@ def append_df_to_feather(df: pd.DataFrame,
                          local_path: Optional[str] = None,
                          keep: Optional[Literal['first', 'last']] = None,
                          index_col: Optional[str] = INDEX_COLUMN
-                         ) -> None:
+                         ) -> pd.DataFrame:
     """
     append csv file
     """
@@ -661,6 +661,7 @@ def append_df_to_feather(df: pd.DataFrame,
                        key=key,
                        local_path=local_path,
                        index_col=index_col)
+    return df
 
 
 def load_df_from_feather(file_name: Optional[str] = None,

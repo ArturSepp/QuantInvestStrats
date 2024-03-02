@@ -34,7 +34,7 @@ class TrainLiveSamples:
 
 
 def split_to_train_live_samples(ts_index: Union[pd.DatetimeIndex, pd.Index],
-                                model_update_freq: 'str' = 'M',
+                                model_update_freq: 'str' = 'ME',
                                 roll_period: int = 12
                                 ) -> TrainLiveSamples:
 
@@ -61,7 +61,7 @@ def split_to_train_live_samples(ts_index: Union[pd.DatetimeIndex, pd.Index],
 
 
 def split_to_samples(data: Union[pd.DataFrame, pd.Series],
-                     sample_freq: 'str' = 'A',
+                     sample_freq: 'str' = 'YE',
                      start_to_one: bool = False
                      ) -> Dict[pd.Timestamp, pd.DataFrame]:
     data1 = data.resample(sample_freq).last()
@@ -81,7 +81,7 @@ def split_to_samples(data: Union[pd.DataFrame, pd.Series],
 
 
 def get_data_samples_df(data: Union[pd.DataFrame, pd.Series],
-                        sample_freq: 'str' = 'A',
+                        sample_freq: 'str' = 'YE',
                         start_to_one: bool = False
                         ) -> pd.DataFrame:
     data_samples = {}
@@ -103,8 +103,8 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.SAMPLE_DATES:
         time_period = TimePeriod(start='31Dec2018', end='31Dec2020')
 
-        ts_index = time_period.to_pd_datetime_index(freq='M')
-        train_live_samples = split_to_train_live_samples(ts_index=ts_index, model_update_freq='M', roll_period=12)
+        ts_index = time_period.to_pd_datetime_index(freq='ME')
+        train_live_samples = split_to_train_live_samples(ts_index=ts_index, model_update_freq='ME', roll_period=12)
         train_live_samples.print()
 
     elif unit_test == UnitTests.SPLIT_TO_SAMPLES:
@@ -113,7 +113,7 @@ def run_unit_test(unit_test: UnitTests):
         ts_index = time_period.to_pd_datetime_index(freq='B')
         data = pd.DataFrame(data=np.random.normal(0, 1.0, (len(ts_index), 1)), index=ts_index, columns=['id1'])
 
-        data_samples = split_to_samples(data=data, sample_freq='A')
+        data_samples = split_to_samples(data=data, sample_freq='YE')
         print(data_samples)
 
     plt.show()

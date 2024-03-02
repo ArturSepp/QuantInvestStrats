@@ -20,7 +20,7 @@ from qis.plots.utils import LegendStats
 def plot_bars(df: Union[pd.DataFrame, pd.Series],
               stacked: bool = True,
               date_format: str = '%d-%b-%y',
-              x_date_freq: str = 'Q',
+              x_date_freq: str = 'QE',
               title: str = None,
               fontsize: int = 10,
               add_bar_values: bool = False,
@@ -43,6 +43,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               xlabel: str = None,
               ylabel: str = None,
               reverse_columns: bool = False,
+              is_sns: bool = True,
               add_avg_line: bool = False,
               ax: plt.Subplot = None,
               **kwargs
@@ -74,16 +75,18 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
 
     elif isinstance(df, pd.Series):
-        #sns.barplot(x=df.index, y=df, palette=colors, ax=ax)
+        # sns.barplot(x=df.index, y=df, palette=colors, ax=ax)
         df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
     else:  # need to melt for barplot
         value_name = ylabel or 'y'
         var_name = xlabel or 'x'
         df1 = df.melt(ignore_index=False, var_name=var_name, value_name=value_name)
-        sns.barplot(x=df1.index, y=value_name, data=df1, hue=var_name,
-                    palette=colors, edgecolor='none',
-                    ax=ax)
-        # df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+        if is_sns:
+            sns.barplot(x=df1.index, y=value_name, data=df1, hue=var_name,
+                        palette=colors, edgecolor='none',
+                        ax=ax)
+        else:
+            df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
 
     # put totals to bar and store locations
     x_locs = []
@@ -167,9 +170,9 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                          **kwargs)
 
     put.set_ax_tick_params(ax=ax)
-    put.set_ax_tick_labels(ax=ax, fontsize=fontsize, skip_y_axis=skip_y_axis, **kwargs)
     local_kwargs = sop.update_kwargs(dict(yvar_format=yvar_format, fontsize=fontsize), kwargs)
     put.set_ax_ticks_format(ax=ax, x_rotation=x_rotation, **local_kwargs)
+    put.set_ax_tick_labels(ax=ax, fontsize=fontsize, skip_y_axis=skip_y_axis, **kwargs)
 
     if y_limits is not None:
         put.set_y_limits(ax=ax, y_limits=y_limits)
@@ -455,7 +458,7 @@ def run_unit_test(unit_test: UnitTests):
         import qis.perfstats.returns as ret
 
         prices = load_etf_data().dropna().loc['2020':, :].iloc[:, :3]
-        returns = ret.to_returns(prices=prices, freq='M', drop_first=True)
+        returns = ret.to_returns(prices=prices, freq='ME', drop_first=True)
         print(returns)
         fig, ax = plt.subplots(1, 1, figsize=(8, 6), tight_layout=True)
 

@@ -205,7 +205,7 @@ def generate_performance_attribution_report(multi_portfolio_data: MultiPortfolio
         multi_portfolio_data.plot_performance_periodic_table(portfolio_ids=[0],
                                                              time_period=time_period,
                                                              attribution_metric=AttributionMetric.INST_PNL,
-                                                             freq='M',
+                                                             freq='ME',
                                                              ax=ax,
                                                              **kwargs)
 

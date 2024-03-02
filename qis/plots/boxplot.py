@@ -41,7 +41,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
              y_lines: List[Dict] = None,
              labels: List[str] = None,
              original_index: Union[pd.DatetimeIndex, pd.Index] = None,
-             x_date_freq: Union[str, None] = 'A',
+             x_date_freq: Union[str, None] = 'YE',
              date_format: str = '%b-%y',
              num_obs_for_ci: np.ndarray = None,
              add_zero_line: bool = False,
@@ -505,7 +505,7 @@ def run_unit_test(unit_test: UnitTests):
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
-    returns = prices.asfreq('Q', method='ffill').pct_change().dropna()
+    returns = prices.asfreq('QE', method='ffill').pct_change().dropna()
 
     if unit_test == UnitTests.RETURNS_BOXPLOT:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))

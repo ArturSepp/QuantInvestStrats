@@ -16,7 +16,7 @@ from qis.portfolio.portfolio_data import PortfolioData
 
 def backtest_model_portfolio(prices: pd.DataFrame,
                              weights: Union[Dict[str, float], List[float], np.ndarray, pd.DataFrame],  # can be nan
-                             rebalance_freq: str = 'Q',
+                             rebalance_freq: str = 'QE',
                              initial_nav: float = 100,
                              funding_rate: pd.Series = None,  # on positive / negative cash balances
                              instruments_carry: pd.DataFrame = None,  # on nav
@@ -203,15 +203,15 @@ def run_unit_test(unit_test: UnitTests):
 
         portfolio_nav_1_0 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 0.0]),
-                                                     rebalance_freq='Q')
+                                                     rebalance_freq='QE')
 
         portfolio_nav_5_5 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 0.5]),
-                                                     rebalance_freq='Q')
+                                                     rebalance_freq='QE')
 
         portfolio_nav_0_1 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 1.0]),
-                                                     rebalance_freq='Q')
+                                                     rebalance_freq='QE')
 
         portfolio_nav = pd.concat([portfolio_nav_1_0, portfolio_nav_5_5, portfolio_nav_0_1], axis=1)
         portfolio_nav.columns = ['x1=100, x2=0', 'x1=100, x2=50', 'x1=100, x2=100']
@@ -222,7 +222,7 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.COSTS:
         portfolio_nav = backtest_model_portfolio(prices=prices,
                                                  weights=np.array([1.0, 1.0]),
-                                                 rebalance_freq='Q',
+                                                 rebalance_freq='QE',
                                                  is_output_portfolio_data=True)
 
         portfolio_nav.plot_pnl()

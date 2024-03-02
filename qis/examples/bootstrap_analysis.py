@@ -36,7 +36,7 @@ def plot_bootsrap_paths(prices: pd.Series,
 
     colors = num_samples * ['gray']
     colors1 = colors + ['red']
-    kwargs = dict(x_date_freq='A', legend_loc=None)
+    kwargs = dict(x_date_freq='YE', legend_loc=None)
     with sns.axes_style("darkgrid"):
         fig, axs = plt.subplots(2, 1, figsize=(10, 7))
         qis.set_suptitle(fig, title='Log-performance and drawdowns of realized (red) and bootsrapped paths (grey)')

@@ -34,7 +34,7 @@ def plot_scatter(df: pd.DataFrame,
                  order: int = 2,  # regression order
                  full_sample_order: Optional[int] = 2,  # full sample order can be different
                  fit_intercept: bool = True,
-                 color0: str = 'darkblue',
+                 full_sample_color: str = 'grey',
                  colors: List[str] = None,
                  xvar_format: str = '{:.0%}',
                  yvar_format: str = '{:.0%}',
@@ -117,9 +117,9 @@ def plot_scatter(df: pd.DataFrame,
         elif full_sample_order == 0:  # just scatter plot
             sns.scatterplot(x=x, y=y, data=df,
                             # ci=ci,
-                            s=markersize, color=color0, ax=ax)
+                            s=markersize, color=full_sample_color, ax=ax)
         else:  # regplot add scatter and ml lines even if order is == 0
-            sns.regplot(x=x, y=y, data=df, ci=ci, order=full_sample_order, color=color0,
+            sns.regplot(x=x, y=y, data=df, ci=ci, order=full_sample_order, color=full_sample_color,
                         scatter_kws={'s': markersize},
                         line_kws={'linewidth': linewidth}, ax=ax)
 
@@ -136,7 +136,7 @@ def plot_scatter(df: pd.DataFrame,
 
             if add_universe_model_prediction:
                 prediction = reg_model.predict(x1)
-                ax.plot(x, prediction, color=color0, lw=linewidth, linestyle='--')
+                ax.plot(x, prediction, color=full_sample_color, lw=linewidth, linestyle='--')
 
             if add_universe_model_ci:
                 y_model = reg_model.predict(x1)
@@ -149,10 +149,10 @@ def plot_scatter(df: pd.DataFrame,
                 text_str = f"{full_sample_label} " \
                            f"{qu.reg_model_params_to_str(reg_model=reg_model, order=full_sample_order, r2_only=False, fit_intercept=fit_intercept, **kwargs)}"
                 legend_labels.append(text_str)
-                legend_colors.append(color0)
+                legend_colors.append(full_sample_color)
 
     # add colors for annotation labels
-    df['color'] = color0
+    df['color'] = full_sample_color
     if hue is not None :
         hue_ids = df[hue].unique()
         for color, hue_id in zip(colors, hue_ids):

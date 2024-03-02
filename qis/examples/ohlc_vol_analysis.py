@@ -96,7 +96,7 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.HF_PRICES:
         intervals = ['1h', '30m', '15m', '1m']
         # 'BTC-USD'
-        df = fetch_hf_ohlc(ticker='SPY', interval='15m')
+        df = fetch_hf_ohlc(ticker='ETH-USD', interval='5m')
         print(df)
 
     elif unit_test == UnitTests.HF_VOL:
@@ -107,7 +107,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.PLOT_HF_VOL:
         # plot_hf_vols(ticker='SPY', agg_freq='B', af=260)
-        plot_hf_vols(ticker='BTC-USD', agg_freq='D', af=365,
+        plot_hf_vols(ticker='ETH-USD', agg_freq='D', af=365,
                      ohlc_estimator_type=OhlcEstimatorType.CLOSE_TO_CLOSE)
 
     plt.show()

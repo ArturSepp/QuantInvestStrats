@@ -19,9 +19,9 @@ vix_portfolio = PortfolioData(nav=vix)
 
 # set timeperiod for analysis
 time_period = qis.TimePeriod('31Dec2019', None)
-perf_params = qis.PerfParams(freq='W-WED', freq_reg='M', alpha_an_factor=12.0,
+perf_params = qis.PerfParams(freq='W-WED', freq_reg='ME', alpha_an_factor=12.0,
                              rates_data=yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0)
-regime_params = qis.BenchmarkReturnsQuantileRegimeSpecs(freq='M')
+regime_params = qis.BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
 with sns.axes_style("darkgrid"):
     fig, axs = plt.subplots(3, 1, figsize=(10, 10))

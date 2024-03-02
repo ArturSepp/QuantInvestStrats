@@ -264,7 +264,7 @@ def plot_ra_perf_annual_matrix(price: pd.Series,
 
     # extract years
     dates_schedule = da.generate_dates_schedule(time_period=da.get_time_period(df=price),
-                                                freq='A',
+                                                freq='YE',
                                                 include_start_date=True,
                                                 include_end_date=True)
     yearly_dfs = {}
@@ -300,7 +300,7 @@ def plot_ra_perf_annual_matrix(price: pd.Series,
 
 
 def plot_desc_freq_table(df: pd.DataFrame,
-                         freq: str = 'A',
+                         freq: str = 'YE',
                          agg_func: Callable = np.sum,
                          var_format: str = '{:.2f}',
                          special_columns_colors: List[Tuple[int, str]] = None,
@@ -384,7 +384,7 @@ def run_unit_test(unit_test: UnitTests):
                              perf_params=perf_params)
 
     elif unit_test == UnitTests.PLOT_RA_PERF_TABLE_BENCHMARKS:
-        perf_params = PerfParams(freq='M')
+        perf_params = PerfParams(freq='ME')
         plot_ra_perf_table_benchmark(prices=prices,
                                      benchmark='SPY',
                                      perf_params=perf_params,
@@ -392,7 +392,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.PLOT_DESC_FREQ_TABLE:
         freq_data = plot_desc_freq_table(df=prices,
-                                         freq='A',
+                                         freq='YE',
                                          agg_func=np.mean)
         print(freq_data)
 
