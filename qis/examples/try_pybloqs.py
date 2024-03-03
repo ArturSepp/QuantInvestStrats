@@ -1,3 +1,12 @@
+"""
+to use pybloqs for pandas > 2.x
+locate file "...\Lib\site-packages\pybloqs\jinja\table.html"
+change line 44 from:
+{% for col_name, cell in row.iteritems() %}
+to:
+{% for col_name, cell in row.items() %}
+"""
+
 # packages
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -112,6 +121,7 @@ def generate_performances(prices: pd.DataFrame,
                   p.Block(fig3), p.Block(fig4), p.Block(fig5)])
 
     report_file_name = f"{local_path.get_output_path()}PyBloqs_Factsheet_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.pdf"
+    print(f"saved to {report_file_name}")
     r.save(report_file_name)
 
 

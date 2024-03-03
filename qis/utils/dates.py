@@ -77,7 +77,7 @@ def get_period_days(freq: str = 'B',
     elif freq in ['15M', '15T']:
         days = 1.0 / 24.0 / 12.0
         an_f = an_days * 24.0 * 4.0
-    elif freq in ['H']:
+    elif freq in ['h']:
         days = 1.0 / 24.0
         an_f = an_days * 24.0
     elif freq in ['D']:  # for 'D' always use 365
@@ -509,7 +509,7 @@ def generate_dates_schedule(time_period: TimePeriod,
     if end_date is None:
         raise ValueError(f"end_date must be given")
     is_24_hour_offset = False
-    if freq == 'H':  # need to do offset so the end of the day will be at 22:00:00 end date
+    if freq == 'h':  # need to do offset so the end of the day will be at 22:00:00 end date
         if end_date.hour == 0:
             is_24_hour_offset = True
         end_date = time_period.end + pd.offsets.Hour(24)
@@ -577,7 +577,7 @@ def generate_dates_schedule(time_period: TimePeriod,
             dates_schedule = pd.DatetimeIndex([time_period.start])
         elif include_end_date:
             dates_schedule = pd.DatetimeIndex([time_period.end])
-    elif freq == 'H':
+    elif freq == 'h':
         dates_schedule = dates_schedule[dates_schedule >= time_period.start]
         if is_24_hour_offset:
             dates_schedule = dates_schedule[:-1]  # drop the next dat at 00:00:00
@@ -858,7 +858,7 @@ def get_sample_dates_idx(population_dates: pd.Index, sample_dates: pd.Index) -> 
 
 
 def generate_fixed_maturity_rolls(time_period: TimePeriod,
-                                  freq: str = 'H',
+                                  freq: str = 'h',
                                   roll_freq: str = 'W-FRI',
                                   roll_hour: Optional[int] = 8,
                                   min_days_to_next_roll: int = 6,
@@ -985,7 +985,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.EOD_FREQ_HOUR:
         time_period = TimePeriod(pd.Timestamp('2022-11-10', tz='UTC'), pd.Timestamp('2023-03-03', tz='UTC'))
-        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
+        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='h')
         print(rebalancing_times)
 
     elif unit_test == UnitTests.FREQ_HOUR:
@@ -1001,7 +1001,7 @@ def run_unit_test(unit_test: UnitTests):
         value_time = pd.Timestamp('2023-10-04 08:00:00+00:00').normalize()
         print(value_time)
         time_period = TimePeriod(value_time, value_time)
-        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='H')
+        rebalancing_times = generate_dates_schedule(time_period=time_period, freq='h')
         print(rebalancing_times)
 
     elif unit_test == UnitTests.FREQ_REB:
@@ -1034,21 +1034,21 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.FIXED_MATURITY_ROLLS:
         time_period = TimePeriod('01Oct2022', '21Feb2023', tz='UTC')
         """
-        weekly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='W-FRI',
+        weekly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='h', roll_freq='W-FRI',
                                                      roll_hour=8,
                                                      min_days_to_next_roll=6)
         print(f"weekly_rolls:\n{weekly_rolls}")
 
-        monthly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='M-FRI',
+        monthly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='h', roll_freq='M-FRI',
                                                       roll_hour=8,
                                                       min_days_to_next_roll=28)  # 4 weeks before
         print(f"monthly_rolls:\n{monthly_rolls}")
         """
-        quarterly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='Q-FRI',
+        quarterly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='h', roll_freq='Q-FRI',
                                                         roll_hour=8,
                                                         min_days_to_next_roll=28)  # 4 weeks before
         print(f"quarterly_rolls:\n{quarterly_rolls}")
-        quarterly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='H', roll_freq='Q-FRI',
+        quarterly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='h', roll_freq='Q-FRI',
                                                         roll_hour=8,
                                                         min_days_to_next_roll=56)  # 8 weeks before
         print(f"quarterly_rolls:\n{quarterly_rolls}")
@@ -1056,7 +1056,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.SAMPLE_DATES_IDX
+    unit_test = UnitTests.FREQ_HOUR
 
     is_run_all_tests = False
     if is_run_all_tests:
