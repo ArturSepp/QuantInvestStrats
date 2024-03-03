@@ -39,12 +39,12 @@ def estimate_cond_regression(prices: pd.DataFrame,
                                                                                               benchmark=benchmark,
                                                                                               **regime_params._asdict())
     sampled_returns_with_regime_id = sampled_returns_with_regime_id.dropna(how='all', axis=0)
-    regime_groups = sampled_returns_with_regime_id.groupby([BenchmarkReturnsQuantilesRegime.REGIME_COLUMN])
+    regime_groups = sampled_returns_with_regime_id.groupby([BenchmarkReturnsQuantilesRegime.REGIME_COLUMN], observed=False)
     # create prediction matrix
     regression_datas = []
     for regime in regime_classifier.get_regime_ids():
         # regime-conditional benchmark data will be benchmark returns renamed by regime name
-        benchmark_data = regime_groups.get_group(regime)[benchmark].rename(regime)
+        benchmark_data = regime_groups.get_group((regime, ))[benchmark].rename(regime)
         regression_datas.append(benchmark_data)
 
     # now x is 3 column manrix with bear normal bull columns
@@ -73,13 +73,13 @@ def estimate_cond_regression(prices: pd.DataFrame,
             else:
                 estimated_model_params = pd.Series(data=np.nan, index=model_params[0].index)
         else:
-            if np.sum(nan_ind==False) < min_period: # skip estimation
+            if np.sum(nan_ind == False) < min_period: # skip estimation
                 estimated_model_params = pd.Series(data=np.nan, index=model_params[0].index)
             else:
                 if np.any(nan_ind):
                     y = y.loc[nan_ind==False]
-                    regression_matrix_a = regression_matrix_1.loc[nan_ind==False, :]
-
+                # align with y index
+                regression_matrix_a = regression_matrix_1.loc[y.index, :]
                 model = sm.OLS(y, regression_matrix_a)
                 estimated_model = model.fit()
 

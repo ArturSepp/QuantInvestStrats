@@ -149,7 +149,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.COMMODITY_ETFS
+    unit_test = UnitTests.ETF_DATA
 
     is_run_all_tests = False
     if is_run_all_tests:
