@@ -26,7 +26,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               add_bar_values: bool = False,
               add_top_bar_values: bool = False,
               legend_stats: LegendStats = LegendStats.NONE,
-              var_format: str = '{:.1%}',
+              xvar_format: str = '{:.1%}',
               yvar_format: str = '{:,.2f}',
               x_rotation: int = 0,
               skip_y_axis: bool = False,
@@ -45,6 +45,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               reverse_columns: bool = False,
               is_sns: bool = True,
               add_avg_line: bool = False,
+              is_horizontal: bool = False,
               ax: plt.Subplot = None,
               **kwargs
               ) -> Optional[plt.Figure]:
@@ -56,6 +57,10 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
     else:
         fig = None
 
+    # convert to series to avoid melting
+    # if isinstance(df, pd.DataFrame) and len(df.columns) == 1:
+    #    df = df.iloc[:, 0]
+
     if colors is None:
         if isinstance(df, pd.Series):
             n = 1
@@ -66,17 +71,24 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                 n = len(df.index)
         colors = put.get_n_colors(n=n, **kwargs)
 
-    if isinstance(df.index, pd.DatetimeIndex) and isinstance(df, pd.Series):  # we can use str for dates with plot.bar
-        # df.index = [date.strftime(date_format) for date in df.index]
+    # use str for dates with plot.bar
+    if isinstance(df.index, pd.DatetimeIndex) and isinstance(df, pd.Series):
         df, datalables = put.map_dates_index_to_str(data=df,
                                                     x_date_freq=x_date_freq,
                                                     date_format=date_format)
         df.index = datalables
-        df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+        if is_horizontal:
+            df.plot.barh(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+        else:
+            df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
 
     elif isinstance(df, pd.Series):
         # sns.barplot(x=df.index, y=df, palette=colors, ax=ax)
-        df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+        if is_horizontal:
+            df.plot.barh(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+        else:
+            df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+
     else:  # need to melt for barplot
         value_name = ylabel or 'y'
         var_name = xlabel or 'x'
@@ -84,9 +96,13 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         if is_sns:
             sns.barplot(x=df1.index, y=value_name, data=df1, hue=var_name,
                         palette=colors, edgecolor='none',
+                        orient='h' if is_horizontal else 'v',
                         ax=ax)
         else:
-            df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+            if is_horizontal:
+                df.plot.barh(stacked=stacked, color=colors, edgecolor='none', ax=ax)
+            else:
+                df.plot.bar(stacked=stacked, color=colors, edgecolor='none', ax=ax)
 
     # put totals to bar and store locations
     x_locs = []
@@ -118,7 +134,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
             ax.set_ylim([ymin, ymax * 1.1])
 
         for total, x_loc, x_min, x_max in zip(totals, x_locs, x_mins, x_maxs):
-            label = var_format.format(total)
+            label = yvar_format.format(total)
             if is_top_totals:
                 trans = transforms.blended_transform_factory(ax.transData, ax.transAxes)
                 ax.text(x_min + 0.2 * (x_max - x_min), 0.975, label,
@@ -161,8 +177,6 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         xmin, xmax = ax.get_xlim()
         ax.text(xmax, avg, f"Average", fontsize=fontsize, weight='normal', color='coral')
 
-    ax.axhline(0, color='black', lw=1)
-
     put.set_ax_xy_labels(ax=ax,
                          fontsize=fontsize,
                          xlabel=xlabel,
@@ -170,9 +184,17 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                          **kwargs)
 
     put.set_ax_tick_params(ax=ax)
-    local_kwargs = sop.update_kwargs(dict(yvar_format=yvar_format, fontsize=fontsize), kwargs)
+    local_kwargs = sop.update_kwargs(dict(yvar_format=yvar_format, xvar_format=xvar_format,  fontsize=fontsize), kwargs)
     put.set_ax_ticks_format(ax=ax, x_rotation=x_rotation, **local_kwargs)
     put.set_ax_tick_labels(ax=ax, fontsize=fontsize, skip_y_axis=skip_y_axis, **kwargs)
+
+    if is_horizontal:
+        ax.set_yticks(np.arange(len(df.index)), labels=df.index.to_list())
+        ax.xaxis.set_tick_params(rotation=x_rotation)
+        ax.invert_yaxis()  # labels read top-to-bottom
+    else:
+        ax.set_xticks(np.arange(len(df.index)), labels=df.index.to_list())
+        ax.axhline(0, color='black', lw=1)
 
     if y_limits is not None:
         put.set_y_limits(ax=ax, y_limits=y_limits)
@@ -230,7 +252,7 @@ def plot_vbars(df: pd.DataFrame,
             else:
                 colors = put.compute_heatmap_colors(a=np.sum(df.to_numpy(), axis=1))
         else:
-            colors = put.get_n_mlt_colors(n=len(df.columns))
+            colors = put.get_n_colors(n=len(df.columns))
     else:
         legend_colors = colors
         colors = np.tile(colors, len(category_names))

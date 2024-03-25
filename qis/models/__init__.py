@@ -91,3 +91,12 @@ from qis.models.stats.ohlc_vol import (
     estimate_ohlc_var
 )
 
+from qis.models.linear.ewm_winsor_outliers import (
+    ReplacementType,
+    OutlierPolicy,
+    OutlierPolicyTypes,
+    filter_outliers,
+    ewm_winsorising,
+    compute_ewm_score
+)
+

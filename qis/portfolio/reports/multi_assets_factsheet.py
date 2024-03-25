@@ -13,7 +13,6 @@ from enum import Enum
 # qis
 import qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData
-
 from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
 
@@ -205,21 +204,22 @@ class MultiAssetsReport:
                              benchmark: str,
                              time_period: TimePeriod = None,
                              freq: str = 'QE',
+                             order: int = 2,
                              ax: plt.Subplot = None,
                              **kwargs) -> None:
         local_kwargs = qis.update_kwargs(kwargs=kwargs,
-                                        new_kwargs=dict(weight='bold',
-                                                        markersize=8,
-                                                        x_rotation=0,
-                                                        first_color_fixed=False,
-                                                        ci=None))
+                                         new_kwargs=dict(weight='bold',
+                                                         markersize=8,
+                                                         x_rotation=0,
+                                                         first_color_fixed=False,
+                                                         ci=None))
         qis.plot_returns_scatter(prices=self.get_prices(benchmark=benchmark, time_period=time_period),
-                                benchmark=benchmark,
-                                order=2,
-                                freq=freq,
-                                title=f"Scatterplot of {self.perf_params.freq_reg}-returns vs {benchmark}",
-                                ax=ax,
-                                **local_kwargs)
+                                 benchmark=benchmark,
+                                 order=order,
+                                 freq=freq,
+                                 title=f"Scatterplot of {self.perf_params.freq_reg}-returns vs {benchmark}",
+                                 ax=ax,
+                                 **local_kwargs)
 
     def plot_benchmark_beta(self,
                             benchmark: str,
@@ -252,17 +252,17 @@ class MultiAssetsReport:
         prices = self.get_prices(time_period=time_period)
         title = f"Sharpe ratio decomposition by Strategies to {benchmark} Bear/Normal/Bull regimes"
         regime_classifier = qis.BenchmarkReturnsQuantilesRegime(regime_params=self.regime_params)
-        fig = qis.plot_regime_data(regime_classifier=regime_classifier,
-                                  prices=prices,
-                                  benchmark=benchmark,
-                                  is_conditional_sharpe=is_conditional_sharpe,
-                                  regime_data_to_plot=regime_data_to_plot,
-                                  var_format=var_format or '{:.2f}',
-                                  legend_loc=legend_loc,
-                                  perf_params=self.perf_params,
-                                  title=title,
-                                  ax=ax,
-                                  **kwargs)
+        qis.plot_regime_data(regime_classifier=regime_classifier,
+                             prices=prices,
+                             benchmark=benchmark,
+                             is_conditional_sharpe=is_conditional_sharpe,
+                             regime_data_to_plot=regime_data_to_plot,
+                             var_format=var_format or '{:.2f}',
+                             legend_loc=legend_loc,
+                             perf_params=self.perf_params,
+                             title=title,
+                             ax=ax,
+                             **kwargs)
 
 
 def generate_multi_asset_factsheet(prices: pd.DataFrame,

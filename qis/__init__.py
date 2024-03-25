@@ -9,7 +9,6 @@ from qis.file_utils import (
     get_all_folder_files,
     get_local_file_path,
     get_output_path,
-    get_param_file_path,
     get_paths,
     get_pdf_path,
     get_resource_path,

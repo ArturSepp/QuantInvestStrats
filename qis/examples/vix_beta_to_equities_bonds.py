@@ -23,12 +23,14 @@ perf_params = qis.PerfParams(freq='W-WED', freq_reg='ME', alpha_an_factor=12.0,
                              rates_data=yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0)
 regime_params = qis.BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
+prices = pd.concat([vix, benchmark_prices], axis=1).sort_index().dropna()
+prices = time_period.locate(prices)
+
 with sns.axes_style("darkgrid"):
     fig, axs = plt.subplots(3, 1, figsize=(10, 10))
     kwargs = dict(framealpha=0.9, fontsize=12, legend_loc='lower left')
 
     # plot performances
-    prices = time_period.locate(pd.concat([vix, benchmark_prices], axis=1))
     qis.plot_prices(prices=prices,
                     perf_params=perf_params,
                     title='Log Performance',

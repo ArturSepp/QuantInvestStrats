@@ -79,14 +79,14 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
                 bfill_data[start:] = bfill_data[start:].fillna(fill_method)
 
         bfill_datas.append(bfill_data)
-    bfill_datas = pd.concat(bfill_datas, axis=1)
+    bfill_datas = pd.concat(bfill_datas, axis=1).sort_index()
 
     if is_prices:
         bfill_datas = ret.returns_to_nav(returns=bfill_datas,
                                          init_period=None,
                                          terminal_value=terminal_value)
 
-    if pd.infer_freq(bfill_datas) != freq:
+    if pd.infer_freq(bfill_datas.index) != freq:
         bfill_datas = bfill_datas.asfreq(freq, method='ffill')
 
     if is_series_out:
@@ -154,7 +154,7 @@ def replace_nan_by_median(df: pd.DataFrame,
     fill non nan using median of other columns
     """
     if is_replace_zeros:
-        df = df.replace({0.0, np.nan})
+        df = df.replace(0.0, np.nan)
     np_data = df.to_numpy()
     data_med = npo.np_array_to_df_columns(a=np.nanmedian(np_data, axis=1), n_col=len(df.columns))
     np_data_fill = np.where(np.isnan(np_data), data_med, np_data)
@@ -171,7 +171,7 @@ def df_fill_first_nan_by_cross_median(df: pd.DataFrame,
     """
     df = df.copy()
     if is_replace_zeros:
-        df = df.replace({0.0, np.nan})
+        df = df.replace(0.0, np.nan)
 
     # for each column find first nonan
     first_nonnan_index = dfo.get_first_before_nonnan_index(df)
@@ -183,7 +183,9 @@ def df_fill_first_nan_by_cross_median(df: pd.DataFrame,
         merged_data.loc[its_first_nonnan_index:, column] = df.loc[its_first_nonnan_index:, column].to_numpy()
 
     # fillnans with ffill in data after
-    merged_data = merged_data.ffill()
+    with pd.option_context("future.no_silent_downcasting", True):
+        merged_data = merged_data.ffill().infer_objects(copy=False)
+
     return merged_data
 
 
@@ -198,5 +200,3 @@ def df_price_fill_first_nan_by_cross_median(prices: pd.DataFrame) -> pd.DataFram
     returns_fill = returns_fill.fillna(0.0)
     bfilled_data = ret.returns_to_nav(returns=returns_fill, terminal_value=prices.iloc[-1, :])
     return bfilled_data
-
-

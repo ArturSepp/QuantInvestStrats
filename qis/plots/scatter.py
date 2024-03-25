@@ -82,7 +82,7 @@ def plot_scatter(df: pd.DataFrame,
     estimated_reg_models = {}
     if hue is not None:
         if colors is None:
-            colors = qp.get_n_colors(n=len(df[hue].unique()), **kwargs)
+            colors = qp.get_n_sns_colors(n=len(df[hue].unique()), **kwargs)
         palette = colors
 
         hue_ids = df[hue].unique()

@@ -1,66 +1,96 @@
 # packages
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from enum import Enum
-
-# qis
-import qis.utils.dates as da
-from qis.perfstats.config import PerfParams
-import qis.plots.derived.prices as pdp
-import qis.plots.scatter as psc
-
-# project
 import yfinance as yf
+import qis as qis
+
+
+def plot_vol_vs_underlying(spot: pd.Series, vol: pd.Series, time_period: qis.TimePeriod = None) -> plt.Figure:
+
+    kwargs = dict(fontsize=12, digits_to_show=1, sharpe_digits=2,
+                  alpha_format='{0:+0.0%}',
+                  beta_format='{:+0.1f}',
+                  performance_label=qis.PerformanceLabel.TOTAL_DETAILED,
+                  framealpha=0.75,
+                  is_fixed_n_colors=False)
+
+    df1 = spot.pct_change()
+    df2 = 0.01 * vol.diff(1)
+    df = pd.concat([df1, df2], axis=1).dropna()
+
+    if time_period is not None:
+        df = time_period.locate(df)
+
+    hue = 'year'
+    df[hue] = [x.year for x in df.index]
+    vol1 = vol.reindex(index=df.index)
+    df2 = 0.01 * vol1.rename(f"{vol1.name} avg by year").to_frame()
+    df2[hue] = [x.year for x in df2.index]
+    df2_avg_by_year = df2.groupby(hue).mean()
+
+    df2_avg_by_year = pd.concat([pd.Series(np.nanmean(0.01 * vol1), index=['Full sample']),
+                                 df2_avg_by_year.iloc[:, 0]], axis=0)
+
+    with sns.axes_style('darkgrid'):
+        fig = plt.figure(figsize=(18, 8), constrained_layout=True)
+        gs = fig.add_gridspec(nrows=1, ncols=4, wspace=0.0, hspace=0.0)
+        qis.plot_scatter(df=df,
+                         x=str(spot.name),
+                         y=str(vol.name),
+                         xlabel=f'{spot.name} daily return',
+                         ylabel=f'{vol.name} daily change',
+                         title=f'Daily change in the {vol.name}  predicted by daily return of {spot.name} index split by years',
+                         xvar_format='{:.0%}',
+                         yvar_format='{:.0%}',
+                         hue=hue,
+                         order=2,
+                         fit_intercept=False,
+                         add_hue_model_label=True,
+                         # add_universe_model_ci=True,
+                         ci=95,
+                         # annotation_labels=annotation_labels,
+                         # full_sample_label='Universe: ',
+                         ax=fig.add_subplot(gs[0, :3]),
+                         **kwargs)
+
+        qis.plot_bars(df2_avg_by_year,
+                      yvar_format='{:.0f}',
+                      xvar_format='{:,.0%}',
+                      title=f'Average {vol.name} by year',
+                      xlabel=f'Average {vol.name}',
+                      legend_loc=None,
+                      x_rotation=0,
+                      is_horizontal=True,
+                      ax=fig.add_subplot(gs[0, 3]),
+                      **kwargs)
+    return fig
 
 
 class UnitTests(Enum):
     VIX_SPY = 1
+    USDJPY = 2
 
 
 def run_unit_test(unit_test: UnitTests):
 
-    perf_params = PerfParams(freq_drawdown='B', freq='B')
-    kwargs = dict(fontsize=12, digits_to_show=1, sharpe_digits=2,
-                  alpha_format='{0:+0.0%}',
-                  beta_format='{:0.1f}',
-                  performance_label=pdp.PerformanceLabel.TOTAL_DETAILED,
-                  framealpha=0.9)
-
-    time_period = da.TimePeriod('31Dec2016', None)
+    time_period = qis.TimePeriod('01Jan1996', None)
 
     if unit_test == UnitTests.VIX_SPY:
-        prices = time_period.locate(yf.download(['SPY', '^VIX'], start=None, end=None)['Adj Close'])
+        prices = yf.download(['SPY', '^VIX'], start=None, end=None)['Adj Close']
+        fig = plot_vol_vs_underlying(spot=prices['SPY'].rename('S&P500'),
+                                     vol=prices['^VIX'].rename('VIX'),
+                                     time_period=time_period)
+        qis.save_fig(fig, file_name='spx_vix')
 
-        df1 = prices['SPY'].pct_change()
-        df2 = 0.01*prices['^VIX'].rename('VIX').diff(1)
-        df = pd.concat([df1, df2], axis=1).dropna()
-
-        hue = 'year'
-        df[hue] = [x.year for x in df.index]
-        print(df)
-
-        with sns.axes_style('darkgrid'):
-            fig1, ax = plt.subplots(1, 1, figsize=(15, 8), constrained_layout=True)
-            psc.plot_scatter(df=df,
-                             x='SPY',
-                             y='VIX',
-                             xlabel='S&P 500 daily return',
-                             ylabel='VIX daily change',
-                             title='Daily change in the VIX predicted by daily return of S&P 500 index split by years',
-                             xvar_format='{:.0%}',
-                             yvar_format='{:.0%}',
-                             hue=hue,
-                             order=2,
-                             fit_intercept=False,
-                             add_hue_model_label=True,
-                             #add_universe_model_ci=True,
-                             ci=95,
-                             # annotation_labels=annotation_labels,
-                             #full_sample_label='Universe: ',
-                             ax=ax,
-                             **kwargs)
-
+    elif unit_test == UnitTests.USDJPY:
+        from quant_strats.data.apis.bbg_fetch import fetch_fields_timeseries_per_ticker
+        spot = fetch_fields_timeseries_per_ticker(ticker='USDJPY Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY')
+        vol = fetch_fields_timeseries_per_ticker(ticker='USDJPYV1M BGN Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY 1M ATM')
+        fig = plot_vol_vs_underlying(spot=spot, vol=vol, time_period=time_period)
+        qis.save_fig(fig, file_name='usdjpy')
     plt.show()
 
 

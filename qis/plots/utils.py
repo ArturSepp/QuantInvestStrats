@@ -1139,7 +1139,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 def get_n_colors(n: int,
                  first_color_fixed: bool = False,
                  last_color_fixed: bool = False,
-                 fixed_color: str = 'orangered',  # 'goldenrod',
+                 fixed_color: str = 'orangered',
                  type: str = 'soft',
                  is_fixed_n_colors: bool = True,
                  **kwargs
@@ -1152,7 +1152,7 @@ def get_n_colors(n: int,
                                     type=type,
                                     **kwargs)
     else:
-        colors = get_n_cmap_colors(n=n)
+        colors = get_n_cmap_colors(n=n, type=type)
         """
         colors = get_n_mlt_colors(n=n,
                                   first_color_fixed=first_color_fixed,
@@ -1314,8 +1314,12 @@ def get_cmap_colors(n: int, name: str = 'RdYlGn') -> List[str]:
     return colors
 
 
-def get_n_sns_colors(n: int, palette: str = 'bright', **kwargs) -> List[str]:
-    return sns.color_palette(palette=palette, n_colors=n, **kwargs)
+def get_n_sns_colors(n: int,
+                     palette:str = 'bright',
+                     desat: Optional[float] = None,
+                     as_cmap: bool = False,
+                     **kwargs) -> List[str]:
+    return sns.color_palette(palette=palette, n_colors=n, desat=desat, as_cmap=as_cmap)
 
 
 def compute_heatmap_colors(a: np.ndarray,

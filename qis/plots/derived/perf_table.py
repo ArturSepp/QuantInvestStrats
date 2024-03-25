@@ -331,9 +331,9 @@ def plot_desc_freq_table(df: pd.DataFrame,
 
 
 def plot_top_bottom_performers(prices: pd.DataFrame,
-                               ax: plt.Subplot = None,
                                yvar_format: str = '{:.0%}',
                                num_assets: int = None,
+                               ax: plt.Subplot = None,
                                **kwargs
                                ) -> Optional[plt.Subplot]:
     returns = ret.to_total_returns(prices=prices).sort_values().dropna()

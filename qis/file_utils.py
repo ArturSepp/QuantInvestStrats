@@ -61,7 +61,6 @@ class FileTypes(FileData, Enum):
     PDF = FileData(extension='.pdf', folder=None)
     TXT = FileData(extension='.txt', folder='txt')
     PARQUET = FileData(extension='.parquet', folder='parquet')
-    PARAMS = FileData(extension='.xlsx', folder='data\\params')
     ZIP = FileData(extension='.zip', folder=None)
 
 
@@ -174,17 +173,6 @@ def get_local_file_path(file_name: Optional[str],
     return file_path
 
 
-def get_param_file_path(file_name: Optional[str] = None,
-                        file_type: FileTypes = FileTypes.PARAMS
-                        ) -> str:
-    path_data = RESOURCE_PATH
-    if file_name is not None:
-        file_path = join(path_data, file_type.folder, file_name + file_type.extension)
-    else:
-        file_path = join(path_data, file_type.folder)
-    return file_path
-
-
 def timer(func):
     """
     Print the runtime of the decorated function
@@ -210,8 +198,8 @@ Pandas to/from Excel core
 """
 
 
-def delocalize_df(data: pd.DataFrame, delocalize: bool) -> pd.DataFrame:
-    if delocalize and isinstance(data.index, pd.DatetimeIndex):
+def delocalize_df(data: pd.DataFrame) -> pd.DataFrame:
+    if isinstance(data.index, pd.DatetimeIndex):
         data.index = data.index.tz_localize(None)
     return data
 
@@ -244,20 +232,20 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
         if sheet_names is None:
             sheet_names = [f"Sheet {n+1}" for n, _ in enumerate(data)]
         for df, name in zip(data, sheet_names):
-            df = delocalize_df(df, delocalize=True)
+            df = delocalize_df(df)
             if transpose:
                 df = df.T
             df.to_excel(excel_writer=excel_writer, sheet_name=name)
     elif isinstance(data, dict):  # publish with sheet names
         for key, df in data.items():
-            df = delocalize_df(df, delocalize=True)
+            df = delocalize_df(df)
             if transpose:
                 df = df.T
             df.to_excel(excel_writer=excel_writer, sheet_name=key)
     else:
         if transpose:
             data = data.T
-        data = delocalize_df(data, delocalize=True)
+        data = delocalize_df(data)
         data.to_excel(excel_writer=excel_writer)
 
     excel_writer.close()
@@ -291,8 +279,8 @@ def load_df_from_excel(file_name: str,
     index_col = 0 if is_index else None
     df = excel_reader.parse(sheet_name=sheet_name, index_col=index_col)
 
-    if is_index:
-        df = delocalize_df(df, delocalize=delocalize)
+    if is_index and delocalize:
+        df = delocalize_df(df)
 
     return df
 
@@ -321,7 +309,8 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
 
     excel_writer = pd.ExcelWriter(file_path)
     for key, data in datasets.items():
-        data = delocalize_df(data, delocalize=delocalize)
+        if delocalize:
+            data = delocalize_df(data)
         data.to_excel(excel_writer=excel_writer, sheet_name=key)
     excel_writer.close()
     return file_path
@@ -361,7 +350,8 @@ def load_df_dict_from_excel(file_name: str,
             df = excel_reader.parse(sheet_name=key, index_col=index_col)
         except:
             raise TypeError(f"sheet_name data {key} nor found")
-        df = delocalize_df(df, delocalize=delocalize)
+        if delocalize:
+            df = delocalize_df(df)
         if tz is not None:
             df.index = df.index.tz_localize(tz)
         pandas_dict[key] = df
@@ -519,6 +509,7 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
                           folder_name: str = None,
                           subfolder_name: str = None,
                           is_index: bool = True,
+                          dayfirst: Optional[bool] = None,
                           force_not_found_error: bool = False,
                           ) -> Dict[str, pd.DataFrame]:
     """
@@ -536,7 +527,8 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
         if os.path.isfile(file_path):
             data = pd.read_csv(filepath_or_buffer=file_path,
                                index_col=index_col,
-                               parse_dates=True)
+                               parse_dates=True,
+                               dayfirst=dayfirst)
             pandas_dict[key] = data
         else:
             message = f"file data {file_path}, {key} not found"
@@ -772,7 +764,8 @@ def save_df_to_parquet(df: pd.DataFrame,
                                     folder_name=folder_name,
                                     subfolder_name=subfolder_name,
                                     key=key)
-    df = delocalize_df(df, delocalize=delocalize)
+    if delocalize:
+        df = delocalize_df(df)
     df.to_parquet(path=file_path)
 
 
@@ -796,8 +789,8 @@ def load_df_from_parquet(file_name: Optional[str],
         df = pd.read_parquet(path=file_path)
     else:
         raise FileNotFoundError(f"not found {file_name} with path={file_path}")
-
-    df = delocalize_df(df, delocalize=delocalize)
+    if delocalize:
+        df = delocalize_df(df)
 
     return df
 
@@ -820,7 +813,8 @@ def save_df_dict_to_parquet(datasets: Dict[Union[str, Enum, NamedTuple], pd.Data
                                             folder_name=folder_name,
                                             subfolder_name=subfolder_name,
                                             key=key)
-            data = delocalize_df(data, delocalize=delocalize)
+            if delocalize:
+                data = delocalize_df(data)
             data.to_parquet(path=file_path)
 
 

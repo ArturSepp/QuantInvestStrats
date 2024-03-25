@@ -231,7 +231,7 @@ def get_first_nonnan_values(df: Union[np.ndarray, pd.Series, pd.DataFrame]) -> U
             nonnan_column_data = sdata[~sdata.isnull()]
             if nonnan_column_data.empty:
                 raise ValueError(f"all nans in {df}")
-            values = nonnan_column_data[0]
+            values = nonnan_column_data.iloc[0]
         return values
 
     if isinstance(df, pd.DataFrame):
@@ -277,7 +277,7 @@ def get_last_nonnan_values(df: Union[pd.Series, pd.DataFrame]) -> Union[np.ndarr
                 # print(f"in get_last_non_nan_values: all nans in {ds}")
                 values = np.nan
             else:
-                values = nonnan_column_data[-1]
+                values = nonnan_column_data.iloc[-1]
         return values
 
     if isinstance(df, pd.DataFrame):

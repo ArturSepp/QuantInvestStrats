@@ -442,6 +442,8 @@ def get_time_period(df: Union[pd.Series, pd.DataFrame], tz: str = None) -> TimeP
     """
     get tz-aware start end dates
     """
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise ValueError(f"df.index must be type of pd.DatetimeIndex not of {type(df.index)}")
     if len(df.index) > 0:
         output = TimePeriod(start=df.index[0], end=df.index[-1], tz=tz or df.index.tz)
     else:
