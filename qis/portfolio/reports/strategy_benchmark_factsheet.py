@@ -25,6 +25,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               backtest_name: str = None,
                                               add_strategy_factsheet: bool = True,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+                                              fontsize: int = 4,
                                               **kwargs
                                               ) -> List[plt.Figure]:
     """
@@ -37,7 +38,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         raise ValueError(f"must be at least two strategies")
 
     # set report specific kqargs
-    plot_kwargs = dict(fontsize=5,
+    plot_kwargs = dict(fontsize=fontsize,
                        linewidth=0.5,
                        digits_to_show=1, sharpe_digits=2,
                        weight='normal',
@@ -99,19 +100,19 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[0:2, 2:]),
                                                benchmark_price=benchmark_price,
                                                perf_params=perf_params,
-                                               **qis.update_kwargs(kwargs, dict(fontsize=4)))
+                                               **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
     # change regression to weekly
     multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[2:4, 2:]),
                                                benchmark_price=benchmark_price,
                                                perf_params=perf_params,
-                                               **qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=4,
+                                               **qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize,
                                                                                 alpha_an_factor=52, freq_reg='W-WED')))
 
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
-                                     new_kwargs=dict(fontsize=4, square=False, x_rotation=90, transpose=False))
+                                     new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=False))
     multi_portfolio_data.portfolio_datas[0].plot_periodic_returns(ax=fig.add_subplot(gs[4:6, 2]),
                                                                   **local_kwargs)
 
@@ -123,14 +124,14 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                              title=f"{multi_portfolio_data.portfolio_datas[0].nav.name}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
-                                                             **qis.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
+                                                             **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
 
     multi_portfolio_data.portfolio_datas[1].plot_regime_data(ax=fig.add_subplot(gs[6:8, 3]),
                                                              benchmark_price=benchmark_price,
                                                              title=f"{multi_portfolio_data.portfolio_datas[1].nav.name}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
-                                                             **qis.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
+                                                             **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
 
     # vol regimes
     """
@@ -138,12 +139,12 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                              benchmark_price=benchmark_price,
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
-                                                             **qis.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
+                                                             **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
     multi_portfolio_data.portfolio_datas[1].plot_vol_regimes(ax=fig.add_subplot(gs[8:10, 3]),
                                                              benchmark_price=benchmark_price,
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
-                                                             **qis.update_kwargs(kwargs, dict(fontsize=4, x_rotation=90)))
+                                                             **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
     """
     multi_portfolio_data.plot_instrument_pnl_diff(ax=fig.add_subplot(gs[8:10, 2:]),
                                                   benchmark=regime_benchmark,

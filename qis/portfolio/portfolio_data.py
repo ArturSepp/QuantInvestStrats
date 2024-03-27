@@ -212,10 +212,13 @@ class PortfolioData:
                   is_grouped: bool = False,
                   time_period: da.TimePeriod = None,
                   add_total: bool = True,
+                  is_norm_costs: bool = True,
                   roll_period: Optional[int] = 260
                   ) -> Union[pd.DataFrame, pd.Series]:
 
-        costs = self.realized_costs.divide(self.nav.to_numpy(), axis=0)
+        costs = self.realized_costs
+        if is_norm_costs:
+            costs = costs.divide(self.nav.to_numpy(), axis=0)
         if is_agg:
             costs = pd.Series(np.nansum(costs, axis=1), index=self.nav.index, name=self.nav.name)
         elif is_grouped:

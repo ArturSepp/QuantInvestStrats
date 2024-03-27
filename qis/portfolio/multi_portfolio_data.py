@@ -375,11 +375,12 @@ class MultiPortfolioData:
                    time_period: da.TimePeriod = None,
                    regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                    var_format: str = '{:.2%}',
+                   is_norm_costs: bool = True,
                    ax: plt.Subplot = None,
                    **kwargs) -> None:
         costs = []
         for portfolio in self.portfolio_datas:
-            costs.append(portfolio.get_costs(roll_period=None, is_agg=True).rename(portfolio.nav.name))
+            costs.append(portfolio.get_costs(roll_period=None, is_agg=True, is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
         costs = pd.concat(costs, axis=1)
         if roll_period is not None:
             costs = costs.rolling(roll_period).sum()
@@ -389,7 +390,7 @@ class MultiPortfolioData:
                              var_format=var_format,
                              y_limits=(0.0, None),
                              legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                             title='Annualized daily Costs %',
+                             title='1y Rolling Costs %',
                              ax=ax,
                              **kwargs)
         if benchmark is not None:

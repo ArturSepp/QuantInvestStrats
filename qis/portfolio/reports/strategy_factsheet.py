@@ -20,12 +20,14 @@ from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
 def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 benchmark_prices: pd.DataFrame,
-                                time_period: TimePeriod = None,
+                                time_period: TimePeriod,
                                 perf_params: PerfParams = PERF_PARAMS,
                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                 regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
-                                weight_freq: Optional[str] = 'B', #'W-WED',
+                                weight_freq: Optional[str] = 'W-WED', #'W-WED',
+                                roll_period: int = 260,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+                                fontsize: int = 4,
                                 **kwargs
                                 ) -> plt.Figure:
     # align
@@ -36,7 +38,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
 
-    plot_kwargs = dict(fontsize=5,
+    plot_kwargs = dict(fontsize=fontsize,
                        linewidth=0.5,
                        digits_to_show=1, sharpe_digits=2,
                        weight='normal',
@@ -91,7 +93,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # turnover
     ax = fig.add_subplot(gs[6:8, :2])
-    turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=260)
+    turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=roll_period)
 
     qis.plot_time_series(df=turnover,
                          var_format='{:,.2%}',
@@ -148,26 +150,26 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                       benchmark_price=benchmark_prices[regime_benchmark],
                                       time_period=time_period,
                                       perf_params=perf_params,
-                                      **qis.update_kwargs(kwargs, dict(fontsize=4)))
+                                      **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
     ax = fig.add_subplot(gs[1, 2:])
     # change regression to weekly
     portfolio_data.plot_ra_perf_table(ax=ax,
                                       benchmark_price=benchmark_prices[regime_benchmark],
                                       time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
                                       perf_params=perf_params,
-                                      **qis.update_kwargs(kwargs, dict(fontsize=4, alpha_an_factor=52, freq_reg='W-WED')))
+                                      **qis.update_kwargs(kwargs, dict(fontsize=fontsize, alpha_an_factor=52, freq_reg='W-WED')))
 
     # heatmap
     ax = fig.add_subplot(gs[2:4, 2:])
     portfolio_data.plot_monthly_returns_heatmap(ax=ax,
                                                 time_period=time_period,
                                                 title='Monthly Returns',
-                                                **qis.update_kwargs(kwargs, dict(fontsize=4, date_format='%Y')))
+                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize, date_format='%Y')))
 
     # periodic returns
     ax = fig.add_subplot(gs[4:6, 2:])
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
-                                     new_kwargs=dict(fontsize=4, square=False, x_rotation=90, transpose=True))
+                                     new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=True))
     portfolio_data.plot_periodic_returns(ax=ax,
                                          benchmark_prices=benchmark_prices,
                                          time_period=time_period,
@@ -190,7 +192,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # regime data
     ax = fig.add_subplot(gs[8:10, 2:])
     portfolio_data.plot_regime_data(ax=ax,
-                                    benchmark_price=benchmark_prices.iloc[:, 0],
+                                    benchmark_price=benchmark_prices[regime_benchmark],
                                     time_period=time_period,
                                     perf_params=perf_params,
                                     regime_params=regime_params,
@@ -200,7 +202,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     """
     ax = fig.add_subplot(gs[10:12, 2:])
     portfolio_data.plot_vol_regimes(ax=ax,
-                                    benchmark_price=benchmark_prices.iloc[:, 0],
+                                    benchmark_price=benchmark_prices[regime_benchmark],
                                     time_period=time_period,
                                     perf_params=perf_params,
                                     regime_params=regime_params,

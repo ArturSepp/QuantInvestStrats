@@ -84,7 +84,6 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
                                   perf_params: PerfParams = None,
                                   perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                                   column_header: str = 'Asset',
-                                  alpha_an_factor: float = None,
                                   **kwargs
                                   ) -> pd.DataFrame:
     """
@@ -93,7 +92,6 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
     ra_perf_table = rpt.compute_ra_perf_table_with_benchmark(prices=prices,
                                                              benchmark=benchmark,
                                                              perf_params=perf_params,
-                                                             alpha_an_factor=alpha_an_factor,
                                                              **kwargs)
     df = pd.DataFrame(index=ra_perf_table.index)
     for perf_column in perf_columns:

@@ -25,6 +25,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        heatmap_freq: str = 'YE',
                                        figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                        is_grouped: bool = False,
+                                       fontsize: int = 4,
                                        **kwargs
                                        ) -> plt.Figure:
     """
@@ -37,7 +38,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     if regime_benchmark is None:
         regime_benchmark = multi_portfolio_data.benchmark_prices.columns[0]
 
-    plot_kwargs = dict(fontsize=5,
+    plot_kwargs = dict(fontsize=fontsize,
                        linewidth=0.5,
                        digits_to_show=1, sharpe_digits=2,
                        weight='normal',
@@ -104,35 +105,35 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                perf_params=perf_params,
                                                perf_column=PerfStat.SHARPE_EXCESS,
                                                time_period=time_period,
-                                               **qis.update_kwargs(kwargs, dict(fontsize=5)))
+                                               **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     multi_portfolio_data.plot_performance_bars(ax=fig.add_subplot(gs[0, 3]),
                                                perf_params=perf_params,
                                                perf_column=PerfStat.MAX_DD,
                                                time_period=time_period,
-                                               **qis.update_kwargs(kwargs, dict(fontsize=5)))
+                                               **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     multi_portfolio_data.plot_ra_perf_table(ax=fig.add_subplot(gs[1, 2:]),
                                             perf_params=perf_params,
                                             time_period=time_period,
-                                            **qis.update_kwargs(kwargs, dict(fontsize=5)))
+                                            **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     multi_portfolio_data.plot_periodic_returns(ax=fig.add_subplot(gs[2, 2:]),
                                                heatmap_freq=heatmap_freq,
                                                title=f"{heatmap_freq} returns",
                                                time_period=time_period,
-                                               **qis.update_kwargs(kwargs, dict(fontsize=5)))
+                                               **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     """
     multi_portfolio_data.plot_ra_perf_table(ax=fig.add_subplot(gs[3, 2:]),
                                             perf_params=perf_params,
                                             time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
-                                            **qis.update_kwargs(kwargs, dict(fontsize=5, alpha_an_factor=52, freq_reg='W-WED')))
+                                            **qis.update_kwargs(kwargs, dict(fontsize=fontsize, alpha_an_factor=52, freq_reg='W-WED')))
     """
     multi_portfolio_data.plot_corr_table(ax=fig.add_subplot(gs[3, 2:]),
                                          time_period=time_period,
                                          freq='W-WED',
-                                         **qis.update_kwargs(kwargs, dict(fontsize=4)))
+                                         **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 2:]),
                                           is_grouped=False,
