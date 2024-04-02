@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qis"
-version = "2.0.42"
+version = "2.0.43"
 description = "Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
 license = "LICENSE.txt"
 authors = ["Artur Sepp <artursepp@gmail.com>"]
@@ -35,7 +35,7 @@ numba = ">=0.56.4"
 numpy = ">=1.22.4"
 scipy = ">=1.10"
 statsmodels = ">=0.13.5"
-pandas = ">=1.5.2"
+pandas = ">=2.2.0"
 matplotlib = ">=3.2.2"
 seaborn = ">=0.12.2"
 openpyxl = ">=3.0.10"

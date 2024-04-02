@@ -63,7 +63,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         if prices.index[0] > weights.index[0]:
             raise ValueError(f"price dates {prices.index[0]} are after weights start date {weights.index[0]}")
         portfolio_weights = weights[prices.columns]  # alighn
-        is_rebalancing = pd.Series(True, index=portfolio_weights.index).reindex(index=prices.index).fillna(False)
+        # rebalancing is set on portfolio weight index
+        is_rebalancing = pd.Series(1, index=portfolio_weights.index, dtype=int).reindex(index=prices.index
+                                                                                        ).replace(np.nan, 0).astype(bool)
 
     else:
         raise NotImplementedError(f"unsupported weights type = {type(weights)}")

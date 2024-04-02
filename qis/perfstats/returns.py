@@ -176,15 +176,29 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
     """
     compute returns for one asset
     """
+    if not isinstance(prices, pd.Series) and not isinstance(prices, pd.DataFrame):
+        raise ValueError(f"not supperted type={type(prices)}")
+
     if prices.empty:
         print(f"in compute_pa_return_dict: {prices} is all nans")
-        n = len(prices.columns) if isinstance(prices, pd.DataFrame) else 1
-        return_dict = {PerfStat.TOTAL_RETURN.to_str(): np.full(n, fill_value=np.nan),
-                       PerfStat.PA_RETURN.to_str(): np.full(n, fill_value=np.nan),
-                       PerfStat.AN_LOG_RETURN.to_str(): np.full(n, fill_value=np.nan),
-                       PerfStat.AN_LOG_RETURN_EXCESS.to_str(): np.full(n, fill_value=np.nan),
-                       PerfStat.APR.to_str(): np.full(n, fill_value=np.nan),
-                       PerfStat.NUM_YEARS.to_str(): np.full(n, fill_value=np.nan)}
+        if isinstance(prices, pd.Series):
+            n = 1
+        else:
+            n = len(prices.columns)
+        if n == 1:
+            return_dict = {PerfStat.TOTAL_RETURN.to_str(): np.nan,
+                           PerfStat.PA_RETURN.to_str(): np.nan,
+                           PerfStat.AN_LOG_RETURN.to_str(): np.nan,
+                           PerfStat.AN_LOG_RETURN_EXCESS.to_str(): np.nan,
+                           PerfStat.APR.to_str(): np.nan,
+                           PerfStat.NUM_YEARS.to_str(): np.nan}
+        else:
+            return_dict = {PerfStat.TOTAL_RETURN.to_str(): np.full(n, fill_value=np.nan),
+                           PerfStat.PA_RETURN.to_str(): np.full(n, fill_value=np.nan),
+                           PerfStat.AN_LOG_RETURN.to_str(): np.full(n, fill_value=np.nan),
+                           PerfStat.AN_LOG_RETURN_EXCESS.to_str(): np.full(n, fill_value=np.nan),
+                           PerfStat.APR.to_str(): np.full(n, fill_value=np.nan),
+                           PerfStat.NUM_YEARS.to_str(): np.full(n, fill_value=np.nan)}
         return return_dict
 
     if perf_params is None:  # only needed for EXCESS returns use defaults

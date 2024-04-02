@@ -286,6 +286,72 @@ def compute_ewm_covar_tensor(a: np.ndarray,
     return output_covar
 
 
+@njit
+def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
+                                              span: Union[int, np.ndarray] = None,
+                                              ewm_lambda: float = 0.94,
+                                              covar0: np.ndarray = None,
+                                              is_corr: bool = False,
+                                              nan_backfill: NanBackfill = NanBackfill.FFILL
+                                              ) -> np.ndarray:
+    """
+    compute ewm covariance matrix time series as 3-d tensor [t, x, x]
+    returns vector a is normalised by vol
+    """
+    if span is not None:
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    ewm_lambda_1 = 1.0 - ewm_lambda
+
+    if not a.ndim == 2:
+        raise ValueError(f"only 2-d arrays are supported")
+
+    t = a.shape[0]
+    n = a.shape[1]  # array of ndarray
+    zero_covar = np.zeros((n, n))
+
+    if covar0 is None:
+        covar = zero_covar
+    else:
+        covar = np.where(np.isfinite(covar0), covar0, zero_covar)
+
+    output_covar = np.empty((t, n, n))
+    last_covar = covar
+
+    # compute vols
+    a_var = np.square(a)
+    ewm_vol = np.sqrt(ewm_recursion(a=a_var, ewm_lambda=ewm_lambda, init_value=np.nanmean(a_var, axis=0), nan_backfill=nan_backfill))
+    a_norm = np.divide(a,  ewm_vol, where=np.greater(ewm_vol, 0.0))
+
+    # loop over rows
+    for idx in range(0, t):  # row in x:
+        row = a_norm[idx]
+        r_ij = np.outer(row, row)
+        covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
+        if nan_backfill == NanBackfill.FFILL:
+            last_covar = np.where(np.isfinite(covar), covar, last_covar)
+        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+            last_covar = np.where(np.isfinite(covar), covar, ewm_lambda * last_covar)
+        else:  # use zero fill
+            last_covar = np.where(np.isfinite(covar), covar, zero_covar)
+
+        if is_corr:
+            if np.nansum(np.diag(last_covar)) > 1e-10:
+                inv_vol = np.reciprocal(np.sqrt(np.diag(last_covar)))
+                norm = np.outer(inv_vol, inv_vol)
+            else:
+                norm = np.identity(n)
+            last_covar_ = norm * last_covar
+        else:
+            last_covar_ = last_covar
+
+        if nan_backfill == NanBackfill.NAN_FILL:  # fill zeros with nans
+            last_covar_ = np.where(np.equal(last_covar_, zero_covar), np.nan, last_covar_)
+
+        output_covar[idx] = last_covar_
+
+    return output_covar
+
+
 # @njit
 def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
                                y: np.ndarray,  # asset returns

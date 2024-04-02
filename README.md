@@ -38,16 +38,16 @@ dependecy path increasing sequentially as follows.
 ## **Updates** <a name="updates"></a>
 
 ## **Installation** <a name="installation"></a>
-install using
+Install using
 ```python 
 pip install qis
 ```
-upgrade using
+Upgrade using
 ```python 
 pip install --upgrade qis
 ```
 
-close using
+Close using
 ```python 
 git clone https://github.com/ArturSepp/QuantInvestStrats.git
 ```

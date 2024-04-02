@@ -68,7 +68,7 @@ class PortfolioData:
         if self.units is None:  # default will be delta-1 portfolio of nav
             self.units = pd.DataFrame(1.0, index=self.prices.index, columns=self.prices.columns)
         if self.instrument_pnl is None:
-            self.instrument_pnl = self.prices.pct_change().multiply(self.weights.shift(1)).fillna(0.0)
+            self.instrument_pnl = self.prices.pct_change(fill_method=None).multiply(self.weights.shift(1)).fillna(0.0)
         if self.realized_costs is None:
             self.realized_costs = pd.DataFrame(0.0, index=self.prices.index, columns=self.prices.columns)
         if self.group_data is None:  # use instruments as groups

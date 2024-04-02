@@ -86,7 +86,7 @@ def run_unit_test(unit_test: UnitTests):
         qis.save_fig(fig, file_name='spx_vix')
 
     elif unit_test == UnitTests.USDJPY:
-        from quant_strats.data.apis.bbg_fetch import fetch_fields_timeseries_per_ticker
+        from bbg_fetch import fetch_fields_timeseries_per_ticker
         spot = fetch_fields_timeseries_per_ticker(ticker='USDJPY Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY')
         vol = fetch_fields_timeseries_per_ticker(ticker='USDJPYV1M BGN Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY 1M ATM')
         fig = plot_vol_vs_underlying(spot=spot, vol=vol, time_period=time_period)
