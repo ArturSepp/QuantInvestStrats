@@ -7,13 +7,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 # qis
-import qis
-from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs
-import qis.plots.derived.regime_data
-import qis.utils.dates as da
+import qis as qis
+from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod
+from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 import qis.utils.struct_ops as sop
 import qis.utils.df_groups as dfg
 import qis.perfstats.returns as ret
@@ -28,9 +27,6 @@ import qis.plots.derived.returns_heatmap as rhe
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.models.linear.plot_correlations as pco
-
-# internal
-from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 
 
 PERF_PARAMS = PerfParams(freq='W-WED')
@@ -69,7 +65,7 @@ class MultiPortfolioData:
     """
     def get_navs(self,
                  benchmark: str = None,
-                 time_period: da.TimePeriod = None
+                 time_period: TimePeriod = None
                  ) -> pd.DataFrame:
         """
         get portfolio navs
@@ -83,7 +79,7 @@ class MultiPortfolioData:
 
     def get_benchmark_price(self,
                             benchmark: str,
-                            time_period: da.TimePeriod = None
+                            time_period: TimePeriod = None
                             ) -> pd.Series:
         price = self.benchmark_prices[benchmark]
         if time_period is not None:
@@ -93,7 +89,7 @@ class MultiPortfolioData:
     def get_ac_navs(self,
                     portfolio_idx: int = 0,
                     benchmark: str = None,
-                    time_period: da.TimePeriod = None
+                    time_period: TimePeriod = None
                     ) -> pd.DataFrame:
         prices = self.portfolio_datas[portfolio_idx].get_ac_navs(time_period=time_period)
         if benchmark is not None:
@@ -117,10 +113,10 @@ class MultiPortfolioData:
         pivot_prices = self.benchmark_prices[regime_benchmark]
         if index is not None:
             pivot_prices = pivot_prices.reindex(index=index, method='ffill')
-        qis.plots.derived.regime_data.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
 
     def plot_nav(self,
-                 time_period: da.TimePeriod = None,
+                 time_period: TimePeriod = None,
                  regime_benchmark: str = None,
                  perf_params: PerfParams = PERF_PARAMS,
                  regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
@@ -139,7 +135,7 @@ class MultiPortfolioData:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
     def plot_periodic_returns(self,
-                              time_period: da.TimePeriod = None,
+                              time_period: TimePeriod = None,
                               heatmap_freq: str = 'YE',
                               date_format: str = '%Y',
                               transpose: bool = True,
@@ -157,7 +153,7 @@ class MultiPortfolioData:
                                         **kwargs)
 
     def plot_performance_bars(self,
-                              time_period: da.TimePeriod = None,
+                              time_period: TimePeriod = None,
                               perf_column: PerfStat = PerfStat.SHARPE_RF0,
                               perf_params: PerfParams = PERF_PARAMS,
                               ax: plt.Subplot = None,
@@ -168,12 +164,12 @@ class MultiPortfolioData:
         ppt.plot_ra_perf_bars(prices=prices,
                               perf_column=perf_column,
                               perf_params=perf_params,
-                              title=f"{perf_column.to_str()}: {da.get_time_period(prices).to_str()}",
+                              title=f"{perf_column.to_str()}: {qis.get_time_period(prices).to_str()}",
                               ax=ax,
                               **kwargs)
 
     def plot_corr_table(self,
-                        time_period: da.TimePeriod = None,
+                        time_period: TimePeriod = None,
                         freq: str = 'W-WED',
                         ax: plt.Subplot = None,
                         **kwargs) -> None:
@@ -187,7 +183,7 @@ class MultiPortfolioData:
                                         **kwargs)
 
     def plot_drawdowns(self,
-                       time_period: da.TimePeriod = None,
+                       time_period: TimePeriod = None,
                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                        regime_benchmark: str = None,
                        ax: plt.Subplot = None,
@@ -201,7 +197,7 @@ class MultiPortfolioData:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
     def plot_rolling_time_under_water(self,
-                                      time_period: da.TimePeriod = None,
+                                      time_period: TimePeriod = None,
                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                       regime_benchmark: str = None,
                                       ax: plt.Subplot = None,
@@ -215,7 +211,7 @@ class MultiPortfolioData:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
     def plot_ra_perf_table(self,
-                           time_period: da.TimePeriod = None,
+                           time_period: TimePeriod = None,
                            perf_params: PerfParams = PERF_PARAMS,
                            perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                            ax: plt.Subplot = None,
@@ -226,14 +222,14 @@ class MultiPortfolioData:
                                          benchmark=benchmark,
                                          perf_params=perf_params,
                                          perf_columns=perf_columns,
-                                         title=f"RA performance table: {da.get_time_period(prices).to_str()}",
+                                         title=f"RA performance table: {qis.get_time_period(prices).to_str()}",
                                          rotation_for_columns_headers=0,
                                          ax=ax,
                                          **kwargs)
 
     def plot_ac_ra_perf_table(self,
                               benchmark_price: pd.Series,
-                              time_period: da.TimePeriod = None,
+                              time_period: TimePeriod = None,
                               perf_params: PerfParams = PERF_PARAMS,
                               perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                               ax: plt.Subplot = None,
@@ -258,7 +254,7 @@ class MultiPortfolioData:
                                          perf_columns=perf_columns,
                                          drop_benchmark=True,
                                          rows_edge_lines=rows_edge_lines,
-                                         title=f"RA performance table by Asset Group: {da.get_time_period(prices).to_str()}",
+                                         title=f"RA performance table by Asset Group: {qis.get_time_period(prices).to_str()}",
                                          rotation_for_columns_headers=0,
                                          row_height=0.5,
                                          ax=ax,
@@ -267,7 +263,7 @@ class MultiPortfolioData:
     def plot_exposures(self,
                        benchmark: str = None,
                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                       time_period: da.TimePeriod = None,
+                       time_period: TimePeriod = None,
                        var_format: str = '{:.0%}',
                        ax: plt.Subplot = None,
                        **kwargs
@@ -291,7 +287,7 @@ class MultiPortfolioData:
                                  is_grouped: bool = True,
                                  benchmark: str = None,
                                  regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                                 time_period: da.TimePeriod = None,
+                                 time_period: TimePeriod = None,
                                  var_format: str = '{:.0%}',
                                  ax: plt.Subplot = None,
                                  **kwargs) -> None:
@@ -325,7 +321,7 @@ class MultiPortfolioData:
                             portfolio_idx2: int = 1,
                             benchmark: str = None,
                             regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                            time_period: da.TimePeriod = None,
+                            time_period: TimePeriod = None,
                             var_format: str = '{:.0%}',
                             ax: plt.Subplot = None,
                             **kwargs) -> None:
@@ -344,7 +340,7 @@ class MultiPortfolioData:
     def plot_turnover(self,
                       roll_period: int = 260,
                       benchmark: str = None,
-                      time_period: da.TimePeriod = None,
+                      time_period: TimePeriod = None,
                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                       var_format: str = '{:.0%}',
                       ax: plt.Subplot = None,
@@ -372,7 +368,7 @@ class MultiPortfolioData:
     def plot_costs(self,
                    roll_period: int = 260,
                    benchmark: str = None,
-                   time_period: da.TimePeriod = None,
+                   time_period: TimePeriod = None,
                    regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                    var_format: str = '{:.2%}',
                    is_norm_costs: bool = True,
@@ -399,7 +395,7 @@ class MultiPortfolioData:
     def plot_factor_betas(self,
                           benchmark_prices: pd.DataFrame,
                           regime_benchmark: str = None,
-                          time_period: da.TimePeriod = None,
+                          time_period: TimePeriod = None,
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           var_format: str = '{:,.2f}',
                           axs: List[plt.Subplot] = None,
@@ -430,7 +426,7 @@ class MultiPortfolioData:
                 self.add_regime_shadows(ax=axs[idx], regime_benchmark=regime_benchmark, index=factor_exposure.index, regime_params=regime_params)
 
     def plot_nav_with_dd(self,
-                         time_period: da.TimePeriod = None,
+                         time_period: TimePeriod = None,
                          perf_params: PerfParams = PERF_PARAMS,
                          axs: List[plt.Subplot] = None,
                          **kwargs
@@ -448,7 +444,7 @@ class MultiPortfolioData:
 
     def plot_returns_scatter(self,
                              benchmark: str,
-                             time_period: da.TimePeriod = None,
+                             time_period: TimePeriod = None,
                              freq: str = 'QE',
                              ax: plt.Subplot = None,
                              **kwargs
@@ -469,7 +465,7 @@ class MultiPortfolioData:
 
     def plot_performance_attribution(self,
                                      portfolio_ids: List[int] = (0, ),
-                                     time_period: da.TimePeriod = None,
+                                     time_period: TimePeriod = None,
                                      attribution_metric: AttributionMetric = AttributionMetric.PNL,
                                      ax: plt.Subplot = None,
                                      **kwargs
@@ -495,7 +491,7 @@ class MultiPortfolioData:
 
     def plot_performance_periodic_table(self,
                                         portfolio_id: int = 0,
-                                        time_period: da.TimePeriod = None,
+                                        time_period: TimePeriod = None,
                                         freq: str = 'YE',
                                         ax: plt.Subplot = None,
                                         **kwargs
@@ -516,7 +512,7 @@ class MultiPortfolioData:
                          is_grouped: bool = False,
                          portfolio_idx: int = 0,
                          regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
-                         time_period: da.TimePeriod = None,
+                         time_period: TimePeriod = None,
                          var_format: Optional[str] = None,
                          is_conditional_sharpe: bool = True,
                          perf_params: PerfParams = PERF_PARAMS,
@@ -549,3 +545,43 @@ class MultiPortfolioData:
                              title=title,
                              ax=ax,
                              **kwargs)
+
+    def plot_brinson_attribution(self,
+                                 strategy_idx: int = 0,
+                                 benchmark_idx: int = 1,
+                                 freq: Optional[str] = None,
+                                 axs: List[plt.Subplot] = (None, None, None, None, None),
+                                 total_column: str = 'Total Sum',
+                                 time_period: TimePeriod = None,
+                                 is_exclude_interaction_term: bool = True,
+                                 **kwargs
+                                 ) -> Tuple[plt.Figure, plt.Figure, plt.Figure, plt.Figure, plt.Figure]:
+
+        strategy_pnl = self.portfolio_datas[strategy_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
+        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
+
+        benchmark_pnl = self.portfolio_datas[benchmark_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
+        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
+
+        asset_class_data = self.portfolio_datas[strategy_idx].group_data
+
+        totals_table, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
+            qis.compute_brinson_attribution_table(benchmark_pnl=benchmark_pnl,
+                                                  strategy_pnl=strategy_pnl,
+                                                  strategy_weights=strategy_weights,
+                                                  benchmark_weights=benchmark_weights,
+                                                  asset_class_data=asset_class_data,
+                                                  total_column=total_column,
+                                                  is_exclude_interaction_term=is_exclude_interaction_term)
+
+        fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inters = qis.plot_brinson_attribution_table(
+            totals_table=totals_table,
+            grouped_allocation_return=grouped_allocation_return,
+            grouped_selection_return=grouped_selection_return,
+            grouped_interaction_return=grouped_interaction_return,
+            total_column=total_column,
+            is_exclude_interaction_term=is_exclude_interaction_term,
+            axs=axs,
+            **kwargs)
+
+        return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inters

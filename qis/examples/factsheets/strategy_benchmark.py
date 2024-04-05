@@ -77,7 +77,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_STRATEGY:
 
-        time_period = qis.TimePeriod('31Dec2005', '12Sep2023')  # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2005', '04Apr2024')  # time period for portfolio reporting
 
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
 
@@ -88,9 +88,11 @@ def run_unit_test(unit_test: UnitTests):
                                                                  span=30,
                                                                  vol_target=0.15)
 
+        add_brinson_attribution = True
         figs = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=multi_portfolio_data,
                                                          backtest_name='Vol Parity Portfolio vs Equal Weight',
                                                          time_period=time_period,
+                                                         add_brinson_attribution=add_brinson_attribution,
                                                          **fetch_default_report_kwargs(time_period=time_period))
         """
         figs = generate_performance_attribution_report(multi_portfolio_data=multi_portfolio_data,
@@ -101,7 +103,8 @@ def run_unit_test(unit_test: UnitTests):
                              file_name=f"strategy_benchmark_factsheet", orientation='landscape',
                              local_path=qis.local_path.get_output_path())
         qis.save_fig(fig=figs[0], file_name=f"strategy_benchmark", local_path=qis.local_path.get_output_path())
-
+        if add_brinson_attribution:
+            qis.save_fig(fig=figs[1], file_name=f"brinson_attribution", local_path=qis.local_path.get_output_path())
         plt.show()
 
 

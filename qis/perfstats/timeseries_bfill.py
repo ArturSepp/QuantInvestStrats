@@ -2,6 +2,7 @@
 Implement core for contacenation of time series
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 from enum import Enum
@@ -34,7 +35,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
     if isinstance(df_newer, pd.Series) or isinstance(df_older, pd.Series):
         # will be error if not same type
         df_newer = df_newer.to_frame()
-        df_older = df_older.to_frame()
+        df_older = df_older.to_frame(name=df_newer.columns[0])
         is_series_out = True
 
     if is_prices:
@@ -76,7 +77,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             if fill_method == 'to_zero':
                 bfill_data[start:] = bfill_data[start:].fillna(value=0.0)
             else:
-                bfill_data[start:] = bfill_data[start:].fillna(fill_method)
+                bfill_data[start:] = bfill_data[start:].ffill()
 
         bfill_datas.append(bfill_data)
     bfill_datas = pd.concat(bfill_datas, axis=1).sort_index()
@@ -87,7 +88,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
                                          terminal_value=terminal_value)
 
     if pd.infer_freq(bfill_datas.index) != freq:
-        bfill_datas = bfill_datas.asfreq(freq, method='ffill')
+        bfill_datas = bfill_datas.asfreq(freq, method='ffill').ffill()
 
     if is_series_out:
         bfill_datas = bfill_datas.iloc[:, 0]
@@ -178,7 +179,9 @@ def df_fill_first_nan_by_cross_median(df: pd.DataFrame,
     merged_data = pd.DataFrame(index=df.index, columns=df.columns)
     for idx, column in enumerate(df.columns):
         its_first_nonnan_index = first_nonnan_index[idx]
-        median_backfill = np.nanmedian(df.loc[:its_first_nonnan_index, :].to_numpy(), axis=1)
+        with warnings.catch_warnings():  # silence All-NaN slice encountered
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            median_backfill = np.nanmedian(df.loc[:its_first_nonnan_index, :].to_numpy(), axis=1)
         merged_data.loc[:its_first_nonnan_index, column] = median_backfill
         merged_data.loc[its_first_nonnan_index:, column] = df.loc[its_first_nonnan_index:, column].to_numpy()
 

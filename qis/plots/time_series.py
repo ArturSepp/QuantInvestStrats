@@ -127,7 +127,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
             x0 = y.first_valid_index() or y.index[0]  # if all are nons
             x1 = y.index[-1]
             y0 = y[x0]
-            y1 = y[-1]
+            y1 = y.iloc[-1]
             x = [x0, x1]
             y = [y0, y1]
             ax.plot(x, y,

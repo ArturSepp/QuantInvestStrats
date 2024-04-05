@@ -240,6 +240,8 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
                                                         return_type=self.regime_params.return_type,
                                                         include_start_date=include_start_date,
                                                         include_end_date=include_end_date)
+        if len(sampled_returns_with_regime_id.index) <= 3:
+            raise ValueError(f"need to have more than 3 returns in time series: {sampled_returns_with_regime_id.index}\nDecrease regime frequency")
         x = sampled_returns_with_regime_id[benchmark]
         quant0 = pd.qcut(x=x, q=self.regime_params.q, labels=self.get_regime_ids())
         sampled_returns_with_regime_id[self.REGIME_COLUMN] = quant0

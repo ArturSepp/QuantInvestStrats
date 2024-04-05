@@ -12,7 +12,7 @@ from typing import Union, Dict, Any, Optional, Tuple, List, NamedTuple
 from enum import Enum
 
 # qis
-import qis
+import qis as qis
 import qis.file_utils as fu
 import qis.utils.dates as da
 import qis.utils.df_groups as dfg
@@ -20,7 +20,7 @@ import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.perfstats.regime_classifier as rcl
-from qis import PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantileRegimeSpecs
+from qis import PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod
 
 # plots
 import qis.plots.time_series as pts
@@ -319,7 +319,7 @@ class PortfolioData:
     def get_instruments_returns(self,
                                 time_period: da.TimePeriod = None
                                 ) -> pd.DataFrame:
-        returns = self.prices.pct_change()
+        returns = self.prices.pct_change(fill_method=None)
         if time_period is not None:
             returns = time_period.locate(returns)
         return returns
@@ -639,14 +639,17 @@ class PortfolioData:
     def get_weights(self,
                     is_input_weights: bool = True,
                     columns: List[str] = None,
+                    time_period: TimePeriod = None,
                     freq: Optional[str] = 'W-WED'
                     ) -> pd.DataFrame:
-        if is_input_weights:
+        if is_input_weights and self.input_weights is not None:
             weights = self.input_weights.copy()
         else:
             weights = self.weights.copy()
         if columns is not None:
             weights = weights[columns]
+        if time_period is not None:
+            weights = time_period.locate(weights)
         if freq is not None:
             weights = weights.resample(freq).last().ffill()
         return weights

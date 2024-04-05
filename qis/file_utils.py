@@ -509,7 +509,7 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
                           folder_name: str = None,
                           subfolder_name: str = None,
                           is_index: bool = True,
-                          dayfirst: Optional[bool] = None,
+                          dayfirst: Optional[bool] = None,  # will give priority to formats where day come first
                           force_not_found_error: bool = False,
                           ) -> Dict[str, pd.DataFrame]:
     """

@@ -154,19 +154,21 @@ class MultiAssetsReport:
     def plot_drawdowns(self,
                        regime_benchmark_str: str = None,
                        time_period: TimePeriod = None,
+                       title: str = 'Running Drawdowns',
                        ax: plt.Subplot = None,
                        **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark_str)
-        qis.plot_rolling_drawdowns(prices=prices, ax=ax, **kwargs)
+        qis.plot_rolling_drawdowns(prices=prices, title=title, ax=ax, **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark_str=regime_benchmark_str, data_df=prices)
 
     def plot_rolling_time_under_water(self,
                                       regime_benchmark_str: str = None,
                                       time_period: TimePeriod = None,
+                                      title: str = 'Running Time Under Water',
                                       ax: plt.Subplot = None,
                                       **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark_str)
-        qis.plot_rolling_time_under_water(prices=prices, ax=ax, **kwargs)
+        qis.plot_rolling_time_under_water(prices=prices, title=title, ax=ax, **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark_str=regime_benchmark_str, data_df=prices)
 
     def plot_annual_returns(self,
@@ -223,8 +225,8 @@ class MultiAssetsReport:
 
     def plot_benchmark_beta(self,
                             benchmark: str,
-                            freq: str = 'B',
-                            span: int = 60,
+                            freq: str = 'M',
+                            span: int = 12,
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,
                             **kwargs) -> None:

@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis, skew
 from typing import Callable, Union, Dict, Tuple, Any, Optional, Literal
-from collections import OrderedDict
 from enum import Enum
 
 # qis
@@ -128,7 +127,7 @@ def compute_performance_table(prices: Union[pd.DataFrame, pd.Series],
     if perf_params is None:
         perf_params = PerfParams()
 
-    dict_data = OrderedDict()
+    dict_data = {}
     for asset in prices:
         asset_data = prices[asset].dropna()  # force drop na
         return_dict = ret.compute_returns_dict(prices=asset_data, perf_params=perf_params)
@@ -160,7 +159,7 @@ def compute_risk_table(prices: pd.DataFrame,
         dd_sampled_prices = ret.prices_at_freq(prices=prices, freq=perf_params.freq_drawdown)
 
     vol_dt = np.sqrt(da.infer_an_from_data(data=sampled_prices))
-    dict_data = OrderedDict()
+    dict_data = {}
     for asset in sampled_prices:
         sampled_price = sampled_prices[asset].dropna()
         if len(sampled_price.index) > 1:
@@ -205,6 +204,9 @@ def compute_risk_table(prices: pd.DataFrame,
 def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
                           perf_params: PerfParams = None
                           ) -> pd.DataFrame:
+    """
+    compute whole ra perf table
+    """
     if perf_params is None:
         perf_params = PerfParams(freq=pd.infer_freq(prices.index))
 

@@ -164,6 +164,9 @@ Run example in ```qis.examples.factsheets.strategy_benchmark.py``` https://githu
 
 ![image info](qis/examples/figures/strategy_benchmark.PNG)
 
+Brinson performance attribution (https://en.wikipedia.org/wiki/Performance_attribution)
+![image info](qis/examples/figures/brinson_attribution.PNG)
+
 
 ### 5. Multi strategy factsheet <a name="multistrategy"></a>
 This report is adopted to examine the sensitivity of 

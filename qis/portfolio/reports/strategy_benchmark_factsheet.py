@@ -24,6 +24,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                               backtest_name: str = None,
                                               add_strategy_factsheet: bool = True,
+                                              add_brinson_attribution: bool = True,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 4,
                                               **kwargs
@@ -162,6 +163,23 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               benchmark=regime_benchmark,
                                               freq=perf_params.freq_reg,
                                               **kwargs)
+
+    if add_brinson_attribution:
+        with sns.axes_style("darkgrid"):
+            fig = plt.figure(figsize=figsize, constrained_layout=True)
+            qis.set_suptitle(fig, title='Brinson performance attribution report')
+            figs.append(fig)
+            gs = fig.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)
+            axs = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]),
+                   fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1]),
+                   fig.add_subplot(gs[2, 0])]
+            multi_portfolio_data.plot_brinson_attribution(strategy_idx=0,
+                                                          benchmark_idx=1,
+                                                          freq=None,
+                                                          axs=axs,
+                                                          total_column='Total Sum',
+                                                          is_exclude_interaction_term=True,
+                                                          **kwargs)
 
     if add_strategy_factsheet:
         for portfolio_data in multi_portfolio_data.portfolio_datas:

@@ -138,7 +138,7 @@ def agg_median_mad(df: pd.DataFrame,
 def agg_data_by_axis(df: pd.DataFrame,
                      total_column: Union[str, None] = None,
                      is_total_column_first: bool = False,  # last of not
-                     agg_func: Callable[[pd.DataFrame], pd.Series] = np.nansum,
+                     agg_func: Callable[[pd.DataFrame, int], pd.Series] = np.nansum,
                      agg_total_func: Callable[[pd.Series], pd.Series] = np.nansum,
                      axis: int = 0
                      ) -> pd.Series:
@@ -157,9 +157,9 @@ def agg_data_by_axis(df: pd.DataFrame,
         agg_total = pd.Series(data=agg_total_func(agg_data), index=[total_column])
 
         if is_total_column_first == 0:
-            agg_data = agg_total.append(agg_data)
+            agg_data = pd.concat([agg_total, agg_data])
         else:
-            agg_data = agg_data.append(agg_total)
+            agg_data = pd.concat([agg_data, agg_total])
 
     return agg_data
 
