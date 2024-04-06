@@ -36,6 +36,7 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
 
     regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(**kwargs)
     data = regime_datas[regime_data_to_plot]
+    data = data.dropna(how='all', axis=0)  # remove data wit all rows nans
 
     if drop_sharpe_from_labels:
         data.columns = [x.replace(' Sharpe', '') for x in data.columns]
