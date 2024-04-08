@@ -27,6 +27,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               add_brinson_attribution: bool = True,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 4,
+                                              add_grouped_exposures: bool = False,
                                               **kwargs
                                               ) -> List[plt.Figure]:
     """
@@ -187,8 +188,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                     benchmark_prices=multi_portfolio_data.benchmark_prices,
                                                     perf_params=perf_params,
                                                     regime_params=regime_params,
+                                                    add_grouped_exposures=add_grouped_exposures,
                                                     **kwargs  # time period will be in kwargs
                                                     ))
+        figs = qis.to_flat_list(figs)
     return figs
 
 

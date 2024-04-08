@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # packages
@@ -16,6 +15,7 @@ import qis as qis
 import qis.file_utils as fu
 import qis.utils.dates as da
 import qis.utils.df_groups as dfg
+import qis.utils.df_agg as dfa
 import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
@@ -99,6 +99,7 @@ class PortfolioData:
     """
     NAV level getters
     """
+
     def get_portfolio_nav(self, time_period: da.TimePeriod = None) -> pd.Series:
         """
         get nav using consistent function for all return computations
@@ -157,6 +158,24 @@ class PortfolioData:
         ac_navs = ret.returns_to_nav(returns=grouped_ac_pnl, constant_trade_level=constant_trade_level)
         return ac_navs
 
+    def get_weights(self,
+                    is_input_weights: bool = True,
+                    columns: List[str] = None,
+                    time_period: TimePeriod = None,
+                    freq: Optional[str] = 'W-WED'
+                    ) -> pd.DataFrame:
+        if is_input_weights and self.input_weights is not None:
+            weights = self.input_weights.copy()
+        else:
+            weights = self.weights.copy()
+        if columns is not None:
+            weights = weights[columns]
+        if time_period is not None:
+            weights = time_period.locate(weights)
+        if freq is not None:
+            weights = weights.resample(freq).last().ffill()
+        return weights
+
     def get_exposures(self,
                       time_period: da.TimePeriod = None,
                       is_grouped: bool = False,
@@ -173,6 +192,51 @@ class PortfolioData:
         if time_period is not None:
             exposures = time_period.locate(exposures)
         return exposures
+
+    def get_grouped_exposures(self, time_period: da.TimePeriod = None
+                              ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+        """
+        compute grouped net long / short exposues
+        """
+        group_dict = dfg.get_group_dict(group_data=self.group_data,
+                                        group_order=self.group_order,
+                                        total_column=None)
+        all_exposures = self.get_exposures(time_period=time_period)
+        grouped_exposures_by_inst = {}
+        grouped_exposures_agg = {}
+        for group, tickers in group_dict.items():
+            exposures_by_inst = all_exposures[tickers]
+            grouped_exposures_by_inst[group] = exposures_by_inst
+            total = dfa.nansum(exposures_by_inst, axis=1).rename('Total')
+            net_long = dfa.nansum_positive(exposures_by_inst, axis=1).rename('Net Long')
+            net_short = dfa.nansum_negative(exposures_by_inst, axis=1).rename('Net Short')
+            grouped_exposures_agg[group] = pd.concat([total, net_long, net_short], axis=1)
+        return grouped_exposures_agg, grouped_exposures_by_inst
+
+    def get_grouped_cum_pnls(self, time_period: da.TimePeriod = None
+                             ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+        """
+        compute grouped net long / short exposues
+        """
+        group_dict = dfg.get_group_dict(group_data=self.group_data,
+                                        group_order=self.group_order,
+                                        total_column=None)
+
+        pnls = self.get_instruments_pnl(time_period=time_period, is_compounded=False).fillna(0.0)
+        all_exposures = self.get_exposures(time_period=time_period)
+        pnl_positive_exp = pnls.where(all_exposures > 0.0, other=0.0)
+        pnl_negative_exp = pnls.where(all_exposures < 0.0, other=0.0)
+
+        grouped_pnls_by_inst = {}
+        grouped_pnls_agg = {}
+        for group, tickers in group_dict.items():
+            pnls_by_inst = pnls[tickers]
+            grouped_pnls_by_inst[group] = pnls_by_inst.cumsum(axis=0)
+            total = dfa.nansum(pnls_by_inst, axis=1).rename('Total')
+            net_long = dfa.nansum(pnl_positive_exp[tickers], axis=1).rename('Net Long')
+            net_short = dfa.nansum(pnl_negative_exp[tickers], axis=1).rename('Net Short')
+            grouped_pnls_agg[group] = pd.concat([total, net_long, net_short], axis=1).cumsum(axis=0)
+        return grouped_pnls_agg, grouped_pnls_by_inst
 
     def get_turnover(self,
                      is_agg: bool = False,
@@ -242,7 +306,7 @@ class PortfolioData:
                                    trade_level: float = 100000000
                                    ) -> pd.DataFrame:
         exposure = (self.units.multiply(self.prices)).divide(self.nav.to_numpy(), axis=0)
-        participation = trade_level*exposure.divide(mcap)
+        participation = trade_level * exposure.divide(mcap)
         return participation
 
     def compute_volume_participation(self,
@@ -250,7 +314,7 @@ class PortfolioData:
                                      trade_level: float = 100000000
                                      ) -> pd.DataFrame:
         turnover = self.get_turnover(is_agg=False)
-        participation = trade_level*turnover.divide(volumes)
+        participation = trade_level * turnover.divide(volumes)
         return participation
 
     def compute_cumulative_attribution(self) -> pd.DataFrame:
@@ -316,6 +380,7 @@ class PortfolioData:
     """
     ### instrument level getters
     """
+
     def get_instruments_returns(self,
                                 time_period: da.TimePeriod = None
                                 ) -> pd.DataFrame:
@@ -423,6 +488,7 @@ class PortfolioData:
     """
     plotting methods
     """
+
     def plot_nav(self,
                  time_period: da.TimePeriod = None,
                  ax: plt.Subplot = None,
@@ -432,7 +498,7 @@ class PortfolioData:
         if ax is None:
             with sns.axes_style('darkgrid'):
                 fig, ax = plt.subplots(1, 1, figsize=(16, 12), tight_layout=True)
-        ppd.plot_prices(prices=nav, ax=ax,**kwargs)
+        ppd.plot_prices(prices=nav, ax=ax, **kwargs)
 
     def plot_ra_perf_table(self,
                            benchmark_price: pd.Series = None,
@@ -459,7 +525,8 @@ class PortfolioData:
                                              perf_columns=perf_columns,
                                              title=title,
                                              rotation_for_columns_headers=0,
-                                             special_rows_colors=[(1, 'deepskyblue'), (len(prices.columns), 'lavender')],
+                                             special_rows_colors=[(1, 'deepskyblue'),
+                                                                  (len(prices.columns), 'lavender')],
                                              column_header='Portfolio',
                                              ax=ax,
                                              **kwargs)
@@ -540,13 +607,13 @@ class PortfolioData:
             hline_rows = None
 
         rhe.plot_periodic_returns_table(prices=prices,
-                                                    freq=heatmap_freq,
-                                                    ax=ax,
-                                                    title=title,
-                                                    date_format=date_format,
-                                                    transpose=transpose,
-                                                    hline_rows=hline_rows,
-                                                    **kwargs)
+                                        freq=heatmap_freq,
+                                        ax=ax,
+                                        title=title,
+                                        date_format=date_format,
+                                        transpose=transpose,
+                                        hline_rows=hline_rows,
+                                        **kwargs)
 
     def plot_regime_data(self,
                          benchmark_price: pd.Series,
@@ -605,13 +672,14 @@ class PortfolioData:
             title = title or f"{regime_params.freq}-returns conditional on vols {str(benchmark_price.name)}"
         prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
 
-        regime_classifier = rcl.BenchmarkVolsQuantilesRegime(regime_params=rcl.VolQuantileRegimeSpecs(freq=regime_params.freq))
+        regime_classifier = rcl.BenchmarkVolsQuantilesRegime(
+            regime_params=rcl.VolQuantileRegimeSpecs(freq=regime_params.freq))
         fig = qis.plot_regime_boxplot(regime_classifier=regime_classifier,
-                                                                prices=prices,
-                                                                benchmark=str(benchmark_price.name),
-                                                                title=title,
-                                                                ax=ax,
-                                                                **kwargs)
+                                      prices=prices,
+                                      benchmark=str(benchmark_price.name),
+                                      title=title,
+                                      ax=ax,
+                                      **kwargs)
         return fig
 
     def plot_contributors(self,
@@ -631,28 +699,13 @@ class PortfolioData:
         with sns.axes_style('darkgrid'):
             fig, axs = plt.subplots(5, 1, figsize=(10, 16), tight_layout=True)
             pts.plot_time_series(df=prices, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='prices', ax=axs[0])
-            pts.plot_time_series(df=avg_costs, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='avg_costs', ax=axs[1])
-            pts.plot_time_series(df=realized_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='realized_pnl', ax=axs[2])
+            pts.plot_time_series(df=avg_costs, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='avg_costs',
+                                 ax=axs[1])
+            pts.plot_time_series(df=realized_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='realized_pnl',
+                                 ax=axs[2])
             pts.plot_time_series(df=mtm_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='mtm_pnl', ax=axs[3])
-            pts.plot_time_series(df=total_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='total_pnl', ax=axs[4])
-
-    def get_weights(self,
-                    is_input_weights: bool = True,
-                    columns: List[str] = None,
-                    time_period: TimePeriod = None,
-                    freq: Optional[str] = 'W-WED'
-                    ) -> pd.DataFrame:
-        if is_input_weights and self.input_weights is not None:
-            weights = self.input_weights.copy()
-        else:
-            weights = self.weights.copy()
-        if columns is not None:
-            weights = weights[columns]
-        if time_period is not None:
-            weights = time_period.locate(weights)
-        if freq is not None:
-            weights = weights.resample(freq).last().ffill()
-        return weights
+            pts.plot_time_series(df=total_pnl, legend_stats=pts.LegendStats.FIRST_AVG_LAST, title='total_pnl',
+                                 ax=axs[4])
 
     def plot_weights(self,
                      is_input_weights: bool = True,
@@ -701,6 +754,10 @@ class PortfolioData:
                       ax=ax,
                       **kwargs)
 
+    def plot_grouped_exposures(self):
+        self.get_exposures()
+
+
 @njit
 def compute_realized_pnl(prices: np.ndarray,
                          units: np.ndarray
@@ -716,14 +773,15 @@ def compute_realized_pnl(prices: np.ndarray,
         if idx == 0:
             avg_costs[idx] = np.where(np.greater(unit1, 1e-16), price1, 0.0)
         else:
-            unit0 = units[idx-1]
-            avg_costs0 = avg_costs[idx-1]
+            unit0 = units[idx - 1]
+            avg_costs0 = avg_costs[idx - 1]
             delta = unit1 - unit0
             is_purchase = np.greater(delta, 1e-16)
             is_sell = np.less(delta, -1e-16)
-            realized_pnl[idx] = np.where(is_sell, -delta*(price1-avg_costs0), 0.0)
-            avg_costs[idx] = np.where(is_purchase, np.true_divide(delta*price1+unit0*avg_costs0, unit1), avg_costs0)
-            mtm_pnl[idx] = unit0*(price1 - avg_costs0) - realized_pnl[idx]
+            realized_pnl[idx] = np.where(is_sell, -delta * (price1 - avg_costs0), 0.0)
+            avg_costs[idx] = np.where(is_purchase, np.true_divide(delta * price1 + unit0 * avg_costs0, unit1),
+                                      avg_costs0)
+            mtm_pnl[idx] = unit0 * (price1 - avg_costs0) - realized_pnl[idx]
             trades[idx] = delta
     return avg_costs, realized_pnl, mtm_pnl, trades
 

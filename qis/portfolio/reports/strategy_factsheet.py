@@ -7,13 +7,9 @@ PortfolioData can contain either simulated or actual portfolio data
 # packages
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Tuple, Optional
-
-# qis
-import qis
+from typing import Tuple, Optional, List
+import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs
-
-# portfolio
 from qis.portfolio.portfolio_data import PortfolioData
 from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
@@ -28,8 +24,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 roll_period: int = 260,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
+                                add_grouped_exposures: bool = False,
+                                add_grouped_cum_pnl: bool = False,
                                 **kwargs
-                                ) -> plt.Figure:
+                                ) -> List[plt.Figure]:
     # align
     benchmark_prices = benchmark_prices.reindex(index=portfolio_data.nav.index, method='ffill')
     if regime_benchmark is None:
@@ -234,5 +232,56 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                 attribution_metric=qis.AttributionMetric.PNL_RISK,
                                                 ax=fig.add_subplot(gs[12:, 2:]),
                                                 **local_kwargs)
+    
+    figs = [fig]
+    if add_grouped_exposures:
+        # time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+        grouped_exposures_agg, grouped_exposures_by_inst = portfolio_data.get_grouped_exposures(time_period=time_period)
+        nrows = len(grouped_exposures_agg.keys())
+        fig1 = plt.figure(figsize=figsize, constrained_layout=True)
+        figs.append(fig1)
+        fig1.suptitle(f"{portfolio_data.nav.name} Exposures by groups for period {time_period.to_str()}",
+                     fontweight="bold", fontsize=8, color='blue')
+        gs = fig1.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
+        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
+        for idx, (group, exposures_agg) in enumerate(grouped_exposures_agg.items()):
+            datas = {f"{group} aggregated": grouped_exposures_agg[group],
+                     f"{group} by instrument": grouped_exposures_by_inst[group]}
+            for idx_, (key, df) in enumerate(datas.items()):
+                ax = fig1.add_subplot(gs[idx, idx_])
+                qis.plot_time_series(df=df,
+                                     var_format='{:,.0%}',
+                                     legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                                     title=f"{key}",
+                                     ax=ax,
+                                     **local_kwargs)
+                qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+                qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+                ax.axhline(0, color='black', linewidth=1)
 
-    return fig
+    if add_grouped_cum_pnl:
+        time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+        grouped_pnls_agg, grouped_pnls_by_inst = portfolio_data.get_grouped_cum_pnls(time_period=time_period1)
+        nrows = len(grouped_pnls_agg.keys())
+        fig1 = plt.figure(figsize=figsize, constrained_layout=True)
+        figs.append(fig1)
+        fig1.suptitle(f"{portfolio_data.nav.name} P&L by groups for period {time_period1.to_str()}",
+                     fontweight="bold", fontsize=8, color='blue')
+        gs = fig1.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
+        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
+        for idx, (group, pnls_agg) in enumerate(grouped_pnls_agg.items()):
+            datas = {f"{group} aggregated": grouped_pnls_agg[group],
+                     f"{group} by instrument": grouped_pnls_by_inst[group]}
+            for idx_, (key, df) in enumerate(datas.items()):
+                ax = fig1.add_subplot(gs[idx, idx_])
+                qis.plot_time_series(df=df,
+                                     var_format='{:,.0%}',
+                                     legend_stats=qis.LegendStats.LAST,
+                                     title=f"{key}",
+                                     ax=ax,
+                                     **local_kwargs)
+                qis.add_bnb_regime_shadows(ax=ax, pivot_prices=time_period1.locate(pivot_prices),
+                                           regime_params=BenchmarkReturnsQuantileRegimeSpecs(freq='ME'))
+                qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+
+    return figs

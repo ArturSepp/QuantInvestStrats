@@ -92,45 +92,45 @@ def run_unit_test(unit_test: UnitTests):
                                                       time_period=time_period,
                                                       span=30,
                                                       vol_target=0.15)
-        fig = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
+        figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                               benchmark_prices=benchmark_prices,
                                               time_period=time_period,
                                               **fetch_default_report_kwargs(time_period=time_period))
-        qis.save_figs_to_pdf(figs=[fig],
+        qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_long",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
-        fig = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
+        figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                               benchmark_prices=benchmark_prices,
                                               time_period=time_period_short,
                                               **fetch_default_report_kwargs(time_period=time_period_short))
-        qis.save_figs_to_pdf(figs=[fig],
+        qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_short",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
-        qis.save_fig(fig=fig, file_name=f"strategy", local_path=qis.local_path.get_output_path())
+        qis.save_fig(fig=figs[0], file_name=f"strategy", local_path=qis.local_path.get_output_path())
 
     elif unit_test == UnitTests.EQUITY_BOND:
         prices, benchmark_prices, group_data = fetch_equity_bond()
         portfolio_data = generate_equity_bond_portfolio(prices=prices,
                                                         weights=[0.6, 0.4],
                                                         group_data=group_data)
-        fig = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
+        figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                               benchmark_prices=benchmark_prices,
                                               time_period=time_period,
                                               **fetch_default_report_kwargs(time_period=time_period))
-        qis.save_figs_to_pdf(figs=[fig],
+        qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_long",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
-        fig = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
+        figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                               benchmark_prices=benchmark_prices,
                                               time_period=TimePeriod('31Dec2019', time_period_short),
                                               **fetch_default_report_kwargs(time_period=time_period_short))
-        qis.save_figs_to_pdf(figs=[fig],
+        qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())

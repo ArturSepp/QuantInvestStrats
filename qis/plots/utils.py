@@ -763,6 +763,7 @@ class LegendStats(Enum):
     TSTAT = 23
     AVG_STD_TSTAT = 24
     LAST_NONNAN = 25
+    AVG_MIN_MAX_LAST = 26
 
 
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
@@ -1129,6 +1130,24 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             else:
                 total = np.nansum(column_data)
             legend_lines.append(f"{column}: total={var_format.format(total)}")
+    
+    elif legend_stats == LegendStats.AVG_MIN_MAX_LAST:
+        legend_lines = []
+        for column in data.columns:
+            data_column = data[column]
+            if np.all(np.isnan(data_column)):
+                avg = np.nan
+                min = np.nan
+                max = np.nan
+            else:
+                nonnan_data = data_column.dropna()
+                avg = np.nanmean(nonnan_data)
+                min = np.min(nonnan_data)
+                max = np.max(nonnan_data)
+                last = nonnan_data.iloc[-1]
+
+            legend_lines.append(f"{column}: avg={var_format.format(avg)}, min={var_format.format(min)}, "
+                                f"max={var_format.format(max)}, last={var_format.format(last)}")
 
     else:
         raise TypeError(f"{legend_stats} not implemented")
