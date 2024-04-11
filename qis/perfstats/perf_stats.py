@@ -339,8 +339,8 @@ def compute_rolling_drawdowns(prices: Union[pd.DataFrame, pd.Series],
     if not isinstance(prices, pd.Series) and not isinstance(prices, pd.DataFrame):
         raise ValueError(f"unsuported type {type(prices)}")
     peak = prices.expanding(min_periods=min_periods).max()
-    max_dd = prices.divide(peak)-1.0
-    return max_dd
+    drawdown = (prices.divide(peak)-1.0).ffill()  # ffill nans
+    return drawdown
 
 
 def compute_rolling_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Series],
@@ -352,10 +352,10 @@ def compute_rolling_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Ser
     """
     if not isinstance(prices, pd.Series) and not isinstance(prices, pd.DataFrame):
         raise ValueError(f"unsuported type {type(prices)}")
-    prices = prices.asfreq(freq=sampling_freq, method='ffill')
+    prices = prices.asfreq(freq=sampling_freq, method='ffill').ffill()
     # find expanding peak
     peak = prices.expanding(min_periods=1).max()
-    drawdown = prices.divide(peak) - 1.0
+    drawdown = (prices.divide(peak)-1.0).ffill()  # ffill nans
     if isinstance(prices, pd.DataFrame):
         is_in_dd = pd.DataFrame(np.where(prices < peak, 1.0, np.nan), index=prices.index, columns=prices.columns)
     else:
@@ -363,6 +363,7 @@ def compute_rolling_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Ser
 
     # cumsum until first nan for series
     time_under_water = is_in_dd.apply(lambda x: x.groupby(x.isna().cumsum()).cumsum(), axis=0)
+    time_under_water = time_under_water.fillna(0.0)
     return drawdown, time_under_water
 
 

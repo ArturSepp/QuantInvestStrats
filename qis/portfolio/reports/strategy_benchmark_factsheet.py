@@ -38,7 +38,12 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     """
     if len(multi_portfolio_data.portfolio_datas) == 1:
         raise ValueError(f"must be at least two strategies")
-
+    
+    if len(multi_portfolio_data.portfolio_datas[0].group_data) <= 7:  # otherwise tables look too bad
+        is_grouped = True
+    else:
+        is_grouped = False
+        
     # set report specific kqargs
     plot_kwargs = dict(fontsize=fontsize,
                        linewidth=0.5,
@@ -53,7 +58,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     figs.append(fig)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
-
+    
     if backtest_name is not None:
         fig.suptitle(backtest_name, fontweight="bold", fontsize=8, color='blue')
 
@@ -102,6 +107,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[0:2, 2:]),
                                                benchmark_price=benchmark_price,
                                                perf_params=perf_params,
+                                               is_grouped=is_grouped,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
@@ -109,30 +115,35 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[2:4, 2:]),
                                                benchmark_price=benchmark_price,
                                                perf_params=perf_params,
+                                               is_grouped=is_grouped,
                                                **qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize,
                                                                                 alpha_an_factor=52, freq_reg='W-WED')))
 
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
                                      new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=False))
-    multi_portfolio_data.portfolio_datas[0].plot_periodic_returns(ax=fig.add_subplot(gs[4:6, 2]),
+    multi_portfolio_data.portfolio_datas[0].plot_periodic_returns(is_grouped=is_grouped,
+                                                                  ax=fig.add_subplot(gs[4:6, 2]),
                                                                   **local_kwargs)
 
-    multi_portfolio_data.portfolio_datas[1].plot_periodic_returns(ax=fig.add_subplot(gs[4:6, 3]),
+    multi_portfolio_data.portfolio_datas[1].plot_periodic_returns(is_grouped=is_grouped,
+                                                                  ax=fig.add_subplot(gs[4:6, 3]),
                                                                   **local_kwargs)
 
-    multi_portfolio_data.portfolio_datas[0].plot_regime_data(ax=fig.add_subplot(gs[6:8, 2]),
-                                                             benchmark_price=benchmark_price,
+    multi_portfolio_data.portfolio_datas[0].plot_regime_data(benchmark_price=benchmark_price,
+                                                             is_grouped=is_grouped,
                                                              title=f"{multi_portfolio_data.portfolio_datas[0].nav.name}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
+                                                             ax=fig.add_subplot(gs[6:8, 2]),
                                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
 
-    multi_portfolio_data.portfolio_datas[1].plot_regime_data(ax=fig.add_subplot(gs[6:8, 3]),
-                                                             benchmark_price=benchmark_price,
+    multi_portfolio_data.portfolio_datas[1].plot_regime_data(benchmark_price=benchmark_price,
+                                                             is_grouped=is_grouped,
                                                              title=f"{multi_portfolio_data.portfolio_datas[1].nav.name}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
+                                                             ax=fig.add_subplot(gs[6:8, 3]),
                                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
 
     # vol regimes

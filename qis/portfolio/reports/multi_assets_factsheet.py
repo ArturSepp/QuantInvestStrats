@@ -225,7 +225,7 @@ class MultiAssetsReport:
 
     def plot_benchmark_beta(self,
                             benchmark: str,
-                            freq: str = 'M',
+                            freq: str = 'ME',
                             span: int = 12,
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,

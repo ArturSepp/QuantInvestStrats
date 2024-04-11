@@ -240,7 +240,10 @@ def plot_periodic_returns_table(prices: pd.DataFrame,
     data = ret.to_returns(prices=prices, freq=freq, include_start_date=True, include_end_date=True, drop_first=True)
     total_return = ret.to_total_returns(prices=prices).rename(total_name).to_frame().T
     data = pd.concat([data, total_return], axis=0)
-    np_data = data.to_numpy()[:-1, :-1]  # exclude last row from cmap
+    if len(data.columns) > 1:
+        np_data = data.to_numpy()[:-1, :-1]  # exclude last row from cmap
+    else:
+        np_data = data.to_numpy()
     fig = plot_heatmap(df=data,
                        vline_columns=[len(data.index)-1],
                        transpose=transpose,

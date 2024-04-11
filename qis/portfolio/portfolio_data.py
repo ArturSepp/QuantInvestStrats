@@ -514,7 +514,7 @@ class PortfolioData:
             prices = self.get_ac_navs(time_period=time_period)
             title = title or f"RA performance table by groups: {da.get_time_period(prices).to_str()}"
         else:
-            prices = self.get_portfolio_nav(time_period=time_period)
+            prices = self.get_portfolio_nav(time_period=time_period).to_frame()
             title = title or f"RA performance table: {da.get_time_period(prices).to_str()}"
         if benchmark_price is not None:
             if benchmark_price.name not in prices.columns:
@@ -598,7 +598,7 @@ class PortfolioData:
             prices = self.get_ac_navs(time_period=time_period)
             title = title or f"{heatmap_freq}-returns by groups"
         else:
-            prices = self.get_portfolio_nav(time_period=time_period)
+            prices = self.get_portfolio_nav(time_period=time_period).to_frame()
             title = title or f"{heatmap_freq}-returns"
         if benchmark_prices is not None:
             hline_rows = [len(prices.columns)]
@@ -634,7 +634,7 @@ class PortfolioData:
             prices = self.get_ac_navs(time_period=time_period)
             title = title or f"Sharpe ratio decomposition by groups to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
         else:
-            prices = self.get_portfolio_nav(time_period=time_period)
+            prices = self.get_portfolio_nav(time_period=time_period).to_frame()
             title = title or f"Sharpe ratio decomposition to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
 
         if benchmark_price.name not in prices.columns:

@@ -33,6 +33,11 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     if regime_benchmark is None:
         regime_benchmark = benchmark_prices.columns[0]
 
+    if len(portfolio_data.group_data) <= 7:  # otherwise tables look too bad
+        is_grouped = True
+    else:
+        is_grouped = False
+
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
 
@@ -148,6 +153,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                       benchmark_price=benchmark_prices[regime_benchmark],
                                       time_period=time_period,
                                       perf_params=perf_params,
+                                      is_grouped=is_grouped,
                                       **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
     ax = fig.add_subplot(gs[1, 2:])
     # change regression to weekly
@@ -155,6 +161,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                       benchmark_price=benchmark_prices[regime_benchmark],
                                       time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
                                       perf_params=perf_params,
+                                      is_grouped=is_grouped,
                                       **qis.update_kwargs(kwargs, dict(fontsize=fontsize, alpha_an_factor=52, freq_reg='W-WED')))
 
     # heatmap
@@ -168,9 +175,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[4:6, 2:])
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
                                      new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=True))
-    portfolio_data.plot_periodic_returns(ax=ax,
-                                         benchmark_prices=benchmark_prices,
+    portfolio_data.plot_periodic_returns(benchmark_prices=benchmark_prices,
+                                         is_grouped=is_grouped,
                                          time_period=time_period,
+                                         ax=ax,
                                          **local_kwargs)
 
     # perf contributors
@@ -189,11 +197,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # regime data
     ax = fig.add_subplot(gs[8:10, 2:])
-    portfolio_data.plot_regime_data(ax=ax,
+    portfolio_data.plot_regime_data(is_grouped=is_grouped,
                                     benchmark_price=benchmark_prices[regime_benchmark],
                                     time_period=time_period,
                                     perf_params=perf_params,
                                     regime_params=regime_params,
+                                    ax=ax,
                                     **kwargs)
 
     # vol regime data
@@ -257,7 +266,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      **local_kwargs)
                 qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
                 qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
-                ax.axhline(0, color='black', linewidth=1)
+                ax.axhline(0, color='black', linewidth=0.5)
 
     if add_grouped_cum_pnl:
         time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)

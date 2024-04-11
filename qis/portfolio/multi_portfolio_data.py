@@ -232,8 +232,15 @@ class MultiPortfolioData:
                               time_period: TimePeriod = None,
                               perf_params: PerfParams = PERF_PARAMS,
                               perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+                              is_grouped: bool = True,
                               ax: plt.Subplot = None,
                               **kwargs) -> None:
+        if is_grouped:  # otherwise tables look too bad
+            add_ac = True
+            drop_benchmark = True
+        else:
+            add_ac = False
+            drop_benchmark = False
         strategy_prices = []
         ac_prices = []
         rows_edge_lines = [len(self.portfolio_datas)]
@@ -241,18 +248,23 @@ class MultiPortfolioData:
             portfolio_name = str(portfolio.nav.name)
             prices_ = portfolio.get_ac_navs(time_period=time_period)
             strategy_prices.append(prices_[portfolio_name])
-            ac_prices_ = prices_.drop(portfolio_name, axis=1)
-            ac_prices_.columns = [f"{portfolio_name}-{x}" for x in ac_prices_.columns]
-            ac_prices.append(ac_prices_)
-            rows_edge_lines.append(sum(rows_edge_lines)+len(ac_prices_.columns))
+            if add_ac:
+                ac_prices_ = prices_.drop(portfolio_name, axis=1)
+                ac_prices_.columns = [f"{portfolio_name}-{x}" for x in ac_prices_.columns]
+                ac_prices.append(ac_prices_)
+                rows_edge_lines.append(sum(rows_edge_lines)+len(ac_prices_.columns))
         strategy_prices = pd.concat(strategy_prices, axis=1)
-        ac_prices = pd.concat(ac_prices, axis=1)
-        prices = pd.concat([benchmark_price.reindex(index=strategy_prices.index, method='ffill'), strategy_prices, ac_prices], axis=1)
+        benchmark_price = benchmark_price.reindex(index=strategy_prices.index, method='ffill')
+        if add_ac:  # otherwise tables look too bad
+            ac_prices = pd.concat(ac_prices, axis=1)
+            prices = pd.concat([benchmark_price, strategy_prices, ac_prices],axis=1)
+        else:
+            prices = pd.concat([strategy_prices, benchmark_price], axis=1)
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=str(benchmark_price.name),
                                          perf_params=perf_params,
                                          perf_columns=perf_columns,
-                                         drop_benchmark=True,
+                                         drop_benchmark=drop_benchmark,
                                          rows_edge_lines=rows_edge_lines,
                                          title=f"RA performance table by Asset Group: {qis.get_time_period(prices).to_str()}",
                                          rotation_for_columns_headers=0,
