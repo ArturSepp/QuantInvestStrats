@@ -32,12 +32,16 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
     nb output columns are always data_newer columns
     """
     is_series_out = False
-    if isinstance(df_newer, pd.Series) or isinstance(df_older, pd.Series):
+    if isinstance(df_newer, pd.Series) and isinstance(df_older, pd.Series):
         # will be error if not same type
         df_newer = df_newer.to_frame()
         df_older = df_older.to_frame(name=df_newer.columns[0])
         is_series_out = True
-
+    elif isinstance(df_newer, pd.DataFrame) and isinstance(df_older, pd.DataFrame):
+        pass
+    else:
+        raise NotImplementedError(f"type1={type(df_newer)}, type2={type(df_older)}") 
+    
     if is_prices:
         terminal_value = dfo.get_last_nonnan_values(df_newer)
         if np.any(np.isnan(terminal_value)):

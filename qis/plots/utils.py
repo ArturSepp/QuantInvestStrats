@@ -764,6 +764,7 @@ class LegendStats(Enum):
     AVG_STD_TSTAT = 24
     LAST_NONNAN = 25
     AVG_MIN_MAX_LAST = 26
+    FIRST_MIN_MAX_LAST = 27
 
 
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
@@ -1139,6 +1140,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                 avg = np.nan
                 min = np.nan
                 max = np.nan
+                last = np.nan
             else:
                 nonnan_data = data_column.dropna()
                 avg = np.nanmean(nonnan_data)
@@ -1149,6 +1151,25 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, min={var_format.format(min)}, "
                                 f"max={var_format.format(max)}, last={var_format.format(last)}")
 
+    elif legend_stats == LegendStats.FIRST_MIN_MAX_LAST:
+        legend_lines = []
+        for column in data.columns:
+            data_column = data[column]
+            if np.all(np.isnan(data_column)):
+                first = np.nan
+                min = np.nan
+                max = np.nan
+                last = np.nan
+            else:
+                nonnan_data = data_column.dropna()
+                first = nonnan_data.iloc[0]
+                min = np.min(nonnan_data)
+                max = np.max(nonnan_data)
+                last = nonnan_data.iloc[-1]
+
+            legend_lines.append(f"{column}: first={var_format.format(first)}, min={var_format.format(min)}, "
+                                f"max={var_format.format(max)}, last={var_format.format(last)}")
+        
     else:
         raise TypeError(f"{legend_stats} not implemented")
 

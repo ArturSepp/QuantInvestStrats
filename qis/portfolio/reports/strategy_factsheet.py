@@ -33,7 +33,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     if regime_benchmark is None:
         regime_benchmark = benchmark_prices.columns[0]
 
-    if len(portfolio_data.group_data) <= 7:  # otherwise tables look too bad
+    if portfolio_data.group_data is not None and len(portfolio_data.group_data.unique()) <= 7:  # otherwise tables look too bad
         is_grouped = True
     else:
         is_grouped = False
@@ -68,7 +68,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[2:4, :2])
     qis.plot_rolling_drawdowns(prices=joint_prices,
                                title='Running Drawdowns',
-                               dd_legend_type=qis.DdLegendType.SIMPLE,
+                               dd_legend_type=qis.DdLegendType.DETAILED,
                                ax=ax, **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
@@ -88,7 +88,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                    use_bar_plot=True,
                    baseline='zero',
                    title='Exposures',
-                   legend_stats=qis.LegendStats.AVG_LAST,
+                   legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                    var_format='{:.1%}',
                    ax=ax,
                    **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncol=2)))
@@ -101,7 +101,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     qis.plot_time_series(df=turnover,
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
-                         legend_stats=qis.LegendStats.AVG_LAST,
+                         legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                          title='1y rolling average Turnover',
                          ax=ax,
                          **kwargs)
@@ -115,7 +115,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                         time_period=time_period)
     qis.plot_time_series(df=factor_exposures,
                          var_format='{:,.2f}',
-                         legend_stats=qis.LegendStats.AVG_LAST,
+                         legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                          title='Portfolio Benchmark betas',
                          ax=ax,
                          **kwargs)
@@ -128,7 +128,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                                 time_period=time_period)
     qis.plot_time_series(df=factor_attribution,
                          var_format='{:,.0%}',
-                         legend_stats=qis.LegendStats.LAST,
+                         legend_stats=qis.LegendStats.LAST_NONNAN,
                          title='Portfolio Cumulative return attribution to benchmark betas',
                          ax=ax,
                          **kwargs)
@@ -211,7 +211,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     portfolio_data.plot_vol_regimes(ax=ax,
                                     benchmark_price=benchmark_prices[regime_benchmark],
                                     time_period=time_period,
-                                    perf_params=perf_params,
+                                    freq=perf_params.freq,
                                     regime_params=regime_params,
                                     **kwargs)
     """
@@ -285,7 +285,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                 ax = fig1.add_subplot(gs[idx, idx_])
                 qis.plot_time_series(df=df,
                                      var_format='{:,.0%}',
-                                     legend_stats=qis.LegendStats.LAST,
+                                     legend_stats=qis.LegendStats.LAST_NONNAN,
                                      title=f"{key}",
                                      ax=ax,
                                      **local_kwargs)

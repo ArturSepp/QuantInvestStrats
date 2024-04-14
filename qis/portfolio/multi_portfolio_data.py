@@ -42,9 +42,10 @@ class MultiPortfolioData:
     benchmark_prices: pd.DataFrame = None
 
     def __post_init__(self):
-        self.set_navs(freq=None)  # default frequency is freq of backtests, can be non for strats at different freqs
+        # default frequency is freq of backtests, can be non for strats at different freqs
+        self.set_navs(freq=None)
 
-    def set_navs(self, freq: Optional[str] = None):
+    def set_navs(self, freq: Optional[str] = None) -> None:
         navs = []
         for portfolio in self.portfolio_datas:
             navs.append(portfolio.get_portfolio_nav())
@@ -56,9 +57,10 @@ class MultiPortfolioData:
         if self.benchmark_prices is not None:
             self.benchmark_prices = self.benchmark_prices.reindex(index=self.navs.index, method='ffill')
 
-    def _set_benchmark_prices(self, benchmark_prices: pd.DataFrame) -> None:
+    def set_benchmark_prices(self, benchmark_prices: pd.DataFrame, freq: Optional[str] = None) -> None:
+        # can pass benchmark prices here
         self.benchmark_prices = benchmark_prices
-        self.set_navs(freq=None)
+        self.set_navs(freq=freq)
 
     """
     data get methods
@@ -134,6 +136,40 @@ class MultiPortfolioData:
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
+    def plot_rolling_sharpe(self,
+                            regime_benchmark: str = None,
+                            time_period: TimePeriod = None,
+                            rolling_window: int = 1300,
+                            roll_freq: Optional[str] = None,
+                            legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
+                            title: Optional[str] = None,
+                            var_format: str = '{:.2f}',
+                            regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                            ax: plt.Subplot = None,
+                            **kwargs
+                            ) -> plt.Figure:
+
+        # do not use start end dates here so the sharpe will be continuous with different time_period
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        prices = self.get_navs(time_period=time_period)
+        fig = ppd.plot_rolling_sharpe(prices=prices,
+                                      time_period=time_period,
+                                      roll_periods=rolling_window,
+                                      roll_freq=roll_freq,
+                                      legend_stats=legend_stats,
+                                      trend_line=qis.TrendLine.ZERO_SHADOWS,
+                                      var_format=var_format,
+                                      title=title or f"5y rolling Sharpe ratio",
+                                      ax=ax,
+                                      **kwargs)
+
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
+                                    regime_params=regime_params)
+        return fig
+    
     def plot_periodic_returns(self,
                               time_period: TimePeriod = None,
                               heatmap_freq: str = 'YE',
@@ -321,7 +357,7 @@ class MultiPortfolioData:
 
         pts.plot_time_series(df=diff,
                              var_format=var_format,
-                             legend_stats=pts.LegendStats.LAST,
+                             legend_stats=pts.LegendStats.LAST_NONNAN,
                              title=f"Cumulative p&l diff {self.portfolio_datas[portfolio_idx1].nav.name}-{self.portfolio_datas[portfolio_idx2].nav.name}",
                              ax=ax,
                              **sop.update_kwargs(kwargs, dict(legend_loc='lower left')))
@@ -458,6 +494,7 @@ class MultiPortfolioData:
                              benchmark: str,
                              time_period: TimePeriod = None,
                              freq: str = 'QE',
+                             order: int = 2,
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> None:
@@ -466,11 +503,12 @@ class MultiPortfolioData:
                                          new_kwargs={'weight': 'bold',
                                                      'x_rotation': 0,
                                                      'first_color_fixed': False,
-                                                     'ci': None})
+                                                     'ci': None,
+                                                     'markersize': 6})
         prs.plot_returns_scatter(prices=prices,
                                  benchmark=benchmark,
                                  freq=freq,
-                                 order=2,
+                                 order=order,
                                  title=f"Scatterplot of {freq}-returns vs {benchmark}",
                                  ax=ax,
                                  **local_kwargs)

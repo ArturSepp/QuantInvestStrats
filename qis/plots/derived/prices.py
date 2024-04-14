@@ -369,7 +369,7 @@ def plot_prices_2ax(prices_ax1: Union[pd.DataFrame, pd.Series],
     return fig
 
 
-def plot_rolling_sharpe(prices: pd.DataFrame,
+def plot_rolling_sharpe(prices: Union[pd.Series, pd.DataFrame],
                         is_sharpe: bool = True,
                         time_period: da.TimePeriod = None,
                         roll_periods: int = 260,
@@ -387,8 +387,8 @@ def plot_rolling_sharpe(prices: pd.DataFrame,
 
     if is_sharpe:
         df = compute_rolling_sharpes(prices=prices,
-                                      roll_periods=roll_periods,
-                                      freq=freq)
+                                     roll_periods=roll_periods,
+                                     freq=freq)
     else:
         df = compute_rolling_skew(prices=prices,
                                   roll_periods=roll_periods,

@@ -25,9 +25,9 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               backtest_name: str = None,
                                               add_strategy_factsheet: bool = True,
                                               add_brinson_attribution: bool = True,
+                                              add_grouped_exposures: bool = False,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 4,
-                                              add_grouped_exposures: bool = False,
                                               **kwargs
                                               ) -> List[plt.Figure]:
     """
@@ -39,7 +39,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     if len(multi_portfolio_data.portfolio_datas) == 1:
         raise ValueError(f"must be at least two strategies")
     
-    if len(multi_portfolio_data.portfolio_datas[0].group_data) <= 7:  # otherwise tables look too bad
+    if (multi_portfolio_data.portfolio_datas[0].group_data is not None
+            and len(multi_portfolio_data.portfolio_datas[0].group_data.unique()) <= 7):  # otherwise tables look too bad
         is_grouped = True
     else:
         is_grouped = False
@@ -130,9 +131,11 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                                   ax=fig.add_subplot(gs[4:6, 3]),
                                                                   **local_kwargs)
 
+
+    post_title = f"Sharpe ratio decomposition to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
     multi_portfolio_data.portfolio_datas[0].plot_regime_data(benchmark_price=benchmark_price,
                                                              is_grouped=is_grouped,
-                                                             title=f"{multi_portfolio_data.portfolio_datas[0].nav.name}",
+                                                             title=f"{multi_portfolio_data.portfolio_datas[0].nav.name} {post_title}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
                                                              ax=fig.add_subplot(gs[6:8, 2]),
@@ -140,7 +143,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     multi_portfolio_data.portfolio_datas[1].plot_regime_data(benchmark_price=benchmark_price,
                                                              is_grouped=is_grouped,
-                                                             title=f"{multi_portfolio_data.portfolio_datas[1].nav.name}",
+                                                             title=f"{multi_portfolio_data.portfolio_datas[1].nav.name} {post_title}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
                                                              ax=fig.add_subplot(gs[6:8, 3]),
@@ -151,11 +154,11 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     multi_portfolio_data.portfolio_datas[0].plot_vol_regimes(ax=fig.add_subplot(gs[8:10, 2]),
                                                              benchmark_price=benchmark_price,
                                                              perf_params=perf_params,
-                                                             regime_params=regime_params,
+                                                             freq=regime_params.freq,
                                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
     multi_portfolio_data.portfolio_datas[1].plot_vol_regimes(ax=fig.add_subplot(gs[8:10, 3]),
                                                              benchmark_price=benchmark_price,
-                                                             perf_params=perf_params,
+                                                             freq=perf_params.freq,
                                                              regime_params=regime_params,
                                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
     """
@@ -179,7 +182,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     if add_brinson_attribution:
         with sns.axes_style("darkgrid"):
             fig = plt.figure(figsize=figsize, constrained_layout=True)
-            qis.set_suptitle(fig, title='Brinson performance attribution report')
+            fig.suptitle(f'{backtest_name} Brinson performance attribution report', fontweight="bold", fontsize=8, color='blue')
             figs.append(fig)
             gs = fig.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)
             axs = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]),

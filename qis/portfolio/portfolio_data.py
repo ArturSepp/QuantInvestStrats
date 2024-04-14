@@ -56,6 +56,7 @@ class PortfolioData:
     tickers_to_names_map: Optional[Dict[str, str]] = None  # renaming of long tickers
     group_data: pd.Series = None  # for asset class grouping
     group_order: List[str] = None
+    benchmark_prices: pd.DataFrame = None  # can pass benchmark prices here
 
     def __post_init__(self):
 
@@ -75,6 +76,12 @@ class PortfolioData:
             self.group_data = pd.Series(self.prices.columns, index=self.prices.columns)
         if self.group_order is None:
             self.group_order = list(self.group_data.unique())
+        if self.benchmark_prices is not None:
+            self.benchmark_prices = self.benchmark_prices.reindex(index=self.nav.index, method='ffill')
+
+    def set_benchmark_prices(self, benchmark_prices: pd.DataFrame) -> None:
+        # can pass benchmark prices here
+        self.benchmark_prices = benchmark_prices.reindex(index=self.nav.index, method='ffill')
 
     def save(self, ticker: str, local_path: str = './') -> None:
         datasets = dict(nav=self.nav, prices=self.prices, weights=self.weights, units=self.units,
@@ -100,15 +107,30 @@ class PortfolioData:
     NAV level getters
     """
 
-    def get_portfolio_nav(self, time_period: da.TimePeriod = None) -> pd.Series:
+    def get_portfolio_nav(self, time_period: da.TimePeriod = None, freq: Optional[str] = None) -> pd.Series:
         """
         get nav using consistent function for all return computations
         """
         if time_period is not None:
             nav_ = time_period.locate(self.nav)
         else:
-            nav_ = self.nav
+            nav_ = self.nav.copy()
+        if freq is not None:
+            nav_ = nav_.asfreq(freq=freq, method='ffill')
         return nav_
+
+    def get_portfolio_nav_with_benchmark_rices(self,
+                                               time_period: da.TimePeriod = None,
+                                               freq: Optional[str] = None
+                                               ) -> pd.DataFrame:
+        """
+        get nav using consistent function for all return computations
+        """
+        navs = self.get_portfolio_nav(time_period=time_period, freq=freq)
+        if self.benchmark_prices is not None:
+            benchmark_prices = self.benchmark_prices.reindex(index=navs.index, method='ffill')
+            navs = pd.concat([navs, benchmark_prices], axis=1)
+        return navs
 
     def get_instruments_pnl(self,
                             add_total: bool = False,
@@ -491,14 +513,53 @@ class PortfolioData:
 
     def plot_nav(self,
                  time_period: da.TimePeriod = None,
+                 add_benchmarks: bool = False,
                  ax: plt.Subplot = None,
                  **kwargs
                  ) -> None:
-        nav = self.get_portfolio_nav(time_period=time_period)
+        if add_benchmarks:
+            prices = self.get_portfolio_nav_with_benchmark_rices(time_period=time_period)
+        else:
+            prices = self.get_portfolio_nav(time_period=time_period)
         if ax is None:
             with sns.axes_style('darkgrid'):
                 fig, ax = plt.subplots(1, 1, figsize=(16, 12), tight_layout=True)
-        ppd.plot_prices(prices=nav, ax=ax, **kwargs)
+        ppd.plot_prices(prices=prices, ax=ax, **kwargs)
+
+    def plot_rolling_sharpe(self,
+                            add_benchmarks: bool = False,
+                            regime_benchmark: str = None,
+                            time_period: TimePeriod = None,
+                            rolling_window: int = 1300,
+                            roll_freq: Optional[str] = None,
+                            legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
+                            title: Optional[str] = None,
+                            var_format: str = '{:.2f}',
+                            regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                            ax: plt.Subplot = None,
+                            **kwargs
+                            ) -> plt.Figure:
+
+        # do not use start end dates here so the sharpe will be continuous with different time_period
+        if add_benchmarks:
+            prices = self.get_portfolio_nav_with_benchmark_rices(time_period=time_period)
+        else:
+            prices = self.get_portfolio_nav(time_period=time_period)
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        fig = ppd.plot_rolling_sharpe(prices=prices,
+                                      time_period=time_period,
+                                      roll_periods=rolling_window,
+                                      roll_freq=roll_freq,
+                                      legend_stats=legend_stats,
+                                      trend_line=qis.TrendLine.ZERO_SHADOWS,
+                                      var_format=var_format,
+                                      title=title or f"5y rolling Sharpe ratio",
+                                      ax=ax,
+                                      **kwargs)
+        return fig
 
     def plot_ra_perf_table(self,
                            benchmark_price: pd.Series = None,
@@ -659,21 +720,20 @@ class PortfolioData:
                          is_grouped: bool = True,
                          time_period: da.TimePeriod = None,
                          title: str = None,
-                         regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                         freq: str = 'ME',
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> plt.Figure:
 
         if is_grouped:
             prices = self.get_ac_navs(time_period=time_period)
-            title = title or f"{regime_params.freq}-returns by groups conditional on vols {str(benchmark_price.name)}"
+            title = title or f"{freq}-returns by groups conditional on vols {str(benchmark_price.name)}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
-            title = title or f"{regime_params.freq}-returns conditional on vols {str(benchmark_price.name)}"
+            title = title or f"{freq}-returns conditional on vols {str(benchmark_price.name)}"
         prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
 
-        regime_classifier = rcl.BenchmarkVolsQuantilesRegime(
-            regime_params=rcl.VolQuantileRegimeSpecs(freq=regime_params.freq))
+        regime_classifier = rcl.BenchmarkVolsQuantilesRegime(regime_params=rcl.VolQuantileRegimeSpecs(freq=freq))
         fig = qis.plot_regime_boxplot(regime_classifier=regime_classifier,
                                       prices=prices,
                                       benchmark=str(benchmark_price.name),
