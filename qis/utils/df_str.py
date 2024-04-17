@@ -242,13 +242,13 @@ def df_index_to_str(df: pd.DataFrame,
 
 
 def idx_to_alphabet(idx: int = 1, capitalise: bool = True) -> str:
- """
- map index to alphabet character
- """
- if capitalise:
-     return chr(ord('@') + idx)
- else:
-    return chr(ord('`') + idx)
+    """
+    map index to alphabet character
+    """
+    if capitalise:
+        return chr(ord('@') + idx)
+    else:
+        return chr(ord('`') + idx)
 
 
 class UnitTests(Enum):

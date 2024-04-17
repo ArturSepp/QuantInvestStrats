@@ -22,6 +22,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
                                 weight_freq: Optional[str] = 'W-WED', #'W-WED',
                                 roll_period: int = 260,
+                                beta_span: int = 52,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
                                 add_grouped_exposures: bool = False,
@@ -112,11 +113,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # benchmark betas
     ax = fig.add_subplot(gs[8:10, :2])
     factor_exposures = portfolio_data.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                        time_period=time_period)
+                                                                        time_period=time_period,
+                                                                        freq=perf_params.freq_vol,
+                                                                        span=beta_span
+                                                                        )
     qis.plot_time_series(df=factor_exposures,
                          var_format='{:,.2f}',
                          legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                         title='Portfolio Benchmark betas',
+                         title=f"Portfolio rolling {beta_span}-span Betas to Benchmarks",
                          ax=ax,
                          **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)

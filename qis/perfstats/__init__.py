@@ -77,8 +77,15 @@ from qis.perfstats.returns import (
     prices_to_scaled_nav,
     to_total_returns,
     to_zero_first_nonnan_returns,
-    df_price_ffill_between_nans,
-    to_rolling_returns
+    df_price_ffill_between_nans
+)
+
+from qis.perfstats.rolling_stats import (RollingPerfStat,
+                                         compute_rolling_perf_stat,
+                                         compute_rolling_returns,
+                                         compute_rolling_pa_returns,
+                                         compute_rolling_sharpes,
+                                         compute_rolling_skew
 )
 
 from qis.perfstats.timeseries_bfill import (

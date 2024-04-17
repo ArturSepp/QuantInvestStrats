@@ -77,7 +77,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_STRATEGY:
 
-        time_period = qis.TimePeriod('31Dec2005', '04Apr2024')  # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2005', '16Apr2024')  # time period for portfolio reporting
 
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
 

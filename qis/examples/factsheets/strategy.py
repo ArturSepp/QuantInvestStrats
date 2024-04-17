@@ -81,7 +81,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    time_period = qis.TimePeriod('31Dec2005', '12Sep2023')  # time period for portfolio reporting
+    time_period = qis.TimePeriod('31Dec2005', '16Apr2024')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2019', time_period.end)
 
     if unit_test == UnitTests.VOLPARITY_PORTFOLIO:

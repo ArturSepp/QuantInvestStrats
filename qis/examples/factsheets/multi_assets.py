@@ -23,12 +23,12 @@ def run_unit_test(unit_test: UnitTests):
 
         benchmark = 'SPY'
         tickers = [benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
-        time_period = qis.TimePeriod('31Dec2007', '12Sep2023')  # time period for reporting
+        time_period = qis.TimePeriod('31Dec2007', '16Apr2024')  # time period for reporting
 
     elif unit_test == UnitTests.BTC_SQQQ:
         benchmark = 'QQQ'
         tickers = [benchmark, 'BTC-USD', 'TQQQ', 'SQQQ']
-        time_period = qis.TimePeriod('31Dec2019', '12Sep2023')
+        time_period = qis.TimePeriod('31Dec2019', '16Apr2024')
 
     else:
         raise NotImplementedError

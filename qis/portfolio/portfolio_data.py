@@ -20,7 +20,8 @@ import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.perfstats.regime_classifier as rcl
-from qis import PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod
+from qis import (PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantileRegimeSpecs,
+                 TimePeriod, RollingPerfStat)
 
 # plots
 import qis.plots.time_series as pts
@@ -31,6 +32,10 @@ import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.returns_heatmap as rhe
 from qis.plots.derived.returns_heatmap import plot_returns_heatmap
 import qis.models.linear.ewm_factors as ef
+
+
+PERF_PARAMS = PerfParams(freq='W-WED')
+REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
 
 class MetricSpec(NamedTuple):
@@ -79,8 +84,10 @@ class PortfolioData:
         if self.benchmark_prices is not None:
             self.benchmark_prices = self.benchmark_prices.reindex(index=self.nav.index, method='ffill')
 
-    def set_benchmark_prices(self, benchmark_prices: pd.DataFrame) -> None:
+    def set_benchmark_prices(self, benchmark_prices: Union[pd.Series, pd.DataFrame]) -> None:
         # can pass benchmark prices here
+        if isinstance(benchmark_prices, pd.Series):
+            benchmark_prices = benchmark_prices.to_frame()
         self.benchmark_prices = benchmark_prices.reindex(index=self.nav.index, method='ffill')
 
     def save(self, ticker: str, local_path: str = './') -> None:
@@ -168,17 +175,17 @@ class PortfolioData:
         navs = ret.returns_to_nav(returns=pnl, constant_trade_level=constant_trade_level)
         return navs
 
-    def get_ac_navs(self,
+    def get_group_navs(self,
                     time_period: da.TimePeriod = None,
                     constant_trade_level: bool = False
                     ) -> pd.DataFrame:
-        grouped_ac_pnl = dfg.agg_df_by_groups_ax1(df=self.get_instruments_pnl(time_period=time_period),
+        grouped_pnl = dfg.agg_df_by_groups_ax1(df=self.get_instruments_pnl(time_period=time_period),
                                                   group_data=self.group_data,
                                                   agg_func=np.sum,
                                                   total_column=str(self.nav.name),
                                                   group_order=self.group_order)
-        ac_navs = ret.returns_to_nav(returns=grouped_ac_pnl, constant_trade_level=constant_trade_level)
-        return ac_navs
+        group_navs = ret.returns_to_nav(returns=grouped_pnl, constant_trade_level=constant_trade_level)
+        return group_navs
 
     def get_weights(self,
                     is_input_weights: bool = True,
@@ -367,8 +374,8 @@ class PortfolioData:
                                           ) -> pd.DataFrame:
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-        ewm_linear_model = ef.estimate_ewm_linear_model(x=ret.to_returns(prices=benchmark_prices, freq=freq),
-                                                        y=ret.to_returns(prices=instrument_prices, freq=freq),
+        ewm_linear_model = ef.estimate_ewm_linear_model(x=ret.to_returns(prices=benchmark_prices, freq=freq, is_log_returns=True),
+                                                        y=ret.to_returns(prices=instrument_prices, freq=freq, is_log_returns=True),
                                                         span=span,
                                                         is_x_correlated=True)
         exposures = self.get_exposures().reindex(index=instrument_prices.index, method='ffill')
@@ -392,7 +399,8 @@ class PortfolioData:
         total_attrib = x_attribution.sum(1)
         total = self.get_portfolio_nav().reindex(index=total_attrib.index, method='ffill').pct_change()
         residual = np.subtract(total, total_attrib)
-        # joint_attrib = pd.concat([x_attribution, total_attrib.rename('Total benchmarks'), residual.rename('Residual')], axis=1)
+        # joint_attrib = pd.concat([x_attribution, total_attrib.rename('Total benchmarks'),
+        # residual.rename('Residual')], axis=1)
         joint_attrib = pd.concat([x_attribution, residual.rename('Residual')], axis=1)
         if time_period is not None:
             joint_attrib = time_period.locate(joint_attrib)
@@ -432,10 +440,10 @@ class PortfolioData:
                                              time_period: da.TimePeriod = None
                                              ) -> pd.DataFrame:
         pnl = self.get_instruments_pnl(time_period=time_period)
-        portfolio_pnl = pnl.sum(axis=1)
+        # portfolio_pnl = pnl.sum(axis=1)
 
         pnl_risk = np.nanstd(pnl.replace({0.0: np.nan}), axis=0)
-        portfolio_pnl_risk = np.nanstd(portfolio_pnl.replace({0.0: np.nan}), axis=0)
+        # portfolio_pnl_risk = np.nanstd(portfolio_pnl.replace({0.0: np.nan}), axis=0)
         # pnl_risk_ratio = pnl_risk / portfolio_pnl_risk
         pnl_risk_ratio = pnl_risk / np.nansum(pnl_risk)
 
@@ -476,7 +484,6 @@ class PortfolioData:
         """
         insts_returns = self.get_instruments_returns(time_period=time_period)
         insts_return = ret.to_total_returns(prices=ret.returns_to_nav(returns=insts_returns))
-
         weight = self.weights
         if time_period is not None:
             weight = time_period.locate(weight)
@@ -510,10 +517,27 @@ class PortfolioData:
     """
     plotting methods
     """
+    def add_regime_shadows(self,
+                           ax: plt.Subplot,
+                           regime_benchmark: str,
+                           index: pd.Index = None,
+                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS
+                           ) -> None:
+        """
+        add regime shadows using regime_benchmark
+        """
+        if self.benchmark_prices is None:
+            raise ValueError(f"set benchmarks data")
+        pivot_prices = self.benchmark_prices[regime_benchmark]
+        if index is not None:
+            pivot_prices = pivot_prices.reindex(index=index, method='ffill')
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
 
     def plot_nav(self,
+                 regime_benchmark: str = None,
                  time_period: da.TimePeriod = None,
                  add_benchmarks: bool = False,
+                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                  ax: plt.Subplot = None,
                  **kwargs
                  ) -> None:
@@ -526,19 +550,46 @@ class PortfolioData:
                 fig, ax = plt.subplots(1, 1, figsize=(16, 12), tight_layout=True)
         ppd.plot_prices(prices=prices, ax=ax, **kwargs)
 
-    def plot_rolling_sharpe(self,
-                            add_benchmarks: bool = False,
-                            regime_benchmark: str = None,
-                            time_period: TimePeriod = None,
-                            rolling_window: int = 1300,
-                            roll_freq: Optional[str] = None,
-                            legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
-                            title: Optional[str] = None,
-                            var_format: str = '{:.2f}',
-                            regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
-                            ax: plt.Subplot = None,
-                            **kwargs
-                            ) -> plt.Figure:
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
+                                    regime_params=regime_params)
+
+    def plot_group_nav(self,
+                       regime_benchmark: str = None,
+                       time_period: da.TimePeriod = None,
+                       add_benchmarks: bool = False,
+                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                       ax: plt.Subplot = None,
+                       **kwargs
+                       ) -> None:
+        
+        group_navs = self.get_group_navs(time_period=time_period)
+        if add_benchmarks and self.benchmark_prices is not None:
+            benchmark_prices = self.benchmark_prices.reindex(index=group_navs.index, method='ffill')
+            group_navs = pd.concat([group_navs, benchmark_prices], axis=1)
+        if ax is None:
+            with sns.axes_style('darkgrid'):
+                fig, ax = plt.subplots(1, 1, figsize=(16, 12), tight_layout=True)
+        ppd.plot_prices(prices=group_navs, ax=ax, **kwargs)
+
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=group_navs.index,
+                                    regime_params=regime_params)
+            
+    def plot_rolling_perf(self,
+                          rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
+                          add_benchmarks: bool = False,
+                          regime_benchmark: str = None,
+                          time_period: TimePeriod = None,
+                          rolling_window: int = 1300,
+                          roll_freq: Optional[str] = None,
+                          legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
+                          title: Optional[str] = None,
+                          var_format: str = '{:.2f}',
+                          regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                          ax: plt.Subplot = None,
+                          **kwargs
+                          ) -> plt.Figure:
 
         # do not use start end dates here so the sharpe will be continuous with different time_period
         if add_benchmarks:
@@ -549,16 +600,20 @@ class PortfolioData:
         if ax is None:
             fig, ax = plt.subplots()
 
-        fig = ppd.plot_rolling_sharpe(prices=prices,
-                                      time_period=time_period,
-                                      roll_periods=rolling_window,
-                                      roll_freq=roll_freq,
-                                      legend_stats=legend_stats,
-                                      trend_line=qis.TrendLine.ZERO_SHADOWS,
-                                      var_format=var_format,
-                                      title=title or f"5y rolling Sharpe ratio",
-                                      ax=ax,
-                                      **kwargs)
+        fig = ppd.plot_rolling_perf_stat(prices=prices,
+                                         rolling_perf_stat=rolling_perf_stat,
+                                         time_period=time_period,
+                                         roll_periods=rolling_window,
+                                         roll_freq=roll_freq,
+                                         legend_stats=legend_stats,
+                                         trend_line=qis.TrendLine.ZERO_SHADOWS,
+                                         var_format=var_format,
+                                         title=title or f"5y rolling Sharpe ratio",
+                                         ax=ax,
+                                         **kwargs)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
+                                    regime_params=regime_params)
         return fig
 
     def plot_ra_perf_table(self,
@@ -572,7 +627,7 @@ class PortfolioData:
                            **kwargs
                            ) -> None:
         if is_grouped:
-            prices = self.get_ac_navs(time_period=time_period)
+            prices = self.get_group_navs(time_period=time_period)
             title = title or f"RA performance table by groups: {da.get_time_period(prices).to_str()}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
@@ -611,7 +666,7 @@ class PortfolioData:
                              **kwargs
                              ) -> None:
         if is_grouped:
-            prices = self.get_ac_navs(time_period=time_period)
+            prices = self.get_group_navs(time_period=time_period)
             title = title or f"Scatterplot of {freq}-returns by groups vs {str(benchmark_price.name)}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
@@ -656,7 +711,7 @@ class PortfolioData:
                               **kwargs
                               ) -> None:
         if is_grouped:
-            prices = self.get_ac_navs(time_period=time_period)
+            prices = self.get_group_navs(time_period=time_period)
             title = title or f"{heatmap_freq}-returns by groups"
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
@@ -692,11 +747,12 @@ class PortfolioData:
                          ) -> plt.Figure:
 
         if is_grouped:
-            prices = self.get_ac_navs(time_period=time_period)
-            title = title or f"Sharpe ratio decomposition by groups to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
+            prices = self.get_group_navs(time_period=time_period)
+            title = title or (f"Sharpe ratio attribution by groups to {str(benchmark_price.name)} "
+                              f"Bear/Normal/Bull regimes")
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
-            title = title or f"Sharpe ratio decomposition to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
+            title = title or f"Sharpe ratio attribution to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
 
         if benchmark_price.name not in prices.columns:
             prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
@@ -726,7 +782,7 @@ class PortfolioData:
                          ) -> plt.Figure:
 
         if is_grouped:
-            prices = self.get_ac_navs(time_period=time_period)
+            prices = self.get_group_navs(time_period=time_period)
             title = title or f"{freq}-returns by groups conditional on vols {str(benchmark_price.name)}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
@@ -814,8 +870,35 @@ class PortfolioData:
                       ax=ax,
                       **kwargs)
 
-    def plot_grouped_exposures(self):
-        self.get_exposures()
+    def plot_benchmark_betas(self,
+                             benchmark_prices: pd.DataFrame,
+                             regime_benchmark: str = None,
+                             time_period: TimePeriod = None,
+                             freq: str = 'W-WED',
+                             title: str = None,
+                             beta_span: int = 52,
+                             regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                             add_zero_line: bool = True,
+                             ax: plt.Subplot = None,
+                             **kwargs
+                             ) -> None:
+        factor_exposures = self.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
+                                                                  time_period=time_period,
+                                                                  freq=freq,
+                                                                  span=beta_span)
+        qis.plot_time_series(df=factor_exposures,
+                             var_format='{:,.2f}',
+                             legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                             title=title or f"Portfolio rolling {beta_span}-span Betas to Benchmarks",
+                             ax=ax,
+                             **kwargs)
+
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=factor_exposures.index,
+                                    regime_params=regime_params)
+
+        if add_zero_line:
+            ax.axhline(0, color='black', lw=1)
 
 
 @njit

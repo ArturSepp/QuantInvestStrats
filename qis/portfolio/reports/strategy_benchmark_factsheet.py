@@ -85,16 +85,24 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                        title='Rolling time under water',
                                                        **kwargs)
 
-    multi_portfolio_data.plot_exposures(ax=fig.add_subplot(gs[6:8, :2]),
+    multi_portfolio_data.plot_rolling_perf(ax=fig.add_subplot(gs[6:8, :2]),
+                                           regime_benchmark=regime_benchmark,
+                                           regime_params=regime_params,
+                                           rolling_window=60,
+                                           roll_freq='ME',
+                                           title='Rolling 5y Sharpe',
+                                           **kwargs)
+
+    multi_portfolio_data.plot_exposures(ax=fig.add_subplot(gs[8:10, :2]),
                                         benchmark=regime_benchmark,
                                         regime_params=regime_params,
                                         **kwargs)
-
+    """
     multi_portfolio_data.plot_exposures_diff(ax=fig.add_subplot(gs[8:10, :2]),
                                              benchmark=regime_benchmark,
                                              regime_params=regime_params,
                                              **kwargs)
-
+    """
     multi_portfolio_data.plot_turnover(ax=fig.add_subplot(gs[10:12, :2]),
                                        benchmark=regime_benchmark,
                                        regime_params=regime_params,

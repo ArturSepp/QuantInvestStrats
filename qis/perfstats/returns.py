@@ -3,12 +3,11 @@ core for computing performance
 """
 # packages
 import warnings
-from enum import Enum
-from typing import Union, Dict, Optional
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from enum import Enum
+from typing import Union, Dict, Optional
 
 # qis
 import qis.utils.dates as da
@@ -671,16 +670,6 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
     return bfilled_data
 
 
-def to_rolling_returns(prices: Union[pd.DataFrame, pd.Series],
-                       periods: int = 7
-                       ) -> Union[pd.DataFrame, pd.Series]:
-    """
-    compute rolling returns
-    """
-    returns = prices.divide(prices.shift(periods=periods)) - 1.0
-    return returns
-
-
 class UnitTests(Enum):
     TO_ZERO_NONNAN = 1
     VOL_SAMPLE = 2
@@ -748,19 +737,12 @@ def run_unit_test(unit_test: UnitTests):
         net_navs = get_net_navs(navs=nav)
         print(net_navs)
 
-    elif unit_test == UnitTests.ROLLING_RETURNS:
-        returns = to_rolling_returns(prices=prices.iloc[:, 0])
-        print(returns)
-        pts.plot_time_series(df=returns,
-                             var_format='{:.2%}',
-                             title='rollling returns')
-
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.ROLLING_RETURNS
+    unit_test = UnitTests.NET_RETURN
 
     is_run_all_tests = False
     if is_run_all_tests:
@@ -768,5 +750,3 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-
-

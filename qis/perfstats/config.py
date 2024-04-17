@@ -55,8 +55,8 @@ class PerfStat(ColVar, Enum):
     VOL = ColVar(name='Vol', short_n='An. vol', value_type=ValueType.PERCT)
     DOWNSIDE_VOL = ColVar(name='DownVol', short_n='DownVol', value_type=ValueType.PERCT)
     AVG_LOG_RETURN = ColVar(name='AvgLogReturn', short_n='AvgReturn', value_type=ValueType.PERCT)
-    SHARPE_RF0 = ColVar(name='Sharpe rf=0', short='Sharpe', short_n='Sharpe\nrf=0', value_type=ValueType.SHARPE)  # compounded returns with rate = 0.0
-    SHARPE_EXCESS = ColVar(name='Ex. Sharpe', short_n='Excess\nSharpe', value_type=ValueType.SHARPE)  #  compunded with given rate
+    SHARPE_RF0 = ColVar(name='Sharpe (rf=0)', short='Sharpe (rf=0)', short_n='Sharpe\n(rf=0)', value_type=ValueType.SHARPE)  # compounded returns with rate = 0.0
+    SHARPE_EXCESS = ColVar(name='Ex. Sharpe', short_n='Excess\nSharpe', value_type=ValueType.SHARPE)  # compunded with given rate
     SHARPE_LOG_AN = ColVar(name='An. Log Sharpe', short_n='An. Log Sharpe', value_type=ValueType.SHARPE)  # log return
     SHARPE_AVG = ColVar(name='Sharpe Avg', short_n='Sharpe Avg', value_type=ValueType.SHARPE)  # using avg return
     SHARPE_LOG_EXCESS = ColVar(name='Log Sharpe', short_n='Log Sharpe', value_type=ValueType.SHARPE)

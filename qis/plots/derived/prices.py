@@ -1,8 +1,6 @@
 # biult in
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import skew
 from typing import Optional, Union, List, Tuple
 from enum import Enum
 
@@ -10,8 +8,8 @@ from enum import Enum
 import qis.utils.dates as da
 import qis.utils.df_ops as dfo
 import qis.utils.struct_ops as sop
-import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as pt
+from qis.perfstats.rolling_stats import RollingPerfStat, compute_rolling_perf_stat
 from qis.perfstats.config import PerfStat, PerfParams
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
 
@@ -38,19 +36,55 @@ class PerformanceLabel(Enum):
     TOTAL_ARITHMETIC = 14
 
 
+class PerfStatsLabels(Enum):
+    DETAILED_WITH_DD = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, PerfStat.MAX_DD, )
+
+
+def get_performance_labels_for_stats(prices: Union[pd.DataFrame, pd.Series],
+                                     perf_stats: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, PerfStat.MAX_DD, ),
+                                     perf_params: PerfParams = None,
+                                     **kwargs
+                                     ) -> List[str]:
+
+    if any(prices.columns.duplicated()):
+        raise ValueError(f"dublicated columns:\n{prices.columns[prices.columns.duplicated()]}")
+
+    ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
+    legend_labels = []
+    for index in ra_perf_table.index:
+        name = index if isinstance(index, str) else str(index)
+        label = f"{name}: "
+        for perf_stat in perf_stats:
+            # pefromance strat is always defines using perf_stat.to_str()
+            label += f"{perf_stat.to_str(**kwargs)}={perf_stat.to_format(**kwargs).format(ra_perf_table.loc[index, perf_stat.to_str()])}, "
+        legend_labels.append(label[:-2])  # remove last ", "
+
+    return legend_labels
+
+
 def get_performance_labels(prices: Union[pd.DataFrame, pd.Series],
                            performance_label: PerformanceLabel = PerformanceLabel.DETAILED,
+                           perf_stats: List[PerfStat] = None,
                            perf_params: PerfParams = None,
-                           digits_to_show: int = 2,
+                           digits_to_show_: int = 2,  # temporary before removal
                            sharpe_format: str = '{:.2f}',
                            **kwargs
                            ) -> List[str]:
-    ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
+    """
+    performance labels for figures
+    can pass costume made list perf_stats
+    """
+    if any(prices.columns.duplicated()):
+        raise ValueError(f"dublicated columns:\n{prices.columns[prices.columns.duplicated()]}")
 
-    if digits_to_show == 2:
+    if perf_stats is not None:
+        return get_performance_labels_for_stats(prices=prices, perf_stats=perf_stats, perf_params=perf_params, **kwargs)
+
+    ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
+    if digits_to_show_ == 2:
         ra_vol_vormat = '{:.2%}'
         vol_vormat = '{:.2f}'
-    elif digits_to_show == 1:
+    elif digits_to_show_ == 1:
         ra_vol_vormat = '{:.1%}'
         vol_vormat = '{:.1f}'
     else:
@@ -369,30 +403,28 @@ def plot_prices_2ax(prices_ax1: Union[pd.DataFrame, pd.Series],
     return fig
 
 
-def plot_rolling_sharpe(prices: Union[pd.Series, pd.DataFrame],
-                        is_sharpe: bool = True,
-                        time_period: da.TimePeriod = None,
-                        roll_periods: int = 260,
-                        freq: str = None,
-                        legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
-                        var_format: str = '{:.2f}',
-                        title: Optional[str] = None,
-                        regime_benchmark_str: str = None,
-                        pivot_prices: pd.Series = None,
-                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
-                        perf_params: PerfParams = None,
-                        ax: plt.Subplot = None,
-                        **kwargs
-                        ) -> plt.Figure:
-
-    if is_sharpe:
-        df = compute_rolling_sharpes(prices=prices,
-                                     roll_periods=roll_periods,
-                                     freq=freq)
-    else:
-        df = compute_rolling_skew(prices=prices,
-                                  roll_periods=roll_periods,
-                                  freq=freq)
+def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
+                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
+                           time_period: da.TimePeriod = None,
+                           roll_periods: int = 260,
+                           roll_freq: str = None,
+                           legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
+                           var_format: str = '{:.2f}',
+                           title: Optional[str] = None,
+                           regime_benchmark_str: str = None,
+                           pivot_prices: pd.Series = None,
+                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
+                           perf_params: PerfParams = None,
+                           ax: plt.Subplot = None,
+                           **kwargs
+                           ) -> plt.Figure:
+    """
+    plot rolling performance
+    """
+    df = compute_rolling_perf_stat(prices=prices,
+                                   rolling_perf_stat=rolling_perf_stat,
+                                   roll_periods=roll_periods,
+                                   roll_freq=roll_freq)
 
     if time_period is not None:
         df = time_period.locate(df)
@@ -415,45 +447,10 @@ def plot_rolling_sharpe(prices: Union[pd.Series, pd.DataFrame],
     return fig
 
 
-def compute_rolling_sharpes(prices: Union[pd.Series, pd.DataFrame],
-                            freq: Optional[str] = None,
-                            roll_periods: int = 60,  # 5y * 12 month
-                            ) -> Union[pd.Series, pd.DataFrame]:
-    log_returns = ret.to_returns(prices=prices, freq=freq, is_log_returns=True, drop_first=False)
-    saf = np.sqrt(da.infer_an_from_data(data=log_returns))
-    sharpes = log_returns.rolling(roll_periods).apply(lambda x: compute_sharpe(x, saf=saf))
-    return sharpes
-
-
-def compute_sharpe(log_returns: Union[pd.Series, pd.DataFrame], saf: float = None) -> np.ndarray:
-    if saf is None:
-        saf = np.sqrt(da.infer_an_from_data(data=log_returns))
-    mean = np.expm1(np.nanmean(log_returns.to_numpy()))
-    vol = np.nanstd(log_returns.to_numpy(), ddof=1)
-    if np.greater(vol, 0.0):
-        sharpe = saf * mean / vol
-    else:
-        sharpe = np.nan
-    return sharpe
-
-
-def compute_rolling_skew(prices: Union[pd.Series, pd.DataFrame],
-                         freq: Optional[str] = None,
-                         roll_periods: int = 60,  # 5y * 12 month
-                         ) -> Union[pd.Series, pd.DataFrame]:
-    log_returns = ret.to_returns(prices=prices, freq=freq, is_log_returns=True, drop_first=False)
-    skw = log_returns.rolling(roll_periods).apply(lambda x: compute_skew(x))
-    return skw
-
-
-def compute_skew(log_returns: Union[pd.Series, pd.DataFrame]) -> np.ndarray:
-    skw = skew(log_returns.to_numpy(), axis=0, nan_policy='omit')
-    return skw
-
-
 class UnitTests(Enum):
-    PRICE = 1
-    PRICE_WITH_DD = 2
+    PERFORMANCE_LABELS = 1
+    PRICE = 2
+    PRICE_WITH_DD = 3
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -461,7 +458,14 @@ def run_unit_test(unit_test: UnitTests):
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
-    if unit_test == UnitTests.PRICE:
+    if unit_test == UnitTests.PERFORMANCE_LABELS:
+        this = get_performance_labels_for_stats(prices=prices, perf_stats=[PerfStat.PA_RETURN,
+                                                                           PerfStat.VOL,
+                                                                           PerfStat.SHARPE_RF0,
+                                                                           PerfStat.MAX_DD])
+        print(this)
+
+    elif unit_test == UnitTests.PRICE:
         perf_params = PerfParams(freq='B')
         plot_prices(prices=prices, perf_params=perf_params)
 
@@ -476,7 +480,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PRICE_WITH_DD
+    unit_test = UnitTests.PERFORMANCE_LABELS
 
     is_run_all_tests = False
     if is_run_all_tests:

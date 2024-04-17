@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 # qis
 import qis as qis
-from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod
+from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, RollingPerfStat
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 import qis.utils.struct_ops as sop
 import qis.utils.df_groups as dfg
@@ -88,12 +88,12 @@ class MultiPortfolioData:
             price = time_period.locate(price)
         return price
 
-    def get_ac_navs(self,
+    def get_group_navs(self,
                     portfolio_idx: int = 0,
                     benchmark: str = None,
                     time_period: TimePeriod = None
                     ) -> pd.DataFrame:
-        prices = self.portfolio_datas[portfolio_idx].get_ac_navs(time_period=time_period)
+        prices = self.portfolio_datas[portfolio_idx].get_group_navs(time_period=time_period)
         if benchmark is not None:
             benchmark_price = self.get_benchmark_price(benchmark=self.benchmark_prices.columns[0],
                                                        time_period=time_period)
@@ -136,34 +136,36 @@ class MultiPortfolioData:
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
-    def plot_rolling_sharpe(self,
-                            regime_benchmark: str = None,
-                            time_period: TimePeriod = None,
-                            rolling_window: int = 1300,
-                            roll_freq: Optional[str] = None,
-                            legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
-                            title: Optional[str] = None,
-                            var_format: str = '{:.2f}',
-                            regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                            ax: plt.Subplot = None,
-                            **kwargs
-                            ) -> plt.Figure:
+    def plot_rolling_perf(self,
+                          rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
+                          regime_benchmark: str = None,
+                          time_period: TimePeriod = None,
+                          rolling_window: int = 1300,
+                          roll_freq: Optional[str] = None,
+                          legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
+                          title: Optional[str] = None,
+                          var_format: str = '{:.2f}',
+                          regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                          ax: plt.Subplot = None,
+                          **kwargs
+                          ) -> plt.Figure:
 
         # do not use start end dates here so the sharpe will be continuous with different time_period
         if ax is None:
             fig, ax = plt.subplots()
 
         prices = self.get_navs(time_period=time_period)
-        fig = ppd.plot_rolling_sharpe(prices=prices,
-                                      time_period=time_period,
-                                      roll_periods=rolling_window,
-                                      roll_freq=roll_freq,
-                                      legend_stats=legend_stats,
-                                      trend_line=qis.TrendLine.ZERO_SHADOWS,
-                                      var_format=var_format,
-                                      title=title or f"5y rolling Sharpe ratio",
-                                      ax=ax,
-                                      **kwargs)
+        fig = ppd.plot_rolling_perf_stat(prices=prices,
+                                         rolling_perf_stat=rolling_perf_stat,
+                                         time_period=time_period,
+                                         roll_periods=rolling_window,
+                                         roll_freq=roll_freq,
+                                         legend_stats=legend_stats,
+                                         trend_line=qis.TrendLine.ZERO_SHADOWS,
+                                         var_format=var_format,
+                                         title=title or f"5y rolling Sharpe ratio",
+                                         ax=ax,
+                                         **kwargs)
 
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
@@ -282,7 +284,7 @@ class MultiPortfolioData:
         rows_edge_lines = [len(self.portfolio_datas)]
         for portfolio in self.portfolio_datas:
             portfolio_name = str(portfolio.nav.name)
-            prices_ = portfolio.get_ac_navs(time_period=time_period)
+            prices_ = portfolio.get_group_navs(time_period=time_period)
             strategy_prices.append(prices_[portfolio_name])
             if add_ac:
                 ac_prices_ = prices_.drop(portfolio_name, axis=1)
@@ -572,7 +574,7 @@ class MultiPortfolioData:
                          **kwargs
                          ) -> None:
         if is_grouped:
-            prices = self.get_ac_navs(portfolio_idx=portfolio_idx, benchmark=benchmark, time_period=time_period)
+            prices = self.get_group_navs(portfolio_idx=portfolio_idx, benchmark=benchmark, time_period=time_period)
             title = f"Sharpe ratio decomposition by Asset Group to {benchmark} Bear/Normal/Bull regimes"
         else:
             prices = self.get_navs(benchmark=benchmark, time_period=time_period)

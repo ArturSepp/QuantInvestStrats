@@ -5,7 +5,7 @@ pieplot
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 
 # qis
@@ -16,6 +16,8 @@ def plot_pie(df: [pd.Series, pd.DataFrame],
              y_column: str = None,
              ylabel: str = '',
              title: str = None,
+             colors: List[str] = None,
+             legend_loc: Optional[str] = None,
              autopct: Optional[str] = '%.0f%%',
              ax: plt.Subplot = None,
              **kwargs
@@ -28,8 +30,13 @@ def plot_pie(df: [pd.Series, pd.DataFrame],
 
     if y_column is None and isinstance(df, pd.DataFrame):
         y_column = df.columns[0]
+    if colors is None:
+        colors = put.get_cmap_colors(n=len(df.index), **kwargs)
 
-    df.plot.pie(y=y_column, autopct=autopct, ax=ax)
+    df.plot.pie(y=y_column, autopct=autopct, colors=colors, ax=ax)
+
+    if legend_loc is None:
+        ax.legend().set_visible(False)
 
     if title is not None:
         put.set_title(ax=ax, title=title, **kwargs)
@@ -56,7 +63,6 @@ def run_unit_test(unit_test: UnitTests):
 
         with sns.axes_style("darkgrid"):
             fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-
             plot_pie(df=df,
                      ax=ax,
                      **kwargs)
@@ -74,4 +80,3 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-
