@@ -13,7 +13,7 @@ def plot_vol_vs_underlying(spot: pd.Series, vol: pd.Series, time_period: qis.Tim
     kwargs = dict(fontsize=12, digits_to_show=1, sharpe_digits=2,
                   alpha_format='{0:+0.0%}',
                   beta_format='{:+0.1f}',
-                  performance_label=qis.PerformanceLabel.TOTAL_DETAILED,
+                  perf_stats_labels=qis.PerfStatsLabels.TOTAL_DETAILED.value,
                   framealpha=0.75,
                   is_fixed_n_colors=False)
 

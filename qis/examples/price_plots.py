@@ -37,7 +37,7 @@ def generate_performances(prices: pd.DataFrame,
 
     local_kwargs = dict(digits_to_show=1,
                         framealpha=0.75,
-                        performance_label=qis.PerformanceLabel.WITH_DD)
+                        perf_stats_labels=qis.PerfStatsLabels.DETAILED_WITH_DD.value)
     kwargs = qis.update_kwargs(kwargs, local_kwargs)
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 4), tight_layout=True)

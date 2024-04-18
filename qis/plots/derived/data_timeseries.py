@@ -51,7 +51,7 @@ def plot_data_timeseries(data: Union[pd.DataFrame, pd.Series],
                         start_to_one=start_to_one,
                         is_log=False,
                         var_format=var_format,
-                        performance_label=ppd.PerformanceLabel.WITH_DDVOL,
+                        perf_stats_labels=ppd.PerfStatsLabels.DETAILED_WITH_DDVOL.value,
                         ax=ax,
                         **kwargs)
     else:

@@ -70,7 +70,7 @@ with sns.axes_style("darkgrid"):
 
     # plot performance
     qis.plot_prices_with_dd(prices=prices,
-                            performance_label=qis.PerformanceLabel.ARITHMETIC,
+                            perf_stats_labels=qis.PerfStatsLabels.TOTAL.value,
                             title=f"Realized performance of strategies with short exposure to {ticker}",
                             axs=axs)
 

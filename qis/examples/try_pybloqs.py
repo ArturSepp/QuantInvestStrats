@@ -44,7 +44,7 @@ def generate_performances(prices: pd.DataFrame,
                           **kwargs
                           ) -> None:
 
-    local_kwargs = dict(digits_to_show=1, framealpha=0.75, performance_label=qis.PerformanceLabel.WITH_DD)
+    local_kwargs = dict(digits_to_show=1, framealpha=0.75, perf_stats_labels = qis.PerfStatsLabels.DETAILED_WITH_DD)
     kwargs = qis.update_kwargs(kwargs, local_kwargs)
 
     figsize = qis.get_df_table_size(df=pd.DataFrame(),

@@ -99,9 +99,8 @@ from qis.plots.time_series import (
 
 
 from qis.plots.derived.prices import (
-    PerformanceLabel,
     add_bnb_regime_shadows,
-    get_performance_labels,
+    get_performance_labels_for_stats,
     get_performance_labels_for_stats,
     PerfStatsLabels,
     plot_prices,

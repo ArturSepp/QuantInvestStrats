@@ -293,10 +293,11 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
                                               covar0: np.ndarray = None,
                                               is_corr: bool = False,
                                               nan_backfill: NanBackfill = NanBackfill.FFILL
-                                              ) -> np.ndarray:
+                                              ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     compute ewm covariance matrix time series as 3-d tensor [t, x, x]
     returns vector a is normalised by vol
+    compute normalised covar, covar for natural vars and vols
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
@@ -314,13 +315,14 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
     else:
         covar = np.where(np.isfinite(covar0), covar0, zero_covar)
 
+    output_covar_norm = np.empty((t, n, n))
     output_covar = np.empty((t, n, n))
     last_covar = covar
 
     # compute vols
     a_var = np.square(a)
     ewm_vol = np.sqrt(ewm_recursion(a=a_var, ewm_lambda=ewm_lambda, init_value=np.nanmean(a_var, axis=0), nan_backfill=nan_backfill))
-    a_norm = np.divide(a,  ewm_vol, where=np.greater(ewm_vol, 0.0))
+    a_norm = np.divide(a, ewm_vol, where=np.greater(ewm_vol, 0.0))
 
     # loop over rows
     for idx in range(0, t):  # row in x:
@@ -347,9 +349,11 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
         if nan_backfill == NanBackfill.NAN_FILL:  # fill zeros with nans
             last_covar_ = np.where(np.equal(last_covar_, zero_covar), np.nan, last_covar_)
 
-        output_covar[idx] = last_covar_
+        ewm_vol_ = ewm_vol[idx]
+        output_covar[idx] = last_covar_ * np.outer(ewm_vol_, ewm_vol_)
+        output_covar_norm[idx] = last_covar_
 
-    return output_covar
+    return output_covar_norm, output_covar, ewm_vol
 
 
 # @njit

@@ -34,7 +34,7 @@ with sns.axes_style("darkgrid"):
     qis.plot_prices(prices=prices,
                     perf_params=perf_params,
                     title='Log Performance',
-                    performance_label=qis.PerformanceLabel.TOTAL_DETAILED,
+                    perf_stats_labels=qis.PerfStatsLabels.TOTAL_DETAILED.value,
                     is_log=True,
                     ax=axs[0],
                     **kwargs)

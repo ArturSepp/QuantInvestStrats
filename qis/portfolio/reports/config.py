@@ -2,7 +2,7 @@
 configuration for performance reports
 """
 from typing import Dict, Any, Tuple
-from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat, PerformanceLabel
+from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat, PerfStatsLabels
 import yfinance as yf
 
 # default params have no risk-free rate
@@ -47,7 +47,7 @@ def fetch_default_report_kwargs(time_period: TimePeriod,
                              regime_params=BenchmarkReturnsQuantileRegimeSpecs(freq='QE'),
                              perf_columns=PERF_COLUMNS,
                              short=True,  # ra columns
-                             performance_label=PerformanceLabel.DETAILED_EXCESS_SHARPE,
+                             perf_stats_labels=(PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_EXCESS, ),
                              heatmap_freq='YE',
                              x_date_freq='YE',
                              date_format='%b-%y')
@@ -57,7 +57,7 @@ def fetch_default_report_kwargs(time_period: TimePeriod,
                              regime_params=BenchmarkReturnsQuantileRegimeSpecs(freq='ME'),
                              perf_columns=PERF_COLUMNS,
                              short=True,  # ra columns
-                             performance_label=PerformanceLabel.DETAILED_EXCESS_SHARPE,
+                             perf_stats_labels=(PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_EXCESS, ),
                              heatmap_freq='QE',
                              x_date_freq='QE',
                              date_format='%b-%y')
