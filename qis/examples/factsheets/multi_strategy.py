@@ -78,24 +78,24 @@ def run_unit_test(unit_test: UnitTests):
                                                                  time_period=time_period,
                                                                  vol_target=0.15)
 
-        fig = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
+        figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                  time_period=time_period,
                                                  **fetch_default_report_kwargs(time_period=time_period))
-        qis.save_figs_to_pdf(figs=[fig],
+        qis.save_figs_to_pdf(figs=figs,
                              file_name=f"volparity_span_factsheet_long",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
         time_period_short = TimePeriod('31Dec2019', time_period.end)
-        fig = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
+        figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                  time_period=time_period_short,
                                                  **fetch_default_report_kwargs(time_period=time_period_short))
-        qis.save_figs_to_pdf(figs=[fig],
+        qis.save_figs_to_pdf(figs=figs,
                              file_name=f"volparity_span_factsheet_short",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
-        qis.save_fig(fig=fig, file_name=f"multi_strategy", local_path=qis.local_path.get_output_path())
+        qis.save_fig(fig=figs[0], file_name=f"multi_strategy", local_path=qis.local_path.get_output_path())
 
     # plt.show()
 

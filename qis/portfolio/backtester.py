@@ -20,7 +20,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              initial_nav: float = 100,
                              funding_rate: pd.Series = None,  # on positive / negative cash balances
                              instruments_carry: pd.DataFrame = None,  # on nav
-                             rebalancing_costs: float = None,  # rebalancing costs in bp
+                             rebalancing_costs: Union[float, pd.Series] = None,  # rebalancing costs in bp
                              constant_trade_level: float = None,
                              is_rebalanced_at_first_date: bool = False,
                              ticker: str = None,
@@ -82,6 +82,11 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         instruments_carry_dt = qu.multiply_df_by_dt(df=instruments_carry, dates=prices.index, lag=0)
     else:
         instruments_carry_dt = pd.Series(0.0, index=prices.index)
+
+    if rebalancing_costs is not None:
+        if isinstance(rebalancing_costs, pd.Series):
+            rebalancing_costs = rebalancing_costs[prices.columns].to_numpy()
+
     nav, units, effective_weights, realized_costs = backtest_rebalanced_portfolio(prices=prices.to_numpy(),
                                                                                   weights=portfolio_weights.to_numpy(),
                                                                                   is_rebalancing=is_rebalancing.to_numpy(),

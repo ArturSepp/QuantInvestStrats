@@ -4,16 +4,15 @@ and generating sensitivities to parameters
 see example in qis.examples.factheets.multi_strategy.py
 """
 # packages
-import matplotlib.pyplot as plt
-from typing import Tuple
-
 import pandas as pd
-
+import matplotlib.pyplot as plt
+from typing import Tuple, List
 # qis
-import qis
+import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantileRegimeSpecs
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 
 
 def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
@@ -25,9 +24,10 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        heatmap_freq: str = 'YE',
                                        figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                        groups: pd.Series = None,
+                                       add_strategy_factsheets: bool = False,
                                        fontsize: int = 4,
                                        **kwargs
-                                       ) -> plt.Figure:
+                                       ) -> List[plt.Figure]:
     """
     for portfolio data with structurally different strategies
     for portfolios with large universe use is_grouped = True to report tunrover and exposures by groups
@@ -177,5 +177,16 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                regime_benchmark=regime_benchmark,
                                                regime_params=regime_params,
                                                **kwargs)
+    figs = [fig]
+    if add_strategy_factsheets:
+        for portfolio_data in multi_portfolio_data.portfolio_datas:
+            figs.append(generate_strategy_factsheet(portfolio_data=portfolio_data,
+                                                    benchmark_prices=multi_portfolio_data.benchmark_prices,
+                                                    perf_params=perf_params,
+                                                    regime_params=regime_params,
+                                                    add_grouped_exposures=is_grouped,
+                                                    **kwargs
+                                                    ))
+        figs = qis.to_flat_list(figs)
 
-    return fig
+    return figs
