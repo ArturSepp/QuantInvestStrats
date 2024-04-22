@@ -134,7 +134,8 @@ from qis.plots.derived.regime_scatter import plot_scatter_regression
 
 from qis.plots.derived.returns_heatmap import (
     compute_periodic_returns_by_row_table,
-    get_periodic_returns_table,
+    compute_periodic_returns_table,
+    compute_periodic_returns,
     plot_periodic_returns_table,
     plot_returns_heatmap,
     plot_returns_table,

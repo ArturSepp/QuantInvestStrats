@@ -62,15 +62,20 @@ def compute_periodic_returns_by_row_table(prices: pd.Series,
     return returns_table
 
 
-def get_periodic_returns_table(prices: Union[pd.Series, pd.DataFrame],
-                               pivot: str,
-                               heatmap_freq: str = 'YE',
-                               column_period: Optional[str] = 'ME',  # colums for pivot
-                               row_date_format: str = '%Y',
-                               is_inverse_order: bool = False,
-                               is_add_annual_column: bool = True,
-                               ytd_name: str = 'YTD'
-                               ) -> pd.DataFrame:
+def compute_periodic_returns_table(prices: pd.Series,
+                                   heatmap_freq: str = 'YE',
+                                   column_period: Optional[str] = 'ME',
+                                   row_date_format: str = '%Y',
+                                   is_inverse_order: bool = False,
+                                   is_add_annual_column: bool = True,
+                                   ytd_name: str = 'YTD'
+                                   ) -> pd.DataFrame:
+    """
+    compute table for heatmap: columns are monthly returns, rows are years
+    implemented only for single asset with price passed as series
+    """
+    if not isinstance(prices, pd.Series):
+        raise ValueError(f"prices must be pd.Series")
 
     if column_period is None:
         # insert returns returns table
@@ -84,15 +89,7 @@ def get_periodic_returns_table(prices: Union[pd.Series, pd.DataFrame],
             row_periodic_returns.index.strftime(row_date_format).to_numpy())
         periodic_returns_table = row_periodic_returns
     else:
-
-        if isinstance(prices, pd.Series):
-            pivot_price_data = prices
-        else:
-            if pivot is None:
-                pivot = prices.columns[0]
-            pivot_price_data = prices[pivot]
-
-        periodic_returns_table = compute_periodic_returns_by_row_table(prices=pivot_price_data,
+        periodic_returns_table = compute_periodic_returns_by_row_table(prices=prices,
                                                                        heatmap_freq=heatmap_freq,
                                                                        column_period=column_period)
         row_periodic_returns = ret.to_returns(prices=prices, freq=heatmap_freq,
@@ -118,8 +115,7 @@ def get_periodic_returns_table(prices: Union[pd.Series, pd.DataFrame],
     return periodic_returns_table
 
 
-def plot_returns_heatmap(prices: Union[pd.Series, pd.DataFrame],
-                         pivot: str = None,
+def plot_returns_heatmap(prices: pd.Series,
                          heatmap_freq: str = 'YE',
                          heatmap_column_freq: Optional[str] = 'ME',  # colums for pivot
                          date_format: str = '%Y',
@@ -136,14 +132,13 @@ def plot_returns_heatmap(prices: Union[pd.Series, pd.DataFrame],
                          **kwargs
                          ) -> plt.Figure:
 
-    periodic_returns_table = get_periodic_returns_table(prices=prices,
-                                                        pivot=pivot,
-                                                        heatmap_freq=heatmap_freq,
-                                                        column_period=heatmap_column_freq,
-                                                        row_date_format=date_format,
-                                                        is_inverse_order=is_inverse_order,
-                                                        is_add_annual_column=is_add_annual_column,
-                                                        ytd_name=ytd_name)
+    periodic_returns_table = compute_periodic_returns_table(prices=prices,
+                                                            heatmap_freq=heatmap_freq,
+                                                            column_period=heatmap_column_freq,
+                                                            row_date_format=date_format,
+                                                            is_inverse_order=is_inverse_order,
+                                                            is_add_annual_column=is_add_annual_column,
+                                                            ytd_name=ytd_name)
     if is_add_annual_column:
         shift = 4 if heatmap_column_freq == 'QE' else 12
         vline_columns_ = [0, shift]
@@ -208,6 +203,43 @@ def plot_returns_table(prices: pd.DataFrame,
     return fig
 
 
+def compute_periodic_returns(prices: pd.DataFrame,
+                             freq: str = 'ME',
+                             time_period: da.TimePeriod = None,
+                             total_name: str = None,
+                             add_total: bool = True,
+                             date_format: str = None,
+                             **kwargs
+                             ) -> pd.DataFrame:
+    """
+    compute returns at specified frequency for datadrfame
+    index are periods, columns are prices.columns
+    """
+    if not isinstance(prices, pd.DataFrame):
+        raise ValueError(f"prices must be dataframe")
+    if time_period is not None:
+        prices = time_period.locate(prices)
+
+    # make sure there are no gaps for heterogeneous price data
+    prices = prices.ffill().bfill()
+    data = ret.to_returns(prices=prices, freq=freq, include_start_date=True, include_end_date=True, drop_first=True)
+
+    if add_total:
+        if freq == 'ME':
+            total_name = total_name or 'last 12m'
+        elif freq == 'YE':
+            total_name = total_name or 'Total'
+        else:
+            total_name = total_name or 'total'
+        total_return = ret.to_total_returns(prices=prices).rename(total_name).to_frame().T
+        data = pd.concat([data, total_return], axis=0)
+
+    if date_format is not None:  # index may include 'Total'
+        data.index = [date.strftime(date_format) if isinstance(date, pd.Timestamp) else date for date in data.index]
+
+    return data
+
+
 def plot_periodic_returns_table(prices: pd.DataFrame,
                                 freq: str = 'ME',
                                 date_format: str = None,
@@ -215,31 +247,31 @@ def plot_periodic_returns_table(prices: pd.DataFrame,
                                 transpose: bool = True,
                                 var_format: str = '{:.0%}',
                                 total_name: str = None,
+                                add_total: bool = True,
                                 ax: plt.Subplot = None,
                                 **kwargs
                                 ) -> plt.Figure:
     """
-    plot returns at specified frequency
+    plot returns at specified frequency for datadrfame
+    columns are periods, rows are prices.columns
     """
     if time_period is not None:
         prices = time_period.locate(prices)
 
     if freq == 'ME':
         date_format = date_format or '%b'
-        total_name = total_name or 'last 12m'
     elif freq == 'YE':
         date_format = date_format or '%Y'
-        total_name = total_name or 'Total'
     else:
         date_format = date_format or '%d%b%Y'
-        total_name = total_name or 'total'
 
-    # make sure there are no gaps for heterogeneous price data
-    prices = prices.ffill().bfill()
+    data = compute_periodic_returns(prices=prices,
+                                    freq=freq,
+                                    time_period=time_period,
+                                    total_name=total_name,
+                                    add_total=add_total,
+                                    **kwargs)
 
-    data = ret.to_returns(prices=prices, freq=freq, include_start_date=True, include_end_date=True, drop_first=True)
-    total_return = ret.to_total_returns(prices=prices).rename(total_name).to_frame().T
-    data = pd.concat([data, total_return], axis=0)
     if len(data.columns) > 1:
         np_data = data.to_numpy()[:-1, :-1]  # exclude last row from cmap
     else:
@@ -335,11 +367,10 @@ def run_unit_test(unit_test: UnitTests):
         print(periodic_returns_table)
 
     elif unit_test == UnitTests.RETURNS_HEATMAP:
-        periodic_returns_table = get_periodic_returns_table(prices=prices['SPY'],
-                                                            pivot='SPY',
-                                                            column_period='ME',
-                                                            is_add_annual_column=True,
-                                                            is_inverse_order=True)
+        periodic_returns_table = compute_periodic_returns_table(prices=prices['SPY'],
+                                                                column_period='ME',
+                                                                is_add_annual_column=True,
+                                                                is_inverse_order=True)
         print(periodic_returns_table)
 
         plot_returns_heatmap(prices=prices['SPY'],
@@ -395,7 +426,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.SORTED_PERIODIC_RETURNS_TABLE
+    unit_test = UnitTests.RETURNS_HEATMAP
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -84,6 +84,7 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
                                   perf_params: PerfParams = None,
                                   perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                                   column_header: str = 'Asset',
+                                  is_convert_to_str: bool = True,
                                   **kwargs
                                   ) -> pd.DataFrame:
     """
@@ -95,9 +96,13 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
                                                              **kwargs)
     df = pd.DataFrame(index=ra_perf_table.index)
     for perf_column in perf_columns:
-        # here we can shorten the performance var for outputs
-        df[perf_column.to_str(**kwargs)] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
-                                                             var_format=perf_column.to_format(**kwargs))
+        if is_convert_to_str:
+            # here we can shorten the performance var for outputs
+            df[perf_column.to_str(**kwargs)] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
+                                                                 var_format=perf_column.to_format(**kwargs))
+        else:
+            df[perf_column.to_str(**kwargs)] = ra_perf_table[perf_column.to_str()]
+
     if drop_benchmark:
         df = df.drop(benchmark, axis=0)
     df.index.name = column_header
@@ -131,11 +136,11 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                                   **kwargs)
     if is_fig_out:
         return ptb.plot_df_table(df=ra_perf_table,
-                                transpose=transpose,
-                                special_columns_colors=special_columns_colors,
-                                fontsize=fontsize,
-                                ax=ax,
-                                **kwargs)
+                                 transpose=transpose,
+                                 special_columns_colors=special_columns_colors,
+                                 fontsize=fontsize,
+                                 ax=ax,
+                                 **kwargs)
     else:
         return ra_perf_table
 

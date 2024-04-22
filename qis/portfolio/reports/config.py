@@ -14,6 +14,7 @@ PERF_COLUMNS = (PerfStat.TOTAL_RETURN,
                 PerfStat.VOL,
                 PerfStat.SHARPE_EXCESS,
                 PerfStat.MAX_DD,
+                PerfStat.MAX_DD_VOL,
                 PerfStat.SKEWNESS,
                 PerfStat.ALPHA_AN,
                 PerfStat.BETA,
@@ -64,3 +65,32 @@ def fetch_default_report_kwargs(time_period: TimePeriod,
 
     return report_kwargs
 
+# for pybloqs
+margin_top = 1.0
+margin_bottom = 1.0
+line_height = 0.99
+font_family = 'Calibri'
+KWARGS_SUPTITLE = {'title_wrap': True, 'text_align': 'center', 'color': 'blue', 'font_size': "12px", 'font-weight': 'normal',
+                   'title_level': 1, 'line_height': 0.7, 'inherit_cfg': False,
+                   'margin_top': 0, 'margin_bottom': 0,
+                   'font-family': 'sans-serif'}
+KWARGS_TITLE = {'title_wrap': True, 'text_align': 'left', 'color': 'blue', 'font_size': "12px",
+                'title_level': 1, 'line_height': line_height, 'inherit_cfg': False,
+                'margin_top': margin_top,  'margin_bottom': margin_bottom,
+                'font-family': font_family}
+KWARGS_DESC = {'title_wrap': True, 'text_align': 'left', 'font_size': "12px", 'font-weight': 'normal',
+               'title_level': 2, 'line_height': line_height, 'inherit_cfg': False,
+               'margin_top': margin_top, 'margin_bottom': margin_bottom,
+               'font-family': font_family}
+KWARGS_TEXT = {'title_wrap': True, 'text_align': 'left', 'font_size': "12px", 'font-weight': 'normal',
+               'title_level': 2, 'line_height': line_height, 'inherit_cfg': False,
+               'margin_top': margin_top, 'margin_bottom': margin_bottom,
+               'font-family': font_family}
+KWARGS_FIG = {'title_wrap': True, 'text_align': 'left', 'font_size': "12px",
+              'title_level': 2, 'line_height': line_height, 'inherit_cfg': False,
+              'margin_top': margin_top, 'margin_bottom': margin_bottom,
+              'font-family': font_family}
+KWARGS_FOOTNOTE = {'title_wrap': True, 'text_align': 'left', 'font_size': "12px", 'font-weight': 'normal',
+                   'title_level': 3, 'line_height': line_height, 'inherit_cfg': False,
+                   'margin_top': margin_top, 'margin_bottom': margin_bottom,
+                   'font-family': font_family}

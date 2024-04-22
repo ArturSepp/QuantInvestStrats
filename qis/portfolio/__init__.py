@@ -17,3 +17,5 @@ from qis.portfolio.reports.strategy_benchmark_factsheet import generate_strategy
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
+
+from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pyblogs

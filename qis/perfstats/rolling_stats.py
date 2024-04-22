@@ -14,11 +14,12 @@ from qis.perfstats import returns as ret
 from qis.utils import dates as da
 
 
-class RollingPerfStat(Enum):
-    TOTAL_RETURNS = 1
-    PA_RETURNS = 2
-    SHARPE = 3
-    SKEW = 4
+class RollingPerfStat(str, Enum):
+    TOTAL_RETURNS = 'Total returns'
+    PA_RETURNS = 'Pa returns'
+    VOL = 'Volatility'
+    SHARPE = 'Sharp ratio'
+    SKEW = 'Skeweness'
 
 
 def compute_rolling_perf_stat(prices: Union[pd.DataFrame, pd.Series],
@@ -35,6 +36,8 @@ def compute_rolling_perf_stat(prices: Union[pd.DataFrame, pd.Series],
         perf_stat = compute_rolling_returns(prices=prices, roll_periods=roll_periods)
     elif rolling_perf_stat == RollingPerfStat.PA_RETURNS:
         perf_stat = compute_rolling_pa_returns(prices=prices, roll_periods=roll_periods)
+    elif rolling_perf_stat == RollingPerfStat.VOL:
+        perf_stat = compute_rolling_vols(prices=prices, roll_freq=roll_freq, roll_periods=roll_periods)
     elif rolling_perf_stat == RollingPerfStat.SHARPE:
         perf_stat = compute_rolling_sharpes(prices=prices, roll_freq=roll_freq, roll_periods=roll_periods)
     elif rolling_perf_stat == RollingPerfStat.SKEW:
@@ -62,6 +65,16 @@ def compute_rolling_pa_returns(prices: Union[pd.DataFrame, pd.Series],
     """
     pa_returns = prices.rolling(roll_periods).apply(lambda x: ret.compute_pa_return(x))
     return pa_returns
+
+
+def compute_rolling_vols(prices: Union[pd.Series, pd.DataFrame],
+                        roll_freq: Optional[str] = None,
+                        roll_periods: int = 260
+                        ) -> Union[pd.Series, pd.DataFrame]:
+    log_returns = ret.to_returns(prices=prices, freq=roll_freq, is_log_returns=True, drop_first=False)
+    saf = np.sqrt(da.infer_an_from_data(data=log_returns))
+    vols = saf * log_returns.rolling(roll_periods).apply(lambda x: np.nanstd(x, ddof=1))
+    return vols
 
 
 def compute_rolling_sharpes(prices: Union[pd.Series, pd.DataFrame],

@@ -96,7 +96,7 @@ from qis.models.linear.ewm_winsor_outliers import (
     OutlierPolicy,
     OutlierPolicyTypes,
     filter_outliers,
-    ewm_winsorising,
+    ewm_insample_winsorising,
     compute_ewm_score
 )
 

@@ -12,13 +12,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from enum import Enum
+import pybloqs as p
 
 # qis
 import yfinance as yf
 import qis
 from qis import PerfStat, local_path
-
-import pybloqs as p
 
 
 # define entries to show in ra perf table
@@ -44,7 +43,7 @@ def generate_performances(prices: pd.DataFrame,
                           **kwargs
                           ) -> None:
 
-    local_kwargs = dict(digits_to_show=1, framealpha=0.75, perf_stats_labels = qis.PerfStatsLabels.DETAILED_WITH_DD)
+    local_kwargs = dict(digits_to_show=1, framealpha=0.75, perf_stats_labels=qis.PerfStatsLabels.DETAILED_WITH_DD.value)
     kwargs = qis.update_kwargs(kwargs, local_kwargs)
 
     figsize = qis.get_df_table_size(df=pd.DataFrame(),

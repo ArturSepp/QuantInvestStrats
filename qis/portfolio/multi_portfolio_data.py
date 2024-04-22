@@ -194,6 +194,7 @@ class MultiPortfolioData:
                               time_period: TimePeriod = None,
                               perf_column: PerfStat = PerfStat.SHARPE_RF0,
                               perf_params: PerfParams = PERF_PARAMS,
+                              title: str = None,
                               ax: plt.Subplot = None,
                               **kwargs
                               ) -> None:
@@ -202,7 +203,7 @@ class MultiPortfolioData:
         ppt.plot_ra_perf_bars(prices=prices,
                               perf_column=perf_column,
                               perf_params=perf_params,
-                              title=f"{perf_column.to_str()}: {qis.get_time_period(prices).to_str()}",
+                              title=title or f"{perf_column.to_str()}: {qis.get_time_period(prices).to_str()}",
                               ax=ax,
                               **kwargs)
 
@@ -248,18 +249,44 @@ class MultiPortfolioData:
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
+    def get_ra_perf_table(self,
+                          benchmark: str = None,
+                          time_period: TimePeriod = None,
+                          drop_benchmark: bool = False,
+                          is_convert_to_str: bool = True,
+                          perf_params: PerfParams = PERF_PARAMS,
+                          perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+                          **kwargs
+                          ) -> pd.DataFrame:
+        if benchmark is None:
+            benchmark = self.benchmark_prices.columns[0]
+        prices = self.get_navs(benchmark=benchmark, time_period=time_period)
+        ra_perf_table = ppt.get_ra_perf_benchmark_columns(prices=prices,
+                                                          benchmark=benchmark,
+                                                          drop_benchmark=drop_benchmark,
+                                                          is_convert_to_str=is_convert_to_str,
+                                                          perf_params=perf_params,
+                                                          perf_columns=perf_columns,
+                                                          **kwargs)
+        return ra_perf_table
+
     def plot_ra_perf_table(self,
+                           benchmark: str = None,
                            time_period: TimePeriod = None,
+                           drop_benchmark: bool = False,
                            perf_params: PerfParams = PERF_PARAMS,
                            perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                            ax: plt.Subplot = None,
-                           **kwargs) -> None:
-        benchmark = self.benchmark_prices.columns[0]
+                           **kwargs
+                           ) -> None:
+        if benchmark is None:
+            benchmark = self.benchmark_prices.columns[0]
         prices = self.get_navs(benchmark=benchmark, time_period=time_period)
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=benchmark,
                                          perf_params=perf_params,
                                          perf_columns=perf_columns,
+                                         drop_benchmark=drop_benchmark,
                                          title=f"RA performance table: {qis.get_time_period(prices).to_str()}",
                                          rotation_for_columns_headers=0,
                                          ax=ax,
@@ -567,18 +594,20 @@ class MultiPortfolioData:
                          time_period: TimePeriod = None,
                          var_format: Optional[str] = None,
                          is_conditional_sharpe: bool = True,
+                         is_use_vbar: bool = False,
                          perf_params: PerfParams = PERF_PARAMS,
                          regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                         title: str = None,
                          legend_loc: Optional[str] = 'upper center',
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> None:
         if is_grouped:
             prices = self.get_group_navs(portfolio_idx=portfolio_idx, benchmark=benchmark, time_period=time_period)
-            title = f"Sharpe ratio decomposition by Asset Group to {benchmark} Bear/Normal/Bull regimes"
+            title = title or f"Sharpe ratio decomposition by Asset Group to {benchmark} Bear/Normal/Bull regimes"
         else:
             prices = self.get_navs(benchmark=benchmark, time_period=time_period)
-            title = f"Sharpe ratio decomposition by Strategies to {benchmark} Bear/Normal/Bull regimes"
+            title = title or f"Sharpe ratio decomposition by Strategies to {benchmark} Bear/Normal/Bull regimes"
         if var_format is None:
             if regime_data_to_plot == RegimeData.REGIME_SHARPE:
                 var_format = '{:.2f}'
@@ -591,6 +620,7 @@ class MultiPortfolioData:
                              is_conditional_sharpe=is_conditional_sharpe,
                              regime_data_to_plot=regime_data_to_plot,
                              var_format=var_format,
+                             is_use_vbar=is_use_vbar,
                              regime_params=regime_params,
                              legend_loc=legend_loc,
                              perf_params=perf_params,

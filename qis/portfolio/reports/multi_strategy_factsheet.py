@@ -10,8 +10,6 @@ from typing import Tuple
 # qis
 import qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantileRegimeSpecs
-
-# portfolio
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
