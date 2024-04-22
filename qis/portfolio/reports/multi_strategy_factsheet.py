@@ -185,6 +185,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                     perf_params=perf_params,
                                                     regime_params=regime_params,
                                                     add_grouped_exposures=is_grouped,
+                                                    time_period=time_period,
                                                     **kwargs
                                                     ))
         figs = qis.to_flat_list(figs)
