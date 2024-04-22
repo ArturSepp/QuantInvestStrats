@@ -90,6 +90,11 @@ class PortfolioData:
             benchmark_prices = benchmark_prices.to_frame()
         self.benchmark_prices = benchmark_prices.reindex(index=self.nav.index, method='ffill')
 
+    def set_group_data(self, group_data: pd.Series, group_order: List[str] = None) -> None:
+        self.group_data = group_data  # for asset class grouping
+        if group_order is not None:
+            self.group_order = group_order
+
     def save(self, ticker: str, local_path: str = './') -> None:
         datasets = dict(nav=self.nav, prices=self.prices, weights=self.weights, units=self.units,
                         instrument_pnl=self.instrument_pnl, realized_costs=self.realized_costs)

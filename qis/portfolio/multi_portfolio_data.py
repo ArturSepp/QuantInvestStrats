@@ -140,10 +140,10 @@ class MultiPortfolioData:
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
-                          rolling_window: int = 1300,
+                          rolling_window: int = 260,
                           roll_freq: Optional[str] = None,
                           legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
-                          title: Optional[str] = None,
+                          sharpe_title: Optional[str] = None,
                           var_format: str = '{:.2f}',
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           ax: plt.Subplot = None,
@@ -155,6 +155,8 @@ class MultiPortfolioData:
             fig, ax = plt.subplots()
 
         prices = self.get_navs(time_period=time_period)
+        if roll_freq is None:
+            roll_freq = pd.infer_freq(index=prices.index)
         fig = ppd.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
@@ -163,7 +165,7 @@ class MultiPortfolioData:
                                          legend_stats=legend_stats,
                                          trend_line=qis.TrendLine.ZERO_SHADOWS,
                                          var_format=var_format,
-                                         title=title or f"5y rolling Sharpe ratio",
+                                         title=sharpe_title or f"{rolling_window}-window Sharpe ratio for {roll_freq}-returns",
                                          ax=ax,
                                          **kwargs)
 
@@ -474,7 +476,10 @@ class MultiPortfolioData:
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                          beta_freq: str = 'B',
+                          beta_span: int = 260,
                           var_format: str = '{:,.2f}',
+                          beta_title: str = None,
                           axs: List[plt.Subplot] = None,
                           **kwargs
                           ) -> None:
@@ -484,6 +489,8 @@ class MultiPortfolioData:
         factor_exposures = {factor: [] for factor in benchmark_prices.columns}
         for portfolio in self.portfolio_datas:
             factor_exposure = portfolio.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
+                                                                          freq=beta_freq,
+                                                                          span=beta_span,
                                                                           time_period=time_period)
             for factor in factor_exposure.columns:
                 factor_exposures[factor].append(factor_exposure[factor].rename(portfolio.nav.name))
@@ -493,14 +500,21 @@ class MultiPortfolioData:
 
         for idx, factor in enumerate(benchmark_prices.columns):
             factor_exposure = pd.concat(factor_exposures[factor], axis=1)
+            if beta_title is not None:
+                beta_title = f"{beta_title} to {factor}"
+            else:
+                beta_title = f"Rolling {beta_span}-span of {beta_freq}-returns to {factor}"
             pts.plot_time_series(df=factor_exposure,
                                  var_format=var_format,
                                  legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                                 title=f"Factor exposure to {factor}",
+                                 title=f"{beta_title}",
                                  ax=axs[idx],
                                  **kwargs)
             if regime_benchmark is not None:
-                self.add_regime_shadows(ax=axs[idx], regime_benchmark=regime_benchmark, index=factor_exposure.index, regime_params=regime_params)
+                self.add_regime_shadows(ax=axs[idx],
+                                        regime_benchmark=regime_benchmark,
+                                        index=factor_exposure.index,
+                                        regime_params=regime_params)
 
     def plot_nav_with_dd(self,
                          time_period: TimePeriod = None,

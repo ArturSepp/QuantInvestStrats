@@ -15,7 +15,7 @@ from qis.portfolio.portfolio_data import PortfolioData
 
 
 def backtest_model_portfolio(prices: pd.DataFrame,
-                             weights: Union[Dict[str, float], List[float], np.ndarray, pd.DataFrame],  # can be nan
+                             weights: Union[Dict[str, float], List[float], np.ndarray, pd.DataFrame, pd.Series],
                              rebalance_freq: str = 'QE',
                              initial_nav: float = 100,
                              funding_rate: pd.Series = None,  # on positive / negative cash balances
@@ -31,6 +31,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
     include_start_date if index rebalanced at start date
     the safest weight is to pass weights as Dict or pd.Dataframe - this enforces the alignment with prices
     """
+
+    if isinstance(weights, pd.Series):  # map to dict
+        weights = weights.to_dict()
 
     if isinstance(weights, Dict):  # map to np
         qu.assert_list_subset(large_list=prices.columns.to_list(),
