@@ -62,6 +62,7 @@ class PortfolioData:
     group_data: pd.Series = None  # for asset class grouping
     group_order: List[str] = None
     benchmark_prices: pd.DataFrame = None  # can pass benchmark prices here
+    ticker: str = None
 
     def __post_init__(self):
 
@@ -91,9 +92,10 @@ class PortfolioData:
         self.benchmark_prices = benchmark_prices.reindex(index=self.nav.index, method='ffill')
 
     def set_group_data(self, group_data: pd.Series, group_order: List[str] = None) -> None:
-        self.group_data = group_data  # for asset class grouping
-        if group_order is not None:
-            self.group_order = group_order
+        self.group_data = group_data
+        if group_order is None:
+            group_order = group_data.to_list()
+        self.group_order = group_order
 
     def save(self, ticker: str, local_path: str = './') -> None:
         datasets = dict(nav=self.nav, prices=self.prices, weights=self.weights, units=self.units,
@@ -108,12 +110,6 @@ class PortfolioData:
         dataset_keys = ['nav', 'prices', 'weights', 'units', 'instrument_pnl', 'realized_costs', 'group_data']
         datasets = fu.load_df_dict_from_csv(dataset_keys=dataset_keys, file_name=ticker)
         return cls(**datasets)
-
-    def set_group_data(self, group_data: pd.Series, group_order: List[str] = None) -> None:
-        self.group_data = group_data
-        if group_order is None:
-            group_order = list(group_data.unique())
-        self.group_order = group_order
 
     """
     NAV level getters
@@ -372,16 +368,17 @@ class PortfolioData:
         total_pnl = realized_pnl.add(mtm_pnl)
         return avg_costs, realized_pnl, mtm_pnl, total_pnl, trades
 
-    def compute_portfolio_benchmark_betas(self, benchmark_prices: pd.DataFrame,
+    def compute_portfolio_benchmark_betas(self,
+                                          benchmark_prices: pd.DataFrame,
                                           time_period: da.TimePeriod = None,
-                                          freq: str = None,
-                                          span: int = 65  # quarter
+                                          beta_freq: str = None,
+                                          factor_beta_span: int = 65  # quarter
                                           ) -> pd.DataFrame:
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-        ewm_linear_model = ef.estimate_ewm_linear_model(x=ret.to_returns(prices=benchmark_prices, freq=freq, is_log_returns=True),
-                                                        y=ret.to_returns(prices=instrument_prices, freq=freq, is_log_returns=True),
-                                                        span=span,
+        ewm_linear_model = ef.estimate_ewm_linear_model(x=ret.to_returns(prices=benchmark_prices, freq=beta_freq, is_log_returns=True),
+                                                        y=ret.to_returns(prices=instrument_prices, freq=beta_freq, is_log_returns=True),
+                                                        span=factor_beta_span,
                                                         is_x_correlated=True)
         exposures = self.get_exposures().reindex(index=instrument_prices.index, method='ffill')
         benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(asset_exposures=exposures)
@@ -397,7 +394,7 @@ class PortfolioData:
                                                 span: int = 63  # quarter
                                                 ) -> pd.DataFrame:
         portfolio_benchmark_betas = self.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                           freq=freq, span=span)
+                                                                           beta_freq=freq, factor_beta_span=span)
         benchmark_prices = benchmark_prices.reindex(index=portfolio_benchmark_betas.index, method='ffill')
         x = ret.to_returns(prices=benchmark_prices, freq=freq)
         x_attribution = (portfolio_benchmark_betas.shift(1)).multiply(x)
@@ -633,13 +630,12 @@ class PortfolioData:
                            ) -> None:
         if is_grouped:
             prices = self.get_group_navs(time_period=time_period)
-            title = title or f"RA performance table by groups: {da.get_time_period(prices).to_str()}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
-            title = title or f"RA performance table: {da.get_time_period(prices).to_str()}"
         if benchmark_price is not None:
             if benchmark_price.name not in prices.columns:
                 prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
+            title = title or f"RA performance table with beta to {benchmark_price.name}: {da.get_time_period(prices).to_str()}"
             ppt.plot_ra_perf_table_benchmark(prices=prices,
                                              benchmark=str(benchmark_price.name),
                                              perf_params=perf_params,
@@ -652,6 +648,7 @@ class PortfolioData:
                                              ax=ax,
                                              **kwargs)
         else:
+            title = title or f"RA performance table: {da.get_time_period(prices).to_str()}"
             ppt.plot_ra_perf_table(prices=prices,
                                    perf_params=perf_params,
                                    perf_columns=rpt.COMPACT_TABLE_COLUMNS,
@@ -672,10 +669,10 @@ class PortfolioData:
                              ) -> None:
         if is_grouped:
             prices = self.get_group_navs(time_period=time_period)
-            title = title or f"Scatterplot of {freq}-returns by groups vs {str(benchmark_price.name)}"
+            title = title or f"Scatterplot of {freq}-freq returns by groups vs {str(benchmark_price.name)}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
-            title = title or f"Scatterplot of {freq}-returns vs {str(benchmark_price.name)}"
+            title = title or f"Scatterplot of {freq}-freq returns vs {str(benchmark_price.name)}"
         prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
         local_kwargs = sop.update_kwargs(kwargs=kwargs,
                                          new_kwargs={'weight': 'bold',
@@ -728,13 +725,12 @@ class PortfolioData:
             hline_rows = None
 
         rhe.plot_periodic_returns_table(prices=prices,
-                                        freq=heatmap_freq,
                                         ax=ax,
                                         title=title,
                                         date_format=date_format,
                                         transpose=transpose,
                                         hline_rows=hline_rows,
-                                        **kwargs)
+                                        **qis.update_kwargs(kwargs, dict(freq=heatmap_freq)))
 
     def plot_regime_data(self,
                          benchmark_price: pd.Series,
@@ -889,8 +885,8 @@ class PortfolioData:
                              ) -> None:
         factor_exposures = self.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                   time_period=time_period,
-                                                                  freq=freq,
-                                                                  span=beta_span)
+                                                                  beta_freq=freq,
+                                                                  factor_beta_span=beta_span)
         qis.plot_time_series(df=factor_exposures,
                              var_format='{:,.2f}',
                              legend_stats=qis.LegendStats.AVG_NONNAN_LAST,

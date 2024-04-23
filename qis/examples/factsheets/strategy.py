@@ -44,7 +44,8 @@ def generate_volparity_portfolio(prices: pd.DataFrame,
                                  group_data: pd.Series,
                                  time_period: TimePeriod = None,
                                  span: int = 60,
-                                 vol_target: float = 0.15
+                                 vol_target: float = 0.15,
+                                 rebalancing_costs: float = 0.0010
                                  ) -> PortfolioData:
     ra_returns, weights, ewm_vol = qis.compute_ra_returns(returns=qis.to_returns(prices=prices, is_log_returns=True),
                                                           span=span,
@@ -56,6 +57,7 @@ def generate_volparity_portfolio(prices: pd.DataFrame,
 
     volparity_portfolio = qis.backtest_model_portfolio(prices=prices,
                                                        weights=weights,
+                                                       rebalancing_costs=rebalancing_costs,
                                                        is_output_portfolio_data=True,
                                                        ticker='VolParity')
     volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
@@ -64,10 +66,12 @@ def generate_volparity_portfolio(prices: pd.DataFrame,
 
 def generate_equity_bond_portfolio(prices: pd.DataFrame,
                                    weights: List[float],
-                                   group_data: pd.Series
+                                   group_data: pd.Series,
+                                   rebalancing_costs: float = 0.0010
                                    ) -> PortfolioData:
     volparity_portfolio = qis.backtest_model_portfolio(prices=prices,
                                                        weights=weights,
+                                                       rebalancing_costs=rebalancing_costs,
                                                        is_output_portfolio_data=True,
                                                        ticker='EquityBond')
     volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
@@ -83,6 +87,7 @@ def run_unit_test(unit_test: UnitTests):
 
     time_period = qis.TimePeriod('31Dec2005', '16Apr2024')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2019', time_period.end)
+    rebalancing_costs = 0.0010  # per traded volume
 
     if unit_test == UnitTests.VOLPARITY_PORTFOLIO:
 
@@ -91,20 +96,23 @@ def run_unit_test(unit_test: UnitTests):
                                                       group_data=group_data,
                                                       time_period=time_period,
                                                       span=30,
-                                                      vol_target=0.15)
+                                                      vol_target=0.15,
+                                                      rebalancing_costs=rebalancing_costs)
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                              benchmark_prices=benchmark_prices,
-                                              time_period=time_period,
-                                              **fetch_default_report_kwargs(time_period=time_period))
+                                               benchmark_prices=benchmark_prices,
+                                               time_period=time_period,
+                                               **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_long",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                              benchmark_prices=benchmark_prices,
-                                              time_period=time_period_short,
-                                              **fetch_default_report_kwargs(time_period=time_period_short))
+                                               benchmark_prices=benchmark_prices,
+                                               add_grouped_exposures=True,
+                                               add_grouped_cum_pnl=True,
+                                               time_period=time_period_short,
+                                               **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_short",
                              orientation='landscape',
@@ -116,20 +124,25 @@ def run_unit_test(unit_test: UnitTests):
         prices, benchmark_prices, group_data = fetch_equity_bond()
         portfolio_data = generate_equity_bond_portfolio(prices=prices,
                                                         weights=[0.6, 0.4],
-                                                        group_data=group_data)
+                                                        group_data=group_data,
+                                                        rebalancing_costs=rebalancing_costs)
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                              benchmark_prices=benchmark_prices,
-                                              time_period=time_period,
-                                              **fetch_default_report_kwargs(time_period=time_period))
+                                               benchmark_prices=benchmark_prices,
+                                               add_grouped_exposures=True,
+                                               add_grouped_cum_pnl=True,
+                                               time_period=time_period,
+                                               **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_long",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                              benchmark_prices=benchmark_prices,
-                                              time_period=TimePeriod('31Dec2019', time_period_short),
-                                              **fetch_default_report_kwargs(time_period=time_period_short))
+                                               benchmark_prices=benchmark_prices,
+                                               add_grouped_exposures=True,
+                                               add_grouped_cum_pnl=True,
+                                               time_period=TimePeriod('31Dec2019', time_period_short),
+                                               **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
                              orientation='landscape',

@@ -38,7 +38,8 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
                                       group_data: pd.Series,
                                       time_period: TimePeriod,
                                       spans: List[int] = (5, 10, 20, 40, 60, 120),
-                                      vol_target: float = 0.15
+                                      vol_target: float = 0.15,
+                                      rebalancing_costs: float = 0.0010
                                       ) -> MultiPortfolioData:
     """
     generate volparity sensitivity to span
@@ -51,7 +52,7 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
         weights = weights.divide(weights.sum(1), axis=0)
         portfolio_data = qis.backtest_model_portfolio(prices=prices,
                                                       weights=time_period.locate(weights),
-                                                      rebalancing_costs=0.0005,
+                                                      rebalancing_costs=rebalancing_costs,
                                                       is_output_portfolio_data=True,
                                                       ticker=f"VP span-{span}")
         portfolio_data.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
@@ -76,11 +77,13 @@ def run_unit_test(unit_test: UnitTests):
                                                                  benchmark_prices=benchmark_prices,
                                                                  group_data=group_data,
                                                                  time_period=time_period,
-                                                                 vol_target=0.15)
+                                                                 vol_target=0.15,
+                                                                 rebalancing_costs=0.0010  # per traded volume
+                                                                 )
 
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
-                                                 time_period=time_period,
-                                                 **fetch_default_report_kwargs(time_period=time_period))
+                                                  time_period=time_period,
+                                                  **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"volparity_span_factsheet_long",
                              orientation='landscape',
@@ -88,8 +91,8 @@ def run_unit_test(unit_test: UnitTests):
 
         time_period_short = TimePeriod('31Dec2019', time_period.end)
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
-                                                 time_period=time_period_short,
-                                                 **fetch_default_report_kwargs(time_period=time_period_short))
+                                                  time_period=time_period_short,
+                                                  **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"volparity_span_factsheet_short",
                              orientation='landscape',

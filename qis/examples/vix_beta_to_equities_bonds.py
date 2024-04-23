@@ -43,7 +43,7 @@ with sns.axes_style("darkgrid"):
     # plot vix betas to benchmarks
     span = 63  # use 3m for half-live
     vix_benchmark_betas = vix_portfolio.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                          span=span)
+                                                                          factor_beta_span=span)
     qis.plot_time_series(df=vix_benchmark_betas,
                          var_format='{:,.2f}',
                          legend_stats=qis.LegendStats.AVG_LAST,

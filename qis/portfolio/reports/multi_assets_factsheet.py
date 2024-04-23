@@ -86,14 +86,16 @@ class MultiAssetsReport:
                            benchmark: str,
                            time_period: TimePeriod = None,
                            perf_columns: List[PerfStat] = qis.BENCHMARK_TABLE_COLUMNS,
+                           title: Optional[str] = None,
                            ax: plt.Subplot = None,
                            **kwargs) -> None:
         prices = self.get_prices(benchmark, time_period=time_period)
+        title = title or f"RA performance table with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
         qis.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=benchmark,
                                          perf_params=self.perf_params,
                                          perf_columns=perf_columns,
-                                         title=f"RA performance table: {qis.get_time_period(prices).to_str()}",
+                                         title=title,
                                          rotation_for_columns_headers=0,
                                          ax=ax,
                                          **kwargs)
@@ -199,7 +201,7 @@ class MultiAssetsReport:
         qis.plot_returns_corr_table(prices=prices,
                                     x_rotation=90,
                                     freq=freq,
-                                    title=f"Correlation {freq} returns: {qis.get_time_period(prices).to_str()}",
+                                    title=f"Correlation {freq}-freq returns: {qis.get_time_period(prices).to_str()}",
                                     ax=ax,
                                     **local_kwargs)
 
@@ -220,25 +222,31 @@ class MultiAssetsReport:
                                  benchmark=benchmark,
                                  order=order,
                                  freq=freq,
-                                 title=f"Scatterplot of {self.perf_params.freq_reg}-returns vs {benchmark}",
+                                 title=f"Scatterplot of {self.perf_params.freq_reg}-freq returns vs {benchmark}",
                                  ax=ax,
                                  **local_kwargs)
 
     def plot_benchmark_beta(self,
                             benchmark: str,
-                            freq: str = 'ME',
-                            span: int = 12,
+                            beta_freq: str = 'ME',
+                            factor_beta_span: int = 12,
+                            factor_beta_title: Optional[str] = None,
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,
                             **kwargs) -> None:
-        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=freq)
+        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=beta_freq)
+        if factor_beta_title is not None:
+            factor_beta_title = f"{factor_beta_title} to {benchmark}"
+        else:
+            factor_beta_title = factor_beta_title or f"{factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {benchmark}"
+
         ewm_linear_model = qis.estimate_ewm_linear_model(x=returns[benchmark].to_frame(),
                                                          y=returns.drop(benchmark, axis=1),
-                                                         span=span,
+                                                         span=factor_beta_span,
                                                          is_x_correlated=True)
         ewm_linear_model.plot_factor_loadings(factor=benchmark,
                                               time_period=time_period,
-                                              title=f"Rolling EWM span-{span:0.0f} beta to {benchmark}",
+                                              title=factor_beta_title,
                                               ax=ax,
                                               **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, time_period=time_period, data_df=self.prices)
@@ -247,10 +255,10 @@ class MultiAssetsReport:
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
-                          rolling_window: int = 3*252,
-                          roll_freq: Optional[str] = None,
+                          sharpe_title: Optional[str] = None,
+                          sharpe_rolling_window: int = 3 * 252,
+                          sharpe_freq: Optional[str] = None,
                           legend_stats: LegendStats = LegendStats.AVG_LAST,
-                          title: Optional[str] = None,
                           var_format: str = '{:.2f}',
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           ax: plt.Subplot = None,
@@ -260,16 +268,16 @@ class MultiAssetsReport:
         # do not use start end dates here so the sharpe will be continuous with different time_period
         if ax is None:
             fig, ax = plt.subplots()
-
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark)
+        sharpe_title = sharpe_title or f"{sharpe_rolling_window}-period rolling {rolling_perf_stat.value} for {sharpe_freq}-returns"
         fig = qis.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
-                                         roll_periods=rolling_window,
-                                         roll_freq=roll_freq,
+                                         roll_periods=sharpe_rolling_window,
+                                         roll_freq=sharpe_freq,
                                          legend_stats=legend_stats,
                                          var_format=var_format,
-                                         title=title or f"3y rolling {rolling_perf_stat.value}",
+                                         title=sharpe_title,
                                          ax=ax,
                                          **kwargs)
 
@@ -283,11 +291,12 @@ class MultiAssetsReport:
                          time_period: TimePeriod = None,
                          var_format: Optional[str] = None,
                          is_conditional_sharpe: bool = True,
+                         title: str = None,
                          legend_loc: Optional[str] = 'upper center',
                          ax: plt.Subplot = None,
                          **kwargs) -> None:
         prices = self.get_prices(time_period=time_period)
-        title = f"Sharpe ratio decomposition by Strategies to {benchmark} Bear/Normal/Bull regimes"
+        title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {self.regime_params.freq}-freq regimes"
         regime_classifier = qis.BenchmarkReturnsQuantilesRegime(regime_params=self.regime_params)
         qis.plot_regime_data(regime_classifier=regime_classifier,
                              prices=prices,
@@ -308,7 +317,6 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    perf_params: PerfParams = PERF_PARAMS,
                                    regime_params: qis.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                    heatmap_freq: str = 'YE',
-                                   corr_freq: str = 'ME',
                                    time_period: TimePeriod = None,  # time period for reporting
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                    **kwargs
@@ -377,20 +385,23 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
 
     time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
     # change regression to weekly
+    time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+    if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
+        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED'))
+    else:
+        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1))
     report.plot_ra_perf_table(benchmark=benchmark,
                               ax=fig.add_subplot(gs[1, 2:]),
-                              **qis.update_kwargs(kwargs, dict(time_period=time_period1,
-                                                               alpha_an_factor=52,
-                                                               freq_reg='W-WED')))
+                              **local_kwargs)
 
     report.plot_annual_returns(ax=fig.add_subplot(gs[2:4, 2:]),
                                heatmap_freq=heatmap_freq,
                                **kwargs)
 
-    report.plot_corr_table(freq=corr_freq,
+    report.plot_corr_table(freq=perf_params.freq,
                            ax=fig.add_subplot(gs[4, 2]),
                            **kwargs)
-    report.plot_corr_table(freq=corr_freq,
+    report.plot_corr_table(freq=perf_params.freq,
                            ax=fig.add_subplot(gs[4, 3]),
                            **qis.update_kwargs(kwargs, dict(time_period=time_period1)))
 

@@ -140,10 +140,10 @@ class MultiPortfolioData:
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
-                          rolling_window: int = 260,
-                          roll_freq: Optional[str] = None,
-                          legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
+                          sharpe_rolling_window: int = 260,
+                          sharpe_freq: Optional[str] = None,
                           sharpe_title: Optional[str] = None,
+                          legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                           var_format: str = '{:.2f}',
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           ax: plt.Subplot = None,
@@ -155,17 +155,19 @@ class MultiPortfolioData:
             fig, ax = plt.subplots()
 
         prices = self.get_navs(time_period=time_period)
-        if roll_freq is None:
-            roll_freq = pd.infer_freq(index=prices.index)
+        if sharpe_freq is None:
+            sharpe_freq = pd.infer_freq(index=prices.index)
+
+        sharpe_title = sharpe_title or f"{sharpe_rolling_window}-period rolling Sharpe ratio for {sharpe_freq}-returns"
         fig = ppd.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
-                                         roll_periods=rolling_window,
-                                         roll_freq=roll_freq,
+                                         roll_periods=sharpe_rolling_window,
+                                         roll_freq=sharpe_freq,
                                          legend_stats=legend_stats,
                                          trend_line=qis.TrendLine.ZERO_SHADOWS,
                                          var_format=var_format,
-                                         title=sharpe_title or f"{rolling_window}-window Sharpe ratio for {roll_freq}-returns",
+                                         title=sharpe_title,
                                          ax=ax,
                                          **kwargs)
 
@@ -327,13 +329,15 @@ class MultiPortfolioData:
             prices = pd.concat([benchmark_price, strategy_prices, ac_prices],axis=1)
         else:
             prices = pd.concat([strategy_prices, benchmark_price], axis=1)
+
+        ra_perf_title = f"RA performance table by Asset Group with beta to {benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=str(benchmark_price.name),
                                          perf_params=perf_params,
                                          perf_columns=perf_columns,
                                          drop_benchmark=drop_benchmark,
                                          rows_edge_lines=rows_edge_lines,
-                                         title=f"RA performance table by Asset Group: {qis.get_time_period(prices).to_str()}",
+                                         title=ra_perf_title,
                                          rotation_for_columns_headers=0,
                                          row_height=0.5,
                                          ax=ax,
@@ -417,10 +421,11 @@ class MultiPortfolioData:
             self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=diff.index, regime_params=regime_params)
 
     def plot_turnover(self,
-                      roll_period: int = 260,
                       benchmark: str = None,
                       time_period: TimePeriod = None,
                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                      turnover_rolling_period: Optional[int] = 260,
+                      turnover_title: Optional[str] = None,
                       var_format: str = '{:.0%}',
                       ax: plt.Subplot = None,
                       **kwargs) -> None:
@@ -429,23 +434,26 @@ class MultiPortfolioData:
         for portfolio in self.portfolio_datas:
             turnover.append(portfolio.get_turnover(roll_period=None, is_agg=True).rename(portfolio.nav.name))
         turnover = pd.concat(turnover, axis=1)
-        if roll_period is not None:
-            turnover = turnover.rolling(roll_period).sum()
+        if turnover_rolling_period is not None:
+            turnover = turnover.rolling(turnover_rolling_period).sum()
         if time_period is not None:
             turnover = time_period.locate(turnover)
-
+        
+        freq = pd.infer_freq(turnover.index)
+        turnover_title = turnover_title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
         pts.plot_time_series(df=turnover,
                              var_format=var_format,
                              y_limits=(0.0, None),
                              legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                             title='Annualized daily Turnover',
+                             title=turnover_title,
                              ax=ax,
                              **kwargs)
         if benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=turnover.index, regime_params=regime_params)
 
     def plot_costs(self,
-                   roll_period: int = 260,
+                   cost_rolling_period: Optional[int] = 260,
+                   cost_title: Optional[str] = None,
                    benchmark: str = None,
                    time_period: TimePeriod = None,
                    regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
@@ -457,15 +465,18 @@ class MultiPortfolioData:
         for portfolio in self.portfolio_datas:
             costs.append(portfolio.get_costs(roll_period=None, is_agg=True, is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
         costs = pd.concat(costs, axis=1)
-        if roll_period is not None:
-            costs = costs.rolling(roll_period).sum()
+        if cost_rolling_period is not None:
+            costs = costs.rolling(cost_rolling_period).sum()
         if time_period is not None:
             costs = time_period.locate(costs)
+
+        freq = pd.infer_freq(costs.index)
+        cost_title = cost_title or f"{cost_rolling_period}-period rolling {freq}-freq Costs %"
         pts.plot_time_series(df=costs,
                              var_format=var_format,
                              y_limits=(0.0, None),
                              legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                             title='1y Rolling Costs %',
+                             title=cost_title,
                              ax=ax,
                              **kwargs)
         if benchmark is not None:
@@ -477,9 +488,9 @@ class MultiPortfolioData:
                           time_period: TimePeriod = None,
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           beta_freq: str = 'B',
-                          beta_span: int = 260,
+                          factor_beta_span: int = 260,
                           var_format: str = '{:,.2f}',
-                          beta_title: str = None,
+                          factor_beta_title: Optional[str] = None,
                           axs: List[plt.Subplot] = None,
                           **kwargs
                           ) -> None:
@@ -489,8 +500,8 @@ class MultiPortfolioData:
         factor_exposures = {factor: [] for factor in benchmark_prices.columns}
         for portfolio in self.portfolio_datas:
             factor_exposure = portfolio.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                          freq=beta_freq,
-                                                                          span=beta_span,
+                                                                          beta_freq=beta_freq,
+                                                                          factor_beta_span=factor_beta_span,
                                                                           time_period=time_period)
             for factor in factor_exposure.columns:
                 factor_exposures[factor].append(factor_exposure[factor].rename(portfolio.nav.name))
@@ -500,14 +511,14 @@ class MultiPortfolioData:
 
         for idx, factor in enumerate(benchmark_prices.columns):
             factor_exposure = pd.concat(factor_exposures[factor], axis=1)
-            if beta_title is not None:
-                beta_title = f"{beta_title} to {factor}"
+            if factor_beta_title is not None:
+                factor_beta_title = f"{factor_beta_title} to {factor}"
             else:
-                beta_title = f"Rolling {beta_span}-span of {beta_freq}-returns to {factor}"
+                factor_beta_title = factor_beta_title or f"{factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {factor}"
             pts.plot_time_series(df=factor_exposure,
                                  var_format=var_format,
                                  legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                                 title=f"{beta_title}",
+                                 title=f"{factor_beta_title}",
                                  ax=axs[idx],
                                  **kwargs)
             if regime_benchmark is not None:
@@ -552,7 +563,7 @@ class MultiPortfolioData:
                                  benchmark=benchmark,
                                  freq=freq,
                                  order=order,
-                                 title=f"Scatterplot of {freq}-returns vs {benchmark}",
+                                 title=f"Scatterplot of {freq}-freq returns vs {benchmark}",
                                  ax=ax,
                                  **local_kwargs)
 
@@ -618,15 +629,15 @@ class MultiPortfolioData:
                          ) -> None:
         if is_grouped:
             prices = self.get_group_navs(portfolio_idx=portfolio_idx, benchmark=benchmark, time_period=time_period)
-            title = title or f"Sharpe ratio decomposition by Asset Group to {benchmark} Bear/Normal/Bull regimes"
         else:
             prices = self.get_navs(benchmark=benchmark, time_period=time_period)
-            title = title or f"Sharpe ratio decomposition by Strategies to {benchmark} Bear/Normal/Bull regimes"
         if var_format is None:
             if regime_data_to_plot == RegimeData.REGIME_SHARPE:
                 var_format = '{:.2f}'
             else:
                 var_format = '{:.2%}'
+
+        title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {regime_params.freq}-freq regimes"
         regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
         qis.plot_regime_data(regime_classifier=regime_classifier,
                              prices=prices,

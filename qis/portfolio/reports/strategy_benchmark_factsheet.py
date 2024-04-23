@@ -5,6 +5,8 @@ for test implementation see qis.examples.portfolio_factsheet
 # packages
 import matplotlib.pyplot as plt
 from typing import List, Tuple
+
+import pandas as pd
 import seaborn as sns
 
 # qis
@@ -19,13 +21,17 @@ from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
 
 def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfolioData,
+                                              strategy_idx: int = 0,  # strategy is multi_portfolio_data[strategy_idx]
+                                              benchmark_idx: int = 1,  # benchmark is multi_portfolio_data[benchmark_idx]
                                               time_period: TimePeriod = None,
                                               perf_params: PerfParams = PERF_PARAMS,
                                               regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                               backtest_name: str = None,
-                                              add_strategy_factsheet: bool = True,
                                               add_brinson_attribution: bool = True,
-                                              add_grouped_exposures: bool = False,
+                                              add_exposures_pnl_attribution: bool = True,
+                                              add_strategy_factsheet: bool = True,
+                                              add_grouped_exposures: bool = False,  # for strategy factsheet
+                                              add_grouped_cum_pnl: bool = False,  # for strategy factsheet
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 4,
                                               **kwargs
@@ -88,9 +94,6 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     multi_portfolio_data.plot_rolling_perf(ax=fig.add_subplot(gs[6:8, :2]),
                                            regime_benchmark=regime_benchmark,
                                            regime_params=regime_params,
-                                           rolling_window=60,
-                                           roll_freq='ME',
-                                           title='Rolling 5y Sharpe',
                                            **kwargs)
 
     multi_portfolio_data.plot_exposures(ax=fig.add_subplot(gs[8:10, :2]),
@@ -121,12 +124,16 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
     # change regression to weekly
+    if pd.infer_freq(benchmark_price.index) in ['B', 'D']:
+        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED', fontsize=fontsize))
+    else:
+        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
+
     multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[2:4, 2:]),
                                                benchmark_price=benchmark_price,
                                                perf_params=perf_params,
                                                is_grouped=is_grouped,
-                                               **qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize,
-                                                                                alpha_an_factor=52, freq_reg='W-WED')))
+                                               **local_kwargs)
 
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
@@ -139,8 +146,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                                   ax=fig.add_subplot(gs[4:6, 3]),
                                                                   **local_kwargs)
 
-
-    post_title = f"Sharpe ratio decomposition to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
+    post_title = f"Sharpe ratio split to {str(benchmark_price.name)} Bear/Normal/Bull {regime_params.freq}-freq regimes"
     multi_portfolio_data.portfolio_datas[0].plot_regime_data(benchmark_price=benchmark_price,
                                                              is_grouped=is_grouped,
                                                              title=f"{multi_portfolio_data.portfolio_datas[0].nav.name} {post_title}",
@@ -184,25 +190,67 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     multi_portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[12:, 2:]),
                                               benchmark=regime_benchmark,
-                                              freq=perf_params.freq_reg,
-                                              **kwargs)
+                                              **qis.update_kwargs(kwargs, dict(freq=perf_params.freq_reg)))
 
     if add_brinson_attribution:
         with sns.axes_style("darkgrid"):
-            fig = plt.figure(figsize=figsize, constrained_layout=True)
-            fig.suptitle(f'{backtest_name} Brinson performance attribution report', fontweight="bold", fontsize=8, color='blue')
-            figs.append(fig)
-            gs = fig.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)
-            axs = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]),
-                   fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1]),
-                   fig.add_subplot(gs[2, 0])]
-            multi_portfolio_data.plot_brinson_attribution(strategy_idx=0,
-                                                          benchmark_idx=1,
+            fig1 = plt.figure(figsize=figsize, constrained_layout=True)
+            fig1.suptitle(f'{backtest_name} Brinson performance attribution report', fontweight="bold", fontsize=8, color='blue')
+            figs.append(fig1)
+            gs = fig1.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)
+            axs = [fig1.add_subplot(gs[0, 0]), fig1.add_subplot(gs[0, 1]),
+                   fig1.add_subplot(gs[1, 0]), fig1.add_subplot(gs[1, 1]),
+                   fig1.add_subplot(gs[2, 0])]
+            multi_portfolio_data.plot_brinson_attribution(strategy_idx=strategy_idx,
+                                                          benchmark_idx=benchmark_idx,
                                                           freq=None,
                                                           axs=axs,
                                                           total_column='Total Sum',
                                                           is_exclude_interaction_term=True,
                                                           **kwargs)
+
+    if add_exposures_pnl_attribution:
+        strategy_name = multi_portfolio_data.portfolio_datas[strategy_idx].ticker
+        benchmark_name = multi_portfolio_data.portfolio_datas[benchmark_idx].ticker
+        strategy_grouped_exposures_agg, strategy_grouped_exposures_by_inst = \
+            multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_exposures(time_period=time_period)
+
+        benchmark_grouped_exposures_agg, benchmark_grouped_exposures_by_inst = \
+            multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_exposures(time_period=time_period)
+
+        strategy_grouped_pnls_agg, strategy_grouped_pnls_by_inst \
+            = multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_cum_pnls(time_period=time_period)
+
+        benchmark_grouped_pnls_agg, strategy_grouped_pnls_by_inst \
+            = multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_cum_pnls(time_period=time_period)
+
+        nrows = len(strategy_grouped_exposures_agg.keys())
+        fig2 = plt.figure(figsize=figsize, constrained_layout=True)
+        figs.append(fig2)
+        fig2.suptitle(f"{backtest_name}: Strategy vs Benchmark exposures by groups for period {time_period.to_str()}",
+                     fontweight="bold", fontsize=8, color='blue')
+        gs = fig2.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
+        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
+        for idx, (group, exposures_agg) in enumerate(strategy_grouped_exposures_agg.items()):
+            df1 = pd.concat([strategy_grouped_exposures_agg[group]['Total'].rename(strategy_name),
+                             benchmark_grouped_exposures_agg[group]['Total'].rename(benchmark_name)],
+                            axis=1)
+            df2 = pd.concat([strategy_grouped_pnls_agg[group]['Total'].rename(strategy_name),
+                             benchmark_grouped_pnls_agg[group]['Total'].rename(benchmark_name)],
+                            axis=1)
+
+            datas = {f"{group} aggregated net exposures": df1,
+                     f"{group} cumulative P&L attribution": df2}
+            for idx_, (key, df) in enumerate(datas.items()):
+                ax = fig2.add_subplot(gs[idx, idx_])
+                qis.plot_time_series(df=df,
+                                     var_format='{:,.0%}',
+                                     legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                                     title=f"{key}",
+                                     ax=ax,
+                                     **local_kwargs)
+                multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=df.index, regime_params=regime_params)
+                qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     if add_strategy_factsheet:
         for portfolio_data in multi_portfolio_data.portfolio_datas:
@@ -211,6 +259,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                     perf_params=perf_params,
                                                     regime_params=regime_params,
                                                     add_grouped_exposures=add_grouped_exposures,
+                                                    add_grouped_cum_pnl=add_grouped_cum_pnl,
                                                     **kwargs  # time period will be in kwargs
                                                     ))
         figs = qis.to_flat_list(figs)

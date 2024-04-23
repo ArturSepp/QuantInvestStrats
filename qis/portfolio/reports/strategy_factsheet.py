@@ -20,9 +20,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 perf_params: PerfParams = PERF_PARAMS,
                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                 regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
-                                weight_freq: Optional[str] = 'W-WED', #'W-WED',
-                                roll_period: int = 260,
-                                beta_span: int = 52,
+                                exposures_freq: Optional[str] = 'W-WED',  #'W-WED',
+                                turnover_rolling_period: int = 260,
+                                turnover_title: Optional[str] = None,
+                                factor_beta_span: int = 52,
+                                beta_freq: str = 'W-WED',
+                                factor_beta_title: Optional[str] = None,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
                                 add_grouped_exposures: bool = False,
@@ -82,8 +85,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         exposures = portfolio_data.get_exposures(is_grouped=False, time_period=time_period,
                                                  add_total=False)
     ax = fig.add_subplot(gs[4:6, :2])
-    if weight_freq is not None:
-        exposures = exposures.resample(weight_freq).last()
+    if exposures_freq is not None:
+        exposures = exposures.resample(exposures_freq).last()
     qis.plot_stack(df=exposures,
                    add_mean_levels=False,
                    use_bar_plot=True,
@@ -97,16 +100,16 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # turnover
     ax = fig.add_subplot(gs[6:8, :2])
-    turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=roll_period)
-
+    turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=turnover_rolling_period)
+    freq = pd.infer_freq(turnover.index)
+    turnover_title = turnover_title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
     qis.plot_time_series(df=turnover,
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
                          legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                         title='1y rolling average Turnover',
+                         title=turnover_title,
                          ax=ax,
                          **kwargs)
-
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
@@ -114,13 +117,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[8:10, :2])
     factor_exposures = portfolio_data.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                         time_period=time_period,
-                                                                        freq=perf_params.freq_vol,
-                                                                        span=beta_span
+                                                                        beta_freq=beta_freq,
+                                                                        factor_beta_span=factor_beta_span
                                                                         )
+    factor_beta_title = factor_beta_title or f"Rolling {factor_beta_span}-span beta of {beta_freq}-freq returns"
     qis.plot_time_series(df=factor_exposures,
                          var_format='{:,.2f}',
                          legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                         title=f"Portfolio rolling {beta_span}-span Betas to Benchmarks",
+                         title=factor_beta_title,
                          ax=ax,
                          **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
@@ -129,6 +133,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # attribution
     ax = fig.add_subplot(gs[10:12, :2])
     factor_attribution = portfolio_data.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
+                                                                                freq=beta_freq,
+                                                                                span=factor_beta_span,
                                                                                 time_period=time_period)
     qis.plot_time_series(df=factor_attribution,
                          var_format='{:,.0%}',
@@ -161,12 +167,16 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                       **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
     ax = fig.add_subplot(gs[1, 2:])
     # change regression to weekly
+    time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+    if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
+        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED', fontsize=fontsize))
+    else:
+        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
     portfolio_data.plot_ra_perf_table(ax=ax,
                                       benchmark_price=benchmark_prices[regime_benchmark],
-                                      time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
                                       perf_params=perf_params,
                                       is_grouped=is_grouped,
-                                      **qis.update_kwargs(kwargs, dict(fontsize=fontsize, alpha_an_factor=52, freq_reg='W-WED')))
+                                      **local_kwargs)
 
     # heatmap
     ax = fig.add_subplot(gs[2:4, 2:])

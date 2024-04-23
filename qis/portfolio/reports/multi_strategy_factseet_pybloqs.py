@@ -142,7 +142,7 @@ def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiP
                                               ax=axs[idx],
                                               **qis.update_kwargs(kwargs, dict(fontsize=8)))
     b_fig_regime = p.Block(
-        [p.Paragraph(f"Sharpe ratio decomposition by Strategies to benchmarksBear/Normal/Bull regimes", **KWARGS_TITLE),
+        [p.Paragraph(f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {regime_params.freq}-freq regimes", **KWARGS_TITLE),
          p.Block(fig_perf_regime, **KWARGS_FIG)], **KWARGS_TEXT)
     blocks.append(b_fig_regime)
 

@@ -5,9 +5,9 @@ output is one-page figure with key numbers
 """
 # packages
 import matplotlib.pyplot as plt
-from enum import Enum
 import yfinance as yf
-import qis
+import qis as qis
+from enum import Enum
 from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_factsheet
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 

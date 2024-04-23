@@ -132,7 +132,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     """
     multi_portfolio_data.plot_corr_table(ax=fig.add_subplot(gs[3, 2:]),
                                          time_period=time_period,
-                                         freq='W-WED',
+                                         freq=perf_params.freq,
                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     if len(multi_portfolio_data.benchmark_prices.columns) > 1:

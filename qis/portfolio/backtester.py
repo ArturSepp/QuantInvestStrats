@@ -107,7 +107,8 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                                               input_weights=weights,
                                               is_rebalancing=is_rebalancing,
                                               prices=prices,
-                                              realized_costs=pd.DataFrame(realized_costs, index=prices.index, columns=prices.columns))
+                                              realized_costs=pd.DataFrame(realized_costs, index=prices.index, columns=prices.columns),
+                                              ticker=ticker)
     else:
         output_portfolio_data = portfolio_nav
     return output_portfolio_data

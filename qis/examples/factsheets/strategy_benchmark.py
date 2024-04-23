@@ -41,7 +41,8 @@ def generate_volparity_multiportfolio(prices: pd.DataFrame,
                                       group_data: pd.Series,
                                       time_period: TimePeriod = None,
                                       span: int = 60,
-                                      vol_target: float = 0.15
+                                      vol_target: float = 0.15,
+                                      rebalancing_costs: float = 0.0010
                                       ) -> MultiPortfolioData:
 
     ra_returns, weights, ewm_vol = qis.compute_ra_returns(returns=qis.to_returns(prices=prices, is_log_returns=True),
@@ -54,12 +55,14 @@ def generate_volparity_multiportfolio(prices: pd.DataFrame,
 
     volparity_portfolio = qis.backtest_model_portfolio(prices=prices,
                                                        weights=weights,
+                                                       rebalancing_costs=rebalancing_costs,
                                                        is_output_portfolio_data=True,
                                                        ticker='VolParity')
     volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
 
     ew_portfolio = qis.backtest_model_portfolio(prices=prices,
                                                 weights=np.ones(len(prices.columns)) / len(prices.columns),
+                                                rebalancing_costs=rebalancing_costs,
                                                 is_output_portfolio_data=True,
                                                 ticker='EqualWeight')
     ew_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
@@ -77,7 +80,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_STRATEGY:
 
-        time_period = qis.TimePeriod('31Dec2005', '16Apr2024')  # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2006', '16Apr2024')  # time period for portfolio reporting
 
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
 
@@ -86,13 +89,19 @@ def run_unit_test(unit_test: UnitTests):
                                                                  group_data=group_data,
                                                                  time_period=time_period,
                                                                  span=30,
-                                                                 vol_target=0.15)
+                                                                 vol_target=0.15,
+                                                                 rebalancing_costs=0.0010  # per traded volume
+                                                                 )
 
         add_brinson_attribution = True
         figs = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=multi_portfolio_data,
                                                          backtest_name='Vol Parity Portfolio vs Equal Weight',
                                                          time_period=time_period,
                                                          add_brinson_attribution=add_brinson_attribution,
+                                                         add_exposures_pnl_attribution=True,
+                                                         add_strategy_factsheet=False, # for strategy factsheet
+                                                         add_grouped_exposures=False,  # for strategy factsheet
+                                                         add_grouped_cum_pnl=False,  # for strategy factsheet
                                                          **fetch_default_report_kwargs(time_period=time_period))
         """
         figs = generate_performance_attribution_report(multi_portfolio_data=multi_portfolio_data,
