@@ -31,7 +31,8 @@ def backtest_model_portfolio(prices: pd.DataFrame,
     include_start_date if index rebalanced at start date
     the safest weight is to pass weights as Dict or pd.Dataframe - this enforces the alignment with prices
     """
-
+    if not isinstance(prices, pd.DataFrame):
+        raise ValueError(f"prices type={type(prices)} must be pd.Dataframe")
     if isinstance(weights, pd.Series):  # map to dict
         weights = weights.to_dict()
 

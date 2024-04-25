@@ -23,7 +23,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        backtest_name: str = None,
                                        heatmap_freq: str = 'YE',
                                        figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                       groups: pd.Series = None,
+                                       group_data: pd.Series = None,
                                        add_strategy_factsheets: bool = False,
                                        fontsize: int = 4,
                                        **kwargs
@@ -32,7 +32,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     for portfolio data with structurally different strategies
     for portfolios with large universe use is_grouped = True to report tunrover and exposures by groups
     """
-    if groups is not None:
+    if group_data is not None:
         is_grouped = True
     else:
         is_grouped = False

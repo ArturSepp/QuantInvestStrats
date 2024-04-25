@@ -80,7 +80,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_STRATEGY:
 
-        time_period = qis.TimePeriod('31Dec2006', '16Apr2024')  # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2006', '25Apr2024')  # time period for portfolio reporting
 
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
 
@@ -93,12 +93,12 @@ def run_unit_test(unit_test: UnitTests):
                                                                  rebalancing_costs=0.0010  # per traded volume
                                                                  )
 
-        add_brinson_attribution = True
+        pnl_attribution = True
         figs = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=multi_portfolio_data,
                                                          backtest_name='Vol Parity Portfolio vs Equal Weight',
                                                          time_period=time_period,
-                                                         add_brinson_attribution=add_brinson_attribution,
-                                                         add_exposures_pnl_attribution=True,
+                                                         add_brinson_attribution=pnl_attribution,
+                                                         add_exposures_pnl_attribution=pnl_attribution,
                                                          add_strategy_factsheet=False, # for strategy factsheet
                                                          add_grouped_exposures=False,  # for strategy factsheet
                                                          add_grouped_cum_pnl=False,  # for strategy factsheet
@@ -112,8 +112,9 @@ def run_unit_test(unit_test: UnitTests):
                              file_name=f"strategy_benchmark_factsheet", orientation='landscape',
                              local_path=qis.local_path.get_output_path())
         qis.save_fig(fig=figs[0], file_name=f"strategy_benchmark", local_path=qis.local_path.get_output_path())
-        if add_brinson_attribution:
+        if pnl_attribution:
             qis.save_fig(fig=figs[1], file_name=f"brinson_attribution", local_path=qis.local_path.get_output_path())
+            qis.save_fig(fig=figs[2], file_name=f"pnl_attribution", local_path=qis.local_path.get_output_path())
         plt.show()
 
 

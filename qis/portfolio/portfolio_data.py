@@ -74,10 +74,10 @@ class PortfolioData:
             self.weights = pd.DataFrame(1.0, index=self.prices.index, columns=self.prices.columns)
         if self.units is None:  # default will be delta-1 portfolio of nav
             self.units = pd.DataFrame(1.0, index=self.prices.index, columns=self.prices.columns)
-        if self.instrument_pnl is None:
-            self.instrument_pnl = self.prices.pct_change(fill_method=None).multiply(self.weights.shift(1)).fillna(0.0)
         if self.realized_costs is None:
             self.realized_costs = pd.DataFrame(0.0, index=self.prices.index, columns=self.prices.columns)
+        if self.instrument_pnl is None:
+            self.instrument_pnl = self.prices.pct_change(fill_method=None).multiply(self.weights.shift(1)).fillna(0.0)
         if self.group_data is None:  # use instruments as groups
             self.group_data = pd.Series(self.prices.columns, index=self.prices.columns)
         if self.group_order is None:
@@ -143,9 +143,14 @@ class PortfolioData:
     def get_instruments_pnl(self,
                             add_total: bool = False,
                             time_period: da.TimePeriod = None,
+                            is_net: bool = False,
+                            is_norm_costs: bool = True,
                             is_compounded: bool = False
                             ) -> pd.DataFrame:
         pnl = self.instrument_pnl.copy()
+        if is_net:
+            costs = self.get_costs(add_total=False, is_norm_costs=is_norm_costs)
+            pnl = pnl.subtract(costs)
         if add_total:
             pnl.insert(loc=0, value=pnl.sum(1), column='Total')
         if time_period is not None:
@@ -177,16 +182,33 @@ class PortfolioData:
         return navs
 
     def get_group_navs(self,
-                    time_period: da.TimePeriod = None,
-                    constant_trade_level: bool = False
-                    ) -> pd.DataFrame:
+                       time_period: da.TimePeriod = None,
+                       constant_trade_level: bool = False,
+                       is_add_group_total: bool = False
+                       ) -> pd.DataFrame:
+        """
+        group total will exclude transaction costs so it is not equal to portfolio nav
+        """
+        if is_add_group_total:
+            total_column = str(self.nav.name)
+        else:
+            total_column = None
         grouped_pnl = dfg.agg_df_by_groups_ax1(df=self.get_instruments_pnl(time_period=time_period),
-                                                  group_data=self.group_data,
-                                                  agg_func=np.sum,
-                                                  total_column=str(self.nav.name),
-                                                  group_order=self.group_order)
+                                               group_data=self.group_data,
+                                               agg_func=np.sum,
+                                               total_column=total_column,
+                                               group_order=self.group_order)
         group_navs = ret.returns_to_nav(returns=grouped_pnl, constant_trade_level=constant_trade_level)
         return group_navs
+
+    def get_total_nav_with_group_navs(self, time_period: TimePeriod = None) -> pd.DataFrame:
+        """
+        group total will exclude transaction costs so it is not equal to portfolio nav
+        """
+        total_nav = self.get_portfolio_nav(time_period=time_period)
+        group_navs = self.get_group_navs(time_period=time_period, is_add_group_total=False)
+        prices = pd.concat([total_nav, group_navs], axis=1)
+        return prices
 
     def get_weights(self,
                     is_input_weights: bool = True,
@@ -564,18 +586,18 @@ class PortfolioData:
                        ax: plt.Subplot = None,
                        **kwargs
                        ) -> None:
-        
-        group_navs = self.get_group_navs(time_period=time_period)
+
+        total_group_navs = self.get_total_nav_with_group_navs(time_period=time_period)
         if add_benchmarks and self.benchmark_prices is not None:
-            benchmark_prices = self.benchmark_prices.reindex(index=group_navs.index, method='ffill')
-            group_navs = pd.concat([group_navs, benchmark_prices], axis=1)
+            benchmark_prices = self.benchmark_prices.reindex(index=total_group_navs.index, method='ffill')
+            total_group_navs = pd.concat([total_group_navs, benchmark_prices], axis=1)
         if ax is None:
             with sns.axes_style('darkgrid'):
                 fig, ax = plt.subplots(1, 1, figsize=(16, 12), tight_layout=True)
-        ppd.plot_prices(prices=group_navs, ax=ax, **kwargs)
+        ppd.plot_prices(prices=total_group_navs, ax=ax, **kwargs)
 
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=group_navs.index,
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=total_group_navs.index,
                                     regime_params=regime_params)
             
     def plot_rolling_perf(self,
@@ -629,13 +651,15 @@ class PortfolioData:
                            **kwargs
                            ) -> None:
         if is_grouped:
-            prices = self.get_group_navs(time_period=time_period)
+            total_nav = self.get_portfolio_nav(time_period=time_period)
+            group_navs = self.get_group_navs(time_period=time_period, is_add_group_total=False)
+            prices = pd.concat([total_nav, group_navs], axis=1)
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
         if benchmark_price is not None:
             if benchmark_price.name not in prices.columns:
                 prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
-            title = title or f"RA performance table with beta to {benchmark_price.name}: {da.get_time_period(prices).to_str()}"
+            title = title or f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
             ppt.plot_ra_perf_table_benchmark(prices=prices,
                                              benchmark=str(benchmark_price.name),
                                              perf_params=perf_params,
@@ -713,7 +737,7 @@ class PortfolioData:
                               **kwargs
                               ) -> None:
         if is_grouped:
-            prices = self.get_group_navs(time_period=time_period)
+            prices = self.get_total_nav_with_group_navs(time_period=time_period)
             title = title or f"{heatmap_freq}-returns by groups"
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
@@ -748,7 +772,7 @@ class PortfolioData:
                          ) -> plt.Figure:
 
         if is_grouped:
-            prices = self.get_group_navs(time_period=time_period)
+            prices = self.total_group_navs = self.get_total_nav_with_group_navs(time_period=time_period)
             title = title or (f"Sharpe ratio attribution by groups to {str(benchmark_price.name)} "
                               f"Bear/Normal/Bull regimes")
         else:
@@ -783,7 +807,7 @@ class PortfolioData:
                          ) -> plt.Figure:
 
         if is_grouped:
-            prices = self.get_group_navs(time_period=time_period)
+            prices = self.get_total_nav_with_group_navs(time_period=time_period)
             title = title or f"{freq}-returns by groups conditional on vols {str(benchmark_price.name)}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period)

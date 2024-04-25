@@ -8,11 +8,10 @@ from enum import Enum
 # qis
 import qis.utils.dates as da
 import qis.utils.df_str as dfs
-
+import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfStat, PerfParams
 import qis.perfstats.perf_stats as rpt
-
 import qis.plots.scatter as psc
 import qis.plots.table as ptb
 import qis.plots.utils as put
@@ -135,6 +134,9 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                                   alpha_an_factor=alpha_an_factor,
                                                   **kwargs)
     if is_fig_out:
+        if not drop_benchmark:
+            special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
+            kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
         return ptb.plot_df_table(df=ra_perf_table,
                                  transpose=transpose,
                                  special_columns_colors=special_columns_colors,

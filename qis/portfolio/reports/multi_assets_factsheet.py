@@ -8,9 +8,6 @@ see example in qis.examples.multi_asset.py
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Union, List, Optional, Tuple
-from enum import Enum
-
-# qis
 import qis as qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData, RollingPerfStat, LegendStats, BenchmarkReturnsQuantileRegimeSpecs
 from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
@@ -90,11 +87,12 @@ class MultiAssetsReport:
                            ax: plt.Subplot = None,
                            **kwargs) -> None:
         prices = self.get_prices(benchmark, time_period=time_period)
-        title = title or f"RA performance table with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
+        title = title or f"RA performance table for {self.perf_params.freq_vol}-freq returns with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
         qis.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=benchmark,
                                          perf_params=self.perf_params,
                                          perf_columns=perf_columns,
+                                         index_column_name='Assets',
                                          title=title,
                                          rotation_for_columns_headers=0,
                                          ax=ax,
@@ -109,27 +107,31 @@ class MultiAssetsReport:
                              ax: plt.Subplot = None,
                              **kwargs) -> None:
 
+        """
+        plot table with bear/normal/bull sharpes
+        """
         prices = pd.concat([self.prices, self.benchmark_prices], axis=1)
-
         if time_period is not None:
             prices = time_period.locate(prices)
 
         cvar_table = qis.compute_bnb_regimes_pa_perf_table(prices=prices,
-                                                          benchmark=regime_benchmark_str,
-                                                          perf_params=self.perf_params,
-                                                          regime_params=self.regime_params)
+                                                           benchmark=regime_benchmark_str,
+                                                           perf_params=self.perf_params,
+                                                           regime_params=self.regime_params)
         table_data = pd.DataFrame(data=prices.columns, index=cvar_table.index, columns=[columns_title])
 
         for perf_column in perf_columns:
             table_data[perf_column.to_str()] = qis.series_to_str(ds=cvar_table[perf_column.to_str()],
-                                                             var_format=perf_column.to_format(**kwargs))
+                                                                 var_format=perf_column.to_format(**kwargs))
 
         special_columns_colors = [(0, 'steelblue')]
+        special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
         qis.plot_df_table(df=table_data,
                           first_column_width=first_column_width,
                           add_index_as_column=False,
-                          index_column_name='Strategies',
+                          index_column_name='Assets',
                           special_columns_colors=special_columns_colors,
+                          special_rows_colors=special_rows_colors,
                           ax=ax,
                           **kwargs)
 
@@ -192,16 +194,20 @@ class MultiAssetsReport:
                                         **local_kwargs)
 
     def plot_corr_table(self,
-                        freq: str = 'W-WED',
+                        corr_freq: str = 'W-WED',
                         time_period: TimePeriod = None,
                         ax: plt.Subplot = None,
-                        **kwargs) -> None:
-        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(fontsize=4))
+                        **kwargs
+                        ) -> None:
         prices = self.get_prices(time_period=time_period)
+        if len(prices.columns) >= 12:
+            new_kwargs = dict(fontsize=3.25, freq=corr_freq)
+        else:
+            new_kwargs = dict(fontsize=4, freq=corr_freq)
+        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=new_kwargs)
         qis.plot_returns_corr_table(prices=prices,
                                     x_rotation=90,
-                                    freq=freq,
-                                    title=f"Correlation {freq}-freq returns: {qis.get_time_period(prices).to_str()}",
+                                    title=f"Correlation of {corr_freq}-freq returns: {qis.get_time_period(prices).to_str()}",
                                     ax=ax,
                                     **local_kwargs)
 
@@ -319,6 +325,8 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    heatmap_freq: str = 'YE',
                                    time_period: TimePeriod = None,  # time period for reporting
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+                                   fontsize: int = 4,
+                                   factsheet_name: str = None,
                                    **kwargs
                                    ) -> plt.Figure:
 
@@ -344,19 +352,25 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                perf_params=perf_params,
                                regime_params=regime_params)
 
-    local_kwargs = dict(fontsize=5,
-                        linewidth=0.5,
+    # overrite local_kwargs with kwargs is they are provided
+    local_kwargs = dict(linewidth=0.5,
                         weight='normal',
                         markersize=1,
                         framealpha=0.75,
-                        x_date_freq='YE',
-                        time_period=time_period)
-    # overrite local_kwargs with kwargs is they are provided
+                        time_period=time_period,
+                        fontsize=fontsize)
     kwargs = qis.update_kwargs(local_kwargs, kwargs)
 
     # figure
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=10, ncols=4, wspace=0.0, hspace=0.0)
+
+    if time_period is not None:
+        report_period = time_period.to_str()
+    else:
+        report_period = qis.get_time_period(df=prices).to_str()
+    factsheet_name = factsheet_name or f"Multi-asset report: {report_period}"
+    qis.set_suptitle(fig=fig, title=factsheet_name, fontsize=8)
 
     report.plot_nav(regime_benchmark=benchmark,
                     ax=fig.add_subplot(gs[:2, :2]),
@@ -383,9 +397,8 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                               ax=fig.add_subplot(gs[0, 2:]),
                               **kwargs)
 
-    time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
     # change regression to weekly
-    time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+    time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
     if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
         local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED'))
     else:
@@ -399,22 +412,23 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                **kwargs)
 
     report.plot_corr_table(freq=perf_params.freq,
-                           ax=fig.add_subplot(gs[4, 2]),
+                           ax=fig.add_subplot(gs[4:6, 2]),
                            **kwargs)
     report.plot_corr_table(freq=perf_params.freq,
-                           ax=fig.add_subplot(gs[4, 3]),
+                           ax=fig.add_subplot(gs[4:6, 3]),
                            **qis.update_kwargs(kwargs, dict(time_period=time_period1)))
 
     report.plot_regime_data(benchmark=benchmark,
-                            ax=fig.add_subplot(gs[5, 2:]),
+                            ax=fig.add_subplot(gs[6:8, 2:]),
                             **kwargs)
 
+    """
     report.plot_rolling_perf(regime_benchmark=benchmark,
                              rolling_perf_stat=RollingPerfStat.VOL,
                              var_format='{:.1%}',
                              ax=fig.add_subplot(gs[6:8, 2:]),
                              **kwargs)
-
+    """
     report.plot_returns_scatter(benchmark=benchmark,
                                 ax=fig.add_subplot(gs[8:10, 2:]),
                                 freq=perf_params.freq_reg,

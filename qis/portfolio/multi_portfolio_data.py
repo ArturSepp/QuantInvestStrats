@@ -89,11 +89,12 @@ class MultiPortfolioData:
         return price
 
     def get_group_navs(self,
-                    portfolio_idx: int = 0,
-                    benchmark: str = None,
-                    time_period: TimePeriod = None
-                    ) -> pd.DataFrame:
-        prices = self.portfolio_datas[portfolio_idx].get_group_navs(time_period=time_period)
+                       portfolio_idx: int = 0,
+                       benchmark: str = None,
+                       time_period: TimePeriod = None,
+                       is_add_group_total: bool = False
+                       ) -> pd.DataFrame:
+        prices = self.portfolio_datas[portfolio_idx].get_group_navs(time_period=time_period, is_add_group_total=is_add_group_total)
         if benchmark is not None:
             benchmark_price = self.get_benchmark_price(benchmark=self.benchmark_prices.columns[0],
                                                        time_period=time_period)
@@ -286,12 +287,13 @@ class MultiPortfolioData:
         if benchmark is None:
             benchmark = self.benchmark_prices.columns[0]
         prices = self.get_navs(benchmark=benchmark, time_period=time_period)
+        ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=benchmark,
                                          perf_params=perf_params,
                                          perf_columns=perf_columns,
                                          drop_benchmark=drop_benchmark,
-                                         title=f"RA performance table: {qis.get_time_period(prices).to_str()}",
+                                         title=ra_perf_title,
                                          rotation_for_columns_headers=0,
                                          ax=ax,
                                          **kwargs)
@@ -315,10 +317,10 @@ class MultiPortfolioData:
         rows_edge_lines = [len(self.portfolio_datas)]
         for portfolio in self.portfolio_datas:
             portfolio_name = str(portfolio.nav.name)
-            prices_ = portfolio.get_group_navs(time_period=time_period)
-            strategy_prices.append(prices_[portfolio_name])
+            navs_ = portfolio.get_portfolio_nav(time_period=time_period)  # navs include costs while group navs are cost free
+            ac_prices_ = portfolio.get_group_navs(time_period=time_period, is_add_group_total=False)
+            strategy_prices.append(navs_)
             if add_ac:
-                ac_prices_ = prices_.drop(portfolio_name, axis=1)
                 ac_prices_.columns = [f"{portfolio_name}-{x}" for x in ac_prices_.columns]
                 ac_prices.append(ac_prices_)
                 rows_edge_lines.append(sum(rows_edge_lines)+len(ac_prices_.columns))
@@ -330,7 +332,7 @@ class MultiPortfolioData:
         else:
             prices = pd.concat([strategy_prices, benchmark_price], axis=1)
 
-        ra_perf_title = f"RA performance table by Asset Group with beta to {benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
+        ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=str(benchmark_price.name),
                                          perf_params=perf_params,
