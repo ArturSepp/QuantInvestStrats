@@ -147,6 +147,38 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
         return ra_perf_table
 
 
+def plot_ra_perf_bars(prices: pd.DataFrame,
+                      benchmark: Optional[str] = None,
+                      drop_benchmark: bool = False,
+                      perf_column: PerfStat = PerfStat.SHARPE_RF0,
+                      perf_params: PerfParams = None,
+                      legend_loc: Optional[str] = None,
+                      ax: plt.Subplot = None,
+                      **kwargs
+                      ) -> plt.Figure:
+
+    if benchmark is None:
+        ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
+    else:
+        ra_perf_table = get_ra_perf_benchmark_columns(prices=prices,
+                                                      benchmark=benchmark,
+                                                      drop_benchmark=drop_benchmark,
+                                                      perf_params=perf_params,
+                                                      is_convert_to_str=False,
+                                                      **kwargs)
+
+    df = ra_perf_table[perf_column.to_str()].to_frame()
+    colors = put.compute_heatmap_colors(a=df.to_numpy())
+    fig = plot_vbars(df=df,
+                     var_format=perf_column.to_format(**kwargs),
+                     legend_loc=legend_loc,
+                     colors=colors,
+                     is_category_names_colors=False,
+                     ax=ax,
+                     **kwargs)
+    return fig
+
+
 def plot_ra_perf_scatter(prices: pd.DataFrame,
                          benchmark: str = None,
                          perf_params: PerfParams = None,
@@ -194,28 +226,6 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
                            ci=ci,
                            ax=ax,
                            **kwargs)
-
-    return fig
-
-
-def plot_ra_perf_bars(prices: pd.DataFrame,
-                      perf_column: PerfStat = PerfStat.SHARPE_RF0,
-                      perf_params: PerfParams = None,
-                      legend_loc: Optional[str] = None,
-                      ax: plt.Subplot = None,
-                      **kwargs
-                      ) -> plt.Figure:
-
-    ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
-    df = ra_perf_table[perf_column.to_str()].to_frame()
-    colors = put.compute_heatmap_colors(a=df.to_numpy())
-    fig = plot_vbars(df=df,
-                     var_format=perf_column.to_format(**kwargs),
-                     legend_loc=legend_loc,
-                     colors=colors,
-                     is_category_names_colors=False,
-                     ax=ax,
-                     **kwargs)
 
     return fig
 

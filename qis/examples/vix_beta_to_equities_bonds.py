@@ -54,7 +54,7 @@ with sns.axes_style("darkgrid"):
 
     # plot performance attribution to betas
     factor_attribution = vix_portfolio.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
-                                                                               span=span,
+                                                                               factor_beta_span=span,
                                                                                time_period=time_period)
     qis.plot_time_series(df=factor_attribution,
                          var_format='{:,.0%}',

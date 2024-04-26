@@ -49,7 +49,11 @@ from qis.models.linear.ewm import (
 
 from qis.models.linear.ewm_convolution import ConvolutionType, SignalAggType, ewm_xy_convolution
 
-from qis.models.linear.ewm_factors import LinearModel, estimate_ewm_linear_model
+from qis.models.linear.ewm_factors import (LinearModel,
+                                           estimate_ewm_linear_model,
+                                           compute_portfolio_benchmark_betas,
+                                           compute_portfolio_benchmark_beta_alpha_attribution
+                                           )
 
 from qis.models.linear.pca import(
     apply_pca,

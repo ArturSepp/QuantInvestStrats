@@ -5,11 +5,12 @@ implementation of multi factor ewm model
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from enum import Enum
 
 # qis
 import qis.utils.df_ops as dfo
+import qis.perfstats.returns as ret
 import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
 from qis.models.linear.ewm import MeanAdjType, InitType
@@ -41,11 +42,11 @@ class LinearModel:
             print(f"{factor}:\n{loading}")
 
     def compute_agg_factor_exposures(self,
-                                     asset_exposures: pd.DataFrame
+                                     exposures: pd.DataFrame
                                      ) -> pd.DataFrame:
         factor_exposures = {}
         for factor, loading in self.loadings.items():
-            factor_exposures[factor] = loading.multiply(asset_exposures).sum(axis=1)
+            factor_exposures[factor] = loading.multiply(exposures).sum(axis=1)
         factor_exposures = pd.DataFrame.from_dict(factor_exposures)
         return factor_exposures
 
@@ -72,6 +73,18 @@ class LinearModel:
             total = attribution.sum(1).rename('Total')
             attribution = pd.concat([total, attribution], axis=1)
         return attribution
+
+    def get_factor_alpha(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        factor_alpha = y - sum(factor_beta_{t-1}*x)
+        """
+        explained_returns = pd.DataFrame(0.0, index=self.y.index, columns=self.y.columns)
+        for factor in self.x.columns:
+            factor_betas = self.loadings[factor]
+            explained_return = (factor_betas.shift(1)).multiply(self.x[factor].to_numpy(), axis=0)
+            explained_returns = explained_returns.add(explained_return)
+        factor_alpha = self.y.subtract(explained_returns)
+        return factor_alpha, explained_returns
 
     def plot_factor_loadings(self,
                              factor: str,
@@ -139,22 +152,79 @@ def estimate_ewm_linear_model(x: pd.DataFrame,
     return ewm_lm
 
 
+def compute_portfolio_benchmark_betas(instrument_prices: pd.DataFrame,
+                                      exposures: pd.DataFrame,
+                                      benchmark_prices: pd.DataFrame,
+                                      time_period: TimePeriod = None,
+                                      beta_freq: str = None,
+                                      factor_beta_span: int = 63  # quarter
+                                      ) -> pd.DataFrame:
+    """
+    compute benchmark betas of instruments
+    portfolio_beta_i = sum(instrument_beta_i*exposure)
+    """
+    benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
+    ewm_linear_model = estimate_ewm_linear_model(x=ret.to_returns(prices=benchmark_prices, freq=beta_freq, is_log_returns=True),
+                                                 y=ret.to_returns(prices=instrument_prices, freq=beta_freq, is_log_returns=True),
+                                                 span=factor_beta_span,
+                                                 is_x_correlated=True)
+    exposures = exposures.reindex(index=instrument_prices.index, method='ffill')
+    benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(exposures=exposures)
+    benchmark_betas = benchmark_betas.replace({0.0: np.nan}).ffill()  # fillholidays
+    if time_period is not None:
+        benchmark_betas = time_period.locate(benchmark_betas)
+    return benchmark_betas
+
+
+def compute_portfolio_benchmark_beta_alpha_attribution(instrument_prices: pd.DataFrame,
+                                                       exposures: pd.DataFrame,
+                                                       benchmark_prices: pd.DataFrame,
+                                                       portfolio_nav: pd.Series,
+                                                       time_period: TimePeriod = None,
+                                                       beta_freq: str = None,
+                                                       factor_beta_span: int = 63,  # quarter
+                                                       residual_name: str = 'Alpha'
+                                                       ) -> pd.DataFrame:
+    """
+    attribution:=alpha_{t} = portfolio_return_{t} - benchmark_return_{t}*beta_{t-1}
+    using compounded returns
+    portfolio_nav is the gross/net portfolio nav
+    """
+    portfolio_benchmark_betas = compute_portfolio_benchmark_betas(instrument_prices=instrument_prices,
+                                                                  exposures=exposures,
+                                                                  benchmark_prices=benchmark_prices,
+                                                                  time_period=None,
+                                                                  beta_freq=beta_freq,
+                                                                  factor_beta_span=factor_beta_span)
+
+    benchmark_prices = benchmark_prices.reindex(index=portfolio_benchmark_betas.index, method='ffill')
+    x = ret.to_returns(prices=benchmark_prices, freq=beta_freq)
+    x_attribution = (portfolio_benchmark_betas.shift(1)).multiply(x)
+    total_attrib = x_attribution.sum(axis=1)
+    total = portfolio_nav.reindex(index=total_attrib.index, method='ffill').pct_change()
+    residual = np.subtract(total, total_attrib)
+    joint_attrib = pd.concat([x_attribution, residual.rename(residual_name)], axis=1)
+    if time_period is not None:
+        joint_attrib = time_period.locate(joint_attrib)
+    return joint_attrib
+
+
 class UnitTests(Enum):
-    MODEL_TEST = 1
+    MODEL = 1
+    ATTRIBUTION = 2
 
 
 def run_unit_test(unit_test: UnitTests):
 
-    if unit_test == UnitTests.MODEL_TEST:
+    from qis.test_data import load_etf_data
+    prices = load_etf_data().dropna()
 
-        from qis.test_data import load_etf_data
-        prices = load_etf_data().dropna()
-
+    if unit_test == UnitTests.MODEL:
         returns = np.log(prices.divide(prices.shift(1)))
 
         # factors
         factors = ['SPY', 'TLT', 'GLD']
-        factors = ['SPY']
+        # factors = ['SPY']
         factor_returns = returns[factors]
 
         # assets
@@ -174,12 +244,33 @@ def run_unit_test(unit_test: UnitTests):
         ewm_linear_model.print()
         ewm_linear_model.plot_factor_loadings(factor='SPY')
 
+        factor_alpha, explained_returns = ewm_linear_model.get_factor_alpha()
+        pts.plot_time_series(df=factor_alpha.cumsum(0), title='Cumulative alpha')
+        pts.plot_time_series(df=explained_returns.cumsum(0), title='Cumulative explained return')
+
+    elif unit_test == UnitTests.ATTRIBUTION:
+        benchmark_prices = prices[['SPY', 'TLT']]
+        instrument_prices = prices[['QQQ', 'HYG', 'GLD']]
+        exposures = pd.DataFrame(1.0/3.0, index=instrument_prices.index, columns=instrument_prices.columns)
+        portfolio_nav = ret.returns_to_nav(returns=(exposures.shift(1)).multiply(instrument_prices.pct_change()).sum(axis=1))
+        print(portfolio_nav)
+
+        attribution = compute_portfolio_benchmark_beta_alpha_attribution(instrument_prices=instrument_prices,
+                                                                         exposures=exposures,
+                                                                         benchmark_prices=benchmark_prices,
+                                                                         portfolio_nav=portfolio_nav,
+                                                                         time_period=None,
+                                                                         beta_freq='W-WED',
+                                                                         factor_beta_span=52,  # quarter
+                                                                         residual_name='Alpha')
+        pts.plot_time_series(df=attribution.cumsum(0))
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.MODEL_TEST
+    unit_test = UnitTests.MODEL
 
     is_run_all_tests = False
     if is_run_all_tests:

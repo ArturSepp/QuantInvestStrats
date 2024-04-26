@@ -396,39 +396,44 @@ class PortfolioData:
                                           beta_freq: str = None,
                                           factor_beta_span: int = 65  # quarter
                                           ) -> pd.DataFrame:
+        """
+        compute benchmark betas of instruments
+        portfolio_beta_i = sum(instrument_beta_i*exposure)
+        """
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-        ewm_linear_model = ef.estimate_ewm_linear_model(x=ret.to_returns(prices=benchmark_prices, freq=beta_freq, is_log_returns=True),
-                                                        y=ret.to_returns(prices=instrument_prices, freq=beta_freq, is_log_returns=True),
-                                                        span=factor_beta_span,
-                                                        is_x_correlated=True)
         exposures = self.get_exposures().reindex(index=instrument_prices.index, method='ffill')
-        benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(asset_exposures=exposures)
-        benchmark_betas = benchmark_betas.replace({0.0: np.nan}).ffill()  # fillholidays
-        if time_period is not None:
-            benchmark_betas = time_period.locate(benchmark_betas)
+        benchmark_betas = ef.compute_portfolio_benchmark_betas(instrument_prices=instrument_prices,
+                                                               exposures=exposures,
+                                                               benchmark_prices=benchmark_prices,
+                                                               time_period=time_period,
+                                                               beta_freq=beta_freq,
+                                                               factor_beta_span=factor_beta_span)
         return benchmark_betas
 
     def compute_portfolio_benchmark_attribution(self,
                                                 benchmark_prices: pd.DataFrame,
                                                 time_period: da.TimePeriod = None,
-                                                freq: str = 'B',
-                                                span: int = 63  # quarter
+                                                beta_freq: str = 'B',
+                                                factor_beta_span: int = 63,  # quarter
+                                                residual_name: str = 'Alpha'
                                                 ) -> pd.DataFrame:
-        portfolio_benchmark_betas = self.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                           beta_freq=freq, factor_beta_span=span)
-        benchmark_prices = benchmark_prices.reindex(index=portfolio_benchmark_betas.index, method='ffill')
-        x = ret.to_returns(prices=benchmark_prices, freq=freq)
-        x_attribution = (portfolio_benchmark_betas.shift(1)).multiply(x)
-        total_attrib = x_attribution.sum(1)
-        total = self.get_portfolio_nav().reindex(index=total_attrib.index, method='ffill').pct_change()
-        residual = np.subtract(total, total_attrib)
-        # joint_attrib = pd.concat([x_attribution, total_attrib.rename('Total benchmarks'),
-        # residual.rename('Residual')], axis=1)
-        joint_attrib = pd.concat([x_attribution, residual.rename('Residual')], axis=1)
-        if time_period is not None:
-            joint_attrib = time_period.locate(joint_attrib)
-        joint_attrib = joint_attrib.cumsum(axis=0)
+        """
+        attribution = portfolio_return_{t} - benchmark_return_{t}*bet_{t-1}
+        returns are compounded
+        """
+        instrument_prices = self.prices
+        benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
+        exposures = self.get_exposures().reindex(index=instrument_prices.index, method='ffill')
+        portfolio_nav = self.get_portfolio_nav().reindex(index=instrument_prices.index, method='ffill')
+        joint_attrib = ef.compute_portfolio_benchmark_beta_alpha_attribution(instrument_prices=instrument_prices,
+                                                                             exposures=exposures,
+                                                                             benchmark_prices=benchmark_prices,
+                                                                             portfolio_nav=portfolio_nav,
+                                                                             time_period=time_period,
+                                                                             beta_freq=beta_freq,
+                                                                             factor_beta_span=factor_beta_span,
+                                                                             residual_name=residual_name)
         return joint_attrib
 
     """

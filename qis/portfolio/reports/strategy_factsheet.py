@@ -26,6 +26,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 factor_beta_span: int = 52,
                                 beta_freq: str = 'W-WED',
                                 factor_beta_title: Optional[str] = None,
+                                factor_attribution_title: Optional[str] = None,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
                                 add_grouped_exposures: bool = False,
@@ -133,13 +134,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # attribution
     ax = fig.add_subplot(gs[10:12, :2])
     factor_attribution = portfolio_data.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
-                                                                                freq=beta_freq,
-                                                                                span=factor_beta_span,
+                                                                                beta_freq=beta_freq,
+                                                                                factor_beta_span=factor_beta_span,
                                                                                 time_period=time_period)
+    factor_attribution_title = factor_attribution_title or f"Cumulative return attribution using rolling {factor_beta_span}-span beta of {beta_freq}-freq returns"
     qis.plot_time_series(df=factor_attribution,
                          var_format='{:,.0%}',
                          legend_stats=qis.LegendStats.LAST_NONNAN,
-                         title='Portfolio Cumulative return attribution to benchmark betas',
+                         title=factor_attribution_title,
                          ax=ax,
                          **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)

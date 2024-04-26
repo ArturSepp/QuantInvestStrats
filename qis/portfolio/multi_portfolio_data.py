@@ -203,7 +203,6 @@ class MultiPortfolioData:
                               ax: plt.Subplot = None,
                               **kwargs
                               ) -> None:
-
         prices = self.get_navs(time_period=time_period)
         ppt.plot_ra_perf_bars(prices=prices,
                               perf_column=perf_column,

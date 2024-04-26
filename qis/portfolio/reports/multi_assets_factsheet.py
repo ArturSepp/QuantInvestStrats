@@ -88,6 +88,10 @@ class MultiAssetsReport:
                            **kwargs) -> None:
         prices = self.get_prices(benchmark, time_period=time_period)
         title = title or f"RA performance table for {self.perf_params.freq_vol}-freq returns with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
+        if len(prices.columns) >= 12:
+            local_kwargs = qis.update_kwargs(kwargs, dict(fontsize=3, pad=10, bbox=(0, -0.4, 1.0, 1.6)))
+        else:
+            local_kwargs = qis.update_kwargs(kwargs, dict(fontsize=3.5, pad=10, bbox=(0, -0.4, 1.0, 1.6)))
         qis.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=benchmark,
                                          perf_params=self.perf_params,
@@ -96,7 +100,7 @@ class MultiAssetsReport:
                                          title=title,
                                          rotation_for_columns_headers=0,
                                          ax=ax,
-                                         **kwargs)
+                                         **local_kwargs)
 
     def plot_ra_regime_table(self,
                              regime_benchmark_str: str = None,
@@ -201,7 +205,7 @@ class MultiAssetsReport:
                         ) -> None:
         prices = self.get_prices(time_period=time_period)
         if len(prices.columns) >= 12:
-            new_kwargs = dict(fontsize=3.25, freq=corr_freq)
+            new_kwargs = dict(fontsize=2.75, freq=corr_freq)
         else:
             new_kwargs = dict(fontsize=4, freq=corr_freq)
         local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=new_kwargs)
@@ -240,6 +244,9 @@ class MultiAssetsReport:
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,
                             **kwargs) -> None:
+        """
+        plot rolling beta to one benchmark
+        """
         returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=beta_freq)
         if factor_beta_title is not None:
             factor_beta_title = f"{factor_beta_title} to {benchmark}"
@@ -257,6 +264,33 @@ class MultiAssetsReport:
                                               **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, time_period=time_period, data_df=self.prices)
 
+    def plot_benchmark_alpha_attribution(self,
+                                         benchmark: str,
+                                         beta_freq: str = 'ME',
+                                         factor_beta_span: int = 12,
+                                         factor_alpha_title: Optional[str] = None,
+                                         time_period: TimePeriod = None,
+                                         ax: plt.Subplot = None,
+                                         **kwargs) -> None:
+        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=beta_freq)
+        ewm_linear_model = qis.estimate_ewm_linear_model(x=returns[benchmark].to_frame(),
+                                                         y=returns.drop(benchmark, axis=1),
+                                                         span=factor_beta_span,
+                                                         is_x_correlated=True)
+        factor_alpha, explained_returns = ewm_linear_model.get_factor_alpha()
+
+        if factor_alpha_title is not None:
+            factor_alpha_title = f"{factor_alpha_title} to {benchmark}"
+        else:
+            factor_alpha_title = factor_alpha_title or f"Cumulative alpha using {factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {benchmark}"
+
+        qis.plot_time_series(df=factor_alpha.cumsum(0),
+                             title=factor_alpha_title,
+                             ax=ax,
+                             **qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(var_format='{:,.0%}',
+                                                                                legend_stats=qis.LegendStats.LAST_NONNAN)))
+        self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, time_period=time_period, data_df=self.prices)
+
     def plot_rolling_perf(self,
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
                           regime_benchmark: str = None,
@@ -264,7 +298,7 @@ class MultiAssetsReport:
                           sharpe_title: Optional[str] = None,
                           sharpe_rolling_window: int = 3 * 252,
                           sharpe_freq: Optional[str] = None,
-                          legend_stats: LegendStats = LegendStats.AVG_LAST,
+                          legend_stats: LegendStats = LegendStats.FIRST_AVG_LAST,
                           var_format: str = '{:.2f}',
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           ax: plt.Subplot = None,
@@ -316,6 +350,47 @@ class MultiAssetsReport:
                              ax=ax,
                              **kwargs)
 
+    def plot_vol_regimes(self,
+                         benchmark: str,
+                         time_period: TimePeriod = None,
+                         title: str = None,
+                         ax: plt.Subplot = None,
+                         **kwargs
+                         ) -> None:
+        prices = self.get_prices(time_period=time_period)
+        title = title or f"Boxplot of average {self.regime_params.freq}-freq return conditional on volatility regime of {str(benchmark)}"
+        regime_classifier = qis.BenchmarkVolsQuantilesRegime(regime_params=qis.VolQuantileRegimeSpecs(freq=self.regime_params.freq))
+        if len(prices.columns) >= 8:
+            ncol = len(prices.columns) // 2
+        else:
+            ncol = len(prices.columns)
+        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(ncol=ncol))
+        qis.plot_regime_boxplot(regime_classifier=regime_classifier,
+                                prices=prices,
+                                benchmark=benchmark,
+                                meanline=False,
+                                title=title,
+                                ax=ax,
+                                **local_kwargs)
+
+    def plot_performance_bars(self,
+                              time_period: TimePeriod = None,
+                              benchmark: Optional[str] = None,
+                              perf_column: PerfStat = PerfStat.SHARPE_RF0,
+                              perf_params: PerfParams = PERF_PARAMS,
+                              title: str = None,
+                              ax: plt.Subplot = None,
+                              **kwargs
+                              ) -> None:
+        prices = self.get_prices(benchmark=benchmark, time_period=time_period)
+        qis.plot_ra_perf_bars(prices=prices,
+                              benchmark=benchmark,
+                              perf_column=perf_column,
+                              perf_params=perf_params,
+                              title=title or f"{perf_column.to_str()}: {qis.get_time_period(prices).to_str()}",
+                              ax=ax,
+                              **kwargs)
+
 
 def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    benchmark_prices: Union[pd.Series, pd.DataFrame] = None,
@@ -352,7 +427,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                perf_params=perf_params,
                                regime_params=regime_params)
 
-    # overrite local_kwargs with kwargs is they are provided
+    # overwrite local_kwargs with kwargs is they are provided
     local_kwargs = dict(linewidth=0.5,
                         weight='normal',
                         markersize=1,
@@ -363,7 +438,8 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
 
     # figure
     fig = plt.figure(figsize=figsize, constrained_layout=True)
-    gs = fig.add_gridspec(nrows=10, ncols=4, wspace=0.0, hspace=0.0)
+    # 7 figures, *6 palce holders
+    gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
 
     if time_period is not None:
         report_period = time_period.to_str()
@@ -389,12 +465,30 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                              ax=fig.add_subplot(gs[6:8, :2]),
                              **kwargs)
 
-    report.plot_benchmark_beta(benchmark=benchmark,
-                               ax=fig.add_subplot(gs[8:10, :2]),
-                               **kwargs)
+    report.plot_rolling_perf(regime_benchmark=benchmark,
+                             rolling_perf_stat=RollingPerfStat.VOL,
+                             var_format='{:.1%}',
+                             ax=fig.add_subplot(gs[8:10, :2]),
+                             **kwargs)
 
+    report.plot_benchmark_beta(benchmark=benchmark,
+                               ax=fig.add_subplot(gs[10:12, :2]),
+                               **kwargs)
+    report.plot_benchmark_alpha_attribution(benchmark=benchmark,
+                                            ax=fig.add_subplot(gs[12:14, :2]),
+                                            **kwargs)
+
+    report.plot_performance_bars(ax=fig.add_subplot(gs[0:2, 2]),
+                                 perf_column=PerfStat.SHARPE_RF0, **kwargs)
+    report.plot_performance_bars(ax=fig.add_subplot(gs[0:2, 3]),
+                                 perf_column=PerfStat.MAX_DD, **kwargs)
+    """
+    report.plot_performance_bars(ax=fig.add_subplot(gs[0:2, 10:12]),
+                                 benchmark=benchmark,
+                                 perf_column=PerfStat.BETA, **kwargs)
+    """
     report.plot_ra_perf_table(benchmark=benchmark,
-                              ax=fig.add_subplot(gs[0, 2:]),
+                              ax=fig.add_subplot(gs[2, 2:]),
                               **kwargs)
 
     # change regression to weekly
@@ -404,33 +498,31 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     else:
         local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1))
     report.plot_ra_perf_table(benchmark=benchmark,
-                              ax=fig.add_subplot(gs[1, 2:]),
+                              ax=fig.add_subplot(gs[3, 2:]),
                               **local_kwargs)
 
-    report.plot_annual_returns(ax=fig.add_subplot(gs[2:4, 2:]),
+    report.plot_annual_returns(ax=fig.add_subplot(gs[4:6, 2:]),
                                heatmap_freq=heatmap_freq,
                                **kwargs)
 
     report.plot_corr_table(freq=perf_params.freq,
-                           ax=fig.add_subplot(gs[4:6, 2]),
+                           ax=fig.add_subplot(gs[6:8, 2]),
                            **kwargs)
     report.plot_corr_table(freq=perf_params.freq,
-                           ax=fig.add_subplot(gs[4:6, 3]),
+                           ax=fig.add_subplot(gs[6:8, 3]),
                            **qis.update_kwargs(kwargs, dict(time_period=time_period1)))
 
     report.plot_regime_data(benchmark=benchmark,
-                            ax=fig.add_subplot(gs[6:8, 2:]),
+                            ax=fig.add_subplot(gs[8:10, 2:]),
                             **kwargs)
-
-    """
-    report.plot_rolling_perf(regime_benchmark=benchmark,
-                             rolling_perf_stat=RollingPerfStat.VOL,
-                             var_format='{:.1%}',
-                             ax=fig.add_subplot(gs[6:8, 2:]),
-                             **kwargs)
-    """
+    
+    report.plot_vol_regimes(benchmark=benchmark,
+                            ax=fig.add_subplot(gs[10:12, 2:]),
+                            **kwargs)
+    
     report.plot_returns_scatter(benchmark=benchmark,
-                                ax=fig.add_subplot(gs[8:10, 2:]),
+                                ax=fig.add_subplot(gs[12:14, 2:]),
                                 freq=perf_params.freq_reg,
                                 **kwargs)
+
     return fig
