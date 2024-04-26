@@ -166,7 +166,7 @@ class MultiPortfolioData:
                                          roll_periods=sharpe_rolling_window,
                                          roll_freq=sharpe_freq,
                                          legend_stats=legend_stats,
-                                         trend_line=qis.TrendLine.ZERO_SHADOWS,
+                                         trend_line=None, #qis.TrendLine.ZERO_SHADOWS,
                                          var_format=var_format,
                                          title=sharpe_title,
                                          ax=ax,

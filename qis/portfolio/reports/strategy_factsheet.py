@@ -138,7 +138,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                                 factor_beta_span=factor_beta_span,
                                                                                 time_period=time_period)
     factor_attribution_title = factor_attribution_title or f"Cumulative return attribution using rolling {factor_beta_span}-span beta of {beta_freq}-freq returns"
-    qis.plot_time_series(df=factor_attribution,
+    qis.plot_time_series(df=factor_attribution.cumsum(0),
                          var_format='{:,.0%}',
                          legend_stats=qis.LegendStats.LAST_NONNAN,
                          title=factor_attribution_title,

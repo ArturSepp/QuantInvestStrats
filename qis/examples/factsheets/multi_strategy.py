@@ -84,6 +84,9 @@ def run_unit_test(unit_test: UnitTests):
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period,
                                                   **fetch_default_report_kwargs(time_period=time_period))
+
+        qis.save_fig(fig=figs[0], file_name=f"multi_strategy", local_path=qis.local_path.get_output_path())
+
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"volparity_span_factsheet_long",
                              orientation='landscape',
@@ -97,9 +100,6 @@ def run_unit_test(unit_test: UnitTests):
                              file_name=f"volparity_span_factsheet_short",
                              orientation='landscape',
                              local_path=qis.local_path.get_output_path())
-
-        qis.save_fig(fig=figs[0], file_name=f"multi_strategy", local_path=qis.local_path.get_output_path())
-
     # plt.show()
 
 

@@ -278,6 +278,8 @@ class MultiAssetsReport:
                                                          span=factor_beta_span,
                                                          is_x_correlated=True)
         factor_alpha, explained_returns = ewm_linear_model.get_factor_alpha()
+        if time_period is not None:
+            factor_alpha = time_period.locate(factor_alpha)
 
         if factor_alpha_title is not None:
             factor_alpha_title = f"{factor_alpha_title} to {benchmark}"
