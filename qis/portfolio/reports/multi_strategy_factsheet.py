@@ -159,8 +159,10 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                               benchmark=multi_portfolio_data.benchmark_prices.columns[0],
                                               **kwargs)
     if len(multi_portfolio_data.benchmark_prices.columns) > 1:
+        # take first two benchmarks
+        benchmark_prices = multi_portfolio_data.benchmark_prices.iloc[:, :2]
         multi_portfolio_data.plot_factor_betas(axs=[fig.add_subplot(gs[5, 2:]), fig.add_subplot(gs[6, 2:])],
-                                               benchmark_prices=multi_portfolio_data.benchmark_prices,
+                                               benchmark_prices=benchmark_prices,
                                                time_period=time_period,
                                                regime_benchmark=regime_benchmark,
                                                regime_params=regime_params,

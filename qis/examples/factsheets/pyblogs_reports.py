@@ -1,16 +1,14 @@
-"""
-multi strategy backtest is generated using same strategy with a set of different model parameters
-"""
 
 import pandas as pd
-import matplotlib.pyplot as plt
 from typing import Tuple, List
 from enum import Enum
 import yfinance as yf
 import qis
 from qis import TimePeriod, MultiPortfolioData
-from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 from qis.portfolio.reports.config import fetch_default_report_kwargs
+
+# multiportfolio
+from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pyblogs
 
 
 def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -63,12 +61,13 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
 
 
 class UnitTests(Enum):
-        VOLPARITY_SPAN = 1
+        MULTI_PORTFOLIO = 1
+        STRATEGY_BENCHMARK = 2
 
 
 def run_unit_test(unit_test: UnitTests):
 
-    if unit_test == UnitTests.VOLPARITY_SPAN:
+    if unit_test == UnitTests.MULTI_PORTFOLIO:
 
         time_period = qis.TimePeriod('31Dec2005', '25Apr2024')  # time period for portfolio reporting
 
@@ -81,31 +80,20 @@ def run_unit_test(unit_test: UnitTests):
                                                                  rebalancing_costs=0.0010  # per traded volume
                                                                  )
 
-        figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
+        report = generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period,
                                                   **fetch_default_report_kwargs(time_period=time_period))
 
-        qis.save_fig(fig=figs[0], file_name=f"multi_strategy", local_path=qis.local_path.get_output_path())
+        filename = f"{qis.local_path.get_output_path()}_volparity_span_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.pdf"
+        report.save(filename)
+        print(f"saved allocation report to {filename}")
 
-        qis.save_figs_to_pdf(figs=figs,
-                             file_name=f"volparity_span_factsheet_long",
-                             orientation='landscape',
-                             local_path=qis.local_path.get_output_path())
-
-        time_period_short = TimePeriod('31Dec2019', time_period.end)
-        figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
-                                                  time_period=time_period_short,
-                                                  **fetch_default_report_kwargs(time_period=time_period_short))
-        qis.save_figs_to_pdf(figs=figs,
-                             file_name=f"volparity_span_factsheet_short",
-                             orientation='landscape',
-                             local_path=qis.local_path.get_output_path())
-    # plt.show()
-
+    elif unit_test == UnitTests.STRATEGY_BENCHMARK:
+        pass
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.VOLPARITY_SPAN
+    unit_test = UnitTests.MULTI_PORTFOLIO
 
     is_run_all_tests = False
     if is_run_all_tests:

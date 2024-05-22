@@ -122,7 +122,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                is_grouped=is_grouped,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
-    time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+    time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period, n_years=1)
     # change regression to weekly
     if pd.infer_freq(benchmark_price.index) in ['B', 'D']:
         local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED', fontsize=fontsize))

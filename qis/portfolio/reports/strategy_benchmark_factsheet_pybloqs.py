@@ -18,18 +18,20 @@ from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 from qis.portfolio.reports.config import KWARGS_SUPTITLE, KWARGS_TITLE, KWARGS_TEXT, KWARGS_FOOTNOTE, KWARGS_FIG
 
 
-def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiPortfolioData,
-                                                    time_period: TimePeriod = None,
-                                                    time_period_last: TimePeriod = None,
-                                                    perf_params: PerfParams = PERF_PARAMS,
-                                                    regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                                                    benchmark: str = None,
-                                                    backtest_name: str = None,
-                                                    heatmap_freq: str = 'YE',
-                                                    param_name: Optional[str] = 'gamma',
-                                                    fontsize: int = 4,
-                                                    **kwargs
-                                                    ) -> p.VStack:
+def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: MultiPortfolioData,
+                                                       strategy_idx: int = 0,  # strategy is multi_portfolio_data[strategy_idx]
+                                                       benchmark_idx: int = 1,  # benchmark is multi_portfolio_data[benchmark_idx]
+                                                       time_period: TimePeriod = None,
+                                                       time_period_last: TimePeriod = None,
+                                                       perf_params: PerfParams = PERF_PARAMS,
+                                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                                       benchmark: str = None,
+                                                       backtest_name: str = None,
+                                                       heatmap_freq: str = 'YE',
+                                                       param_name: Optional[str] = 'gamma',
+                                                       fontsize: int = 4,
+                                                       **kwargs
+                                                       ) -> p.VStack:
     """
     this one is well suited for large backtests with over 100 strategies
     """
@@ -37,7 +39,6 @@ def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiP
         raise ValueError(f"pass non none time_period")
     if time_period_last is None:
         time_period_last = qis.get_time_period_shifted_by_years(time_period=time_period, n_years=1)
-
 
     if benchmark is None:
         benchmark = multi_portfolio_data.benchmark_prices.columns[0]

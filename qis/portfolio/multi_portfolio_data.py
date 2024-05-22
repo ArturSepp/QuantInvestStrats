@@ -7,17 +7,15 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 # qis
 import qis as qis
 from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, RollingPerfStat
-from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 import qis.utils.struct_ops as sop
 import qis.utils.df_groups as dfg
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
-import qis.plots.derived.drawdowns as cdr
 import qis.perfstats.regime_classifier as rcl
 
 # plots
@@ -26,7 +24,8 @@ import qis.plots.derived.prices as ppd
 import qis.plots.derived.returns_heatmap as rhe
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
-import qis.models.linear.plot_correlations as pco
+import qis.plots.derived.drawdowns as cdr
+from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 
 
 PERF_PARAMS = PerfParams(freq='W-WED')
@@ -39,11 +38,13 @@ class MultiPortfolioData:
     data structure to unify multi portfolio reporting
     """
     portfolio_datas: List[PortfolioData]
-    benchmark_prices: pd.DataFrame = None
+    benchmark_prices: Union[pd.DataFrame, pd.Series] = None
 
     def __post_init__(self):
         # default frequency is freq of backtests, can be non for strats at different freqs
         self.set_navs(freq=None)
+        if self.benchmark_prices is not None and isinstance(self.benchmark_prices, pd.Series):
+            self.benchmark_prices = self.benchmark_prices.to_frame()
 
     def set_navs(self, freq: Optional[str] = None) -> None:
         navs = []
@@ -218,7 +219,7 @@ class MultiPortfolioData:
                         **kwargs) -> None:
         prices = self.get_navs(time_period=time_period)
         if len(prices.columns) > 1:
-            pco.plot_returns_corr_table(prices=prices,
+            qis.plot_returns_corr_table(prices=prices,
                                         x_rotation=90,
                                         freq=freq,
                                         title=f'Correlation of {freq} returns',
