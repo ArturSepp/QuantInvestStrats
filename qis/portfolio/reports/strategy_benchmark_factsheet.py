@@ -266,6 +266,92 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     return figs
 
 
+def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortfolioData,
+                                                strategy_idx: int = 0,  # strategy is multi_portfolio_data[strategy_idx]
+                                                benchmark_idx: int = 1, # benchmark is multi_portfolio_data[benchmark_idx]
+                                                time_period: TimePeriod = None,
+                                                perf_params: PerfParams = PERF_PARAMS,
+                                                regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                                backtest_name: str = None,
+                                                add_strategy_factsheet: bool = False,
+                                                add_grouped_exposures: bool = False,  # for strategy factsheet
+                                                add_grouped_cum_pnl: bool = False,  # for strategy factsheet
+                                                figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+                                                fontsize: int = 8,
+                                                **kwargs
+                                                ) -> List[plt.Figure]:
+    """
+    display 2*2 plot with nav and Brinson attribution
+    """
+    if len(multi_portfolio_data.portfolio_datas) == 1:
+        raise ValueError(f"must be at least two strategies")
+
+    # set report specific kqargs
+    plot_kwargs = dict(fontsize=fontsize,
+                       linewidth=1.0,
+                       digits_to_show=1, sharpe_digits=2,
+                       weight='normal',
+                       markersize=1,
+                       framealpha=0.75,
+                       time_period=time_period,
+                       perf_stats_labels=qis.PerfStatsLabels.DETAILED_WITH_DD.value)
+    kwargs = qis.update_kwargs(kwargs, plot_kwargs)
+
+    figs = []
+    fig = plt.figure(figsize=figsize, constrained_layout=True)
+    figs.append(fig)
+    gs = fig.add_gridspec(nrows=2, ncols=2, wspace=0.0, hspace=0.0)
+
+    if backtest_name is not None:
+        fig.suptitle(backtest_name, fontweight="bold", fontsize=8, color='blue')
+
+    regime_benchmark = multi_portfolio_data.benchmark_prices.columns[0]
+    benchmark_price = multi_portfolio_data.benchmark_prices[regime_benchmark]
+
+    multi_portfolio_data.plot_nav(ax=fig.add_subplot(gs[0, 0]),
+                                  regime_benchmark=regime_benchmark,
+                                  perf_params=perf_params,
+                                  regime_params=regime_params,
+                                  title='Cumulative performance',
+                                  **kwargs)
+
+    totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
+        multi_portfolio_data.compute_brinson_attribution(strategy_idx=strategy_idx,
+                                                         benchmark_idx=benchmark_idx,
+                                                         freq=None,
+                                                         time_period=time_period,
+                                                         is_exclude_interaction_term=True)
+
+    datas = {'Active total (Brinson attribution)': (active_total.cumsum(0), fig.add_subplot(gs[0, 1])),
+             'Asset class allocation return': (grouped_allocation_return.cumsum(0), fig.add_subplot(gs[1, 0])),
+             'Asset class selection return': (grouped_selection_return.cumsum(0), fig.add_subplot(gs[1, 1]))}
+    for key, (df, ax) in datas.items():
+        legend_labels = [column + ', sum=' + '{:.1%}'.format(df[column].iloc[-1]) for column in df.columns]
+        qis.plot_time_series(df=df,
+                             title=key,
+                             var_format='{:.1%}',
+                             legend_labels=legend_labels,
+                             ax=ax,
+                             **kwargs)
+
+        if regime_benchmark is not None:
+            multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=df.index,
+                                                    regime_params=regime_params)
+
+    if add_strategy_factsheet:
+        for portfolio_data in multi_portfolio_data.portfolio_datas:
+            figs.append(generate_strategy_factsheet(portfolio_data=portfolio_data,
+                                                    benchmark_prices=multi_portfolio_data.benchmark_prices,
+                                                    perf_params=perf_params,
+                                                    regime_params=regime_params,
+                                                    add_grouped_exposures=add_grouped_exposures,
+                                                    add_grouped_cum_pnl=add_grouped_cum_pnl,
+                                                    **kwargs  # time period will be in kwargs
+                                                    ))
+        figs = qis.to_flat_list(figs)
+    return figs
+
+
 def generate_performance_attribution_report(multi_portfolio_data: MultiPortfolioData,
                                             time_period: TimePeriod = None,
                                             figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
@@ -289,7 +375,7 @@ def generate_performance_attribution_report(multi_portfolio_data: MultiPortfolio
 
         multi_portfolio_data.plot_performance_attribution(portfolio_ids=[1],
                                                           time_period=time_period,
-                                                          attribution_metric=AttributionMetric.PNL_RISK,
+                                                          attribution_metric=AttributionMetric.PNL,
                                                           ax=fig.add_subplot(gs[2, :]),
                                                           **kwargs)
 

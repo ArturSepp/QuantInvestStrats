@@ -21,7 +21,7 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
                                       asset_class_data: pd.Series,
                                       total_column: str = 'Total Sum',
                                       is_exclude_interaction_term: bool = True
-                                      ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                                      ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     brinson attribution
     """
@@ -97,10 +97,19 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
     grouped_selection_return[total_column] = np.sum(grouped_selection_return, axis=1)
     grouped_interaction_return[total_column] = np.sum(grouped_interaction_return, axis=1)
 
-    return totals_table, grouped_allocation_return, grouped_selection_return, grouped_interaction_return
+    # get total of allocation and selection:
+    allocation_total = grouped_allocation_return[total_column].to_frame(name='Allocation Total')
+    selection_total = grouped_selection_return[total_column].to_frame(name='Selection Total')
+    active_total = pd.concat([allocation_total, selection_total], axis=1)
+    if not is_exclude_interaction_term:
+        interaction_total = grouped_interaction_return[total_column].to_frame(name='Interaction Total')
+        active_total = pd.concat([active_total, interaction_total], axis=1)
+
+    return totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return
 
 
 def plot_brinson_attribution_table(totals_table: pd.DataFrame,
+                                   active_total: pd.DataFrame,
                                    grouped_allocation_return: pd.DataFrame,
                                    grouped_selection_return: pd.DataFrame,
                                    grouped_interaction_return: pd.DataFrame,
@@ -133,14 +142,7 @@ def plot_brinson_attribution_table(totals_table: pd.DataFrame,
                               **kwargs)
 
     # get total of allocation and selection:
-    allocation_total = grouped_allocation_return[total_column].to_frame(name='Allocation Total')
-    selection_total = grouped_selection_return[total_column].to_frame(name='Selection Total')
-    active_total = pd.concat([allocation_total, selection_total], axis=1)
-    if not is_exclude_interaction_term:
-        interaction_total = grouped_interaction_return[total_column].to_frame(name='Interaction Total')
-        active_total = pd.concat([active_total, interaction_total], axis=1)
     active_total = active_total.cumsum(axis=0)
-
     legend_labels = [column + ', sum=' + '{:.0%}'.format(active_total[column].iloc[-1]) for column in active_total.columns]
     fig_active_total = pts.plot_time_series(df=active_total,
                                             var_format='{:.0%}',

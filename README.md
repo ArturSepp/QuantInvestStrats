@@ -66,6 +66,9 @@ Optional dependencies:
     yfinance ">=0.1.38" (for getting test price data),
     pybloqs ">=1.2.13" (for producing html and pdf factsheets)
 
+To use pybloqs for pandas > 2.x, locate file "...\Lib\site-packages\pybloqs\jinja\table.html" and 
+change line 44 from {% for col_name, cell in row.iteritems() %} to {% for col_name, cell in row.items() %}
+
 
 ## **Examples** <a name="examples"></a>
 

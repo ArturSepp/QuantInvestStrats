@@ -29,6 +29,7 @@ class PerfStatsLabels(Enum):
     """
     SHARPE = (PerfStat.SHARPE_RF0, )
     DETAILED_EXCESS_SHARPE = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_EXCESS, )
+    DETAILED_SHARPE_RF0 = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0,)
     DETAILED_WITH_DD = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, PerfStat.MAX_DD, )
     DETAILED_WITH_SKEW = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, PerfStat.SKEWNESS, )
     DETAILED_LOG_SHARPE = (PerfStat.AN_LOG_RETURN, PerfStat.VOL, PerfStat.SHARPE_LOG_AN, )

@@ -655,6 +655,33 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
 
+    def compute_brinson_attribution(self,
+                                    strategy_idx: int = 0,
+                                    benchmark_idx: int = 1,
+                                    freq: Optional[str] = None,
+                                    total_column: str = 'Total Sum',
+                                    time_period: TimePeriod = None,
+                                    is_exclude_interaction_term: bool = True
+                                    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+
+        strategy_pnl = self.portfolio_datas[strategy_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
+        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
+
+        benchmark_pnl = self.portfolio_datas[benchmark_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
+        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
+
+        asset_class_data = self.portfolio_datas[strategy_idx].group_data
+
+        totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
+            qis.compute_brinson_attribution_table(benchmark_pnl=benchmark_pnl,
+                                                  strategy_pnl=strategy_pnl,
+                                                  strategy_weights=strategy_weights,
+                                                  benchmark_weights=benchmark_weights,
+                                                  asset_class_data=asset_class_data,
+                                                  total_column=total_column,
+                                                  is_exclude_interaction_term=is_exclude_interaction_term)
+        return totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return
+
     def plot_brinson_attribution(self,
                                  strategy_idx: int = 0,
                                  benchmark_idx: int = 1,
@@ -666,25 +693,17 @@ class MultiPortfolioData:
                                  **kwargs
                                  ) -> Tuple[plt.Figure, plt.Figure, plt.Figure, plt.Figure, plt.Figure]:
 
-        strategy_pnl = self.portfolio_datas[strategy_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
-        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
-
-        benchmark_pnl = self.portfolio_datas[benchmark_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
-        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
-
-        asset_class_data = self.portfolio_datas[strategy_idx].group_data
-
-        totals_table, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
-            qis.compute_brinson_attribution_table(benchmark_pnl=benchmark_pnl,
-                                                  strategy_pnl=strategy_pnl,
-                                                  strategy_weights=strategy_weights,
-                                                  benchmark_weights=benchmark_weights,
-                                                  asset_class_data=asset_class_data,
-                                                  total_column=total_column,
-                                                  is_exclude_interaction_term=is_exclude_interaction_term)
+        totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
+            self.compute_brinson_attribution(strategy_idx=strategy_idx,
+                                             benchmark_idx=benchmark_idx,
+                                             freq=freq,
+                                             total_column=total_column,
+                                             time_period=time_period,
+                                             is_exclude_interaction_term=is_exclude_interaction_term)
 
         fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inters = qis.plot_brinson_attribution_table(
             totals_table=totals_table,
+            active_total=active_total,
             grouped_allocation_return=grouped_allocation_return,
             grouped_selection_return=grouped_selection_return,
             grouped_interaction_return=grouped_interaction_return,

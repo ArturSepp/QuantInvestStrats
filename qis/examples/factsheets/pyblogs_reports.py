@@ -9,6 +9,7 @@ from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 # multiportfolio
 from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pyblogs
+from qis.portfolio.reports.strategy_benchmark_factsheet_pybloqs import generate_strategy_benchmark_factsheet_with_pyblogs
 
 
 def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -67,18 +68,18 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
+    time_period = qis.TimePeriod('31Dec2005', '25Apr2024')  # time period for portfolio reporting
+
+    prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
+    multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,
+                                                             benchmark_prices=benchmark_prices,
+                                                             group_data=group_data,
+                                                             time_period=time_period,
+                                                             vol_target=0.15,
+                                                             rebalancing_costs=0.0010  # per traded volume
+                                                             )
+
     if unit_test == UnitTests.MULTI_PORTFOLIO:
-
-        time_period = qis.TimePeriod('31Dec2005', '25Apr2024')  # time period for portfolio reporting
-
-        prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
-        multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,
-                                                                 benchmark_prices=benchmark_prices,
-                                                                 group_data=group_data,
-                                                                 time_period=time_period,
-                                                                 vol_target=0.15,
-                                                                 rebalancing_costs=0.0010  # per traded volume
-                                                                 )
 
         report = generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period,
@@ -89,11 +90,21 @@ def run_unit_test(unit_test: UnitTests):
         print(f"saved allocation report to {filename}")
 
     elif unit_test == UnitTests.STRATEGY_BENCHMARK:
-        pass
+
+        report = generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data=multi_portfolio_data,
+                                                                    strategy_idx=-1,
+                                                                    benchmark_idx=0,
+                                                                    time_period=time_period,
+                                                                    **fetch_default_report_kwargs(time_period=time_period))
+
+        filename = f"{qis.local_path.get_output_path()}_volparity_pybloq_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.pdf"
+        report.save(filename)
+        print(f"saved allocation report to {filename}")
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.MULTI_PORTFOLIO
+    unit_test = UnitTests.STRATEGY_BENCHMARK
 
     is_run_all_tests = False
     if is_run_all_tests:

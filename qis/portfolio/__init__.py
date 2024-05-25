@@ -19,7 +19,8 @@ from qis.portfolio.reports.multi_assets_factsheet import (MultiAssetsReport, gen
 
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 
-from qis.portfolio.reports.strategy_benchmark_factsheet import generate_strategy_benchmark_factsheet_plt
+from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strategy_benchmark_factsheet_plt,
+                                                                generate_strategy_benchmark_active_perf_plt)
 
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 

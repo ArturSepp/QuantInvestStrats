@@ -84,6 +84,8 @@ class PortfolioData:
             self.group_order = list(self.group_data.unique())
         if self.benchmark_prices is not None:
             self.benchmark_prices = self.benchmark_prices.reindex(index=self.nav.index, method='ffill')
+        if self.ticker is None:
+            self.ticker = str(self.nav.name)
 
     def set_benchmark_prices(self, benchmark_prices: Union[pd.Series, pd.DataFrame]) -> None:
         # can pass benchmark prices here
@@ -531,14 +533,23 @@ class PortfolioData:
     def get_attribution_table_by_instrument(self,
                                             time_period: da.TimePeriod = None,
                                             freq: str = 'ME',
+                                            is_input_weights: bool = False
                                             ) -> pd.DataFrame:
         """
         using avg weight
         """
-        returns_f = self.get_instruments_periodic_returns(time_period=time_period, freq=freq)
-        weight = self.weights.reindex(index=returns_f.index, method='ffill').shift(1)
-        # first row is None
-        portf_return = returns_f.multiply(weight).iloc[1:, :]
+        if is_input_weights:
+            weights = self.input_weights
+            if not isinstance(weights, pd.DataFrame):
+                raise ValueError(f"input weights must be pd.Dataframe for is_input_weights=True")
+            prices_w = self.prices.reindex(index=weights.index, method='ffill')
+            returns_f = prices_w.pct_change()
+            portf_return = returns_f.multiply(weights.shift(1)).iloc[1:, :]
+        else:
+            returns_f = self.get_instruments_periodic_returns(time_period=time_period, freq=freq)
+            weight = self.weights.reindex(index=returns_f.index, method='ffill')
+            # first row is None
+            portf_return = returns_f.multiply(weight.shift(1)).iloc[1:, :]
         if self.tickers_to_names_map is not None:
             portf_return = portf_return.rename(columns=self.tickers_to_names_map)
         return portf_return
