@@ -197,7 +197,7 @@ class PortfolioData:
             total_column = None
         grouped_pnl = dfg.agg_df_by_groups_ax1(df=self.get_instruments_pnl(time_period=time_period),
                                                group_data=self.group_data,
-                                               agg_func=np.sum,
+                                               agg_func=np.nansum,
                                                total_column=total_column,
                                                group_order=self.group_order)
         group_navs = ret.returns_to_nav(returns=grouped_pnl, constant_trade_level=constant_trade_level)
@@ -213,49 +213,42 @@ class PortfolioData:
         return prices
 
     def get_weights(self,
-                    is_input_weights: bool = True,
+                    is_input_weights: bool = False,
                     columns: List[str] = None,
                     time_period: TimePeriod = None,
+                    is_grouped: bool = False,
+                    add_total: bool = False,
                     freq: Optional[str] = 'W-WED'
                     ) -> pd.DataFrame:
-        if is_input_weights and self.input_weights is not None:
+        if is_input_weights and self.input_weights is not None and isinstance(self.input_weights, pd.DataFrame):
             weights = self.input_weights.copy()
         else:
             weights = self.weights.copy()
-        if columns is not None:
-            weights = weights[columns]
         if time_period is not None:
             weights = time_period.locate(weights)
         if freq is not None:
             weights = weights.resample(freq).last().ffill()
+
+        if is_grouped:
+            weights = dfg.agg_df_by_groups_ax1(df=weights,
+                                               group_data=self.group_data,
+                                               agg_func=np.nansum,
+                                               total_column=self.ticker if add_total else None,
+                                               group_order=self.group_order)
+        elif columns is not None:
+            weights = weights[columns]
+
         return weights
 
-    def get_exposures(self,
-                      time_period: da.TimePeriod = None,
-                      is_grouped: bool = False,
-                      add_total: bool = True
-                      ) -> pd.DataFrame:
-        if is_grouped:
-            exposures = dfg.agg_df_by_groups_ax1(df=self.weights,
-                                                 group_data=self.group_data,
-                                                 agg_func=np.nansum,
-                                                 total_column=str(self.nav.name) if add_total else None,
-                                                 group_order=self.group_order)
-        else:
-            exposures = self.weights
-        if time_period is not None:
-            exposures = time_period.locate(exposures)
-        return exposures
-
-    def get_grouped_exposures(self, time_period: da.TimePeriod = None
-                              ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+    def get_grouped_long_short_exposures(self, time_period: da.TimePeriod = None
+                                         ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
         """
-        compute grouped net long / short exposues
+        compute grouped net long / short exposures
         """
         group_dict = dfg.get_group_dict(group_data=self.group_data,
                                         group_order=self.group_order,
                                         total_column=None)
-        all_exposures = self.get_exposures(time_period=time_period)
+        all_exposures = self.get_weights(time_period=time_period)
         grouped_exposures_by_inst = {}
         grouped_exposures_agg = {}
         for group, tickers in group_dict.items():
@@ -277,7 +270,7 @@ class PortfolioData:
                                         total_column=None)
 
         pnls = self.get_instruments_pnl(time_period=time_period, is_compounded=False).fillna(0.0)
-        all_exposures = self.get_exposures(time_period=time_period)
+        all_exposures = self.get_weights(time_period=time_period)
         pnl_positive_exp = pnls.where(all_exposures > 0.0, other=0.0)
         pnl_negative_exp = pnls.where(all_exposures < 0.0, other=0.0)
 
@@ -404,7 +397,7 @@ class PortfolioData:
         """
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-        exposures = self.get_exposures().reindex(index=instrument_prices.index, method='ffill')
+        exposures = self.get_weights().reindex(index=instrument_prices.index, method='ffill')
         benchmark_betas = ef.compute_portfolio_benchmark_betas(instrument_prices=instrument_prices,
                                                                exposures=exposures,
                                                                benchmark_prices=benchmark_prices,
@@ -426,7 +419,7 @@ class PortfolioData:
         """
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-        exposures = self.get_exposures().reindex(index=instrument_prices.index, method='ffill')
+        exposures = self.get_weights().reindex(index=instrument_prices.index, method='ffill')
         portfolio_nav = self.get_portfolio_nav().reindex(index=instrument_prices.index, method='ffill')
         joint_attrib = ef.compute_portfolio_benchmark_beta_alpha_attribution(instrument_prices=instrument_prices,
                                                                              exposures=exposures,

@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import pybloqs as p
 import pybloqs.block.table_formatters as tf
+from scipy import stats as stats
+from typing import Optional, Dict
 
 # qis
 import qis as qis
@@ -19,6 +21,7 @@ from qis.portfolio.reports.config import KWARGS_SUPTITLE, KWARGS_TITLE, KWARGS_T
 
 
 def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: MultiPortfolioData,
+                                                       alphas: Optional[Dict[str, pd.DataFrame]] = None,  # to show signals
                                                        strategy_idx: int = 0,  # strategy is multi_portfolio_data[strategy_idx]
                                                        benchmark_idx: int = 1,  # benchmark is multi_portfolio_data[benchmark_idx]
                                                        time_period: TimePeriod = None,
@@ -83,9 +86,24 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
 
     strategy_dw = (strategy_weights.iloc[-1, :].subtract(strategy_weights.iloc[-2, :])).rename(f"delta {strategy_name}")
     benchmark_dw = (benchmark_weights.iloc[-1, :].subtract(benchmark_weights.iloc[-2, :])).rename(f"delta {benchmark_name}")
-    
+
     weights = pd.concat([strategy_w, benchmark_w, delta_w, strategy_dw, benchmark_dw], axis=1)
     weights_by_ac = qis.agg_df_by_groups(df=weights.T, group_data=asset_class_data, group_order=group_order).T
+
+    if alphas is not None:
+        alphas_last = []
+        alpha_scores = []
+        for key, alpha in alphas.items():
+            last_score = qis.compute_last_score(df=alpha)
+            alpha_scores.append(last_score.rename(f"{key}-score%"))
+            alphas_last.append(alpha.iloc[-1, :].rename(f"{key}"))
+        alphas_df = pd.concat([pd.concat(alphas_last, axis=1), pd.concat(alpha_scores, axis=1)], axis=1)
+
+        #weights1 = pd.concat([weights, pd.concat(alphas_last, axis=1)], axis=1)
+        #weights_by_ac = qis.agg_df_by_groups(df=weights1.T, group_data=asset_class_data, group_order=group_order).T
+
+    else:
+        alphas_df = None
 
     # attribution
     strategy_attrib_last = strategy_pnl.iloc[-1, :].rename(f"{strategy_name} last")
@@ -103,7 +121,7 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
     attribs_by_ac.loc['Total', :] = np.nansum(attribs_by_ac, axis=0)
 
     # 1. weights table
-    b_weights = p.Block([p.Paragraph(f"Instrument weights for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
+    b_weights1 = p.Block([p.Paragraph(f"Instrument weights for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
                           p.Block(weights,
                                   formatters=[
                                       tf.FmtPercent(n_decimals=2, apply_to_header_and_index=False),
@@ -116,6 +134,25 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
                                   ]),
                           p.Paragraph(f"  ", **KWARGS_FOOTNOTE)],
                          **KWARGS_TEXT)
+    # 1a alphas_df table
+    if alphas_df is not None:
+        # heatmap for scores
+        formatters = [tf.FmtHeatmap(columns=[alphas_df.columns[idx]]) for idx in range(2*len(alphas.keys()))]
+        b_weights2 = p.Block([p.Paragraph(f"Instrument alphas and alpha time series scores for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
+                              p.Block(alphas_df,
+                                      formatters=formatters + [
+                                          tf.FmtPercent(n_decimals=0, apply_to_header_and_index=False),
+                                          tf.FmtReplaceNaN(value=''),
+                                          tf.FmtAddCellBorder(each=1.0,
+                                                              columns=alphas_df.columns.to_list(),
+                                                              color=tf.colors.GREY,
+                                                              apply_to_header_and_index=True)
+                                      ]),
+                              p.Paragraph(f"  ", **KWARGS_FOOTNOTE)],
+                             **KWARGS_TEXT)
+        b_weights = p.HStack([b_weights1, b_weights2])
+    else:
+        b_weights = b_weights1
     blocks.append(b_weights)
 
     # 2. weights by ac table

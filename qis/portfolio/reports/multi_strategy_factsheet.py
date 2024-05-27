@@ -30,7 +30,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        ) -> List[plt.Figure]:
     """
     for portfolio data with structurally different strategies
-    for portfolios with large universe use is_grouped = True to report tunrover and exposures by groups
+    for portfolios with large universe use is_grouped = True to report turnover and exposures by groups
     """
     if group_data is not None:
         is_grouped = True

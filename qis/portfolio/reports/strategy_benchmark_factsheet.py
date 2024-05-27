@@ -3,14 +3,11 @@ generate strategy factsheet report with comparision to benchmark strategy using 
 for test implementation see qis.examples.portfolio_factsheet
 """
 # packages
-import matplotlib.pyplot as plt
-from typing import List, Tuple
-
 import pandas as pd
 import seaborn as sns
-
-# qis
-import qis
+import matplotlib.pyplot as plt
+from typing import List, Tuple, Optional
+import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs
 
 # portfolio
@@ -213,10 +210,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         strategy_name = multi_portfolio_data.portfolio_datas[strategy_idx].ticker
         benchmark_name = multi_portfolio_data.portfolio_datas[benchmark_idx].ticker
         strategy_grouped_exposures_agg, strategy_grouped_exposures_by_inst = \
-            multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_exposures(time_period=time_period)
+            multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_long_short_exposures(time_period=time_period)
 
         benchmark_grouped_exposures_agg, benchmark_grouped_exposures_by_inst = \
-            multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_exposures(time_period=time_period)
+            multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_long_short_exposures(time_period=time_period)
 
         strategy_grouped_pnls_agg, strategy_grouped_pnls_by_inst \
             = multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_cum_pnls(time_period=time_period)
@@ -273,10 +270,12 @@ def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortf
                                                 perf_params: PerfParams = PERF_PARAMS,
                                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                                 backtest_name: str = None,
+                                                weight_freq: Optional[str] = 'ME',
                                                 add_strategy_factsheet: bool = False,
                                                 add_grouped_exposures: bool = False,  # for strategy factsheet
                                                 add_grouped_cum_pnl: bool = False,  # for strategy factsheet
                                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+                                                is_long_only: bool = False,
                                                 fontsize: int = 8,
                                                 **kwargs
                                                 ) -> List[plt.Figure]:
@@ -300,7 +299,7 @@ def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortf
     figs = []
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     figs.append(fig)
-    gs = fig.add_gridspec(nrows=2, ncols=2, wspace=0.0, hspace=0.0)
+    gs = fig.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)
 
     if backtest_name is not None:
         fig.suptitle(backtest_name, fontweight="bold", fontsize=8, color='blue')
@@ -322,9 +321,9 @@ def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortf
                                                          time_period=time_period,
                                                          is_exclude_interaction_term=True)
 
-    datas = {'Active total (Brinson attribution)': (active_total.cumsum(0), fig.add_subplot(gs[0, 1])),
-             'Asset class allocation return': (grouped_allocation_return.cumsum(0), fig.add_subplot(gs[1, 0])),
-             'Asset class selection return': (grouped_selection_return.cumsum(0), fig.add_subplot(gs[1, 1]))}
+    datas = {'Active total return (Brinson attribution)': (active_total.cumsum(0), fig.add_subplot(gs[0, 1])),
+             'Asset class allocation return': (grouped_allocation_return.cumsum(0), fig.add_subplot(gs[1, 1])),
+             'Instrument selection return': (grouped_selection_return.cumsum(0), fig.add_subplot(gs[2, 1]))}
     for key, (df, ax) in datas.items():
         legend_labels = [column + ', sum=' + '{:.1%}'.format(df[column].iloc[-1]) for column in df.columns]
         qis.plot_time_series(df=df,
@@ -337,6 +336,33 @@ def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortf
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=df.index,
                                                     regime_params=regime_params)
+
+    # weights box plot
+    # make horizontal is too many instruments
+    if len(multi_portfolio_data.portfolio_datas[0].prices.columns) > 9:
+        local_kwargs = qis.update_kwargs(kwargs, dict(x_rotation=90, add_hue_to_legend_title=False))
+    else:
+        local_kwargs = qis.update_kwargs(kwargs, dict(add_hue_to_legend_title=False))
+    ax = fig.add_subplot(gs[1, 0])
+    multi_portfolio_data.plot_weights_boxplot(strategy_idx=strategy_idx,
+                                              benchmark_idx=benchmark_idx,
+                                              freq=weight_freq,
+                                              is_grouped=True,
+                                              title=f"Boxplot of weights by groups at {weight_freq}-freq",
+                                              ax=ax,
+                                              **local_kwargs)
+    if is_long_only:
+        qis.set_y_limits(ax=ax, y_limits=(0, None))
+    ax = fig.add_subplot(gs[2, 0])
+    multi_portfolio_data.plot_weights_boxplot(strategy_idx=strategy_idx,
+                                              benchmark_idx=benchmark_idx,
+                                              freq=weight_freq,
+                                              is_grouped=False,
+                                              title=f"Boxplot of weights by instruments at {weight_freq}-freq",
+                                              ax=ax,
+                                              **local_kwargs)
+    if is_long_only:
+        qis.set_y_limits(ax=ax, y_limits=(0, None))
 
     if add_strategy_factsheet:
         for portfolio_data in multi_portfolio_data.portfolio_datas:

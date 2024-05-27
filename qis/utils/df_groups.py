@@ -4,7 +4,7 @@ implement group by operations on df
 # packages
 import numpy as np
 import pandas as pd
-from typing import Union, List, Dict, Callable
+from typing import Union, List, Dict, Callable, Optional
 from enum import Enum
 
 # qis
@@ -88,7 +88,7 @@ def split_df_by_groups(df: pd.DataFrame,
 
 def agg_df_by_groups_ax1(df: pd.DataFrame,
                          group_data: pd.Series,
-                         agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.nansum,
+                         agg_func: Callable[[pd.DataFrame], pd.Series] = np.nansum,
                          total_column: Union[str, None] = None,
                          group_order: List[str] = None
                          ) -> pd.DataFrame:
@@ -117,7 +117,8 @@ def agg_df_by_groups(df: pd.DataFrame,
                      agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.nansum,
                      total_column: Union[str, None] = None,
                      is_total_first: bool = True,
-                     group_order: List[str] = None
+                     group_order: List[str] = None,
+                     axis: Optional[int] = 1  # axis for integration
                      ) -> pd.DataFrame:
     """
     take pandas data which are index=time series, data = instruments
@@ -134,7 +135,8 @@ def agg_df_by_groups(df: pd.DataFrame,
     agg_grouped_datas = []
     if group is None:  # output pandas with columns by dictionary keys
         for key, group_columns in group_dict.items():
-            agg_grouped_datas.append(agg_func(df[group_columns]).rename(key))
+            if len(group_columns) > 0:
+                agg_grouped_datas.append(agg_func(df[group_columns], axis=axis).rename(key))
         agg_grouped_data = pd.concat(agg_grouped_datas, axis=1)
 
     else:  # just take the group

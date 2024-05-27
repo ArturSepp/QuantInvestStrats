@@ -50,6 +50,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
              continuous_x_col: str = None,
              y_limits: Tuple[Optional[float], Optional[float]] = None,
              whis: Optional[float] = 1.5,  # sns default
+             add_hue_to_legend_title: bool = True,
              ax: plt.Subplot = None,
              **kwargs
              ) -> Optional[plt.Figure]:
@@ -203,7 +204,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
 
     if legend_loc is not None:
         put.set_legend(ax=ax,
-                       legend_title=hue,
+                       legend_title=hue if add_hue_to_legend_title else None,
                        legend_loc=legend_loc,
                        fontsize=fontsize,
                        lines=lines,
@@ -303,6 +304,7 @@ def df_dict_boxplot_by_columns(dfs: Dict[str, Union[pd.Series, pd.DataFrame]],
     """
     box_datas = []
     for key, df in dfs.items():
+        df = df.dropna()  # important
         box_data = dfm.melt_df_by_columns(df=df, x_index_var_name=None, hue_var_name=hue_var_name, y_var_name=y_var_name)
         box_data[hue] = key
         box_datas.append(box_data)

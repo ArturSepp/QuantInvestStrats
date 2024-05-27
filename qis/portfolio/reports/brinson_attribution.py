@@ -19,6 +19,7 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
                                       strategy_weights: pd.DataFrame,
                                       benchmark_weights: pd.DataFrame,
                                       asset_class_data: pd.Series,
+                                      group_order: List[str] = None,
                                       total_column: str = 'Total Sum',
                                       is_exclude_interaction_term: bool = True
                                       ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -28,19 +29,23 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
     # 1 get grouped pnl
     grouped_strategy_pnl = dfg.agg_df_by_groups(df=strategy_pnl,
                                                 group_data=asset_class_data,
+                                                group_order=group_order,
                                                 agg_func=dfa.nansum)
 
     grouped_benchmark_pnl = dfg.agg_df_by_groups(df=benchmark_pnl,
                                                  group_data=asset_class_data,
+                                                 group_order=group_order,
                                                  agg_func=dfa.nansum)
 
     # 2. get grouped weights
     grouped_strategy_weights = dfg.agg_df_by_groups(df=strategy_weights,
                                                     group_data=asset_class_data,
+                                                    group_order=group_order,
                                                     agg_func=dfa.nansum)
 
     grouped_benchmark_weights = dfg.agg_df_by_groups(df=benchmark_weights,
                                                      group_data=asset_class_data,
+                                                     group_order=group_order,
                                                      agg_func=dfa.nansum)
 
     # active return by instrument
@@ -50,6 +55,7 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
     if is_revaluate_active_return:
         grouped_active_return = dfg.agg_df_by_groups(df=active_return,
                                                      group_data=asset_class_data,
+                                                     group_order=group_order,
                                                      agg_func=dfa.nansum)
     else:
         grouped_active_return = grouped_strategy_pnl - grouped_benchmark_pnl

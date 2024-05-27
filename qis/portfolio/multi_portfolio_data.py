@@ -355,7 +355,7 @@ class MultiPortfolioData:
                        ) -> None:
         exposures = []
         for portfolio in self.portfolio_datas:
-            exposures.append(portfolio.get_exposures(time_period=time_period).sum(axis=1).rename(portfolio.nav.name))
+            exposures.append(portfolio.get_weights(time_period=time_period).sum(axis=1).rename(portfolio.nav.name))
         exposures = pd.concat(exposures, axis=1)
         pts.plot_time_series(df=exposures,
                              var_format=var_format,
@@ -410,8 +410,8 @@ class MultiPortfolioData:
                             var_format: str = '{:.0%}',
                             ax: plt.Subplot = None,
                             **kwargs) -> None:
-        exposures1 = self.portfolio_datas[portfolio_idx1].get_exposures(is_grouped=True, time_period=time_period, add_total=False)
-        exposures2 = self.portfolio_datas[portfolio_idx2].get_exposures(is_grouped=True, time_period=time_period, add_total=False)
+        exposures1 = self.portfolio_datas[portfolio_idx1].get_weights(is_grouped=True, time_period=time_period, add_total=False)
+        exposures2 = self.portfolio_datas[portfolio_idx2].get_weights(is_grouped=True, time_period=time_period, add_total=False)
         diff = exposures1.subtract(exposures2)
         pts.plot_time_series(df=diff,
                              var_format=var_format,
@@ -671,6 +671,7 @@ class MultiPortfolioData:
         benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
 
         asset_class_data = self.portfolio_datas[strategy_idx].group_data
+        group_order = self.portfolio_datas[strategy_idx].group_order
 
         totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
             qis.compute_brinson_attribution_table(benchmark_pnl=benchmark_pnl,
@@ -678,6 +679,7 @@ class MultiPortfolioData:
                                                   strategy_weights=strategy_weights,
                                                   benchmark_weights=benchmark_weights,
                                                   asset_class_data=asset_class_data,
+                                                  group_order=group_order,
                                                   total_column=total_column,
                                                   is_exclude_interaction_term=is_exclude_interaction_term)
         return totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return
@@ -713,3 +715,28 @@ class MultiPortfolioData:
             **kwargs)
 
         return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inters
+
+    def plot_weights_boxplot(self,
+                             strategy_idx: int = 0,
+                             benchmark_idx: int = 1,
+                             freq: Optional[str] = 'ME',
+                             time_period: TimePeriod = None,
+                             is_grouped: bool = False,
+                             ax: plt.Subplot = None,
+                             **kwargs
+                             ) -> None:
+        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=freq,
+                                                                          is_grouped=is_grouped, is_input_weights=False)
+        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq,
+                                                                            is_grouped=is_grouped, is_input_weights=False)
+        dfs = {self.portfolio_datas[strategy_idx].ticker: strategy_weights,
+               self.portfolio_datas[benchmark_idx].ticker: benchmark_weights}
+
+        local_kwargs = qis.update_kwargs(kwargs, dict(ncol=2, legend_loc='upper center', showmedians=True,
+                                                      yvar_format='{:.1%}'))
+        qis.df_dict_boxplot_by_columns(dfs=dfs,
+                                       hue_var_name='groups' if is_grouped else 'instruments',
+                                       y_var_name='weights',
+                                       ylabel='weights',
+                                       ax=ax,
+                                       **local_kwargs)

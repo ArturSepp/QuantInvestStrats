@@ -126,6 +126,7 @@ def run_unit_test(unit_test: UnitTests):
         figs = generate_strategy_benchmark_active_perf_plt(multi_portfolio_data=multi_portfolio_data,
                                                            time_period=time_period,
                                                            figsize=(11, 6),
+                                                           is_long_only=True,
                                                            **fetch_default_report_kwargs(time_period=time_period))
 
     plt.show()
