@@ -84,7 +84,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     # time period for portfolio reporting
-    time_period = qis.TimePeriod('31Dec2006', '24May2024')
+    time_period = qis.TimePeriod('31Dec2006', '31May2024')
     prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
     multi_portfolio_data = generate_volparity_multiportfolio(prices=prices,
                                                              benchmark_prices=benchmark_prices,
@@ -134,7 +134,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.ACTIVE_PERFORMANCE
+    unit_test = UnitTests.STRATEGY_BENCHMARK_PLT
 
     is_run_all_tests = False
     if is_run_all_tests:

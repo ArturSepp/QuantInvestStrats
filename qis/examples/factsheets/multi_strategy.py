@@ -63,14 +63,14 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
 
 
 class UnitTests(Enum):
-        VOLPARITY_SPAN = 1
+    VOLPARITY_SPAN = 1
 
 
 def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_SPAN:
 
-        time_period = qis.TimePeriod('31Dec2005', '25Apr2024')  # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2005', '31May2024')  # time period for portfolio reporting
 
         prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
         multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,

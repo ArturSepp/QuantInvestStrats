@@ -1,4 +1,9 @@
-﻿import pandas as pd
+﻿"""
+compute and display conditial returns on short front month VIX future strategy SPVXSPI conditioned on
+different predictors: VIX and vols
+"""
+
+import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt

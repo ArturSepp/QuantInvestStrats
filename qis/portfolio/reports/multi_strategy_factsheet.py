@@ -103,7 +103,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
 
     multi_portfolio_data.plot_performance_bars(ax=fig.add_subplot(gs[0, 2]),
                                                perf_params=perf_params,
-                                               perf_column=PerfStat.SHARPE_EXCESS,
+                                               perf_column=PerfStat.SHARPE_RF0,
                                                time_period=time_period,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 

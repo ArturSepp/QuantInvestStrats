@@ -85,7 +85,8 @@ class MultiAssetsReport:
                            perf_columns: List[PerfStat] = qis.BENCHMARK_TABLE_COLUMNS,
                            title: Optional[str] = None,
                            ax: plt.Subplot = None,
-                           **kwargs) -> None:
+                           **kwargs
+                           ) -> None:
         prices = self.get_prices(benchmark, time_period=time_period)
         title = title or f"RA performance table for {self.perf_params.freq_vol}-freq returns with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
         if len(prices.columns) >= 12:
@@ -406,7 +407,6 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    factsheet_name: str = None,
                                    **kwargs
                                    ) -> plt.Figure:
-
     # use passed benchmark
     if benchmark is None and benchmark_prices is not None:
         if benchmark_prices is None:

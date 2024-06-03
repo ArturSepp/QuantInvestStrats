@@ -12,6 +12,7 @@ REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
 PERF_COLUMNS = (PerfStat.TOTAL_RETURN,
                 PerfStat.PA_RETURN,
                 PerfStat.VOL,
+                PerfStat.SHARPE_RF0,
                 PerfStat.SHARPE_EXCESS,
                 PerfStat.MAX_DD,
                 PerfStat.MAX_DD_VOL,
@@ -44,8 +45,8 @@ class FactsheetConfig(NamedTuple):
     factor_beta_title: Optional[str] = None
     exposures_freq: str = 'W-WED'  # for plotting strategy exposures
     # general data
-    perf_columns = PERF_COLUMNS,
-    perf_stats_labels: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_EXCESS,)
+    perf_columns: List[PerfStat] = PERF_COLUMNS
+    perf_stats_labels: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0,)
     short: bool = True  # ra columns
     # next depend on report time period
     heatmap_freq: str = 'YE'  # for heatmap
