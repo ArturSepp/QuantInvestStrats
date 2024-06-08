@@ -2,7 +2,6 @@
 plot changes in VIX or ATM volatility predicted by the underlying asset
 data is split by years
 """
-
 # packages
 import pandas as pd
 import numpy as np
@@ -14,6 +13,24 @@ import qis as qis
 
 
 def plot_vol_vs_underlying(spot: pd.Series, vol: pd.Series, time_period: qis.TimePeriod = None) -> plt.Figure:
+    """
+    plot scatter plot of changes in the volatility predicted by returns in the underlying
+    """
+    df = pd.concat([spot.pct_change(), 0.01 * vol.diff(1)], axis=1).dropna()
+
+    if time_period is not None:
+        df = time_period.locate(df)
+
+    # insert year classifier
+    hue = 'year'
+    df[hue] = [x.year for x in df.index]
+    vol1 = vol.reindex(index=df.index, method='ffill')
+    df2 = 0.01 * vol1.rename(f"{vol1.name} avg by year").to_frame()
+    df2[hue] = [x.year for x in df2.index]
+    df2_avg_by_year = df2.groupby(hue).mean()
+
+    df2_avg_by_year = pd.concat([pd.Series(np.nanmean(0.01 * vol1), index=['Full sample']),
+                                 df2_avg_by_year.iloc[:, 0]], axis=0)
 
     kwargs = dict(fontsize=12, digits_to_show=1, sharpe_digits=2,
                   alpha_format='{0:+0.0%}',
@@ -21,23 +38,6 @@ def plot_vol_vs_underlying(spot: pd.Series, vol: pd.Series, time_period: qis.Tim
                   perf_stats_labels=qis.PerfStatsLabels.TOTAL_DETAILED.value,
                   framealpha=0.75,
                   is_fixed_n_colors=False)
-
-    df1 = spot.pct_change()
-    df2 = 0.01 * vol.diff(1)
-    df = pd.concat([df1, df2], axis=1).dropna()
-
-    if time_period is not None:
-        df = time_period.locate(df)
-
-    hue = 'year'
-    df[hue] = [x.year for x in df.index]
-    vol1 = vol.reindex(index=df.index)
-    df2 = 0.01 * vol1.rename(f"{vol1.name} avg by year").to_frame()
-    df2[hue] = [x.year for x in df2.index]
-    df2_avg_by_year = df2.groupby(hue).mean()
-
-    df2_avg_by_year = pd.concat([pd.Series(np.nanmean(0.01 * vol1), index=['Full sample']),
-                                 df2_avg_by_year.iloc[:, 0]], axis=0)
 
     with sns.axes_style('darkgrid'):
         fig = plt.figure(figsize=(18, 8), constrained_layout=True)
@@ -54,10 +54,7 @@ def plot_vol_vs_underlying(spot: pd.Series, vol: pd.Series, time_period: qis.Tim
                          order=2,
                          fit_intercept=False,
                          add_hue_model_label=True,
-                         # add_universe_model_ci=True,
                          ci=95,
-                         # annotation_labels=annotation_labels,
-                         # full_sample_label='Universe: ',
                          ax=fig.add_subplot(gs[0, :3]),
                          **kwargs)
 
