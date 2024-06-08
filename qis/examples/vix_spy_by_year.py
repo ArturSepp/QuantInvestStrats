@@ -1,3 +1,8 @@
+"""
+plot changes in VIX or ATM volatility predicted by the underlying asset
+data is split by years
+"""
+
 # packages
 import pandas as pd
 import numpy as np
@@ -86,6 +91,7 @@ def run_unit_test(unit_test: UnitTests):
         qis.save_fig(fig, file_name='spx_vix')
 
     elif unit_test == UnitTests.USDJPY:
+        # need to use bloomberg data
         from bbg_fetch import fetch_fields_timeseries_per_ticker
         spot = fetch_fields_timeseries_per_ticker(ticker='USDJPY Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY')
         vol = fetch_fields_timeseries_per_ticker(ticker='USDJPYV1M BGN Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY 1M ATM')
