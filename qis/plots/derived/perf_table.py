@@ -23,6 +23,7 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                         perf_columns: List[PerfStat] = rpt.STANDARD_TABLE_COLUMNS,
                         column_header: str = 'Asset',
                         df_to_add: pd.DataFrame = None,
+                        is_to_str: bool = True,
                         **kwargs
                         ) -> pd.DataFrame:
     """
@@ -33,8 +34,11 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
     ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
     data = pd.DataFrame(index=ra_perf_table.index)
     for perf_column in perf_columns:
-        data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
-                                                       var_format=perf_column.to_format(**kwargs))
+        if is_to_str:
+            data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
+                                                           var_format=perf_column.to_format(**kwargs))
+        else:
+            data[perf_column.to_str()] = ra_perf_table[perf_column.to_str()]
 
     if df_to_add is not None:
         for idx, column in enumerate(df_to_add.columns):

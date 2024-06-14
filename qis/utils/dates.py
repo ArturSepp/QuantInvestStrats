@@ -104,7 +104,7 @@ def get_period_days(freq: str = 'B',
     elif freq in ['2M', '2BM', '2MS', '2BMS']:
         days = 60 if is_calendar else 42
         an_f = 6
-    elif freq in ['QE', 'DQ', 'BQ', 'QS', 'BQS', 'Q-DEC', 'Q-JAN', 'Q-FEB']:
+    elif freq in ['QE', 'DQ', 'BQ', 'QS', 'BQS', 'QE-DEC', 'QE-JAN', 'QE-FEB']:
         days = 91 if is_calendar else 63
         an_f = 4
     elif freq in ['2Q', '2BQ', '2QS', '2BQS']:
