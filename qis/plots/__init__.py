@@ -159,3 +159,6 @@ from qis.plots.derived.regime_data import (
 )
 
 from qis.plots.derived.desc_table import plot_desc_table
+
+from qis.plots.reports.utils import ReportType
+from qis.plots.reports.econ_data_single import econ_data_report

@@ -307,11 +307,10 @@ class MultiAssetsReport:
                           ax: plt.Subplot = None,
                           **kwargs
                           ) -> plt.Figure:
-
-        # do not use start end dates here so the sharpe will be continuous with different time_period
         if ax is None:
             fig, ax = plt.subplots()
-        prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark)
+        # do not use start end dates here so the sharpe will be continuous with different time_period
+        prices = self.get_prices(time_period=None, benchmark=regime_benchmark)
         sharpe_title = sharpe_title or f"{sharpe_rolling_window}-period rolling {rolling_perf_stat.value} for {sharpe_freq}-returns"
         fig = qis.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
@@ -321,11 +320,9 @@ class MultiAssetsReport:
                                          legend_stats=legend_stats,
                                          var_format=var_format,
                                          title=sharpe_title,
+                                         regime_benchmark_str=regime_benchmark,
                                          ax=ax,
                                          **kwargs)
-
-        if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, data_df=prices, regime_params=regime_params)
         return fig
 
     def plot_regime_data(self,

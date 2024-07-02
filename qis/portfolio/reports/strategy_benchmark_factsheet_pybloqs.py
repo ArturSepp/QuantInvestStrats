@@ -94,9 +94,10 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
         alphas_last = []
         alpha_scores = []
         for key, alpha in alphas.items():
-            last_score = qis.compute_last_score(df=alpha)
-            alpha_scores.append(last_score.rename(f"{key}-score%"))
-            alphas_last.append(alpha.iloc[-1, :].rename(f"{key}"))
+            last_alpha = alpha.iloc[-1, :].rename(f"{key}")
+            last_score = qis.compute_last_score(df=alpha).rename(f"{key}-score%")
+            alpha_scores.append(last_score)
+            alphas_last.append(last_alpha)
         alphas_df = pd.concat([pd.concat(alphas_last, axis=1), pd.concat(alpha_scores, axis=1)], axis=1)
 
         #weights1 = pd.concat([weights, pd.concat(alphas_last, axis=1)], axis=1)
@@ -119,6 +120,28 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
     attribs_by_ac = qis.agg_df_by_groups(df=attribs.T, group_data=asset_class_data, group_order=group_order).T
     attribs.loc['Total', :] = np.nansum(attribs, axis=0)
     attribs_by_ac.loc['Total', :] = np.nansum(attribs_by_ac, axis=0)
+
+    # tre
+    prices = multi_portfolio_data.portfolio_datas[strategy_idx].prices
+    prices = prices.reindex(columns=strategy_weights.columns)
+    covar = qis.compute_ewm_covar(a=qis.to_returns(prices=prices, freq=weight_freq, is_log_returns=True).to_numpy(),
+                                  span=12)
+    covar *= 12
+    inst_vol = np.sqrt(np.diag(covar))
+    tre_vol = np.abs(delta_w.T) @ np.diag(inst_vol)
+    tre_contrib = delta_w.T @ covar
+    tre_table = last_alpha.copy().to_frame('alpha')
+    tre_table['weight diff'] = delta_w
+    tre_table['tre (vol)'] = tre_vol
+    # tre_table['tre contrib'] = tre_contrib
+    # tre_table['tre_rel %'] = tre_contrib / (delta_w.T @ covar @ delta_w)
+    tre_table['IR per vol bp'] = delta_w*last_alpha / (inst_vol)
+    tre_table.loc['Total', :] = np.nansum(tre_table, axis=0)
+    tre_table.loc['Total', 'alpha'] = delta_w.T @ last_alpha
+    tre_table.loc['Total', 'tre (vol)'] = np.sqrt(delta_w.T @ covar @ delta_w)
+
+    print(tre_table)
+
 
     # 1. weights table
     b_weights1 = p.Block([p.Paragraph(f"Instrument weights for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
@@ -155,7 +178,23 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
         b_weights = b_weights1
     blocks.append(b_weights)
 
-    # 2. weights by ac table
+    # 2. tre_table
+    b_tre_table = p.Block([p.Paragraph(f"Instrument alphas and tracking error for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
+                          p.Block(tre_table,
+                                  formatters=[
+                                      tf.FmtPercent(n_decimals=2, apply_to_header_and_index=False),
+                                      tf.FmtReplaceNaN(value=''),
+                                      tf.FmtHeatmap(columns=['diff']),  # , max_color=(255,0,255)
+                                      tf.FmtAddCellBorder(each=1.0,
+                                                          columns=tre_table.columns.to_list(),
+                                                          color=tf.colors.GREY,
+                                                          apply_to_header_and_index=True)
+                                  ]),
+                          p.Paragraph(f"  ", **KWARGS_FOOTNOTE)],
+                         **KWARGS_TEXT)
+    blocks.append(b_tre_table)
+
+    # 3. weights by ac table
     b_weights2 = p.Block([p.Paragraph(f"Asset class weights for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
                           p.Block(weights_by_ac,
                                   formatters=[

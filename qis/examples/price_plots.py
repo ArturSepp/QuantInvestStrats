@@ -91,6 +91,7 @@ class UnitTests(Enum):
     TF_ETF = 3
     ETFS = 4
     COMMODITY_ETFS = 5
+    VOL_ETFS = 6
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -119,6 +120,10 @@ def run_unit_test(unit_test: UnitTests):
         regime_benchmark_str = 'AOR'
         tickers = [regime_benchmark_str, 'SPY', 'GLD', 'GSG', 'COMT', 'PDBC']
 
+    elif unit_test == UnitTests.VOL_ETFS:
+        regime_benchmark_str = 'SPY'
+        tickers = [regime_benchmark_str, 'SVOL']
+
     else:
         raise NotImplementedError
 
@@ -135,7 +140,7 @@ def run_unit_test(unit_test: UnitTests):
         perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=12)
         kwargs = dict(x_date_freq='ME', heatmap_freq='ME', date_format='%b-%y', perf_params=perf_params)
 
-    prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers]#.dropna()
+    prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers].dropna()
 
     if time_period is not None:
         prices = time_period.locate(prices)
@@ -149,7 +154,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.ETF_DATA
+    unit_test = UnitTests.VOL_ETFS
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -161,11 +161,11 @@ class MultiPortfolioData:
             sharpe_freq = pd.infer_freq(index=prices.index)
 
         sharpe_title = sharpe_title or f"{sharpe_rolling_window}-period rolling Sharpe ratio for {sharpe_freq}-returns"
+        kwargs = qis.update_kwargs(kwargs, dict(roll_freq=sharpe_freq))
         fig = ppd.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
                                          roll_periods=sharpe_rolling_window,
-                                         roll_freq=sharpe_freq,
                                          legend_stats=legend_stats,
                                          trend_line=None, #qis.TrendLine.ZERO_SHADOWS,
                                          var_format=var_format,
