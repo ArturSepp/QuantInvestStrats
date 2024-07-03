@@ -18,6 +18,7 @@ class UnitTests(Enum):
     HEDGED_ETFS = 3
     BBG = 4
     RATES_FUTURES = 5
+    HYG_ETFS = 6
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -66,6 +67,18 @@ def run_unit_test(unit_test: UnitTests):
         prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
         prices = prices.rename(tickers, axis=1)
 
+    elif unit_test == UnitTests.HYG_ETFS:
+        benchmark = 'IBOXHY'
+        tickers = {'IBOXHY Index': benchmark,
+                   'HYDB US Equity': 'HYDB',
+                   'HYG US Equity': 'HYG'
+                   }
+        from bbg_fetch import fetch_field_timeseries_per_tickers
+        prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
+        prices = prices.rename(tickers, axis=1)
+        time_period = qis.get_time_period(prices)
+
+
     else:
         raise NotImplementedError
 
@@ -92,7 +105,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.RATES_FUTURES
+    unit_test = UnitTests.HYG_ETFS
 
     is_run_all_tests = False
     if is_run_all_tests:
