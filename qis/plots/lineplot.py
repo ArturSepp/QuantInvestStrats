@@ -33,6 +33,7 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
               colors: List[str] = None,
               x_limits: Tuple[Optional[float], Optional[float]] = None,
               y_limits: Tuple[Optional[float], Optional[float]] = None,
+              is_log: bool = False,
               ax: plt.Subplot = None,
               **kwargs
               ) -> Optional[plt.Figure]:
@@ -87,6 +88,9 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
 
     put.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, fontsize=fontsize, **kwargs)
     put.set_spines(ax=ax, **kwargs)
+
+    if is_log:
+        ax.set_yscale('log')
 
     return fig
 

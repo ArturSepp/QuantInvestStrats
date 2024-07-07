@@ -193,7 +193,7 @@ class RegimeClassifier(ABC):
         map_id_into_color = self.get_regime_ids_colors()
         regime_id_color = regime_data.map(map_id_into_color)
         regime_id_color = regime_id_color.astype(str)  # change category index
-        regime_id_color.loc[np.in1d(regime_id_color.to_numpy(), 'nan')] = '#FFFFFF'  #just in case put white for non-mapped data
+        regime_id_color.loc[np.isin(regime_id_color.to_numpy(), 'nan')] = '#FFFFFF'  #just in case put white for non-mapped data
         return regime_id_color
     
     def get_regime_ids(self) -> List[str]:

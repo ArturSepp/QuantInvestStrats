@@ -282,11 +282,11 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     put.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, fontsize=fontsize, **kwargs)
     put.set_spines(ax=ax, **kwargs)
 
-    if is_log:
-        ax.set_yscale('log')
-
     if title is not None:
         put.set_title(ax=ax, title=title, fontsize=fontsize, **kwargs)
+
+    if is_log:
+        ax.set_yscale('log')
 
     return fig
 

@@ -631,13 +631,13 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series],
     indicators_on_grid = all_dates_indicators.reindex(index=df.index).dropna()
 
     # off time grid
-    indicators_off_grid = all_dates_indicators.iloc[np.in1d(all_dates_indicators.index, indicators_on_grid.index) == False]
+    indicators_off_grid = all_dates_indicators.iloc[np.isin(all_dates_indicators.index, indicators_on_grid.index) == False]
     next_dates_off_grid = pd.Series(df.index, index=df.index).reindex(index=indicators_off_grid.index, method='bfill')
     indicators_off_grid = pd.Series(data=True, index=next_dates_off_grid.to_numpy())
 
     indicators_on_grid = pd.concat([indicators_on_grid, indicators_off_grid], axis=0).sort_index()
 
-    indicators_full = pd.Series(data=np.where(np.in1d(df.index, indicators_on_grid.index), True, False), index=df.index)
+    indicators_full = pd.Series(data=np.where(np.isin(df.index, indicators_on_grid.index), True, False), index=df.index)
 
     return indicators_full
 
@@ -854,7 +854,7 @@ def get_sample_dates_idx(population_dates: pd.Index, sample_dates: pd.Index) -> 
     sampled_population = pd_population_dates.reindex(index=sample_dates, method='ffill')
 
     # reset index will be idx of pd_population_dates masked with cond
-    cond = np.in1d(population_dates, sampled_population, assume_unique=True)
+    cond = np.isin(population_dates, sampled_population, assume_unique=True)
     sample_dates_idx = pd_population_dates.reset_index().loc[cond].index.to_list()
     return sample_dates_idx
 

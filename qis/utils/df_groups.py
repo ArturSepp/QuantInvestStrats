@@ -48,15 +48,15 @@ def get_group_dict(group_data: pd.Series,
     if total_column is not None:
         group_tickers = group_data.index
         if index_data is not None:  # match group_tickers in index_data: necessary if index_data != group_data.index
-            group_tickers = index_data[np.in1d(ar1=index_data, ar2=group_tickers, assume_unique=True)]
+            group_tickers = index_data[np.isin(index_data, group_tickers, assume_unique=True)]
         group_dict[total_column] = group_tickers
 
     # match group to instruments in group_data
     for group in groups:
         if group in data_groups:
-            group_instruments = group_data.index[np.in1d(ar1=group_data_np, ar2=[group], assume_unique=True)]
+            group_instruments = group_data.index[np.isin(group_data_np, [group], assume_unique=True)]
             if index_data is not None:  # match group_tickers in index_data: necessary if index_data != group_data.index
-                group_instruments = index_data[np.in1d(ar1=index_data, ar2=group_instruments, assume_unique=True)]
+                group_instruments = index_data[np.isin(index_data, group_instruments, assume_unique=True)]
             group_dict[group] = group_instruments.to_list()
 
     return group_dict
