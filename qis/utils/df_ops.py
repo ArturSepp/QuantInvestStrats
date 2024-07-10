@@ -306,7 +306,7 @@ def get_last_nonnan(df: Union[pd.Series, pd.DataFrame]) -> pd.Series:
     if isinstance(df, pd.DataFrame):
         ds = pd.Series(values, index=df.columns)
     else:
-        ds = pd.Series(values, index=df.name)
+        ds = pd.Series(values, index=[df.name])
     return ds
 
 

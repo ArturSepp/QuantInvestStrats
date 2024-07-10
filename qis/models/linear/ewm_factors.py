@@ -41,6 +41,9 @@ class LinearModel:
         for factor, loading in self.loadings.items():
             print(f"{factor}:\n{loading}")
 
+    def get_factor_loadings(self, factor: str) -> pd.DataFrame:
+        return self.loadings[factor]
+
     def compute_agg_factor_exposures(self,
                                      exposures: pd.DataFrame
                                      ) -> pd.DataFrame:
