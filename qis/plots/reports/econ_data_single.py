@@ -10,7 +10,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Dict, List
 from enum import Enum
-from tqdm import tqdm
 
 # qis
 import qis as qis
@@ -94,7 +93,7 @@ def econ_data_report(data: pd.DataFrame,
                                            agg_func=dfa.nanmean,
                                            total_column=None)
     figure_num = 0
-    for inst, insample_price in tqdm(insample_prices.items()):
+    for inst, insample_price in insample_prices.items():
         if np.all(insample_price.isnull()):  # skip for all nans
             continue
         figure_num += 1

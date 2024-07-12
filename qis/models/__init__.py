@@ -56,6 +56,7 @@ from qis.models.linear.ewm_factors import (LinearModel,
                                            )
 
 from qis.models.linear.pca import(
+    compute_eigen_portfolio_weights,
     apply_pca,
     compute_data_pca_r2,
     compute_pca_r2

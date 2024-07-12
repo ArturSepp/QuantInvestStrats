@@ -615,10 +615,12 @@ def generate_dates_schedule(time_period: TimePeriod,
 def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series],
                                     freq: str = 'ME',
                                     include_start_date: bool = False,
-                                    include_end_date: bool = False
+                                    include_end_date: bool = False,
+                                    num_warmup_periods: Optional[int] = None
                                     ) -> pd.Series:
     """
     tz awre rebalancing date indicators for rebalancing at data index
+    optional num_warmup_periods in number of periods at freq-schedule
     """
     dates_schedule = generate_dates_schedule(time_period=get_time_period(df=df),
                                              freq=freq,
@@ -638,6 +640,9 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series],
     indicators_on_grid = pd.concat([indicators_on_grid, indicators_off_grid], axis=0).sort_index()
 
     indicators_full = pd.Series(data=np.where(np.isin(df.index, indicators_on_grid.index), True, False), index=df.index)
+
+    if num_warmup_periods is not None:
+        indicators_full.iloc[:num_warmup_periods] = False
 
     return indicators_full
 

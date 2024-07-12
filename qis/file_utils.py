@@ -207,6 +207,7 @@ def delocalize_df(data: pd.DataFrame) -> pd.DataFrame:
 def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.DataFrame]],
                      file_name: str,
                      local_path: Optional[str] = None,
+                     mode: Literal['w', 'a'] = 'w',
                      folder_name: str = None,
                      subfolder_name: str = None,
                      key: str = None,
@@ -227,7 +228,7 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
                                     subfolder_name=subfolder_name,
                                     key=key)
 
-    excel_writer = pd.ExcelWriter(file_path)
+    excel_writer = pd.ExcelWriter(file_path, engine='openpyxl', mode=mode, if_sheet_exists='replace')
     if isinstance(data, list):  # publish with sheet names
         if sheet_names is None:
             sheet_names = [f"Sheet {n+1}" for n, _ in enumerate(data)]
@@ -288,6 +289,7 @@ def load_df_from_excel(file_name: str,
 def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
                           file_name: str,
                           local_path: Optional[str] = None,
+                          mode: Literal['w', 'a'] = 'w',
                           folder_name: str = None,
                           subfolder_name: str = None,
                           key: str = None,
@@ -295,7 +297,8 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
                           delocalize: bool = False
                           ) -> str:
     """
-    dictionary of pandas to same Excel
+    dictionary of pandas to same Excel with dfs as separate sheets
+    w adds/replaces with new excel; a appends to exisiting
     """
     if add_current_date:
         file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
@@ -307,7 +310,7 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
                                     subfolder_name=subfolder_name,
                                     key=key)
 
-    excel_writer = pd.ExcelWriter(file_path)
+    excel_writer = pd.ExcelWriter(file_path, engine='openpyxl', mode=mode, if_sheet_exists='replace')
     for key, data in datasets.items():
         if delocalize:
             data = delocalize_df(data)

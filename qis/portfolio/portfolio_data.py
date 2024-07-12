@@ -240,7 +240,10 @@ class PortfolioData:
 
         return weights
 
-    def get_grouped_long_short_exposures(self, time_period: da.TimePeriod = None
+    def get_grouped_long_short_exposures(self,
+                                         time_period: da.TimePeriod = None,
+                                         total_name: str = 'Total',
+                                         exposures_freq: Optional[str] = 'W-WED'
                                          ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
         """
         compute grouped net long / short exposures
@@ -248,19 +251,21 @@ class PortfolioData:
         group_dict = dfg.get_group_dict(group_data=self.group_data,
                                         group_order=self.group_order,
                                         total_column=None)
-        all_exposures = self.get_weights(time_period=time_period)
+        all_exposures = self.get_weights(time_period=time_period, freq=exposures_freq)
         grouped_exposures_by_inst = {}
         grouped_exposures_agg = {}
         for group, tickers in group_dict.items():
             exposures_by_inst = all_exposures[tickers]
             grouped_exposures_by_inst[group] = exposures_by_inst
-            total = dfa.nansum(exposures_by_inst, axis=1).rename('Total')
+            total = dfa.nansum(exposures_by_inst, axis=1).rename(total_name)
             net_long = dfa.nansum_positive(exposures_by_inst, axis=1).rename('Net Long')
             net_short = dfa.nansum_negative(exposures_by_inst, axis=1).rename('Net Short')
             grouped_exposures_agg[group] = pd.concat([total, net_long, net_short], axis=1)
         return grouped_exposures_agg, grouped_exposures_by_inst
 
-    def get_grouped_cum_pnls(self, time_period: da.TimePeriod = None
+    def get_grouped_cum_pnls(self,
+                             total_name: str = 'Total',
+                             time_period: da.TimePeriod = None
                              ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
         """
         compute grouped net long / short exposues
@@ -279,7 +284,7 @@ class PortfolioData:
         for group, tickers in group_dict.items():
             pnls_by_inst = pnls[tickers]
             grouped_pnls_by_inst[group] = pnls_by_inst.cumsum(axis=0)
-            total = dfa.nansum(pnls_by_inst, axis=1).rename('Total')
+            total = dfa.nansum(pnls_by_inst, axis=1).rename(total_name)
             net_long = dfa.nansum(pnl_positive_exp[tickers], axis=1).rename('Net Long')
             net_short = dfa.nansum(pnl_negative_exp[tickers], axis=1).rename('Net Short')
             grouped_pnls_agg[group] = pd.concat([total, net_long, net_short], axis=1).cumsum(axis=0)

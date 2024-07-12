@@ -24,6 +24,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        heatmap_freq: str = 'YE',
                                        figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                        group_data: pd.Series = None,
+                                       add_group_exposures_and_pnl: bool = False,
                                        add_strategy_factsheets: bool = False,
                                        fontsize: int = 4,
                                        **kwargs
@@ -174,12 +175,20 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                   **kwargs)
 
         multi_portfolio_data.plot_factor_betas(axs=[fig.add_subplot(gs[6, 2:])],
-                                               benchmark_prices=multi_portfolio_data.benchmark_prices,
                                                time_period=time_period,
+                                               benchmark_prices=multi_portfolio_data.benchmark_prices,
                                                regime_benchmark=regime_benchmark,
                                                regime_params=regime_params,
                                                **kwargs)
+
     figs = [fig]
+    if add_group_exposures_and_pnl:
+        figs1 = multi_portfolio_data.plot_group_exposures_and_pnl(time_period=time_period,
+                                                                  regime_benchmark=regime_benchmark,
+                                                                  regime_params=regime_params,
+                                                                  **kwargs)
+        figs.append(figs1)
+
     if add_strategy_factsheets:
         for portfolio_data in multi_portfolio_data.portfolio_datas:
             figs.append(generate_strategy_factsheet(portfolio_data=portfolio_data,
@@ -190,6 +199,5 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                     time_period=time_period,
                                                     **kwargs
                                                     ))
-        figs = qis.to_flat_list(figs)
-
+    figs = qis.to_flat_list(figs)
     return figs

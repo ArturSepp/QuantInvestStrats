@@ -83,6 +83,7 @@ def run_unit_test(unit_test: UnitTests):
 
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period,
+                                                  add_group_exposures_and_pnl=True,
                                                   **fetch_default_report_kwargs(time_period=time_period))
 
         qis.save_fig(fig=figs[0], file_name=f"multi_strategy", local_path=qis.local_path.get_output_path())
@@ -95,6 +96,7 @@ def run_unit_test(unit_test: UnitTests):
         time_period_short = TimePeriod('31Dec2019', time_period.end)
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period_short,
+                                                  add_group_exposures_and_pnl=True,
                                                   **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"volparity_span_factsheet_short",

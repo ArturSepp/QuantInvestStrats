@@ -740,3 +740,69 @@ class MultiPortfolioData:
                                        ylabel='weights',
                                        ax=ax,
                                        **local_kwargs)
+
+    def plot_group_exposures_and_pnl(self,
+                                     regime_benchmark: str = None,
+                                     time_period: TimePeriod = None,
+                                     regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                     total_name: str = 'Total',
+                                     exposures_freq: Optional[str] = 'W-WED',
+                                     figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+                                     **kwargs
+                                     ) -> List[plt.Figure]:
+        """
+        report total exposures by portfolio
+        """
+        # aling to the first
+        group_data = self.portfolio_datas[0].group_data
+        grouped_exposures_aggs = {}  # dict[portfolio, Dict[group, pd.Dataframe]]
+        grouped_pnls_aggs = {}
+        for portfolio_data in self.portfolio_datas:
+            grouped_exposures_agg, grouped_exposures_by_inst = portfolio_data.get_grouped_long_short_exposures(time_period=time_period,
+                                                                                                               exposures_freq=exposures_freq,
+                                                                                                               total_name=total_name)
+            grouped_pnls_agg, grouped_pnls_by_inst = portfolio_data.get_grouped_cum_pnls(time_period=time_period,
+                                                                                         total_name=total_name)
+
+            grouped_exposures_aggs[portfolio_data.ticker] = grouped_exposures_agg
+            grouped_pnls_aggs[portfolio_data.ticker] = grouped_pnls_agg
+
+        group_exposures_by_portfolio = {group: {} for group in group_data}
+        for group in group_data:
+            for ticker, df in grouped_exposures_aggs.items():
+                group_exposures_by_portfolio[group].update({ticker: df[group][total_name]})
+
+        group_pnl_by_portfolio = {group: {} for group in group_data}
+        for group in group_data:
+            for ticker, df in grouped_pnls_aggs.items():
+                group_pnl_by_portfolio[group].update({ticker: df[group][total_name]})
+
+        for group in group_data:
+            group_exposures_by_portfolio[group] = pd.DataFrame.from_dict(group_exposures_by_portfolio[group], orient='columns')
+            group_pnl_by_portfolio[group] = pd.DataFrame.from_dict(group_pnl_by_portfolio[group], orient='columns')
+
+        figs = []
+        for group, exposures_agg in group_exposures_by_portfolio.items():
+            fig, axs = plt.subplots(2, 1, figsize=figsize, tight_layout=True)
+            qis.set_suptitle(fig, f"Total Exposures and P&L by {group}")
+            figs.append(fig)
+            qis.plot_time_series(df=exposures_agg,
+                                 var_format='{:,.0%}',
+                                 legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                                 title=f"Exposure by {group}",
+                                 ax=axs[0],
+                                 **kwargs)
+            qis.plot_time_series(df=group_pnl_by_portfolio[group],
+                                 var_format='{:,.0%}',
+                                 legend_stats=qis.LegendStats.LAST,
+                                 title=f"Cumulative P&L by {group}",
+                                 ax=axs[1],
+                                 **kwargs)
+            if regime_benchmark is not None:
+                for ax in axs:
+                    self.add_regime_shadows(ax=ax,
+                                            regime_benchmark=regime_benchmark,
+                                            index=exposures_agg.index,
+                                            regime_params=regime_params)
+
+        return figs

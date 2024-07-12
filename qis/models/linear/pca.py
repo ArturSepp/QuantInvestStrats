@@ -1,11 +1,26 @@
 import numpy as np
 import pandas as pd
 from enum import Enum
-
-# qis
 import qis.utils.dates as da
 import qis.perfstats.returns as ret
 import qis.models.linear.ewm as ewm
+
+
+def compute_eigen_portfolio_weights(covar: np.ndarray) -> np.ndarray:
+    """
+    return weights for pca portolios with unit variance
+    covar = eigen_vectors @ np.diag(eigen_values) @ eigen_vectors.T
+    rows are principal portolio weights ranked
+    """
+    vols = np.sqrt(np.diag(covar))
+    inv_vol = np.reciprocal(vols)
+    norm = np.outer(inv_vol, inv_vol)
+    corr = norm * covar
+    eigen_values, eigen_vectors = apply_pca(cmatrix=corr, is_max_sign_positive=True)
+    # eigen_values, eigen_vectors = np.linalg.eigh(corr)
+    scale = np.outer(vols, np.sqrt(eigen_values).T)
+    weights = np.reciprocal(scale) * eigen_vectors
+    return weights.T
 
 
 def apply_pca(cmatrix: np.ndarray,
@@ -19,26 +34,21 @@ def apply_pca(cmatrix: np.ndarray,
     # Make a list of (eigenvalue, eigenvector) tuples for sorting
     eig_pairs = [(eig_vals[i], eig_vecs[:, i]) for i in range(len(eig_vals))]
 
-    # sort using numpy
-    # inds = eig_vals.argsort()
-    # print(inds)
-
-    # Sort the (eigenvalue, eigenvector) tuples from high to low
-    # eig_pairs.sort()
+    # reverse (eigenvalue, eigenvector) tuples from high to low
     eig_pairs.reverse()
 
     # get back to ndarrays
-    eigen_values = np.array([eig_pair[0] for eig_pair in eig_pairs])
-    eigen_vectors = np.array([eig_pair[1] for eig_pair in eig_pairs])
+    eigen_values = np.array([eig_pair[0] for eig_pair in eig_pairs]).T
+    eigen_vectors = np.array([eig_pair[1] for eig_pair in eig_pairs]).T
 
     if is_max_sign_positive and eigen_signs is None:
 
         signed_eigen_vectors = eigen_vectors
-        for idx, eigen_vector in enumerate(eigen_vectors):
+        for idx, eigen_vector in enumerate(eigen_vectors.T):
             arg_max = np.argmax(np.abs(eigen_vector))
             if eigen_vector[arg_max] < 0.0:
                 eigen_vector = - eigen_vector
-                signed_eigen_vectors[idx] = eigen_vector
+                signed_eigen_vectors[:, idx] = eigen_vector
         eigen_vectors = signed_eigen_vectors
 
     elif eigen_signs is not None:
@@ -117,3 +127,5 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
+
+
