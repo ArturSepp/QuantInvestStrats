@@ -755,6 +755,7 @@ class MultiPortfolioData:
         """
         # aling to the first
         group_data = self.portfolio_datas[0].group_data
+        group_order = self.portfolio_datas[0].group_order
         grouped_exposures_aggs = {}  # dict[portfolio, Dict[group, pd.Dataframe]]
         grouped_pnls_aggs = {}
         for portfolio_data in self.portfolio_datas:
@@ -767,17 +768,17 @@ class MultiPortfolioData:
             grouped_exposures_aggs[portfolio_data.ticker] = grouped_exposures_agg
             grouped_pnls_aggs[portfolio_data.ticker] = grouped_pnls_agg
 
-        group_exposures_by_portfolio = {group: {} for group in group_data}
+        group_exposures_by_portfolio = {group: {} for group in group_order}
         for group in group_data:
             for ticker, df in grouped_exposures_aggs.items():
                 group_exposures_by_portfolio[group].update({ticker: df[group][total_name]})
 
-        group_pnl_by_portfolio = {group: {} for group in group_data}
+        group_pnl_by_portfolio = {group: {} for group in group_order}
         for group in group_data:
             for ticker, df in grouped_pnls_aggs.items():
                 group_pnl_by_portfolio[group].update({ticker: df[group][total_name]})
 
-        for group in group_data:
+        for group in group_order:
             group_exposures_by_portfolio[group] = pd.DataFrame.from_dict(group_exposures_by_portfolio[group], orient='columns')
             group_pnl_by_portfolio[group] = pd.DataFrame.from_dict(group_pnl_by_portfolio[group], orient='columns')
 

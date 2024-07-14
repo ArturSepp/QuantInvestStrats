@@ -2,7 +2,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import yfinance as yf
-import qis
+import qis as qis
 
 
 # define tickers and fetch price data
