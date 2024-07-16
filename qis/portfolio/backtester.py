@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 from enum import Enum
-from typing import Union, Dict, Tuple, List
+from typing import Union, Dict, Tuple, List, Optional
 
 # qis
 import qis.utils as qu
@@ -16,7 +16,7 @@ from qis.portfolio.portfolio_data import PortfolioData
 
 def backtest_model_portfolio(prices: pd.DataFrame,
                              weights: Union[Dict[str, float], List[float], np.ndarray, pd.DataFrame, pd.Series],
-                             rebalance_freq: str = 'QE',
+                             rebalance_freq: Optional[str] = 'QE',
                              initial_nav: float = 100,
                              funding_rate: pd.Series = None,  # on positive / negative cash balances
                              instruments_carry: pd.DataFrame = None,  # on nav
@@ -30,6 +30,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
     simulate portfolio given prices and weights
     include_start_date if index rebalanced at start date
     the safest weight is to pass weights as Dict or pd.Dataframe - this enforces the alignment with prices
+    does not rebalance_freq when dates are pd.DataFrmae
     """
     if not isinstance(prices, pd.DataFrame):
         raise ValueError(f"prices type={type(prices)} must be pd.Dataframe")

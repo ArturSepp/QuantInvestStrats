@@ -438,14 +438,22 @@ def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],
     return df_
 
 
-def get_time_period(df: Union[pd.Series, pd.DataFrame], tz: str = None) -> TimePeriod:
+def get_time_period(df: Union[pd.Series, pd.DataFrame] = None,
+                    index: pd.DatetimeIndex = None,
+                    tz: str = None
+                    ) -> TimePeriod:
     """
     get tz-aware start end dates
     """
-    if not isinstance(df.index, pd.DatetimeIndex):
-        raise ValueError(f"df.index must be type of pd.DatetimeIndex not of {type(df.index)}")
-    if len(df.index) > 0:
-        output = TimePeriod(start=df.index[0], end=df.index[-1], tz=tz or df.index.tz)
+    if df is not None:
+        index = df.index
+    else:
+        if index is None:
+            raise ValueError(f"must pass either df or index")
+    # if not isinstance(index, pd.DatetimeIndex):
+    #    raise ValueError(f"index must be type of pd.DatetimeIndex not of {type(index)}")
+    if len(index) > 0:
+        output = TimePeriod(start=index[0], end=index[-1], tz=tz or index.tz)
     else:
         output = TimePeriod()
     return output
@@ -612,7 +620,8 @@ def generate_dates_schedule(time_period: TimePeriod,
     return dates_schedule
 
 
-def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series],
+def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series] = None,
+                                    index: pd.DatetimeIndex = None,
                                     freq: str = 'ME',
                                     include_start_date: bool = False,
                                     include_end_date: bool = False,
@@ -622,7 +631,13 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series],
     tz awre rebalancing date indicators for rebalancing at data index
     optional num_warmup_periods in number of periods at freq-schedule
     """
-    dates_schedule = generate_dates_schedule(time_period=get_time_period(df=df),
+    if df is not None:
+        index = df.index
+    else:
+        if index is None:
+            raise ValueError(f"must pass either df or index")
+
+    dates_schedule = generate_dates_schedule(time_period=get_time_period(index=index),
                                              freq=freq,
                                              include_start_date=include_start_date,
                                              include_end_date=include_end_date)
@@ -630,16 +645,16 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series],
     all_dates_indicators = pd.Series(data=True, index=dates_schedule)  # all indicators
 
     # on time grid
-    indicators_on_grid = all_dates_indicators.reindex(index=df.index).dropna()
+    indicators_on_grid = all_dates_indicators.reindex(index=index).dropna()
 
     # off time grid
     indicators_off_grid = all_dates_indicators.iloc[np.isin(all_dates_indicators.index, indicators_on_grid.index) == False]
-    next_dates_off_grid = pd.Series(df.index, index=df.index).reindex(index=indicators_off_grid.index, method='bfill')
+    next_dates_off_grid = pd.Series(index, index=index).reindex(index=indicators_off_grid.index, method='bfill')
     indicators_off_grid = pd.Series(data=True, index=next_dates_off_grid.to_numpy())
 
     indicators_on_grid = pd.concat([indicators_on_grid, indicators_off_grid], axis=0).sort_index()
 
-    indicators_full = pd.Series(data=np.where(np.isin(df.index, indicators_on_grid.index), True, False), index=df.index)
+    indicators_full = pd.Series(data=np.where(np.isin(index, indicators_on_grid.index), True, False), index=index)
 
     if num_warmup_periods is not None:
         indicators_full.iloc[:num_warmup_periods] = False

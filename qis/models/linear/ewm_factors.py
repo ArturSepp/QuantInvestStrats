@@ -89,6 +89,17 @@ class LinearModel:
         factor_alpha = self.y.subtract(explained_returns)
         return factor_alpha, explained_returns
 
+    def get_model_ewm_r2(self, span: int = 52) -> pd.DataFrame:
+        """
+        ss_res = ewm (y - sum(factor_beta_{t-1}*x)) ^ 2
+        """
+        factor_alpha, explained_returns = self.get_factor_alpha()
+        ewm_residuals_2 = ewm.compute_ewm(data=np.square(factor_alpha), span=span)
+        y_demean = self.y - ewm.compute_ewm(data=self.y, span=span)
+        ewm_variance = ewm.compute_ewm(data=np.square(y_demean), span=span)
+        r_2 = 1.0 - ewm_residuals_2.divide(ewm_variance)
+        return r_2
+
     def plot_factor_loadings(self,
                              factor: str,
                              var_format: str = '{:,.2f}',

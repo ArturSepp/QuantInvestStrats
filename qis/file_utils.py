@@ -228,7 +228,7 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
                                     subfolder_name=subfolder_name,
                                     key=key)
 
-    excel_writer = pd.ExcelWriter(file_path, engine='openpyxl', mode=mode, if_sheet_exists='replace')
+    excel_writer = pd.ExcelWriter(file_path, engine='openpyxl', mode=mode)
     if isinstance(data, list):  # publish with sheet names
         if sheet_names is None:
             sheet_names = [f"Sheet {n+1}" for n, _ in enumerate(data)]
@@ -310,7 +310,7 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
                                     subfolder_name=subfolder_name,
                                     key=key)
 
-    excel_writer = pd.ExcelWriter(file_path, engine='openpyxl', mode=mode, if_sheet_exists='replace')
+    excel_writer = pd.ExcelWriter(file_path, engine='openpyxl', mode=mode)
     for key, data in datasets.items():
         if delocalize:
             data = delocalize_df(data)

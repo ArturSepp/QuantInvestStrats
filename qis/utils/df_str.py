@@ -8,6 +8,7 @@ from pandas.api.types import is_string_dtype
 from tabulate import tabulate
 from typing import List, Optional, Union, Dict
 
+import qis
 from qis.utils.dates import DATE_FORMAT
 
 EMPTY_NUM = ' '
@@ -124,7 +125,7 @@ def df_to_numeric(df: pd.DataFrame) -> np.ndarray:
 
 
 def df_to_str(df: pd.DataFrame,
-              var_format: str = '{:.2f}',
+              var_format: Optional[str] = '{:.2f}',
               var_formats: Union[List[Optional[str]], Dict[str, str]] = None,  # specific for each column
               is_exclude_nans: bool = True
               ) -> pd.DataFrame:
@@ -132,10 +133,16 @@ def df_to_str(df: pd.DataFrame,
     pd.DataFrame to string using float_to_str
     """
     if var_formats is not None:
+
         if isinstance(var_formats, list):
             if not len(var_formats) == len(df.columns):
                 raise ValueError(f"match len of var_formats {var_formats} with {df.columns}")
         elif isinstance(var_formats, dict):
+
+            if var_format is not None:  # use var_format as pivot
+                var_formats_missing = {x: var_format for x in df.columns}
+                var_formats = qis.update_kwargs(var_formats_missing, var_formats)
+
             var_formats_ = []
             for column in df.columns:
                 if column in var_formats.keys():
@@ -145,6 +152,7 @@ def df_to_str(df: pd.DataFrame,
             var_formats = var_formats_
         else:
             raise ValueError(f"{var_formats} is not supported")
+
     else:
         var_formats = [var_format]*len(df.columns)
     df = df.copy()
