@@ -5,7 +5,7 @@ implementation of multi factor ewm model
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Literal
 from enum import Enum
 
 # qis
@@ -77,14 +77,16 @@ class LinearModel:
             attribution = pd.concat([total, attribution], axis=1)
         return attribution
 
-    def get_factor_alpha(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def get_factor_alpha(self, lag: Literal[0, 1] = 1) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        factor_alpha = y - sum(factor_beta_{t-1}*x)
+        factor_alpha = y - sum(factor_beta_{t-shift}*x)
+        lag = 1 for step-1 forecast
+        lag = 0 for insample forecast
         """
         explained_returns = pd.DataFrame(0.0, index=self.y.index, columns=self.y.columns)
         for factor in self.x.columns:
             factor_betas = self.loadings[factor]
-            explained_return = (factor_betas.shift(1)).multiply(self.x[factor].to_numpy(), axis=0)
+            explained_return = (factor_betas.shift(lag)).multiply(self.x[factor].to_numpy(), axis=0)
             explained_returns = explained_returns.add(explained_return)
         factor_alpha = self.y.subtract(explained_returns)
         return factor_alpha, explained_returns
@@ -93,12 +95,19 @@ class LinearModel:
         """
         ss_res = ewm (y - sum(factor_beta_{t-1}*x)) ^ 2
         """
-        factor_alpha, explained_returns = self.get_factor_alpha()
-        ewm_residuals_2 = ewm.compute_ewm(data=np.square(factor_alpha), span=span)
-        y_demean = self.y - ewm.compute_ewm(data=self.y, span=span)
+        residuals, explained_returns = self.get_factor_alpha(lag=0)
+        ewm_residuals_2 = ewm.compute_ewm(data=np.square(residuals), span=span)
+        y_demean = self.y #- ewm.compute_ewm(data=self.y, span=span)
         ewm_variance = ewm.compute_ewm(data=np.square(y_demean), span=span)
         r_2 = 1.0 - ewm_residuals_2.divide(ewm_variance)
         return r_2
+
+    def get_model_residuals_corrs(self, span: int = 52) -> Tuple[pd.DataFrame, pd.Series]:
+        residuals, explained_returns = self.get_factor_alpha(lag=0)
+        corr = ewm.compute_ewm_covar(residuals.to_numpy(), span=span, is_corr=True)
+        avg_corr = pd.Series(0.5*np.nanmean(corr - np.eye(corr.shape[0]), axis=1), index=self.y.columns)
+        corr_pd = pd.DataFrame(corr, index=self.y.columns, columns=self.y.columns)
+        return corr_pd, avg_corr
 
     def plot_factor_loadings(self,
                              factor: str,

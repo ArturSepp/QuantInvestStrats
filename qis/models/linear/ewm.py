@@ -175,6 +175,7 @@ def compute_ewm_covar(a: np.ndarray,
                       span: Union[int, np.ndarray] = None,
                       ewm_lambda: float = 0.94,
                       covar0: np.ndarray = None,
+                      is_corr: bool = False,
                       nan_backfill: NanBackfill = NanBackfill.FFILL
                       ) -> np.ndarray:
     """
@@ -222,7 +223,19 @@ def compute_ewm_covar(a: np.ndarray,
             else:  # use zero fill
                 fill_value = np.zeros_like(last_covar)
 
-            covar = last_covar = np.where(np.isfinite(covar), covar, fill_value)
+            last_covar = np.where(np.isfinite(covar), covar, fill_value)
+
+            if is_corr:
+                if np.nansum(np.diag(last_covar)) > 1e-10:
+                    inv_vol = np.reciprocal(np.sqrt(np.diag(last_covar)))
+                    norm = np.outer(inv_vol, inv_vol)
+                else:
+                    norm = np.identity(n)
+                last_covar_ = norm * last_covar
+            else:
+                last_covar_ = last_covar
+
+            covar = last_covar_
 
     return covar
 

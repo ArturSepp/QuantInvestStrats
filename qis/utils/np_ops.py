@@ -5,7 +5,7 @@ import time
 import numpy as np
 import pandas as pd
 from enum import Enum
-from typing import Union, Optional, Tuple, Callable
+from typing import Union, Optional, Tuple, Callable, Dict
 from numba import njit
 
 
@@ -465,6 +465,7 @@ class UnitTests(Enum):
     CUM_POWER = 2
     ROLLING = 3
     WA = 4
+    ARRAY_RANK = 5
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -504,10 +505,18 @@ def run_unit_test(unit_test: UnitTests):
         xx = np_nonan_weighted_avg(a=x, weights=weights)
         print(xx)
 
+    elif unit_test == UnitTests.ARRAY_RANK:
+        a = np.array([1.0, 2.0, 10.0, 20.0, 3.0, 4.0, 5.0])
+        array_rank = np.argsort(a).argsort()  # ranks by smallest value
+        print(np.argsort(a))
+        array_idx_rank = {array_rank[n]: n for n in np.arange(a.shape[0])}  # assign rank to idx
+        array_idx_rank = dict(sorted(array_idx_rank.items()))  # sort by rank
+        print(array_idx_rank)
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CUM_POWER
+    unit_test = UnitTests.ARRAY_RANK
 
     is_run_all_tests = False
     if is_run_all_tests:
