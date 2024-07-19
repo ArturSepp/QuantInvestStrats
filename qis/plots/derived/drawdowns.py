@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Union, Tuple, Optional
 from enum import Enum
-
 # qis
 import qis.plots.utils as put
 import qis.plots.time_series as pts
@@ -38,7 +37,7 @@ def plot_rolling_drawdowns(prices: Union[pd.Series, pd.DataFrame],
         for column in max_dd_data.columns:
             avg, quant, nmax, last = pt.compute_avg_max_dd(ds=max_dd_data[column], is_max=False)
             if dd_legend_type == DdLegendType.SIMPLE:
-                legend_labels.append(f"{column}, max dd={var_format.format(nmax)}")
+                legend_labels.append(f"{column}, max dd={var_format.format(nmax)}, last={var_format.format(last)}")
             elif dd_legend_type == DdLegendType.DETAILED:
                 legend_labels.append(f"{column}, mean={var_format.format(avg)},"
                                      f" quantile_10%={var_format.format(quant)}, max={var_format.format(nmax)},"
@@ -59,8 +58,10 @@ def plot_rolling_drawdowns(prices: Union[pd.Series, pd.DataFrame],
 
 def plot_rolling_time_under_water(prices: pd.DataFrame,
                                   title: Union[str, None] = None,
+                                  dd_legend_type: DdLegendType = DdLegendType.SIMPLE,
                                   var_format: str = '{:,.0f}',
                                   y_limits: Tuple[Optional[float], Optional[float]] = (0.0, None),
+                                  legend_loc: str = 'lower left',
                                   ax: plt.Subplot = None,
                                   **kwargs
                                   ) -> plt.Figure:
@@ -76,10 +77,26 @@ def plot_rolling_time_under_water(prices: pd.DataFrame,
                              f"quantile_10%={var_format.format(quant)}, max={var_format.format(nmax)},"
                              f" last={var_format.format(last)}")
 
+    if dd_legend_type == DdLegendType.NONE:
+        legend_loc = None
+        legend_labels = None
+    else:
+        legend_labels = []
+        for column in max_dd_data.columns:
+            avg, quant, nmax, last = pt.compute_avg_max_dd(ds=max_dd_data[column], is_max=False)
+            if dd_legend_type == DdLegendType.SIMPLE:
+                legend_labels.append(f"{column}, max={var_format.format(nmax)}, last={var_format.format(last)}")
+            elif dd_legend_type == DdLegendType.DETAILED:
+                legend_labels.append(f"{column}, mean={var_format.format(avg)}, "
+                                     f"quantile_10%={var_format.format(quant)}, max={var_format.format(nmax)},"
+                                     f" last={var_format.format(last)}")
+            else:
+                raise NotImplementedError(f"{dd_legend_type}")
+
     fig = pts.plot_time_series(df=time_under_water,
                                var_format=var_format,
-                               legend_loc='upper left',
                                legend_labels=legend_labels,
+                               legend_loc=legend_loc,
                                title=title,
                                y_limits=y_limits,
                                ax=ax,

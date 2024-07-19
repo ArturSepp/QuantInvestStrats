@@ -230,13 +230,14 @@ class MultiPortfolioData:
                        time_period: TimePeriod = None,
                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                        regime_benchmark: str = None,
+                       dd_legend_type: qis.DdLegendType = qis.DdLegendType.DETAILED,
                        ax: plt.Subplot = None,
                        **kwargs) -> None:
         if len(self.portfolio_datas) == 1 and regime_benchmark is not None:
             prices = self.get_navs(time_period=time_period, benchmark=regime_benchmark)
         else:
             prices = self.get_navs(time_period=time_period)
-        cdr.plot_rolling_drawdowns(prices=prices, ax=ax, **kwargs)
+        cdr.plot_rolling_drawdowns(prices=prices, dd_legend_type=dd_legend_type, ax=ax, **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 
@@ -244,13 +245,14 @@ class MultiPortfolioData:
                                       time_period: TimePeriod = None,
                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                       regime_benchmark: str = None,
+                                      dd_legend_type: qis.DdLegendType = qis.DdLegendType.DETAILED,
                                       ax: plt.Subplot = None,
                                       **kwargs) -> None:
         if len(self.portfolio_datas) == 1 and regime_benchmark is not None:
             prices = self.get_navs(time_period=time_period, benchmark=regime_benchmark)
         else:
             prices = self.get_navs(time_period=time_period)
-        cdr.plot_rolling_time_under_water(prices=prices, ax=ax, **kwargs)
+        cdr.plot_rolling_time_under_water(prices=prices, dd_legend_type=dd_legend_type, ax=ax, **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
 

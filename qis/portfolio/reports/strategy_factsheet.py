@@ -27,6 +27,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 beta_freq: str = 'W-WED',
                                 factor_beta_title: Optional[str] = None,
                                 factor_attribution_title: Optional[str] = None,
+                                add_all_benchmarks_to_nav_figure: bool = False,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
                                 add_grouped_exposures: bool = False,
@@ -57,8 +58,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                  fontweight="bold", fontsize=8, color='blue')
 
     # prices
-    joint_prices = pd.concat([portfolio_data.get_portfolio_nav(time_period=time_period),
-                              benchmark_prices], axis=1).dropna()
+    portfolio_nav = portfolio_data.get_portfolio_nav(time_period=time_period)
+    if add_all_benchmarks_to_nav_figure:
+        benchmark_prices_ = benchmark_prices
+    else:
+        benchmark_prices_ = benchmark_prices[regime_benchmark]
+    joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
     pivot_prices = joint_prices[regime_benchmark]
     ax = fig.add_subplot(gs[0:2, :2])
     qis.plot_prices(prices=joint_prices,

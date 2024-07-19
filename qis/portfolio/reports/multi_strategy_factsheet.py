@@ -67,6 +67,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                         time_period=time_period,
                                         regime_benchmark=regime_benchmark,
                                         regime_params=regime_params,
+                                        dd_legend_type=qis.DdLegendType.DETAILED,
                                         title='Running Drawdowns',
                                         **kwargs)
 

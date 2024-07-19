@@ -266,6 +266,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     multi_portfolio_data.plot_drawdowns(ax=fig.add_subplot(gs[1, :2]),
                                         time_period=time_period,
                                         regime_benchmark=regime_benchmark,
+                                        dd_legend_type=qis.DdLegendType.DETAILED,
                                         regime_params=regime_params,
                                         title='Running Drawdowns',
                                         **kwargs)

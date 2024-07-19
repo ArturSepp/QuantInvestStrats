@@ -668,12 +668,15 @@ class PortfolioData:
             total_nav = self.get_portfolio_nav(time_period=time_period)
             group_navs = self.get_group_navs(time_period=time_period, is_add_group_total=False)
             prices = pd.concat([total_nav, group_navs], axis=1)
+            for_title = 'with portfolio groups'
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
+            for_title = ''
         if benchmark_price is not None:
             if benchmark_price.name not in prices.columns:
                 prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
-            title = title or f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
+            title = title or f"RA performance table {for_title} for {perf_params.freq_vol}-freq returns with beta to {benchmark_price.name}:" \
+                             f" {qis.get_time_period(prices).to_str()}"
             ppt.plot_ra_perf_table_benchmark(prices=prices,
                                              benchmark=str(benchmark_price.name),
                                              perf_params=perf_params,
@@ -686,7 +689,7 @@ class PortfolioData:
                                              ax=ax,
                                              **kwargs)
         else:
-            title = title or f"RA performance table: {da.get_time_period(prices).to_str()}"
+            title = title or f"RA performance table {for_title}: {da.get_time_period(prices).to_str()}"
             ppt.plot_ra_perf_table(prices=prices,
                                    perf_params=perf_params,
                                    perf_columns=rpt.COMPACT_TABLE_COLUMNS,

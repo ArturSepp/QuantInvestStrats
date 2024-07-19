@@ -91,11 +91,11 @@ class LinearModel:
         factor_alpha = self.y.subtract(explained_returns)
         return factor_alpha, explained_returns
 
-    def get_model_ewm_r2(self, span: int = 52) -> pd.DataFrame:
+    def get_model_ewm_r2(self, span: int = 52, lag: Literal[0, 1] = 0) -> pd.DataFrame:
         """
         ss_res = ewm (y - sum(factor_beta_{t-1}*x)) ^ 2
         """
-        residuals, explained_returns = self.get_factor_alpha(lag=0)
+        residuals, explained_returns = self.get_factor_alpha(lag=lag)
         ewm_residuals_2 = ewm.compute_ewm(data=np.square(residuals), span=span)
         y_demean = self.y #- ewm.compute_ewm(data=self.y, span=span)
         ewm_variance = ewm.compute_ewm(data=np.square(y_demean), span=span)

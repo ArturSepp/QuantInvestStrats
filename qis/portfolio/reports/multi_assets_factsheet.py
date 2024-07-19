@@ -89,10 +89,10 @@ class MultiAssetsReport:
                            ) -> None:
         prices = self.get_prices(benchmark, time_period=time_period)
         title = title or f"RA performance table for {self.perf_params.freq_vol}-freq returns with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
-        if len(prices.columns) >= 12:
-            local_kwargs = qis.update_kwargs(kwargs, dict(fontsize=3, pad=10, bbox=(0, -0.4, 1.0, 1.6)))
-        else:
-            local_kwargs = qis.update_kwargs(kwargs, dict(fontsize=3.5, pad=10, bbox=(0, -0.4, 1.0, 1.6)))
+        #if len(prices.columns) >= 12:
+        #    local_kwargs = qis.update_kwargs(kwargs, dict(fontsize=3, pad=10, bbox=(0, -0.4, 1.0, 1.6)))
+        #else:
+        #    local_kwargs = qis.update_kwargs(kwargs, dict(fontsize=3.5, pad=10, bbox=(0, -0.4, 1.0, 1.6)))
         qis.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=benchmark,
                                          perf_params=self.perf_params,
@@ -101,7 +101,7 @@ class MultiAssetsReport:
                                          title=title,
                                          rotation_for_columns_headers=0,
                                          ax=ax,
-                                         **local_kwargs)
+                                         **kwargs)
 
     def plot_ra_regime_table(self,
                              regime_benchmark_str: str = None,
@@ -164,21 +164,23 @@ class MultiAssetsReport:
     def plot_drawdowns(self,
                        regime_benchmark_str: str = None,
                        time_period: TimePeriod = None,
+                       dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
                        title: str = 'Running Drawdowns',
                        ax: plt.Subplot = None,
                        **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark_str)
-        qis.plot_rolling_drawdowns(prices=prices, title=title, ax=ax, **kwargs)
+        qis.plot_rolling_drawdowns(prices=prices, dd_legend_type=dd_legend_type, title=title, ax=ax, **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark_str, data_df=prices)
 
     def plot_rolling_time_under_water(self,
                                       regime_benchmark: str = None,
                                       time_period: TimePeriod = None,
+                                      dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
                                       title: str = 'Running Time Under Water',
                                       ax: plt.Subplot = None,
                                       **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark)
-        qis.plot_rolling_time_under_water(prices=prices, title=title, ax=ax, **kwargs)
+        qis.plot_rolling_time_under_water(prices=prices, dd_legend_type=dd_legend_type, title=title, ax=ax, **kwargs)
         self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, data_df=prices)
 
     def plot_annual_returns(self,
@@ -335,7 +337,7 @@ class MultiAssetsReport:
                          legend_loc: Optional[str] = 'upper center',
                          ax: plt.Subplot = None,
                          **kwargs) -> None:
-        prices = self.get_prices(time_period=time_period)
+        prices = self.get_prices(time_period=time_period, benchmark=benchmark)
         title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {self.regime_params.freq}-freq regimes"
         regime_classifier = qis.BenchmarkReturnsQuantilesRegime(regime_params=self.regime_params)
         qis.plot_regime_data(regime_classifier=regime_classifier,
@@ -357,7 +359,7 @@ class MultiAssetsReport:
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> None:
-        prices = self.get_prices(time_period=time_period)
+        prices = self.get_prices(time_period=time_period, benchmark=benchmark)
         title = title or f"Boxplot of average {self.regime_params.freq}-freq return conditional on volatility regime of {str(benchmark)}"
         regime_classifier = qis.BenchmarkVolsQuantilesRegime(regime_params=qis.VolQuantileRegimeSpecs(freq=self.regime_params.freq))
         if len(prices.columns) >= 8:
@@ -444,6 +446,8 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
         report_period = time_period.to_str()
     else:
         report_period = qis.get_time_period(df=prices).to_str()
+    time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
+
     factsheet_name = factsheet_name or f"Multi-asset report: {report_period}"
     qis.set_suptitle(fig=fig, title=factsheet_name, fontsize=8)
 
@@ -481,24 +485,24 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                  perf_column=PerfStat.SHARPE_RF0, **kwargs)
     report.plot_performance_bars(ax=fig.add_subplot(gs[0:2, 3]),
                                  perf_column=PerfStat.MAX_DD, **kwargs)
-    """
-    report.plot_performance_bars(ax=fig.add_subplot(gs[0:2, 10:12]),
-                                 benchmark=benchmark,
-                                 perf_column=PerfStat.BETA, **kwargs)
-    """
-    report.plot_ra_perf_table(benchmark=benchmark,
-                              ax=fig.add_subplot(gs[2, 2:]),
-                              **kwargs)
 
-    # change regression to weekly
-    time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
-    if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
-        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED'))
-    else:
-        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1))
-    report.plot_ra_perf_table(benchmark=benchmark,
-                              ax=fig.add_subplot(gs[3, 2:]),
-                              **local_kwargs)
+    if len(prices.columns) >= 12:
+        report.plot_ra_perf_table(benchmark=benchmark,
+                                  ax=fig.add_subplot(gs[2:4, 2:]),
+                                  **kwargs)
+    else:  # plot two tables
+        report.plot_ra_perf_table(benchmark=benchmark,
+                                  ax=fig.add_subplot(gs[2, 2:]),
+                                  **kwargs)
+
+        # change regression to weekly
+        if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
+            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED'))
+        else:
+            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1))
+        report.plot_ra_perf_table(benchmark=benchmark,
+                                  ax=fig.add_subplot(gs[3, 2:]),
+                                  **local_kwargs)
 
     report.plot_annual_returns(ax=fig.add_subplot(gs[4:6, 2:]),
                                heatmap_freq=heatmap_freq,
