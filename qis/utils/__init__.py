@@ -138,14 +138,17 @@ from qis.utils.df_to_weights import (
     compute_long_short_ind_by_row,
     df_nans_to_one_zero,
     df_to_equal_weight_allocation,
-    df_to_max_score,
     df_to_top_n_indicators,
     df_to_weight_allocation_sum1,
+    df_to_long_only_allocation_sum1,
     fill_long_short_signal,
-    get_weights,
+    compute_long_only_portfolio_weights,
     mult_df_columns_with_vector,
     mult_df_columns_with_vector_group
 )
+from qis.utils.df_to_scores import (
+    df_to_max_score,
+    df_to_cross_sectional_score)
 
 from qis.utils.generic import (
     ValueType,

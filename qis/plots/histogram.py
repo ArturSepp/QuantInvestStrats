@@ -151,6 +151,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
             label = f"{label}\nrank={'{:.0%}'.format(0.01*percentile)}"
             put.autolabel(ax=ax, rects=rects, xpos='right', label0=label, color=colors[idx], fontsize=fontsize)
 
+    norm_lable = None
     if add_norm_std_pdf or add_data_std_pdf:
         xmin, xmax = ax.get_xlim()
         if add_data_std_pdf:
@@ -162,8 +163,9 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
 
         dx = 0.1 * norm_std
         x_axis = np.arange(xmin, xmax, dx)
+        norm_lable = f"Normal PDF: avg={xvar_format.format(norm_mean)}, std={xvar_format.format(norm_std)}"
         ax.plot(x_axis, norm.pdf(x_axis, norm_mean, norm_std),
-                label=f"Normal PDF ({xvar_format.format(norm_mean)},  {xvar_format.format(norm_std)})",
+                label=norm_lable,
                 color='black',
                 lw=1, linestyle='--')
         ymin, ymax = ax.get_ylim()
@@ -176,9 +178,9 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
 
     if desc_table_type is not None and desc_table_type != dsc.DescTableType.NONE:
         stats_table = dsc.compute_desc_table(df=df,
-                                         annualize_vol=annualize_vol,
-                                         desc_table_type=desc_table_type,
-                                         **qis.update_kwargs(kwargs, dict(var_format=xvar_format)))
+                                             annualize_vol=annualize_vol,
+                                             desc_table_type=desc_table_type,
+                                             **qis.update_kwargs(kwargs, dict(var_format=xvar_format)))
         put.set_legend_with_stats_table(stats_table=stats_table,
                                         ax=ax,
                                         colors=colors,
@@ -190,6 +192,9 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
         legend_labels = put.get_legend_lines(data=df,
                                              legend_stats=legend_stats,
                                              var_format=xvar_format)
+        if norm_lable is not None:
+            legend_labels += [norm_lable]
+            colors += ['black']
         put.set_legend(ax=ax,
                        labels=legend_labels,
                        colors=colors,

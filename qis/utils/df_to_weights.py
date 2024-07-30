@@ -1,5 +1,5 @@
 """
-different methods to generate signal and portfolio weights from df
+different methods to generate portfolio weights from df
 """
 import numpy as np
 import pandas as pd
@@ -16,7 +16,12 @@ class WeightMethod(str, Enum):
     SQRT_PROPORTIONAL = 'Sqrt '
 
 
-def get_weights(data: pd.DataFrame, weight_method: WeightMethod = WeightMethod.EQUAL_WEIGHT) -> pd.DataFrame:
+def compute_long_only_portfolio_weights(data: pd.DataFrame,
+                                        weight_method: WeightMethod = WeightMethod.EQUAL_WEIGHT
+                                        ) -> pd.DataFrame:
+    """
+    compute [0, 1] weights data
+    """
     if weight_method == WeightMethod.EQUAL_WEIGHT:
         weights = df_to_equal_weight_allocation(df=data)
     elif weight_method == WeightMethod.PROPORTIONAL:
@@ -26,6 +31,51 @@ def get_weights(data: pd.DataFrame, weight_method: WeightMethod = WeightMethod.E
     else:
         raise TypeError(f"not implemented method {weight_method}")
     return weights
+
+
+def df_to_equal_weight_allocation(df: Union[pd.Series, pd.DataFrame],
+                                  freq: str = None
+                                  ) -> Union[pd.Series, pd.DataFrame]:
+    """
+    equal weight accounting for nans in df
+    """
+    equal_weight_allocation = df_to_weight_allocation_sum1(df=df_nans_to_one_zero(df=df))
+    if freq is not None:
+        equal_weight_allocation = equal_weight_allocation.asfreq(freq, method='ffill')
+    return equal_weight_allocation
+
+
+def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
+    """
+    normalized rows by cross-sectional sum
+    """
+    if isinstance(df, pd.Series):
+        weights = df.divide(np.nansum(df, axis=0)).fillna(0.0)
+    else:
+        weights = df.divide(np.nansum(df, axis=1, keepdims=True)).fillna(0.0)
+    return weights
+
+
+def df_to_long_only_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
+    """
+    normalized rows by cross-sectional sum
+    """
+    weighted_score = np.where(df.to_numpy() > 0.0, df, 0.0)
+    if isinstance(df, pd.Series):
+        weights = weighted_score / np.nansum(weighted_score)
+        weights = pd.Series(weights, index=df.index).fillna(0.0)
+    else:
+        weights = weighted_score / np.nansum(weighted_score, axis=1, keepdims=True)
+        weights = pd.DataFrame(weights, index=df.index, columns=df.columns).fillna(0.0)
+    return weights
+
+
+def df_nans_to_one_zero(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    return 1 if is set is not None and 0 otherwise
+    """
+    data = np.where(np.isfinite(df.to_numpy(dtype=np.float64)), 1.0, 0.0)
+    return pd.DataFrame(data=data, index=df.index, columns=df.columns)
 
 
 def mult_df_columns_with_vector(df: pd.DataFrame,
@@ -77,26 +127,6 @@ def mult_df_columns_with_vector_group(df: pd.DataFrame,
     return group_conv
 
 
-def df_to_equal_weight_allocation(df: pd.DataFrame) -> pd.DataFrame:
-    indicator = np.isfinite(df).astype(np.float64)  # 0.0 or 1.0
-    equal_weight_allocation = mult_df_columns_with_vector(df=indicator,
-                                                          vector=pd.Series(1.0, index=df.columns),
-                                                          is_norm=True,
-                                                          nan_fill_zero=True)
-    return equal_weight_allocation
-
-
-def df_to_max_score(df: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
-    """
-    normalized rows by cross-sectional max
-    """
-    if isinstance(df, pd.Series):
-        score = df.divide(np.nanmax(df, axis=0))
-    else:
-        score = df.divide(np.nanmax(df, axis=1, keepdims=True))
-    return score
-
-
 def df_to_top_n_indicators(df: Union[pd.Series, pd.DataFrame],
                            num_top_assets: int = 15
                            ) -> Union[pd.Series, pd.DataFrame]:
@@ -120,25 +150,6 @@ def df_to_top_n_indicators(df: Union[pd.Series, pd.DataFrame],
     return ranked_data
 
 
-def df_nans_to_one_zero(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    return 1 if is set is not None and 0 otherwise
-    """
-    data = np.where(np.isfinite(df.to_numpy(dtype=np.float64)), 1.0, 0.0)
-    return pd.DataFrame(data=data, index=df.index, columns=df.columns)
-
-
-def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
-    """
-    normalized rows by cross-sectional sum
-    """
-    if isinstance(df, pd.Series):
-        weights = df.divide(np.nansum(df, axis=0)).fillna(0.0)
-    else:
-        weights = df.divide(np.nansum(df, axis=1, keepdims=True)).fillna(0.0)
-    return weights
-
-
 def fill_long_short_signal(rank_data: np.ndarray,
                            leg_size: int
                            ) -> np.ndarray:
@@ -160,7 +171,7 @@ def compute_long_short_ind_by_row(data: pd.DataFrame,
                                   leg_size: Optional[int] = None
                                   ) -> pd.DataFrame:
     """
-    get cross sectional
+    get cross sectional indicators
     """
     if len(data.columns) == 1:
         raise ValueError(f"one column is not supported for ranking")
@@ -188,7 +199,7 @@ def compute_long_short_ind(data: np.ndarray,
                            leg_size: Optional[int] = None
                            ) -> np.ndarray:
     """
-    row wise operator
+    row wise operator to assing -/+1 for ranked data in df
     """
     if not data.ndim == 1:
         raise ValueError(f"ndim must be 1")
@@ -208,6 +219,7 @@ def compute_long_short_ind(data: np.ndarray,
 class UnitTests(Enum):
     CONV = 1
     EW_ALLOC = 2
+    AC_EQUAL_WEIGHT_ALLOCATION = 3
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -272,10 +284,35 @@ def run_unit_test(unit_test: UnitTests):
         weights = df_to_equal_weight_allocation(constituent_prices)
         print(weights)
 
+    elif unit_test == UnitTests.AC_EQUAL_WEIGHT_ALLOCATION:
+        universe_data = dict(SPY='Equities',
+                             QQQ='Equities',
+                             EEM='Equities',
+                             TLT='Bonds',
+                             IEF='Bonds',
+                             LQD='Credit',
+                             HYG='Credit',
+                             GLD='Gold')
+        # each asset class has equal weight allocation
+        group_data = pd.Series(universe_data)
+        constituents = pd.DataFrame(1.0, columns=group_data.index, index=['date1', 'date2'])
+        constituents.loc['date1', 'EEM'] = np.nan
+        constituents.loc['date2', 'IEF'] = np.nan
+        within_ac_weight = pd.Series(1.0, index=group_data.index)
+        within_ac_weight['HYG'] = 0.5
+        rel_ac_weight_by_ints = mult_df_columns_with_vector_group(df=constituents,
+                                                                  vector=within_ac_weight,
+                                                                  group_data=group_data,
+                                                                  is_norm=True, nan_fill_zero=True,
+                                                                  return_df=True)
+        rel_ac_weight_by_ints = df_to_weight_allocation_sum1(df=rel_ac_weight_by_ints)
+        print(rel_ac_weight_by_ints)
+        print(rel_ac_weight_by_ints.sum(1))
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CONV
+    unit_test = UnitTests.AC_EQUAL_WEIGHT_ALLOCATION
 
     is_run_all_tests = False
     if is_run_all_tests:

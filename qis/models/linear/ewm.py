@@ -170,6 +170,57 @@ def ewm_recursion(a: np.ndarray,
     return ewm
 
 
+def compute_ewm_long_short_filter(data: pd.DataFrame,
+                                  long_span: Union[int, np.ndarray] = 63,
+                                  short_span: Optional[Union[int, np.ndarray]] = 5,
+                                  warmup_period: Optional[Union[int, np.ndarray]] = 21
+                                  ) -> pd.DataFrame:
+    """
+    signal smoother
+    """
+    long_lambda = 1.0 - 2.0 / (long_span+1.0)
+
+    data_np = data.to_numpy()
+    init_value = np.zeros(data_np.shape[1])
+    if short_span is not None:  # use short + long filter
+        short_lambda = 1.0 - 2.0 / (short_span + 1.0)
+        weight_long = 1.0 / (np.sqrt(1.0 - long_lambda) * np.sqrt(1.0 / (1.0 - long_lambda)
+                                                                  + 1.0 / (1.0 - short_lambda)
+                                                                  - 2.0 / (1.0 - np.sqrt(long_lambda * short_lambda))))
+        weight_short = 1.0 / (np.sqrt(1.0 - short_lambda) * np.sqrt(1.0 / (1.0 - long_lambda)
+                                                                    + 1.0 / (1.0 - short_lambda)
+                                                                    - 2.0 / (1.0 - np.sqrt(long_lambda * short_lambda))))
+        load_long = np.sqrt(1.0 - long_lambda) / (1.0 - np.sqrt(long_lambda))
+        long_signal = weight_long * ewm_recursion(a=load_long * data_np,
+                                                  ewm_lambda=np.sqrt(long_lambda),
+                                                  init_value=init_value)
+        load_short = np.sqrt(1.0 - short_lambda) / (1.0 - np.sqrt(short_lambda))
+        short_signal = weight_short * ewm_recursion(a=load_short * data_np,
+                                                    ewm_lambda=np.sqrt(short_lambda),
+                                                    init_value=init_value)
+        filter = long_signal - short_signal
+
+    else:
+        load_long = np.sqrt(1.0 - long_lambda) / (1.0 - np.sqrt(long_lambda))
+        filter = ewm_recursion(a=load_long * data_np,
+                               ewm_lambda=np.sqrt(long_lambda),
+                               init_value=init_value)
+
+    if warmup_period is not None:   # set to nan first nonnan in warmup_period
+        if isinstance(warmup_period, float):
+            warmup_period = np.full(data_np.shape[1], warmup_period)
+            if np.any(warmup_period > 0):
+                for p, idx in zip(warmup_period, range(filter.shape[1])):
+                    nan_indicators = np.argwhere(np.isfinite(data_np[:, idx]))
+                    if nan_indicators.size > p:
+                        filter[:nan_indicators[p][0], idx] = np.nan
+                    else:
+                        filter[:, idx] = np.nan
+
+    filter = pd.DataFrame(data=filter, index=data.index, columns=data.columns)
+    return filter
+
+
 @njit
 def compute_ewm_covar(a: np.ndarray,
                       span: Union[int, np.ndarray] = None,

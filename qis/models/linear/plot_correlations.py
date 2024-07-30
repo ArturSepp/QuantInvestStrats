@@ -57,8 +57,8 @@ def plot_returns_ewm_corr_table(prices: pd.DataFrame,
                                 init_type: InitType = InitType.ZERO,
                                 freq: Optional[str] = None,
                                 cmap: str = 'PiYG',
+                                is_last: bool = True,
                                 ax: plt.Subplot = None,
-                                is_average: bool = True,
                                 **kwargs
                                 ) -> plt.Figure:
     """
@@ -71,10 +71,10 @@ def plot_returns_ewm_corr_table(prices: pd.DataFrame,
                                         ewm_lambda=ewm_lambda,
                                         covar0=init_value,
                                         is_corr=True)
-    if is_average:
-        ar = npn.tensor_mean(corr)
-    else:
+    if is_last:
         ar = corr[-1]
+    else:
+        ar = npn.tensor_mean(corr)
 
     df = pd.DataFrame(ar, index=prices.columns, columns=prices.columns)
     fig = phe.plot_heatmap(df=df,

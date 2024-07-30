@@ -934,7 +934,7 @@ def save_figs(figs: Dict[str, plt.Figure],
 
 def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
                      file_name: str,
-                     orientation: Literal['portrait', 'landscape'] = 'portrait',
+                     orientation: Literal['portrait', 'landscape'] = 'landscape',
                      local_path: Optional[str] = None,
                      add_current_date: bool = True
                      ) -> str:
@@ -955,7 +955,7 @@ def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
             for fig in figs:
                 if fig is not None:
                     pdf.savefig(fig, orientation=orientation)
-
+    print(f"""<a href=r"{file_path}">link</a>""")
     print(f"created PDF doc: {file_path}")
     return file_path
 

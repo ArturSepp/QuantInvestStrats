@@ -95,7 +95,7 @@ with sns.axes_style("darkgrid"):
 ```python 
 # 2-axis plot with drawdowns using sns styles
 with sns.axes_style("darkgrid"):
-    fig, axs = plt.subplots(2, 1, figsize=(10, 7))
+    fig, axs = plt.subplots(2, 1, figsize=(10, 7), tight_layout=True)
     qis.plot_prices_with_dd(prices=prices, x_date_freq='YE', axs=axs)
 ```
 ![image info](qis/examples/figures/perf2.PNG)

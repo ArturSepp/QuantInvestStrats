@@ -33,7 +33,6 @@ import qis.plots.derived.returns_heatmap as rhe
 from qis.plots.derived.returns_heatmap import plot_returns_heatmap
 import qis.models.linear.ewm_factors as ef
 
-
 PERF_PARAMS = PerfParams(freq='W-WED')
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
@@ -496,13 +495,16 @@ class PortfolioData:
 
         return data
 
-    def get_num_investable_instruments(self, time_period: da.TimePeriod = None) -> pd.Series:
-        exposures = self.weights.replace({0.0: np.nan})
-        count = np.sum(np.where(np.isfinite(exposures), 1.0, 0.0), axis=1)
-        num_investable_instruments = pd.Series(count, index=exposures.index, name=self.nav.name)
+    def get_num_investable_instruments(self, time_period: da.TimePeriod = None) -> pd.DataFrame:
+        num_available_prices = np.sum(np.where(np.isfinite(self.prices), 1.0, 0.0), axis=1)
+        num_available_prices = pd.Series(num_available_prices, index=self.weights.index, name='Investable')
+        non_zero_exposures = self.weights.where(np.isclose(self.weights, 0.0) == False, other=np.nan)
+        num_invested_instruments = np.sum(np.where(np.isfinite(non_zero_exposures), 1.0, 0.0), axis=1)
+        num_invested_instruments = pd.Series(num_invested_instruments, index=self.weights.index, name='Invested')
+        df = pd.concat([num_available_prices, num_invested_instruments], axis=1)
         if time_period is not None:
-            num_investable_instruments = time_period.locate(num_investable_instruments)
-        return num_investable_instruments
+            df = time_period.locate(df)
+        return df
 
     def get_instruments_performance_table(self,
                                           time_period: da.TimePeriod = None,
@@ -552,9 +554,58 @@ class PortfolioData:
             portf_return = portf_return.rename(columns=self.tickers_to_names_map)
         return portf_return
 
+    def compute_distribution_yield(self,
+                                   paid_dividends: pd.DataFrame,
+                                   div_rolling_freq: str = 'ME',
+                                   div_rolling_period: int = 12,
+                                   time_period: TimePeriod = None
+                                   ) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
+        positions = self.units
+        distributions_by_instrument = paid_dividends.multiply(positions)
+        nav = self.get_portfolio_nav().reindex(index=distributions_by_instrument.index, method='ffill')
+        distributions_by_instrument_yield = distributions_by_instrument.divide(nav, axis=0)
+        # resample at 'ME' and compute rolling sum
+        distributions_by_instrument_yield_m = distributions_by_instrument_yield.resample(div_rolling_freq).sum()
+        distributions_by_instrument_yield_12m = distributions_by_instrument_yield_m.fillna(0.0).rolling(div_rolling_period).sum()
+        # find total distributions
+        distribution_yield = distributions_by_instrument_yield_m.sum(1)
+        distribution_yield_12m = distributions_by_instrument_yield_12m.sum(1)
+        if time_period is not None:
+            distributions_by_instrument_yield_12m = time_period.locate(distributions_by_instrument_yield_12m)
+            distribution_yield = time_period.locate(distribution_yield)
+            distribution_yield_12m = time_period.locate(distribution_yield_12m)
+        return distributions_by_instrument_yield_12m, distribution_yield, distribution_yield_12m
+
+    def plot_distribution_yield(self,
+                                paid_dividends: pd.DataFrame,
+                                time_period: TimePeriod = None,
+                                div_rolling_freq: str = 'ME',
+                                div_rolling_period: int = 12,
+                                axs: List[plt.Subplot] = None,
+                                **kwargs
+                                ):
+        distributions_by_instrument_yield_12m, distribution_yield, distribution_yield_12m =\
+            self.compute_distribution_yield(paid_dividends=paid_dividends,
+                                            time_period=time_period,
+                                            div_rolling_freq=div_rolling_freq,
+                                            div_rolling_period=div_rolling_period)
+        if axs is None:
+            fig1, ax1 = plt.subplots(1, 1, figsize=(14, 10), constrained_layout=True)
+            fig2, ax2 = plt.subplots(1, 1, figsize=(14, 10), constrained_layout=True)
+            axs = [ax1, ax2]
+
+        qis.plot_time_series(distribution_yield_12m,
+                             ax=axs[0],
+                             **kwargs)
+        qis.plot_stack(df=distributions_by_instrument_yield_12m.resample('ME').last(),
+                       use_bar_plot=True,
+                       ax=axs[1],
+                       **kwargs)
+
     """
     plotting methods
     """
+
     def add_regime_shadows(self,
                            ax: plt.Subplot,
                            regime_benchmark: str,
@@ -613,7 +664,7 @@ class PortfolioData:
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=total_group_navs.index,
                                     regime_params=regime_params)
-            
+
     def plot_rolling_perf(self,
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
                           add_benchmarks: bool = False,
@@ -655,11 +706,13 @@ class PortfolioData:
         return fig
 
     def plot_ra_perf_table(self,
-                           benchmark_price: pd.Series = None,
+                           benchmark_price: Union[pd.Series, pd.DataFrame] = None,
+                           benchmark: str = None,
                            is_grouped: bool = True,
                            time_period: da.TimePeriod = None,
                            perf_params: PerfParams = None,
                            perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+                           add_all_benchmarks_to_nav_figure: bool = False,
                            title: str = None,
                            ax: plt.Subplot = None,
                            **kwargs
@@ -673,12 +726,18 @@ class PortfolioData:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
             for_title = ''
         if benchmark_price is not None:
-            if benchmark_price.name not in prices.columns:
+            if isinstance(benchmark_price, pd.DataFrame):  # bechmark is the last asset
+                if benchmark is None:
+                    benchmark = benchmark_price.columns[-1]
+            else:
+                benchmark = benchmark_price.name
+            if benchmark not in prices.columns:
                 prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
-            title = title or f"RA performance table {for_title} for {perf_params.freq_vol}-freq returns with beta to {benchmark_price.name}:" \
+            prices = prices.loc[:, ~prices.columns.duplicated(keep='first')]
+            title = title or f"RA performance table {for_title} for {perf_params.freq_vol}-freq returns with beta to {benchmark}:" \
                              f" {qis.get_time_period(prices).to_str()}"
             ppt.plot_ra_perf_table_benchmark(prices=prices,
-                                             benchmark=str(benchmark_price.name),
+                                             benchmark=benchmark,
                                              perf_params=perf_params,
                                              perf_columns=perf_columns,
                                              title=title,

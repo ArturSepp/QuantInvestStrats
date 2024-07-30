@@ -17,7 +17,6 @@ def run_unit_test(unit_test: UnitTests):
         fig, ax = plt.subplots(1, 1, figsize=(7, 7), tight_layout=True)
         qis.plot_returns_ewm_corr_table(prices=prices,
                                         ewm_lambda=0.97,
-                                        is_average=False,
                                         ax=ax)
     plt.show()
 

@@ -254,7 +254,7 @@ class MultiAssetsReport:
         if factor_beta_title is not None:
             factor_beta_title = f"{factor_beta_title} to {benchmark}"
         else:
-            factor_beta_title = factor_beta_title or f"{factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {benchmark}"
+            factor_beta_title = factor_beta_title or f"{factor_beta_span}-period rolling Beta of {beta_freq}-freq returns to {benchmark}"
 
         ewm_linear_model = qis.estimate_ewm_linear_model(x=returns[benchmark].to_frame(),
                                                          y=returns.drop(benchmark, axis=1),
@@ -287,7 +287,7 @@ class MultiAssetsReport:
         if factor_alpha_title is not None:
             factor_alpha_title = f"{factor_alpha_title} to {benchmark}"
         else:
-            factor_alpha_title = factor_alpha_title or f"Cumulative alpha using {factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {benchmark}"
+            factor_alpha_title = factor_alpha_title or f"Cumulative alpha using {factor_beta_span}-period rolling Beta of {beta_freq}-freq returns to {benchmark}"
 
         qis.plot_time_series(df=factor_alpha.cumsum(0),
                              title=factor_alpha_title,
@@ -468,11 +468,16 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                              ax=fig.add_subplot(gs[6:8, :2]),
                              **kwargs)
 
+    # use vol_rolling_window
+    if 'vol_rolling_window' in kwargs.keys():
+        local_kwargs = qis.update_kwargs(kwargs, dict(sharpe_rolling_window=kwargs['vol_rolling_window']))
+    else:
+        local_kwargs = kwargs
     report.plot_rolling_perf(regime_benchmark=benchmark,
                              rolling_perf_stat=RollingPerfStat.VOL,
                              var_format='{:.1%}',
                              ax=fig.add_subplot(gs[8:10, :2]),
-                             **kwargs)
+                             **local_kwargs)
 
     report.plot_benchmark_beta(benchmark=benchmark,
                                ax=fig.add_subplot(gs[10:12, :2]),

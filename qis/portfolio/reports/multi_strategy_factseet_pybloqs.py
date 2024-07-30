@@ -11,11 +11,11 @@ import pybloqs.block.table_formatters as tf
 from typing import Tuple, Optional
 
 # qis
-import qis
+import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantileRegimeSpecs
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
-from qis.portfolio.reports.config import KWARGS_SUPTITLE, KWARGS_TITLE, KWARGS_TEXT, KWARGS_FOOTNOTE, KWARGS_FIG
+from qis.portfolio.reports.config import (PERF_PARAMS, REGIME_PARAMS, KWARGS_SUPTITLE, KWARGS_TITLE,
+                                          KWARGS_TEXT, KWARGS_FOOTNOTE, KWARGS_FIG)
 
 
 def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiPortfolioData,

@@ -62,7 +62,7 @@ def run_unit_test(unit_test: UnitTests):
         kwargs = dict(fontsize=8, linewidth=0.5, weight='normal', markersize=1)
 
         with sns.axes_style("darkgrid"):
-            fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+            fig, ax = plt.subplots(1, 1, figsize=(8, 6), tight_layout=True)
             plot_pie(df=df,
                      ax=ax,
                      **kwargs)

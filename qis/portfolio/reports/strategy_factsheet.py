@@ -32,6 +32,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 fontsize: int = 4,
                                 add_grouped_exposures: bool = False,
                                 add_grouped_cum_pnl: bool = False,
+                                is_1y_exposures: bool = False,
                                 **kwargs
                                 ) -> List[plt.Figure]:
     # align
@@ -54,7 +55,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                        markersize=1,
                        framealpha=0.75)
     kwargs = qis.update_kwargs(kwargs, plot_kwargs)
-    fig.suptitle(f"{portfolio_data.nav.name} portfolio factsheet",
+    fig.suptitle(f"{portfolio_data.nav.name} factsheet",
                  fontweight="bold", fontsize=8, color='blue')
 
     # prices
@@ -94,9 +95,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     if exposures_freq is not None:
         exposures = exposures.resample(exposures_freq).last()
     qis.plot_stack(df=exposures,
-                   add_mean_levels=False,
                    use_bar_plot=True,
-                   baseline='zero',
                    title='Exposures',
                    legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                    var_format='{:.1%}',
@@ -126,7 +125,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                         beta_freq=beta_freq,
                                                                         factor_beta_span=factor_beta_span
                                                                         )
-    factor_beta_title = factor_beta_title or f"Rolling {factor_beta_span}-span beta of {beta_freq}-freq returns"
+    factor_beta_title = factor_beta_title or f"Rolling {factor_beta_span}-period beta of {beta_freq}-freq returns"
     qis.plot_time_series(df=factor_exposures,
                          var_format='{:,.2f}',
                          legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
@@ -142,7 +141,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                                 beta_freq=beta_freq,
                                                                                 factor_beta_span=factor_beta_span,
                                                                                 time_period=time_period)
-    factor_attribution_title = factor_attribution_title or f"Cumulative return attribution using rolling {factor_beta_span}-span beta of {beta_freq}-freq returns"
+    factor_attribution_title = factor_attribution_title or f"Cumulative return attribution using rolling " \
+                                                           f"{factor_beta_span}-period beta of {beta_freq}-freq returns"
     qis.plot_time_series(df=factor_attribution.cumsum(0),
                          var_format='{:,.0%}',
                          legend_stats=qis.LegendStats.LAST_NONNAN,
@@ -158,32 +158,46 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     qis.plot_time_series(df=num_investable_instruments,
                          var_format='{:,.0f}',
                          legend_stats=qis.LegendStats.FIRST_AVG_LAST,
-                         title='Number of investable instruments',
+                         title='Number of investable and invested instruments',
                          ax=ax,
                          **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # ra perf table
-    ax = fig.add_subplot(gs[0, 2:])
-    portfolio_data.plot_ra_perf_table(ax=ax,
-                                      benchmark_price=benchmark_prices[regime_benchmark],
-                                      time_period=time_period,
-                                      perf_params=perf_params,
-                                      is_grouped=is_grouped,
-                                      **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
-    ax = fig.add_subplot(gs[1, 2:])
-    # change regression to weekly
-    time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
-    if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
-        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED', fontsize=fontsize))
+    if add_all_benchmarks_to_nav_figure:
+        benchmark_price = benchmark_prices
     else:
-        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
-    portfolio_data.plot_ra_perf_table(ax=ax,
-                                      benchmark_price=benchmark_prices[regime_benchmark],
-                                      perf_params=perf_params,
-                                      is_grouped=is_grouped,
-                                      **local_kwargs)
+        benchmark_price = benchmark_prices[regime_benchmark]
+    if is_grouped:
+        ax = fig.add_subplot(gs[:2, 2:])
+        portfolio_data.plot_ra_perf_table(ax=ax,
+                                          benchmark_price=benchmark_price,
+                                          time_period=time_period,
+                                          perf_params=perf_params,
+                                          is_grouped=is_grouped,
+                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
+    else:  # plot two tables
+
+        ax = fig.add_subplot(gs[0, 2:])
+        portfolio_data.plot_ra_perf_table(ax=ax,
+                                          benchmark_price=benchmark_price,
+                                          time_period=time_period,
+                                          perf_params=perf_params,
+                                          is_grouped=is_grouped,
+                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
+        ax = fig.add_subplot(gs[1, 2:])
+        # change regression to weekly
+        time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+        if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
+            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED', fontsize=fontsize))
+        else:
+            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
+        portfolio_data.plot_ra_perf_table(ax=ax,
+                                          benchmark_price=benchmark_price,
+                                          perf_params=perf_params,
+                                          is_grouped=is_grouped,
+                                          **local_kwargs)
 
     # heatmap
     ax = fig.add_subplot(gs[2:4, 2:])
@@ -265,12 +279,15 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     
     figs = [fig]
     if add_grouped_exposures:
-        # time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
-        grouped_exposures_agg, grouped_exposures_by_inst = portfolio_data.get_grouped_long_short_exposures(time_period=time_period)
+        if is_1y_exposures:
+            time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+        else:
+            time_period1 = time_period
+        grouped_exposures_agg, grouped_exposures_by_inst = portfolio_data.get_grouped_long_short_exposures(time_period=time_period1)
         nrows = len(grouped_exposures_agg.keys())
         fig1 = plt.figure(figsize=figsize, constrained_layout=True)
         figs.append(fig1)
-        fig1.suptitle(f"{portfolio_data.nav.name} Exposures by groups for period {time_period.to_str()}",
+        fig1.suptitle(f"{portfolio_data.nav.name} Exposures by groups for period {time_period1.to_str()}",
                      fontweight="bold", fontsize=8, color='blue')
         gs = fig1.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
         local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
@@ -290,7 +307,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                 ax.axhline(0, color='black', linewidth=0.5)
 
     if add_grouped_cum_pnl:
-        time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+        if is_1y_exposures:
+            time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+        else:
+            time_period1 = time_period
         grouped_pnls_agg, grouped_pnls_by_inst = portfolio_data.get_grouped_cum_pnls(time_period=time_period1)
         nrows = len(grouped_pnls_agg.keys())
         fig1 = plt.figure(figsize=figsize, constrained_layout=True)

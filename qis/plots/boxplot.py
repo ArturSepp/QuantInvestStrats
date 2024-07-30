@@ -27,7 +27,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
              colors: Union[List[str], List[Tuple[float, float, float]]] = None,
              title: str = None,
              meanline: bool = False,
-             showfliers: bool = False,
+             showfliers: bool = False,  # outliers
              showmeans: bool = False,
              showmedians: bool = False,
              add_y_mean_labels: bool = False,
@@ -349,6 +349,7 @@ def df_boxplot_by_hue_var(df: Union[pd.Series, pd.DataFrame],
                                       y_var_name=y_var_name,
                                       hue_var_name=hue_var_name,
                                       hue_order=hue_order)
+    print(box_data)
     if colors is None:
         if is_heatmap_colors:
             a = np.nanmedian(df.to_numpy(), axis=0)
@@ -400,6 +401,10 @@ def df_boxplot_by_classification_var(df: pd.DataFrame,
                                                       bins=None,
                                                       xvar_format=xvar_format,
                                                       is_value_labels=is_value_labels)
+    if hue_order is not None:
+        labels = hue_order
+    else:
+        labels = None
 
     plot_box(df=scatter_data,
              x=x_hue_name,
@@ -417,6 +422,7 @@ def df_boxplot_by_classification_var(df: pd.DataFrame,
              medianline=medianline,
              add_xy_mean_labels=add_xy_mean_labels,
              add_xy_med_labels=add_xy_med_labels,
+             labels=labels,
              colors=colors,
              ax=ax,
              **kwargs)

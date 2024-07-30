@@ -32,7 +32,8 @@ class FactsheetConfig(NamedTuple):
     freq_reg: str = 'W-WED'  # for beta regressions
     alpha_an_factor: float = 52 # for W-WED returns
     regime_freq: str = 'QE'  # for regime frequency
-    sharpe_rolling_window: int = 156 # 3y of weekly returns
+    sharpe_rolling_window: int = 156  # 3y of weekly returns
+    vol_rolling_window: int = 52  # 1y volatility
     sharpe_freq: str = 'W-WED'
     sharpe_title: Optional[str] = None
     turnover_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
@@ -67,6 +68,7 @@ FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
                                                             alpha_an_factor=12,
                                                             regime_freq='QE',
                                                             sharpe_rolling_window=36,
+                                                            vol_rolling_window=13,
                                                             sharpe_freq='ME',
                                                             sharpe_title=None,
                                                             turnover_rolling_period=12,

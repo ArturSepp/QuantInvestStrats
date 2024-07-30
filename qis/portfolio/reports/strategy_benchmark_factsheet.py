@@ -25,8 +25,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                               backtest_name: str = None,
                                               add_brinson_attribution: bool = True,
-                                              add_exposures_pnl_attribution: bool = True,
-                                              add_strategy_factsheet: bool = True,
+                                              add_exposures_pnl_attribution: bool = False,
+                                              add_strategy_factsheet: bool = False,
                                               add_grouped_exposures: bool = False,  # for strategy factsheet
                                               add_grouped_cum_pnl: bool = False,  # for strategy factsheet
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
@@ -143,18 +143,29 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                                   ax=fig.add_subplot(gs[4:6, 3]),
                                                                   **local_kwargs)
 
+    # gross comparision
     post_title = f"Sharpe ratio split to {str(benchmark_price.name)} Bear/Normal/Bull {regime_params.freq}-freq regimes"
+    """
     multi_portfolio_data.portfolio_datas[0].plot_regime_data(benchmark_price=benchmark_price,
-                                                             is_grouped=is_grouped,
+                                                             is_grouped=False,
                                                              title=f"{multi_portfolio_data.portfolio_datas[0].nav.name} {post_title}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
                                                              ax=fig.add_subplot(gs[6:8, 2]),
                                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
+    """
+    multi_portfolio_data.plot_regime_data(benchmark=str(benchmark_price.name),
+                                          is_grouped=False,
+                                          title=f"{post_title}",
+                                          perf_params=perf_params,
+                                          regime_params=regime_params,
+                                          ax=fig.add_subplot(gs[6:8, 2]),
+                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
 
-    multi_portfolio_data.portfolio_datas[1].plot_regime_data(benchmark_price=benchmark_price,
+    # strategy by asset class
+    multi_portfolio_data.portfolio_datas[0].plot_regime_data(benchmark_price=benchmark_price,
                                                              is_grouped=is_grouped,
-                                                             title=f"{multi_portfolio_data.portfolio_datas[1].nav.name} {post_title}",
+                                                             title=f"{multi_portfolio_data.portfolio_datas[0].nav.name} {post_title}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
                                                              ax=fig.add_subplot(gs[6:8, 3]),

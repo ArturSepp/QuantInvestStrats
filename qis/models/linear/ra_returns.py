@@ -1,28 +1,26 @@
 """
 define transform for ra returns
 """
-
 # packages
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
+from scipy.stats import laplace
 from typing import Union, Optional, Tuple
 from enum import Enum
-
 # qis
 import qis.utils.dates as da
 import qis.utils.np_ops as npo
 import qis.models.linear.ewm as ewm
-
-PD_UNION = Union[pd.Series, pd.DataFrame]
 
 
 def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
                        ewm_lambda: Union[float, np.ndarray] = 0.94,
                        vol_target: Optional[float] = 0.12,
                        span: Optional[int] = None,
-                       weight_shift: Optional[int] = 1,
+                       weight_lag: Optional[int] = 1,
                        is_log_returns_to_arithmetic: bool = True  # typically log-return are passed to vol computations
-                       ) -> Tuple[PD_UNION, PD_UNION, PD_UNION]:
+                       ) -> Tuple[Union[pd.Series, pd.DataFrame], Union[pd.Series, pd.DataFrame], Union[pd.Series, pd.DataFrame]]:
 
     if span is not None:
         ewm_lambda = 1.0-2.0/(span+1.0)
@@ -40,8 +38,8 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
 
     weights = npo.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
     weights = weights.multiply(vol_target)
-    if weight_shift is not None:
-        weights = weights.shift(weight_shift)
+    if weight_lag is not None:
+        weights = weights.shift(weight_lag)
 
     if is_log_returns_to_arithmetic:  # convert returns back to arithmetic = exp(r)-1.0
         returns = np.expm1(returns)
@@ -54,6 +52,87 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
         weights = weights[returns.columns]
 
     return ra_returns, weights, ewm_vol
+
+
+def compute_ewm_long_short_filtered_ra_returns(returns: pd.DataFrame,
+                                               vol_span: Optional[Union[int, np.ndarray]] = 31,
+                                               long_span: Union[int, np.ndarray] = 63,
+                                               short_span: Optional[Union[int, np.ndarray]] = 5,
+                                               warmup_period: Optional[Union[int, np.ndarray]] = 21,
+                                               weight_lag: Optional[int] = 1
+                                               ) -> pd.DataFrame:
+    if vol_span is not None:
+        ra_returns, _, _ = compute_ra_returns(returns=returns, span=vol_span, vol_target=None, weight_lag=weight_lag)
+    else:
+        ra_returns = returns
+    filter = ewm.compute_ewm_long_short_filter(data=ra_returns,
+                                               long_span=long_span,
+                                               short_span=short_span,
+                                               warmup_period=warmup_period)
+    return filter
+
+
+class SignalMapType(Enum):
+    NormalCDF = 1
+    LaplaceCDF = 2
+    ExpCDF = 3
+
+
+def map_signal_to_weight(signals: pd.DataFrame, signal_map_type: SignalMapType = SignalMapType.NormalCDF,
+                         loc: Union[float, pd.DataFrame] = 0.0,
+                         scale: Union[float, np.ndarray] = 1.0,
+                         tail_level: Union[float, np.ndarray] = 1.0,
+                         slope_right: Union[float, np.ndarray] = 0.5,
+                         slope_left: Union[float, np.ndarray] = 0.5,
+                         tail_decay_right: Optional[Union[float, np.ndarray]] = None,
+                         tail_decay_left: Optional[Union[float, np.ndarray]] = None
+                         ) -> pd.DataFrame:
+    x = signals.to_numpy()
+    if isinstance(loc, pd.DataFrame):
+        loc = loc.to_numpy()
+    if isinstance(scale, np.ndarray) and scale.shape[0] != x.shape[1]:
+        raise ValueError(f"{scale.shape[0]} != {x.shape[1]}")
+    if isinstance(slope_right, np.ndarray) and slope_right.shape[0] != x.shape[1]:
+        raise ValueError(f"{slope_right.shape[0]} != {x.shape[1]}")
+    if isinstance(slope_left, np.ndarray) and slope_left.shape[0] != x.shape[1]:
+        raise ValueError(f"{slope_left.shape[0]} != {x.shape[1]}")
+    if isinstance(tail_level, np.ndarray) and tail_level.shape[0] != x.shape[1]:
+        raise ValueError(f"{tail_level.shape[0]} != {x.shape[1]}")
+
+    if signal_map_type == SignalMapType.NormalCDF:
+        weight = 2.0*norm.cdf(x=x, loc=loc, scale=scale) - 1.0
+
+    elif signal_map_type == SignalMapType.LaplaceCDF:
+        weight = 2.0*laplace.cdf(x=x, loc=loc, scale=scale) - 1.0
+
+    elif signal_map_type == SignalMapType.ExpCDF:
+        if np.any(np.less_equal(tail_level, slope_right)) or np.any(np.less_equal(tail_level, slope_left)):
+            raise ValueError(f"must be tail>slope_positive and tail > slope_negative")
+        scale_negative = 1.5625 * scale / np.log(tail_level / (tail_level - slope_left))
+        scale_positive = 1.5625 * scale / np.log(tail_level / (tail_level - slope_right))
+        s_negative = - tail_level * (1.0 - np.exp(-np.square(x - loc) / scale_negative))
+        s_positive = tail_level * (1.0 - np.exp(-np.square(x - loc) / scale_positive))
+        weight = np.where(np.less(x, loc, where=np.isfinite(x)), s_negative, s_positive)
+
+        if tail_decay_right is not None and tail_decay_left is not None:  # take min(loc,0.0) and max(loc, 0.0)
+            if isinstance(tail_decay_right, np.ndarray) and tail_decay_right.shape[0] != x.shape[1]:
+                raise ValueError(f"{tail_decay_right.shape[0]} != {x.shape[1]}")
+            if isinstance(tail_decay_left, np.ndarray) and tail_decay_left.shape[0] != x.shape[1]:
+                raise ValueError(f"{tail_decay_left.shape[0]} != {x.shape[1]}")
+
+            x_left_tail = x + tail_level - np.where(np.less(loc, 0.0), loc, 0.0)
+            f_left_tail = np.where(np.less(x_left_tail, 0.0), np.exp(x_left_tail / tail_decay_left), 1.0)
+
+            x_right_tail = x - tail_level - np.where(np.greater(loc, 0.0), loc, 0.0)
+            f_right_tail = np.where(np.greater(x_right_tail, 0.0), np.exp(-x_right_tail / tail_decay_right), 1.0)
+
+            tails = np.where(np.greater(x_right_tail, 0.0), f_right_tail, f_left_tail)
+            weight = weight * tails
+
+    else:
+        raise NotImplementedError(f"signal_map_type={signal_map_type}")
+    weight = pd.DataFrame(weight, index=signals.index, columns=signals.columns)
+    return weight
 
 
 def compute_rolling_ra_returns(returns: pd.DataFrame,
@@ -79,7 +158,7 @@ def compute_rolling_ra_returns(returns: pd.DataFrame,
     ra_returns, weights, _ = compute_ra_returns(returns=rolling_returns,
                                                 ewm_lambda=ewm_lambda,
                                                 vol_target=vol_target,
-                                                weight_shift=weight_shift,
+                                                weight_lag=weight_shift,
                                                 is_log_returns_to_arithmetic=is_log_returns_to_arithmetic)
     return ra_returns
 
@@ -100,7 +179,7 @@ def compute_sum_rolling_ra_returns(returns: pd.DataFrame,
     ra_returns, weights, _ = compute_ra_returns(returns=returns,
                                                 ewm_lambda=ewm_lambda,
                                                 vol_target=vol_target,
-                                                weight_shift=weight_shift,
+                                                weight_lag=weight_shift,
                                                 is_log_returns_to_arithmetic=is_log_returns_to_arithmetic)
 
     if span > 1:
@@ -130,7 +209,7 @@ def compute_sum_freq_ra_returns(returns: Union[pd.Series, pd.DataFrame],
     ra_returns, weights, _ = compute_ra_returns(returns=returns,
                                                 ewm_lambda=ewm_lambda,
                                                 vol_target=vol_target,
-                                                weight_shift=weight_shift,
+                                                weight_lag=weight_shift,
                                                 is_log_returns_to_arithmetic=is_log_returns_to_arithmetic)
 
     if freq not in ['B', 'D']:
@@ -163,7 +242,7 @@ def compute_ewm_ra_returns_momentum(returns: Union[pd.Series, pd.DataFrame],
     ra_returns, _, _ = compute_ra_returns(returns=returns,
                                           ewm_lambda=vol_lambda,
                                           vol_target=None,
-                                          weight_shift=weight_shift)
+                                          weight_lag=weight_shift)
 
     ewm_signal = ewm.ewm_recursion(a=ra_returns.to_numpy(),
                                    ewm_lambda=momentum_lambda,

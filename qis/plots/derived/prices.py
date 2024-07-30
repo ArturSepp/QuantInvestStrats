@@ -135,7 +135,7 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                         remove_xticklabels_ax1: bool = True,
                         title: str = 'Performance',
                         dd_title: str = 'Running Drawdown',
-                        dd_legend_type: dra.DdLegendType = dra.DdLegendType.NONE,
+                        dd_legend_type: dra.DdLegendType = dra.DdLegendType.SIMPLE,
                         axs: List[plt.Subplot] = None,
                         **kwargs
                         ) -> plt.Figure:
