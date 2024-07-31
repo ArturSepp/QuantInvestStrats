@@ -207,13 +207,17 @@ def compute_ewm_long_short_filter(data: pd.DataFrame,
                                init_value=init_value)
 
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
-        if isinstance(warmup_period, float):
+        if isinstance(warmup_period, int):
             warmup_period = np.full(data_np.shape[1], warmup_period)
+        elif isinstance(warmup_period, np.ndarray):
+            pass
+        else:
+            raise ValueError(f"type={type(warmup_period)}")
         if np.any(warmup_period > 0):
-            for p, idx in zip(warmup_period, range(filter.shape[1])):
+            for idx, period in enumerate(warmup_period):
                 nan_indicators = np.argwhere(np.isfinite(data_np[:, idx]))
-                if nan_indicators.size > p:
-                    filter[:nan_indicators[p][0], idx] = np.nan
+                if nan_indicators.size > period:
+                    filter[:nan_indicators[period][0], idx] = np.nan
                 else:
                     filter[:, idx] = np.nan
 
