@@ -336,7 +336,7 @@ class PortfolioData:
             costs = costs.divide(self.nav.to_numpy(), axis=0)
         if is_agg:
             costs = pd.Series(np.nansum(costs, axis=1), index=self.nav.index, name=self.nav.name)
-        elif is_grouped:
+        elif is_grouped or len(costs.columns) > 10:  # agg by groups
             costs = dfg.agg_df_by_groups_ax1(costs,
                                              group_data=self.group_data,
                                              agg_func=np.nansum,
@@ -778,7 +778,8 @@ class PortfolioData:
                                          new_kwargs={'weight': 'bold',
                                                      'x_rotation': 0,
                                                      'first_color_fixed': False,
-                                                     'ci': None})
+                                                     'ci': None,
+                                                     'markersize': 6})
         prs.plot_returns_scatter(prices=prices,
                                  benchmark=str(benchmark_price.name),
                                  freq=freq,
@@ -1001,6 +1002,51 @@ class PortfolioData:
         if add_zero_line:
             ax.axhline(0, color='black', lw=1)
 
+    def plot_portfolio_grouped_var(self,
+                                   is_correlated: bool = True,
+                                   regime_benchmark: str = None,
+                                   time_period: TimePeriod = None,
+                                   freq: str = 'B',
+                                   title: str = None,
+                                   total_column: Optional[str] = 'Total',
+                                   vol_span: int = 31,  # span in number of freq-returns
+                                   regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                                   ax: plt.Subplot = None,
+                                   **kwargs
+                                   ) -> None:
+
+        if is_correlated:
+            title = title or f"Portfolio {freq}-freq correlated Var with {vol_span}-span ewma covar"
+            portfolio_vars = qis.compute_portfolio_correlated_var_by_ac(prices=self.prices,
+                                                                        weights=self.get_weights(freq=freq),
+                                                                        group_data=self.group_data,
+                                                                        group_order=self.group_order,
+                                                                        freq=freq,
+                                                                        vol_span=vol_span,  # span in number of freq-returns
+                                                                        total_column=total_column,
+                                                                        time_period=time_period)
+        else:
+            title = title or f"Portfolio {freq}-freq independent Var with {vol_span}-span ewma vols"
+            instrument_vars, portfolio_vars = qis.compute_portfolio_independent_var_by_ac(prices=self.prices,
+                                                                                          weights=self.get_weights(freq=freq),
+                                                                                          group_data=self.group_data,
+                                                                                          group_order=self.group_order,
+                                                                                          freq=freq,
+                                                                                          vol_span=vol_span,  # span in number of freq-returns
+                                                                                          total_column=total_column,
+                                                                                          time_period=time_period)
+
+        qis.plot_time_series(df=portfolio_vars,
+                             var_format='{:,.2%}',
+                             legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                             title=title,
+                             y_limits=(0.0, None),
+                             ax=ax,
+                             **kwargs)
+
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=portfolio_vars.index,
+                                    regime_params=regime_params)
 
 @njit
 def compute_realized_pnl(prices: np.ndarray,

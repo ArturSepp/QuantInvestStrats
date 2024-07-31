@@ -101,12 +101,12 @@ def run_unit_test(unit_test: UnitTests):
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                                benchmark_prices=benchmark_prices,
                                                time_period=time_period,
+                                               add_var_risk_sheet=True,
                                                **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_long",
-                             orientation='landscape',
                              local_path=qis.local_path.get_output_path())
-
+        """
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                                benchmark_prices=benchmark_prices,
                                                add_grouped_exposures=True,
@@ -115,10 +115,10 @@ def run_unit_test(unit_test: UnitTests):
                                                **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_short",
-                             orientation='landscape',
                              local_path=qis.local_path.get_output_path())
-
+        
         qis.save_fig(fig=figs[0], file_name=f"strategy", local_path=qis.local_path.get_output_path())
+        """
 
     elif unit_test == UnitTests.EQUITY_BOND:
         prices, benchmark_prices, group_data = fetch_equity_bond()
@@ -134,7 +134,6 @@ def run_unit_test(unit_test: UnitTests):
                                                **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_long",
-                             orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
@@ -145,7 +144,6 @@ def run_unit_test(unit_test: UnitTests):
                                                **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
-                             orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
     # plt.show()

@@ -38,7 +38,6 @@ from qis.models.linear.ewm import (
     compute_ewm_vol,
     compute_ewm_xy_beta_tensor,
     compute_one_factor_ewm_betas,
-    compute_portfolio_vol,
     compute_roll_mean,
     compute_rolling_mean_adj,
     ewm_vol_assymetric,
@@ -47,6 +46,9 @@ from qis.models.linear.ewm import (
     set_init_dim2
 )
 
+from qis.models.linear.ewm_portfolio_risk import (compute_portfolio_vol,
+                                                  compute_portfolio_correlated_var_by_ac,
+                                                  compute_portfolio_independent_var_by_ac)
 
 from qis.models.linear.ewm_convolution import ConvolutionType, SignalAggType, ewm_xy_convolution
 

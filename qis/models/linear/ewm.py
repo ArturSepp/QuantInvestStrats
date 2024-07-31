@@ -209,13 +209,13 @@ def compute_ewm_long_short_filter(data: pd.DataFrame,
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
         if isinstance(warmup_period, float):
             warmup_period = np.full(data_np.shape[1], warmup_period)
-            if np.any(warmup_period > 0):
-                for p, idx in zip(warmup_period, range(filter.shape[1])):
-                    nan_indicators = np.argwhere(np.isfinite(data_np[:, idx]))
-                    if nan_indicators.size > p:
-                        filter[:nan_indicators[p][0], idx] = np.nan
-                    else:
-                        filter[:, idx] = np.nan
+        if np.any(warmup_period > 0):
+            for p, idx in zip(warmup_period, range(filter.shape[1])):
+                nan_indicators = np.argwhere(np.isfinite(data_np[:, idx]))
+                if nan_indicators.size > p:
+                    filter[:nan_indicators[p][0], idx] = np.nan
+                else:
+                    filter[:, idx] = np.nan
 
     filter = pd.DataFrame(data=filter, index=data.index, columns=data.columns)
     return filter
@@ -934,85 +934,6 @@ def compute_ewm_alpha_r2(y_data: pd.DataFrame,
     ewm_r2 = pd.DataFrame(data=ewm_r2, index=y_data.index, columns=y_data.columns)
 
     return ewm_alpha, ewm_r2
-
-
-@njit
-def compute_portfolio_vol_np(returns: np.ndarray,
-                             weights: np.ndarray,
-                             span: Union[int, np.ndarray] = None,
-                             ewm_lambda: Union[float, np.ndarray] = 0.94
-                             ) -> np.ndarray:
-
-    t = returns.shape[0]  # time dimension
-    n = returns.shape[1]  # space dimension
-
-    # important to replace nans for @ operator
-    weights = np.where(np.isfinite(weights), weights, 0.0)
-    last_covar = np.zeros((n, n))
-    portfolio_vol = np.zeros(t)
-    if span is not None:
-        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-    ewm_lambda_1 = 1.0 - ewm_lambda
-    for idx in range(0, t):  # row in x
-        row = returns[idx]
-        r_ij = np.outer(row, row)
-        covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-        covar = np.where(np.isfinite(covar), covar, ewm_lambda*last_covar)
-        last_covar = covar
-        weights_t = np.ascontiguousarray(weights[idx])  # to remove NumbaPerformanceWarning warning
-        portfolio_vol[idx] = weights_t.T @ covar @ weights_t
-
-    return portfolio_vol
-
-
-def compute_portfolio_vol(returns: pd.DataFrame,
-                          weights: pd.DataFrame,
-                          span: Union[int, np.ndarray] = None,
-                          ewm_lambda: Union[float, np.ndarray] = 0.94,
-                          is_return_vol: bool = True,
-                          mean_adj_type: MeanAdjType = MeanAdjType.NONE,
-                          init_type: InitType = InitType.ZERO,
-                          annualize: bool = False,
-                          annualization_factor: float = None,
-                          nan_backfill: NanBackfill = NanBackfill.FFILL
-                          ) -> pd.Series:
-
-    # align index and columns
-    weights, returns = weights.align(other=returns, join='inner', method='ffill')
-    weights = weights.shift(1)
-
-    returns_np = npo.to_finite_np(data=returns, fill_value=0.0)
-    weights_np = npo.to_finite_np(data=weights, fill_value=0.0)
-
-    if mean_adj_type != MeanAdjType.NONE:
-        returns_np = compute_rolling_mean_adj(data=returns_np,
-                                              mean_adj_type=mean_adj_type,
-                                              span=span,
-                                              ewm_lambda=ewm_lambda,
-                                              init_type=init_type,
-                                              nan_backfill=nan_backfill)
-
-    portfolio_vol = compute_portfolio_vol_np(returns=returns_np,
-                                             weights=weights_np,
-                                             span=span,
-                                             ewm_lambda=ewm_lambda)
-
-    if annualize:
-        if annualization_factor is None:
-            if isinstance(weights, pd.DataFrame):
-                annualization_factor = da.infer_an_from_data(data=weights)
-            else:
-                warnings.warn(f"in compute_ewm: annualization_factor for np array, default is 1")
-                annualization_factor = 1.0
-
-        portfolio_vol = annualization_factor * portfolio_vol
-
-    if is_return_vol:
-        portfolio_vol = np.sqrt(portfolio_vol)
-
-    portfolio_vol = pd.Series(data=portfolio_vol, index=weights.index)
-
-    return portfolio_vol
 
 
 def compute_ewm_sharpe(returns: pd.DataFrame,

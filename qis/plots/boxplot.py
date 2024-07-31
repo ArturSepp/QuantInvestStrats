@@ -349,7 +349,6 @@ def df_boxplot_by_hue_var(df: Union[pd.Series, pd.DataFrame],
                                       y_var_name=y_var_name,
                                       hue_var_name=hue_var_name,
                                       hue_order=hue_order)
-    print(box_data)
     if colors is None:
         if is_heatmap_colors:
             a = np.nanmedian(df.to_numpy(), axis=0)
