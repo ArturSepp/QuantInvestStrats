@@ -18,8 +18,8 @@ benchmark_prices = yf.download(tickers=['SPY', 'TLT'], start=None, end=None, ign
 vix_portfolio = PortfolioData(nav=vix)
 
 # set timeperiod for analysis
-time_period = qis.TimePeriod('31Dec2019', None)
-perf_params = qis.PerfParams(freq='W-WED', freq_reg='ME', alpha_an_factor=12.0,
+time_period = qis.TimePeriod('31Dec2021', None)
+perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', alpha_an_factor=52.0,
                              rates_data=yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0)
 regime_params = qis.BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
@@ -34,7 +34,7 @@ with sns.axes_style("darkgrid"):
     qis.plot_prices(prices=prices,
                     perf_params=perf_params,
                     title='Log Performance',
-                    perf_stats_labels=qis.PerfStatsLabels.TOTAL_DETAILED.value,
+                    perf_stats_labels=qis.PerfStatsLabels.DETAILED_WITH_DD.value,
                     is_log=True,
                     ax=axs[0],
                     **kwargs)
@@ -56,7 +56,7 @@ with sns.axes_style("darkgrid"):
     factor_attribution = vix_portfolio.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
                                                                                factor_beta_span=span,
                                                                                time_period=time_period)
-    qis.plot_time_series(df=factor_attribution,
+    qis.plot_time_series(df=factor_attribution.cumsum(axis=0),
                          var_format='{:,.0%}',
                          legend_stats=qis.LegendStats.LAST,
                          title='VIX ETF return attribution to benchmark betas',
