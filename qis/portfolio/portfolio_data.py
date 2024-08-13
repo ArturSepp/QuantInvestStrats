@@ -64,7 +64,6 @@ class PortfolioData:
     ticker: str = None
 
     def __post_init__(self):
-
         if isinstance(self.nav, pd.DataFrame):
             self.nav = self.nav.iloc[:, 0]
         if self.prices is None:
@@ -304,7 +303,7 @@ class PortfolioData:
         if is_agg:
             turnover = pd.Series(np.nansum(turnover, axis=1), index=turnover.index, name=self.nav.name)
             turnover = turnover.reindex(index=self.nav.index)
-        elif is_grouped or len(turnover.columns) > 10:  # agg by groups
+        elif is_grouped:  # agg by groups
             turnover = dfg.agg_df_by_groups_ax1(df=turnover,
                                                 group_data=self.group_data,
                                                 agg_func=np.nansum,
@@ -364,7 +363,7 @@ class PortfolioData:
                                      volumes: pd.DataFrame,
                                      trade_level: float = 100000000
                                      ) -> pd.DataFrame:
-        turnover = self.get_turnover(is_agg=False)
+        turnover = self.get_turnover(is_agg=False, is_grouped=False)
         participation = trade_level * turnover.divide(volumes)
         return participation
 
@@ -712,7 +711,6 @@ class PortfolioData:
                            time_period: da.TimePeriod = None,
                            perf_params: PerfParams = None,
                            perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
-                           add_all_benchmarks_to_nav_figure: bool = False,
                            title: str = None,
                            ax: plt.Subplot = None,
                            **kwargs
@@ -722,9 +720,11 @@ class PortfolioData:
             group_navs = self.get_group_navs(time_period=time_period, is_add_group_total=False)
             prices = pd.concat([total_nav, group_navs], axis=1)
             for_title = 'with portfolio groups'
+            rows_edge_lines = [len(prices.columns)]
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
             for_title = ''
+            rows_edge_lines = None
         if benchmark_price is not None:
             if isinstance(benchmark_price, pd.DataFrame):  # bechmark is the last asset
                 if benchmark is None:
@@ -743,7 +743,8 @@ class PortfolioData:
                                              title=title,
                                              rotation_for_columns_headers=0,
                                              special_rows_colors=[(1, 'deepskyblue'),
-                                                                  (len(prices.columns), 'lavender')],
+                                                                  (len(prices.columns), 'lightskyblue')],
+                                             rows_edge_lines=rows_edge_lines,
                                              column_header='Portfolio',
                                              ax=ax,
                                              **kwargs)
@@ -768,7 +769,7 @@ class PortfolioData:
                              **kwargs
                              ) -> None:
         if is_grouped:
-            prices = self.get_group_navs(time_period=time_period)
+            prices = self.get_total_nav_with_group_navs(time_period=time_period)
             title = title or f"Scatterplot of {freq}-freq returns by groups vs {str(benchmark_price.name)}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
@@ -803,7 +804,7 @@ class PortfolioData:
                              **kwargs)
 
     def plot_periodic_returns(self,
-                              benchmark_prices: pd.DataFrame = None,
+                              benchmark_prices: Union[pd.DataFrame, pd.Series] = None,
                               is_grouped: bool = True,
                               time_period: da.TimePeriod = None,
                               heatmap_freq: str = 'YE',
@@ -820,7 +821,7 @@ class PortfolioData:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
             title = title or f"{heatmap_freq}-returns"
         if benchmark_prices is not None:
-            hline_rows = [len(prices.columns)]
+            hline_rows = [1, len(prices.columns)]
             prices = pd.concat([prices, benchmark_prices.reindex(index=prices.index, method='ffill')], axis=1)
         else:
             hline_rows = None
@@ -847,19 +848,20 @@ class PortfolioData:
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> plt.Figure:
+        regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
 
         if is_grouped:
-            prices = self.total_group_navs = self.get_total_nav_with_group_navs(time_period=time_period)
+            prices = self.get_total_nav_with_group_navs(time_period=time_period)
             title = title or (f"Sharpe ratio attribution by groups to {str(benchmark_price.name)} "
-                              f"Bear/Normal/Bull regimes")
+                              f"Bear/Normal/Bull regimes of {regime_classifier.regime_params.freq} returns")
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
-            title = title or f"Sharpe ratio attribution to {str(benchmark_price.name)} Bear/Normal/Bull regimes"
+            title = title or (f"Sharpe ratio attribution to {str(benchmark_price.name)} Bear/Normal/Bull regimes "
+                              f"of {regime_classifier.regime_params.freq} returns")
 
         if benchmark_price.name not in prices.columns:
             prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
 
-        regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
         fig = qis.plot_regime_data(regime_classifier=regime_classifier,
                                    prices=prices,
                                    benchmark=str(benchmark_price.name),
@@ -956,19 +958,27 @@ class PortfolioData:
     def plot_performance_attribution(self,
                                      time_period: da.TimePeriod = None,
                                      attribution_metric: AttributionMetric = AttributionMetric.PNL,
+                                     add_top_bar_values: Optional[bool] = None,
                                      ax: plt.Subplot = None,
                                      **kwargs
                                      ) -> None:
         data = self.get_performance_data(attribution_metric=attribution_metric, time_period=time_period)
+        if add_top_bar_values is None:
+            if isinstance(data, pd.Series) and len(data.index) <= 20:
+                add_top_bar_values = True
+            else:
+                add_top_bar_values = False
+
         kwargs = sop.update_kwargs(kwargs=kwargs,
-                                   new_kwargs={'bbox_to_anchor': (0.5, 1.05),
-                                               'x_rotation': 90})
+                                   new_kwargs=dict(bbox_to_anchor=(0.5, 1.05),
+                                                   add_top_bar_values=add_top_bar_values,
+                                                   x_rotation=90))
         data = data.replace({0.0: np.nan}).dropna()
         qis.plot_bars(df=data,
                       skip_y_axis=True,
                       title=f"{attribution_metric.title}",
                       stacked=False,
-                      yvar_format='{:,.2%}',
+                      yvar_format='{:,.1%}' if add_top_bar_values else '{:,.2%}',
                       ax=ax,
                       **kwargs)
 
@@ -1002,6 +1012,34 @@ class PortfolioData:
         if add_zero_line:
             ax.axhline(0, color='black', lw=1)
 
+    def compute_portfolio_vars(self,
+                               is_correlated: bool = True,
+                               time_period: TimePeriod = None,
+                               freq: str = 'B',
+                               total_column: Optional[str] = 'Total',
+                               vol_span: int = 31  # span in number of freq-returns
+                               ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+        if is_correlated:
+            portfolio_vars = qis.compute_portfolio_correlated_var_by_groups(prices=self.prices,
+                                                                            weights=self.get_weights(freq=freq),
+                                                                            group_data=self.group_data,
+                                                                            group_order=self.group_order,
+                                                                            freq=freq,
+                                                                            vol_span=vol_span,  # span in number of freq-returns
+                                                                            total_column=total_column,
+                                                                            time_period=time_period)
+            instrument_vars = None
+        else:
+            instrument_vars, portfolio_vars = qis.compute_portfolio_independent_var_by_ac(prices=self.prices,
+                                                                                          weights=self.get_weights(freq=freq),
+                                                                                          group_data=self.group_data,
+                                                                                          group_order=self.group_order,
+                                                                                          freq=freq,
+                                                                                          vol_span=vol_span,  # span in number of freq-returns
+                                                                                          total_column=total_column,
+                                                                                          time_period=time_period)
+        return portfolio_vars, instrument_vars
+
     def plot_portfolio_grouped_var(self,
                                    is_correlated: bool = True,
                                    regime_benchmark: str = None,
@@ -1014,27 +1052,15 @@ class PortfolioData:
                                    ax: plt.Subplot = None,
                                    **kwargs
                                    ) -> None:
-
+        portfolio_vars, instrument_vars = self.compute_portfolio_vars(is_correlated=is_correlated,
+                                                                      time_period=time_period,
+                                                                      freq=freq,
+                                                                      total_column=total_column,
+                                                                      vol_span=vol_span)
         if is_correlated:
-            title = title or f"Portfolio {freq}-freq correlated Var with {vol_span}-span ewma covar"
-            portfolio_vars = qis.compute_portfolio_correlated_var_by_ac(prices=self.prices,
-                                                                        weights=self.get_weights(freq=freq),
-                                                                        group_data=self.group_data,
-                                                                        group_order=self.group_order,
-                                                                        freq=freq,
-                                                                        vol_span=vol_span,  # span in number of freq-returns
-                                                                        total_column=total_column,
-                                                                        time_period=time_period)
+            title = title or f"Correlated {freq}-freq 99%-VAR with {vol_span}-span ewma covar"
         else:
-            title = title or f"Portfolio {freq}-freq independent Var with {vol_span}-span ewma vols"
-            instrument_vars, portfolio_vars = qis.compute_portfolio_independent_var_by_ac(prices=self.prices,
-                                                                                          weights=self.get_weights(freq=freq),
-                                                                                          group_data=self.group_data,
-                                                                                          group_order=self.group_order,
-                                                                                          freq=freq,
-                                                                                          vol_span=vol_span,  # span in number of freq-returns
-                                                                                          total_column=total_column,
-                                                                                          time_period=time_period)
+            title = title or f"Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols"
 
         qis.plot_time_series(df=portfolio_vars,
                              var_format='{:,.2%}',
@@ -1047,6 +1073,120 @@ class PortfolioData:
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=portfolio_vars.index,
                                     regime_params=regime_params)
+
+    def plot_current_weights(self,
+                             is_grouped: bool = False,
+                             add_top_bar_values: Optional[bool] = None,
+                             title: str = None,
+                             ax: plt.Subplot = None,
+                             **kwargs
+                             ) -> None:
+        weights = self.get_weights(is_input_weights=True, is_grouped=is_grouped)
+        weights_1 = weights.iloc[-1, :]
+        if add_top_bar_values is None:
+            if len(weights_1.index) <= 10:
+                add_top_bar_values = True
+            else:
+                add_top_bar_values = False
+        kwargs = sop.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None,
+                                                                  add_top_bar_values=add_top_bar_values,
+                                                                  x_rotation=90))
+        if title is None:
+            if is_grouped:
+                title = f"Current weights by groups on {qis.date_to_str(weights_1.name)}"
+            else:
+                title = f"Current weights by instruments on {qis.date_to_str(weights_1.name)}"
+        qis.plot_bars(df=weights_1,
+                      skip_y_axis=True,
+                      title=title,
+                      stacked=False,
+                      yvar_format='{:,.2%}' if add_top_bar_values else '{:,.2%}',
+                      ax=ax,
+                      **kwargs)
+
+    def plot_last_weights_change(self,
+                                 is_grouped: bool = False,
+                                 title: str = None,
+                                 add_top_bar_values: Optional[bool] = None,
+                                 ax: plt.Subplot = None,
+                                 **kwargs
+                                 ) -> None:
+        weights = self.get_weights(is_input_weights=True, is_grouped=is_grouped)
+        weights_1 = weights.iloc[-1, :]
+        if len(weights.index) > 1:
+            weights_0 = weights.iloc[-2, :]
+            delta = weights_1.subtract(weights_0)
+            post_title = f"rebalancing between {qis.date_to_str(weights_1.name)} and {qis.date_to_str(weights_0.name)}"
+        else:
+            delta = weights_1
+            post_title = f"rebalancing on {qis.date_to_str(weights_1.name)} starting from zero"
+        if add_top_bar_values is None:
+            if len(delta.index) <= 10:
+                add_top_bar_values = True
+            else:
+                add_top_bar_values = False
+        kwargs = sop.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None,
+                                                                  add_top_bar_values=add_top_bar_values,
+                                                                  x_rotation=90))
+        if title is None:
+            if is_grouped:
+                title = f"Change in weights by groups with {post_title}"
+            else:
+                title = f"Change in weights by instruments with {post_title}"
+        qis.plot_bars(df=delta,
+                      skip_y_axis=True,
+                      title=title,
+                      stacked=False,
+                      yvar_format='{:,.2%}' if add_top_bar_values else '{:,.2%}',
+                      ax=ax,
+                      **kwargs)
+
+    def plot_current_var(self,
+                         is_grouped: bool = False,
+                         is_correlated: bool = True,
+                         time_period: TimePeriod = None,
+                         freq: str = 'B',
+                         title: str = None,
+                         add_top_bar_values: Optional[bool] = None,
+                         total_column: Optional[str] = 'Total',
+                         vol_span: int = 31,  # span in number of freq-returns
+                         ax: plt.Subplot = None,
+                         **kwargs
+                         ) -> None:
+        portfolio_vars, instrument_vars = self.compute_portfolio_vars(is_correlated=is_correlated,
+                                                                      time_period=time_period,
+                                                                      freq=freq,
+                                                                      total_column=total_column,
+                                                                      vol_span=vol_span)
+        if is_grouped:
+            var_1 = portfolio_vars.iloc[-1, :]
+            if is_correlated:
+                title = title or f"Correlated {freq}-freq 99%-VAR with {vol_span}-span ewma covar on {qis.date_to_str(var_1.name)}"
+            else:
+                title = title or f"Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols on {qis.date_to_str(var_1.name)}"
+
+        else:
+            if is_correlated:
+                raise ValueError(f"instrument var is not defined for correlated var ")
+            else:
+                var_1 = instrument_vars.iloc[-1, :]
+                title = title or f"Instrument independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols on {qis.date_to_str(var_1.name)}"
+
+        if add_top_bar_values is None:
+            if len(var_1.index) <= 10:
+                add_top_bar_values = True
+            else:
+                add_top_bar_values = False
+        kwargs = sop.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None,
+                                                                  add_top_bar_values=add_top_bar_values,
+                                                                  x_rotation=90))
+        qis.plot_bars(df=var_1,
+                      skip_y_axis=True,
+                      title=title,
+                      stacked=False,
+                      yvar_format='{:,.2%}',
+                      ax=ax,
+                      **kwargs)
 
 @njit
 def compute_realized_pnl(prices: np.ndarray,

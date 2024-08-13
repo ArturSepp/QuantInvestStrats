@@ -37,6 +37,7 @@ class FactsheetConfig(NamedTuple):
     sharpe_freq: str = 'W-WED'
     sharpe_title: Optional[str] = None
     turnover_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
+    turnover_freq: str = 'B'   # daily freq
     turnover_title: Optional[str] = None
     cost_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
     cost_title: Optional[str] = None
@@ -72,6 +73,7 @@ FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
                                                             sharpe_freq='ME',
                                                             sharpe_title=None,
                                                             turnover_rolling_period=12,
+                                                            turnover_freq='ME',
                                                             turnover_title=None,
                                                             cost_rolling_period=12,
                                                             cost_title=None,

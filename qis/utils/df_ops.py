@@ -3,12 +3,11 @@ common pandas operations
 """
 # packages
 import warnings
-from enum import Enum
-from typing import Union, List, Optional, Dict, Tuple, Type, Any, Literal
-
 import numpy as np
 import pandas as pd
 from scipy import stats
+from typing import Union, List, Optional, Dict, Tuple, Type, Any, Literal
+from enum import Enum
 
 # qis
 import qis.utils.np_ops as npo

@@ -154,7 +154,7 @@ def add_bnb_regime_shadows(ax: plt.Subplot,
     for date_1, date in zip(regime_ids.index[:-1], regime_ids.index[1:]):
         ax.axvspan(xmin=date_1, xmax=date, alpha=alpha, color=regime_id_color[date], lw=0)
     if is_force_lim:
-        ax.set_xlim([price_data_index[0], regime_ids.index[-1]])
+        ax.set_xlim(price_data_index[0], regime_ids.index[-1])
 
 
 class UnitTests(Enum):

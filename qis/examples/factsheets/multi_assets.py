@@ -28,17 +28,17 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.CORE_ETFS:
         benchmark = 'SPY'
         tickers = [benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
-        time_period = qis.TimePeriod('31Dec2007', '31May2024')  # time period for reporting
+        time_period = qis.TimePeriod('31Dec2007', '12Aug2024')  # time period for reporting
 
     elif unit_test == UnitTests.BTC_SQQQ:
         benchmark = 'QQQ'
         tickers = [benchmark, 'BTC-USD', 'TQQQ', 'SQQQ']
-        time_period = qis.TimePeriod('31Dec2019', '31May2024')
+        time_period = qis.TimePeriod('31Dec2019', '12Aug2024')
 
     elif unit_test == UnitTests.HEDGED_ETFS:
         benchmark = 'SPY'
         tickers = [benchmark, 'SHY', 'LQDH', 'HYGH', 'FLOT']
-        time_period = qis.TimePeriod('27May2014', '31May2024')
+        time_period = qis.TimePeriod('27May2014', '12Aug2024')
 
     elif unit_test == UnitTests.BBG:
         benchmark = 'SPTR'
@@ -49,7 +49,7 @@ def run_unit_test(unit_test: UnitTests):
                    'MQQFUSAI Index': 'MerQube AI',
                    'CSRPAIS Index': 'CS RavenPack',
                    'CITIMSTR Index': 'Citi Grand'}
-        time_period = qis.TimePeriod('31Dec2019', '20Jun2024')
+        time_period = qis.TimePeriod('31Dec2019', '12Aug2024')
         from bbg_fetch import fetch_field_timeseries_per_tickers
         prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
         prices = prices.rename(tickers, axis=1)
@@ -62,7 +62,7 @@ def run_unit_test(unit_test: UnitTests):
                    'ER4 Comdty': 'EUR IR',
                    'IR4 Comdty': 'AUD IR',
                    'BA4 Comdty': 'CAD IR'}
-        time_period = qis.TimePeriod(start='02Apr1986', end='31Mar2023')
+        time_period = qis.TimePeriod(start='02Apr1986', end='12Aug2024')
         from bbg_fetch import fetch_field_timeseries_per_tickers
         prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
         prices = prices.rename(tickers, axis=1)
@@ -105,7 +105,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.HYG_ETFS
+    unit_test = UnitTests.CORE_ETFS
 
     is_run_all_tests = False
     if is_run_all_tests:

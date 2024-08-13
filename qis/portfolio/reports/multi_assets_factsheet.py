@@ -7,6 +7,7 @@ see example in qis.examples.multi_asset.py
 # packages
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from typing import Union, List, Optional, Tuple
 import qis as qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData, RollingPerfStat, LegendStats, BenchmarkReturnsQuantileRegimeSpecs
@@ -452,6 +453,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     qis.set_suptitle(fig=fig, title=factsheet_name, fontsize=8)
 
     report.plot_nav(regime_benchmark=benchmark,
+                    title=f"Cumulative performance with background colors using bear/normal/bull regimes of {benchmark} {regime_params.freq}-returns",
                     ax=fig.add_subplot(gs[:2, :2]),
                     **kwargs)
 
@@ -491,7 +493,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     report.plot_performance_bars(ax=fig.add_subplot(gs[0:2, 3]),
                                  perf_column=PerfStat.MAX_DD, **kwargs)
 
-    if len(prices.columns) >= 12:
+    if len(prices.columns) >= 8:
         report.plot_ra_perf_table(benchmark=benchmark,
                                   ax=fig.add_subplot(gs[2:4, 2:]),
                                   **kwargs)
@@ -528,9 +530,10 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                             ax=fig.add_subplot(gs[10:12, 2:]),
                             **kwargs)
     
-    report.plot_returns_scatter(benchmark=benchmark,
-                                ax=fig.add_subplot(gs[12:14, 2:]),
-                                freq=perf_params.freq_reg,
-                                **kwargs)
+    with sns.axes_style("whitegrid"):
+        report.plot_returns_scatter(benchmark=benchmark,
+                                    ax=fig.add_subplot(gs[12:14, 2:]),
+                                    freq=perf_params.freq_reg,
+                                    **kwargs)
 
     return fig

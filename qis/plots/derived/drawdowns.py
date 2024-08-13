@@ -1,3 +1,6 @@
+"""
+analytics for drawdowns
+"""
 # packages
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -70,20 +73,13 @@ def plot_rolling_time_under_water(prices: pd.DataFrame,
 
     max_dd_data, time_under_water = pt.compute_rolling_drawdown_time_under_water(prices=prices)
 
-    legend_labels = []
-    for column in time_under_water.columns:
-        avg, quant, nmax, last = pt.compute_avg_max_dd(ds=time_under_water[column], is_max=True)
-        legend_labels.append(f"{column}, mean={var_format.format(avg)}, "
-                             f"quantile_10%={var_format.format(quant)}, max={var_format.format(nmax)},"
-                             f" last={var_format.format(last)}")
-
     if dd_legend_type == DdLegendType.NONE:
         legend_loc = None
         legend_labels = None
     else:
         legend_labels = []
         for column in max_dd_data.columns:
-            avg, quant, nmax, last = pt.compute_avg_max_dd(ds=max_dd_data[column], is_max=False)
+            avg, quant, nmax, last = pt.compute_avg_max_dd(ds=time_under_water[column], is_max=True)
             if dd_legend_type == DdLegendType.SIMPLE:
                 legend_labels.append(f"{column}, max={var_format.format(nmax)}, last={var_format.format(last)}")
             elif dd_legend_type == DdLegendType.DETAILED:
@@ -129,7 +125,6 @@ def plot_top_drawdowns_paths(price: pd.Series,
         price_slices[name] = (price.loc[start:end] / peak - 1.0).reset_index(drop=True)
         points[name] = {trough: max_dd}
     price_slices = pd.DataFrame.from_dict(price_slices, orient='columns')
-    # price_slices = price_slices.dropna(axis=0, how='all')  # drop rows with all nans = business days
 
     n = len(price_slices.columns)
     colors, linestyles = put.get_n_colors(n=n), None
@@ -159,6 +154,7 @@ def plot_top_drawdowns_paths(price: pd.Series,
                                ax=ax,
                                **kwargs)
     return fig
+
 
 class UnitTests(Enum):
     DRAWDOWN_TS = 1

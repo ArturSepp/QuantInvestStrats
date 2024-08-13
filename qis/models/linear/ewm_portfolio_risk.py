@@ -101,16 +101,16 @@ def compute_portfolio_vol_np(returns: np.ndarray,
     return portfolio_vol
 
 
-def compute_portfolio_correlated_var_by_ac(prices: pd.DataFrame,
-                                           weights: pd.DataFrame,
-                                           group_data: Optional[pd.Series] = None,
-                                           group_order: List[str] = None,
-                                           total_column: Optional[str] = 'Total',
-                                           freq: Optional[str] = 'B',
-                                           vol_span: int = 31,  # span in number of freq-retunrs
-                                           time_period: da.TimePeriod = None,
-                                           mean_adj_type: MeanAdjType = MeanAdjType.NONE
-                                           ) -> pd.DataFrame:
+def compute_portfolio_correlated_var_by_groups(prices: pd.DataFrame,
+                                               weights: pd.DataFrame,
+                                               group_data: Optional[pd.Series] = None,
+                                               group_order: List[str] = None,
+                                               total_column: Optional[str] = 'Total',
+                                               freq: Optional[str] = 'B',
+                                               vol_span: int = 31,  # span in number of freq-retunrs
+                                               time_period: da.TimePeriod = None,
+                                               mean_adj_type: MeanAdjType = MeanAdjType.NONE
+                                               ) -> pd.DataFrame:
     """
     portfolio VAR accounting for correlations
     by the default var is max daily loss in bp

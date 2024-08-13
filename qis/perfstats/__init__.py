@@ -98,3 +98,6 @@ from qis.perfstats.timeseries_bfill import (
     df_price_fill_first_nan_by_cross_median,
     replace_nan_by_median
 )
+
+from qis.perfstats.fx_ops import (get_aligned_fx_spots,
+                                  compute_futures_fx_adjusted_returns)

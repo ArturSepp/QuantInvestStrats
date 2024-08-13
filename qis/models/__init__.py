@@ -47,7 +47,7 @@ from qis.models.linear.ewm import (
 )
 
 from qis.models.linear.ewm_portfolio_risk import (compute_portfolio_vol,
-                                                  compute_portfolio_correlated_var_by_ac,
+                                                  compute_portfolio_correlated_var_by_groups,
                                                   compute_portfolio_independent_var_by_ac)
 
 from qis.models.linear.ewm_convolution import ConvolutionType, SignalAggType, ewm_xy_convolution

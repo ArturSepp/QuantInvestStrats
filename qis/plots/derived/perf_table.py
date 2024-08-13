@@ -118,6 +118,7 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  perf_params: PerfParams = None,
                                  perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                                  special_columns_colors: List[Tuple[int, str]] = ((0, 'skyblue'),),
+                                 special_rows_colors: List[Tuple[int, str]] = None,
                                  column_header: str = 'Asset',
                                  fontsize: int = 10,
                                  transpose: bool = False,
@@ -138,9 +139,9 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                                   alpha_an_factor=alpha_an_factor,
                                                   **kwargs)
     if is_fig_out:
-        if not drop_benchmark:
+        if not drop_benchmark and special_rows_colors is None:
             special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
-            kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
+        kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
         return ptb.plot_df_table(df=ra_perf_table,
                                  transpose=transpose,
                                  special_columns_colors=special_columns_colors,
@@ -350,8 +351,9 @@ def plot_desc_freq_table(df: pd.DataFrame,
 
 
 def plot_top_bottom_performers(prices: pd.DataFrame,
-                               yvar_format: str = '{:.0%}',
+                               yvar_format: str = '{:.2%}',
                                num_assets: int = None,
+                               add_bar_values: Optional[bool] = False,
                                ax: plt.Subplot = None,
                                **kwargs
                                ) -> Optional[plt.Subplot]:
@@ -365,6 +367,7 @@ def plot_top_bottom_performers(prices: pd.DataFrame,
                     skip_y_axis=True,
                     legend_loc=None,
                     x_rotation=90,
+                    add_bar_values=add_bar_values,
                     yvar_format=yvar_format,
                     ax=ax,
                     **kwargs)

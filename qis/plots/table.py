@@ -209,11 +209,11 @@ def plot_df_table(df: pd.DataFrame,
 
     if rows_edge_lines is not None:
         for rows_edge_line in rows_edge_lines:
-            ax.axhline(y=rows_edge_line, color='black', alpha=0.5*alpha)
+            ax.axhline(y=rows_edge_line, color='black', alpha=0.5*alpha, lw=0.75)
 
     if columns_edge_lines is not None:
         for columns_edge_line in columns_edge_lines:
-            ax.axvline(x=columns_edge_line[0], color=columns_edge_line[1], alpha=0.5*alpha)
+            ax.axvline(x=columns_edge_line[0], color=columns_edge_line[1], alpha=0.5*alpha, lw=0.75)
             # set_column_edge_color(mpl_table, column=columns_edge_line[0], color=columns_edge_line[1])
 
     if title is not None:

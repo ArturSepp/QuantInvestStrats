@@ -283,10 +283,8 @@ def subplot_border(fig: plt.Figure,
     """
     draw border for a figure with multiple subplots
     """
-
     n_ax1 = nrows
     n_ax2 = ncols
-
     rects = []
     height = 1.0 / n_ax1
     for r in range(n_ax1):
@@ -378,7 +376,7 @@ def set_y_limits(ax: plt.Subplot,
         ymin = y_limits[0]
     if y_limits[1] is not None:
         ymax = y_limits[1]
-    ax.set_ylim([ymin, ymax])
+    ax.set_ylim(ymin, ymax)
 
 
 def set_x_limits(ax: plt.Subplot,
@@ -389,7 +387,7 @@ def set_x_limits(ax: plt.Subplot,
         xmin = x_limits[0]
     if x_limits[1] is not None:
         xmax = x_limits[1]
-    ax.set_xlim([xmin, xmax])
+    ax.set_xlim(xmin, xmax)
 
 
 def align_xy_limits(ax: plt.Subplot) -> None:
@@ -397,8 +395,8 @@ def align_xy_limits(ax: plt.Subplot) -> None:
     ymin, ymax = ax.get_ylim()
     xy_min = np.minimum(xmin, ymin)
     xy_max = np.maximum(xmax, ymax)
-    ax.set_xlim([xy_min, xy_max])
-    ax.set_ylim([xy_min, xy_max])
+    ax.set_xlim(xy_min, xy_max)
+    ax.set_ylim(xy_min, xy_max)
 
 
 def align_y_limits_ax12(ax1: plt.Subplot,
@@ -416,8 +414,8 @@ def align_y_limits_ax12(ax1: plt.Subplot,
     if ymax is None:
         ymax = np.maximum(ymax1, ymax2)
 
-    ax1.set_ylim([ymin, ymax])
-    ax2.set_ylim([ymin, ymax])
+    ax1.set_ylim(ymin, ymax)
+    ax2.set_ylim(ymin, ymax)
 
     if is_invisible_x_ax1:
         ax1.axes.get_xaxis().set_visible(False)
@@ -437,7 +435,7 @@ def align_y_limits_axs(axs: List[plt.Subplot],
     ymin = np.min(ymins)
     ymax = np.max(ymaxs)
     for ax in axs:
-        ax.set_ylim([ymin, ymax])
+        ax.set_ylim(ymin, ymax)
 
     if is_invisible_ys:
         for idx, ax in enumerate(axs):
@@ -456,8 +454,8 @@ def align_x_limits_ax12(ax1: plt.Subplot,
     xmin2, xmax2 = ax2.get_xlim()
     xmin = np.minimum(xmin1, xmin2)
     xmax = np.maximum(xmax1, xmax2)
-    ax1.set_xlim([xmin, xmax])
-    ax2.set_xlim([xmin, xmax])
+    ax1.set_xlim(xmin, xmax)
+    ax2.set_xlim(xmin, xmax)
 
     if is_invisible_x_ax1:
         ax1.axes.get_xaxis().set_visible(False)
@@ -477,7 +475,7 @@ def align_x_limits_axs(axs: List[plt.Subplot],
     xmin = np.min(xmins)
     xmax = np.max(xmaxs)
     for ax in axs:
-        ax.set_xlim([xmin, xmax])
+        ax.set_xlim(xmin, xmax)
 
     if is_invisible_xs:
         for idx, ax in enumerate(axs):

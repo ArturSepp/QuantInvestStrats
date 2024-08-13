@@ -195,8 +195,8 @@ def plot_scatter(df: pd.DataFrame,
         xmin, xmax = ax.get_xlim()
         min = ymin if ymin < xmin else xmin
         max = ymax if ymax > xmax else xmax
-        ax.set_xlim([min, max])
-        ax.set_ylim([min, max])
+        ax.set_xlim(min, max)
+        ax.set_ylim(min, max)
         x = np.linspace(*ax.get_xlim())
         ax.plot(x, x, color='black', lw=1, linestyle='--')
 

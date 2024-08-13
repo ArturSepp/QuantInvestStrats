@@ -126,7 +126,8 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.ROLLING_STATS:
 
         for rolling_perf_stat in RollingPerfStat:
-            stats = compute_rolling_perf_stat(prices=prices, rolling_perf_stat=rolling_perf_stat,
+            stats = compute_rolling_perf_stat(prices=prices,
+                                              rolling_perf_stat=rolling_perf_stat,
                                               roll_freq='W-WED',
                                               roll_periods=5*52)
             pts.plot_time_series(df=stats,

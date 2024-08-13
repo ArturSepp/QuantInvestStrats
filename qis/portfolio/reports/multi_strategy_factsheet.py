@@ -60,7 +60,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                   regime_benchmark=regime_benchmark,
                                   perf_params=perf_params,
                                   regime_params=regime_params,
-                                  title='Cumulative performance',
+                                  title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_params.freq}-returns",
                                   **kwargs)
 
     multi_portfolio_data.plot_drawdowns(ax=fig.add_subplot(gs[1, :2]),

@@ -105,6 +105,7 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
 
     else:
         alphas_df = None
+        last_alpha = None
 
     # attribution
     strategy_attrib_last = strategy_pnl.iloc[-1, :].rename(f"{strategy_name} last")
@@ -130,18 +131,17 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
     inst_vol = np.sqrt(np.diag(covar))
     tre_vol = np.abs(delta_w.T) @ np.diag(inst_vol)
     tre_contrib = delta_w.T @ covar
-    tre_table = last_alpha.copy().to_frame('alpha')
+    tre_table = alphas_df.copy().to_frame('alpha')
     tre_table['weight diff'] = delta_w
     tre_table['tre (vol)'] = tre_vol
     # tre_table['tre contrib'] = tre_contrib
     # tre_table['tre_rel %'] = tre_contrib / (delta_w.T @ covar @ delta_w)
-    tre_table['IR per vol bp'] = delta_w*last_alpha / (inst_vol)
-    tre_table.loc['Total', :] = np.nansum(tre_table, axis=0)
-    tre_table.loc['Total', 'alpha'] = delta_w.T @ last_alpha
-    tre_table.loc['Total', 'tre (vol)'] = np.sqrt(delta_w.T @ covar @ delta_w)
-
-    print(tre_table)
-
+    if last_alpha is not None:
+        tre_table['IR per vol bp'] = delta_w*last_alpha / (inst_vol)
+        tre_table.loc['Total', :] = np.nansum(tre_table, axis=0)
+        tre_table.loc['Total', 'alpha'] = delta_w.T @ last_alpha
+        tre_table.loc['Total', 'tre (vol)'] = np.sqrt(delta_w.T @ covar @ delta_w)
+        print(tre_table)
 
     # 1. weights table
     b_weights1 = p.Block([p.Paragraph(f"Instrument weights for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),

@@ -124,10 +124,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
 
     else:
 
-        ax.set_xticklabels(ax.get_xticklabels(),
-                           fontsize=fontsize,
-                           rotation=x_rotation,
-                           minor=False)
+        # ax.set_xticklabels(ax.get_xticklabels(), fontsize=fontsize, rotation=x_rotation, minor=False)
         put.set_ax_tick_params(ax=ax, fontsize=fontsize)
         put.set_ax_tick_labels(ax=ax, x_rotation=x_rotation, fontsize=fontsize)
 

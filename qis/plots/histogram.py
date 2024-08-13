@@ -169,7 +169,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                 color='black',
                 lw=1, linestyle='--')
         ymin, ymax = ax.get_ylim()
-        ax.set_ylim([0.0, ymax])
+        ax.set_ylim(0.0, ymax)
 
     if y_limits is not None:
         put.set_y_limits(ax=ax, y_limits=y_limits)

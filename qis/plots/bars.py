@@ -36,6 +36,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               totals: List[float] = None,
               is_top_totals: bool = False,
               totals_offset: Tuple[float, float] = (2.55, 5),
+              series_color: str = 'lightblue',
               colors: List[str] = None,
               legend_labels: List[str] = None,
               legend_colors: List[str] = None,
@@ -63,13 +64,13 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
 
     if colors is None:
         if isinstance(df, pd.Series):
-            n = 1
+            colors = [series_color]
         else:
             if stacked:
                 n = len(df.columns)
             else:
                 n = len(df.index)
-        colors = put.get_n_colors(n=n, **kwargs)
+            colors = put.get_n_colors(n=n, **kwargs)
 
     # use str for dates with plot.bar
     if isinstance(df.index, pd.DatetimeIndex) and isinstance(df, pd.Series):
@@ -131,7 +132,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
     if totals is not None:
         if is_top_totals:
             ymin, ymax = ax.get_ylim()
-            ax.set_ylim([ymin, ymax * 1.1])
+            ax.set_ylim(ymin, ymax * 1.1)
 
         for total, x_loc, x_min, x_max in zip(totals, x_locs, x_mins, x_maxs):
             label = yvar_format.format(total)
@@ -194,7 +195,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         ax.invert_yaxis()  # labels read top-to-bottom
     else:
         ax.set_xticks(np.arange(len(df.index)), labels=df.index.to_list())
-        ax.axhline(0, color='black', lw=1)
+        ax.axhline(0, color='black', lw=0.5)
 
     if y_limits is not None:
         put.set_y_limits(ax=ax, y_limits=y_limits)
@@ -339,7 +340,7 @@ def plot_vbars(df: pd.DataFrame,
     if xmin_shift is not None:
         xmin, xmax = ax.get_xlim()
         xmin_ = xmin + xmin_shift
-        ax.set_xlim([xmin_, xmax])
+        ax.set_xlim(xmin_, xmax)
 
     if add_total_bar:
         for idx, total in enumerate(totals):

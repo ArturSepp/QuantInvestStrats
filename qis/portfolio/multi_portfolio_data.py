@@ -429,6 +429,7 @@ class MultiPortfolioData:
                       time_period: TimePeriod = None,
                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                       turnover_rolling_period: Optional[int] = 260,
+                      turnover_freq: Optional[str] = 'B',
                       turnover_title: Optional[str] = None,
                       var_format: str = '{:.0%}',
                       ax: plt.Subplot = None,
@@ -436,7 +437,7 @@ class MultiPortfolioData:
 
         turnover = []
         for portfolio in self.portfolio_datas:
-            turnover.append(portfolio.get_turnover(roll_period=None, is_agg=True).rename(portfolio.nav.name))
+            turnover.append(portfolio.get_turnover(roll_period=None, freq=turnover_freq, is_agg=True).rename(portfolio.nav.name))
         turnover = pd.concat(turnover, axis=1)
         if turnover_rolling_period is not None:
             turnover = turnover.rolling(turnover_rolling_period).sum()

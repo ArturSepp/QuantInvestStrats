@@ -76,7 +76,8 @@ from qis.utils.df_groups import (
     fill_df_with_group_avg,
     get_group_dict,
     sort_df_by_index_group,
-    split_df_by_groups
+    split_df_by_groups,
+    set_group_loadings
 )
 
 from qis.utils.df_melt import (
