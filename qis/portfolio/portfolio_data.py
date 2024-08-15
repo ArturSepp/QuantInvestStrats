@@ -210,6 +210,12 @@ class PortfolioData:
         prices = pd.concat([total_nav, group_navs], axis=1)
         return prices
 
+    def get_input_weights(self, time_period: TimePeriod = None) -> Union[np.ndarray, pd.DataFrame, Dict[str, float]]:
+        input_weights = self.input_weights.copy()
+        if time_period is not None and isinstance(input_weights, pd.DataFrame):
+            input_weights = time_period.locate(input_weights)
+        return input_weights
+
     def get_weights(self,
                     is_input_weights: bool = False,
                     columns: List[str] = None,
@@ -1081,7 +1087,7 @@ class PortfolioData:
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> None:
-        weights = self.get_weights(is_input_weights=True, is_grouped=is_grouped)
+        weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped)
         weights_1 = weights.iloc[-1, :]
         if add_top_bar_values is None:
             if len(weights_1.index) <= 10:
@@ -1111,7 +1117,7 @@ class PortfolioData:
                                  ax: plt.Subplot = None,
                                  **kwargs
                                  ) -> None:
-        weights = self.get_weights(is_input_weights=True, is_grouped=is_grouped)
+        weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped)
         weights_1 = weights.iloc[-1, :]
         if len(weights.index) > 1:
             weights_0 = weights.iloc[-2, :]
@@ -1178,7 +1184,7 @@ class PortfolioData:
             else:
                 add_top_bar_values = False
         kwargs = sop.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None,
-                                                                  add_top_bar_values=add_top_bar_values,
+                                                                  add_bar_values=add_top_bar_values,
                                                                   x_rotation=90))
         qis.plot_bars(df=var_1,
                       skip_y_axis=True,

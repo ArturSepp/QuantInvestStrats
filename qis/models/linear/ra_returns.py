@@ -19,6 +19,7 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
                        vol_target: Optional[float] = 0.12,
                        span: Optional[int] = None,
                        weight_lag: Optional[int] = 1,
+                       mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE,
                        is_log_returns_to_arithmetic: bool = True  # typically log-return are passed to vol computations
                        ) -> Tuple[Union[pd.Series, pd.DataFrame], Union[pd.Series, pd.DataFrame], Union[pd.Series, pd.DataFrame]]:
 
@@ -33,7 +34,7 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
 
     ewm_vol = ewm.compute_ewm_vol(data=returns,
                                   ewm_lambda=ewm_lambda,
-                                  mean_adj_type=ewm.MeanAdjType.NONE,
+                                  mean_adj_type=mean_adj_type,
                                   annualize=annualize)
 
     weights = npo.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
@@ -59,10 +60,13 @@ def compute_ewm_long_short_filtered_ra_returns(returns: pd.DataFrame,
                                                long_span: Union[int, np.ndarray] = 63,
                                                short_span: Optional[Union[int, np.ndarray]] = 5,
                                                warmup_period: Optional[Union[int, np.ndarray]] = 21,
-                                               weight_lag: Optional[int] = 1
+                                               weight_lag: Optional[int] = 1,
+                                               mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE
                                                ) -> pd.DataFrame:
     if vol_span is not None:
-        ra_returns, _, _ = compute_ra_returns(returns=returns, span=vol_span, vol_target=None, weight_lag=weight_lag)
+        ra_returns, _, _ = compute_ra_returns(returns=returns, span=vol_span, vol_target=None,
+                                              mean_adj_type=mean_adj_type,
+                                              weight_lag=weight_lag)
     else:
         ra_returns = returns
     filter = ewm.compute_ewm_long_short_filter(data=ra_returns,
@@ -344,4 +348,3 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-

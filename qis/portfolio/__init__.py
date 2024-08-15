@@ -1,4 +1,8 @@
 
+from qis.portfolio.ewm_portfolio_risk import (compute_portfolio_vol,
+                                              compute_portfolio_correlated_var_by_groups,
+                                              compute_portfolio_independent_var_by_ac)
+
 from qis.portfolio.reports.config import (FactsheetConfig,
                                           FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD,
                                           FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD,
