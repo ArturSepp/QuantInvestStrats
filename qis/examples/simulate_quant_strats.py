@@ -235,7 +235,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.SPY_SIMULATION:
         prices = yf.download(tickers=['SPY'], start=None, end=None)['Adj Close'].rename('SPY').dropna()
-        time_period = qis.TimePeriod('31Dec1999', '29Dec2022')
+        time_period = qis.TimePeriod('31Dec2019', '15Aug2024')
         figs = create_time_series_report(prices=prices, time_period=time_period, vol_target=0.15, vol_af=260)
         fu.save_figs_to_pdf(figs=figs, file_name='spy_analysis', orientation='landscape',
                             add_current_date=True, local_path=None)

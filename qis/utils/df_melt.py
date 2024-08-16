@@ -19,19 +19,17 @@ def melt_scatter_data_with_xvar(df: pd.DataFrame,
     column with xvar_str will be repeated to melted y_column
     index is ignored
     """
+    df = df.dropna()
     ex_benchmark_data = df.drop(xvar_str, axis=1)
-
     scatter_data = pd.melt(df,
                            value_vars=ex_benchmark_data.columns,
                            id_vars=[xvar_str],
                            var_name=hue_name,
                            value_name=y_column)
-
     # move hue to last position
     columns_ex_hue = scatter_data.columns.to_list()
     columns_ex_hue.remove(hue_name)
     scatter_data = scatter_data[columns_ex_hue+[hue_name]]
-
     return scatter_data
 
 

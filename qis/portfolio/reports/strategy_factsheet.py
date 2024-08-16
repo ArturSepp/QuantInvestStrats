@@ -29,7 +29,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 beta_freq: str = 'W-WED',
                                 factor_beta_title: Optional[str] = None,
                                 factor_attribution_title: Optional[str] = None,
-                                add_all_benchmarks_to_nav_figure: bool = False,
+                                add_benchmarks_to_navs: bool = False,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
                                 add_current_position_var_risk_sheet: bool = True,
@@ -62,7 +62,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # prices
     portfolio_nav = portfolio_data.get_portfolio_nav(time_period=time_period)
-    if add_all_benchmarks_to_nav_figure:
+    if add_benchmarks_to_navs:
         benchmark_prices_ = benchmark_prices
     else:
         benchmark_prices_ = benchmark_prices[regime_benchmark]
@@ -155,7 +155,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # ra perf table
-    if add_all_benchmarks_to_nav_figure:
+    if add_benchmarks_to_navs:
         benchmark_price1 = benchmark_prices
     else:
         benchmark_price1 = benchmark_prices[regime_benchmark]
@@ -311,7 +311,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[6:8, 2:]),
                                                 benchmark_price=benchmark_prices.iloc[:, 0],
                                                 time_period=time_period,
-                                                freq=regime_params.freq,
+                                                freq=perf_params.freq_reg,
                                                 is_grouped=is_grouped,
                                                 **kwargs)
 
@@ -320,7 +320,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                 portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[8:10, 2:]),
                                                     benchmark_price=benchmark_prices.iloc[:, 1],
                                                     time_period=time_period,
-                                                    freq=regime_params.freq,
+                                                    freq=perf_params.freq_reg,
                                                     is_grouped=is_grouped,
                                                     **kwargs)
 

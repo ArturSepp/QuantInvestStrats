@@ -641,26 +641,29 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series] = None,
                                              freq=freq,
                                              include_start_date=include_start_date,
                                              include_end_date=include_end_date)
-
-    all_dates_indicators = pd.Series(data=True, index=dates_schedule)  # all indicators
-
-    # on time grid
-    indicators_on_grid = all_dates_indicators.reindex(index=index).dropna()
-
-    # off time grid
-    indicators_off_grid = all_dates_indicators.iloc[np.isin(all_dates_indicators.index, indicators_on_grid.index) == False]
-    next_dates_off_grid = pd.Series(index, index=index).reindex(index=indicators_off_grid.index, method='bfill')
-    indicators_off_grid = pd.Series(data=True, index=next_dates_off_grid.to_numpy())
-
-    indicators_on_grid = pd.concat([indicators_on_grid, indicators_off_grid], axis=0).sort_index()
-
-    indicators_full = pd.Series(data=np.where(np.isin(index, indicators_on_grid.index), True, False), index=index)
-
+    indicators_full = set_rebalancing_timeindex_on_given_timeindex(given_index=index, rebalancing_index=dates_schedule)
     if num_warmup_periods is not None:
         indicators_full.iloc[:num_warmup_periods] = False
 
     return indicators_full
 
+
+def set_rebalancing_timeindex_on_given_timeindex(given_index: pd.DatetimeIndex,
+                                                 rebalancing_index: pd.DatetimeIndex
+                                                 ) -> pd.Series:
+    """
+    place rebalancing pd.DatetimeIndex on available or next valin
+    """
+    all_dates_indicators = pd.Series(data=True, index=rebalancing_index)  # all indicators
+    # on time grid
+    indicators_on_grid = all_dates_indicators.reindex(index=given_index).dropna()
+    # off time grid
+    indicators_off_grid = all_dates_indicators.iloc[np.isin(all_dates_indicators.index, indicators_on_grid.index) == False]
+    next_dates_off_grid = pd.Series(given_index, index=given_index).reindex(index=indicators_off_grid.index, method='bfill')
+    indicators_off_grid = pd.Series(data=True, index=next_dates_off_grid.to_numpy())
+    indicators_on_grid = pd.concat([indicators_on_grid, indicators_off_grid], axis=0).sort_index()
+    indicators_full = pd.Series(data=np.where(np.isin(given_index, indicators_on_grid.index), True, False), index=given_index)
+    return indicators_full
 
 def generate_sample_dates(time_period: TimePeriod,
                           freq: str = 'ME',

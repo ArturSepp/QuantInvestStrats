@@ -478,7 +478,7 @@ def run_unit_test(unit_test: UnitTests):
     prices = load_etf_data().dropna()
 
     if unit_test == UnitTests.PRICES:
-        fig, axs = plt.subplots(2, 1, figsize=(8, 6))
+        fig, axs = plt.subplots(2, 1, figsize=(8, 6), tight_layout=True)
         global_kwargs = {'fontsize': 8,
                          'linewidth': 0.5,
                          'weight': 'normal',
@@ -497,7 +497,7 @@ def run_unit_test(unit_test: UnitTests):
                          **global_kwargs)
 
     elif unit_test == UnitTests.PRICES_2AX:
-        fig, ax = plt.subplots(1, 1, figsize=(4, 3))
+        fig, ax = plt.subplots(1, 1, figsize=(4, 3), tight_layout=True)
         global_kwargs = {'fontsize': 6,
                          'linewidth': 0.5,
                          'weight': 'normal',

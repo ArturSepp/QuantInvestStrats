@@ -22,6 +22,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        regime_benchmark: str = None,
                                        backtest_name: str = None,
                                        heatmap_freq: str = 'YE',
+                                       add_benchmarks_to_navs: bool = False,
                                        figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                        group_data: pd.Series = None,
                                        add_group_exposures_and_pnl: bool = False,
@@ -60,6 +61,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                   regime_benchmark=regime_benchmark,
                                   perf_params=perf_params,
                                   regime_params=regime_params,
+                                  add_benchmarks_to_navs=add_benchmarks_to_navs,
                                   title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_params.freq}-returns",
                                   **kwargs)
 
@@ -67,7 +69,8 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                         time_period=time_period,
                                         regime_benchmark=regime_benchmark,
                                         regime_params=regime_params,
-                                        dd_legend_type=qis.DdLegendType.DETAILED,
+                                        dd_legend_type=qis.DdLegendType.SIMPLE,
+                                        add_benchmarks_to_navs=add_benchmarks_to_navs,
                                         title='Running Drawdowns',
                                         **kwargs)
 
@@ -75,6 +78,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                        time_period=time_period,
                                                        regime_benchmark=regime_benchmark,
                                                        regime_params=regime_params,
+                                                       add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                        title='Rolling time under water',
                                                        **kwargs)
 
@@ -82,6 +86,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                            time_period=time_period,
                                            regime_benchmark=regime_benchmark,
                                            regime_params=regime_params,
+                                           add_benchmarks_to_navs=add_benchmarks_to_navs,
                                            **kwargs)
 
     multi_portfolio_data.plot_exposures(ax=fig.add_subplot(gs[4, :2]),
@@ -107,12 +112,14 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                perf_params=perf_params,
                                                perf_column=PerfStat.SHARPE_RF0,
                                                time_period=time_period,
+                                               add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     multi_portfolio_data.plot_performance_bars(ax=fig.add_subplot(gs[0, 3]),
                                                perf_params=perf_params,
                                                perf_column=PerfStat.MAX_DD,
                                                time_period=time_period,
+                                               add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     multi_portfolio_data.plot_ra_perf_table(ax=fig.add_subplot(gs[1, 2:]),
@@ -124,6 +131,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                heatmap_freq=heatmap_freq,
                                                title=f"{heatmap_freq} returns",
                                                time_period=time_period,
+                                               add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     """
@@ -135,6 +143,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     multi_portfolio_data.plot_corr_table(ax=fig.add_subplot(gs[3, 2:]),
                                          time_period=time_period,
                                          freq=perf_params.freq,
+                                         add_benchmarks_to_navs=add_benchmarks_to_navs,
                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     if len(multi_portfolio_data.benchmark_prices.columns) > 1:
@@ -173,7 +182,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
         multi_portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[5, 2:]),
                                                   time_period=time_period,
                                                   benchmark=multi_portfolio_data.benchmark_prices.columns[0],
-                                                  **kwargs)
+                                                  **qis.update_kwargs(kwargs, dict(freq=perf_params.freq_reg)))
 
         multi_portfolio_data.plot_factor_betas(axs=[fig.add_subplot(gs[6, 2:])],
                                                time_period=time_period,

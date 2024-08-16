@@ -257,10 +257,8 @@ class MultiAssetsReport:
         else:
             factor_beta_title = factor_beta_title or f"{factor_beta_span}-period rolling Beta of {beta_freq}-freq returns to {benchmark}"
 
-        ewm_linear_model = qis.estimate_ewm_linear_model(x=returns[benchmark].to_frame(),
-                                                         y=returns.drop(benchmark, axis=1),
-                                                         span=factor_beta_span,
-                                                         is_x_correlated=True)
+        ewm_linear_model = qis.EwmLinearModel(x=returns[benchmark].to_frame(), y=returns.drop(benchmark, axis=1))
+        ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
         ewm_linear_model.plot_factor_loadings(factor=benchmark,
                                               time_period=time_period,
                                               title=factor_beta_title,
@@ -277,10 +275,8 @@ class MultiAssetsReport:
                                          ax: plt.Subplot = None,
                                          **kwargs) -> None:
         returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=beta_freq)
-        ewm_linear_model = qis.estimate_ewm_linear_model(x=returns[benchmark].to_frame(),
-                                                         y=returns.drop(benchmark, axis=1),
-                                                         span=factor_beta_span,
-                                                         is_x_correlated=True)
+        ewm_linear_model = qis.EwmLinearModel(x=returns[benchmark].to_frame(), y=returns.drop(benchmark, axis=1))
+        ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
         factor_alpha, explained_returns = ewm_linear_model.get_factor_alpha()
         if time_period is not None:
             factor_alpha = time_period.locate(factor_alpha)

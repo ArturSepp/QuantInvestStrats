@@ -5,6 +5,7 @@ implementation of multi factor ewm model
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Literal
 from enum import Enum
 
@@ -17,23 +18,20 @@ from qis.models.linear.ewm import MeanAdjType, InitType
 from qis import TimePeriod
 
 
+@dataclass
 class LinearModel:
     """
     core class to store and process of data for different linear signals of shape:
     y =  loadings^T @ x
     """
-    def __init__(self,
-                 x: pd.DataFrame,  # t, x_n factors
-                 y: pd.DataFrame,  # t, y_m factors
-                 loadings: Dict[str, pd.DataFrame],
-                 ):
+    x: pd.DataFrame  # t, x_n factors
+    y: pd.DataFrame  # t, y_m factors
+    loadings: Dict[str, pd.DataFrame] = None  # estimated factor loadings
 
-        str_factors = list(loadings.keys())
-        assert str_factors == x.columns.to_list()
-
-        self.x = x
-        self.y = y
-        self.loadings = loadings
+    def __post_init__(self):
+        if self.loadings is not None:
+            str_factors = list(self.loadings.keys())
+            assert str_factors == x.columns.to_list()
 
     def print(self):
         print(f"x:\n{self.x}")
@@ -123,56 +121,59 @@ class LinearModel:
                              ax=ax, **kwargs)
 
 
-def estimate_ewm_linear_model(x: pd.DataFrame,
-                              y: pd.DataFrame,
-                              span: Optional[int] = 31,
-                              ewm_lambda: float = 0.94,
-                              is_x_correlated: bool = True,
-                              mean_adj_type: MeanAdjType = MeanAdjType.NONE,
-                              init_type: InitType = InitType.MEAN
-                              ) -> LinearModel:
-
+class EwmLinearModel(LinearModel):
     """
-    estimate time series ewm betas
-    factor_returns is factors returns data: T*M
-    asset_returns is asset returns data: T*N
-    return type is {factor_returns.columns: factor of asset_returns T*N}
-
-    is_independent specifies the asset_returns covar structure
-    is_x_correlated:
-    True = x covariance is orthogonal with ewm_covar being diagonal matrix
-    False = x covariance is ewm covariance with ewm_covar being full matrix
-
-    ewm betas = (ewm_covar[x, x]^{-1}) @ (ewm_covar[x, y])
+    implementation for ewma model
     """
-    if span is not None:
-        ewm_lambda = 1.0 - 2.0/(span+1.0)
-    if mean_adj_type != MeanAdjType.NONE:
-        x = ewm.compute_rolling_mean_adj(data=x,
-                                         mean_adj_type=mean_adj_type,
-                                         ewm_lambda=ewm_lambda,
-                                         init_type=init_type)
+    def fit(self,
+            span: Optional[int] = 31,
+            ewm_lambda: float = 0.94,
+            is_x_correlated: bool = True,
+            mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+            init_type: InitType = InitType.MEAN
+            ) -> None:
+        """
+        estimate time series ewm betas
+        factor_returns is factors returns data: T*M
+        asset_returns is asset returns data: T*N
+        return type is {factor_returns.columns: factor of asset_returns T*N}
 
-        y = ewm.compute_rolling_mean_adj(data=y,
-                                         mean_adj_type=mean_adj_type,
-                                         ewm_lambda=ewm_lambda,
-                                         init_type=init_type)
+        is_independent specifies the asset_returns covar structure
+        is_x_correlated:
+        True = x covariance is orthogonal with ewm_covar being diagonal matrix
+        False = x covariance is ewm covariance with ewm_covar being full matrix
 
-    # compute list of betas using ewm numba recursion for cross product of x y and covariance of x
-    # output is tensor of betas per date = [t, factors, assets]
-    betas_ts = ewm.compute_ewm_xy_beta_tensor(x=x.to_numpy(),
-                                              y=y.to_numpy(),
-                                              ewm_lambda=ewm_lambda,
-                                              is_x_correlated=is_x_correlated)
-    # factor_loadings = {factor_id: pd.DataFrame(factor loadings)}
-    loadings = dfo.np_txy_tensor_to_pd_dict(np_tensor_txy=betas_ts,
-                                            dateindex=x.index,
-                                            factor_names=x.columns.to_list(),
-                                            asset_names=y.columns.to_list())
+        ewm betas = (ewm_covar[x, x]^{-1}) @ (ewm_covar[x, y])
+        """
+        x = self.x
+        y = self.y
+        if span is not None:
+            ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+        if mean_adj_type != MeanAdjType.NONE:
+            x = ewm.compute_rolling_mean_adj(data=x,
+                                             mean_adj_type=mean_adj_type,
+                                             ewm_lambda=ewm_lambda,
+                                             init_type=init_type)
 
-    ewm_lm = LinearModel(x=x, y=y, loadings=loadings)
+            y = ewm.compute_rolling_mean_adj(data=y,
+                                             mean_adj_type=mean_adj_type,
+                                             ewm_lambda=ewm_lambda,
+                                             init_type=init_type)
 
-    return ewm_lm
+        # compute list of betas using ewm numba recursion for cross product of x y and covariance of x
+        # output is tensor of betas per date = [t, factors, assets]
+        betas_ts = ewm.compute_ewm_xy_beta_tensor(x=x.to_numpy(),
+                                                  y=y.to_numpy(),
+                                                  ewm_lambda=ewm_lambda,
+                                                  is_x_correlated=is_x_correlated)
+        # factor_loadings = {factor_id: pd.DataFrame(factor loadings)}
+        loadings = dfo.np_txy_tensor_to_pd_dict(np_tensor_txy=betas_ts,
+                                                dateindex=x.index,
+                                                factor_names=x.columns.to_list(),
+                                                asset_names=y.columns.to_list())
+        self.x = x
+        self.y = y
+        self.loadings = loadings
 
 
 def compute_portfolio_benchmark_betas(instrument_prices: pd.DataFrame,
@@ -187,10 +188,9 @@ def compute_portfolio_benchmark_betas(instrument_prices: pd.DataFrame,
     portfolio_beta_i = sum(instrument_beta_i*exposure)
     """
     benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-    ewm_linear_model = estimate_ewm_linear_model(x=ret.to_returns(prices=benchmark_prices, freq=beta_freq, is_log_returns=True),
-                                                 y=ret.to_returns(prices=instrument_prices, freq=beta_freq, is_log_returns=True),
-                                                 span=factor_beta_span,
-                                                 is_x_correlated=True)
+    ewm_linear_model = EwmLinearModel(x=ret.to_returns(prices=benchmark_prices, freq=beta_freq, is_log_returns=True),
+                                      y=ret.to_returns(prices=instrument_prices, freq=beta_freq, is_log_returns=True))
+    ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
     exposures = exposures.reindex(index=instrument_prices.index, method='ffill')
     benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(exposures=exposures)
     benchmark_betas = benchmark_betas.replace({0.0: np.nan}).ffill()  # fillholidays
@@ -219,12 +219,26 @@ def compute_portfolio_benchmark_beta_alpha_attribution(instrument_prices: pd.Dat
                                                                   time_period=None,
                                                                   beta_freq=beta_freq,
                                                                   factor_beta_span=factor_beta_span)
+    joint_attrib = compute_benchmarks_beta_attribution(portfolio_nav=portfolio_nav,
+                                                       benchmark_prices=benchmark_prices,
+                                                       portfolio_benchmark_betas=portfolio_benchmark_betas,
+                                                       residual_name=residual_name,
+                                                       time_period=time_period)
+    return joint_attrib
 
+
+def compute_benchmarks_beta_attribution(portfolio_nav: pd.Series,
+                                        benchmark_prices: pd.DataFrame,
+                                        portfolio_benchmark_betas: pd.DataFrame,
+                                        residual_name: str = 'Alpha',
+                                        time_period: TimePeriod = None
+                                        ) -> pd.DataFrame:
     benchmark_prices = benchmark_prices.reindex(index=portfolio_benchmark_betas.index, method='ffill')
-    x = ret.to_returns(prices=benchmark_prices, freq=beta_freq)
+    portfolio_nav = portfolio_nav.reindex(index=portfolio_benchmark_betas.index, method='ffill')
+    x = ret.to_returns(prices=benchmark_prices, freq=None)
     x_attribution = (portfolio_benchmark_betas.shift(1)).multiply(x)
     total_attrib = x_attribution.sum(axis=1)
-    total = portfolio_nav.reindex(index=total_attrib.index, method='ffill').pct_change()
+    total = portfolio_nav.pct_change()
     residual = np.subtract(total, total_attrib)
     joint_attrib = pd.concat([x_attribution, residual.rename(residual_name)], axis=1)
     if time_period is not None:
@@ -258,11 +272,8 @@ def run_unit_test(unit_test: UnitTests):
         else:
             assets = ['QQQ', 'HYG']
             asset_returns = returns[assets]
-
-        ewm_linear_model = estimate_ewm_linear_model(x=factor_returns,
-                                                     y=asset_returns,
-                                                     ewm_lambda=0.94,
-                                                     is_x_correlated=True)
+        ewm_linear_model = EwmLinearModel(x=factor_returns, y=asset_returns)
+        ewm_linear_model.fit(ewm_lambda=0.94, is_x_correlated=True)
 
         ewm_linear_model.print()
         ewm_linear_model.plot_factor_loadings(factor='SPY')

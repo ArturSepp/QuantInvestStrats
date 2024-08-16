@@ -333,7 +333,8 @@ class PortfolioData:
                   time_period: da.TimePeriod = None,
                   add_total: bool = True,
                   is_norm_costs: bool = True,
-                  roll_period: Optional[int] = 260
+                  roll_period: Optional[int] = 260,
+                  freq: Optional[str] = None
                   ) -> Union[pd.DataFrame, pd.Series]:
 
         costs = self.realized_costs
@@ -353,6 +354,8 @@ class PortfolioData:
 
         if roll_period is not None:
             costs = costs.rolling(roll_period).sum()
+        elif freq is not None:
+            costs = costs.resample(freq).sum()
         if time_period is not None:
             costs = time_period.locate(costs)
         return costs
@@ -781,6 +784,8 @@ class PortfolioData:
             prices = self.get_portfolio_nav(time_period=time_period)
             title = title or f"Scatterplot of {freq}-freq returns vs {str(benchmark_price.name)}"
         prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
+        if np.any(prices.columns.duplicated()):
+            raise ValueError(f"duplicated columns {prices.columns}")
         local_kwargs = sop.update_kwargs(kwargs=kwargs,
                                          new_kwargs={'weight': 'bold',
                                                      'x_rotation': 0,

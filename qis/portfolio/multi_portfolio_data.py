@@ -67,6 +67,7 @@ class MultiPortfolioData:
     data get methods
     """
     def get_navs(self,
+                 add_benchmarks_to_navs: bool = False,
                  benchmark: str = None,
                  time_period: TimePeriod = None
                  ) -> pd.DataFrame:
@@ -75,7 +76,10 @@ class MultiPortfolioData:
         """
         navs = self.navs
         if benchmark is not None:
-            navs = pd.concat([self.benchmark_prices[benchmark], navs], axis=1).ffill()
+            navs = pd.concat([self.benchmark_prices[benchmark].reindex(index=navs.index).ffill(), navs], axis=1)
+        elif add_benchmarks_to_navs:
+            navs = pd.concat([self.benchmark_prices.reindex(index=navs.index).ffill(), navs], axis=1).ffill()
+            
         if time_period is not None:
             navs = time_period.locate(navs)
         return navs
@@ -124,13 +128,14 @@ class MultiPortfolioData:
                  regime_benchmark: str = None,
                  perf_params: PerfParams = PERF_PARAMS,
                  regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                 add_benchmarks_to_navs: bool = False,
                  ax: plt.Subplot = None,
                  **kwargs) -> None:
 
         if ax is None:
             fig, ax = plt.subplots()
 
-        prices = self.get_navs(time_period=time_period)
+        prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         ppd.plot_prices(prices=prices,
                         perf_params=perf_params,
                         ax=ax,
@@ -148,6 +153,7 @@ class MultiPortfolioData:
                           legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                           var_format: str = '{:.2f}',
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                          add_benchmarks_to_navs: bool = False,
                           ax: plt.Subplot = None,
                           **kwargs
                           ) -> plt.Figure:
@@ -156,7 +162,7 @@ class MultiPortfolioData:
         if ax is None:
             fig, ax = plt.subplots()
 
-        prices = self.get_navs(time_period=time_period)
+        prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         if sharpe_freq is None:
             sharpe_freq = pd.infer_freq(index=prices.index)
 
@@ -183,11 +189,12 @@ class MultiPortfolioData:
                               heatmap_freq: str = 'YE',
                               date_format: str = '%Y',
                               transpose: bool = True,
+                              add_benchmarks_to_navs: bool = False,
                               title: str = None,
                               ax: plt.Subplot = None,
                               **kwargs
                               ) -> None:
-        prices = self.get_navs(time_period=time_period)
+        prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         rhe.plot_periodic_returns_table(prices=prices,
                                         freq=heatmap_freq,
                                         ax=ax,
@@ -200,11 +207,12 @@ class MultiPortfolioData:
                               time_period: TimePeriod = None,
                               perf_column: PerfStat = PerfStat.SHARPE_RF0,
                               perf_params: PerfParams = PERF_PARAMS,
+                              add_benchmarks_to_navs: bool = False,
                               title: str = None,
                               ax: plt.Subplot = None,
                               **kwargs
                               ) -> None:
-        prices = self.get_navs(time_period=time_period)
+        prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         ppt.plot_ra_perf_bars(prices=prices,
                               perf_column=perf_column,
                               perf_params=perf_params,
@@ -215,9 +223,10 @@ class MultiPortfolioData:
     def plot_corr_table(self,
                         time_period: TimePeriod = None,
                         freq: str = 'W-WED',
+                        add_benchmarks_to_navs: bool = False,
                         ax: plt.Subplot = None,
                         **kwargs) -> None:
-        prices = self.get_navs(time_period=time_period)
+        prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         if len(prices.columns) > 1:
             qis.plot_returns_corr_table(prices=prices,
                                         x_rotation=90,
@@ -231,12 +240,10 @@ class MultiPortfolioData:
                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                        regime_benchmark: str = None,
                        dd_legend_type: qis.DdLegendType = qis.DdLegendType.DETAILED,
+                       add_benchmarks_to_navs: bool = False,
                        ax: plt.Subplot = None,
                        **kwargs) -> None:
-        if len(self.portfolio_datas) == 1 and regime_benchmark is not None:
-            prices = self.get_navs(time_period=time_period, benchmark=regime_benchmark)
-        else:
-            prices = self.get_navs(time_period=time_period)
+        prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         cdr.plot_rolling_drawdowns(prices=prices, dd_legend_type=dd_legend_type, ax=ax, **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
@@ -246,12 +253,10 @@ class MultiPortfolioData:
                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                       regime_benchmark: str = None,
                                       dd_legend_type: qis.DdLegendType = qis.DdLegendType.DETAILED,
+                                      add_benchmarks_to_navs: bool = False,
                                       ax: plt.Subplot = None,
                                       **kwargs) -> None:
-        if len(self.portfolio_datas) == 1 and regime_benchmark is not None:
-            prices = self.get_navs(time_period=time_period, benchmark=regime_benchmark)
-        else:
-            prices = self.get_navs(time_period=time_period)
+        prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         cdr.plot_rolling_time_under_water(prices=prices, dd_legend_type=dd_legend_type, ax=ax, **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
@@ -458,6 +463,7 @@ class MultiPortfolioData:
 
     def plot_costs(self,
                    cost_rolling_period: Optional[int] = 260,
+                   cost_freq: Optional[str] = 'B',
                    cost_title: Optional[str] = None,
                    benchmark: str = None,
                    time_period: TimePeriod = None,
@@ -468,7 +474,7 @@ class MultiPortfolioData:
                    **kwargs) -> None:
         costs = []
         for portfolio in self.portfolio_datas:
-            costs.append(portfolio.get_costs(roll_period=None, is_agg=True, is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
+            costs.append(portfolio.get_costs(roll_period=None, freq=cost_freq, is_agg=True, is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
         costs = pd.concat(costs, axis=1)
         if cost_rolling_period is not None:
             costs = costs.rolling(cost_rolling_period).sum()

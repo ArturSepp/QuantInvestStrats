@@ -3,6 +3,7 @@ from qis.utils.dates import (
     TimePeriod,
     generate_dates_schedule,
     generate_rebalancing_indicators,
+    set_rebalancing_timeindex_on_given_timeindex,
     generate_sample_dates,
     get_month_days,
     get_period_days,

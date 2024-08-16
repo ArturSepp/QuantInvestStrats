@@ -58,6 +58,7 @@ def generate_volparity_portfolio(prices: pd.DataFrame,
     volparity_portfolio = qis.backtest_model_portfolio(prices=prices,
                                                        weights=weights,
                                                        rebalancing_costs=rebalancing_costs,
+                                                       weight_implementation_lag=1,
                                                        is_output_portfolio_data=True,
                                                        ticker='VolParity')
     volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
@@ -85,8 +86,8 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    time_period = qis.TimePeriod('31Dec2005', '12Aug2024')  # time period for portfolio reporting
-    time_period_short = TimePeriod('31Dec2019', time_period.end)
+    time_period = qis.TimePeriod('31Dec2005', '15Aug2024')  # time period for portfolio reporting
+    time_period_short = TimePeriod('31Dec2022', time_period.end)
     rebalancing_costs = 0.0010  # per traded volume
 
     if unit_test == UnitTests.VOLPARITY_PORTFOLIO:

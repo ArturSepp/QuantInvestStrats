@@ -21,6 +21,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              funding_rate: pd.Series = None,  # on positive / negative cash balances
                              instruments_carry: pd.DataFrame = None,  # on nav
                              rebalancing_costs: Union[float, pd.Series] = None,  # rebalancing costs in bp
+                             weight_implementation_lag: Optional[int] = None,  # applies for weight is pd.Dataframe
                              constant_trade_level: float = None,
                              is_rebalanced_at_first_date: bool = False,
                              ticker: str = None,
@@ -68,10 +69,14 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         if prices.index[0] > weights.index[0]:
             raise ValueError(f"price dates {prices.index[0]} are after weights start date {weights.index[0]}")
         portfolio_weights = weights[prices.columns]  # alighn
-        # rebalancing is set on portfolio weight index
-        is_rebalancing = pd.Series(1, index=portfolio_weights.index, dtype=int).reindex(index=prices.index
-                                                                                        ).replace(np.nan, 0).astype(bool)
 
+        # implementation lag is only valid for quant-generated weights
+        if weight_implementation_lag is not None and weight_implementation_lag > 0:
+            rebalancing_index = portfolio_weights.index + pd.Timedelta(days=weight_implementation_lag)
+        else:
+            rebalancing_index = portfolio_weights.index
+        is_rebalancing = qu.set_rebalancing_timeindex_on_given_timeindex(given_index=prices.index,
+                                                                         rebalancing_index=rebalancing_index)
     else:
         raise NotImplementedError(f"unsupported weights type = {type(weights)}")
 

@@ -40,7 +40,7 @@ class FactsheetConfig(NamedTuple):
     turnover_freq: str = 'B'   # daily freq
     turnover_title: Optional[str] = None
     cost_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
-    cost_title: Optional[str] = None
+    cost_freq: Optional[str] = 'B'
     is_norm_costs: bool = True  # for long-only protfolio use nrmalised costs
     factor_beta_span: int = 52  # to compute rolling beta
     beta_freq: str = 'W-WED'
@@ -60,7 +60,11 @@ class FactsheetConfig(NamedTuple):
 FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD = FactsheetConfig()
 
 FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD = FactsheetConfig(heatmap_freq='QE',
-                                                           x_date_freq='QE')
+                                                           x_date_freq='QE',
+                                                           regime_freq='ME',
+                                                           freq_reg='W-WED',
+                                                           alpha_an_factor=52
+                                                           )
 
 
 FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
@@ -76,7 +80,7 @@ FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
                                                             turnover_freq='ME',
                                                             turnover_title=None,
                                                             cost_rolling_period=12,
-                                                            cost_title=None,
+                                                            cost_freq='ME',
                                                             is_norm_costs=True,
                                                             factor_beta_span=36,
                                                             beta_freq='ME',
