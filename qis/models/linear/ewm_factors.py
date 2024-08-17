@@ -31,7 +31,7 @@ class LinearModel:
     def __post_init__(self):
         if self.loadings is not None:
             str_factors = list(self.loadings.keys())
-            assert str_factors == x.columns.to_list()
+            assert str_factors == self.x.columns.to_list()
 
     def print(self):
         print(f"x:\n{self.x}")
