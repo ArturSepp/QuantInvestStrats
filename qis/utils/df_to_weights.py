@@ -34,7 +34,8 @@ def compute_long_only_portfolio_weights(data: pd.DataFrame,
 
 
 def df_to_equal_weight_allocation(df: Union[pd.Series, pd.DataFrame],
-                                  freq: str = None
+                                  freq: str = None,
+                                  index: pd.DatetimeIndex = None
                                   ) -> Union[pd.Series, pd.DataFrame]:
     """
     equal weight accounting for nans in df
@@ -42,6 +43,8 @@ def df_to_equal_weight_allocation(df: Union[pd.Series, pd.DataFrame],
     equal_weight_allocation = df_to_weight_allocation_sum1(df=df_nans_to_one_zero(df=df))
     if freq is not None:
         equal_weight_allocation = equal_weight_allocation.asfreq(freq, method='ffill')
+    elif index is not None:
+        equal_weight_allocation = equal_weight_allocation.reindex(index, method='ffill')
     return equal_weight_allocation
 
 

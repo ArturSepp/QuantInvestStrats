@@ -147,9 +147,9 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
     current_prices = prices[0, :]
     if is_rebalancing[0]:
         if constant_trade_level is not None:
-            current_units = (constant_trade_level * weights[current_rebalancing_idx]) / prices[0, :]
+            current_units = (constant_trade_level * weights[current_rebalancing_idx]) / current_prices
         else:
-            current_units = (initial_nav * weights[current_rebalancing_idx]) / prices[0, :]
+            current_units = (initial_nav * weights[current_rebalancing_idx]) / current_prices
 
         current_units[np.isnan(current_units)] = 0
         current_cash_balance = initial_nav - np.nansum(current_units * current_prices)

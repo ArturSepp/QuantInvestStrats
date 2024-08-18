@@ -49,12 +49,12 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
                             include_end_date=include_end_date,
                             ffill_nans=ffill_nans)
 
+    # returns are computed for non nans and positive prices
+    prices_np = prices.to_numpy()
+    ind_good = np.logical_and(np.isnan(prices_np) == False, np.greater(prices_np, 0.0))
+
     if return_type == ReturnTypes.LOG or is_log_returns:
-        prices_np = prices.to_numpy()
-        ind_good = np.logical_and(
-            np.logical_and(np.isnan(prices_np) == False, np.isnan(prices_np) == False),
-            np.logical_and(np.greater(prices_np, 0.0), np.greater(prices_np, 0.0)))
-        returns = np.log(np.divide(prices, prices.shift(1)), where=ind_good)
+        returns = np.log(prices).diff(1)
 
     elif return_type == ReturnTypes.RELATIVE:
         returns = np.divide(prices, prices.shift(1)).add(-1.0)
@@ -69,6 +69,8 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
         returns = prices.shift(1)
     else:
         raise NotImplementedError (f"{return_type}")
+
+    returns = returns.where(ind_good, other=np.nan)
 
     if is_first_zero:
         if isinstance(returns, pd.DataFrame):
