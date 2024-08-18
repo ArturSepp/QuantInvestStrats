@@ -52,7 +52,6 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
         portfolio_data = qis.backtest_model_portfolio(prices=prices,
                                                       weights=time_period.locate(weights),
                                                       rebalancing_costs=rebalancing_costs,
-                                                      is_output_portfolio_data=True,
                                                       ticker=f"VP span={span}")
         portfolio_data.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
         portfolio_datas.append(portfolio_data)

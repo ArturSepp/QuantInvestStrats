@@ -27,7 +27,7 @@ unleveraged_portfolio = qis.backtest_model_portfolio(prices=prices[['SSO', 'IEF'
                                                      weights={'SSO': 0.5, 'IEF': 0.5},
                                                      rebalance_freq=rebalance_freq,
                                                      rebalancing_costs=rebalancing_costs,
-                                                     ticker='50/50 SSO/IEF')
+                                                     ticker='50/50 SSO/IEF').get_portfolio_nav()
 
 # leveraged is funded at 100bp + 3m UST
 funding_rate = 0.01 + yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0
@@ -36,7 +36,7 @@ leveraged_portfolio = qis.backtest_model_portfolio(prices=prices[['SPY', 'IEF']]
                                                    rebalance_freq=rebalance_freq,
                                                    rebalancing_costs=rebalancing_costs,
                                                    funding_rate=funding_rate,
-                                                   ticker='100/50 SPY/IEF')
+                                                   ticker='100/50 SPY/IEF').get_portfolio_nav()
 
 
 prices = pd.concat([prices, unleveraged_portfolio, leveraged_portfolio], axis=1)

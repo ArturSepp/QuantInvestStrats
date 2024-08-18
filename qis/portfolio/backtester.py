@@ -24,8 +24,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              weight_implementation_lag: Optional[int] = None,  # applies for weight is pd.Dataframe
                              constant_trade_level: float = None,
                              is_rebalanced_at_first_date: bool = False,
-                             ticker: str = None,
-                             is_output_portfolio_data: bool = False
+                             ticker: str = None
                              ) -> Union[pd.Series, PortfolioData]:
     """
     simulate portfolio given prices and weights
@@ -107,17 +106,15 @@ def backtest_model_portfolio(prices: pd.DataFrame,
     if ticker is not None:
         portfolio_nav = portfolio_nav.rename(ticker)
 
-    if is_output_portfolio_data:
-        output_portfolio_data = PortfolioData(nav=portfolio_nav,
-                                              units=pd.DataFrame(units, index=prices.index, columns=prices.columns),
-                                              weights=pd.DataFrame(effective_weights, index=prices.index, columns=prices.columns),
-                                              input_weights=weights,
-                                              is_rebalancing=is_rebalancing,
-                                              prices=prices,
-                                              realized_costs=pd.DataFrame(realized_costs, index=prices.index, columns=prices.columns),
-                                              ticker=ticker)
-    else:
-        output_portfolio_data = portfolio_nav
+    output_portfolio_data = PortfolioData(nav=portfolio_nav,
+                                          units=pd.DataFrame(units, index=prices.index, columns=prices.columns),
+                                          weights=pd.DataFrame(effective_weights, index=prices.index, columns=prices.columns),
+                                          input_weights=weights,
+                                          is_rebalancing=is_rebalancing,
+                                          prices=prices,
+                                          realized_costs=pd.DataFrame(realized_costs, index=prices.index, columns=prices.columns),
+                                          ticker=ticker)
+
     return output_portfolio_data
 
 
@@ -221,15 +218,15 @@ def run_unit_test(unit_test: UnitTests):
 
         portfolio_nav_1_0 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 0.0]),
-                                                     rebalance_freq='QE')
+                                                     rebalance_freq='QE').get_portfolio_nav()
 
         portfolio_nav_5_5 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 0.5]),
-                                                     rebalance_freq='QE')
+                                                     rebalance_freq='QE').get_portfolio_nav()
 
         portfolio_nav_0_1 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 1.0]),
-                                                     rebalance_freq='QE')
+                                                     rebalance_freq='QE').get_portfolio_nav()
 
         portfolio_nav = pd.concat([portfolio_nav_1_0, portfolio_nav_5_5, portfolio_nav_0_1], axis=1)
         portfolio_nav.columns = ['x1=100, x2=0', 'x1=100, x2=50', 'x1=100, x2=100']
@@ -240,8 +237,7 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.COSTS:
         portfolio_nav = backtest_model_portfolio(prices=prices,
                                                  weights=np.array([1.0, 1.0]),
-                                                 rebalance_freq='QE',
-                                                 is_output_portfolio_data=True)
+                                                 rebalance_freq='QE')
 
         portfolio_nav.plot_pnl()
 

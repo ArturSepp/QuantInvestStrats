@@ -59,7 +59,6 @@ def generate_volparity_portfolio(prices: pd.DataFrame,
                                                        weights=weights,
                                                        rebalancing_costs=rebalancing_costs,
                                                        weight_implementation_lag=1,
-                                                       is_output_portfolio_data=True,
                                                        ticker='VolParity')
     volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
     return volparity_portfolio
@@ -73,7 +72,6 @@ def generate_equity_bond_portfolio(prices: pd.DataFrame,
     volparity_portfolio = qis.backtest_model_portfolio(prices=prices,
                                                        weights=weights,
                                                        rebalancing_costs=rebalancing_costs,
-                                                       is_output_portfolio_data=True,
                                                        ticker='EquityBond')
     volparity_portfolio.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
     return volparity_portfolio
