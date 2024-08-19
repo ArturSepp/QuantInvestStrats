@@ -36,6 +36,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 add_grouped_exposures: bool = False,
                                 add_grouped_cum_pnl: bool = False,
                                 is_1y_exposures: bool = False,
+                                is_grouped: Optional[bool] = None,
                                 **kwargs
                                 ) -> List[plt.Figure]:
     # align
@@ -43,10 +44,11 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     if regime_benchmark is None:
         regime_benchmark = benchmark_prices.columns[0]
 
-    if len(portfolio_data.group_data.unique()) < 10:  # otherwise tables look too bad
-        is_grouped = True
-    else:
-        is_grouped = False
+    if is_grouped is None:
+        if len(portfolio_data.group_data.unique()) < 10:  # otherwise tables look too bad
+            is_grouped = True
+        else:
+            is_grouped = False
 
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)

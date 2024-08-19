@@ -24,11 +24,13 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               perf_params: PerfParams = PERF_PARAMS,
                                               regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                               backtest_name: str = None,
+                                              add_benchmarks_to_navs: bool = False,
                                               add_brinson_attribution: bool = True,
                                               add_exposures_pnl_attribution: bool = False,
                                               add_strategy_factsheet: bool = False,
                                               add_grouped_exposures: bool = False,  # for strategy factsheet
                                               add_grouped_cum_pnl: bool = False,  # for strategy factsheet
+                                              is_grouped: Optional[bool] = None,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 4,
                                               **kwargs
@@ -41,12 +43,13 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     """
     if len(multi_portfolio_data.portfolio_datas) == 1:
         raise ValueError(f"must be at least two strategies")
-    
-    if (multi_portfolio_data.portfolio_datas[0].group_data is not None
-            and len(multi_portfolio_data.portfolio_datas[0].group_data.unique()) <= 7):  # otherwise tables look too bad
-        is_grouped = True
-    else:
-        is_grouped = False
+
+    if is_grouped is None:
+        if (multi_portfolio_data.portfolio_datas[0].group_data is not None
+                and len(multi_portfolio_data.portfolio_datas[0].group_data.unique()) <= 7):  # otherwise tables look too bad
+            is_grouped = True
+        else:
+            is_grouped = False
         
     # set report specific kqargs
     plot_kwargs = dict(fontsize=fontsize,
@@ -70,6 +73,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     benchmark_price = multi_portfolio_data.benchmark_prices[regime_benchmark]
 
     multi_portfolio_data.plot_nav(ax=fig.add_subplot(gs[:2, :2]),
+                                  add_benchmarks_to_navs=add_benchmarks_to_navs,
                                   regime_benchmark=regime_benchmark,
                                   perf_params=perf_params,
                                   regime_params=regime_params,
@@ -77,18 +81,21 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                   **kwargs)
 
     multi_portfolio_data.plot_drawdowns(ax=fig.add_subplot(gs[2:4, :2]),
+                                        add_benchmarks_to_navs=add_benchmarks_to_navs,
                                         regime_benchmark=regime_benchmark,
                                         regime_params=regime_params,
                                         title='Running Drawdowns',
                                         **kwargs)
 
     multi_portfolio_data.plot_rolling_time_under_water(ax=fig.add_subplot(gs[4:6, :2]),
+                                                       add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                        regime_benchmark=regime_benchmark,
                                                        regime_params=regime_params,
                                                        title='Rolling time under water',
                                                        **kwargs)
 
     multi_portfolio_data.plot_rolling_perf(ax=fig.add_subplot(gs[6:8, :2]),
+                                           add_benchmarks_to_navs=add_benchmarks_to_navs,
                                            regime_benchmark=regime_benchmark,
                                            regime_params=regime_params,
                                            **kwargs)
@@ -110,6 +117,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[0:2, 2:]),
                                                benchmark_price=benchmark_price,
+                                               add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                perf_params=perf_params,
                                                is_grouped=is_grouped,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
@@ -123,6 +131,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[2:4, 2:]),
                                                benchmark_price=benchmark_price,
+                                               add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                perf_params=perf_params,
                                                is_grouped=is_grouped,
                                                **local_kwargs)
@@ -130,11 +139,17 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
                                      new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=False))
+    if add_benchmarks_to_navs:
+        benchmark_prices = multi_portfolio_data.benchmark_prices
+    else:
+        benchmark_prices = None
     multi_portfolio_data.portfolio_datas[0].plot_periodic_returns(is_grouped=is_grouped,
+                                                                  benchmark_prices=benchmark_prices,
                                                                   ax=fig.add_subplot(gs[4:6, 2]),
                                                                   **local_kwargs)
 
     multi_portfolio_data.portfolio_datas[1].plot_periodic_returns(is_grouped=is_grouped,
+                                                                  benchmark_prices=benchmark_prices,
                                                                   ax=fig.add_subplot(gs[4:6, 3]),
                                                                   **local_kwargs)
 
@@ -150,6 +165,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
     """
     multi_portfolio_data.plot_regime_data(benchmark=str(benchmark_price.name),
+                                          add_benchmarks_to_navs=add_benchmarks_to_navs,
                                           is_grouped=False,
                                           title=f"{post_title}",
                                           perf_params=perf_params,
@@ -159,7 +175,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     # strategy by asset class
     multi_portfolio_data.portfolio_datas[0].plot_regime_data(benchmark_price=benchmark_price,
-                                                             is_grouped=is_grouped,
+                                                             add_benchmarks_to_navs=add_benchmarks_to_navs,
+                                                             is_grouped=False,
                                                              title=f"{multi_portfolio_data.portfolio_datas[0].nav.name} {post_title}",
                                                              perf_params=perf_params,
                                                              regime_params=regime_params,
@@ -268,6 +285,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                     regime_params=regime_params,
                                                     add_grouped_exposures=add_grouped_exposures,
                                                     add_grouped_cum_pnl=add_grouped_cum_pnl,
+                                                    is_grouped=is_grouped,
                                                     **kwargs  # time period will be in kwargs
                                                     ))
         figs = qis.to_flat_list(figs)

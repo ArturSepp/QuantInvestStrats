@@ -78,7 +78,7 @@ class MultiPortfolioData:
         if benchmark is not None:
             navs = pd.concat([self.benchmark_prices[benchmark].reindex(index=navs.index).ffill(), navs], axis=1)
         elif add_benchmarks_to_navs:
-            navs = pd.concat([self.benchmark_prices.reindex(index=navs.index).ffill(), navs], axis=1).ffill()
+            navs = pd.concat([navs, self.benchmark_prices.reindex(index=navs.index).ffill()], axis=1).ffill()
             
         if time_period is not None:
             navs = time_period.locate(navs)
@@ -239,7 +239,7 @@ class MultiPortfolioData:
                        time_period: TimePeriod = None,
                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                        regime_benchmark: str = None,
-                       dd_legend_type: qis.DdLegendType = qis.DdLegendType.DETAILED,
+                       dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
                        add_benchmarks_to_navs: bool = False,
                        ax: plt.Subplot = None,
                        **kwargs) -> None:
@@ -252,7 +252,7 @@ class MultiPortfolioData:
                                       time_period: TimePeriod = None,
                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                       regime_benchmark: str = None,
-                                      dd_legend_type: qis.DdLegendType = qis.DdLegendType.DETAILED,
+                                      dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
                                       add_benchmarks_to_navs: bool = False,
                                       ax: plt.Subplot = None,
                                       **kwargs) -> None:
@@ -307,37 +307,46 @@ class MultiPortfolioData:
 
     def plot_ac_ra_perf_table(self,
                               benchmark_price: pd.Series,
+                              add_benchmarks_to_navs: bool = False,
                               time_period: TimePeriod = None,
                               perf_params: PerfParams = PERF_PARAMS,
                               perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                               is_grouped: bool = True,
                               ax: plt.Subplot = None,
                               **kwargs) -> None:
-        if is_grouped:  # otherwise tables look too bad
-            add_ac = True
-            drop_benchmark = True
-        else:
-            add_ac = False
+
+        if add_benchmarks_to_navs:
+            prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
             drop_benchmark = False
-        strategy_prices = []
-        ac_prices = []
-        rows_edge_lines = [len(self.portfolio_datas)]
-        for portfolio in self.portfolio_datas:
-            portfolio_name = str(portfolio.nav.name)
-            navs_ = portfolio.get_portfolio_nav(time_period=time_period)  # navs include costs while group navs are cost free
-            ac_prices_ = portfolio.get_group_navs(time_period=time_period, is_add_group_total=False)
-            strategy_prices.append(navs_)
-            if add_ac:
-                ac_prices_.columns = [f"{portfolio_name}-{x}" for x in ac_prices_.columns]
-                ac_prices.append(ac_prices_)
-                rows_edge_lines.append(sum(rows_edge_lines)+len(ac_prices_.columns))
-        strategy_prices = pd.concat(strategy_prices, axis=1)
-        benchmark_price = benchmark_price.reindex(index=strategy_prices.index, method='ffill')
-        if add_ac:  # otherwise tables look too bad
-            ac_prices = pd.concat(ac_prices, axis=1)
-            prices = pd.concat([benchmark_price, strategy_prices, ac_prices],axis=1)
+            rows_edge_lines = [len(self.portfolio_datas)]
         else:
-            prices = pd.concat([strategy_prices, benchmark_price], axis=1)
+            if is_grouped:  # otherwise tables look too bad
+                add_ac = True
+                drop_benchmark = True
+            else:
+                add_ac = False
+                drop_benchmark = False
+
+            strategy_prices = []
+            ac_prices = []
+            rows_edge_lines = [len(self.portfolio_datas)]
+            for portfolio in self.portfolio_datas:
+                portfolio_name = str(portfolio.nav.name)
+                navs_ = portfolio.get_portfolio_nav(time_period=time_period)  # navs include costs while group navs are cost free
+                ac_prices_ = portfolio.get_group_navs(time_period=time_period, is_add_group_total=False)
+                strategy_prices.append(navs_)
+                if add_ac:
+                    ac_prices_.columns = [f"{portfolio_name}-{x}" for x in ac_prices_.columns]
+                    ac_prices.append(ac_prices_)
+                    rows_edge_lines.append(sum(rows_edge_lines)+len(ac_prices_.columns))
+            strategy_prices = pd.concat(strategy_prices, axis=1)
+
+            benchmark_price = benchmark_price.reindex(index=strategy_prices.index, method='ffill')
+            if add_ac:  # otherwise tables look too bad
+                ac_prices = pd.concat(ac_prices, axis=1)
+                prices = pd.concat([benchmark_price, strategy_prices, ac_prices],axis=1)
+            else:
+                prices = pd.concat([strategy_prices, benchmark_price], axis=1)
 
         ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
         ppt.plot_ra_perf_table_benchmark(prices=prices,
@@ -624,6 +633,7 @@ class MultiPortfolioData:
 
     def plot_regime_data(self,
                          benchmark: str,
+                         add_benchmarks_to_navs: bool = False,
                          is_grouped: bool = False,
                          portfolio_idx: int = 0,
                          regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
@@ -641,7 +651,7 @@ class MultiPortfolioData:
         if is_grouped:
             prices = self.get_group_navs(portfolio_idx=portfolio_idx, benchmark=benchmark, time_period=time_period)
         else:
-            prices = self.get_navs(benchmark=benchmark, time_period=time_period)
+            prices = self.get_navs(benchmark=benchmark, add_benchmarks_to_navs=add_benchmarks_to_navs, time_period=time_period)
         if var_format is None:
             if regime_data_to_plot == RegimeData.REGIME_SHARPE:
                 var_format = '{:.2f}'

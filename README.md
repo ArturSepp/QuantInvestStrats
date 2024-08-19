@@ -16,8 +16,13 @@ dependecy path increasing sequentially as follows.
 4. ```qis.models``` is module containing statistical models including filtering and regressions.
 
 5. ```qis.portfolio``` is high level module for analysis, simulation, backtesting, and reporting of quant strategies.
+Function ```backtest_model_portfolio()```  in ```qis.portfolio.backtester.py``` takes instrument prices 
+and simulated weights from a generic strategy and compute the total return, performance attribution, and risk analysis
 
 ```qis.examples``` contains scripts with illustrations of QIS analytics.
+
+```qis.examples.factheets``` contains scripts with examples of factsheets for simulated and actual strategies,
+and cross-sectional analysis of backtests.
 
 
 # Table of contents
@@ -35,7 +40,6 @@ dependecy path increasing sequentially as follows.
 6. [ToDos](#todos)
 7. [Disclaimer](#disclaimer)
 
-## **Updates** <a name="updates"></a>
 
 ## **Installation** <a name="installation"></a>
 Install using

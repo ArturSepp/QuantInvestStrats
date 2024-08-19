@@ -81,7 +81,7 @@ class PortfolioData:
         if self.group_order is None:
             self.group_order = list(self.group_data.unique())
         if self.benchmark_prices is not None:
-            self.benchmark_prices = self.benchmark_prices.reindex(index=self.nav.index, method='ffill')
+            self.ibenchmark_prices = self.benchmark_prices.reindex(index=self.nav.index, method='ffill')
         if self.ticker is None:
             self.ticker = str(self.nav.name)
 
@@ -127,7 +127,7 @@ class PortfolioData:
             nav_ = nav_.asfreq(freq=freq, method='ffill')
         return nav_
 
-    def get_portfolio_nav_with_benchmark_rices(self,
+    def get_portfolio_nav_with_benchmark_prices(self,
                                                time_period: da.TimePeriod = None,
                                                freq: Optional[str] = None
                                                ) -> pd.DataFrame:
@@ -639,7 +639,7 @@ class PortfolioData:
                  **kwargs
                  ) -> None:
         if add_benchmarks:
-            prices = self.get_portfolio_nav_with_benchmark_rices(time_period=time_period)
+            prices = self.get_portfolio_nav_with_benchmark_prices(time_period=time_period)
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
         if ax is None:
@@ -690,7 +690,7 @@ class PortfolioData:
 
         # do not use start end dates here so the sharpe will be continuous with different time_period
         if add_benchmarks:
-            prices = self.get_portfolio_nav_with_benchmark_rices(time_period=time_period)
+            prices = self.get_portfolio_nav_with_benchmark_prices(time_period=time_period)
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
 
