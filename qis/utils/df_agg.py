@@ -6,9 +6,9 @@ import pandas as pd
 from scipy import stats
 from typing import Union, Callable, List, Optional, Tuple, Literal, Dict
 from enum import Enum
-
 # qis
 import qis.utils.np_ops as npo
+import qis.utils.df_ops as dfo
 
 
 def nanmean(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
@@ -183,12 +183,15 @@ def agg_dfs(dfs: List[pd.DataFrame],
     return avg_data
 
 
-def last_row(df: pd.DataFrame, axis: Literal[0, 1] = 0) -> np.ndarray:
+def last_row(df: pd.DataFrame, axis: Literal[0, 1] = 0, is_nonan: bool = True) -> np.ndarray:
     if axis == 0:
-        ds = df.iloc[-1, :]
+        if is_nonan:
+            ds = dfo.get_last_nonnan_values(df=df)
+        else:
+            ds = df.iloc[-1, :].to_numpy()
     else:
-        ds = df.iloc[:, -1]
-    return ds.to_numpy()
+        ds = df.iloc[:, -1].to_numpy()
+    return ds
 
 
 def compute_df_desc_data(df: pd.DataFrame,

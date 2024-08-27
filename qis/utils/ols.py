@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from statsmodels import api as sm
 from statsmodels.regression.linear_model import RegressionResults as RegModel
-from typing import Tuple
+from typing import Tuple, Union
 
 
 def fit_ols(x: np.ndarray,
@@ -18,28 +18,41 @@ def fit_ols(x: np.ndarray,
     """
     fit regression model
     """
-    cond = np.logical_and(np.isfinite(x), np.isfinite(y))
+    if x.ndim == 1:  # x is 1-dimensional
+        cond = np.logical_and(np.isfinite(x), np.isfinite(y))
+    else:
+        cond = np.isfinite(y)
+        for idx in np.arange(x.shape[1]):
+            cond = np.logical_and(cond, np.isfinite(x[:, idx]))
     x, y = x[cond], y[cond]
     x1 = get_ols_x(x=x, order=order, fit_intercept=fit_intercept)
     reg_model = sm.OLS(y, x1).fit()
     return reg_model
 
 
-def estimate_ols_alpha_beta(x: np.ndarray,
-                            y: np.ndarray,
+def estimate_ols_alpha_beta(x: Union[np.ndarray, pd.Series, pd.DataFrame],
+                            y: Union[np.ndarray, pd.Series],
+                            order: int = 1,
                             fit_intercept: bool = True
                             ) -> Tuple[float, float, float]:
     try:
-        reg_model = fit_ols(x=x, y=y, order=1, fit_intercept=fit_intercept)
+        reg_model = fit_ols(x=x, y=y, order=order, fit_intercept=fit_intercept)
     except:
         warnings.warn(f"problem with x={x}, y={y}")
         return 0.0, 0.0, 0.0
     if fit_intercept:
-        alpha = reg_model.params.iloc[0]
-        beta = reg_model.params.iloc[1]
+        if isinstance(reg_model.params, pd.Series):
+            alpha = reg_model.params.iloc[0]
+            beta = reg_model.params.iloc[1]
+        else:
+            alpha = reg_model.params[0]
+            beta = reg_model.params[1]
     else:
         alpha = 0.0
-        beta = reg_model.params.iloc[0]
+        if isinstance(reg_model.params, pd.Series):
+            beta = reg_model.params.iloc[0]
+        else:
+            beta = reg_model.params[0]
     r2 = reg_model.rsquared
     return alpha, beta, r2
 
@@ -57,9 +70,9 @@ def estimate_alpha_beta_paired_dfs(x: pd.DataFrame,
     y = y.loc[x.index, x.columns]
     x_np = x.to_numpy()
     y_np = y.to_numpy()
-    n_col = len(x.columns)
-    alphas, betas = np.zeros(n_col), np.zeros(n_col)
-    for idx in np.arange(n_col):
+    ncols = len(x.columns)
+    alphas, betas = np.zeros(ncols), np.zeros(ncols)
+    for idx in np.arange(ncols):
         alphas[idx], betas[idx], _ = estimate_ols_alpha_beta(x=x_np[:, idx],
                                                              y=y_np[:, idx],
                                                              fit_intercept=fit_intercept)

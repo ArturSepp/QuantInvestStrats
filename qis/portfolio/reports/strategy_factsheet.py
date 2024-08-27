@@ -32,9 +32,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 add_benchmarks_to_navs: bool = False,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
+                                weight_change_sample_size: int = 20,
+                                weight_report_time_period: TimePeriod = None,
                                 add_current_position_var_risk_sheet: bool = True,
                                 add_grouped_exposures: bool = False,
                                 add_grouped_cum_pnl: bool = False,
+                                add_weight_change_report: bool = False,
                                 is_1y_exposures: bool = False,
                                 is_grouped: Optional[bool] = None,
                                 **kwargs
@@ -108,7 +111,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                    legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                    var_format='{:.1%}',
                    ax=ax,
-                   **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncol=2)))
+                   **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncols=2)))
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # turnover
@@ -360,6 +363,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                             freq=regime_params.freq,
                                             regime_params=regime_params,
                                             **kwargs)
+
+    if add_weight_change_report and portfolio_data.strategy_signal_data is not None:
+        fig = qis.generate_weight_change_report(portfolio_data=portfolio_data,
+                                                time_period=weight_report_time_period or time_period,
+                                                sample_size=weight_change_sample_size,
+                                                is_grouped=True,
+                                                **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize)))
+        figs.append(fig)
 
     # set 1y time period for exposures
     if is_1y_exposures:

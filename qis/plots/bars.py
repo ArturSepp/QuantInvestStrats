@@ -35,6 +35,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               y_limits: Tuple[Optional[float], Optional[float]] = None,
               totals: List[float] = None,
               is_top_totals: bool = False,
+              annotate_totals: bool = True,
               totals_offset: Tuple[float, float] = (2.55, 5),
               series_color: str = 'lightblue',
               colors: List[str] = None,
@@ -94,7 +95,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         value_name = ylabel or 'y'
         var_name = xlabel or 'x'
         df1 = df.melt(ignore_index=False, var_name=var_name, value_name=value_name)
-        if is_sns:
+        if is_sns and not stacked:
             sns.barplot(x=df1.index, y=value_name, data=df1, hue=var_name,
                         palette=colors, edgecolor='none',
                         orient='h' if is_horizontal else 'v',
@@ -141,15 +142,16 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                 ax.text(x_min + 0.2 * (x_max - x_min), 0.975, label,
                         transform=trans, fontsize=fontsize, weight='normal')
             else:
-                ax.hlines(xmin=x_min, xmax=x_max, y=total, linestyle='-', color='black', linewidth=2)
-                ax.annotate(text=label, xytext=totals_offset, textcoords='offset points',
-                            xy=(x_max, total),
-                            fontsize=fontsize,
-                            ha='left', va='top')
+                ax.hlines(xmin=x_min, xmax=x_max, y=total, linestyle='-', color='black', linewidth=0.5)
+                if annotate_totals:
+                    ax.annotate(text=label, xytext=totals_offset, textcoords='offset points',
+                                xy=(x_max, total),
+                                fontsize=fontsize,
+                                ha='left', va='top')
 
     if vline_columns is not None:
         for vline_column in vline_columns:
-            ax.vlines([vline_column-0.5], *ax.get_ylim(), lw=1) # shift by 0.5 for visibility
+            ax.vlines([vline_column-0.5], *ax.get_ylim(), lw=1)  # shift by 0.5 for visibility
 
     if legend_labels is not None:
         labels = legend_labels
@@ -414,20 +416,29 @@ def plot_vbars(df: pd.DataFrame,
 
 
 class UnitTests(Enum):
-    BARS2 = 1
-    TOP_BOTTOM_RETURNS = 2
-    VBAR_WEIGHTS = 3
-    MONTHLY_RETURNS_BARS = 4
+    BARS = 1
+    BARS2 = 2
+    TOP_BOTTOM_RETURNS = 3
+    VBAR_WEIGHTS = 4
+    MONTHLY_RETURNS_BARS = 5
 
 
 def run_unit_test(unit_test: UnitTests):
 
-    if unit_test == UnitTests.BARS2:
+    if unit_test == UnitTests.BARS:
+        n = 11
+        index = [f"id{x+1} {x**2}" for x in range(n)]
+        df1 = pd.DataFrame(np.linspace(0.0, 1.0, n), index=index, columns=['part1'])
+        df2 = pd.DataFrame(np.linspace(0.0, 0.5, n), index=index, columns=['part2'])
+        df = pd.concat([df1, df2], axis=1)
+        plot_bars(df=df, stacked=True)
+
+    elif unit_test == UnitTests.BARS2:
 
         n = 11
         index = [f"id{x+1} {x**2}" for x in range(n)]
-        df1 = pd.DataFrame(np.linspace(0.0, 1.0, 11), index=index, columns=['data1'])
-        df2 = pd.DataFrame(np.linspace(0.0, 0.5, 11), index=index, columns=['data2'])
+        df1 = pd.DataFrame(np.linspace(0.0, 1.0, n), index=index, columns=['data1'])
+        df2 = pd.DataFrame(np.linspace(0.0, 0.5, n), index=index, columns=['data2'])
 
         fig, axs = plt.subplots(1, 2, figsize=(8, 6), tight_layout=True)
         datas = [df1, df2]
@@ -498,7 +509,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.MONTHLY_RETURNS_BARS
+    unit_test = UnitTests.BARS
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -123,10 +123,10 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  fontsize: int = 10,
                                  transpose: bool = False,
                                  alpha_an_factor: float = None,
-                                 is_fig_out: bool = True,
+                                 is_df_out: bool = False,
                                  ax: plt.Subplot = None,
                                  **kwargs
-                                 ) -> Union[plt.Figure, pd.DataFrame]:
+                                 ) -> Union[plt.Figure, Tuple[plt.Figure, pd.DataFrame]]:
     """
     plot ra perf table and get ra performance columns with data as string for tables
     """
@@ -138,18 +138,19 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                                   column_header=column_header,
                                                   alpha_an_factor=alpha_an_factor,
                                                   **kwargs)
-    if is_fig_out:
-        if not drop_benchmark and special_rows_colors is None:
-            special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
-        kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
-        return ptb.plot_df_table(df=ra_perf_table,
-                                 transpose=transpose,
-                                 special_columns_colors=special_columns_colors,
-                                 fontsize=fontsize,
-                                 ax=ax,
-                                 **kwargs)
+    if not drop_benchmark and special_rows_colors is None:
+        special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
+    kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
+    fig = ptb.plot_df_table(df=ra_perf_table,
+                            transpose=transpose,
+                            special_columns_colors=special_columns_colors,
+                            fontsize=fontsize,
+                            ax=ax,
+                            **kwargs)
+    if is_df_out:
+        return fig, ra_perf_table
     else:
-        return ra_perf_table
+        return fig
 
 
 def plot_ra_perf_bars(prices: pd.DataFrame,

@@ -34,7 +34,7 @@ def plot_scatter(df: pd.DataFrame,
                  order: int = 2,  # regression order
                  full_sample_order: Optional[int] = 2,  # full sample order can be different
                  fit_intercept: bool = True,
-                 full_sample_color: str = 'grey',
+                 full_sample_color: str = 'blue',
                  colors: List[str] = None,
                  xvar_format: str = '{:.0%}',
                  yvar_format: str = '{:.0%}',

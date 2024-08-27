@@ -328,15 +328,15 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
     if isinstance(df2, pd.Series):
         df2 = df2.to_frame()
 
-    ncol1 = len(df1.columns)
-    ncol2 = len(df2.columns)
+    ncols1 = len(df1.columns)
+    ncols2 = len(df2.columns)
     if colors is None:
-        colors = put.get_n_colors(n=ncol1 + ncol2, **kwargs)
+        colors = put.get_n_colors(n=ncols1 + ncols2, **kwargs)
 
     ax_twin = ax.twinx()
     plot_time_series(df=df1,
                      legend_loc=None,
-                     colors=colors[:ncol1],
+                     colors=colors[:ncols1],
                      var_format=None,
                      linestyles=linestyles,
                      trend_line=trend_line1,
@@ -349,7 +349,7 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
 
     plot_time_series(df=df2,
                      legend_loc=None,
-                     colors=colors[ncol1:],
+                     colors=colors[ncols1:],
                      var_format=None,
                      linestyles=linestyles_ax2,
                      trend_line=trend_line2,

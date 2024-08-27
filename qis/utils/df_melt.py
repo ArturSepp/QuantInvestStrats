@@ -171,7 +171,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PD_MELT
+    unit_test = UnitTests.MELT_DF_BY_COLUMNS
 
     is_run_all_tests = False
     if is_run_all_tests:

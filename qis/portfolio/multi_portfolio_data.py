@@ -596,12 +596,12 @@ class MultiPortfolioData:
                                      ) -> None:
         datas = []
         for portfolio_id in portfolio_ids:
-            datas.append(self.portfolio_datas[portfolio_id].get_performance_data(attribution_metric=attribution_metric,
-                                                                                 time_period=time_period))
+            datas.append(self.portfolio_datas[portfolio_id].get_performance_attribution_data(attribution_metric=attribution_metric,
+                                                                                             time_period=time_period))
         data = pd.concat(datas, axis=1)
         data = data.sort_values(data.columns[0], ascending=False)
         kwargs = sop.update_kwargs(kwargs=kwargs,
-                                         new_kwargs={'ncol': len(data.columns),
+                                         new_kwargs={'ncols': len(data.columns),
                                                      'legend_loc': 'upper center',
                                                      'bbox_to_anchor': (0.5, 1.05),
                                                      'x_rotation': 90})
@@ -751,7 +751,7 @@ class MultiPortfolioData:
         dfs = {self.portfolio_datas[strategy_idx].ticker: strategy_weights,
                self.portfolio_datas[benchmark_idx].ticker: benchmark_weights}
 
-        local_kwargs = qis.update_kwargs(kwargs, dict(ncol=2, legend_loc='upper center', showmedians=True,
+        local_kwargs = qis.update_kwargs(kwargs, dict(ncols=2, legend_loc='upper center', showmedians=True,
                                                       yvar_format='{:.1%}'))
         qis.df_dict_boxplot_by_columns(dfs=dfs,
                                        hue_var_name='groups' if is_grouped else 'instruments',

@@ -20,6 +20,9 @@ class TrainLivePeriod(NamedTuple):
 
 @dataclass
 class TrainLiveSamples:
+    """
+    dictionary when the traning start with TrainLivePeriod
+    """
     train_live_dates: Dict[TimePeriod, TrainLivePeriod] = None
 
     def __post_init__(self):
@@ -37,11 +40,13 @@ def split_to_train_live_samples(ts_index: Union[pd.DatetimeIndex, pd.Index],
                                 model_update_freq: 'str' = 'ME',
                                 roll_period: int = 12
                                 ) -> TrainLiveSamples:
-
+    """
+    ts index is split into overlapping periods at freq = model_update_freq and period lenth of roll_period
+    """
     update_dates = pd.date_range(start=ts_index[0],
                                  end=ts_index[-1],
                                  freq=model_update_freq,
-                                 closed='right')
+                                 inclusive='right')
 
     train_live_samples = TrainLiveSamples()
     for idx, date in enumerate(update_dates):

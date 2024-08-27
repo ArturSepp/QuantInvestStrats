@@ -198,7 +198,7 @@ def run_unit_test(unit_test: UnitTests):
                          is_add_totals=False,
                          add_bar_values=False,
                          fontsize=8,
-                         ncol=3,
+                         ncols=3,
                          bbox_to_anchor=(0.5, 1.12),
                          pad=15,
                          ax=ax,

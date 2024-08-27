@@ -84,7 +84,7 @@ def norm_df_by_ax_mean(data: Union[np.ndarray, pd.DataFrame],
         if proportiontocut is not None:
             mean = npo.np_array_to_df_columns(a=stats.trim_mean(a=a,
                                                                 proportiontocut=proportiontocut, axis=axis),
-                                              n_col=len(data.columns))
+                                              ncols=len(data.columns))
         else:
             mean = np.nanmean(a=a, axis=axis, keepdims=True)
         a = a - mean
@@ -440,11 +440,11 @@ def dfs_to_upper_lower_diag(df_upper: pd.DataFrame,
     create up/low/diag copz
     nb must be square matrizes
     """
-    n_rows = len(df_upper.index)
+    nrows = len(df_upper.index)
     out = df_upper.copy()
-    for i in range(n_rows):
+    for i in range(nrows):
         out.iloc[i, i] = diagonal.iloc[i]
-        for j in range(n_rows):
+        for j in range(nrows):
             if i < j:
                 out.iloc[i, j] = df_upper.iloc[i, j]
             elif i > j:
@@ -611,9 +611,9 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.SCORES:
         np.random.seed(1)
-        nrows, ncol = 20, 5
-        df = pd.DataFrame(data=np.random.normal(0.0, 1.0, size=(nrows, ncol)),
-                          columns=[f"id{n + 1}" for n in range(ncol)])
+        nrows, ncols = 20, 5
+        df = pd.DataFrame(data=np.random.normal(0.0, 1.0, size=(nrows, ncols)),
+                          columns=[f"id{n + 1}" for n in range(ncols)])
         print(df)
         percentiles = compute_last_score(df=df)
         print(percentiles)

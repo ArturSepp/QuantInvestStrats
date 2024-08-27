@@ -892,7 +892,7 @@ def compute_ewm_beta_resid(x_data: pd.DataFrame,
 
     beta_xy = np.divide(xy_covar, x_var, where=np.isclose(x_var, 0.0)==False)
 
-    resid = y - beta_xy * npo.np_array_to_n_column_array(a=x, n_col=beta_xy.shape[1]) # extend x by columns to match columns of beta_xy
+    resid = y - beta_xy * npo.np_array_to_n_column_array(a=x, ncols=beta_xy.shape[1]) # extend x by columns to match columns of beta_xy
     resid2 = np.square(resid)
     iv_resid2 = set_init_dim1(data=resid2, init_type=init_type)
     resid_var = ewm_recursion(a=resid2, ewm_lambda=ewm_lambda, init_value=iv_resid2)

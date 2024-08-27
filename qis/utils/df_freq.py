@@ -141,7 +141,7 @@ def df_resample_at_freq(df: Union[pd.DataFrame, pd.Series],
 
 
 def df_resample_at_int_index(df: pd.DataFrame,
-                             func: Callable = np.nansum,
+                             func: Optional[Callable] = np.nansum,
                              sample_size: int = 5
                              ) -> pd.DataFrame:
     """
@@ -150,15 +150,19 @@ def df_resample_at_int_index(df: pd.DataFrame,
     assert isinstance(sample_size, int)
     original_index = df.index
     df = df.reset_index(drop=True)  # need integer range index
+    int_index = df.index
     sampler = (df.index.to_series() / sample_size).astype(int)
-    df = df.groupby(sampler).agg(func, axis=0)
+    sampler = pd.Series(sampler.values[-1]-sampler.values[::-1], sampler.index)  # reverse so the last samples has full cycle
+    if func is not None:
+        df = df.groupby(sampler, sort=False).agg(func, axis=0)
+    else:
+        # df = df.groupby(sampler, sort=False).apply(lambda x: len(x.index))
+        df = df.groupby(sampler).apply(lambda x: x.iloc[-1])
     if isinstance(df, pd.Series):  # if input is one columns
         df = df.to_frame()
 
     # define sampled index
-    sampled_index = original_index[sample_size-1::sample_size]
-    if len(sampled_index) < len(df.index):
-        sampled_index = sampled_index.append(pd.Index([original_index[-1]]))
+    sampled_index = pd.Series(original_index, index=int_index).groupby(sampler).apply(lambda x: x.iloc[-1])
     df = df.set_index(sampled_index)
     return df
 
@@ -171,7 +175,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    time_period = da.TimePeriod('1Jan2020', '1Dec2020')
+    time_period = da.TimePeriod('1Jan2020', '05Jan2021')
     daily_index = time_period.to_pd_datetime_index(freq='B')
     df = pd.DataFrame(data=np.tile(np.array([1.0, 2.0]), (len(daily_index), 1)), index=daily_index, columns=['1', '2'])
     print(df)
@@ -201,8 +205,11 @@ def run_unit_test(unit_test: UnitTests):
         print(freq_data2.index)
 
     elif unit_test == UnitTests.INT_INDEX:
-        df = df_resample_at_int_index(df=df, sample_size=21)
-        print(df)
+        # df1 = df_resample_at_int_index(df=df, sample_size=21)
+        # print(df1)
+        df2 = df_resample_at_int_index(df=df.cumsum(0), func=None, sample_size=21)
+        print(f"func=None")
+        print(df2)
 
 
 if __name__ == '__main__':

@@ -161,7 +161,7 @@ def replace_nan_by_median(df: pd.DataFrame,
     if is_replace_zeros:
         df = df.replace(0.0, np.nan)
     np_data = df.to_numpy()
-    data_med = npo.np_array_to_df_columns(a=np.nanmedian(np_data, axis=1), n_col=len(df.columns))
+    data_med = npo.np_array_to_df_columns(a=np.nanmedian(np_data, axis=1), ncols=len(df.columns))
     np_data_fill = np.where(np.isnan(np_data), data_med, np_data)
     data_clean = pd.DataFrame(np_data_fill, index=df.index, columns=df.columns)
     return data_clean

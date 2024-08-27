@@ -193,7 +193,7 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
         if not isinstance(data, pd.Series):
             raise ValueError(f"data must be series")
 
-        bootstrap_sample = get_bootsrtap_data_list(data_np=npo.np_array_to_matrix(a=data.to_numpy(), n_col=1),
+        bootstrap_sample = get_bootsrtap_data_list(data_np=npo.np_array_to_matrix(a=data.to_numpy(), ncols=1),
                                                    bootstrapped_indices=bootstrapped_indices)
         data = []
         for idx, sample in enumerate(bootstrap_sample):

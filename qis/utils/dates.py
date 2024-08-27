@@ -625,13 +625,16 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series] = None,
                                     freq: str = 'ME',
                                     include_start_date: bool = False,
                                     include_end_date: bool = False,
-                                    num_warmup_periods: Optional[int] = None
+                                    num_warmup_periods: Optional[int] = None,
+                                    return_true_only: bool = False
                                     ) -> pd.Series:
     """
     tz awre rebalancing date indicators for rebalancing at data index
     optional num_warmup_periods in number of periods at freq-schedule
     """
     if df is not None:
+        if not (isinstance(df, pd.Series) or isinstance(df, pd.DataFrame)):
+            raise NotImplementedError(f"type={type(df)}")
         index = df.index
     else:
         if index is None:
@@ -644,7 +647,8 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series] = None,
     indicators_full = set_rebalancing_timeindex_on_given_timeindex(given_index=index, rebalancing_index=dates_schedule)
     if num_warmup_periods is not None:
         indicators_full.iloc[:num_warmup_periods] = False
-
+    if return_true_only:
+        indicators_full = indicators_full.loc[indicators_full == True]
     return indicators_full
 
 
@@ -664,6 +668,7 @@ def set_rebalancing_timeindex_on_given_timeindex(given_index: pd.DatetimeIndex,
     indicators_on_grid = pd.concat([indicators_on_grid, indicators_off_grid], axis=0).sort_index()
     indicators_full = pd.Series(data=np.where(np.isin(given_index, indicators_on_grid.index), True, False), index=given_index)
     return indicators_full
+
 
 def generate_sample_dates(time_period: TimePeriod,
                           freq: str = 'ME',

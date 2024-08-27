@@ -1,7 +1,13 @@
 
+from qis.portfolio.portfolio_data import (PortfolioData, PortfolioInput, AttributionMetric, StrategySignalData)
+
+from qis.portfolio.multi_portfolio_data import MultiPortfolioData
+
 from qis.portfolio.ewm_portfolio_risk import (compute_portfolio_vol,
                                               compute_portfolio_correlated_var_by_groups,
                                               compute_portfolio_independent_var_by_ac)
+
+from qis.portfolio.backtester import (backtest_model_portfolio, backtest_rebalanced_portfolio)
 
 from qis.portfolio.reports.config import (FactsheetConfig,
                                           FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD,
@@ -15,10 +21,6 @@ from qis.portfolio.reports.config import (FactsheetConfig,
 from qis.portfolio.reports.brinson_attribution import (compute_brinson_attribution_table,
                                                        plot_brinson_attribution_table)
 
-from qis.portfolio.backtester import (backtest_model_portfolio, backtest_rebalanced_portfolio)
-
-from qis.portfolio.portfolio_data import PortfolioData, PortfolioInput, AttributionMetric
-
 from qis.portfolio.reports.multi_assets_factsheet import (MultiAssetsReport, generate_multi_asset_factsheet)
 
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
@@ -26,9 +28,10 @@ from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strategy_benchmark_factsheet_plt,
                                                                 generate_strategy_benchmark_active_perf_plt)
 
-from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
+
+from qis.portfolio.reports.strategy_signal_factsheet import (generate_weight_change_report,
+                                                             generate_strategy_signal_factsheet_by_instrument)
 
 # disable requirements for pyblogs
 # from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pyblogs

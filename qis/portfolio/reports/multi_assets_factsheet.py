@@ -360,10 +360,10 @@ class MultiAssetsReport:
         title = title or f"Boxplot of average {self.regime_params.freq}-freq return conditional on volatility regime of {str(benchmark)}"
         regime_classifier = qis.BenchmarkVolsQuantilesRegime(regime_params=qis.VolQuantileRegimeSpecs(freq=self.regime_params.freq))
         if len(prices.columns) >= 8:
-            ncol = len(prices.columns) // 2
+            ncols = len(prices.columns) // 2
         else:
-            ncol = len(prices.columns)
-        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(ncol=ncol))
+            ncols = len(prices.columns)
+        local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(ncols=ncols))
         qis.plot_regime_boxplot(regime_classifier=regime_classifier,
                                 prices=prices,
                                 benchmark=benchmark,

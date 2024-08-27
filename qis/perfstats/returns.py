@@ -13,8 +13,8 @@ from typing import Union, Dict, Optional
 import qis.utils.dates as da
 import qis.utils.df_freq as dff
 import qis.utils.np_ops as npo
+import qis.utils.df_ops as dfo
 from qis.perfstats.config import PerfStat, ReturnTypes, PerfParams
-from qis.utils import df_ops as dfo
 from qis.utils.dates import CALENDAR_DAYS_PER_YEAR_SHARPE
 
 
@@ -343,7 +343,7 @@ def adjust_navs_to_portfolio_pa(portfolio_nav: pd.Series,
     asset_prices_adj = asset_prices.copy()
     t = (portfolio_nav.index - portfolio_nav.index[0]).days.to_numpy() / CALENDAR_DAYS_PER_YEAR_SHARPE
     c_m = ((portfolio_pa / n + 1.0) / (np.nanmean(assets_pa) + 1.0)) ** t
-    ratio = npo.np_array_to_df_columns(a=c_m, n_col=n)
+    ratio = npo.np_array_to_df_columns(a=c_m, ncols=n)
     asset_prices_adj = asset_prices_adj.multiply(ratio)
     asset_prices_adj = asset_prices_adj[asset_prices.columns]
     return asset_prices_adj
@@ -631,8 +631,8 @@ def get_excess_returns_nav(prices: Union[pd.DataFrame, pd.Series],
     funding_rate_dt = dfo.multiply_df_by_dt(df=funding_rate, dates=nav_returns.index, lag=1)
 
     if isinstance(prices, pd.DataFrame):
-        n_col = len(prices.columns)
-        excess_returns = nav_returns.subtract(npo.np_array_to_df_columns(a=funding_rate_dt.to_numpy(), n_col=n_col),
+        ncols = len(prices.columns)
+        excess_returns = nav_returns.subtract(npo.np_array_to_df_columns(a=funding_rate_dt.to_numpy(), ncols=ncols),
                                               axis=1)
     else:
         data = nav_returns.to_numpy()-funding_rate_dt.to_numpy()

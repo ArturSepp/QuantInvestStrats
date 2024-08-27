@@ -16,8 +16,8 @@ import qis.plots.utils as put
 
 
 def plot_box(df: Union[pd.Series, pd.DataFrame],
-             x: str,
-             y: str,
+             x: str = None,
+             y: str = None,
              xlabel: Optional[Union[str, bool]] = True,
              ylabel: Optional[Union[str, bool]] = True,
              hue: Optional[str] = None,
@@ -58,6 +58,13 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
     plot boxplot of df[[x, y]]
     original_index use for melted df in term of original index
     """
+    if x is None and y is None:
+        if len(df.columns) == 2:
+            x = df.columns[0]
+            y = df.columns[1]
+        else:
+            raise ValueError(f"x and y must be defined for more than one columns")
+
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -164,7 +171,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
             y_val = g_data[y].median()
             x_val = g_data[continuous_x_col].median()
             if add_y_med_labels:
-                ax.text(x_idx, y_val, f"{yvar_format.format(y_val)}\n\n",
+                ax.text(x_idx, y_val, f"median={yvar_format.format(y_val)}\n\n",
                         ha='center', va='center',
                         color='black', fontsize=fontsize)
             else:
@@ -558,7 +565,7 @@ def run_unit_test(unit_test: UnitTests):
                                        legend_loc='upper center',
                                        showmedians=True,
                                        add_y_med_labels=True,
-                                       ncol=2,
+                                       ncols=2,
                                        ax=ax)
 
     plt.show()
@@ -566,7 +573,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.DF_DICT
+    unit_test = UnitTests.DF_WEIGHTS
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -108,7 +108,7 @@ def nan_func_to_data(a: np.ndarray,
                      ) -> np.ndarray:
     """
     apply nan sensitive function to data
-    for pandas:  a.dim=2, a.shape = (n_rows, n_col)
+    for pandas:  a.dim=2, a.shape = (nrows, ncols)
     row or columns wise operation equivalent to
     out = np.where(ind_all_nans, nans, np.nanmean(a=a, axis=axis))
     avoiding RuntimeWarning: Mean of empty slice
@@ -125,22 +125,22 @@ def nan_func_to_data(a: np.ndarray,
             raise ValueError(f"axis=1 not defined for 1-d array")
 
     else:
-        n_rows = a.shape[0]
-        n_col = a.shape[1]
+        nrows = a.shape[0]
+        ncols = a.shape[1]
 
         if axis == 0:
-            out = np.full(n_col, np.nan, dtype=np.double)
+            out = np.full(ncols, np.nan, dtype=np.double)
         else:
-            out = np.full(n_rows, np.nan, dtype=np.double)
+            out = np.full(nrows, np.nan, dtype=np.double)
 
         if axis == 0:  # column wise
-            for col_idx in np.arange(n_col):
+            for col_idx in np.arange(ncols):
                 col_a = a[:, col_idx]
                 if not np.all(np.isnan(col_a)):
                     out[col_idx] = func(col_a)
 
         else:  # row wise
-            for row_idx in np.arange(n_rows):
+            for row_idx in np.arange(nrows):
                 row_a = a[row_idx]
                 if not np.all(np.isnan(row_a)):
                     out[row_idx] = func(row_a)
@@ -252,13 +252,13 @@ def np_get_sorted_idx(a: np.ndarray) -> np.ndarray:
     return sorted_idx
 
 
-def np_array_to_df_columns(a: np.ndarray, n_col: int) -> np.ndarray:
+def np_array_to_df_columns(a: np.ndarray, ncols: int) -> np.ndarray:
     """
     in case operation of np array is needed to apply to pandas column wise,
     the numpy array is broadcast to pandas columns
     the lenth = pandas.index
     """
-    return np.tile(a, (n_col, 1)).T
+    return np.tile(a, (ncols, 1)).T
 
 
 def np_array_to_df_index(a: np.ndarray, n_index: int) -> np.ndarray:
@@ -270,11 +270,11 @@ def np_array_to_df_index(a: np.ndarray, n_index: int) -> np.ndarray:
     return np.tile(a, (n_index, 1))
 
 
-def np_array_to_n_column_array(a: np.ndarray, n_col: int) -> np.ndarray:
+def np_array_to_n_column_array(a: np.ndarray, ncols: int) -> np.ndarray:
     """
     for numpy broadcast of t-dim array to t-n dim array
     """
-    return np.tile(a, (1, n_col))
+    return np.tile(a, (1, ncols))
 
 
 def np_array_to_t_rows_array(a, t_rows: int) -> np.ndarray:
@@ -284,11 +284,11 @@ def np_array_to_t_rows_array(a, t_rows: int) -> np.ndarray:
     return np.tile(a, (t_rows, 1))
 
 
-def np_array_to_matrix(a: np.ndarray, n_col: int) -> np.ndarray:
+def np_array_to_matrix(a: np.ndarray, ncols: int) -> np.ndarray:
     """
     convert series too pandas dimension
     """
-    matrix = np.broadcast_to(a, (n_col, len(a))).T
+    matrix = np.broadcast_to(a, (ncols, len(a))).T
     return matrix
 
 
