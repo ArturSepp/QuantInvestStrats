@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import Tuple, List
+from typing import Tuple, List, Dict, Optional
 import qis as qis
 from qis import TimePeriod, BenchmarkReturnsQuantileRegimeSpecs
 from qis.portfolio.portfolio_data import PortfolioData, StrategySignalData
@@ -18,6 +18,7 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
                                   sample_size: int = 20,
                                   figsize: Tuple[float, float] = (8.3, 11.7),
                                   verbose: bool = False,
+                                  group_deflator: Optional[Dict[str, float]] = dict(STIR=0.1),
                                   **kwargs
                                   ) -> plt.Figure:
     strategy_signal_data = portfolio_data.strategy_signal_data
@@ -25,29 +26,53 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
         raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
 
     if is_grouped:
-        predictions_g, fitted_models_g = strategy_signal_data.estimate_signal_changes_by_groups(
+        predictions_g, fitted_models_g, prediction_period = strategy_signal_data.estimate_signal_changes_by_groups(
             group_data=portfolio_data.group_data,
             group_order=portfolio_data.group_order,
             time_period=time_period,
             sample_size=sample_size)
 
-        with sns.axes_style('darkgrid'):
-            fig, axs = plt.subplots(len(predictions_g.keys())//2+1, 2, figsize=figsize, tight_layout=True)
-            axs = qis.to_flat_list(axs)
-            qis.set_suptitle(fig, title=f"{portfolio_data.ticker} weights change report")
-
+        group_preds = {}
+        agg_preds = {}
         for idx, (group, df) in enumerate(predictions_g.items()):
+            df_ac = df[['momentum_change', 'carry_change', 'target_vol_change', 'port_leverage_change', 'residual']]
+            group_preds[group] = df_ac.copy()
+            if group_deflator is not None and group in group_deflator.keys():
+                df_ac *= group_deflator[group]
+            agg_preds[group] = df_ac.sum(0)
+        agg_preds = pd.DataFrame.from_dict(agg_preds, orient='index')
+
+        post_agg = ''
+        if group_deflator is not None:
+            this = ''
+            for key, deflator in group_deflator.items():
+                this += f"{key}={deflator:0.2f}"
+            post_agg = f" (using deflator for {this})"
+        preds_dict = {f"Total by groups {post_agg}": agg_preds}
+        preds_dict.update(group_preds)
+
+        with sns.axes_style('darkgrid'):
+            fig, axs = plt.subplots(len(preds_dict.keys())//2+len(preds_dict.keys())%2, 2, figsize=figsize, tight_layout=True)
+            axs = qis.to_flat_list(axs)
+            weight_freq = pd.infer_freq(strategy_signal_data.weights.index)
+
+            qis.set_suptitle(fig, title=f"{portfolio_data.ticker} Attribution of changes in weights for period "
+                                        f"{prediction_period.to_str()}"
+                                        f" using last {sample_size} {weight_freq}-freq periods",
+                             fontweight="bold", fontsize=8, color='blue')
+
+        for idx, (group, df_ac) in enumerate(preds_dict.items()):
             if verbose:
                 print(f"{group}")
-                print(df)
+                print(df_ac)
                 print(f"{fitted_models_g[group].summary()}")
-            df_ac = df[['momentum_change', 'carry_change', 'target_vol_change', 'port_leverage_change', 'resid']]
-            qis.plot_bars(df=df_ac, stacked=True,
+            qis.plot_bars(df=df_ac,
+                          stacked=True,
                           totals=df_ac.sum(1).to_list(),
                           annotate_totals=False,
                           title=f"{group}",
                           ncols=len(df_ac.columns)//2,
-                          yvar_format='{:,.2%}',
+                          yvar_format='{:,.1%}',
                           ax=axs[idx],
                           **kwargs)
     else:

@@ -994,9 +994,13 @@ class PortfolioData:
                                                    add_top_bar_values=add_top_bar_values,
                                                    x_rotation=90))
         data = data.replace({0.0: np.nan}).dropna()
+        title = f"{attribution_metric.title}"
+        if time_period is not None:
+            title += f", for period={time_period.to_str()}"
+
         qis.plot_bars(df=data,
                       skip_y_axis=True,
-                      title=f"{attribution_metric.title}",
+                      title=title,
                       stacked=False,
                       yvar_format='{:,.1%}' if add_top_bar_values else '{:,.2%}',
                       ax=ax,
@@ -1097,12 +1101,16 @@ class PortfolioData:
     def plot_current_weights(self,
                              is_grouped: bool = False,
                              add_top_bar_values: Optional[bool] = None,
+                             time_period: TimePeriod = None,
                              title: str = None,
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> None:
         weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped)
-        weights_1 = weights.iloc[-1, :]
+        if time_period is not None:
+            weights_1 = time_period.locate(weights).iloc[0, :]
+        else:
+            weights_1 = weights.iloc[-1, :]
         if add_top_bar_values is None:
             if len(weights_1.index) <= 10:
                 add_top_bar_values = True
@@ -1113,9 +1121,9 @@ class PortfolioData:
                                                                   x_rotation=90))
         if title is None:
             if is_grouped:
-                title = f"Current weights by groups on {qis.date_to_str(weights_1.name)}"
+                title = f"Weights by groups on {qis.date_to_str(weights_1.name)}"
             else:
-                title = f"Current weights by instruments on {qis.date_to_str(weights_1.name)}"
+                title = f"Weights by instruments on {qis.date_to_str(weights_1.name)}"
         qis.plot_bars(df=weights_1,
                       skip_y_axis=True,
                       title=title,
@@ -1263,7 +1271,7 @@ class StrategySignalData:
                                       freq: Optional[str] = None,
                                       sample_size: Optional[int] = 21,  # can use rolling instead for freq
                                       time_period: TimePeriod = None
-                                      ) -> Tuple[pd.DataFrame, RegModel]:
+                                      ) -> Tuple[pd.DataFrame, RegModel, TimePeriod]:
         if tickers is None:
             tickers = self.log_returns.columns.to_list()
         ssd = self.asdiff(tickers=tickers, sample_size=sample_size, freq=freq, time_period=time_period)
@@ -1305,33 +1313,39 @@ class StrategySignalData:
                 pred_t[x_names[idx]] = pred_x
             pred_t['predicted'] = total_pred
             pred_t['actual'] = actual_change[ticker]
-            pred_t['resid'] = actual_change[ticker] - total_pred
-            pred_t['resid %'] = total_pred / actual_change[ticker]
+            pred_t['residual'] = actual_change[ticker] - total_pred
+            pred_t['residual %'] = total_pred / actual_change[ticker]
             pred_t['r2'] = fitted_model.rsquared
             predictions[ticker] = pd.Series(pred_t)
 
         predictions = pd.DataFrame.from_dict(predictions, orient='index')
+        prediction_period = TimePeriod(start=ssd.weights.index[-2], end=ssd.weights.index[-1])
 
-        return predictions, fitted_model
+        return predictions, fitted_model, prediction_period
 
     def estimate_signal_changes_by_groups(self,
                                           group_data: pd.Series, group_order: List[str] = None,
                                           freq: Optional[str] = None,
                                           sample_size: Optional[int] = 21,  # can use rolling instead for freq
                                           time_period: TimePeriod = None
-                                          ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, RegModel]]:
+                                          ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, RegModel], TimePeriod]:
+        """
+        estimate weight change for groups
+        """
         group_dict = dfg.get_group_dict(group_data=group_data,
                                         group_order=group_order,
                                         total_column=None)
         predictions = {}
         fitted_models = {}
+        prediction_period = None
         for group, tickers in group_dict.items():
-            prediction, fitted_model = self.estimate_signal_changes_joint(tickers=tickers, freq=freq,
-                                                                          sample_size=sample_size,
-                                                                          time_period=time_period)
+            prediction, fitted_model, prediction_period = self.estimate_signal_changes_joint(
+                tickers=tickers, freq=freq,
+                sample_size=sample_size,
+                time_period=time_period)
             predictions[group] = prediction
             fitted_models[group] = fitted_model
-        return predictions, fitted_models
+        return predictions, fitted_models, prediction_period
 
     def estimate_signal_changes_individual(self,
                                            tickers: List[str] = None,
@@ -1382,8 +1396,8 @@ class StrategySignalData:
                 pred_t[x_names[idx]] = pred_x
             pred_t['predicted'] = total_pred
             pred_t['actual'] = actual_change
-            pred_t['resid'] = actual_change - total_pred
-            pred_t['resid %'] = total_pred / actual_change
+            pred_t['residual'] = actual_change - total_pred
+            pred_t['residual %'] = total_pred / actual_change
             pred_t['r2'] = fitted_model.rsquared
             predictions[ticker] = pd.Series(pred_t)
             fitted_models[ticker] = fitted_model

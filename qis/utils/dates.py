@@ -494,11 +494,15 @@ def get_time_period_shifted_by_years(time_period: TimePeriod,
     return time_period
 
 
-def get_ytd_time_period(year: int = 2023) -> TimePeriod:
-    end = get_current_time_with_tz()
-    if year is not None:
+def get_ytd_time_period(year: Optional[int] = None,
+                        tz: Optional[str] = None,
+                        days_offset: Optional[int] = -1,
+                        normalize: bool = True
+                        ) -> TimePeriod:
+    end = get_current_time_with_tz(tz=tz, days_offset=days_offset, normalize=normalize)
+    if year is None:
         year = end.year
-    return TimePeriod(start=dt.datetime(year=year - 1, month=12, day=31), end=get_current_time_with_tz(tz=None))
+    return TimePeriod(start=dt.datetime(year=year - 1, month=12, day=31), end=end)
 
 
 def generate_dates_schedule(time_period: TimePeriod,

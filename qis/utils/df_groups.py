@@ -226,12 +226,12 @@ def sort_df_by_index_group(df: pd.DataFrame,
 
 
 def set_group_loadings(group_data: pd.Series, group_order: List[str] = None) -> pd.DataFrame:
-    if not isinstance(group_order, pd.Series):
-        raise ValueError(f"{type(group_order)} must be pd.Series")
+    if not isinstance(group_data, pd.Series):
+        raise ValueError(f"{type(group_data)} must be pd.Series")
     if group_order is None:
         group_order = group_data.unique()
     group_loadings = {}
-    for group in group_loadings:
+    for group in group_order:
         group_loadings[group] = pd.Series(np.where(group_data == group, 1.0, 0.0), index=group_data.index)
     group_loadings = pd.DataFrame.from_dict(group_loadings, orient='columns')
     return group_loadings

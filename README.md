@@ -159,7 +159,8 @@ for either backtested or actual strategy
 
 Run example in ```qis.examples.factsheets.strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/strategy.py
 
-![image info](qis/examples/figures/strategy.PNG)
+![image info](qis/examples/figures/strategy1.PNG)
+![image info](qis/examples/figures/strategy2.PNG)
 
 
 ### 4. Strategy benchmark factsheet <a name="strategybenchmark"></a>
