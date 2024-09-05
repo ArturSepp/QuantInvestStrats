@@ -16,7 +16,9 @@ from bbg_fetch import fetch_field_timeseries_per_tickers
 def get_price_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     tickers = {'HYG US Equity': 'HYG', 'FALN US Equity': 'HY Fallen Angels', 'PIMCMEI ID Equity': 'FI Alpha Fund'}
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B')
-    hedge_tickers = {'ES1 Index': 'SPY', 'US1 Comdty': 'UST'}
+    # hedge_tickers = {'ES1 Index': 'SPY', 'US1 Comdty': 'UST'}
+    hedge_tickers = {'UISYMH5S Index': 'CDX_HY', 'US1 Comdty': 'UST'}
+    # hedge_tickers = {'UISYMI5S Index': 'IG_5Y', 'US1 Comdty': 'UST'}
     hedges = fetch_field_timeseries_per_tickers(tickers=hedge_tickers, freq='B')
     return prices, hedges
 

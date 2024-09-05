@@ -502,7 +502,7 @@ def get_ytd_time_period(year: Optional[int] = None,
     end = get_current_time_with_tz(tz=tz, days_offset=days_offset, normalize=normalize)
     if year is None:
         year = end.year
-    return TimePeriod(start=dt.datetime(year=year - 1, month=12, day=31), end=end)
+    return TimePeriod(start=dt.datetime(year=year-1, month=12, day=31), end=end)
 
 
 def generate_dates_schedule(time_period: TimePeriod,

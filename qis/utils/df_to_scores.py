@@ -8,7 +8,8 @@ from typing import Union, Optional, List
 
 def df_to_cross_sectional_score(df: Union[pd.Series, pd.DataFrame],
                                 lower_clip: Optional[float] = -5.0,
-                                upper_clip: Optional[float] = 5.0
+                                upper_clip: Optional[float] = 5.0,
+                                is_sorted: bool = False
                                 ) -> Union[pd.Series, pd.DataFrame]:
     """
     compute cross sectional score
@@ -18,6 +19,8 @@ def df_to_cross_sectional_score(df: Union[pd.Series, pd.DataFrame],
 
     if isinstance(df, pd.Series):
         score = (df - np.nanmean(df)) / np.nanstd(df)
+        if is_sorted:
+            score = score.sort_values(ascending=False)
     else:
         score = (df - np.nanmean(df, axis=1, keepdims=True)) / np.nanstd(df, axis=1, keepdims=True)
     return score
@@ -57,3 +60,24 @@ def compute_aggregate_scores(scores: List[pd.Series],
         joint_avg = np.nanmean(joint, axis=1)
     joint_score = pd.Series(joint_avg, index=joint.index).sort_values(ascending=False)
     return joint_score
+
+
+def select_top_integrated_scores(scores: pd.DataFrame, top_quantile: float = 0.75) -> pd.DataFrame:
+    """
+
+    """
+    score_quantiles = np.nanquantile(scores, q=top_quantile, axis=0)
+    if len(scores.columns) == 1:
+        joint = np.greater(scores.iloc[:, 0], score_quantiles[0])
+    else:
+        top1 = np.greater(scores.iloc[:, 0], score_quantiles[0])
+        top2 = np.greater(scores.iloc[:, 1], score_quantiles[1])
+        joint = np.logical_and(top1, top2)
+
+        if len(scores.columns) > 2:
+            for idx in np.arange(2, len(scores.columns)):
+                top_idx = np.greater(scores.iloc[:, idx], score_quantiles[idx])
+                joint = np.logical_and(joint, top_idx)
+
+    scores = scores.loc[joint, :]
+    return scores

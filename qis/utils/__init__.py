@@ -150,7 +150,10 @@ from qis.utils.df_to_weights import (
 )
 from qis.utils.df_to_scores import (
     df_to_max_score,
-    df_to_cross_sectional_score)
+    df_to_cross_sectional_score,
+    compute_aggregate_scores,
+    select_top_integrated_scores
+)
 
 from qis.utils.generic import (
     ValueType,
