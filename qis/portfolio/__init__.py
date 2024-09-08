@@ -31,6 +31,7 @@ from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strateg
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 
 from qis.portfolio.reports.strategy_signal_factsheet import (generate_weight_change_report,
+                                                             generate_current_signal_report,
                                                              generate_strategy_signal_factsheet_by_instrument)
 
 # disable requirements for pyblogs

@@ -9,8 +9,10 @@ import yfinance as yf
 import qis
 
 
-def compute_returns(ticker: str = 'SPY') -> Tuple[pd.Series, pd.Series, pd.Series]:
+def compute_returns(ticker: str = 'SPY', time_period: qis.TimePeriod = None) -> Tuple[pd.Series, pd.Series, pd.Series]:
     ohlc_data = yf.download(tickers=ticker, start=None, end=None, ignore_tz=True)
+    if time_period is not None:
+        ohlc_data = time_period.locate(ohlc_data)
     # need to adjust open price for dividends
     adjustment_ratio = ohlc_data['Adj Close'] / ohlc_data['Close']
     adjusted_open = adjustment_ratio.multiply(ohlc_data['Open'])
@@ -21,8 +23,12 @@ def compute_returns(ticker: str = 'SPY') -> Tuple[pd.Series, pd.Series, pd.Serie
     return overnight_return.rename('Overnight'), intraday_return.rename('Intraday'), close_to_close_return.rename('Close-to-Close')
 
 
-def plot_split_returns(ticker: str = 'SPY', is_check_total: bool = False, ax: plt.Subplot = None):
-    overnight_return, intraday_return, close_to_close_return = compute_returns(ticker=ticker)
+def plot_split_returns(ticker: str = 'SPY',
+                       time_period: qis.TimePeriod = None,
+                       is_check_total: bool = False,
+                       ax: plt.Subplot = None
+                       ) -> None:
+    overnight_return, intraday_return, close_to_close_return = compute_returns(ticker=ticker, time_period=time_period)
 
     if is_check_total:
         cum_performance = pd.concat([close_to_close_return.rename('Close-to-Close'),
@@ -43,12 +49,14 @@ def plot_split_returns(ticker: str = 'SPY', is_check_total: bool = False, ax: pl
                          ax=ax)
 
 
-tickers = ['SPY', 'QQQ', 'GLD', 'TLT', 'HYG', 'MSFT']
+# tickers = ['SPY', 'QQQ', 'GLD', 'TLT', 'HYG', 'MSFT']
+tickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'META', 'GOOG']
+time_period = qis.TimePeriod('31Dec2004', None)
 
 with sns.axes_style("darkgrid"):
     fig, axs = plt.subplots(2, len(tickers)//2, figsize=(15, 8), tight_layout=True)
 
 for ticker, ax in zip(tickers, qis.to_flat_list(axs)):
-    plot_split_returns(ticker=ticker, ax=ax)
+    plot_split_returns(ticker=ticker, time_period=time_period, ax=ax)
 
 plt.show()

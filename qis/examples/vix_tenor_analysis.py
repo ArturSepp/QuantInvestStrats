@@ -6,7 +6,7 @@ from bbg_fetch import fetch_field_timeseries_per_tickers
 
 vix_tickers = ['VIX1D Index', 'VIX9D Index', 'VIX Index', 'VIX3M Index', 'VIX6M Index', 'VIX1Y Index']
 
-vols = 0.01*fetch_field_timeseries_per_tickers(tickers=vix_tickers, field='PX_LAST', CshAdjNormal=True).dropna()
+vols = 0.01*fetch_field_timeseries_per_tickers(tickers=vix_tickers).dropna()
 benchmark = 'SPX Index'
 snp = fetch_field_timeseries_per_tickers(tickers=[benchmark], field='PX_LAST', CshAdjNormal=True).dropna()
 snp = snp.reindex(index=vols.index, method='ffill')

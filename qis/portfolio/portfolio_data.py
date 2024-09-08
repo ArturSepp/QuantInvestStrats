@@ -1286,6 +1286,31 @@ class StrategySignalData:
                 data_dict[key] = time_period.locate(df)
         return StrategySignalData(**data_dict)
 
+    def get_current_signal_by_groups(self, group_data: pd.Series,
+                                     group_order: List[str] = None
+                                     ) -> Dict[str, pd.DataFrame]:
+        group_dict = dfg.get_group_dict(group_data=group_data,
+                                        group_order=group_order,
+                                        total_column=None)
+        group_signals = {}
+        agg_by_group = {}
+        last_date = qis.date_to_str(self.signal.index[-21])
+        current_date = qis.date_to_str(self.signal.index[-1])
+        last_signals = self.signal.iloc[-21, :]
+        current_signals = self.signal.iloc[-1, :]
+        for group, tickers in group_dict.items():
+            last_signals_ = last_signals[tickers]
+            current_signals_ = current_signals[tickers]
+            group_signals[group] = pd.concat([last_signals_.rename(last_date),
+                                              current_signals_.rename(current_date)
+                                              ], axis=1)
+
+            agg_by_group[group] = pd.Series({last_date: np.nanmean(last_signals_),
+                                             current_date: np.nanmean(current_signals_)})
+        agg_by_group = {'Total by groups': pd.DataFrame.from_dict(agg_by_group, orient='index')}
+        agg_by_group.update(group_signals)
+        return agg_by_group
+
     def asdiff(self, tickers: List[str] = None,
                freq: str = None,
                sample_size: Optional[int] = 21,  # can use rolling instead for freq

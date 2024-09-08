@@ -328,6 +328,8 @@ class TimePeriod:
         """
         truncate timeseries data to given timeperiod
         """
+        if not (isinstance(df, pd.DataFrame) or isinstance(df, pd.DataFrame)):
+            raise NotImplementedError(f"type(df)={type(df)}")
         if isinstance(df.index, pd.DatetimeIndex):
             tz = df.index.tz
             if tz is not None:

@@ -80,6 +80,41 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
     return fig
 
 
+def generate_current_signal_report(portfolio_data: PortfolioData,
+                                   y_limits: Tuple[Optional[float], Optional[float]] = (-1.0, 1.0),
+                                   figsize: Tuple[float, float] = (8.3, 11.7),
+                                   **kwargs
+                                   ) -> plt.Figure:
+    strategy_signal_data = portfolio_data.strategy_signal_data
+    if strategy_signal_data is None:
+        raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
+
+    agg_by_group_dict = strategy_signal_data.get_current_signal_by_groups(group_data=portfolio_data.group_data,
+                                                                          group_order=portfolio_data.group_order)
+
+    with sns.axes_style('darkgrid'):
+        fig, axs = plt.subplots(len(agg_by_group_dict.keys())//2+len(agg_by_group_dict.keys())%2, 2,
+                                figsize=figsize, tight_layout=True)
+        axs = qis.to_flat_list(axs)
+        qis.set_suptitle(fig, title=(f"{portfolio_data.ticker} Signals for period "
+                                     f"{qis.date_to_str(strategy_signal_data.signal.index[-21])} and "
+                                     f"{qis.date_to_str(strategy_signal_data.signal.index[-1])}; "
+                                     f"min, max = [{y_limits[0]:0.2f}, {y_limits[1]:0.2f}]"),
+                         fontweight="bold", fontsize=8, color='blue')
+
+    for idx, (group, df_ac) in enumerate(agg_by_group_dict.items()):
+        if y_limits is not None:
+            qis.set_y_limits(ax=axs[idx], y_limits=y_limits)
+        qis.plot_bars(df=df_ac,
+                      stacked=False,
+                      title=f"{group}",
+                      ncols=2,
+                      yvar_format='{:,.1f}',
+                      ax=axs[idx],
+                      **kwargs)
+    return fig
+
+
 def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: StrategySignalData,
                                                      time_period: TimePeriod,
                                                      figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait

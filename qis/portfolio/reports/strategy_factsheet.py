@@ -38,6 +38,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 add_grouped_exposures: bool = False,
                                 add_grouped_cum_pnl: bool = False,
                                 add_weight_change_report: bool = False,
+                                add_current_signal_report: bool = False,
+                                y_limits_signal: Tuple[Optional[float], Optional[float]] = (-1.0, 1.0),
                                 is_1y_exposures: bool = False,
                                 is_grouped: Optional[bool] = None,
                                 **kwargs
@@ -399,6 +401,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                 sample_size=weight_change_sample_size,
                                                 is_grouped=True,
                                                 **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize)))
+        figs.append(fig)
+
+    if add_current_signal_report and portfolio_data.strategy_signal_data is not None:
+        fig = qis.generate_current_signal_report(portfolio_data=portfolio_data,
+                                                 **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize,
+                                                                                  y_limits=y_limits_signal)))
         figs.append(fig)
 
     # set 1y time period for exposures
