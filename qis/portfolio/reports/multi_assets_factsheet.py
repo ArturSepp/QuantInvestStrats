@@ -244,7 +244,6 @@ class MultiAssetsReport:
                             benchmark: str,
                             beta_freq: str = 'ME',
                             factor_beta_span: int = 12,
-                            factor_beta_title: Optional[str] = None,
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,
                             **kwargs) -> None:
@@ -252,11 +251,7 @@ class MultiAssetsReport:
         plot rolling beta to one benchmark
         """
         returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=beta_freq)
-        if factor_beta_title is not None:
-            factor_beta_title = f"{factor_beta_title} to {benchmark}"
-        else:
-            factor_beta_title = factor_beta_title or f"{factor_beta_span}-period rolling Beta of {beta_freq}-freq returns to {benchmark}"
-
+        factor_beta_title = f"{factor_beta_span}-period rolling Beta of {beta_freq}-freq returns to {benchmark}"
         ewm_linear_model = qis.EwmLinearModel(x=returns[benchmark].to_frame(), y=returns.drop(benchmark, axis=1))
         ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
         ewm_linear_model.plot_factor_loadings(factor=benchmark,
@@ -297,11 +292,9 @@ class MultiAssetsReport:
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
-                          sharpe_title: Optional[str] = None,
                           sharpe_rolling_window: int = 3 * 252,
                           sharpe_freq: Optional[str] = None,
                           legend_stats: LegendStats = LegendStats.FIRST_AVG_LAST,
-                          var_format: str = '{:.2f}',
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           ax: plt.Subplot = None,
                           **kwargs
@@ -310,15 +303,12 @@ class MultiAssetsReport:
             fig, ax = plt.subplots()
         # do not use start end dates here so the sharpe will be continuous with different time_period
         prices = self.get_prices(time_period=None, benchmark=regime_benchmark)
-        sharpe_title = sharpe_title or f"{sharpe_rolling_window}-period rolling {rolling_perf_stat.value} for {sharpe_freq}-returns"
         fig = qis.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
                                          roll_periods=sharpe_rolling_window,
                                          roll_freq=sharpe_freq,
                                          legend_stats=legend_stats,
-                                         var_format=var_format,
-                                         title=sharpe_title,
                                          regime_benchmark_str=regime_benchmark,
                                          ax=ax,
                                          **kwargs)
@@ -473,7 +463,6 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
         local_kwargs = kwargs
     report.plot_rolling_perf(regime_benchmark=benchmark,
                              rolling_perf_stat=RollingPerfStat.VOL,
-                             var_format='{:.1%}',
                              ax=fig.add_subplot(gs[8:10, :2]),
                              **local_kwargs)
 

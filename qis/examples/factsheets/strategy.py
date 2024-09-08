@@ -84,7 +84,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    time_period = qis.TimePeriod('31Dec2005', '29Aug2024')  # time period for portfolio reporting
+    time_period = qis.TimePeriod('31Dec2005', '06Sep2024')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2022', time_period.end)
     rebalancing_costs = 0.0010  # per traded volume
 

@@ -131,17 +131,19 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
     inst_vol = np.sqrt(np.diag(covar))
     tre_vol = np.abs(delta_w.T) @ np.diag(inst_vol)
     tre_contrib = delta_w.T @ covar
-    tre_table = alphas_df.copy().to_frame('alpha')
-    tre_table['weight diff'] = delta_w
-    tre_table['tre (vol)'] = tre_vol
-    # tre_table['tre contrib'] = tre_contrib
-    # tre_table['tre_rel %'] = tre_contrib / (delta_w.T @ covar @ delta_w)
-    if last_alpha is not None:
+    if alphas_df is not None:
+        tre_table = alphas_df.copy().to_frame('alpha')
+        tre_table['weight diff'] = delta_w
+        tre_table['tre (vol)'] = tre_vol
+        # tre_table['tre contrib'] = tre_contrib
+        # tre_table['tre_rel %'] = tre_contrib / (delta_w.T @ covar @ delta_w)
         tre_table['IR per vol bp'] = delta_w*last_alpha / (inst_vol)
         tre_table.loc['Total', :] = np.nansum(tre_table, axis=0)
         tre_table.loc['Total', 'alpha'] = delta_w.T @ last_alpha
         tre_table.loc['Total', 'tre (vol)'] = np.sqrt(delta_w.T @ covar @ delta_w)
         print(tre_table)
+    else:
+        tre_table = None
 
     # 1. weights table
     b_weights1 = p.Block([p.Paragraph(f"Instrument weights for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
@@ -179,20 +181,21 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
     blocks.append(b_weights)
 
     # 2. tre_table
-    b_tre_table = p.Block([p.Paragraph(f"Instrument alphas and tracking error for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
-                          p.Block(tre_table,
-                                  formatters=[
-                                      tf.FmtPercent(n_decimals=2, apply_to_header_and_index=False),
-                                      tf.FmtReplaceNaN(value=''),
-                                      tf.FmtHeatmap(columns=['diff']),  # , max_color=(255,0,255)
-                                      tf.FmtAddCellBorder(each=1.0,
-                                                          columns=tre_table.columns.to_list(),
-                                                          color=tf.colors.GREY,
-                                                          apply_to_header_and_index=True)
-                                  ]),
-                          p.Paragraph(f"  ", **KWARGS_FOOTNOTE)],
-                         **KWARGS_TEXT)
-    blocks.append(b_tre_table)
+    if tre_table is not None:
+        b_tre_table = p.Block([p.Paragraph(f"Instrument alphas and tracking error for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),
+                              p.Block(tre_table,
+                                      formatters=[
+                                          tf.FmtPercent(n_decimals=2, apply_to_header_and_index=False),
+                                          tf.FmtReplaceNaN(value=''),
+                                          tf.FmtHeatmap(columns=['diff']),  # , max_color=(255,0,255)
+                                          tf.FmtAddCellBorder(each=1.0,
+                                                              columns=tre_table.columns.to_list(),
+                                                              color=tf.colors.GREY,
+                                                              apply_to_header_and_index=True)
+                                      ]),
+                              p.Paragraph(f"  ", **KWARGS_FOOTNOTE)],
+                             **KWARGS_TEXT)
+        blocks.append(b_tre_table)
 
     # 3. weights by ac table
     b_weights2 = p.Block([p.Paragraph(f"Asset class weights for {strategy_weights.index[-1]:'%d%b%Y'}", **KWARGS_TITLE),

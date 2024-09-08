@@ -21,15 +21,16 @@ import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.perfstats.regime_classifier as rcl
 
-# plots
 import qis.plots.time_series as pts
 import qis.plots.stackplot as pst
 import qis.plots.derived.prices as ppd
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.returns_heatmap as rhe
+
 import qis.models.linear.ewm_factors as ef
-from qis.plots.derived.returns_heatmap import plot_returns_heatmap
+from qis.models.linear.ewm import compute_ewm_vol
+from qis.portfolio.ewm_portfolio_risk import compute_portfolio_vol
 
 # default performance and regime params
 PERF_PARAMS = PerfParams(freq='W-WED')
@@ -571,6 +572,30 @@ class PortfolioData:
             portf_return = portf_return.rename(columns=self.tickers_to_names_map)
         return portf_return
 
+    def compute_portfolio_vol(self,
+                              time_period: TimePeriod = None,
+                              freq: str = 'W-WED',
+                              span: int = 13  # 3m span of weekly returns
+                              ) -> pd.DataFrame:
+        """
+        compute_portfolio_vol using 1) instrument weights and covar matrix 2) realised returns vol
+        """
+        returns_f = self.get_instruments_periodic_returns(freq=freq)
+        weights = self.weights.reindex(index=returns_f.index, method='ffill')
+        portfolio_vol = compute_portfolio_vol(returns=returns_f,
+                                              weights=weights,
+                                              span=span,
+                                              annualize=True)
+        strategy_vol = compute_ewm_vol(data=qis.to_returns(self.get_portfolio_nav(freq=freq), is_log_returns=True),
+                                       span=span,
+                                       annualize=True)
+        df = pd.concat([portfolio_vol.rename('instrument weighted vol'),
+                        strategy_vol.rename('strategy returns vol')
+                        ], axis=1)
+        if time_period is not None:
+            df = time_period.locate(df)
+        return df
+
     def compute_distribution_yield(self,
                                    paid_dividends: pd.DataFrame,
                                    div_rolling_freq: str = 'ME',
@@ -682,6 +707,30 @@ class PortfolioData:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=total_group_navs.index,
                                     regime_params=regime_params)
 
+    def plot_portfolio_vols(self,
+                            time_period: TimePeriod = None,
+                            freq: str = 'W-WED',
+                            span: int = 13,  # 3m span of weekly returns
+                            regime_benchmark: str = None,
+                            regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                            ax: plt.Subplot = None,
+                            **kwargs
+                            ) -> plt.Figure:
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        portfolio_vols = self.compute_portfolio_vol(time_period=time_period, freq=freq, span=span)
+        fig = qis.plot_time_series(df=portfolio_vols,
+                                   var_format='{:,.2%}',
+                                   legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                                   title=f"Portfolio EWM {span}-period vols of {freq}-freq returns",
+                                   ax=ax,
+                                   **kwargs)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=portfolio_vols.index,
+                                    regime_params=regime_params)
+        return fig
+
     def plot_rolling_perf(self,
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
                           add_benchmarks: bool = False,
@@ -691,7 +740,6 @@ class PortfolioData:
                           roll_freq: Optional[str] = None,
                           legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                           title: Optional[str] = None,
-                          var_format: str = '{:.2f}',
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           ax: plt.Subplot = None,
                           **kwargs
@@ -702,19 +750,17 @@ class PortfolioData:
             prices = self.get_portfolio_nav_with_benchmark_prices(time_period=time_period)
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
-
         if ax is None:
             fig, ax = plt.subplots()
-
         fig = ppd.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
                                          roll_periods=rolling_window,
                                          roll_freq=roll_freq,
                                          legend_stats=legend_stats,
-                                         trend_line=qis.TrendLine.ZERO_SHADOWS,
-                                         var_format=var_format,
-                                         title=title or f"5y rolling Sharpe ratio",
+                                         # trend_line=qis.TrendLine.ZERO_SHADOWS,
+                                         var_format=rolling_perf_stat.value[1],
+                                         title=title,
                                          ax=ax,
                                          **kwargs)
         if regime_benchmark is not None:
@@ -816,12 +862,12 @@ class PortfolioData:
                                      ) -> None:
         # for monthly returns fix A and date_format
         kwargs = qis.update_kwargs(kwargs, dict(heatmap_freq='YE', date_format='%Y'))
-        plot_returns_heatmap(prices=self.get_portfolio_nav(time_period=time_period),
-                             heatmap_column_freq='ME',
-                             is_add_annual_column=True,
-                             is_inverse_order=True,
-                             ax=ax,
-                             **kwargs)
+        rhe.plot_returns_heatmap(prices=self.get_portfolio_nav(time_period=time_period),
+                                 heatmap_column_freq='ME',
+                                 is_add_annual_column=True,
+                                 is_inverse_order=True,
+                                 ax=ax,
+                                 **kwargs)
 
     def plot_periodic_returns(self,
                               benchmark_prices: Union[pd.DataFrame, pd.Series] = None,
@@ -1028,7 +1074,6 @@ class PortfolioData:
                              title=title or f"Portfolio rolling {beta_span}-span Betas to Benchmarks",
                              ax=ax,
                              **kwargs)
-
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=factor_exposures.index,
                                     regime_params=regime_params)

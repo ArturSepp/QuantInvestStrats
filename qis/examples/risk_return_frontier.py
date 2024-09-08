@@ -35,6 +35,7 @@ time_period = qis.TimePeriod('31Dec2007', '04Sep2024')
 xy1 = [PerfStat.VOL, PerfStat.PA_RETURN]
 xy2 = [PerfStat.VOL, PerfStat.SHARPE_EXCESS]
 xys = [xy1, xy2]
+# xys = [xy2]
 
 with sns.axes_style('darkgrid'):
     fig, axs = plt.subplots(1, len(xys), figsize=(12, 8), tight_layout=True)
@@ -51,7 +52,7 @@ with sns.axes_style('darkgrid'):
                          annotation_labels=perf_table.index.to_list(),
                          xvar_format=xy[0].to_format(), yvar_format=xy[1].to_format(),
                          full_sample_color='blue',
-                         full_sample_order=1,
+                         full_sample_order=2,
                          x_limits=(0.0, None),
                          ax=axs[idx])
 

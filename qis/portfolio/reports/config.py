@@ -2,7 +2,7 @@
 configuration for performance reports
 """
 from typing import Dict, Any, Tuple, NamedTuple, Optional, List
-from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat, PerfStatsLabels
+from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat
 import yfinance as yf
 
 # default params have no risk-free rate
@@ -27,24 +27,22 @@ class FactsheetConfig(NamedTuple):
     enumerate key parameters for report comps and visuals on different time period or data frequency
     default is for daily data with at least 10y
     """
-    freq: str = 'W-WED'  # for vols
+    freq: str = 'W-WED'  # for trading stats
+    vol_freq: str = 'W-WED'
+    vol_rolling_window: int = 13  # 12 span volatility of weekly returns
     freq_drawdown: str = 'D'
     freq_reg: str = 'W-WED'  # for beta regressions
     alpha_an_factor: float = 52 # for W-WED returns
     regime_freq: str = 'QE'  # for regime frequency
     sharpe_rolling_window: int = 156  # 3y of weekly returns
-    vol_rolling_window: int = 52  # 1y volatility
     sharpe_freq: str = 'W-WED'
-    sharpe_title: Optional[str] = None
     turnover_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
     turnover_freq: str = 'B'   # daily freq
-    turnover_title: Optional[str] = None
     cost_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
     cost_freq: Optional[str] = 'B'
     is_norm_costs: bool = True  # for long-only protfolio use nrmalised costs
     factor_beta_span: int = 52  # to compute rolling beta
     beta_freq: str = 'W-WED'
-    factor_beta_title: Optional[str] = None
     exposures_freq: str = 'W-WED'  # for plotting strategy exposures
     # general data
     perf_columns: List[PerfStat] = PERF_COLUMNS
@@ -53,7 +51,7 @@ class FactsheetConfig(NamedTuple):
     # next depend on report time period
     heatmap_freq: str = 'YE'  # for heatmap
     x_date_freq: str = 'YE'  # for time series plots
-    date_format: str = '%b-%y' # for dates
+    date_format: str = '%b-%y'  # for dates
 
 
 # create enumerations
@@ -70,21 +68,19 @@ FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD = FactsheetConfig(heatmap_freq='QE',
 FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
                                                             freq_drawdown='ME',
                                                             freq_reg='ME',
+                                                            vol_freq='ME',
                                                             alpha_an_factor=12,
                                                             regime_freq='QE',
                                                             sharpe_rolling_window=36,
                                                             vol_rolling_window=13,
                                                             sharpe_freq='ME',
-                                                            sharpe_title=None,
                                                             turnover_rolling_period=12,
                                                             turnover_freq='ME',
-                                                            turnover_title=None,
                                                             cost_rolling_period=12,
                                                             cost_freq='ME',
                                                             is_norm_costs=True,
                                                             factor_beta_span=36,
                                                             beta_freq='ME',
-                                                            factor_beta_title=None,
                                                             exposures_freq='ME')
 
 FACTSHEET_CONFIG_MONTHLY_DATA_SHORT_PERIOD = FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD
@@ -103,6 +99,7 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
             rates_data = None
 
     perf_params = PerfParams(freq=factsheet_config.freq,
+                             freq_vol=factsheet_config.vol_freq,
                              freq_drawdown=factsheet_config.freq_drawdown,
                              freq_reg=factsheet_config.freq_reg,
                              alpha_an_factor=factsheet_config.alpha_an_factor,

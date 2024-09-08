@@ -108,3 +108,5 @@ from qis.models.linear.ewm_winsor_outliers import (
     compute_ewm_score
 )
 
+from qis.models.stats.rolling_stats import (RollingPerfStat,
+                                            compute_rolling_perf_stat)

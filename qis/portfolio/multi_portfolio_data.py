@@ -151,7 +151,6 @@ class MultiPortfolioData:
                           sharpe_freq: Optional[str] = None,
                           sharpe_title: Optional[str] = None,
                           legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
-                          var_format: str = '{:.2f}',
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           add_benchmarks_to_navs: bool = False,
                           ax: plt.Subplot = None,
@@ -163,19 +162,14 @@ class MultiPortfolioData:
             fig, ax = plt.subplots()
 
         prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
-        if sharpe_freq is None:
-            sharpe_freq = pd.infer_freq(index=prices.index)
 
-        sharpe_title = sharpe_title or f"{sharpe_rolling_window}-period rolling Sharpe ratio for {sharpe_freq}-returns"
         kwargs = qis.update_kwargs(kwargs, dict(roll_freq=sharpe_freq))
         fig = ppd.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
                                          roll_periods=sharpe_rolling_window,
                                          legend_stats=legend_stats,
-                                         trend_line=None, #qis.TrendLine.ZERO_SHADOWS,
-                                         var_format=var_format,
-                                         title=sharpe_title,
+                                         trend_line=None,  # qis.TrendLine.ZERO_SHADOWS,
                                          ax=ax,
                                          **kwargs)
 
@@ -444,7 +438,6 @@ class MultiPortfolioData:
                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                       turnover_rolling_period: Optional[int] = 260,
                       turnover_freq: Optional[str] = 'B',
-                      turnover_title: Optional[str] = None,
                       var_format: str = '{:.0%}',
                       ax: plt.Subplot = None,
                       **kwargs) -> None:
@@ -459,7 +452,7 @@ class MultiPortfolioData:
             turnover = time_period.locate(turnover)
         
         freq = pd.infer_freq(turnover.index)
-        turnover_title = turnover_title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
+        turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
         pts.plot_time_series(df=turnover,
                              var_format=var_format,
                              y_limits=(0.0, None),
@@ -510,7 +503,6 @@ class MultiPortfolioData:
                           beta_freq: str = 'B',
                           factor_beta_span: int = 260,
                           var_format: str = '{:,.2f}',
-                          factor_beta_title: Optional[str] = None,
                           axs: List[plt.Subplot] = None,
                           **kwargs
                           ) -> None:
@@ -531,10 +523,7 @@ class MultiPortfolioData:
 
         for idx, factor in enumerate(benchmark_prices.columns):
             factor_exposure = pd.concat(factor_exposures[factor], axis=1)
-            if factor_beta_title is not None:
-                factor_beta_title = f"{factor_beta_title} to {factor}"
-            else:
-                factor_beta_title = factor_beta_title or f"{factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {factor}"
+            factor_beta_title = f"{factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {factor}"
             pts.plot_time_series(df=factor_exposure,
                                  var_format=var_format,
                                  legend_stats=pts.LegendStats.AVG_NONNAN_LAST,

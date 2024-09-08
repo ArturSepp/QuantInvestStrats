@@ -80,16 +80,6 @@ from qis.perfstats.returns import (
     df_price_ffill_between_nans
 )
 
-from qis.perfstats.rolling_stats import (
-    RollingPerfStat,
-    compute_rolling_perf_stat,
-    compute_rolling_returns,
-    compute_rolling_pa_returns,
-    compute_rolling_vols,
-    compute_rolling_sharpes,
-    compute_rolling_skew
-)
-
 from qis.perfstats.timeseries_bfill import (
     MergingMethods,
     append_time_series,

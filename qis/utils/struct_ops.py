@@ -119,7 +119,11 @@ def flatten(items: Iterable) -> Any:
 
 
 def to_flat_list(items: Iterable) -> List[Any]:
-    return [item for item in flatten(items)]
+    if isinstance(items, Iterable):
+        flat_list = [item for item in flatten(items)]
+    else:
+        flat_list = [items]
+    return flat_list
 
 
 def update_kwargs(kwargs: Dict[Any, Any],

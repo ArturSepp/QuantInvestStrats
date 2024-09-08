@@ -25,11 +25,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 exposures_freq: Optional[str] = 'W-WED',  #'W-WED',
                                 turnover_rolling_period: int = 260,
                                 turnover_freq: str = 'B',
-                                turnover_title: Optional[str] = None,
                                 factor_beta_span: int = 52,
                                 beta_freq: str = 'W-WED',
-                                factor_beta_title: Optional[str] = None,
-                                factor_attribution_title: Optional[str] = None,
+                                vol_rolling_window: int = 13,
                                 add_benchmarks_to_navs: bool = False,
                                 figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
@@ -123,7 +121,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                            freq=turnover_freq,
                                            is_grouped=is_grouped)
     freq = pd.infer_freq(turnover.index)
-    turnover_title = turnover_title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
+    turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
     qis.plot_time_series(df=turnover,
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
@@ -270,29 +268,57 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             portfolio_data.plot_current_weights(is_grouped=True,
                                                 ax=fig.add_subplot(gs[:2, 2:]), **kwargs)
 
-        # current var
-        with sns.axes_style("whitegrid"):
-            portfolio_data.plot_current_var(is_grouped=False, is_correlated=False,
-                                            ax=fig.add_subplot(gs[2:4, :2]), **kwargs)
-            portfolio_data.plot_current_var(is_grouped=True, is_correlated=False,
-                                            ax=fig.add_subplot(gs[2:4, 2]), **kwargs)
-            portfolio_data.plot_current_var(is_grouped=True, is_correlated=True,
-                                            ax=fig.add_subplot(gs[2:4, 3]), **kwargs)
-
         # change in position
         with sns.axes_style("whitegrid"):
             portfolio_data.plot_last_weights_change(is_grouped=False,
-                                                    ax=fig.add_subplot(gs[4:6, :2]), **kwargs)
+                                                    ax=fig.add_subplot(gs[2:4, :2]), **kwargs)
             portfolio_data.plot_last_weights_change(is_grouped=True,
-                                                    ax=fig.add_subplot(gs[4:6, 2:]), **kwargs)
+                                                    ax=fig.add_subplot(gs[2:4, 2:]), **kwargs)
+
+        # current var
+        with sns.axes_style("whitegrid"):
+            portfolio_data.plot_current_var(is_grouped=False, is_correlated=False,
+                                            ax=fig.add_subplot(gs[4:6, :2]), **kwargs)
+            portfolio_data.plot_current_var(is_grouped=True, is_correlated=False,
+                                            ax=fig.add_subplot(gs[4:6, 2]), **kwargs)
+            portfolio_data.plot_current_var(is_grouped=True, is_correlated=True,
+                                            ax=fig.add_subplot(gs[4:6, 3]), **kwargs)
+
+        # qqq ytd performance attribution for ytd_attribution_time_period
+        with sns.axes_style("whitegrid"):
+            portfolio_data.plot_current_weights(is_grouped=False,
+                                                time_period=ytd_attribution_time_period,
+                                                ax=fig.add_subplot(gs[6:8, :2]),
+                                                **kwargs)
+            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
+            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
+                                                        attribution_metric=qis.AttributionMetric.PNL,
+                                                        ax=fig.add_subplot(gs[6:8, 2:]),
+                                                        **local_kwargs)
+
+        # var
+        ax = fig.add_subplot(gs[8:10, :2])
+        portfolio_data.plot_portfolio_grouped_var(ax=ax,
+                                                  is_correlated=True,
+                                                  time_period=time_period,
+                                                  **kwargs)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+        ax = fig.add_subplot(gs[8:10, 2:])
+        portfolio_data.plot_portfolio_grouped_var(ax=ax,
+                                                  is_correlated=False,
+                                                  time_period=time_period,
+                                                  **kwargs)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # benchmark betas
-        ax = fig.add_subplot(gs[6:8, :2])
+        ax = fig.add_subplot(gs[10:12, :2])
         factor_exposures = portfolio_data.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                             time_period=time_period,
                                                                             beta_freq=beta_freq,
                                                                             factor_beta_span=factor_beta_span)
-        factor_beta_title = factor_beta_title or f"Rolling {factor_beta_span}-period beta of {beta_freq}-freq returns"
+        factor_beta_title = f"Rolling {factor_beta_span}-period beta of {beta_freq}-freq returns"
         qis.plot_time_series(df=factor_exposures,
                              var_format='{:,.2f}',
                              legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
@@ -302,14 +328,33 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
-        # attribution
-        ax = fig.add_subplot(gs[8:10, :2])
+        # vol time series
+        ax = fig.add_subplot(gs[10:12, 2:])
+        portfolio_data.plot_portfolio_vols(freq=perf_params.freq_vol,
+                                           span=vol_rolling_window,
+                                           time_period=time_period,
+                                           ax=ax,
+                                           **kwargs)
+        """
+        portfolio_data.plot_rolling_perf(rolling_perf_stat=qis.RollingPerfStat.EWMA_VOL,
+                                         add_benchmarks=add_benchmarks_to_navs,
+                                         roll_freq=perf_params.freq_vol,
+                                         rolling_window=vol_rolling_window,
+                                         time_period=time_period,
+                                         ax=ax,
+                                         **kwargs)
+        """
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+
+        # beta attribution
+        ax = fig.add_subplot(gs[12:14, :2])
         factor_attribution = portfolio_data.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
                                                                                     beta_freq=beta_freq,
                                                                                     factor_beta_span=factor_beta_span,
                                                                                     time_period=time_period)
-        factor_attribution_title = factor_attribution_title or f"Cumulative return attribution using rolling " \
-                                                               f"{factor_beta_span}-period beta of {beta_freq}-freq returns"
+        factor_attribution_title = (f"Cumulative return attribution using rolling "
+                                    f"{factor_beta_span}-period beta of {beta_freq}-freq returns")
         qis.plot_time_series(df=factor_attribution.cumsum(0),
                              var_format='{:,.0%}',
                              legend_stats=qis.LegendStats.LAST_NONNAN,
@@ -321,49 +366,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
         # returns scatter
         with sns.axes_style("whitegrid"):
-            portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[6:8, 2:]),
+            portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[12:14, 2:]),
                                                 benchmark_price=benchmark_prices.iloc[:, 0],
                                                 time_period=time_period,
                                                 freq=perf_params.freq_reg,
                                                 is_grouped=is_grouped,
                                                 **kwargs)
-
-        if len(benchmark_prices.columns) > 1:
-            with sns.axes_style("whitegrid"):
-                portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[8:10, 2:]),
-                                                    benchmark_price=benchmark_prices.iloc[:, 1],
-                                                    time_period=time_period,
-                                                    freq=perf_params.freq_reg,
-                                                    is_grouped=is_grouped,
-                                                    **kwargs)
-
-        # var
-        ax = fig.add_subplot(gs[10:12, :2])
-        portfolio_data.plot_portfolio_grouped_var(ax=ax,
-                                                  is_correlated=True,
-                                                  time_period=time_period,
-                                                  **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
-        ax = fig.add_subplot(gs[10:12, 2:])
-        portfolio_data.plot_portfolio_grouped_var(ax=ax,
-                                                  is_correlated=False,
-                                                  time_period=time_period,
-                                                  **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
-
-        # qqq ytd performance attribution for ytd_attribution_time_period
-        with sns.axes_style("whitegrid"):
-            portfolio_data.plot_current_weights(is_grouped=False,
-                                                time_period=ytd_attribution_time_period,
-                                                ax=fig.add_subplot(gs[12:14, :2]),
-                                                **kwargs)
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.PNL,
-                                                        ax=fig.add_subplot(gs[12:14, 2:]),
-                                                        **local_kwargs)
 
         """
         # vol regime data

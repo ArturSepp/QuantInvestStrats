@@ -9,7 +9,7 @@ import qis.utils.dates as da
 import qis.utils.df_ops as dfo
 import qis.utils.struct_ops as sop
 import qis.perfstats.perf_stats as pt
-from qis.perfstats.rolling_stats import RollingPerfStat, compute_rolling_perf_stat
+from qis.models.stats.rolling_stats import RollingPerfStat, compute_rolling_perf_stat
 from qis.perfstats.config import PerfStat, PerfParams
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
 
@@ -322,10 +322,10 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
     """
     plot rolling performance
     """
-    df = compute_rolling_perf_stat(prices=prices,
-                                   rolling_perf_stat=rolling_perf_stat,
-                                   roll_periods=roll_periods,
-                                   roll_freq=roll_freq)
+    df, title_ps = compute_rolling_perf_stat(prices=prices,
+                                             rolling_perf_stat=rolling_perf_stat,
+                                             roll_periods=roll_periods,
+                                             roll_freq=roll_freq)
 
     if time_period is not None:
         df = time_period.locate(df)
@@ -333,7 +333,7 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
     fig = pts.plot_time_series(df=df,
                                legend_stats=legend_stats,
                                var_format=var_format,
-                               title=title,
+                               title=title or title_ps,
                                ax=ax,
                                **kwargs)
 
