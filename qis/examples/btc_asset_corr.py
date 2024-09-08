@@ -23,8 +23,8 @@ returns = prices.pct_change()
 # compute rolling correlations
 corr_3m = returns[CRYPTO].rolling(63).corr(returns[ASSET]).rename('3m')
 corr_1y = returns[CRYPTO].rolling(252).corr(returns[ASSET]).rename('1y')
-corr_3y = returns[CRYPTO].rolling(3*252).corr(returns[ASSET]).rename('3y')
-corrs = pd.concat([corr_3m, corr_1y, corr_3y], axis=1).dropna()
+corr_2y = returns[CRYPTO].rolling(2*252).corr(returns[ASSET]).rename('2y')
+corrs = pd.concat([corr_3m, corr_1y, corr_2y], axis=1).dropna()
 
 # select period
 time_period = qis.TimePeriod('01Jan2016', None)
