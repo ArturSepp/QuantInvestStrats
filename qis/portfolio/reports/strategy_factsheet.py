@@ -395,18 +395,19 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                             regime_params=regime_params,
                                             **kwargs)
         """
+
+    if add_current_signal_report and portfolio_data.strategy_signal_data is not None:
+        fig = qis.generate_current_signal_report(portfolio_data=portfolio_data,
+                                                 **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize,
+                                                                                  y_limits=y_limits_signal)))
+        figs.append(fig)
+
     if add_weight_change_report and portfolio_data.strategy_signal_data is not None:
         fig = qis.generate_weight_change_report(portfolio_data=portfolio_data,
                                                 time_period=weight_report_time_period or time_period,
                                                 sample_size=weight_change_sample_size,
                                                 is_grouped=True,
                                                 **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize)))
-        figs.append(fig)
-
-    if add_current_signal_report and portfolio_data.strategy_signal_data is not None:
-        fig = qis.generate_current_signal_report(portfolio_data=portfolio_data,
-                                                 **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize,
-                                                                                  y_limits=y_limits_signal)))
         figs.append(fig)
 
     # set 1y time period for exposures
