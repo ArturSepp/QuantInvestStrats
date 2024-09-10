@@ -29,6 +29,7 @@ def plot_heatmap(df: pd.DataFrame,
                  vmin: float = None,
                  vmax: float = None,
                  labelpad: int = 50,
+                 ylabel: str = '',
                  ax: plt.Subplot = None,
                  **kwargs
                  ) -> Optional[plt.Figure]:
@@ -93,7 +94,7 @@ def plot_heatmap(df: pd.DataFrame,
     if title is not None:
         put.set_title(ax=ax, title=title, fontsize=fontsize, **kwargs)
 
-    ax.set_ylabel('')
+    ax.set_ylabel(ylabel)
     ax.set_xlabel('')
 
     return fig

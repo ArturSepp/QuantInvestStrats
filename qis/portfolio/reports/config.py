@@ -124,23 +124,29 @@ def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileReg
     return perf_params, regime_params
 
 
-def fetch_default_report_kwargs(time_period: TimePeriod,
+def fetch_default_report_kwargs(time_period: Optional[TimePeriod],
                                 is_daily: bool = True,
                                 long_threshold_years: float = 5.0,
                                 add_rates_data: bool = True
                                 ) -> Dict[str, Any]:
 
     # use for number years > 5
-    if time_period.get_time_period_an() > long_threshold_years:
+    if time_period is not None:
+        if time_period.get_time_period_an() > long_threshold_years:
+            if is_daily:
+                factsheet_config = FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD
+            else:
+                factsheet_config = FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD
+        else:
+            if is_daily:
+                factsheet_config = FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD
+            else:
+                factsheet_config = FACTSHEET_CONFIG_MONTHLY_DATA_SHORT_PERIOD
+    else:
         if is_daily:
             factsheet_config = FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD
         else:
             factsheet_config = FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD
-    else:
-        if is_daily:
-            factsheet_config = FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD
-        else:
-            factsheet_config = FACTSHEET_CONFIG_MONTHLY_DATA_SHORT_PERIOD
 
     kwargs = fetch_factsheet_config_kwargs(factsheet_config=factsheet_config,
                                            add_rates_data=add_rates_data)

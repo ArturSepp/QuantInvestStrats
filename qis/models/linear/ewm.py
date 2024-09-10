@@ -429,7 +429,7 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
                                y: np.ndarray,  # asset returns
                                span: Union[int, np.ndarray] = None,
                                ewm_lambda: float = 0.94,
-                               warm_up_period: int = 20,  # to avoid excessive betas at start,
+                               warmup_period: int = 20,  # to avoid excessive betas at start,
                                is_x_correlated: bool = True,  # computation of [x,x]
                                nan_backfill: NanBackfill = NanBackfill.FFILL
                                ) -> np.ndarray:
@@ -486,7 +486,7 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
             covar_xx = np.where(np.isfinite(covar_xx), covar_xx, last_covar_xx)
         last_covar_xx = covar_xx
 
-        if t > warm_up_period:
+        if t > warmup_period:
             # if np.trace(covar_xx) > 1e-8:
             if np.min(np.diag(covar_xx)) > 1e-8:
                 if is_x_correlated:  # use inversion
@@ -589,6 +589,9 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     apply_sqrt: bool = True,
                     annualize: bool = False,
                     af: Optional[float] = None,
+                    vol_floor_quantile: Optional[float] = None,  # to floor the volatility = 0.16
+                    vol_floor_quantile_roll_period: int = 5*260,  # 5y for daily returns
+                    warmup_period: Optional[int] = None,
                     nan_backfill: NanBackfill = NanBackfill.FFILL,
                     is_exlude_weekends: bool = False
                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
@@ -623,6 +626,21 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
             init_value = float(init_value)
 
     ewm = ewm_recursion(a=a, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+
+    # apply quantile
+    if vol_floor_quantile is not None:
+        ewm_pd = pd.DataFrame(ewm)
+        ewm_quantiles = ewm_pd.rolling(vol_floor_quantile_roll_period, min_periods=100).quantile(vol_floor_quantile, interpolation="lower")
+        vol_floor = ewm_quantiles.to_numpy()
+        ewm = np.where(np.less(ewm, vol_floor), vol_floor, ewm)
+
+    if warmup_period is not None:
+        for column in np.arange(ewm.shape[1]):
+            idx = np.argwhere(~np.isnan(ewm[:, column]))  # get first non nan index
+            if idx.size > warmup_period:
+                ewm[:idx[warmup_period][0], column] = np.nan
+            else:
+                ewm[:, column] = np.nan
 
     if annualize or af is not None:
         if af is None:

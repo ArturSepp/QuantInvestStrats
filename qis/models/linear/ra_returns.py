@@ -16,11 +16,15 @@ import qis.models.linear.ewm as ewm
 
 def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
                        ewm_lambda: Union[float, np.ndarray] = 0.94,
-                       vol_target: Optional[float] = 0.12,
+                       vol_target: Optional[float] = None,  # if need to target vol
                        span: Optional[int] = None,
-                       weight_lag: Optional[int] = 1,
                        mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE,
-                       is_log_returns_to_arithmetic: bool = True  # typically log-return are passed to vol computations
+                       init_value: Optional[Union[float, np.ndarray]] = None,
+                       vol_floor_quantile: Optional[float] = None,  # to floor the volatility = 0.16
+                       vol_floor_quantile_roll_period: int = 5 * 260,  # 5y for daily returns
+                       warmup_period: Optional[int] = None,
+                       is_log_returns_to_arithmetic: bool = False,  # typically log-return are passed to vol computations
+                       weight_lag: Optional[int] = 1
                        ) -> Tuple[Union[pd.Series, pd.DataFrame], Union[pd.Series, pd.DataFrame], Union[pd.Series, pd.DataFrame]]:
 
     if span is not None:
@@ -35,6 +39,10 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
     ewm_vol = ewm.compute_ewm_vol(data=returns,
                                   ewm_lambda=ewm_lambda,
                                   mean_adj_type=mean_adj_type,
+                                  init_value=init_value,
+                                  vol_floor_quantile=vol_floor_quantile,
+                                  vol_floor_quantile_roll_period=vol_floor_quantile_roll_period,
+                                  warmup_period=warmup_period,
                                   annualize=annualize)
 
     weights = npo.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
@@ -51,6 +59,7 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
     if isinstance(ra_returns, pd.DataFrame):
         ra_returns = ra_returns[returns.columns]
         weights = weights[returns.columns]
+        ewm_vol = ewm_vol[returns.columns]
 
     return ra_returns, weights, ewm_vol
 
@@ -64,7 +73,9 @@ def compute_ewm_long_short_filtered_ra_returns(returns: pd.DataFrame,
                                                mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE
                                                ) -> pd.DataFrame:
     if vol_span is not None:
-        ra_returns, _, _ = compute_ra_returns(returns=returns, span=vol_span, vol_target=None,
+        ra_returns, _, _ = compute_ra_returns(returns=returns,
+                                              span=vol_span,
+                                              vol_target=None,
                                               mean_adj_type=mean_adj_type,
                                               weight_lag=weight_lag)
     else:

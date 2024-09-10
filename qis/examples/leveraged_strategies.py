@@ -6,10 +6,7 @@ backtest example of leveraged strategies
 import pandas as pd
 import matplotlib.pyplot as plt
 import yfinance as yf
-import qis
-
-from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_factsheet
-from qis.portfolio.reports.config import fetch_default_report_kwargs
+import qis as qis
 
 # select tickers
 benchmark = 'SPY'
@@ -43,10 +40,10 @@ prices = pd.concat([prices, unleveraged_portfolio, leveraged_portfolio], axis=1)
 
 # generate report since SSO launch
 time_period = qis.TimePeriod('21Jun2006', '01Sep2023')
-fig = generate_multi_asset_factsheet(prices=prices,
-                                     benchmark=benchmark,
-                                     time_period=time_period,
-                                     **fetch_default_report_kwargs(time_period=time_period))
+fig = qis.generate_multi_asset_factsheet(prices=prices,
+                                         benchmark=benchmark,
+                                         time_period=time_period,
+                                         **qis.fetch_default_report_kwargs(time_period=time_period))
 
 qis.save_fig(fig=fig, file_name=f"leveraged_fund_analysis", local_path=qis.local_path.get_output_path())
 

@@ -143,6 +143,7 @@ class MultiAssetsReport:
 
     def plot_nav(self,
                  regime_benchmark: str = None,
+                 add_benchmarks_to_navs: bool = True,
                  var_format: str = '{:.0%}',
                  sharpe_format: str = '{:.2f}',
                  title: str = 'Cumulative performance',
@@ -150,8 +151,12 @@ class MultiAssetsReport:
                  time_period: TimePeriod = None,
                  ax: plt.Subplot = None,
                  **kwargs) -> None:
-        prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark)
-        qis.plot_prices(prices=prices,
+        prices = self.get_prices(time_period=time_period,
+                                 benchmark=regime_benchmark)
+        prices0 = prices
+        if not add_benchmarks_to_navs and regime_benchmark in prices.columns:
+            prices0 = prices0.drop(regime_benchmark, axis=1)
+        qis.plot_prices(prices=prices0,
                         perf_params=self.perf_params,
                         start_to_one=True,
                         is_log=is_log,
@@ -384,6 +389,7 @@ class MultiAssetsReport:
 def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    benchmark_prices: Union[pd.Series, pd.DataFrame] = None,
                                    benchmark: str = None,
+                                   add_benchmarks_to_navs: bool = True,
                                    perf_params: PerfParams = PERF_PARAMS,
                                    regime_params: qis.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                    heatmap_freq: str = 'YE',
@@ -439,6 +445,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     qis.set_suptitle(fig=fig, title=factsheet_name, fontsize=8)
 
     report.plot_nav(regime_benchmark=benchmark,
+                    add_benchmarks_to_navs=add_benchmarks_to_navs,
                     title=f"Cumulative performance with background colors using bear/normal/bull regimes of {benchmark} {regime_params.freq}-returns",
                     ax=fig.add_subplot(gs[:2, :2]),
                     **kwargs)
