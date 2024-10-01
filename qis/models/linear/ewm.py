@@ -861,21 +861,26 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
     return cross_xy
 
 
-def compute_ewm_beta_resid(x_data: pd.DataFrame,
-                           y_data: pd.DataFrame,
-                           span: Union[int, np.ndarray] = None,
-                           ewm_lambda: Union[float, np.ndarray] = 0.94,
-                           mean_adj_type: MeanAdjType = MeanAdjType.NONE,
-                           init_type: InitType = InitType.MEAN,
-                           annualize: bool = False,
-                           nan_backfill: NanBackfill = NanBackfill.FFILL
-                           ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
+                                    y_data: pd.DataFrame,
+                                    span: Union[int, np.ndarray] = None,
+                                    ewm_lambda: Union[float, np.ndarray] = 0.94,
+                                    mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+                                    init_type: InitType = InitType.MEAN,
+                                    annualize: bool = False,
+                                    nan_backfill: NanBackfill = NanBackfill.FFILL
+                                    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
     """
-    compute cross ewm for 1-d arrays x and y
+    compute 1-d ewm beta for x and y
+    x can be either series or dataframe
     cross_xy[t] = (1-lambda)*x[t]*y[t] + lambda*cross_xy[t-1]
-    returns betas and annualized vars of resid and beta
+    returns betas, ewm_alpha and annualized vars of resid and beta
     """
+    # adjust indices in case
+    if not x_data.index.equals(y_data.index):
+        y_data = y_data.reindex(index=x_data, method='ffill')
+
     # 1 - adjust by mean
     if mean_adj_type != MeanAdjType.NONE:
         x_data = compute_rolling_mean_adj(data=x_data,
@@ -893,43 +898,54 @@ def compute_ewm_beta_resid(x_data: pd.DataFrame,
                                           nan_backfill=nan_backfill)
 
     # 2  take gen arrays and convert to ndarray to use with numbdas
-    if isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.DataFrame):
+    if isinstance(x_data, pd.Series) and isinstance(y_data, pd.DataFrame):  # extend to df
+        x = npo.np_array_to_n_column_array(a=npo.to_finite_np(data=x_data, fill_value=np.nan), ncols=len(y_data.columns))
+        y = npo.to_finite_np(data=y_data, fill_value=np.nan)
+    elif isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.DataFrame):
         # should be same dimensions
         x = npo.to_finite_np(data=x_data, fill_value=np.nan)
         y = npo.to_finite_np(data=y_data, fill_value=np.nan)
-        xy = np.multiply(x, y)
     else:
-        raise TypeError(f"in compute_ewm_beta_resid: x and y should be type pd.DataFrame")
+        raise NotImplementedError(f"in compute_ewm_beta_resid: not implemented types {type(x_data)} and {type(y_data)}")
 
-    initial_value_xy = set_init_dim1(data=xy, init_type=init_type)
-    xy_covar = ewm_recursion(a=xy, ewm_lambda=ewm_lambda, init_value=initial_value_xy)
+    # compute covar
+    xy = np.multiply(x, y)
+    xy_covar = ewm_recursion(a=xy, span=span, ewm_lambda=ewm_lambda,
+                             init_value=set_init_dim1(data=xy, init_type=init_type))
 
+    # compute x var
     x2 = np.square(x)
-    initial_value_x2 = set_init_dim1(data=x2, init_type=init_type)
-    x_var = ewm_recursion(a=x2, ewm_lambda=ewm_lambda, init_value=initial_value_x2)
+    x_var = ewm_recursion(a=x2, span=span, ewm_lambda=ewm_lambda,
+                          init_value=set_init_dim1(data=x2, init_type=init_type))
 
-    beta_xy = np.divide(xy_covar, x_var, where=np.isclose(x_var, 0.0)==False)
+    # compute beta
+    beta_xy = np.divide(xy_covar, x_var, where=np.isclose(x_var, 0.0) == False)
 
-    resid = y - beta_xy * npo.np_array_to_n_column_array(a=x, ncols=beta_xy.shape[1]) # extend x by columns to match columns of beta_xy
+    # alpha and prediction assuming 1-d factor model
+    y_prediction0 = beta_xy * x
+    resid = y - y_prediction0
+    ewm_alpha = ewm_recursion(a=resid, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill,
+                              init_value=set_init_dim1(data=resid, init_type=init_type))
+    y_prediction = y_prediction0 + ewm_alpha
+
+    # residual
+    resid = y - y_prediction
     resid2 = np.square(resid)
-    iv_resid2 = set_init_dim1(data=resid2, init_type=init_type)
-    resid_var = ewm_recursion(a=resid2, ewm_lambda=ewm_lambda, init_value=iv_resid2)
+    resid_var = ewm_recursion(a=resid2, span=span, ewm_lambda=ewm_lambda,
+                              init_value=set_init_dim1(data=resid2, init_type=init_type))
 
     if annualize:
-        if isinstance(x_data, pd.DataFrame) or isinstance(x_data, pd.Series):
-            an = da.infer_an_from_data(data=x_data)
-        else:
-            warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
-            an = 1.0
+        an = da.infer_an_from_data(data=x_data)
         resid_var = an * resid_var
         x_var = an * x_var
 
     beta_xy = pd.DataFrame(data=beta_xy, index=y_data.index, columns=y_data.columns)
+    alpha = pd.DataFrame(data=ewm_alpha, index=y_data.index, columns=y_data.columns)
+    y_prediction = pd.DataFrame(data=y_prediction, index=y_data.index, columns=y_data.columns)
     resid_var = pd.DataFrame(data=resid_var, index=y_data.index, columns=y_data.columns)
-    # resid_var = pd.DataFrame(data=an * resid2, index=y_data.index, columns=y_data.columns).expanding().var()
     x_var = pd.DataFrame(data=x_var, index=y_data.index)
 
-    return beta_xy, x_var, resid_var
+    return beta_xy, alpha, y_prediction, x_var, resid_var
 
 
 def compute_ewm_alpha_r2(y_data: pd.DataFrame,
@@ -983,7 +999,6 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
         sharpe = pd.DataFrame(data=an*ewm_mean, index=returns.index, columns=returns.columns)
 
     elif norm_type == 1 or norm_type == 2:
-
         ewm_mean = ewm_recursion(a=x,
                                  span=span,
                                  init_value=initial_mean,
@@ -1064,9 +1079,9 @@ def compute_ewm_std1_norm(data: Union[pd.DataFrame, pd.Series],
 
 # @njit
 def ewm_vol_assymetric_np(returns: np.ndarray,
-                        ewm_lambda: Union[float, np.ndarray] = 0.94,
-                        annualization_factor: float = 1.0
-                        ) ->Tuple[np.ndarray, np.ndarray]:
+                          ewm_lambda: Union[float, np.ndarray] = 0.94,
+                          annualization_factor: float = 1.0
+                          ) ->Tuple[np.ndarray, np.ndarray]:
     """
     applies strictly to numpy arrays with utilization of numbda
     data: numpy with dimension = t*n

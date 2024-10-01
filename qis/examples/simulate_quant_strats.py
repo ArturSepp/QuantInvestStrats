@@ -13,7 +13,7 @@ import qis
 
 
 # strats
-from qis.portfolio.strats.quant_strats_delta1 import simulate_vol_target_strats_range, simulate_trend_starts_range
+from qis.portfolio.strats.quant_strats_delta1 import simulate_vol_target_strats_range, simulate_trend_strats_range
 
 FIG_SIZE = (8.3, 11.7)  # A4 for portrait
 
@@ -63,7 +63,7 @@ def create_time_series_report(prices: Union[pd.Series, pd.DataFrame],
                                     **scatter_kwargs)
 
     # tf returns
-    tf_nav_weights, tf_navs, tf_signals = simulate_trend_starts_range(prices=prices, tf_spans=spans, vol_span=vol_span,
+    tf_nav_weights, tf_navs, tf_signals = simulate_trend_strats_range(prices=prices, tf_spans=spans, vol_span=vol_span,
                                                                       vol_target=vol_target/2.0, vol_af=vol_af)
 
     fig2 = plt.figure(figsize=FIG_SIZE, constrained_layout=True)

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qis"
-version = "2.1.5"
+version = "2.1.6"
 description = "Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
 license = "LICENSE.txt"
 authors = ["Artur Sepp <artursepp@gmail.com>"]
@@ -31,7 +31,7 @@ exclude = [ "qis/examples/figures/" ]
 "Personal website" = "https://artursepp.com"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
+python = ">=3.8"
 numba = ">=0.56.4"
 numpy = ">=1.22.4"
 scipy = ">=1.10"

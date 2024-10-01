@@ -334,6 +334,7 @@ class UnitTests(Enum):
     RA_RETURNS = 1
     TRANSFORM = 2
 
+
 def run_unit_test(unit_test: UnitTests):
 
     from qis.test_data import load_etf_data

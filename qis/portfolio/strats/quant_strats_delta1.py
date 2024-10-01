@@ -58,7 +58,7 @@ def simulate_vol_target_strats_range(prices: Union[pd.DataFrame, pd.Series],
     return vt_nav_weights, vt_navs
 
 
-def simulate_trend_starts(prices: Union[pd.DataFrame, pd.Series],
+def simulate_trend_strats(prices: Union[pd.DataFrame, pd.Series],
                           vol_span: int = 31,
                           tf_span: int = 63,
                           vol_target: float = 0.15,
@@ -86,7 +86,7 @@ def simulate_trend_starts(prices: Union[pd.DataFrame, pd.Series],
     return weights, vt_navs, signals
 
 
-def simulate_trend_starts_range(prices: Union[pd.DataFrame, pd.Series],
+def simulate_trend_strats_range(prices: Union[pd.DataFrame, pd.Series],
                                 vol_span: int = 31,
                                 tf_spans: List[int] = (21, 63),
                                 vol_target: float = 0.15,
@@ -96,7 +96,7 @@ def simulate_trend_starts_range(prices: Union[pd.DataFrame, pd.Series],
                                 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     tf_nav_weights, tf_navs, signals = [], [], []
     for tf_span in tf_spans:
-        tf_nav_weights_, tf_navs_, signals_ = simulate_trend_starts(prices=prices, tf_span=tf_span, vol_span=vol_span,
+        tf_nav_weights_, tf_navs_, signals_ = simulate_trend_strats(prices=prices, tf_span=tf_span, vol_span=vol_span,
                                                                     vol_target=vol_target, vol_af=vol_af,
                                                                     constant_trade_level=constant_trade_level)
         if isinstance(prices, pd.Series):

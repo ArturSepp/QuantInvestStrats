@@ -28,7 +28,7 @@ from qis.models.linear.ewm import (
     compute_ewm,
     compute_ewm_long_short_filter,
     compute_ewm_alpha_r2,
-    compute_ewm_beta_resid,
+    compute_ewm_beta_alpha_forecast,
     compute_ewm_cross_xy,
     compute_ewm_covar,
     compute_ewm_covar_tensor,

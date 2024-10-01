@@ -130,15 +130,23 @@ def mult_df_columns_with_vector_group(df: pd.DataFrame,
     return group_conv
 
 
-def df_to_top_n_indicators(df: Union[pd.Series, pd.DataFrame],
-                           num_top_assets: int = 15
-                           ) -> Union[pd.Series, pd.DataFrame]:
+def df_to_top_bottom_n_indicators(df: Union[pd.Series, pd.DataFrame],
+                                  num_top_assets: int = 15
+                                  ) -> Union[pd.Series, pd.DataFrame]:
     """
-    assign unit weight to ranked rows
+    assign unit weight to ranked rows at most num_top_assets
+    nan values are ignored
     """
+    if len(df.columns) < 2*num_top_assets:
+        raise ValueError(f"{len(df.columns)} must exceed {2*num_top_assets}")
+
     def series_to_top_n_indicators(data: pd.Series) -> pd.Series:
-        ranked_row = data.sort_values(ascending=False)
-        ranked_row[:num_top_assets], ranked_row[num_top_assets:] = 1.0, 0.0
+        ranked_row_with_nans = data.sort_values(ascending=False)
+        ranked_row_without_nans = ranked_row_with_nans.dropna()
+        ranked_row_without_nans[:num_top_assets] = 1.0  # top
+        ranked_row_without_nans[-num_top_assets:] = -1.0  # bottom
+        ranked_row_without_nans[num_top_assets:-num_top_assets] = 0.0  # mid  will overwight boundaries
+        ranked_row = ranked_row_without_nans.reindex(index=ranked_row_with_nans.index)
         ranked_row = ranked_row.sort_index()
         return ranked_row
 

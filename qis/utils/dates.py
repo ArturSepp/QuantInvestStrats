@@ -131,8 +131,8 @@ def infer_an_from_data(data: Union[pd.DataFrame, pd.Series], is_calendar: bool =
     else:
         freq = pd.infer_freq(data.index)
     if freq is None:
-        print(f"in infer_an_from_data: cannot infer {freq} - using 252")
-        return 252.0
+        print(f"in infer_an_from_data: cannot infer {freq} - using 260")
+        return 260.0
     an, an_f = get_period_days(freq, is_calendar=is_calendar)
     return an_f
 
@@ -337,6 +337,8 @@ class TimePeriod:
                 start, end = time_period.start, time_period.end
             else:
                 start, end = self.start, self.end
+            if start < df.index[0]:  # restrict
+                start = df.index[0]
             df = df.loc[start:end]
         else:
             pass
@@ -411,8 +413,8 @@ class TimePeriod:
                           end=self.end)
 
     def get_time_period_an(self) -> float:  # annualised time period
-        return get_time_to_maturity(maturity_time=self.end,
-                                    value_time=self.start)
+        return get_time_to_maturity(maturity_time=self.end or pd.Timestamp.today(tz=self.tz),
+                                    value_time=self.start )
 
 
 def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],

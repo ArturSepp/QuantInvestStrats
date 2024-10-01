@@ -17,7 +17,7 @@ def get_aligned_fx_spots(prices: pd.DataFrame,
     fx_prices is fx prices columns = fx_rate_ccy
     """
     # first backfill and the bbfill so prices will have corresponding fx spots data
-    fx_prices = fx_prices.copy().ffill().bfill()
+    fx_prices = fx_prices.reindex(index=prices.index, method='ffill').ffill().bfill()
     fx_prices[quote_currency] = 1.0
 
     fx_spots = {}

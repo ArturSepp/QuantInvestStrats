@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Union
 import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs
 from qis.portfolio.portfolio_data import PortfolioData
@@ -17,7 +17,7 @@ from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
 
 def generate_strategy_factsheet(portfolio_data: PortfolioData,
-                                benchmark_prices: pd.DataFrame,
+                                benchmark_prices: Union[pd.DataFrame, pd.Series],
                                 time_period: TimePeriod,
                                 perf_params: PerfParams = PERF_PARAMS,
                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
@@ -42,15 +42,19 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 y_limits_signal: Tuple[Optional[float], Optional[float]] = (-1.0, 1.0),
                                 is_1y_exposures: bool = False,
                                 is_grouped: Optional[bool] = None,
+                                dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
                                 **kwargs
                                 ) -> List[plt.Figure]:
     # align
+    if isinstance(benchmark_prices, pd.Series):
+        benchmark_prices = benchmark_prices.to_frame()
+
     benchmark_prices = benchmark_prices.reindex(index=portfolio_data.nav.index, method='ffill')
     if regime_benchmark is None:
         regime_benchmark = benchmark_prices.columns[0]
 
     if is_grouped is None:
-        if len(portfolio_data.group_data.unique()) < 10:  # otherwise tables look too bad
+        if len(portfolio_data.group_data.unique()) <= 10:  # otherwise tables look too bad
             is_grouped = True
         else:
             is_grouped = False
@@ -71,10 +75,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     portfolio_nav = portfolio_data.get_portfolio_nav(time_period=time_period)
     if add_benchmarks_to_navs:
         benchmark_prices_ = benchmark_prices
+        joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
+        pivot_prices = joint_prices[regime_benchmark]
     else:
         benchmark_prices_ = benchmark_prices[regime_benchmark]
-    joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
-    pivot_prices = joint_prices[regime_benchmark]
+        joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
+        pivot_prices = joint_prices[regime_benchmark]
+        joint_prices = joint_prices[portfolio_nav.name]
+
     ax = fig.add_subplot(gs[0:2, :2])
     qis.plot_prices(prices=joint_prices,
                     perf_params=perf_params,
@@ -88,7 +96,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[2:4, :2])
     qis.plot_rolling_drawdowns(prices=joint_prices,
                                title='Running Drawdowns',
-                               dd_legend_type=qis.DdLegendType.DETAILED,
+                               dd_legend_type=dd_legend_type,
                                ax=ax, **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
@@ -97,7 +105,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[4:6, :2])
     qis.plot_rolling_time_under_water(prices=joint_prices,
                                       title='Running Time under Water',
-                                      dd_legend_type=qis.DdLegendType.DETAILED,
+                                      dd_legend_type=dd_legend_type,
                                       ax=ax, **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
@@ -136,7 +144,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # costs
     ax = fig.add_subplot(gs[10:12, :2])
-    costs = portfolio_data.get_costs(time_period=time_period, roll_period=turnover_rolling_period)
+    costs = portfolio_data.get_costs(time_period=time_period, roll_period=turnover_rolling_period,
+                                     freq=turnover_freq,
+                                     is_grouped=is_grouped)
     freq = pd.infer_freq(costs.index)
     costs_title = f"{turnover_rolling_period}-period rolling {freq}-freq Costs"
     qis.plot_time_series(df=costs,

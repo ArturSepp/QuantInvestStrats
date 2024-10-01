@@ -181,7 +181,8 @@ def compute_portfolio_benchmark_betas(instrument_prices: pd.DataFrame,
                                       benchmark_prices: pd.DataFrame,
                                       time_period: TimePeriod = None,
                                       beta_freq: str = None,
-                                      factor_beta_span: int = 63  # quarter
+                                      factor_beta_span: int = 63,  # quarter
+                                      mean_adj_type: MeanAdjType = MeanAdjType.EWMA
                                       ) -> pd.DataFrame:
     """
     compute benchmark betas of instruments
@@ -190,7 +191,7 @@ def compute_portfolio_benchmark_betas(instrument_prices: pd.DataFrame,
     benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
     ewm_linear_model = EwmLinearModel(x=ret.to_returns(prices=benchmark_prices, freq=beta_freq, is_log_returns=True),
                                       y=ret.to_returns(prices=instrument_prices, freq=beta_freq, is_log_returns=True))
-    ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
+    ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True, mean_adj_type=mean_adj_type)
     exposures = exposures.reindex(index=instrument_prices.index, method='ffill')
     benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(exposures=exposures)
     benchmark_betas = benchmark_betas.replace({0.0: np.nan}).ffill()  # fillholidays

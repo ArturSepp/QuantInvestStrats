@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple, List
 
-# qis
+import qis as qis
 import qis.utils.df_groups as dfg
 import qis.utils.df_agg as dfa
 import qis.plots.time_series as pts
@@ -149,11 +149,10 @@ def plot_brinson_attribution_table(totals_table: pd.DataFrame,
 
     # get total of allocation and selection:
     active_total = active_total.cumsum(axis=0)
-    legend_labels = [column + ', sum=' + '{:.0%}'.format(active_total[column].iloc[-1]) for column in active_total.columns]
     fig_active_total = pts.plot_time_series(df=active_total,
                                             var_format='{:.0%}',
                                             title='Active total',
-                                            legend_labels=legend_labels,
+                                            legend_stats=qis.LegendStats.LAST_NONNAN,
                                             ax=axs[1],
                                             **kwargs)
 
@@ -161,6 +160,7 @@ def plot_brinson_attribution_table(totals_table: pd.DataFrame,
     fig_ts_alloc = pts.plot_time_series(df=cum_grouped_ac_pnl_diff,
                                         var_format='{:.0%}',
                                         title='Asset class allocation return',
+                                        legend_stats=qis.LegendStats.LAST_NONNAN,
                                         ax=axs[2],
                                         **kwargs)
 
@@ -168,6 +168,7 @@ def plot_brinson_attribution_table(totals_table: pd.DataFrame,
     fig_ts_sel = pts.plot_time_series(df=cum_grouped_ac_pnl_diff,
                                       var_format='{:.0%}',
                                       title='Asset class selection return',
+                                      legend_stats=qis.LegendStats.LAST_NONNAN,
                                       ax=axs[3],
                                       **kwargs)
 

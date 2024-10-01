@@ -2,6 +2,7 @@
 generate strategy factsheet report with comparision to benchmark strategy using MultiPortfolioData object
 for test implementation see qis.examples.portfolio_factsheet
 """
+import numpy as np
 # packages
 import pandas as pd
 import seaborn as sns
@@ -30,6 +31,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               add_strategy_factsheet: bool = False,
                                               add_grouped_exposures: bool = False,  # for strategy factsheet
                                               add_grouped_cum_pnl: bool = False,  # for strategy factsheet
+                                              add_tracking_error_table: bool = False,
+                                              add_exposures_comp: bool = False,
                                               is_grouped: Optional[bool] = None,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 4,
@@ -233,6 +236,50 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                  benchmark=regime_benchmark,
                                                  regime_params=regime_params,
                                                  **kwargs)
+
+    if add_tracking_error_table:
+        tre_table = multi_portfolio_data.compute_tracking_error_table(strategy_idx=strategy_idx,
+                                                                      benchmark_idx=benchmark_idx,
+                                                                      **kwargs)
+        fig1, ax = plt.subplots(1, 1, figsize=qis.get_df_table_size(df=tre_table), constrained_layout=True)
+        fig1.suptitle(f'{backtest_name} Tracking error table', fontweight="bold", fontsize=8, color='blue')
+        figs.append(fig1)
+        qis.plot_df_table(df=tre_table,
+                          first_row_height=0.075,
+                          var_format='{:.2%}',
+                          rotation_for_columns_headers=90,
+                          heatmap_columns=[x+1 for x in np.arange(len(tre_table.columns))],
+                          ax=ax,
+                          cmap='Blues',
+                          **kwargs)
+
+    if add_exposures_comp:
+        strategy_name = multi_portfolio_data.portfolio_datas[strategy_idx].ticker
+        benchmark_name = multi_portfolio_data.portfolio_datas[benchmark_idx].ticker
+        strategy_weights, benchmark_weights = multi_portfolio_data.get_aligned_weights(strategy_idx=strategy_idx,
+                                                                                       benchmark_idx=benchmark_idx,
+                                                                                       **kwargs)
+
+        strategy_turnover, benchmark_turnover = multi_portfolio_data.get_aligned_turnover(strategy_idx=strategy_idx,
+                                                                                          benchmark_idx=benchmark_idx,
+                                                                                          **kwargs)
+        for inst in strategy_weights.columns:
+            df1 = pd.concat([strategy_weights[inst].rename(strategy_name),
+                            benchmark_weights[inst].rename(benchmark_name)], axis=1)
+            df2 = pd.concat([strategy_turnover[inst].rename(strategy_name),
+                            benchmark_turnover[inst].rename(benchmark_name)], axis=1)
+            with sns.axes_style("darkgrid"):
+                fig1, axs = plt.subplots(2, 1, figsize=figsize, constrained_layout=True)
+                fig1.suptitle(f'{inst} Exposures and Turnover', fontweight="bold", fontsize=8, color='blue')
+                figs.append(fig1)
+                qis.plot_time_series(df=df1, title='Exposures',
+                                     legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                                     ax=axs[0], **kwargs)
+                qis.plot_time_series(df=df2, title='Turnover',
+                                     legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                                     ax=axs[1], **kwargs)
+
+            plt.close('all')
 
     if add_exposures_pnl_attribution:
         strategy_name = multi_portfolio_data.portfolio_datas[strategy_idx].ticker

@@ -95,9 +95,11 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         value_name = ylabel or 'y'
         var_name = xlabel or 'x'
         df1 = df.melt(ignore_index=False, var_name=var_name, value_name=value_name)
+        df1 = df1.dropna(subset=[value_name])  # dropna in value_name
         if is_sns and not stacked:
             sns.barplot(x=df1.index, y=value_name, data=df1, hue=var_name,
-                        palette=colors, edgecolor='none',
+                        palette=colors[:len(df1.columns)],
+                        edgecolor='none',
                         orient='h' if is_horizontal else 'v',
                         ax=ax)
         else:

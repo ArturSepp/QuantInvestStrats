@@ -137,6 +137,8 @@ def plot_df_table(df: pd.DataFrame,
     if heatmap_columns is not None:
         for heatmap_column in heatmap_columns:
             column_data = df[df.columns[heatmap_column]]
+            if isinstance(column_data, pd.DataFrame):
+                raise ValueError(f"dublicated columns: {column_data.columns}")
             x_array = dfs.series_to_numeric(ds=column_data)
             colors = put.compute_heatmap_colors(a=x_array, cmap=cmap)
             for k, cell in mpl_table._cells.items():

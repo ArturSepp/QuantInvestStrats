@@ -140,7 +140,7 @@ from qis.utils.df_to_weights import (
     compute_long_short_ind_by_row,
     df_nans_to_one_zero,
     df_to_equal_weight_allocation,
-    df_to_top_n_indicators,
+    df_to_top_bottom_n_indicators,
     df_to_weight_allocation_sum1,
     df_to_long_only_allocation_sum1,
     fill_long_short_signal,

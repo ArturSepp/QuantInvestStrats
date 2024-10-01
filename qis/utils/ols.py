@@ -21,8 +21,8 @@ def fit_ols(x: np.ndarray,
     if x.ndim == 1:  # x is 1-dimensional
         cond = np.logical_and(np.isfinite(x), np.isfinite(y))
     else:
-        cond = np.isfinite(y)
-        for idx in np.arange(x.shape[1]):
+        cond = np.logical_and(np.isfinite(x[:, 0]), np.isfinite(y))
+        for idx in np.arange(1, x.shape[1]):
             cond = np.logical_and(cond, np.isfinite(x[:, idx]))
     x, y = x[cond], y[cond]
     x1 = get_ols_x(x=x, order=order, fit_intercept=fit_intercept)

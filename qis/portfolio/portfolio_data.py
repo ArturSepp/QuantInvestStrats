@@ -95,6 +95,11 @@ class PortfolioData:
         if self.ticker is None:
             self.ticker = str(self.nav.name)
 
+    def set_ticker(self, ticker: str) -> PortfolioData:
+        self.ticker = ticker
+        self.nav = self.nav.rename(ticker)
+        return self
+
     def set_benchmark_prices(self, benchmark_prices: Union[pd.Series, pd.DataFrame]) -> None:
         # can pass benchmark prices here
         if isinstance(benchmark_prices, pd.Series):
@@ -352,7 +357,7 @@ class PortfolioData:
             costs = costs.divide(self.nav.to_numpy(), axis=0)
         if is_agg:
             costs = pd.Series(np.nansum(costs, axis=1), index=self.nav.index, name=self.nav.name)
-        elif is_grouped or len(costs.columns) > 10:  # agg by groups
+        elif is_grouped:  # agg by groups
             costs = dfg.agg_df_by_groups_ax1(costs,
                                              group_data=self.group_data,
                                              agg_func=np.nansum,
@@ -1356,10 +1361,11 @@ class StrategySignalData:
         if self.ra_carry is not None:
             x_var_name0 = 'carry_change'
             x0 = qis.melt_df_by_columns(ssd.ra_carry.iloc[:-1, :], y_var_name=x_var_name0)[x_var_name0]
-            x = pd.concat([x0, x1, x2, x3], axis=1)
+            x = pd.concat([x0, x1, x2, x3], axis=1).dropna()
         else:
-            x = pd.concat([x1, x2, x3], axis=1)
+            x = pd.concat([x1, x2, x3], axis=1).dropna()
         x_names = x.columns.to_list()
+        y = y.reindex(index=x.index)
 
         # keep last obs for prediction
         fitted_model = qis.fit_ols(x=x.to_numpy(), y=y.to_numpy(), order=1, fit_intercept=False)

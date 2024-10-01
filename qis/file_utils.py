@@ -320,7 +320,7 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
 
 
 def load_df_dict_from_excel(file_name: str,
-                            dataset_keys: Optional[List[Union[str, Enum, NamedTuple]]],
+                            dataset_keys: Optional[List[Union[str, Enum, NamedTuple]]] = None,
                             local_path: Optional[str] = None,
                             folder_name: str = None,
                             subfolder_name: str = None,

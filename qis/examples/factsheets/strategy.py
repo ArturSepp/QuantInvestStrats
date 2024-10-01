@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from typing import Tuple, List
 from enum import Enum
@@ -80,11 +81,12 @@ def generate_equity_bond_portfolio(prices: pd.DataFrame,
 class UnitTests(Enum):
     VOLPARITY_PORTFOLIO = 1
     EQUITY_BOND = 2
+    DELTA1_STRATEGY = 3
 
 
 def run_unit_test(unit_test: UnitTests):
 
-    time_period = qis.TimePeriod('31Dec2005', '06Sep2024')  # time period for portfolio reporting
+    time_period = qis.TimePeriod('31Dec2005', '12Sep2024')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2022', time_period.end)
     rebalancing_costs = 0.0010  # per traded volume
 
@@ -148,12 +150,32 @@ def run_unit_test(unit_test: UnitTests):
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
                              local_path=qis.local_path.get_output_path())
 
+    elif unit_test == UnitTests.DELTA1_STRATEGY:
+        from bbg_fetch import fetch_field_timeseries_per_tickers
+        prices = fetch_field_timeseries_per_tickers(tickers={'UISYMH5S Index': 'CDX_HY'})
+        benchmark_prices = fetch_field_timeseries_per_tickers(tickers={'HYG US Equity': 'HYG'})
+        # prices = fetch_field_timeseries_per_tickers(tickers={'UISYMI5S Index': 'IG_5Y'})
+        # benchmark_prices = fetch_field_timeseries_per_tickers(tickers={'LQD US Equity': 'LQD'})
+        delta1_portfolio = qis.backtest_model_portfolio(prices=prices,
+                                                        weights=np.array([1.0]),
+                                                        rebalance_freq='SE',   # only at starts
+                                                        rebalancing_costs=rebalancing_costs,
+                                                        ticker='Delta1')
+        figs = qis.generate_strategy_factsheet(portfolio_data=delta1_portfolio,
+                                               benchmark_prices=benchmark_prices,
+                                               add_current_position_var_risk_sheet=False,
+                                               time_period=time_period,
+                                               **fetch_default_report_kwargs(time_period=time_period))
+        qis.save_figs_to_pdf(figs=figs,
+                             file_name=f"delta1_strategy_factsheet",
+                             local_path=qis.local_path.get_output_path())
+
     # plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.VOLPARITY_PORTFOLIO
+    unit_test = UnitTests.DELTA1_STRATEGY
 
     is_run_all_tests = False
     if is_run_all_tests:

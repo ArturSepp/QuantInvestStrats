@@ -5,7 +5,6 @@ analytic for melting of pandas
 import pandas as pd
 from enum import Enum
 from typing import Dict, Optional, List
-
 # qis
 import qis.utils.np_ops as npo
 
