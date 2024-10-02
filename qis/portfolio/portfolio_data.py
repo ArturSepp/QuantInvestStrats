@@ -1030,10 +1030,17 @@ class PortfolioData:
                                      time_period: TimePeriod = None,
                                      attribution_metric: AttributionMetric = AttributionMetric.PNL,
                                      add_top_bar_values: Optional[bool] = None,
+                                     remove_zero_data: bool = False,
                                      ax: plt.Subplot = None,
                                      **kwargs
                                      ) -> None:
+        """
+        performance attribution for p&l and risk
+        """
         data = self.get_performance_attribution_data(attribution_metric=attribution_metric, time_period=time_period)
+        if remove_zero_data:
+            data = data.replace({0.0: np.nan}).dropna()
+
         if add_top_bar_values is None:
             if isinstance(data, pd.Series) and len(data.index) <= 20:
                 add_top_bar_values = True
@@ -1044,11 +1051,9 @@ class PortfolioData:
                                    new_kwargs=dict(bbox_to_anchor=(0.5, 1.05),
                                                    add_top_bar_values=add_top_bar_values,
                                                    x_rotation=90))
-        data = data.replace({0.0: np.nan}).dropna()
         title = f"{attribution_metric.title}"
         if time_period is not None:
             title += f", for period={time_period.to_str()}"
-
         qis.plot_bars(df=data,
                       skip_y_axis=True,
                       title=title,

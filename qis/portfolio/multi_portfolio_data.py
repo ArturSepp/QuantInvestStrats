@@ -58,10 +58,13 @@ class MultiPortfolioData:
         if self.benchmark_prices is not None:
             self.benchmark_prices = self.benchmark_prices.reindex(index=self.navs.index, method='ffill')
 
-    def set_benchmark_prices(self, benchmark_prices: pd.DataFrame, freq: Optional[str] = None) -> None:
+    def set_benchmark_prices(self, benchmark_prices: pd.DataFrame) -> None:
         # can pass benchmark prices here
-        self.benchmark_prices = benchmark_prices
-        self.set_navs(freq=freq)
+        if isinstance(benchmark_prices, pd.Series):
+            benchmark_prices = benchmark_prices.to_frame()
+        else:
+            benchmark_prices = benchmark_prices
+        self.benchmark_prices = benchmark_prices.reindex(index=self.navs.index, method='ffill')
 
     """
     data get methods

@@ -21,8 +21,8 @@ FIRST_COLUMN_WIDTH = 3.0
 def plot_df_table(df: pd.DataFrame,
                   add_index_as_column: bool = True,
                   column_width: float = COLUMN_WIDTH,
-                  first_column_width: Optional[float] = FIRST_COLUMN_WIDTH,
                   row_height: float = ROW_HIGHT,
+                  first_column_width: Optional[float] = FIRST_COLUMN_WIDTH,
                   first_row_height: float = None,
                   col_widths: List[float] = None,  # can pass as cols
                   rotation_for_columns_headers: int = None,
