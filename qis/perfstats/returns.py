@@ -212,11 +212,11 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
 
     if perf_params.rates_data is not None:
         excess_return_pa = compute_pa_excess_returns(returns=to_returns(prices,
-                                                                     return_type=ReturnTypes.RELATIVE,
-                                                                     is_first_zero=True),
-                                                  rates_data=perf_params.rates_data,
-                                                  first_date=prices.index[0],
-                                                  annualize_less_1y=annualize_less_1y)
+                                                                        return_type=ReturnTypes.RELATIVE,
+                                                                        is_first_zero=True),
+                                                     rates_data=perf_params.rates_data,
+                                                     first_date=prices.index[0],
+                                                     annualize_less_1y=annualize_less_1y)
     else:
         excess_return_pa = compounded_return_pa
 

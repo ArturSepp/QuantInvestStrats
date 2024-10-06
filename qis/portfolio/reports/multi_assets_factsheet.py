@@ -256,7 +256,7 @@ class MultiAssetsReport:
         plot rolling beta to one benchmark
         """
         returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=beta_freq)
-        factor_beta_title = f"{factor_beta_span}-period rolling Beta of {beta_freq}-freq returns to {benchmark}"
+        factor_beta_title = f"{factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {benchmark}"
         ewm_linear_model = qis.EwmLinearModel(x=returns[benchmark].to_frame(), y=returns.drop(benchmark, axis=1))
         ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
         ewm_linear_model.plot_factor_loadings(factor=benchmark,
@@ -284,7 +284,7 @@ class MultiAssetsReport:
         if factor_alpha_title is not None:
             factor_alpha_title = f"{factor_alpha_title} to {benchmark}"
         else:
-            factor_alpha_title = factor_alpha_title or f"Cumulative alpha using {factor_beta_span}-period rolling Beta of {beta_freq}-freq returns to {benchmark}"
+            factor_alpha_title = factor_alpha_title or f"Cumulative alpha using {factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {benchmark}"
 
         qis.plot_time_series(df=factor_alpha.cumsum(0),
                              title=factor_alpha_title,

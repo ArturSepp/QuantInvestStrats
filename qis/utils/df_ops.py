@@ -26,7 +26,7 @@ def df_indicator_like(df: pd.DataFrame, type: Type = bool) -> pd.DataFrame:
     """
     return df_indicator = True is set is not None and False otherwise
     """
-    data = np.where(np.isnan(df.to_numpy(dtype=np.float64)), False, True).astype(type)
+    data = (df.isna() == False).astype(type)
     return pd.DataFrame(data=data, index=df.index, columns=df.columns)
 
 

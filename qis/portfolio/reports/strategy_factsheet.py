@@ -39,10 +39,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 add_grouped_cum_pnl: bool = False,
                                 add_weight_change_report: bool = False,
                                 add_current_signal_report: bool = False,
+                                add_instrument_history_report: bool = False,
                                 y_limits_signal: Tuple[Optional[float], Optional[float]] = (-1.0, 1.0),
                                 is_1y_exposures: bool = False,
                                 is_grouped: Optional[bool] = None,
                                 dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
+                                is_norm_costs: bool = True,
+                                df_to_add: pd.DataFrame = None,
+                                factsheet_name: str = None,
                                 **kwargs
                                 ) -> List[plt.Figure]:
     # align
@@ -69,7 +73,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                        markersize=1,
                        framealpha=0.75)
     kwargs = qis.update_kwargs(kwargs, plot_kwargs)
-    fig.suptitle(f"{portfolio_data.nav.name} factsheet", fontweight="bold", fontsize=8, color='blue')
+    if factsheet_name is None:
+        factsheet_name = f"{portfolio_data.nav.name} factsheet"
+    fig.suptitle(factsheet_name, fontweight="bold", fontsize=8, color='blue')
 
     # prices
     portfolio_nav = portfolio_data.get_portfolio_nav(time_period=time_period)
@@ -146,7 +152,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[10:12, :2])
     costs = portfolio_data.get_costs(time_period=time_period, roll_period=turnover_rolling_period,
                                      freq=turnover_freq,
-                                     is_grouped=is_grouped)
+                                     is_grouped=is_grouped,
+                                     is_norm_costs=is_norm_costs)
     freq = pd.infer_freq(costs.index)
     costs_title = f"{turnover_rolling_period}-period rolling {freq}-freq Costs"
     qis.plot_time_series(df=costs,
@@ -296,7 +303,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             portfolio_data.plot_current_var(is_grouped=True, is_correlated=True,
                                             ax=fig.add_subplot(gs[4:6, 3]), **kwargs)
 
-        # qqq ytd performance attribution for ytd_attribution_time_period
+        # ytd performance attribution for ytd_attribution_time_period
         with sns.axes_style("whitegrid"):
             portfolio_data.plot_current_weights(is_grouped=False,
                                                 time_period=ytd_attribution_time_period,
@@ -308,19 +315,13 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                         ax=fig.add_subplot(gs[6:8, 2:]),
                                                         **local_kwargs)
 
-        # var
+        # vol time series
         ax = fig.add_subplot(gs[8:10, :2])
-        portfolio_data.plot_portfolio_grouped_var(ax=ax,
-                                                  is_correlated=True,
-                                                  time_period=time_period,
-                                                  **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
-        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
-        ax = fig.add_subplot(gs[8:10, 2:])
-        portfolio_data.plot_portfolio_grouped_var(ax=ax,
-                                                  is_correlated=False,
-                                                  time_period=time_period,
-                                                  **kwargs)
+        portfolio_data.plot_portfolio_vols(freq=perf_params.freq_vol,
+                                           span=vol_rolling_window,
+                                           time_period=time_period,
+                                           ax=ax,
+                                           **kwargs)
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
@@ -330,7 +331,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                             time_period=time_period,
                                                                             beta_freq=beta_freq,
                                                                             factor_beta_span=factor_beta_span)
-        factor_beta_title = f"Rolling {factor_beta_span}-period beta of {beta_freq}-freq returns"
+        factor_beta_title = f"Rolling {factor_beta_span}-span beta of {beta_freq}-freq returns"
         qis.plot_time_series(df=factor_exposures,
                              var_format='{:,.2f}',
                              legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
@@ -340,13 +341,6 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
-        # vol time series
-        ax = fig.add_subplot(gs[10:12, 2:])
-        portfolio_data.plot_portfolio_vols(freq=perf_params.freq_vol,
-                                           span=vol_rolling_window,
-                                           time_period=time_period,
-                                           ax=ax,
-                                           **kwargs)
         """
         portfolio_data.plot_rolling_perf(rolling_perf_stat=qis.RollingPerfStat.EWMA_VOL,
                                          add_benchmarks=add_benchmarks_to_navs,
@@ -355,9 +349,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                          time_period=time_period,
                                          ax=ax,
                                          **kwargs)
-        """
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+        """
 
         # beta attribution
         ax = fig.add_subplot(gs[12:14, :2])
@@ -366,7 +360,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                                     factor_beta_span=factor_beta_span,
                                                                                     time_period=time_period)
         factor_attribution_title = (f"Cumulative return attribution using rolling "
-                                    f"{factor_beta_span}-period beta of {beta_freq}-freq returns")
+                                    f"{factor_beta_span}-span beta of {beta_freq}-freq returns")
         qis.plot_time_series(df=factor_attribution.cumsum(0),
                              var_format='{:,.0%}',
                              legend_stats=qis.LegendStats.LAST_NONNAN,
@@ -376,6 +370,32 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
+        # var - independent
+        ax = fig.add_subplot(gs[8:10, 2:])
+        portfolio_data.plot_portfolio_grouped_var(ax=ax,
+                                                  is_correlated=False,
+                                                  time_period=time_period,
+                                                  **kwargs)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+
+        # var correlted
+        ax = fig.add_subplot(gs[10:12, 2:])
+        portfolio_data.plot_portfolio_grouped_var(ax=ax,
+                                                  is_correlated=True,
+                                                  time_period=time_period,
+                                                  **kwargs)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+
+        # var attribution
+        with sns.axes_style("whitegrid"):
+            portfolio_data.plot_var_stack(is_grouped=True, is_correlated=True,
+                                          time_period=time_period,
+                                          ax=fig.add_subplot(gs[12:14, 2:]),
+                                          **kwargs)
+
+        """
         # returns scatter
         with sns.axes_style("whitegrid"):
             portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[12:14, 2:]),
@@ -384,6 +404,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                 freq=perf_params.freq_reg,
                                                 is_grouped=is_grouped,
                                                 **kwargs)
+        """
 
         """
         # vol regime data
@@ -405,6 +426,25 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                             regime_params=regime_params,
                                             **kwargs)
         """
+
+    if add_instrument_history_report:
+        if df_to_add is None:
+            ac_data = portfolio_data.group_data.to_frame(name='AC')
+            if portfolio_data.instrument_names is not None:
+                df_to_add = pd.concat([portfolio_data.instrument_names.rename('Name'),
+                                       ac_data], axis=1)
+            else:
+                df_to_add = ac_data
+
+        perf_columns = (qis.PerfStat.START_DATE, qis.PerfStat.END_DATE, qis.PerfStat.PA_RETURN,
+                        qis.PerfStat.VOL, qis.PerfStat.SHARPE_RF0,
+                        qis.PerfStat.MAX_DD, qis.PerfStat.MAX_DD_VOL, qis.PerfStat.SKEWNESS)
+
+        fig = qis.generate_price_history_report(prices=portfolio_data.prices,
+                                                **qis.update_kwargs(kwargs, dict(fontsize=4, figsize=figsize,
+                                                                                 perf_columns=perf_columns,
+                                                                                 df_to_add=df_to_add)))
+        figs.append(fig)
 
     if add_current_signal_report and portfolio_data.strategy_signal_data is not None:
         fig = qis.generate_current_signal_report(portfolio_data=portfolio_data,

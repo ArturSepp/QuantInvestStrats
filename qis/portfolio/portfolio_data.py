@@ -69,6 +69,7 @@ class PortfolioData:
     tickers_to_names_map: Optional[Dict[str, str]] = None  # renaming of long tickers
     group_data: pd.Series = None  # for asset class grouping
     group_order: List[str] = None
+    instrument_names: pd.Series = None
     benchmark_prices: pd.DataFrame = None  # can pass benchmark prices here
     ticker: str = None
     strategy_signal_data: StrategySignalData = None
@@ -294,7 +295,8 @@ class PortfolioData:
                                         total_column=None)
 
         pnls = self.get_instruments_pnl(time_period=time_period, is_compounded=False).fillna(0.0)
-        all_exposures = self.get_weights(time_period=time_period)
+        all_exposures = self.get_weights(time_period=time_period, freq=None)
+        all_exposures = all_exposures.reindex(index=pnls.index, method='ffill').ffill()
         pnl_positive_exp = pnls.where(all_exposures > 0.0, other=0.0)
         pnl_negative_exp = pnls.where(all_exposures < 0.0, other=0.0)
 
@@ -728,7 +730,7 @@ class PortfolioData:
         fig = qis.plot_time_series(df=portfolio_vols,
                                    var_format='{:,.2%}',
                                    legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                                   title=f"Portfolio EWM {span}-period vols of {freq}-freq returns",
+                                   title=f"Portfolio EWM {span}-span vols of {freq}-freq returns",
                                    ax=ax,
                                    **kwargs)
         if regime_benchmark is not None:
@@ -1191,15 +1193,19 @@ class PortfolioData:
                                  is_grouped: bool = False,
                                  title: str = None,
                                  add_top_bar_values: Optional[bool] = None,
+                                 weights_change_lag: Optional[int] = None,
                                  ax: plt.Subplot = None,
                                  **kwargs
                                  ) -> None:
         weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped)
         weights_1 = weights.iloc[-1, :]
         if len(weights.index) > 1:
-            weights_0 = weights.iloc[-2, :]
+            if weights_change_lag is not None:
+                weights_0 = weights.iloc[-weights_change_lag, :]
+            else:
+                weights_0 = weights.iloc[-2, :]
             delta = weights_1.subtract(weights_0)
-            post_title = f"rebalancing between {qis.date_to_str(weights_1.name)} and {qis.date_to_str(weights_0.name)}"
+            post_title = f"rebalancing between {qis.date_to_str(weights_0.name)} and {qis.date_to_str(weights_1.name)}"
         else:
             delta = weights_1
             post_title = f"rebalancing on {qis.date_to_str(weights_1.name)} starting from zero"
@@ -1270,6 +1276,50 @@ class PortfolioData:
                       yvar_format='{:,.2%}',
                       ax=ax,
                       **kwargs)
+
+    def plot_var_stack(self,
+                       is_grouped: bool = True,
+                       is_correlated: bool = True,
+                       time_period: TimePeriod = None,
+                       freq: str = 'B',
+                       title: str = None,
+                       stack_freq: Optional[str] = 'W-WED',
+                       vol_span: int = 31,  # span in number of freq-returns
+                       ax: plt.Subplot = None,
+                       **kwargs
+                       ) -> None:
+        portfolio_vars, instrument_vars = self.compute_portfolio_vars(is_correlated=is_correlated,
+                                                                      time_period=time_period,
+                                                                      freq=freq,
+                                                                      total_column=None,
+                                                                      vol_span=vol_span)
+        if is_grouped:
+            var_1 = portfolio_vars
+            if is_correlated:
+                title = title or f"Risk Attribution with Correlated {freq}-freq 99%-VAR with {vol_span}-span ewma covar"
+            else:
+                title = title or f"Risk Attribution with Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols "
+
+        else:
+            if is_correlated:
+                raise ValueError(f"instrument var is not defined for correlated var ")
+            else:
+                var_1 = instrument_vars
+                title = title or f"Risk Attribution with Instrument independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols"
+
+        if time_period is not None:
+            var_1 = time_period.locate(var_1)
+        if stack_freq is not None:
+            var_1 = var_1.asfreq(stack_freq, method='ffill')
+        df = var_1.divide(np.nansum(var_1, axis=1, keepdims=True))
+        qis.plot_stack(df=df,
+                       is_yaxis_limit_01=True,
+                       use_bar_plot=True,
+                       title=title,
+                       legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                       var_format='{:.1%}',
+                       ax=ax,
+                       **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncols=2)))
 
 
 @dataclass

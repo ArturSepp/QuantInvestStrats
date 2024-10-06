@@ -455,7 +455,7 @@ class MultiPortfolioData:
             turnover = time_period.locate(turnover)
         
         freq = pd.infer_freq(turnover.index)
-        turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
+        turnover_title = f"{turnover_rolling_period}-preriod rolling {freq}-freq Turnover"
         pts.plot_time_series(df=turnover,
                              var_format=var_format,
                              y_limits=(0.0, None),

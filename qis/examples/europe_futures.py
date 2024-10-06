@@ -4,10 +4,10 @@ import seaborn as sns
 import qis as qis
 from bbg_fetch import fetch_field_timeseries_per_tickers
 
-# tickers = {'GX1 Index': 'DAX', 'CF1 Index': 'CAC', 'IB1 Index': 'IBEX', 'ST1 Index': 'MIB', 'EO1 Index': 'AEX'}
+# tickers = {'CF1 Index': 'CAC', 'GX1 Index': 'DAX', 'IB1 Index': 'IBEX', 'ST1 Index': 'MIB', 'EO1 Index': 'AEX'}
+tickers = {'CF1 Index': 'CAC', 'GX1 Index': 'DAX', 'IB1 Index': 'IBEX', 'ST1 Index': 'MIB'}
 start_date = pd.Timestamp('1Jan1990')
 
-tickers = {'CF1 Index': 'CAC', 'GX1 Index': 'DAX', 'IB1 Index': 'IBEX', 'ST1 Index': 'MIB'}
 futures_prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST',
                                                     start_date=start_date).ffill()
 # use 3m rolling volumes

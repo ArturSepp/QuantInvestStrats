@@ -24,7 +24,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     prices = None
-    end_date = '06Sep2024'
+    end_date = '07Oct2024'
     if unit_test == UnitTests.CORE_ETFS:
         benchmark = 'SPY'
         tickers = [benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']

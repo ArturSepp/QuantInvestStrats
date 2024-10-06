@@ -34,15 +34,16 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
     ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
     data = pd.DataFrame(index=ra_perf_table.index)
     for perf_column in perf_columns:
-        if is_to_str:
-            data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
-                                                           var_format=perf_column.to_format(**kwargs))
-        else:
-            data[perf_column.to_str()] = ra_perf_table[perf_column.to_str()]
+        if perf_column.to_str() in ra_perf_table.columns:
+            if is_to_str:
+                data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
+                                                               var_format=perf_column.to_format(**kwargs))
+            else:
+                data[perf_column.to_str()] = ra_perf_table[perf_column.to_str()]
 
     if df_to_add is not None:
         for idx, column in enumerate(df_to_add.columns):
-            data.insert(idx+1, column=column, value=df_to_add[column].to_numpy())
+            data.insert(idx, column=column, value=df_to_add[column].to_numpy())
     data.index.name = column_header
     return data
 
