@@ -300,7 +300,6 @@ class MultiAssetsReport:
                           sharpe_rolling_window: int = 3 * 252,
                           sharpe_freq: Optional[str] = None,
                           legend_stats: LegendStats = LegendStats.FIRST_AVG_LAST,
-                          regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                           ax: plt.Subplot = None,
                           **kwargs
                           ) -> plt.Figure:

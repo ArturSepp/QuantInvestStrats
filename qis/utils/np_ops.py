@@ -398,7 +398,8 @@ def tensor_mean(a: np.ndarray) -> np.ndarray:
 
 def find_nearest(a: np.ndarray,
                  value: float,
-                 is_sorted: bool = True
+                 is_sorted: bool = True,
+                 is_equal_or_largest: bool = False
                  ) -> float:
     """
     find closes element
@@ -406,10 +407,13 @@ def find_nearest(a: np.ndarray,
     """
     if is_sorted:
         idx = np.searchsorted(a, value, side="left")
-        if idx > 0 and (idx == len(a) or np.abs(value - a[idx - 1]) < np.abs(value - a[idx])):
-            return a[idx - 1]
-        else:
+        if is_equal_or_largest:  # return the equal or largest element
             return a[idx]
+        else:
+            if idx > 0 and (idx == len(a) or np.abs(value - a[idx - 1]) < np.abs(value - a[idx])):
+                return a[idx - 1]
+            else:
+                return a[idx]
     else:
         a = np.asarray(a)
         idx = (np.abs(a - value)).argmin()
@@ -466,6 +470,7 @@ class UnitTests(Enum):
     ROLLING = 3
     WA = 4
     ARRAY_RANK = 5
+    NEAREST = 6
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -513,10 +518,16 @@ def run_unit_test(unit_test: UnitTests):
         array_idx_rank = dict(sorted(array_idx_rank.items()))  # sort by rank
         print(array_idx_rank)
 
+    elif unit_test == UnitTests.NEAREST:
+        a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        print(a)
+        print(f"x={2.1}, nearest={find_nearest(a=a, value=2.1)}")
+        print(f"x={2.1}, nearest={find_nearest(a=a, value=2.1, is_equal_or_largest=True)}")
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.ARRAY_RANK
+    unit_test = UnitTests.NEAREST
 
     is_run_all_tests = False
     if is_run_all_tests:

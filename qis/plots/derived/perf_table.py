@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from typing import List, Tuple, Callable, Optional, Dict, Union
 from enum import Enum
 
+import qis
 # qis
 import qis.utils.dates as da
 import qis.utils.df_str as dfs
@@ -376,6 +377,34 @@ def plot_top_bottom_performers(prices: pd.DataFrame,
     return fig
 
 
+def plot_best_worst_returns(price: pd.Series,
+                            freq: Optional[str] = None,
+                            yvar_format: str = '{:.2%}',
+                            date_format: str = '%d%b%Y',
+                            num_returns: int = 10,
+                            add_bar_values: Optional[bool] = False,
+                            ax: plt.Subplot = None,
+                            **kwargs
+                            ) -> Optional[plt.Subplot]:
+    returns = ret.to_returns(price, freq=freq).sort_values().dropna()
+
+    if len(returns.index) > 2*num_returns:
+        returns = pd.concat([returns.iloc[:num_returns], returns.iloc[-num_returns:]])
+
+    returns.index = [t.strftime(date_format) for t in returns.index]
+
+    fig = plot_bars(df=returns,
+                    stacked=False,
+                    skip_y_axis=True,
+                    legend_loc=None,
+                    x_rotation=90,
+                    add_bar_values=add_bar_values,
+                    yvar_format=yvar_format,
+                    ax=ax,
+                    **kwargs)
+    return fig
+
+
 class UnitTests(Enum):
     PLOT_RA_PERF_TABLE = 1
     PLOT_RA_PERF_SCATTER = 2
@@ -385,6 +414,7 @@ class UnitTests(Enum):
     PLOT_SHARPE_BY_DATES = 6
     PLOT_PERF_FOR_START_END_PERIOD = 7
     PLOT_TOP_BOTTOM_PERFORMERS = 8
+    PLOT_TOP_BOTTOM_RETURNS = 9
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -438,12 +468,15 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.PLOT_TOP_BOTTOM_PERFORMERS:
         plot_top_bottom_performers(prices=prices, num_assets=2)
 
+    elif unit_test == UnitTests.PLOT_TOP_BOTTOM_RETURNS:
+        plot_best_worst_returns(price=prices.iloc[:, 0])
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PLOT_RA_PERF_TABLE_BENCHMARKS
+    unit_test = UnitTests.PLOT_TOP_BOTTOM_RETURNS
 
     is_run_all_tests = False
     if is_run_all_tests:

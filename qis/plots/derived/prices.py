@@ -310,7 +310,6 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
                            roll_periods: int = 260,
                            roll_freq: str = None,
                            legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
-                           var_format: str = '{:.2f}',
                            title: Optional[str] = None,
                            regime_benchmark_str: str = None,
                            pivot_prices: pd.Series = None,
@@ -332,10 +331,9 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
 
     fig = pts.plot_time_series(df=df,
                                legend_stats=legend_stats,
-                               var_format=var_format,
                                title=title or title_ps,
                                ax=ax,
-                               **kwargs)
+                               **sop.update_kwargs(kwargs, dict(var_format=rolling_perf_stat.value[1])))
 
     if regime_benchmark_str is not None and regime_params is not None:
         add_bnb_regime_shadows(ax=ax,

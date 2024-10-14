@@ -1,9 +1,14 @@
 
-from qis.portfolio.portfolio_data import (PortfolioData, PortfolioInput, AttributionMetric, StrategySignalData)
+from qis.portfolio.portfolio_data import (PortfolioData,
+                                          PortfolioInput,
+                                          AttributionMetric,
+                                          SnapshotPeriod,
+                                          StrategySignalData)
 
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 
-from qis.portfolio.ewm_portfolio_risk import (compute_portfolio_vol,
+from qis.portfolio.ewm_portfolio_risk import (limit_weights_to_max_var_limit,
+                                              compute_portfolio_vol,
                                               compute_portfolio_correlated_var_by_groups,
                                               compute_portfolio_independent_var_by_ac)
 

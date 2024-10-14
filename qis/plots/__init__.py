@@ -123,7 +123,8 @@ from qis.plots.derived.perf_table import (
     plot_ra_perf_table,
     plot_ra_perf_table_benchmark,
     get_ra_perf_benchmark_columns,
-    plot_top_bottom_performers
+    plot_top_bottom_performers,
+    plot_best_worst_returns
 )
 
 from qis.plots.derived.regime_class_table import get_quantile_class_table, plot_quantile_class_table

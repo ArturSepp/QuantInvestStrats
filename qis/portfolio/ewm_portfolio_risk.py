@@ -20,6 +20,31 @@ VAR99 = 2.3263
 VAR99_SCALER_BP = VAR99 * 10000
 
 
+@njit
+def limit_weights_to_max_var_limit(weights: np.ndarray,
+                                   vols: np.ndarray,
+                                   max_var_limit_bp: Union[np.ndarray, float] = 25.00,
+                                   af: float = 260
+                                   ) -> np.ndarray:
+    """
+    limit weights to max weight_max_var_bp
+    use: var = 2.33 * abs(weight) * vols_annualised / sqrt(af)
+    then abs(weight) <= weight_max_var_limit_bp / (VAR99_SCALER_BP * vols_annualised / sqrt(af))
+    vols are annualised vols
+    """
+    saf = np.sqrt(af)
+    instrument_var = VAR99_SCALER_BP * np.abs(weights) * vols / saf
+    cond = instrument_var > max_var_limit_bp
+    if np.any(cond):
+        weight_limit = max_var_limit_bp / (VAR99_SCALER_BP * vols / saf)
+        up_breach = np.logical_and(cond, np.greater(weights, 0.0))
+        down_breach = np.logical_and(cond, np.less(weights, 0.0))
+        weights1 = np.where(up_breach, weight_limit, np.where(down_breach, -weight_limit, weights))
+    else:
+        weights1 = weights
+    return weights1
+
+
 def compute_portfolio_vol(returns: pd.DataFrame,
                           weights: pd.DataFrame,
                           span: Union[int, np.ndarray] = None,

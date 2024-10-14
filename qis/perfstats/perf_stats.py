@@ -238,16 +238,27 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
 
 
 def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
-                                         benchmark: str,
+                                         benchmark: str = None,
+                                         benchmark_price: pd.Series = None,
                                          perf_params: PerfParams = None,
                                          is_log_returns: bool = False,
                                          alpha_an_factor: float = None,
                                          freq_reg: str = None,
+                                         drop_benchmark: bool = False,
                                          **kwargs
                                          ) -> pd.DataFrame:
+    if benchmark is None and benchmark_price is None:
+        raise ValueError(f"provide either benchmark name in prices or benchmark_price")
+    if benchmark is not None:
+        if benchmark not in prices.columns:
+            raise ValueError(f"{benchmark} is not in {prices.columns.to_list()}")
+    elif benchmark_price is not None:
+        if not isinstance(benchmark_price, pd.Series):
+            raise ValueError(f"benchmark_price must be pd.Series not {type(benchmark_price)}")
+        benchmark_price = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
+        prices = pd.concat([benchmark_price, prices], axis=1)
+        benchmark = benchmark_price.name
 
-    if benchmark not in prices.columns:
-        raise ValueError(f"{benchmark} is not in {prices.columns.to_list()}")
     if perf_params is None:
         perf_params = PerfParams(freq=pd.infer_freq(prices.index))
 
@@ -276,6 +287,8 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     ra_perf_table[PerfStat.BETA.to_str()] = pd.Series(betas)
     ra_perf_table[PerfStat.R2.to_str()] = pd.Series(r2)
 
+    if drop_benchmark:
+        ra_perf_table = ra_perf_table.drop([benchmark], axis=0)
     return ra_perf_table
 
 
@@ -454,6 +467,7 @@ class UnitTests(Enum):
     RA_PERF_TABLE = 1
     DRAWDOWN = 2
     DRAWDOWN_STATS_TABLE = 3
+    TOP_BOTTOM = 4
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -478,7 +492,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.RA_PERF_TABLE
+    unit_test = UnitTests.DRAWDOWN_STATS_TABLE
 
     is_run_all_tests = False
     if is_run_all_tests:
@@ -486,4 +500,3 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-

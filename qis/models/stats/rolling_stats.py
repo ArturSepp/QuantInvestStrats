@@ -44,7 +44,7 @@ def compute_rolling_perf_stat(prices: Union[pd.DataFrame, pd.Series],
 
     if rolling_perf_stat == RollingPerfStat.TOTAL_RETURNS:
         perf_stat = compute_rolling_returns(prices=prices, roll_freq=roll_freq, roll_periods=roll_periods)
-        title = f"Rolling returns with {roll_freq1}-freq and roll_period={roll_periods}"
+        title = f"Rolling total returns with {roll_freq1}-freq and roll_period={roll_periods}"
     elif rolling_perf_stat == RollingPerfStat.PA_RETURNS:
         perf_stat = compute_rolling_pa_returns(prices=prices, roll_periods=roll_periods)
         title = f"P.a. returns with roll_period={roll_periods}"

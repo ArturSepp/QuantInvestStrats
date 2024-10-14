@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from numba import njit
 from dataclasses import dataclass, asdict
 from statsmodels.regression.linear_model import RegressionResults as RegModel
-from typing import Union, Dict, Any, Optional, Tuple, List, NamedTuple
+from typing import Union, Dict, Any, Optional, Tuple, List
 from enum import Enum
 
 # qis
@@ -37,17 +37,25 @@ PERF_PARAMS = PerfParams(freq='W-WED')
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
 
-class MetricSpec(NamedTuple):
-    title: str
-
-
-class AttributionMetric(MetricSpec, Enum):
+class AttributionMetric(str, Enum):
     """
     input for computation of get_performance_attribution_data()
     """
-    PNL = MetricSpec(title='P&L Attribution, sum=portfolio performance')
-    PNL_RISK = MetricSpec(title='P&L Risk Attribution, sum=100%')
-    INST_PNL = MetricSpec(title='Instrument P&L')
+    PNL = 'P&L Attribution, sum=portfolio performance'
+    PNL_RISK = 'P&L Risk Attribution, sum=100%'
+    INST_PNL = 'Instrument P&L'
+    COSTS = 'Instrument Total Costs'
+    TURNOVER = 'Instrument Annualised Turnover'
+    VOL_ADJUSTED_TURNOVER = 'Instrument Annualised Vol-Adjusted Turnover'
+
+
+class SnapshotPeriod(str, Enum):
+    """
+    input for computation of get_performance_attribution_data()
+    """
+    LAST = 'last'
+    AVG = 'avg'
+    MAX = 'max'
 
 
 @dataclass
@@ -316,13 +324,22 @@ class PortfolioData:
                      is_grouped: bool = False,
                      time_period: TimePeriod = None,
                      roll_period: Optional[int] = 260,
+                     is_vol_adjusted: bool = False,
                      add_total: bool = True,
+                     vol_span: int = 31,
                      freq: Optional[str] = None
                      ) -> Union[pd.DataFrame, pd.Series]:
         turnover = (self.units.diff(1).abs()).multiply(self.prices)
         abs_exposure = self.units.multiply(self.prices).abs().sum(axis=1)
         # turnover = turnover.divide(self.nav.to_numpy(), axis=0)
         turnover = turnover.divide(abs_exposure.to_numpy(), axis=0)
+
+        if is_vol_adjusted:
+            instrument_vols = compute_ewm_vol(data=qis.to_returns(self.prices, is_log_returns=True),
+                                              span=vol_span,
+                                              annualize=True)
+            turnover = turnover.multiply(instrument_vols)
+
         if is_agg:
             turnover = pd.Series(np.nansum(turnover, axis=1), index=turnover.index, name=self.nav.name)
             turnover = turnover.reindex(index=self.nav.index)
@@ -507,7 +524,9 @@ class PortfolioData:
 
     def get_performance_attribution_data(self,
                                          attribution_metric: AttributionMetric = AttributionMetric.PNL,
-                                         time_period: TimePeriod = None
+                                         time_period: TimePeriod = None,
+                                         is_norm_costs: bool = True,
+                                         **kwargs
                                          ) -> Union[pd.DataFrame, pd.Series]:
         if attribution_metric == AttributionMetric.PNL:
             data = self.get_instruments_performance_attribution(time_period=time_period)
@@ -515,6 +534,26 @@ class PortfolioData:
             data = self.get_instruments_pnl_risk_attribution(time_period=time_period)
         elif attribution_metric == AttributionMetric.INST_PNL:
             data = self.get_instruments_navs(time_period=time_period)
+        elif attribution_metric == AttributionMetric.COSTS:
+            data = self.get_costs(is_agg=False, is_grouped=False, roll_period=None, is_norm_costs=is_norm_costs,
+                                  add_total=False,
+                                  time_period=time_period)
+            data = data.sum(0)
+            #print(f"total costs, is_norm_costs={is_norm_costs} = {np.nansum(data)}")
+        elif attribution_metric == AttributionMetric.TURNOVER:
+            data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
+                                     add_total=False,
+                                     time_period=time_period)
+            an = qis.infer_an_from_data(data=data)
+            data = an*data.mean(0)
+            #print(f"total turnover = {np.nansum(data)}")
+        elif attribution_metric == AttributionMetric.VOL_ADJUSTED_TURNOVER:
+            data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
+                                     add_total=False, is_vol_adjusted=True,
+                                     time_period=time_period)
+            an = qis.infer_an_from_data(data=data)
+            data = an * data.mean(0)
+
         else:
             raise NotImplementedError(f"{attribution_metric}")
 
@@ -765,8 +804,6 @@ class PortfolioData:
                                          roll_periods=rolling_window,
                                          roll_freq=roll_freq,
                                          legend_stats=legend_stats,
-                                         # trend_line=qis.TrendLine.ZERO_SHADOWS,
-                                         var_format=rolling_perf_stat.value[1],
                                          title=title,
                                          ax=ax,
                                          **kwargs)
@@ -984,6 +1021,15 @@ class PortfolioData:
         prices = self.get_instruments_navs(time_period=time_period)
         ppt.plot_top_bottom_performers(prices=prices, num_assets=num_assets, ax=ax, **kwargs)
 
+    def plot_best_worst_returns(self,
+                                time_period: TimePeriod = None,
+                                num_returns: int = 10,
+                                ax: plt.Subplot = None,
+                                **kwargs
+                                ) -> None:
+        price = self.get_portfolio_nav(time_period=time_period)
+        ppt.plot_best_worst_returns(price=price, num_returns=num_returns, ax=ax, **kwargs)
+
     def plot_pnl(self, time_period: TimePeriod = None) -> None:
         avg_costs, realized_pnl, mtm_pnl, total_pnl, trades = self.compute_realized_pnl(time_period=time_period)
         prices = self.prices
@@ -1039,7 +1085,9 @@ class PortfolioData:
         """
         performance attribution for p&l and risk
         """
-        data = self.get_performance_attribution_data(attribution_metric=attribution_metric, time_period=time_period)
+        data = self.get_performance_attribution_data(attribution_metric=attribution_metric,
+                                                     time_period=time_period,
+                                                     **kwargs)
         if remove_zero_data:
             data = data.replace({0.0: np.nan}).dropna()
 
@@ -1053,7 +1101,7 @@ class PortfolioData:
                                    new_kwargs=dict(bbox_to_anchor=(0.5, 1.05),
                                                    add_top_bar_values=add_top_bar_values,
                                                    x_rotation=90))
-        title = f"{attribution_metric.title}"
+        title = f"{attribution_metric.value}"
         if time_period is not None:
             title += f", for period={time_period.to_str()}"
         qis.plot_bars(df=data,
@@ -1231,6 +1279,7 @@ class PortfolioData:
                       **kwargs)
 
     def plot_current_var(self,
+                         snapshot_period: SnapshotPeriod = SnapshotPeriod.LAST,
                          is_grouped: bool = False,
                          is_correlated: bool = True,
                          time_period: TimePeriod = None,
@@ -1248,18 +1297,46 @@ class PortfolioData:
                                                                       total_column=total_column,
                                                                       vol_span=vol_span)
         if is_grouped:
-            var_1 = portfolio_vars.iloc[-1, :]
-            if is_correlated:
-                title = title or f"Correlated {freq}-freq 99%-VAR with {vol_span}-span ewma covar on {qis.date_to_str(var_1.name)}"
+            if snapshot_period == SnapshotPeriod.LAST:
+                var_1 = portfolio_vars.iloc[-1, :]
+                if is_correlated:
+                    title = title or f"Correlated {freq}-freq 99%-VAR with {vol_span}-span ewma covar: {qis.date_to_str(var_1.name)}"
+                else:
+                    title = title or f"Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols: {qis.date_to_str(var_1.name)}"
+            elif snapshot_period == SnapshotPeriod.AVG:
+                var_1 = portfolio_vars.mean(0)
+                period = qis.get_time_period(df=portfolio_vars).to_str(date_separator='-')
+                if is_correlated:
+                    title = title or f"Avg Correlated {freq}-freq 99%-VAR with {vol_span}-span: {period}"
+                else:
+                    title = title or f"Avg Independent {freq}-freq 99%-VAR with {vol_span}-span: {period}"
+            elif snapshot_period == SnapshotPeriod.MAX:
+                var_1 = portfolio_vars.max(0)
+                period = qis.get_time_period(df=portfolio_vars).to_str(date_separator='-')
+                if is_correlated:
+                    title = title or f"Max Correlated {freq}-freq 99%-VAR with {vol_span}-span: {period}"
+                else:
+                    title = title or f"Max Independent {freq}-freq 99%-VAR with {vol_span}-span: {period}"
             else:
-                title = title or f"Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols on {qis.date_to_str(var_1.name)}"
+                raise NotImplementedError(f"snapshot_period={snapshot_period}")
 
         else:
             if is_correlated:
                 raise ValueError(f"instrument var is not defined for correlated var ")
             else:
-                var_1 = instrument_vars.iloc[-1, :]
-                title = title or f"Instrument independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols on {qis.date_to_str(var_1.name)}"
+                if snapshot_period == SnapshotPeriod.LAST:
+                    var_1 = instrument_vars.iloc[-1, :]
+                    title = title or f"Instrument independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols: {qis.date_to_str(var_1.name)}"
+                elif snapshot_period == SnapshotPeriod.AVG:
+                    var_1 = instrument_vars.mean(0)
+                    period = qis.get_time_period(df=instrument_vars).to_str()
+                    title = title or f"Avg Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols: {period}"
+                elif snapshot_period == SnapshotPeriod.MAX:
+                    var_1 = instrument_vars.max(0)
+                    period = qis.get_time_period(df=instrument_vars).to_str()
+                    title = title or f"Max Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols: {period}"
+                else:
+                    raise NotImplementedError(f"snapshot_period={snapshot_period}")
 
         if add_top_bar_values is None:
             if len(var_1.index) <= 10:
