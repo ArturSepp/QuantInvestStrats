@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qis"
-version = "2.1.10"
+version = "2.1.13"
 description = "Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
 license = "LICENSE.txt"
 authors = ["Artur Sepp <artursepp@gmail.com>"]
@@ -24,7 +24,8 @@ classifiers=[
         "Topic :: Office/Business :: Financial :: Investment",
     ]
 packages = [ {include = "qis"}]
-exclude = [ "qis/examples/figures/" ]
+exclude = ["qis/examples/figures/",
+           "qis/examples/notebooks/"]
 
 [tool.poetry.urls]
 "Issues" = "https://github.com/ArturSepp/QuantInvestStrats/issues"

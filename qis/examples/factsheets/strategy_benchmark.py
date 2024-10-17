@@ -1,5 +1,5 @@
 """
-example of using startegy construction and reporting
+example of using strategy construction and reporting vs benchmark
 for implementation see portfolio.report.strategy_factsheet
 """
 # packages
@@ -19,7 +19,7 @@ from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strateg
                                                                 generate_performance_attribution_report)
 
 
-def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     """
     define custom universe with asset class grouping
     """
@@ -82,8 +82,8 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     # time period for portfolio reporting
-    time_period = qis.TimePeriod('31Dec2006', '04Oct2024')
-    prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
+    time_period = qis.TimePeriod('31Dec2006', '16Oct2024')
+    prices, benchmark_prices, group_data = fetch_universe_data()
     multi_portfolio_data = generate_volparity_multiportfolio(prices=prices,
                                                              benchmark_prices=benchmark_prices,
                                                              group_data=group_data,

@@ -1,19 +1,17 @@
 """
 multi strategy backtest is generated using same strategy with a set of different model parameters
 """
-
+# packages
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Tuple, List
 from enum import Enum
 import yfinance as yf
 import qis
-from qis import TimePeriod, MultiPortfolioData
-from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
-from qis.portfolio.reports.config import fetch_default_report_kwargs
+from qis import TimePeriod, MultiPortfolioData, generate_multi_portfolio_factsheet, fetch_default_report_kwargs
 
 
-def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     """
     define custom universe with asset class grouping
     """
@@ -28,7 +26,7 @@ def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Ser
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
     prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
-    prices = prices.asfreq('B', method='ffill').loc['2003': ]
+    prices = prices.asfreq('B', method='ffill')
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, group_data
 
@@ -69,9 +67,9 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_SPAN:
 
-        time_period = qis.TimePeriod('31Dec2005', '04Oct2024')  # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2005', '16Oct2024')  # time period for portfolio reporting
 
-        prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
+        prices, benchmark_prices, group_data = fetch_universe_data()
         multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,
                                                                  benchmark_prices=benchmark_prices,
                                                                  group_data=group_data,

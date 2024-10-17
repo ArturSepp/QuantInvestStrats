@@ -161,7 +161,7 @@ Run example in ```qis.examples.factsheets.strategy.py``` https://github.com/Artu
 
 ![image info](qis/examples/figures/strategy1.PNG)
 ![image info](qis/examples/figures/strategy2.PNG)
-
+![image info](qis/examples/figures/strategy3.PNG)
 
 ### 4. Strategy benchmark factsheet <a name="strategybenchmark"></a>
 This report is adopted for report performance and marginal comparison
@@ -195,6 +195,9 @@ Starting local server
 ```python 
 jupyter notebook
 ```
+
+Examples of using qis analytics jupyter notebooks are located here
+https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/notebooks
 
 
 ## **Contributions** <a name="contributions"></a>

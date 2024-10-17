@@ -523,6 +523,7 @@ def run_unit_test(unit_test: UnitTests):
         print(a)
         print(f"x={2.1}, nearest={find_nearest(a=a, value=2.1)}")
         print(f"x={2.1}, nearest={find_nearest(a=a, value=2.1, is_equal_or_largest=True)}")
+        print(f"x={2.0}, nearest={find_nearest(a=a, value=2.0, is_equal_or_largest=True)}")
 
 
 if __name__ == '__main__':

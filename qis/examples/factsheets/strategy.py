@@ -8,7 +8,7 @@ from qis import TimePeriod, PortfolioData
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 
-def fetch_riskparity_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     """
     define custom universe with asset class grouping
     """
@@ -86,13 +86,13 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    time_period = qis.TimePeriod('31Dec2005', '04Oct2024')  # time period for portfolio reporting
+    time_period = qis.TimePeriod('31Dec2005', '16Oct2024')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2022', time_period.end)
     rebalancing_costs = 0.0010  # per traded volume
 
     if unit_test == UnitTests.VOLPARITY_PORTFOLIO:
 
-        prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
+        prices, benchmark_prices, group_data = fetch_universe_data()
         portfolio_data = generate_volparity_portfolio(prices=prices,
                                                       group_data=group_data,
                                                       time_period=time_period,
@@ -103,14 +103,19 @@ def run_unit_test(unit_test: UnitTests):
                                                benchmark_prices=benchmark_prices,
                                                time_period=time_period,
                                                add_current_position_var_risk_sheet=True,
+                                               add_weights_turnover_sheet=True,
                                                add_grouped_exposures=False,
                                                add_grouped_cum_pnl=False,
+                                               add_weight_change_report=False,
+                                               add_current_signal_report=False,
+                                               add_instrument_history_report=True,
                                                **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_long",
                              local_path=qis.local_path.get_output_path())
         qis.save_fig(fig=figs[0], file_name=f"strategy1", local_path=qis.local_path.get_output_path())
         qis.save_fig(fig=figs[1], file_name=f"strategy2", local_path=qis.local_path.get_output_path())
+        qis.save_fig(fig=figs[2], file_name=f"strategy3", local_path=qis.local_path.get_output_path())
 
         """
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,

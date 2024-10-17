@@ -653,16 +653,16 @@ class PortfolioData:
         nav = self.get_portfolio_nav().reindex(index=distributions_by_instrument.index, method='ffill')
         distributions_by_instrument_yield = distributions_by_instrument.divide(nav, axis=0)
         # resample at 'ME' and compute rolling sum
-        distributions_by_instrument_yield_m = distributions_by_instrument_yield.resample(div_rolling_freq).sum()
-        distributions_by_instrument_yield_12m = distributions_by_instrument_yield_m.fillna(0.0).rolling(div_rolling_period).sum()
+        distributions_by_instrument_yield_freq = distributions_by_instrument_yield.resample(div_rolling_freq).sum()
+        distributions_by_instrument_yield_rolling = distributions_by_instrument_yield_freq.fillna(0.0).rolling(div_rolling_period).sum()
         # find total distributions
-        distribution_yield = distributions_by_instrument_yield_m.sum(1)
-        distribution_yield_12m = distributions_by_instrument_yield_12m.sum(1)
+        distribution_yield = distributions_by_instrument_yield_freq.sum(1)
+        distribution_yield_rolling = distributions_by_instrument_yield_rolling.sum(1)
         if time_period is not None:
-            distributions_by_instrument_yield_12m = time_period.locate(distributions_by_instrument_yield_12m)
+            distributions_by_instrument_yield_rolling = time_period.locate(distributions_by_instrument_yield_rolling)
             distribution_yield = time_period.locate(distribution_yield)
-            distribution_yield_12m = time_period.locate(distribution_yield_12m)
-        return distributions_by_instrument_yield_12m, distribution_yield, distribution_yield_12m
+            distribution_yield_rolling = time_period.locate(distribution_yield_rolling)
+        return distributions_by_instrument_yield_rolling, distribution_yield, distribution_yield_rolling
 
     def plot_distribution_yield(self,
                                 paid_dividends: pd.DataFrame,
