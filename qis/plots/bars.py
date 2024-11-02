@@ -199,6 +199,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         ax.invert_yaxis()  # labels read top-to-bottom
     else:
         ax.set_xticks(np.arange(len(df.index)), labels=df.index.to_list())
+        ax.xaxis.set_tick_params(rotation=x_rotation)
         ax.axhline(0, color='black', lw=0.5)
 
     if y_limits is not None:

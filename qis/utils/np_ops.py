@@ -66,6 +66,18 @@ def np_nanstd(a: np.ndarray, axis: int = 1, ddof: int = 1) -> np.ndarray:
 
 
 @njit
+def np_nanvar(a: np.ndarray, axis: int = 1, ddof: int = 0) -> np.ndarray:
+    """
+    nan std of 2-d array along axis
+    """
+    avg_var = np_apply_along_axis(func=np.nanvar, axis=axis, a=a)
+    if ddof == 1:  # numbda does not recognise ddof as param to nanstd
+        n = np_apply_along_axis(func=np.count_nonzero, axis=axis, a=~np.isnan(a))
+        avg_var = np.where(n > 1, avg_var*n / (n - 1.0), np.nan)
+    return avg_var
+
+
+@njit
 def np_cumsum(a: np.ndarray, axis: int = 1) -> np.ndarray:
     """
     canot do  return np_apply_along_axis(func=np.cumsum, axis=axis, a=a)
@@ -203,7 +215,7 @@ def to_finite_reciprocal(data: Union[pd.Series, pd.DataFrame, np.ndarray],
     cond = None
     if is_gt_zero:
         cond = np.greater(x, 0.0)
-    rec_x = np.reciprocal(x, where=cond)
+    rec_x = np.where(cond, np.reciprocal(x, where=cond), np.nan)
     rec_x = to_finite(rec_x, fill_value)
 
     if isinstance(data, pd.DataFrame):

@@ -237,12 +237,10 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
                    PerfStat.APR.to_str(): CALENDAR_DAYS_PER_YEAR_SHARPE*total_return/num_days if num_days > 0 else CALENDAR_DAYS_PER_YEAR_SHARPE*total_return,
                    PerfStat.NAV1.to_str(): (1.0+total_return),
                    PerfStat.NUM_YEARS.to_str(): num_years,
-                   PerfStat.START_DATE.to_str(): prices.index[0]}
-
-    return_dict[PerfStat.START_DATE.to_str()] = prices.index[0]
-    return_dict[PerfStat.END_DATE.to_str()] = prices.index[-1]
-    return_dict[PerfStat.START_PRICE.to_str()] = start_value
-    return_dict[PerfStat.END_PRICE.to_str()] = end_value
+                   PerfStat.START_DATE.to_str(): prices.index[0],
+                   PerfStat.END_DATE.to_str(): prices.index[-1],
+                   PerfStat.START_PRICE.to_str(): start_value,
+                   PerfStat.END_PRICE.to_str(): end_value}
 
     return return_dict
 

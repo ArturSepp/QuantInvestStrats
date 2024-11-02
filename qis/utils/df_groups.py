@@ -36,8 +36,8 @@ def get_group_dict(group_data: pd.Series,
         if np.any(index_data.isnull()):
             raise ValueError(f"index_data is nan:\n{index_data[index_data.isnull()]}")
 
-    group_data_np = group_data.to_numpy()
-    data_groups = list(np.unique(group_data_np))
+    group_data_ls = group_data.to_list()
+    data_groups = list(np.unique(group_data_ls))
     if group_order is not None:
         groups = sop.merge_lists_unique(list1=group_order, list2=data_groups)
     else:
@@ -54,7 +54,7 @@ def get_group_dict(group_data: pd.Series,
     # match group to instruments in group_data
     for group in groups:
         if group in data_groups:
-            group_instruments = group_data.index[np.isin(group_data_np, [group], assume_unique=True)]
+            group_instruments = group_data.index[np.isin(group_data_ls, [group], assume_unique=True)]
             if index_data is not None:  # match group_tickers in index_data: necessary if index_data != group_data.index
                 group_instruments = index_data[np.isin(index_data, group_instruments, assume_unique=True)]
             group_dict[group] = group_instruments.to_list()

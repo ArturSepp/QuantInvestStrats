@@ -151,8 +151,7 @@ class MultiAssetsReport:
                  time_period: TimePeriod = None,
                  ax: plt.Subplot = None,
                  **kwargs) -> None:
-        prices = self.get_prices(time_period=time_period,
-                                 benchmark=regime_benchmark)
+        prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark)
         prices0 = prices
         if not add_benchmarks_to_navs and regime_benchmark in prices.columns:
             prices0 = prices0.drop(regime_benchmark, axis=1)
@@ -370,7 +369,6 @@ class MultiAssetsReport:
                               time_period: TimePeriod = None,
                               benchmark: Optional[str] = None,
                               perf_column: PerfStat = PerfStat.SHARPE_RF0,
-                              perf_params: PerfParams = PERF_PARAMS,
                               title: str = None,
                               ax: plt.Subplot = None,
                               **kwargs
@@ -379,7 +377,7 @@ class MultiAssetsReport:
         qis.plot_ra_perf_bars(prices=prices,
                               benchmark=benchmark,
                               perf_column=perf_column,
-                              perf_params=perf_params,
+                              perf_params=self.perf_params,
                               title=title or f"{perf_column.to_str()}: {qis.get_time_period(prices).to_str()}",
                               ax=ax,
                               **kwargs)

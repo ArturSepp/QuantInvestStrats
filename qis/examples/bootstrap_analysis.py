@@ -63,7 +63,7 @@ def plot_bootsrap_paths(prices: pd.Series,
                              ax=ax,
                              **kwargs)
 
-    acfs, m_acf, std_acf = qis.estimate_path_acf(log_returns, is_pacf=True, nlags=nlags)
+    acfs, m_acf, std_acf = qis.estimate_acf_from_paths(log_returns, is_pacf=True, nlags=nlags)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
         qis.set_suptitle(fig, title=f"Auto-correlation of returns of realized (red) and bootsrapped paths (grey)")
@@ -73,7 +73,7 @@ def plot_bootsrap_paths(prices: pd.Series,
                       ax=ax,
                       **kwargs)
 
-    acfs, m_acf, std_acf = qis.estimate_path_acf(log_returns2, is_pacf=True, nlags=nlags)
+    acfs, m_acf, std_acf = qis.estimate_acf_from_paths(log_returns2, is_pacf=True, nlags=nlags)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
         qis.set_suptitle(fig, title=f"Auto-correlation of squared returns of realized (red) and bootsrapped paths (grey)")
@@ -129,7 +129,7 @@ def plot_autocorr_in_block_size(prices: pd.Series,
         prices1 = pd.concat([bootstrap_prices, prices], axis=1)
         log_returns = qis.to_returns(prices1, is_log_returns=True, is_first_zero=True)
         log_returns2 = np.square(log_returns)
-        acfs, m_acf, std_acf = qis.estimate_path_acf(log_returns2, is_pacf=True, nlags=nlags)
+        acfs, m_acf, std_acf = qis.estimate_acf_from_paths(log_returns2, is_pacf=True, nlags=nlags)
 
         with sns.axes_style("darkgrid"):
             fig, ax = plt.subplots(1, 1, figsize=(14, 10))

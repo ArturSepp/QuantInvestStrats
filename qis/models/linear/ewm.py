@@ -170,18 +170,21 @@ def ewm_recursion(a: np.ndarray,
     return ewm
 
 
-def compute_ewm_long_short_filter(data: pd.DataFrame,
+def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series],
                                   long_span: Union[int, np.ndarray] = 63,
                                   short_span: Optional[Union[int, np.ndarray]] = 5,
                                   warmup_period: Optional[Union[int, np.ndarray]] = 21
-                                  ) -> pd.DataFrame:
+                                  ) -> Union[pd.DataFrame, pd.Series]:
     """
     signal smoother
     """
     long_lambda = 1.0 - 2.0 / (long_span+1.0)
 
     data_np = data.to_numpy()
-    init_value = np.zeros(data_np.shape[1])
+    if isinstance(data, pd.DataFrame):
+        init_value = np.zeros(data_np.shape[1])
+    else:
+        init_value = 0.0
     if short_span is not None:  # use short + long filter
         short_lambda = 1.0 - 2.0 / (short_span + 1.0)
         weight_long = 1.0 / (np.sqrt(1.0 - long_lambda) * np.sqrt(1.0 / (1.0 - long_lambda)
@@ -198,31 +201,22 @@ def compute_ewm_long_short_filter(data: pd.DataFrame,
         short_signal = weight_short * ewm_recursion(a=load_short * data_np,
                                                     ewm_lambda=np.sqrt(short_lambda),
                                                     init_value=init_value)
-        filter = long_signal - short_signal
+        ls_filter = long_signal - short_signal
 
     else:
         load_long = np.sqrt(1.0 - long_lambda) / (1.0 - np.sqrt(long_lambda))
-        filter = ewm_recursion(a=load_long * data_np,
+        ls_filter = ewm_recursion(a=load_long * data_np,
                                ewm_lambda=np.sqrt(long_lambda),
                                init_value=init_value)
 
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
-        if isinstance(warmup_period, int):
-            warmup_period = np.full(data_np.shape[1], warmup_period)
-        elif isinstance(warmup_period, np.ndarray):
-            pass
-        else:
-            raise ValueError(f"type={type(warmup_period)}")
-        if np.any(warmup_period > 0):
-            for idx, period in enumerate(warmup_period):
-                nan_indicators = np.argwhere(np.isfinite(data_np[:, idx]))
-                if nan_indicators.size > period:
-                    filter[:nan_indicators[period][0], idx] = np.nan
-                else:
-                    filter[:, idx] = np.nan
+        ls_filter = set_nans_for_warmup_period(a=ls_filter, warmup_period=warmup_period)
 
-    filter = pd.DataFrame(data=filter, index=data.index, columns=data.columns)
-    return filter
+    if isinstance(data, pd.DataFrame):
+        ls_filter = pd.DataFrame(data=ls_filter, index=data.index, columns=data.columns)
+    else:
+        ls_filter = pd.Series(data=ls_filter, index=data.index, name=data.name)
+    return ls_filter
 
 
 @njit
@@ -634,13 +628,8 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         vol_floor = ewm_quantiles.to_numpy()
         ewm = np.where(np.less(ewm, vol_floor), vol_floor, ewm)
 
-    if warmup_period is not None:
-        for column in np.arange(ewm.shape[1]):
-            idx = np.argwhere(~np.isnan(ewm[:, column]))  # get first non nan index
-            if idx.size > warmup_period:
-                ewm[:idx[warmup_period][0], column] = np.nan
-            else:
-                ewm[:, column] = np.nan
+    if warmup_period is not None:   # set to nan first nonnan in warmup_period
+        ewm = set_nans_for_warmup_period(a=ewm, warmup_period=warmup_period)
 
     if annualize or af is not None:
         if af is None:
@@ -1134,3 +1123,30 @@ def ewm_vol_assymetric(returns: Union[pd.Series, pd.DataFrame],
     else:
         raise TypeError
     return ewm_m, ewm_p
+
+
+def set_nans_for_warmup_period(a: np.ndarray,
+                               warmup_period: Union[int, np.ndarray]
+                               ) -> np.ndarray:
+    """
+    set nans for warmup period
+    """
+    if not (isinstance(warmup_period, int) or isinstance(warmup_period, np.ndarray)):
+        raise ValueError(f"type={type(warmup_period)}")
+    if a.ndim == 2:
+        if isinstance(warmup_period, int):
+            warmup_period = np.full(a.shape[1], warmup_period)
+        if np.any(warmup_period > 0):
+            for idx, period in enumerate(warmup_period):
+                nan_indicators = np.argwhere(np.isfinite(a[:, idx]))
+                if nan_indicators.size > period:
+                    a[:nan_indicators[period][0], idx] = np.nan
+                else:
+                    a[:, idx] = np.nan
+    else:
+        nan_indicators = np.argwhere(np.isfinite(a))
+        if nan_indicators.size > warmup_period:
+            a[:nan_indicators[warmup_period][0]] = np.nan
+        else:
+            a[:] = np.nan
+    return a

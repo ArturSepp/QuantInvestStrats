@@ -169,7 +169,8 @@ class PortfolioData:
                             time_period: TimePeriod = None,
                             is_net: bool = False,
                             is_norm_costs: bool = True,
-                            is_compounded: bool = False
+                            is_compounded: bool = False,
+                            freq: Optional[str] = None
                             ) -> pd.DataFrame:
         pnl = self.instrument_pnl.copy()
         if is_net:
@@ -179,6 +180,8 @@ class PortfolioData:
             pnl.insert(loc=0, value=pnl.sum(1), column='Total')
         if time_period is not None:
             pnl = time_period.locate(pnl)
+        if freq is not None:
+            pnl = pnl.resample(freq).sum()
         if is_compounded:
             pnl = np.expm1(pnl)
         return pnl

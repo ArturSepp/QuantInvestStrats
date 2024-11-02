@@ -132,7 +132,7 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
     tre_vol = np.abs(delta_w.T) @ np.diag(inst_vol)
     tre_contrib = delta_w.T @ covar
     if alphas_df is not None:
-        tre_table = alphas_df.copy().to_frame('alpha')
+        tre_table = alphas_df.copy()
         tre_table['weight diff'] = delta_w
         tre_table['tre (vol)'] = tre_vol
         # tre_table['tre contrib'] = tre_contrib

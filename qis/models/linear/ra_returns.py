@@ -45,7 +45,7 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
                                   warmup_period=warmup_period,
                                   annualize=annualize)
 
-    weights = npo.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
+    weights = npo.to_finite_reciprocal(data=ewm_vol, fill_value=np.nan, is_gt_zero=True)
     weights = weights.multiply(vol_target)
     if weight_lag is not None:
         weights = weights.shift(weight_lag)
@@ -210,22 +210,26 @@ def compute_sum_rolling_ra_returns(returns: pd.DataFrame,
 
 def compute_sum_freq_ra_returns(returns: Union[pd.Series, pd.DataFrame],
                                 freq: str = 'B',
+                                span: int = None,
                                 ewm_lambda: float = 0.94,
                                 vol_target: Optional[float] = None,
                                 weight_shift: Optional[int] = 1,
                                 is_log_returns_to_arithmetic: bool = True,  # typically log-return are passed to vol
-                                is_norm: bool = True
+                                is_norm: bool = True,
+                                warmup_period: Optional[int] = None
                                 ) -> Union[pd.Series, pd.DataFrame]:
     """
     span = 1: daily ra returns
     otherwise compute freq sum of daily ra-returns
     interpretation: pnl of daily voltargeting returns over non-overlap freq
     """
-    ra_returns, weights, _ = compute_ra_returns(returns=returns,
-                                                ewm_lambda=ewm_lambda,
-                                                vol_target=vol_target,
-                                                weight_lag=weight_shift,
-                                                is_log_returns_to_arithmetic=is_log_returns_to_arithmetic)
+    ra_returns, _, _ = compute_ra_returns(returns=returns,
+                                          span=span,
+                                          ewm_lambda=ewm_lambda,
+                                          vol_target=vol_target,
+                                          weight_lag=weight_shift,
+                                          is_log_returns_to_arithmetic=is_log_returns_to_arithmetic,
+                                          warmup_period=warmup_period)
 
     if freq not in ['B', 'D']:
         sum_rolling_ra_returns = ra_returns.resample(freq).sum()

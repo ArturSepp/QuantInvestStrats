@@ -197,11 +197,11 @@ def run_unit_test(unit_test: UnitTests):
             title = 'ewm beta'
 
         elif unit_test == UnitTests.EWMA_AUTO_CORR:
-            plot_data = qm.compute_dynamic_auto_corr(data=data,
-                                                     ewm_lambda=ewm_lambda,
-                                                     mean_adj_type=qm.MeanAdjType.NONE,
-                                                     aggregation_type='median',
-                                                     is_normalize=True)
+            plot_data = qm.compute_ewm_matrix_autocorr_df(data=data,
+                                                          ewm_lambda=ewm_lambda,
+                                                          mean_adj_type=qm.MeanAdjType.NONE,
+                                                          aggregation_type='median',
+                                                          is_normalize=True)
             title = 'ewm auto-corr'
 
         else:

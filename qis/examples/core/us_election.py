@@ -123,11 +123,17 @@ def plot_before_after_prices(joint_prices: pd.DataFrame,
                              xlabel: str = 'Days before/after election date',
                              ylabel: str = 'Normalised performance',
                              title: str = None,
+                             is_norm: bool = True,
                              ax: plt.Subplot = None
                              ) -> Optional[plt.Figure]:
 
     if add_average:
         joint_prices.insert(0, column='Average', value=joint_prices.mean(1))
+    if is_norm:
+        joint_prices = joint_prices - 1.0
+        yvar_format='{:,.0%}'
+    else:
+        yvar_format='{:,.2f}',
     n = len(joint_prices.columns)
     colors = qis.get_cmap_colors(n=n, cmap='tab20')
     linestyles = ['dotted'] * n
@@ -146,6 +152,7 @@ def plot_before_after_prices(joint_prices: pd.DataFrame,
                   title=title,
                   colors=colors,
                   linestyles=linestyles,
+                  yvar_format=yvar_format,
                   framealpha=0.9,
                   ax=ax)
     ax.axvline(0, color='lightsalmon', lw=1, alpha=0.5)  # horizontal
@@ -230,22 +237,33 @@ def run_unit_test(unit_test: UnitTests):
         tickers = {'SPX Index': 'S&P 500',
                    'DXY Curncy': 'DXY',
                    'TY1 Comdty': 'UST 10y bond future'}
+        tickers = {'NKY Index': 'Nikkei 225',
+                   'HSI Index': 'HSI',
+                   'SXXP Index': 'SXXP',
+                   'SPX Index': 'S&P 500',
+                   'DXY Curncy': 'DXY',
+                   'TY1 Comdty': 'UST 10y bond future'
+                   }
         prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B',
                                                     start_date=pd.Timestamp('01Jan1968')).ffill()
+        print(prices)
         figs = []
+        dfss = {}
         for asset in prices.columns:
             price = prices[asset].dropna()
             dfs = compute_conditional_performances(price=price)
-            fig = plot_conditional_performances(dfs=dfs, title=f"{asset} performance conditional on US Goverment")
+            fig = plot_conditional_performances(dfs=dfs, title=f"{asset} performance conditional on US Government")
+            for key, df in dfs.items():
+                dfss[f"{asset}-{key}"] = df - 1.0
             figs.append(fig)
-        qis.save_figs_to_pdf(figs, file_name='perf_conditional_on_goverment', local_path=qis.get_output_path())
-
+        qis.save_figs_to_pdf(figs, file_name='perf_conditional_on_government', local_path=qis.get_output_path())
+        qis.save_df_to_excel(data=dfss, file_name='perf_conditional_on_government', local_path=qis.get_output_path())
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.UNCONDITIONAL_PERFORMANCES
+    unit_test = UnitTests.CONDITIONAL_PERFORMANCES
 
     is_run_all_tests = False
     if is_run_all_tests:

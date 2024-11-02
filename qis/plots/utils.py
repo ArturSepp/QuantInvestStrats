@@ -1426,10 +1426,12 @@ def add_scatter_points(ax: plt.Subplot,
                        linewidth: int = 3,
                        marker: str = '*',
                        size: int = 3,
+                       zorder: int = 10,
                        **kwargs
                        ) -> None:
     """
     add scatter points to ax
+    zorder bring scatter point on top of plot
     """
     if colors is None:
         if isinstance(label_x_y, dict):
@@ -1440,10 +1442,10 @@ def add_scatter_points(ax: plt.Subplot,
         for (key, (x, y)), color in zip(label_x_y.items(), colors):
             ax.annotate(key, xy=(x, y), xytext=(2, 2), color=color,
                         textcoords='offset points', ha='left', va='bottom', fontsize=fontsize)
-            ax.scatter(x=x, y=y, marker=marker, color=color, s=size, linewidth=linewidth)
+            ax.scatter(x=x, y=y, marker=marker, color=color, s=size, linewidth=linewidth, zorder=10)
     else:
         for (x, y), color in zip(label_x_y, colors):
-            ax.scatter(x=x, y=y, marker=marker, color=color, s=size, linewidth=linewidth)
+            ax.scatter(x=x, y=y, marker=marker, color=color, s=size, linewidth=linewidth, zorder=10)
 
 
 def calc_table_height(num_rows: int,
