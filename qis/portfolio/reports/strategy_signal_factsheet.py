@@ -18,6 +18,7 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
                                   sample_size: int = 20,
                                   figsize: Tuple[float, float] = (8.3, 11.7),
                                   verbose: bool = False,
+                                  is_add_residual_to_momentum: bool = True,
                                   group_deflator: Optional[Dict[str, float]] = dict(STIR=0.1),
                                   **kwargs
                                   ) -> plt.Figure:
@@ -35,7 +36,11 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
         group_preds = {}
         agg_preds = {}
         for idx, (group, df) in enumerate(predictions_g.items()):
-            df_ac = df[['momentum_change', 'carry_change', 'target_vol_change', 'port_leverage_change', 'residual']]
+            if is_add_residual_to_momentum:
+                df_mom = df['momentum_change'].add(df['residual']).rename('momentum_change')
+                df_ac = pd.concat([df_mom, df[['carry_change', 'target_vol_change', 'port_leverage_change']]], axis=1)
+            else:
+                df_ac = df[['momentum_change', 'carry_change', 'target_vol_change', 'port_leverage_change', 'residual']]
             group_preds[group] = df_ac.copy()
             if group_deflator is not None and group in group_deflator.keys():
                 df_ac *= group_deflator[group]

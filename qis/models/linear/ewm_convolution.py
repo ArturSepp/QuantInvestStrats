@@ -1,8 +1,5 @@
 """
-implement winsorizing of time series data using ewm
-1. compute mean_t and vol_t
-2. select x% of outliers defined by normalized score (x_t-mean_t) / vol_t
-3. replace or trim outliers as specified
+ewm convolution
 """
 # packages
 import numpy as np
@@ -30,14 +27,14 @@ def ewm_xy_convolution(returns: pd.DataFrame,
                        signals: pd.DataFrame = None,
                        convolution_type: ConvolutionType = ConvolutionType.AUTO_CORR,
                        signal_agg_type: SignalAggType = SignalAggType.LAST_VALUE,
-                       is_ra_return: bool = False,
+                       is_ra_returns: bool = False,
                        estimates_smoothing_lambda: float = None,
                        mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE
                        ) -> pd.DataFrame:
     """
     ewm convolution, typical case:
     y is return, x is signal
-    span deines the
+    span defines the las the
     assumed frequency is daily
     """
 
@@ -48,11 +45,11 @@ def ewm_xy_convolution(returns: pd.DataFrame,
     else:  # take 1.5 for frequency of business day
         ewm_lambda = 0.5 / 2.5
 
-    if is_ra_return:
+    if is_ra_returns:
         ewm_vol = ewm.compute_ewm_vol(data=returns,
-                                         ewm_lambda=ewm_lambda,
-                                         annualize=False)
-        returns = np.divide(returns, ewm_vol, where=np.isclose(ewm_vol, 0.0)==False)
+                                      ewm_lambda=0.94,
+                                      annualize=False)
+        returns = np.divide(returns, ewm_vol.shift(1), where=np.isclose(ewm_vol, 0.0)==False)
 
     # rolling returns by the span
     if not np.isclose(signal_span, 1):
@@ -94,10 +91,10 @@ def ewm_xy_convolution(returns: pd.DataFrame,
 
     # compute ewm cross
     corr = ewm.compute_ewm_cross_xy(x_data=x_data,
-                                      y_data=y_data,
-                                      ewm_lambda=ewm_lambda,
-                                      cross_xy_type=cross_xy_type,
-                                      mean_adj_type=mean_adj_type)
+                                    y_data=y_data,
+                                    ewm_lambda=ewm_lambda,
+                                    cross_xy_type=cross_xy_type,
+                                    mean_adj_type=mean_adj_type)
 
     if estimates_smoothing_lambda is not None:
         corr = ewm.compute_ewm(data=corr, ewm_lambda=estimates_smoothing_lambda)

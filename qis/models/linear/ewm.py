@@ -187,27 +187,20 @@ def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series],
         init_value = 0.0
     if short_span is not None:  # use short + long filter
         short_lambda = 1.0 - 2.0 / (short_span + 1.0)
-        weight_long = 1.0 / (np.sqrt(1.0 - long_lambda) * np.sqrt(1.0 / (1.0 - long_lambda)
-                                                                  + 1.0 / (1.0 - short_lambda)
-                                                                  - 2.0 / (1.0 - np.sqrt(long_lambda * short_lambda))))
-        weight_short = 1.0 / (np.sqrt(1.0 - short_lambda) * np.sqrt(1.0 / (1.0 - long_lambda)
-                                                                    + 1.0 / (1.0 - short_lambda)
-                                                                    - 2.0 / (1.0 - np.sqrt(long_lambda * short_lambda))))
-        load_long = np.sqrt(1.0 - long_lambda) / (1.0 - np.sqrt(long_lambda))
-        long_signal = weight_long * ewm_recursion(a=load_long * data_np,
-                                                  ewm_lambda=np.sqrt(long_lambda),
-                                                  init_value=init_value)
-        load_short = np.sqrt(1.0 - short_lambda) / (1.0 - np.sqrt(short_lambda))
-        short_signal = weight_short * ewm_recursion(a=load_short * data_np,
-                                                    ewm_lambda=np.sqrt(short_lambda),
-                                                    init_value=init_value)
+        short_lambda2 = np.square(short_lambda)
+        long_lambda2 = np.square(long_lambda)
+        covar = np.sqrt(1.0 / (1.0 - long_lambda2) + 1.0 / (1.0 - short_lambda2) - 2.0 / (1.0 - long_lambda * short_lambda))
+        weight_long = 1.0 / (np.sqrt(1.0 - long_lambda2) * covar)
+        weight_short = 1.0 / (np.sqrt(1.0 - short_lambda2) * covar)
+        load_long = np.sqrt((1.0 + long_lambda) / (1.0 - long_lambda))
+        long_signal = weight_long * load_long * ewm_recursion(a=data_np, ewm_lambda=long_lambda, init_value=init_value)
+        load_short = np.sqrt((1.0 + short_lambda) / (1.0 - short_lambda))
+        short_signal = weight_short * load_short * ewm_recursion(a=data_np, ewm_lambda=short_lambda, init_value=init_value)
         ls_filter = long_signal - short_signal
 
     else:
-        load_long = np.sqrt(1.0 - long_lambda) / (1.0 - np.sqrt(long_lambda))
-        ls_filter = ewm_recursion(a=load_long * data_np,
-                               ewm_lambda=np.sqrt(long_lambda),
-                               init_value=init_value)
+        weight_long = np.sqrt((1.0 + long_lambda) / (1.0 - long_lambda))
+        ls_filter = weight_long * ewm_recursion(a=data_np, ewm_lambda=long_lambda, init_value=init_value)
 
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
         ls_filter = set_nans_for_warmup_period(a=ls_filter, warmup_period=warmup_period)

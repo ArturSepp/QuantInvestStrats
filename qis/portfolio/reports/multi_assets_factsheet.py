@@ -352,8 +352,8 @@ class MultiAssetsReport:
         prices = self.get_prices(time_period=time_period, benchmark=benchmark)
         title = title or f"Boxplot of average {self.regime_params.freq}-freq return conditional on volatility regime of {str(benchmark)}"
         regime_classifier = qis.BenchmarkVolsQuantilesRegime(regime_params=qis.VolQuantileRegimeSpecs(freq=self.regime_params.freq))
-        if len(prices.columns) >= 8:
-            ncols = len(prices.columns) // 2
+        if len(prices.columns) >= 6:
+            ncols = 1
         else:
             ncols = len(prices.columns)
         local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(ncols=ncols))
@@ -392,7 +392,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    heatmap_freq: str = 'YE',
                                    time_period: TimePeriod = None,  # time period for reporting
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                   fontsize: int = 4,
+                                   fontsize: int = 3,
                                    factsheet_name: str = None,
                                    **kwargs
                                    ) -> plt.Figure:

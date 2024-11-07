@@ -57,7 +57,7 @@ class FactsheetConfig(NamedTuple):
 # create enumerations
 FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD = FactsheetConfig()
 
-FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD = FactsheetConfig(heatmap_freq='QE',
+FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD = FactsheetConfig(heatmap_freq='YE',
                                                            x_date_freq='QE',
                                                            regime_freq='ME',
                                                            freq_reg='W-WED',
