@@ -9,6 +9,18 @@ import yfinance as yf
 PERF_PARAMS = PerfParams(freq='W-WED', freq_reg='W-WED', alpha_an_factor=52, rates_data=None)
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
 
+PERF_COLUMNS_RF0 = (PerfStat.TOTAL_RETURN,
+                    PerfStat.PA_RETURN,
+                    PerfStat.VOL,
+                    PerfStat.SHARPE_EXCESS,
+                    PerfStat.MAX_DD,
+                    PerfStat.MAX_DD_VOL,
+                    PerfStat.SKEWNESS,
+                    PerfStat.ALPHA_AN,
+                    PerfStat.BETA,
+                    PerfStat.R2)
+
+
 PERF_COLUMNS = (PerfStat.TOTAL_RETURN,
                 PerfStat.PA_RETURN,
                 PerfStat.VOL,
@@ -106,6 +118,13 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
                              rates_data=rates_data)
     regime_params = BenchmarkReturnsQuantileRegimeSpecs(freq=factsheet_config.regime_freq)
     kwargs = factsheet_config._asdict()
+
+    if add_rates_data:
+        kwargs['perf_stats_labels'] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, PerfStat.SHARPE_EXCESS,)
+    else:
+        kwargs['perf_columns'] = PERF_COLUMNS_RF0
+        kwargs['perf_stats_labels'] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, )
+
     kwargs.pop('freq')  # remove frequency as some methods have default freq
     kwargs.update(dict(perf_params=perf_params, regime_params=regime_params))
     return kwargs

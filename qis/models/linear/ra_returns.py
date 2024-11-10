@@ -15,9 +15,9 @@ import qis.models.linear.ewm as ewm
 
 
 def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
+                       span: Union[float, np.ndarray] = None,
                        ewm_lambda: Union[float, np.ndarray] = 0.94,
                        vol_target: Optional[float] = None,  # if need to target vol
-                       span: Optional[int] = None,
                        mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE,
                        init_value: Optional[Union[float, np.ndarray]] = None,
                        vol_floor_quantile: Optional[float] = None,  # to floor the volatility = 0.16
@@ -246,7 +246,7 @@ def compute_sum_freq_ra_returns(returns: Union[pd.Series, pd.DataFrame],
 def compute_ewm_ra_returns_momentum(returns: Union[pd.Series, pd.DataFrame],
                                     momentum_span: int = 63,
                                     momentum_lambda: Optional[Union[float, np.ndarray]] = None,
-                                    vol_span: int = 31,
+                                    vol_span: Union[float, np.ndarray] = 31,
                                     vol_lambda: Optional[Union[float, np.ndarray]] = None,
                                     weight_shift: Optional[int] = 1
                                     ) -> Union[pd.Series, pd.DataFrame]:

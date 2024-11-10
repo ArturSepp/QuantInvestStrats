@@ -28,6 +28,7 @@ from qis.models.linear.ewm import (
     NanBackfill,
     ewm_recursion,
     compute_ewm,
+    compute_ewm_long_short,
     compute_ewm_long_short_filter,
     compute_ewm_alpha_r2,
     compute_ewm_beta_alpha_forecast,

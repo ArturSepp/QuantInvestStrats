@@ -46,11 +46,15 @@ def np_nanmean(a: np.ndarray, axis: int = 1) -> np.ndarray:
 
 
 @njit
-def np_nansum(a: np.ndarray, axis: int = 1) -> np.ndarray:
+def np_nansum(a: np.ndarray, axis: int = 1, keep_dim: bool = True) -> np.ndarray:
     """
     nansum of 2-d array along axis
     """
-    return np_apply_along_axis(func=np.nansum, axis=axis, a=a)
+    result = np_apply_along_axis(func=np.nansum, axis=axis, a=a)
+    if not keep_dim:
+        result = result.reshape(1, -1)
+        result = result
+    return result
 
 
 @njit
@@ -474,6 +478,34 @@ def np_nonan_weighted_avg(a: np.ndarray, weights: np.ndarray) -> float:
         ma = np.ma.MaskedArray(a, mask=np.isnan(a))
         va = np.ma.average(ma, weights=weights)
     return va
+
+
+def set_nans_for_warmup_period(a: np.ndarray,
+                               warmup_period: Union[int, np.ndarray]
+                               ) -> np.ndarray:
+    """
+    set nans for array a as warmup_period
+    warmup_period starts from the first nonnan in a
+    """
+    if not (isinstance(warmup_period, int) or isinstance(warmup_period, np.ndarray)):
+        raise ValueError(f"type={type(warmup_period)}")
+    if a.ndim == 2:
+        if isinstance(warmup_period, int):
+            warmup_period = np.full(a.shape[1], warmup_period)
+        if np.any(warmup_period > 0):
+            for idx, period in enumerate(warmup_period):
+                nan_indicators = np.argwhere(np.isfinite(a[:, idx]))
+                if nan_indicators.size > period:
+                    a[:nan_indicators[period][0], idx] = np.nan
+                else:
+                    a[:, idx] = np.nan
+    else:
+        nan_indicators = np.argwhere(np.isfinite(a))
+        if nan_indicators.size > warmup_period:
+            a[:nan_indicators[warmup_period][0]] = np.nan
+        else:
+            a[:] = np.nan
+    return a
 
 
 class UnitTests(Enum):

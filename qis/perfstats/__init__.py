@@ -49,7 +49,7 @@ from qis.perfstats.regime_classifier import (
     compute_bnb_regimes_pa_perf_table,
     compute_mean_freq_regimes,
     compute_regime_avg,
-    compute_regimes_pa_perf_table
+    compute_regimes_pa_perf_table_from_sampled_returns
 )
 
 from qis.perfstats.returns import (
@@ -86,7 +86,8 @@ from qis.perfstats.timeseries_bfill import (
     bfill_timeseries,
     df_fill_first_nan_by_cross_median,
     df_price_fill_first_nan_by_cross_median,
-    replace_nan_by_median
+    replace_nan_by_median,
+    df_ffill_negatives
 )
 
 from qis.perfstats.fx_ops import (get_aligned_fx_spots,

@@ -13,7 +13,8 @@ import qis.utils.np_ops as npo
 import qis.utils.df_groups as dfg
 import qis.utils.df_agg as dfa
 import qis.perfstats.returns as ret
-from qis.models.linear.ewm import MeanAdjType, InitType, NanBackfill, compute_rolling_mean_adj, compute_ewm_vol
+from qis.models.linear.ewm import (MeanAdjType, InitType, NanBackfill, compute_rolling_mean_adj,
+                                   compute_ewm_vol, compute_ewm_covar)
 
 
 VAR99 = 2.3263
@@ -74,7 +75,7 @@ def compute_portfolio_vol(returns: pd.DataFrame,
                                               init_type=init_type,
                                               nan_backfill=nan_backfill)
 
-    portfolio_vol = compute_portfolio_vol_np(returns=returns_np,
+    portfolio_vol = compute_portfolio_var_np(returns=returns_np,
                                              weights=weights_np,
                                              span=span,
                                              ewm_lambda=ewm_lambda)
@@ -98,7 +99,7 @@ def compute_portfolio_vol(returns: pd.DataFrame,
 
 
 @njit
-def compute_portfolio_vol_np(returns: np.ndarray,
+def compute_portfolio_var_np(returns: np.ndarray,
                              weights: np.ndarray,
                              span: Union[int, np.ndarray] = None,
                              ewm_lambda: Union[float, np.ndarray] = 0.94
@@ -109,7 +110,9 @@ def compute_portfolio_vol_np(returns: np.ndarray,
 
     # important to replace nans for @ operator
     weights = np.where(np.isfinite(weights), weights, 0.0)
-    last_covar = np.zeros((n, n))
+    # use insample ewma covar
+    last_covar = compute_ewm_covar(a=returns, span=span)
+    # last_covar = np.zeros((n, n))
     portfolio_vol = np.zeros(t)
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)

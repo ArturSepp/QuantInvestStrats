@@ -87,7 +87,7 @@ def set_init_dim2(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 @njit
 def ewm_recursion(a: np.ndarray,
                   init_value: Union[float, np.ndarray],
-                  span: Union[int, np.ndarray] = None,
+                  span: Union[float, np.ndarray] = None,
                   ewm_lambda: Union[float, np.ndarray] = 0.94,
                   is_start_from_first_nonan: bool = True,
                   is_unit_vol_scaling: bool = False,
@@ -109,6 +109,7 @@ def ewm_recursion(a: np.ndarray,
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+
     ewm_lambda_1 = 1.0 - ewm_lambda
 
     is_1d = (a.ndim == 1)  # or a.shape[1] == 1)
@@ -164,27 +165,22 @@ def ewm_recursion(a: np.ndarray,
         ewm[t] = last_ewm = current_ewm
 
     if is_unit_vol_scaling:
-        vol_ratio = np.sqrt(1 - ewm_lambda) / (1 - np.sqrt(ewm_lambda))
+        vol_ratio = np.sqrt((1 + ewm_lambda) / (1 - ewm_lambda))
         ewm = vol_ratio * ewm
 
     return ewm
 
 
-def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series],
-                                  long_span: Union[int, np.ndarray] = 63,
-                                  short_span: Optional[Union[int, np.ndarray]] = 5,
-                                  warmup_period: Optional[Union[int, np.ndarray]] = 21
-                                  ) -> Union[pd.DataFrame, pd.Series]:
+@njit
+def compute_ewm_long_short(a: np.ndarray,
+                           init_value: Union[float, np.ndarray],
+                           long_span: Union[float, np.ndarray] = 63,
+                           short_span: Optional[Union[float, np.ndarray]] = 5
+                           ) -> np.ndarray:
     """
-    signal smoother
+    long short ewm filter with unit variance
     """
     long_lambda = 1.0 - 2.0 / (long_span+1.0)
-
-    data_np = data.to_numpy()
-    if isinstance(data, pd.DataFrame):
-        init_value = np.zeros(data_np.shape[1])
-    else:
-        init_value = 0.0
     if short_span is not None:  # use short + long filter
         short_lambda = 1.0 - 2.0 / (short_span + 1.0)
         short_lambda2 = np.square(short_lambda)
@@ -193,22 +189,49 @@ def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series],
         weight_long = 1.0 / (np.sqrt(1.0 - long_lambda2) * covar)
         weight_short = 1.0 / (np.sqrt(1.0 - short_lambda2) * covar)
         load_long = np.sqrt((1.0 + long_lambda) / (1.0 - long_lambda))
-        long_signal = weight_long * load_long * ewm_recursion(a=data_np, ewm_lambda=long_lambda, init_value=init_value)
         load_short = np.sqrt((1.0 + short_lambda) / (1.0 - short_lambda))
-        short_signal = weight_short * load_short * ewm_recursion(a=data_np, ewm_lambda=short_lambda, init_value=init_value)
+        long_signal = weight_long * load_long * ewm_recursion(a=a, ewm_lambda=long_lambda, init_value=init_value)
+        short_signal = weight_short * load_short * ewm_recursion(a=a, ewm_lambda=short_lambda, init_value=init_value)
         ls_filter = long_signal - short_signal
 
     else:
         weight_long = np.sqrt((1.0 + long_lambda) / (1.0 - long_lambda))
-        ls_filter = weight_long * ewm_recursion(a=data_np, ewm_lambda=long_lambda, init_value=init_value)
+        ls_filter = weight_long * ewm_recursion(a=a, ewm_lambda=long_lambda, init_value=init_value)
+    return ls_filter
+
+
+def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series, np.ndarray],
+                                  long_span: Union[float, np.ndarray] = 63,
+                                  short_span: Optional[Union[float, np.ndarray]] = 5,
+                                  warmup_period: Optional[Union[int, np.ndarray]] = 21
+                                  ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+    """
+    signal smoother for pd.Dataframe and pd.Series data
+    """
+
+    if isinstance(data, pd.DataFrame):
+        data_np = data.to_numpy()
+        init_value = np.zeros(data_np.shape[1])
+    elif isinstance(data, pd.Series):
+        data_np = data.to_numpy()
+        init_value = 0.0
+    else:
+        data_np = data
+        init_value = np.zeros_like(data[0])
+
+    ls_filter = compute_ewm_long_short(a=data_np,
+                                       init_value=init_value,
+                                       long_span=long_span,
+                                       short_span=short_span)
 
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
-        ls_filter = set_nans_for_warmup_period(a=ls_filter, warmup_period=warmup_period)
+        ls_filter = npo.set_nans_for_warmup_period(a=ls_filter, warmup_period=warmup_period)
 
     if isinstance(data, pd.DataFrame):
         ls_filter = pd.DataFrame(data=ls_filter, index=data.index, columns=data.columns)
-    else:
+    elif isinstance(data, pd.Series):
         ls_filter = pd.Series(data=ls_filter, index=data.index, name=data.name)
+
     return ls_filter
 
 
@@ -522,7 +545,7 @@ def compute_one_factor_ewm_betas(x: pd.Series,
 
 
 def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
-                span: Union[int, np.ndarray] = None,
+                span: Union[float, np.ndarray] = None,
                 ewm_lambda: Union[float, np.ndarray] = 0.94,
                 init_value: Union[float, np.ndarray, None] = None,
                 init_type: InitType = InitType.X0,
@@ -551,8 +574,11 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         if isinstance(init_value, np.ndarray):
             init_value = float(init_value)
 
+    if span is not None:
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+
     ewm = ewm_recursion(a=a,
-                        span=span,
+                        span=None,
                         ewm_lambda=ewm_lambda,
                         init_value=init_value,
                         is_unit_vol_scaling=is_unit_vol_scaling,
@@ -568,8 +594,8 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
 
 def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
-                    ewm_lambda: Union[float, np.ndarray] = 0.94,
                     span: Optional[Union[float, np.ndarray]] = None,
+                    ewm_lambda: Union[float, np.ndarray] = 0.94,
                     mean_adj_type: MeanAdjType = MeanAdjType.NONE,
                     init_type: InitType = InitType.X0,
                     init_value: Optional[Union[float, np.ndarray]] = None,
@@ -622,7 +648,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         ewm = np.where(np.less(ewm, vol_floor), vol_floor, ewm)
 
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
-        ewm = set_nans_for_warmup_period(a=ewm, warmup_period=warmup_period)
+        ewm = npo.set_nans_for_warmup_period(a=ewm, warmup_period=warmup_period)
 
     if annualize or af is not None:
         if af is None:
@@ -646,7 +672,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
 def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                       mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
-                      span: Union[int, np.ndarray] = None,
+                      span: Union[float, np.ndarray] = None,
                       ewm_lambda: Union[float, np.ndarray] = 0.94,
                       init_value: Union[float, np.ndarray] = None,
                       nan_backfill: NanBackfill = NanBackfill.FFILL
@@ -702,7 +728,7 @@ def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
 def compute_rolling_mean_adj(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                              mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
-                             span: Union[int, np.ndarray] = None,
+                             span: Union[float, np.ndarray] = None,
                              ewm_lambda: Union[float, np.ndarray] = 0.94,
                              init_type: InitType = InitType.MEAN,
                              init_value: Union[float, np.ndarray, None] = None,
@@ -728,7 +754,7 @@ def compute_rolling_mean_adj(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
 def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                          y_data: Union[pd.DataFrame, pd.Series, np.ndarray],
-                         span: Union[int, np.ndarray] = None,
+                         span: Union[float, np.ndarray] = None,
                          ewm_lambda: Union[float, np.ndarray] = 0.94,
                          cross_xy_type: CrossXyType = CrossXyType.COVAR,
                          mean_adj_type: MeanAdjType = MeanAdjType.NONE,
@@ -845,7 +871,7 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
 def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
                                     y_data: pd.DataFrame,
-                                    span: Union[int, np.ndarray] = None,
+                                    span: Union[float, np.ndarray] = None,
                                     ewm_lambda: Union[float, np.ndarray] = 0.94,
                                     mean_adj_type: MeanAdjType = MeanAdjType.NONE,
                                     init_type: InitType = InitType.MEAN,
@@ -932,7 +958,7 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
 
 def compute_ewm_alpha_r2(y_data: pd.DataFrame,
                          y_prediction: pd.DataFrame,
-                         span: Union[int, np.ndarray] = None,
+                         span: Union[float, np.ndarray] = None,
                          ewm_lambda: Union[float, np.ndarray] = 0.94,
                          nan_backfill: NanBackfill = NanBackfill.FFILL
                          ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -957,7 +983,7 @@ def compute_ewm_alpha_r2(y_data: pd.DataFrame,
 
 
 def compute_ewm_sharpe(returns: pd.DataFrame,
-                       span: Union[int, np.ndarray] = 260,
+                       span: Union[float, np.ndarray] = 260,
                        norm_type: int = 1,
                        initial_sharpes: np.ndarray = None
                        ) -> pd.DataFrame:
@@ -1021,7 +1047,7 @@ def compute_ewm_sharpe_from_prices(prices: pd.DataFrame,
 
 
 def compute_ewm_std1_norm(data: Union[pd.DataFrame, pd.Series],
-                          span: Union[int, np.ndarray] = 260,
+                          span: Union[float, np.ndarray] = 260,
                           mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
                           is_demean: bool = True,
                           is_nans_to_zero: bool = True
@@ -1116,30 +1142,3 @@ def ewm_vol_assymetric(returns: Union[pd.Series, pd.DataFrame],
     else:
         raise TypeError
     return ewm_m, ewm_p
-
-
-def set_nans_for_warmup_period(a: np.ndarray,
-                               warmup_period: Union[int, np.ndarray]
-                               ) -> np.ndarray:
-    """
-    set nans for warmup period
-    """
-    if not (isinstance(warmup_period, int) or isinstance(warmup_period, np.ndarray)):
-        raise ValueError(f"type={type(warmup_period)}")
-    if a.ndim == 2:
-        if isinstance(warmup_period, int):
-            warmup_period = np.full(a.shape[1], warmup_period)
-        if np.any(warmup_period > 0):
-            for idx, period in enumerate(warmup_period):
-                nan_indicators = np.argwhere(np.isfinite(a[:, idx]))
-                if nan_indicators.size > period:
-                    a[:nan_indicators[period][0], idx] = np.nan
-                else:
-                    a[:, idx] = np.nan
-    else:
-        nan_indicators = np.argwhere(np.isfinite(a))
-        if nan_indicators.size > warmup_period:
-            a[:nan_indicators[warmup_period][0]] = np.nan
-        else:
-            a[:] = np.nan
-    return a

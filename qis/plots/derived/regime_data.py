@@ -19,7 +19,7 @@ import qis.plots.boxplot as bxp
 def plot_regime_data(regime_classifier: RegimeClassifier,
                      regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
                      drop_sharpe_from_labels: bool = False,  # only leave the regime names
-                     x_rotation: int = 0,
+                     x_rotation: int = 90,
                      add_bar_values: bool = True,
                      title: Optional[str] = 'Conditional Excess Sharpe ratio',
                      var_format: str = '{:.1f}',

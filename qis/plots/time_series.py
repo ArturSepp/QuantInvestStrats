@@ -16,7 +16,7 @@ from qis.perfstats.desc_table import compute_desc_table, DescTableType
 def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      linestyles: List[str] = None,
                      linewidth: float = 1.0,
-                     x_date_freq: Optional[str] = 'QE',
+                     x_date_freq: Optional[str] = 'YE',
                      date_format: str = '%d-%b-%y',
                      legend_title: str = None,
                      legend_loc: Optional[Union[str, bool]] = 'upper left',

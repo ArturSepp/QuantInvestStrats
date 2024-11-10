@@ -43,6 +43,11 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         raise NotImplementedError(f"type1={type(df_newer)}, type2={type(df_older)}") 
     
     if is_prices:
+
+        # make sure no negative prices
+        df_newer = df_ffill_negatives(df_newer)
+        df_older = df_ffill_negatives(df_older)
+
         terminal_value = dfo.get_last_nonnan_values(df_newer)
         if np.any(np.isnan(terminal_value)):
             terminal_value_old = dfo.get_last_nonnan_values(df_older[df_newer.columns])
@@ -207,3 +212,14 @@ def df_price_fill_first_nan_by_cross_median(prices: pd.DataFrame) -> pd.DataFram
     returns_fill = returns_fill.fillna(0.0)
     bfilled_data = ret.returns_to_nav(returns=returns_fill, terminal_value=prices.iloc[-1, :])
     return bfilled_data
+
+
+def df_ffill_negatives(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
+    """
+    use ffill for filling negative prices
+    """
+    nans_mask = pd.isna(df)
+    df = df.where(df >= 0.0, other=0.0).replace({0.0: np.nan}).ffill()
+    # where will convert nans to zeros, replace zeros
+    df = df.where(nans_mask == False, other=np.nan)
+    return df

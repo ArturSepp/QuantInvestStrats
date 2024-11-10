@@ -64,18 +64,18 @@ def compute_regime_avg(sampled_returns_with_regime_id: pd.DataFrame,
     return regime_means, regime_pa, norm_q
 
 
-def compute_regimes_pa_perf_table(sampled_returns_with_regime_id: pd.DataFrame,
-                                  prices: pd.DataFrame,
-                                  benchmark: str,
-                                  perf_params: PerfParams,
-                                  freq: str,
-                                  is_use_benchmark_means: bool = False,
-                                  is_add_ra_perf_table: bool = True,
-                                  drop_benchmark: bool = False,
-                                  additive_pa_returns_to_pa_total: bool = True,
-                                  regime_ids: List[str] = None,  # define regime order
-                                  **kwargs
-                                  ) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
+def compute_regimes_pa_perf_table_from_sampled_returns(sampled_returns_with_regime_id: pd.DataFrame,
+                                                       prices: pd.DataFrame,
+                                                       benchmark: str,
+                                                       perf_params: PerfParams,
+                                                       freq: str,
+                                                       is_use_benchmark_means: bool = False,
+                                                       is_add_ra_perf_table: bool = True,
+                                                       drop_benchmark: bool = False,
+                                                       additive_pa_returns_to_pa_total: bool = True,
+                                                       regime_ids: List[str] = None,  # define regime order
+                                                       **kwargs
+                                                       ) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
 
     """
     compute regime conditional returns, regime conditional Sharpes and total performance
@@ -176,15 +176,15 @@ class RegimeClassifier(ABC):
         compute regime conditional returns, regime conditional Sharpes and total performance
         """
         sampled_returns_with_regime_id = self.compute_sampled_returns_with_regime_id(**regime_id_func_kwargs)
-        cond_perf_table, regime_datas = compute_regimes_pa_perf_table(sampled_returns_with_regime_id=sampled_returns_with_regime_id,
-                                                                      prices=prices,
-                                                                      benchmark=benchmark,
-                                                                      perf_params=perf_params,
-                                                                      freq=freq,
-                                                                      is_use_benchmark_means=is_use_benchmark_means,
-                                                                      is_add_ra_perf_table=is_add_ra_perf_table,
-                                                                      drop_benchmark=drop_benchmark,
-                                                                      regime_ids=regime_ids)
+        cond_perf_table, regime_datas = compute_regimes_pa_perf_table_from_sampled_returns(sampled_returns_with_regime_id=sampled_returns_with_regime_id,
+                                                                                           prices=prices,
+                                                                                           benchmark=benchmark,
+                                                                                           perf_params=perf_params,
+                                                                                           freq=freq,
+                                                                                           is_use_benchmark_means=is_use_benchmark_means,
+                                                                                           is_add_ra_perf_table=is_add_ra_perf_table,
+                                                                                           drop_benchmark=drop_benchmark,
+                                                                                           regime_ids=regime_ids)
         return cond_perf_table, regime_datas
 
     def class_data_to_colors(self,
@@ -405,7 +405,7 @@ def run_unit_test(unit_test: UnitTests):
                                                regime_params=BenchmarkReturnsQuantileRegimeSpecs(),
                                                perf_params=PerfParams())
         print(df)
-
+        print(df.columns)
 
     plt.show()
 

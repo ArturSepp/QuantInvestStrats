@@ -178,6 +178,7 @@ from qis.utils.np_ops import (
     np_array_to_n_column_array,
     np_array_to_t_rows_array,
     np_nanmean,
+    np_nansum,
     np_cumsum,
     np_nanstd,
     np_nanvar,
@@ -190,7 +191,8 @@ from qis.utils.np_ops import (
     to_finite_ratio,
     to_finite_reciprocal,
     repeat_by_columns,
-    repeat_by_rows
+    repeat_by_rows,
+    set_nans_for_warmup_period
 )
 
 from qis.utils.ols import (
