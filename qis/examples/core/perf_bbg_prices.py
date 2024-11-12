@@ -16,14 +16,17 @@ def run_report():
         'GSISXC11 Index': 'GS Macro Carry',
         'XUBSPGRA Index': 'UBS Gold Strangles',
         'XUBSU1D1 Index': 'UBS Short Vol Daily',
-        #'BCKTARU2 Index': 'BNP Call on Short-vol Carry'
+        'BCKTARU2 Index': 'BNP Call on Short-vol Carry',
+        'BNPXAUUS Index': 'BNP Intraday SPX Vol Carry',
+        'BNPXAUTS Index': 'BNP Intraday NDX Vol Carry',
+        'BNPXOV3U Index': 'BNP 3M Long DHhedged Puts'
         }
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
 
-    time_period = qis.TimePeriod('31Dec2019', '07Nov2024')
-    kwargs = qis.fetch_default_report_kwargs(time_period=time_period)
+    time_period = qis.TimePeriod('31Dec2019', '08Nov2024')
+    kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
 
     fig = qis.generate_multi_asset_factsheet(prices=prices,
                                              benchmark='SPTR Index',
@@ -66,7 +69,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PRICE
+    unit_test = UnitTests.REPORT
 
     is_run_all_tests = False
     if is_run_all_tests:
@@ -74,7 +77,6 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-
 
 
 plt.show()

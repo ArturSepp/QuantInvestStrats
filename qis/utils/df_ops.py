@@ -331,7 +331,7 @@ def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
     if dates is not None:
         # align tz
         if isinstance(dates, pd.DatetimeIndex) and df.index.tz is not None:
-            df.index = df.index.tz_localize(dates.tz)
+            df.index = df.index.tz_convert(dates.tz)
         df = df.reindex(index=dates, method='ffill')
 
     # apply dt multiplication

@@ -12,7 +12,7 @@ REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
 PERF_COLUMNS_RF0 = (PerfStat.TOTAL_RETURN,
                     PerfStat.PA_RETURN,
                     PerfStat.VOL,
-                    PerfStat.SHARPE_EXCESS,
+                    PerfStat.SHARPE_RF0,
                     PerfStat.MAX_DD,
                     PerfStat.MAX_DD_VOL,
                     PerfStat.SKEWNESS,

@@ -107,11 +107,13 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
     plot time series of returns correlations infered from prices
     """
     returns = ret.to_returns(prices=prices, return_type=return_type, freq=freq)
+    init_value = ccm.compute_masked_covar_corr(data=returns.to_numpy(), is_covar=True)
+
     corr_pandas = ccm.compute_ewm_corr_df(df=returns,
                                           corr_matrix_output=corr_matrix_output,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
-                                          init_type=init_type)
+                                          init_value=init_value)
     if time_period is not None:
         corr_pandas = time_period.locate(corr_pandas)
 

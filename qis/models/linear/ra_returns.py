@@ -34,7 +34,7 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
         annualize = False
         vol_target = 1.0
     else:
-        annualize = True
+        annualize = False
 
     ewm_vol = ewm.compute_ewm_vol(data=returns,
                                   ewm_lambda=ewm_lambda,
