@@ -214,11 +214,14 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
                      add_current_date: bool = False,
                      sheet_names: List[str] = None,
                      transpose: bool = False,
-                     if_sheet_exists: Literal['error', 'new', 'replace', 'overlay'] = 'replace'
+                     if_sheet_exists: Optional[Literal['error', 'new', 'replace', 'overlay']] = 'replace'
                      ) -> str:
     """
     pandas or list of pandas to one excel
+    if_sheet_exists only for append mode
     """
+    if mode == 'w':
+        if_sheet_exists = None
     if add_current_date:
         file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
 
