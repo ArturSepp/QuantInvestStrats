@@ -214,6 +214,7 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
                      add_current_date: bool = False,
                      sheet_names: List[str] = None,
                      transpose: bool = False,
+                     if_sheet_exists: Literal['error', 'new', 'replace', 'overlay'] = 'replace'
                      ) -> str:
     """
     pandas or list of pandas to one excel
@@ -228,7 +229,7 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
                                     subfolder_name=subfolder_name,
                                     key=key)
 
-    excel_writer = pd.ExcelWriter(file_path, engine='openpyxl', mode=mode)
+    excel_writer = pd.ExcelWriter(file_path, engine='openpyxl', mode=mode, if_sheet_exists=if_sheet_exists)
     if isinstance(data, list):  # publish with sheet names
         if sheet_names is None:
             sheet_names = [f"Sheet {n+1}" for n, _ in enumerate(data)]

@@ -128,13 +128,14 @@ def compute_ewm_corr_df(df: pd.DataFrame,
                         corr_matrix_output: CorrMatrixOutput = CorrMatrixOutput.FULL,
                         span: Union[int, np.ndarray] = None,
                         ewm_lambda: float = 0.94,
-                        init_value: np.ndarray = None
+                        init_value: np.ndarray = None,
+                        init_type: ewm.InitType = ewm.InitType.ZERO
                         ) -> pd.DataFrame:
     """
     compute ewm corr as and output as xi-xj pandas j>i, i = 0,..
     """
     if init_value is None:
-        init_value = np.zeros((len(df.columns), len(df.columns)))
+        init_value = ewm.set_init_dim2(data=df.to_numpy(), init_type=init_type)
 
     corr = ewm.compute_ewm_covar_tensor(a=df.to_numpy(),
                                         span=span,
