@@ -24,8 +24,9 @@ def run_report():
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
+    qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2019', '08Nov2024')
+    time_period = qis.TimePeriod('31Dec2019', '15Nov2024')
     kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
 
     fig = qis.generate_multi_asset_factsheet(prices=prices,

@@ -3,6 +3,7 @@ analytic for melting of pandas
 """
 # packages
 import pandas as pd
+import numpy as np
 from enum import Enum
 from typing import Dict, Optional, List
 # qis
@@ -82,6 +83,8 @@ def melt_df_by_columns(df: pd.DataFrame,
         box_data[sort_column] = box_data[x_index_var_name].map(name_sort)
         box_data = box_data.sort_values(by=sort_column).drop(sort_column, axis=1)
 
+    box_data = box_data.loc[pd.isna(box_data[y_var_name]) == False, :]  # important to exclude nans
+
     return box_data
 
 
@@ -146,9 +149,9 @@ def run_unit_test(unit_test: UnitTests):
     returns = prices.pct_change()
 
     if unit_test == UnitTests.PD_MELT:
-        df = pd.DataFrame(data=[[0, 1, 2.5], [2, 3, 5.0]],
-                          index=['cat', 'dog'],
-                          columns=['weight', 'height', 'age'])
+        df = pd.DataFrame(data=[[0, 1, 2.5, 0], [2, 3, 5.0, 0], [np.nan, 1, 1, 1]],
+                          index=['cat', 'dog', 'missing'],
+                          columns=['weight', 'height', 'age', 'sex'])
         print(df)
         melted = pd.melt(df, value_vars=df.columns, var_name='myVarname', value_name='myValname')
         print(f"melted=\n{melted}")
@@ -170,7 +173,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.MELT_DF_BY_COLUMNS
+    unit_test = UnitTests.PD_MELT
 
     is_run_all_tests = False
     if is_run_all_tests:

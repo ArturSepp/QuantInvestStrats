@@ -84,7 +84,7 @@ def np_nanvar(a: np.ndarray, axis: int = 1, ddof: int = 0) -> np.ndarray:
 @njit
 def np_cumsum(a: np.ndarray, axis: int = 1) -> np.ndarray:
     """
-    canot do  return np_apply_along_axis(func=np.cumsum, axis=axis, a=a)
+    cannot do  return np_apply_along_axis(func=np.cumsum, axis=axis, a=a)
     because the axes is not reduced
     """
     result = np.zeros_like(a)

@@ -48,6 +48,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               is_sns: bool = True,
               add_avg_line: bool = False,
               is_horizontal: bool = False,
+              labels_frequency: Optional[int] = None,
               ax: plt.Subplot = None,
               **kwargs
               ) -> Optional[plt.Figure]:
@@ -98,7 +99,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         df1 = df1.dropna(subset=[value_name])  # dropna in value_name
         if is_sns and not stacked:
             sns.barplot(x=df1.index, y=value_name, data=df1, hue=var_name,
-                        palette=colors[:len(df1.columns)],
+                        palette=colors[:len(df1[var_name].unique())],
                         edgecolor='none',
                         orient='h' if is_horizontal else 'v',
                         ax=ax)
@@ -201,6 +202,9 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         ax.set_xticks(np.arange(len(df.index)), labels=df.index.to_list())
         ax.xaxis.set_tick_params(rotation=x_rotation)
         ax.axhline(0, color='black', lw=0.5)
+
+    if labels_frequency is not None:
+        put.set_labels_frequency(ax=ax, labels_frequency=labels_frequency)
 
     if y_limits is not None:
         put.set_y_limits(ax=ax, y_limits=y_limits)

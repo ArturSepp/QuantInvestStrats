@@ -1525,6 +1525,17 @@ def reset_xticks(ax: plt.Axes, data: np.ndarray, nbins: int = 20, var_format: st
     ax.set_xticklabels([var_format.format(x) for x in x_datalables], rotation=0, fontsize=10)
 
 
+def set_labels_frequency(ax: plt.Axes, labels_frequency: int = 5) -> None:
+    xticklabels = ax.get_xticklabels()
+    # need to use ind+1
+    for ind, label in zip(np.arange(1, len(ax.get_xticklabels())+1), xticklabels):
+        if ind % labels_frequency == 0:  # every 5th label is kept
+            label.set_visible(True)
+        else:
+            label.set_visible(False)
+
+
+
 class UnitTests(Enum):
     DUMMY_LINE = 1
     LEGEND_LINES = 2

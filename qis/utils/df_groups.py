@@ -237,6 +237,29 @@ def set_group_loadings(group_data: pd.Series, group_order: List[str] = None) -> 
     return group_loadings
 
 
+def convert_df_column_to_df_by_groups(df: pd.DataFrame,
+                                      group_data: pd.Series,
+                                      column: str,
+                                      total_column: Union[str, None] = None,
+                                      group_order: List[str] = None
+                                      ) -> pd.DataFrame:
+    """
+    df is dataframe with index = assets
+    group_data is series with index = assets and value = groups
+    take dataframe column: split it to groups and produce df of values with columns = groups
+    the index value is lost
+    """
+    # create df dict
+    dfs = split_df_by_groups(df=df[column].to_frame().T, group_data=group_data,
+                             total_column=total_column,
+                             group_order=group_order)
+    dfs1 = {}
+    for key, df in dfs.items():
+        dfs1[key] = df.T.reset_index(drop=True)[column]  # make series from df
+    df1 = pd.DataFrame.from_dict(dfs1, orient='columns')
+    return df1
+
+
 class UnitTests(Enum):
     GROUP = 1
 

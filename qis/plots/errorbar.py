@@ -16,7 +16,7 @@ import qis.plots.utils as put
 
 def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   y_std_errors: Union[float, pd.Series, pd.DataFrame] = 0.5,
-                  exact: pd.Series = None,  # can add exact solution
+                  exact: Union[pd.Series, pd.DataFrame] = None,  # can add exact solution
                   legend_title: str = None,
                   legend_loc: Optional[Union[str, bool]] = 'upper left',
                   xlabel: str = None,
@@ -26,7 +26,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   fontsize: int = 10,
                   capsize: int = 10,
                   colors: List[str] = None,
-                  exact_color: str = 'green',
+                  exact_colors: Union[str, List[str]] = 'green',
                   exact_marker: str = "v",
                   y_limits: Tuple[Optional[float], Optional[float]] = None,
                   ax: plt.Subplot = None,
@@ -60,13 +60,24 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
 
         ax.errorbar(x=df.index, y=df[column].to_numpy(), yerr=yerr, color=colors[idx], fmt='o', capsize=capsize)
 
-    if exact is not None:
-        for idx, index in enumerate(df.index):
-            put.add_scatter_points(ax=ax, label_x_y=[(index, exact[index])], color=exact_color,
-                                   marker=exact_marker, **kwargs)
-        labels = columns.to_list() + [exact.name]
-        colors = colors + [exact_color]
-        markers = ['o']*len(columns) + [exact_marker]
+    if exact is not None:  # add exact as scatter points
+
+        if isinstance(exact, pd.Series):
+            exact = exact.to_frame()
+
+        labels = columns.to_list()
+        markers = ['o'] * len(columns)
+        if isinstance(exact_colors, str):
+            exact_colors = [exact_colors] * len(columns)
+        for idx1, column in enumerate(exact.columns):
+            for idx, index in enumerate(df.index):
+                put.add_scatter_points(ax=ax,
+                                       label_x_y=[(index, exact.loc[index, column])],
+                                       color=exact_colors[idx1],
+                                       marker=exact_marker, **kwargs)
+            labels = labels + [column]
+            colors = colors + [exact_colors[idx1]]
+            markers = markers + [exact_marker]
     else:
         labels = columns
         markers = ['o']*len(columns)

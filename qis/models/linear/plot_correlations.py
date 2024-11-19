@@ -93,6 +93,7 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
                                          span: Union[int, np.ndarray] = None,
                                          ewm_lambda: float = 0.97,
                                          init_type: InitType = InitType.X0,
+                                         init_value: np.ndarray = None,
                                          var_format: str = '{:.0%}',
                                          legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                                          trend_line: put.TrendLine = put.TrendLine.AVERAGE,
@@ -112,7 +113,8 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
                                           corr_matrix_output=corr_matrix_output,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
-                                          init_type=init_type)
+                                          init_type=init_type,
+                                          init_value=init_value)
     if time_period is not None:
         corr_pandas = time_period.locate(corr_pandas)
 

@@ -57,7 +57,7 @@ git clone https://github.com/ArturSepp/QuantInvestStrats.git
 ```
 
 Core dependencies:
-    python = ">=3.8,<3.11",
+    python = ">=3.8",
     numba = ">=0.56.4",
     numpy = ">=1.22.4",
     scipy = ">=1.10",

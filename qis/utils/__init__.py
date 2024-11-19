@@ -78,7 +78,8 @@ from qis.utils.df_groups import (
     get_group_dict,
     sort_df_by_index_group,
     split_df_by_groups,
-    set_group_loadings
+    set_group_loadings,
+    convert_df_column_to_df_by_groups
 )
 
 from qis.utils.df_melt import (

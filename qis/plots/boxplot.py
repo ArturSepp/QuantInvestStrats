@@ -308,7 +308,6 @@ def df_dict_boxplot_by_columns(dfs: Dict[str, Union[pd.Series, pd.DataFrame]],
     """
     box_datas = []
     for key, df in dfs.items():
-        df = df.dropna()  # important
         box_data = dfm.melt_df_by_columns(df=df, x_index_var_name=None, hue_var_name=hue_var_name, y_var_name=y_var_name)
         box_data[hue] = key
         box_datas.append(box_data)
@@ -515,8 +514,8 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     from qis.test_data import load_etf_data
-    prices = load_etf_data().dropna()
-    returns = prices.asfreq('QE', method='ffill').pct_change().dropna()
+    prices = load_etf_data()
+    returns = prices.asfreq('QE', method='ffill').pct_change()
 
     if unit_test == UnitTests.RETURNS_BOXPLOT:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
@@ -573,7 +572,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.DF_WEIGHTS
+    unit_test = UnitTests.DF_DICT
 
     is_run_all_tests = False
     if is_run_all_tests:

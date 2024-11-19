@@ -276,8 +276,13 @@ def plot_periodic_returns_table(prices: pd.DataFrame,
         np_data = data.to_numpy()[:-1, :-1]  # exclude last row from cmap
     else:
         np_data = data.to_numpy()
+
+    if add_total:
+        vline_columns = [len(data.index) - 1]
+    else:
+        vline_columns = None
     fig = plot_heatmap(df=data,
-                       vline_columns=[len(data.index)-1],
+                       vline_columns=vline_columns,
                        transpose=transpose,
                        date_format=date_format,
                        var_format=var_format,

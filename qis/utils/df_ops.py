@@ -254,7 +254,7 @@ def get_first_nonnan_values(df: Union[np.ndarray, pd.Series, pd.DataFrame]) -> U
             values = x0
         else:
             values = []
-            for idx in enumerate(df.shape[1]):
+            for idx in np.arange(df.shape[1]):
                 values.append(get_non_nan_values_series(sdata=pd.Series(df[:, idx])))
             values = np.array(values)
 
