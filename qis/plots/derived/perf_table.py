@@ -222,7 +222,7 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
     # fu.save_df_to_excel(xy, file_name='xy')
     if hue_data is not None:
         xy = pd.concat([xy, hue_data], axis=1)
-        hue = hue_data.name
+        hue = hue_data.name or 'hue'
     else:
         hue = None
     fig = psc.plot_scatter(df=xy,

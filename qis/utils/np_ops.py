@@ -480,15 +480,20 @@ def np_nonan_weighted_avg(a: np.ndarray, weights: np.ndarray) -> float:
     return va
 
 
-def set_nans_for_warmup_period(a: np.ndarray,
+def set_nans_for_warmup_period(a: Union[np.ndarray, pd.DataFrame],
                                warmup_period: Union[int, np.ndarray]
-                               ) -> np.ndarray:
+                               ) -> Union[int, np.ndarray]:
     """
     set nans for array a as warmup_period
     warmup_period starts from the first nonnan in a
     """
     if not (isinstance(warmup_period, int) or isinstance(warmup_period, np.ndarray)):
         raise ValueError(f"type={type(warmup_period)}")
+    if isinstance(a, pd.DataFrame):
+        a0 = a
+        a = a.to_numpy()
+    else:
+        a0 = None
     if a.ndim == 2:
         if isinstance(warmup_period, int):
             warmup_period = np.full(a.shape[1], warmup_period)
@@ -505,6 +510,9 @@ def set_nans_for_warmup_period(a: np.ndarray,
             a[:nan_indicators[warmup_period][0]] = np.nan
         else:
             a[:] = np.nan
+    if a0 is not None:
+        a = pd.DataFrame(a, index=a0.index, columns=a0.columns)
+
     return a
 
 

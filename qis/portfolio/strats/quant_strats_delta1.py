@@ -59,7 +59,7 @@ def simulate_vol_target_strats_range(prices: Union[pd.DataFrame, pd.Series],
 
 
 def simulate_trend_strats(prices: Union[pd.DataFrame, pd.Series],
-                          vol_span: int = 31,
+                          vol_span: int = 33,
                           tf_span: int = 63,
                           vol_target: float = 0.15,
                           constant_trade_level: bool = False,
@@ -87,7 +87,7 @@ def simulate_trend_strats(prices: Union[pd.DataFrame, pd.Series],
 
 
 def simulate_trend_strats_range(prices: Union[pd.DataFrame, pd.Series],
-                                vol_span: int = 31,
+                                vol_span: int = 33,
                                 tf_spans: List[int] = (21, 63),
                                 vol_target: float = 0.15,
                                 constant_trade_level: bool = False,

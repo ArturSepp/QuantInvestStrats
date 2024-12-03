@@ -18,7 +18,7 @@ from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
 
 def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 benchmark_prices: Union[pd.DataFrame, pd.Series],
-                                time_period: TimePeriod,
+                                time_period: TimePeriod = None,
                                 ytd_attribution_time_period: TimePeriod = qis.get_ytd_time_period(),
                                 perf_params: PerfParams = PERF_PARAMS,
                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,

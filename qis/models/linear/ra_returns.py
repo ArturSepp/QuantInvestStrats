@@ -316,7 +316,7 @@ class ReturnsTransform(Enum):
 def compute_returns_transform(returns: pd.DataFrame,
                               returns_transform: ReturnsTransform = ReturnsTransform.ROLLING_RA_RETURNS,
                               momentum_span: int = 31,
-                              vol_span: int = 31,
+                              vol_span: int = 33,
                               rolling_ra_returns_span: int = 31
                               ) -> pd.DataFrame:
 

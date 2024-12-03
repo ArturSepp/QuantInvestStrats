@@ -198,6 +198,7 @@ class MultiAssetsReport:
                             date_format: str = '%Y',
                             time_period: TimePeriod = None,
                             table_fontsize: int = 4,
+                            title: Optional[str] = None,
                             ax: plt.Subplot = None,
                             **kwargs) -> None:
         local_kwargs = qis.update_kwargs(kwargs=kwargs,
@@ -207,7 +208,7 @@ class MultiAssetsReport:
         qis.plot_periodic_returns_table(prices=self.get_prices(time_period=time_period),
                                         freq=heatmap_freq,
                                         ax=ax,
-                                        title=f"{heatmap_freq} Returns",
+                                        title=title or f"{heatmap_freq} Returns",
                                         date_format=date_format,
                                         **local_kwargs)
 
@@ -329,8 +330,10 @@ class MultiAssetsReport:
                          time_period: TimePeriod = None,
                          var_format: Optional[str] = None,
                          is_conditional_sharpe: bool = True,
+                         drop_benchmark: bool = False,
                          title: str = None,
                          legend_loc: Optional[str] = 'upper center',
+                         perf_params: PerfParams = None,
                          ax: plt.Subplot = None,
                          **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=benchmark)
@@ -343,7 +346,8 @@ class MultiAssetsReport:
                              regime_data_to_plot=regime_data_to_plot,
                              var_format=var_format or '{:.2f}',
                              legend_loc=legend_loc,
-                             perf_params=self.perf_params,
+                             perf_params=perf_params or self.perf_params,
+                             drop_benchmark=drop_benchmark,
                              title=title,
                              ax=ax,
                              **kwargs)

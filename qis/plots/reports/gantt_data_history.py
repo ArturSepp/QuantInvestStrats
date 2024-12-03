@@ -91,7 +91,8 @@ def plot_backfill_history(backfill_data: pd.DataFrame,
     instrument_names aligned with backfill_data.columns
     """
     if instrument_names is not None:
-        descriptions = [f"{asset}, {instrument_names[asset]}" for asset in backfill_data.columns]
+        # descriptions = [f"{asset}, {instrument_names[asset]}" for asset in backfill_data.columns]
+        descriptions = [f"{instrument_names[asset]}" for asset in backfill_data.columns]
     else:
         descriptions = [f"{asset}" for asset in backfill_data.columns]
 

@@ -9,7 +9,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from typing import List, Union, Tuple, Optional
 from enum import Enum
-
 # qis
 import qis.plots.utils as put
 
@@ -27,6 +26,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   capsize: int = 10,
                   colors: List[str] = None,
                   exact_colors: Union[str, List[str]] = 'green',
+                  marker: Optional[str] = 'o',
                   exact_marker: str = "v",
                   y_limits: Tuple[Optional[float], Optional[float]] = None,
                   ax: plt.Subplot = None,
@@ -58,7 +58,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
         else:
             yerr = y_std_errors
 
-        ax.errorbar(x=df.index, y=df[column].to_numpy(), yerr=yerr, color=colors[idx], fmt='o', capsize=capsize)
+        ax.errorbar(x=df.index, y=df[column].to_numpy(), yerr=yerr, color=colors[idx], fmt=marker, capsize=capsize)
 
     if exact is not None:  # add exact as scatter points
 
@@ -66,7 +66,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
             exact = exact.to_frame()
 
         labels = columns.to_list()
-        markers = ['o'] * len(columns)
+        markers = [marker] * len(columns)
         if isinstance(exact_colors, str):
             exact_colors = [exact_colors] * len(columns)
         for idx1, column in enumerate(exact.columns):
@@ -80,7 +80,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
             markers = markers + [exact_marker]
     else:
         labels = columns
-        markers = ['o']*len(columns)
+        markers = [marker]*len(columns)
 
     if title is not None:
         put.set_title(ax=ax, title=title, fontsize=fontsize)

@@ -95,18 +95,19 @@ def compute_regimes_pa_perf_table_from_sampled_returns(sampled_returns_with_regi
     regime_pa.columns = [f"{x} {RegimeData.REGIME_PA.value}" for x in given_columns]
     regime_pa_columns = regime_pa.columns
 
-    # compute stadradized ra _ perf table
+    # compute standardized ra _ perf table
     ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
-    if additive_pa_returns_to_pa_total:  # use pa return to normalize conditional an returns
 
+    if additive_pa_returns_to_pa_total:  # use pa return to normalize conditional an returns
         total_sum = regime_pa[regime_pa_columns].sum(1)
         total_to_match = ra_perf_table[PerfStat.PA_RETURN.to_str()]
 
         # adjust regimes to add to total
         total_pa_diff = (total_to_match - total_sum)
         weighted_diff = pd.DataFrame(np.tile(total_pa_diff, (len(norm_q.to_numpy()), 1)).T,
-                                     index=total_pa_diff.index, columns=norm_q.index) # = matrix[rows[c by asset]]
-        regime_pa_diff = weighted_diff.multiply(norm_q, axis=1)  # each row is regime freq [number of regime] * adjustment[asset]
+                                     index=total_pa_diff.index, columns=norm_q.index)  # = matrix[rows[c by asset]]
+        # each row is regime freq [number of regime] * adjustment[asset]
+        regime_pa_diff = weighted_diff.multiply(norm_q, axis=1)
         regime_pa1 = regime_pa[regime_pa_columns].add(regime_pa_diff.to_numpy(), axis=0)
 
     else:  # need regime_pa1 for level benchmarks

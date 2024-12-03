@@ -329,7 +329,7 @@ class PortfolioData:
                      roll_period: Optional[int] = 260,
                      is_vol_adjusted: bool = False,
                      add_total: bool = True,
-                     vol_span: int = 31,
+                     vol_span: int = 33,
                      freq: Optional[str] = None
                      ) -> Union[pd.DataFrame, pd.Series]:
         turnover = (self.units.diff(1).abs()).multiply(self.prices)
@@ -1179,7 +1179,7 @@ class PortfolioData:
                                    freq: str = 'B',
                                    title: str = None,
                                    total_column: Optional[str] = 'Total',
-                                   vol_span: int = 31,  # span in number of freq-returns
+                                   vol_span: int = 33,  # span in number of freq-returns
                                    regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
                                    ax: plt.Subplot = None,
                                    **kwargs
@@ -1290,7 +1290,7 @@ class PortfolioData:
                          title: str = None,
                          add_top_bar_values: Optional[bool] = None,
                          total_column: Optional[str] = 'Total',
-                         vol_span: int = 31,  # span in number of freq-returns
+                         vol_span: int = 33,  # span in number of freq-returns
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> None:
@@ -1364,7 +1364,7 @@ class PortfolioData:
                        freq: str = 'B',
                        title: str = None,
                        stack_freq: Optional[str] = 'W-WED',
-                       vol_span: int = 31,  # span in number of freq-returns
+                       vol_span: int = 33,  # span in number of freq-returns
                        ax: plt.Subplot = None,
                        **kwargs
                        ) -> None:

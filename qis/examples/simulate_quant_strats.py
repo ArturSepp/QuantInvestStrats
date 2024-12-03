@@ -23,7 +23,7 @@ PERF_PARAMS = qis.PerfParams(freq='B')
 def create_time_series_report(prices: Union[pd.Series, pd.DataFrame],
                               time_period: qis.TimePeriod,
                               spans: List[int] = (7, 14, 21, 30, 60, 130, 260, 520),
-                              vol_span: int = 31,
+                              vol_span: int = 33,
                               vol_target: float = 0.15,
                               vol_af: float = 260
                               ) -> List[plt.Figure]:
@@ -101,7 +101,7 @@ def plot_strategies_prices(nav_data: pd.DataFrame,
                            nav_weights: pd.DataFrame,
                            time_period: qis.TimePeriod,
                            axs: List[plt.Subplot],
-                           vol_span: int = 31,
+                           vol_span: int = 33,
                            vol_af: float = 260.0,
                            **kwargs
                            ) -> None:

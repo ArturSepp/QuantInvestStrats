@@ -145,9 +145,14 @@ def df_resample_at_int_index(df: pd.DataFrame,
                              sample_size: int = 5
                              ) -> pd.DataFrame:
     """
-    resample dataframe at evenly spaced discrete index
+    resample dataframe at evenly spaced discrete index with intervals of sample_size
+    func is accumulating function which needs to have axis={0, 1} as arguments
     """
     assert isinstance(sample_size, int)
+    assert sample_size > 0
+    if sample_size == 1:  # no resampling is needed
+        return df
+
     original_index = df.index
     df = df.reset_index(drop=True)  # need integer range index
     int_index = df.index

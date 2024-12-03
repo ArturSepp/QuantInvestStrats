@@ -19,6 +19,7 @@ import qis.plots.boxplot as bxp
 def plot_regime_data(regime_classifier: RegimeClassifier,
                      regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
                      drop_sharpe_from_labels: bool = False,  # only leave the regime names
+                     drop_benchmark: bool = False,
                      x_rotation: int = 90,
                      add_bar_values: bool = True,
                      title: Optional[str] = 'Conditional Excess Sharpe ratio',
@@ -34,7 +35,8 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                      **kwargs
                      ) -> plt.Figure:
 
-    regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(**kwargs)
+    regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(drop_benchmark=drop_benchmark,
+                                                                                          **kwargs)
     data = regime_datas[regime_data_to_plot]
     data = data.dropna(how='all', axis=0)  # remove data wit all rows nans
 

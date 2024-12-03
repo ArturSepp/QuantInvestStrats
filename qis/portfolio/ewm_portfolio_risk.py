@@ -101,7 +101,7 @@ def compute_portfolio_vol(returns: pd.DataFrame,
 @njit
 def compute_portfolio_var_np(returns: np.ndarray,
                              weights: np.ndarray,
-                             span: Union[int, np.ndarray] = None,
+                             span: Union[int, float, np.ndarray] = None,
                              ewm_lambda: Union[float, np.ndarray] = 0.94
                              ) -> np.ndarray:
 
@@ -135,7 +135,7 @@ def compute_portfolio_correlated_var_by_groups(prices: pd.DataFrame,
                                                group_order: List[str] = None,
                                                total_column: Optional[str] = 'Total',
                                                freq: Optional[str] = 'B',
-                                               vol_span: int = 31,  # span in number of freq-retunrs
+                                               vol_span: int = 33,  # span in number of freq-retunrs
                                                time_period: da.TimePeriod = None,
                                                mean_adj_type: MeanAdjType = MeanAdjType.NONE
                                                ) -> pd.DataFrame:
@@ -178,7 +178,7 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
                                             group_order: List[str] = None,
                                             total_column: Optional[str] = 'Total',
                                             freq: Optional[str] = 'B',
-                                            vol_span: int = 31,  # span in number of freq-retunrs
+                                            vol_span: int = 33,  # span in number of freq-retunrs
                                             time_period: da.TimePeriod = None,
                                             mean_adj_type: MeanAdjType = MeanAdjType.NONE
                                             ) -> Tuple[pd.DataFrame, pd.DataFrame]:

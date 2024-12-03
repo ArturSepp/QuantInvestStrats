@@ -62,14 +62,19 @@ def estimate_acf_from_paths(paths: Union[np.ndarray, pd.DataFrame],
     return acfs, m_acf, std_acf
 
 
-def compute_autocorr_df(df: pd.DataFrame,
-                        num_lags: int = 20
+def compute_autocorr_df(df: Union[pd.Series, pd.DataFrame],
+                        num_lags: int = 20,
+                        axis: int = 0
                         ) -> pd.DataFrame:
     """
     compute auto correlation columns wise and return df with lags = index
+    default is axis = 0
     """
     acf = compute_path_autocorr(a=df.to_numpy())
-    df = pd.DataFrame(data=acf, index=np.arange(0, num_lags), columns=df.columns)
+    if isinstance(df, pd.Series):
+        df = pd.Series(data=acf, index=np.arange(0, num_lags), name=df.name)
+    else:
+        df = pd.DataFrame(data=acf, index=np.arange(0, num_lags), columns=df.columns)
     return df
 
 
