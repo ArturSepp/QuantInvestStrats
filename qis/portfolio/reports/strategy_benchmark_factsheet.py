@@ -48,12 +48,15 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         raise ValueError(f"must be at least two strategies")
 
     if is_grouped is None:
-        if (multi_portfolio_data.portfolio_datas[0].group_data is not None
-                and len(multi_portfolio_data.portfolio_datas[0].group_data.unique()) <= 7):  # otherwise tables look too bad
+        if len(multi_portfolio_data.portfolio_datas[0].get_weights().columns) >= 10:  # otherwise tables look too bad
             is_grouped = True
         else:
             is_grouped = False
-        
+
+    # set reporting time period here
+    if time_period is None:
+        time_period = qis.get_time_period(multi_portfolio_data.portfolio_datas[0].get_portfolio_nav())
+
     # set report specific kqargs
     plot_kwargs = dict(fontsize=fontsize,
                        linewidth=0.5,
