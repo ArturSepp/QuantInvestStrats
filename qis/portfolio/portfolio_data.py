@@ -358,6 +358,8 @@ class PortfolioData:
 
         if roll_period is not None:
             turnover = turnover.rolling(roll_period).sum()
+            if freq is not None:  # report at last freq
+                turnover = turnover.resample(freq).last()
         elif freq is not None:
             turnover = turnover.resample(freq).sum()
         if time_period is not None:
@@ -391,8 +393,10 @@ class PortfolioData:
 
         if roll_period is not None:
             costs = costs.rolling(roll_period).sum()
+            if freq is not None:  # report at last freq
+                costs = costs.resample(freq).last()
         elif freq is not None:
-            costs = costs.resample(freq).sum()
+                costs = costs.resample(freq).sum()
         if time_period is not None:
             costs = time_period.locate(costs)
         return costs

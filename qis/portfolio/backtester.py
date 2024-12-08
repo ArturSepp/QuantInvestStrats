@@ -24,8 +24,8 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              weight_implementation_lag: Optional[int] = None,  # applies for weight is pd.Dataframe
                              constant_trade_level: float = None,
                              is_rebalanced_at_first_date: bool = False,
-                             ticker: str = None
-                             ) -> Union[pd.Series, PortfolioData]:
+                             ticker: str = 'Portfolio'  # default ticker
+                             ) -> PortfolioData:
     """
     simulate portfolio given prices and weights
     include_start_date if index rebalanced at start date

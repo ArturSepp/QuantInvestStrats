@@ -219,6 +219,8 @@ class MultiAssetsReport:
                         **kwargs
                         ) -> None:
         prices = self.get_prices(time_period=time_period)
+        if len(prices.columns) == 1:  # cannot compute corr
+            return
         if len(prices.columns) >= 12:
             new_kwargs = dict(fontsize=2.75, freq=corr_freq)
         else:
