@@ -42,19 +42,21 @@ class FactsheetConfig(NamedTuple):
     freq: str = 'W-WED'  # for trading stats
     vol_freq: str = 'W-WED'
     vol_rolling_window: int = 13  # 12 span volatility of weekly returns
-    freq_drawdown: str = 'D'
+    freq_drawdown: str = 'B'
     freq_reg: str = 'W-WED'  # for beta regressions
+    freq_var: str = 'B'  # for var computations
+    var_span: float = 33.0 # for var computations
     alpha_an_factor: float = 52 # for W-WED returns
-    regime_freq: str = 'QE'  # for regime frequency
+    freq_regime: str = 'QE'  # for regime frequency
     sharpe_rolling_window: int = 156  # 3y of weekly returns
-    sharpe_freq: str = 'W-WED'
+    freq_sharpe: str = 'W-WED'  # for rolling sharpe
     turnover_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
-    turnover_freq: str = 'B'   # daily freq
+    freq_turnover: str = 'B'   # daily freq
     cost_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
-    cost_freq: Optional[str] = 'B'
+    freq_cost: Optional[str] = 'B'  # for rolling costs
     is_norm_costs: bool = True  # for long-only protfolio use nrmalised costs
     factor_beta_span: int = 52  # to compute rolling beta
-    beta_freq: str = 'W-WED'
+    freq_beta: str = 'W-WED'  # for scatter plot
     exposures_freq: str = 'W-WED'  # for plotting strategy exposures
     # general data
     perf_columns: List[PerfStat] = PERF_COLUMNS
@@ -71,7 +73,7 @@ FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD = FactsheetConfig()
 
 FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD = FactsheetConfig(heatmap_freq='YE',
                                                            x_date_freq='QE',
-                                                           regime_freq='ME',
+                                                           freq_regime='ME',
                                                            freq_reg='W-WED',
                                                            alpha_an_factor=52
                                                            )
@@ -82,17 +84,19 @@ FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
                                                             freq_reg='ME',
                                                             vol_freq='ME',
                                                             alpha_an_factor=12,
-                                                            regime_freq='QE',
+                                                            freq_regime='QE',
                                                             sharpe_rolling_window=36,
                                                             vol_rolling_window=13,
-                                                            sharpe_freq='ME',
+                                                            freq_sharpe='ME',
                                                             turnover_rolling_period=12,
-                                                            turnover_freq='ME',
+                                                            freq_turnover='ME',
                                                             cost_rolling_period=12,
-                                                            cost_freq='ME',
+                                                            freq_cost='ME',
+                                                            freq_var='ME',
+                                                            var_span=12,
                                                             is_norm_costs=True,
                                                             factor_beta_span=36,
-                                                            beta_freq='ME',
+                                                            freq_beta='ME',
                                                             exposures_freq='ME')
 
 FACTSHEET_CONFIG_MONTHLY_DATA_SHORT_PERIOD = FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD
@@ -116,7 +120,7 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
                              freq_reg=factsheet_config.freq_reg,
                              alpha_an_factor=factsheet_config.alpha_an_factor,
                              rates_data=rates_data)
-    regime_params = BenchmarkReturnsQuantileRegimeSpecs(freq=factsheet_config.regime_freq)
+    regime_params = BenchmarkReturnsQuantileRegimeSpecs(freq=factsheet_config.freq_regime)
     kwargs = factsheet_config._asdict()
 
     if add_rates_data:

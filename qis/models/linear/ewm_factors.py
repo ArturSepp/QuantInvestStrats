@@ -180,7 +180,7 @@ def compute_portfolio_benchmark_betas(instrument_prices: pd.DataFrame,
                                       exposures: pd.DataFrame,
                                       benchmark_prices: pd.DataFrame,
                                       time_period: TimePeriod = None,
-                                      beta_freq: str = None,
+                                      freq_beta: str = None,
                                       factor_beta_span: int = 63,  # quarter
                                       mean_adj_type: MeanAdjType = MeanAdjType.EWMA
                                       ) -> pd.DataFrame:
@@ -189,8 +189,8 @@ def compute_portfolio_benchmark_betas(instrument_prices: pd.DataFrame,
     portfolio_beta_i = sum(instrument_beta_i*exposure)
     """
     benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-    ewm_linear_model = EwmLinearModel(x=ret.to_returns(prices=benchmark_prices, freq=beta_freq, is_log_returns=True),
-                                      y=ret.to_returns(prices=instrument_prices, freq=beta_freq, is_log_returns=True))
+    ewm_linear_model = EwmLinearModel(x=ret.to_returns(prices=benchmark_prices, freq=freq_beta, is_log_returns=True),
+                                      y=ret.to_returns(prices=instrument_prices, freq=freq_beta, is_log_returns=True))
     ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True, mean_adj_type=mean_adj_type)
     exposures = exposures.reindex(index=instrument_prices.index, method='ffill')
     benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(exposures=exposures)
@@ -205,7 +205,7 @@ def compute_portfolio_benchmark_beta_alpha_attribution(instrument_prices: pd.Dat
                                                        benchmark_prices: pd.DataFrame,
                                                        portfolio_nav: pd.Series,
                                                        time_period: TimePeriod = None,
-                                                       beta_freq: str = None,
+                                                       freq_beta: str = None,
                                                        factor_beta_span: int = 63,  # quarter
                                                        residual_name: str = 'Alpha'
                                                        ) -> pd.DataFrame:
@@ -218,7 +218,7 @@ def compute_portfolio_benchmark_beta_alpha_attribution(instrument_prices: pd.Dat
                                                                   exposures=exposures,
                                                                   benchmark_prices=benchmark_prices,
                                                                   time_period=None,
-                                                                  beta_freq=beta_freq,
+                                                                  freq_beta=freq_beta,
                                                                   factor_beta_span=factor_beta_span)
     joint_attrib = compute_benchmarks_beta_attribution(portfolio_nav=portfolio_nav,
                                                        benchmark_prices=benchmark_prices,
@@ -295,7 +295,7 @@ def run_unit_test(unit_test: UnitTests):
                                                                          benchmark_prices=benchmark_prices,
                                                                          portfolio_nav=portfolio_nav,
                                                                          time_period=None,
-                                                                         beta_freq='W-WED',
+                                                                         freq_beta='W-WED',
                                                                          factor_beta_span=52,  # quarter
                                                                          residual_name='Alpha')
         pts.plot_time_series(df=attribution.cumsum(0))

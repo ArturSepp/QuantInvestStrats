@@ -255,7 +255,7 @@ class MultiAssetsReport:
 
     def plot_benchmark_beta(self,
                             benchmark: str,
-                            beta_freq: str = 'ME',
+                            freq_beta: str = 'ME',
                             factor_beta_span: int = 12,
                             time_period: TimePeriod = None,
                             ax: plt.Subplot = None,
@@ -263,8 +263,8 @@ class MultiAssetsReport:
         """
         plot rolling beta to one benchmark
         """
-        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=beta_freq)
-        factor_beta_title = f"{factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {benchmark}"
+        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=freq_beta)
+        factor_beta_title = f"{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {benchmark}"
         ewm_linear_model = qis.EwmLinearModel(x=returns[benchmark].to_frame(), y=returns.drop(benchmark, axis=1))
         ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
         ewm_linear_model.plot_factor_loadings(factor=benchmark,
@@ -276,13 +276,13 @@ class MultiAssetsReport:
 
     def plot_benchmark_alpha_attribution(self,
                                          benchmark: str,
-                                         beta_freq: str = 'ME',
+                                         freq_beta: str = 'ME',
                                          factor_beta_span: int = 12,
                                          factor_alpha_title: Optional[str] = None,
                                          time_period: TimePeriod = None,
                                          ax: plt.Subplot = None,
                                          **kwargs) -> None:
-        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=beta_freq)
+        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=freq_beta)
         ewm_linear_model = qis.EwmLinearModel(x=returns[benchmark].to_frame(), y=returns.drop(benchmark, axis=1))
         ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
         factor_alpha, explained_returns = ewm_linear_model.get_factor_alpha()
@@ -292,7 +292,7 @@ class MultiAssetsReport:
         if factor_alpha_title is not None:
             factor_alpha_title = f"{factor_alpha_title} to {benchmark}"
         else:
-            factor_alpha_title = factor_alpha_title or f"Cumulative alpha using {factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {benchmark}"
+            factor_alpha_title = factor_alpha_title or f"Cumulative alpha using {factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {benchmark}"
 
         qis.plot_time_series(df=factor_alpha.cumsum(0),
                              title=factor_alpha_title,
@@ -306,7 +306,7 @@ class MultiAssetsReport:
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
                           sharpe_rolling_window: int = 3 * 252,
-                          sharpe_freq: Optional[str] = None,
+                          freq_sharpe: Optional[str] = None,
                           legend_stats: LegendStats = LegendStats.FIRST_AVG_LAST,
                           ax: plt.Subplot = None,
                           **kwargs
@@ -319,7 +319,7 @@ class MultiAssetsReport:
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
                                          roll_periods=sharpe_rolling_window,
-                                         roll_freq=sharpe_freq,
+                                         roll_freq=freq_sharpe,
                                          legend_stats=legend_stats,
                                          regime_benchmark_str=regime_benchmark,
                                          ax=ax,

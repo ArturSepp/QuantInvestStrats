@@ -25,11 +25,16 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
                                 exposures_freq: Optional[str] = 'W-WED',  #'W-WED',
                                 turnover_rolling_period: int = 260,
-                                turnover_freq: str = 'B',
+                                freq_turnover: str = 'B',
+                                freq_cost: str = 'B',
+                                cost_rolling_period: int = 260,
                                 factor_beta_span: int = 52,
-                                beta_freq: str = 'W-WED',
+                                freq_beta: str = 'W-WED',
                                 vol_rolling_window: int = 13,
-                                return_rolling_window: int = 260,
+                                freq_sharpe: str = 'B',
+                                freq_var: str = 'B',
+                                var_span: float = 33,
+                                sharpe_rolling_window: int = 260,
                                 add_benchmarks_to_navs: bool = False,
                                 figsize: Tuple[float, float] = (8.5, 11.7),  # A4 for portrait
                                 fontsize: int = 4,
@@ -126,8 +131,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[6:8, :2])
     portfolio_data.plot_rolling_perf(rolling_perf_stat=qis.RollingPerfStat.TOTAL_RETURNS,
                                      add_benchmarks=add_benchmarks_to_navs,
-                                     roll_freq=None,
-                                     rolling_window=return_rolling_window,
+                                     roll_freq=freq_sharpe,
+                                     rolling_window=sharpe_rolling_window,
                                      time_period=time_period,
                                      ax=ax,
                                      **qis.update_kwargs(kwargs, dict(trend_line=qis.TrendLine.ZERO_SHADOWS)))
@@ -151,7 +156,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # turnover
     ax = fig.add_subplot(gs[10:12, :2])
     turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=turnover_rolling_period,
-                                           freq=turnover_freq,
+                                           freq=freq_turnover,
                                            is_grouped=is_grouped)
     freq = pd.infer_freq(turnover.index)
     turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
@@ -167,12 +172,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # costs
     ax = fig.add_subplot(gs[12:14, :2])
-    costs = portfolio_data.get_costs(time_period=time_period, roll_period=turnover_rolling_period,
-                                     freq=turnover_freq,
+    costs = portfolio_data.get_costs(time_period=time_period, roll_period=cost_rolling_period,
+                                     freq=freq_cost,
                                      is_grouped=is_grouped,
                                      is_norm_costs=is_norm_costs)
     freq = pd.infer_freq(costs.index)
-    costs_title = f"{turnover_rolling_period}-period rolling {freq}-freq Costs"
+    costs_title = f"{cost_rolling_period}-period rolling {freq}-freq Costs"
     qis.plot_time_series(df=costs,
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
@@ -281,16 +286,20 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             axs = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[0, 2]), fig.add_subplot(gs[0, 3])]
             portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.LAST,
                                             is_grouped=True, is_correlated=False, time_period=time_period,
+                                            freq=freq_var, vol_span=var_span,
                                             ax=axs[0], **kwargs)
             portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.MAX,
                                             is_grouped=True, is_correlated=False, time_period=time_period,
+                                            freq=freq_var, vol_span=var_span,
                                             ax=axs[1], **kwargs)
 
             portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.LAST,
                                             is_grouped=True, is_correlated=True, time_period=time_period,
+                                            freq=freq_var, vol_span=var_span,
                                             ax=axs[2], **kwargs)
             portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.MAX,
                                             is_grouped=True, is_correlated=True, time_period=time_period,
+                                            freq=freq_var, vol_span=var_span,
                                             ax=axs[3], **kwargs)
             qis.align_y_limits_axs(axs=axs)
 
@@ -299,9 +308,11 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             axs = [fig.add_subplot(gs[1, 0:2]), fig.add_subplot(gs[1, 2:4])]
             portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.LAST,
                                             is_grouped=False, is_correlated=False, time_period=time_period,
+                                            freq=freq_var, vol_span=var_span,
                                             ax=axs[0], **kwargs)
             portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.MAX,
                                             is_grouped=False, is_correlated=False, time_period=time_period,
+                                            freq=freq_var, vol_span=var_span,
                                             ax=axs[1], **kwargs)
             qis.align_y_limits_axs(axs=axs)
 
@@ -371,9 +382,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         ax = fig.add_subplot(gs[5, :2])
         factor_exposures = portfolio_data.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                             time_period=time_period,
-                                                                            beta_freq=beta_freq,
+                                                                            freq_beta=freq_beta,
                                                                             factor_beta_span=factor_beta_span)
-        factor_beta_title = f"Rolling {factor_beta_span}-span beta of {beta_freq}-freq returns"
+        factor_beta_title = f"Rolling {factor_beta_span}-span beta of {freq_beta}-freq returns"
         qis.plot_time_series(df=factor_exposures,
                              var_format='{:,.2f}',
                              legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
@@ -386,11 +397,11 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         # beta attribution
         ax = fig.add_subplot(gs[6, :2])
         factor_attribution = portfolio_data.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
-                                                                                    beta_freq=beta_freq,
+                                                                                    freq_beta=freq_beta,
                                                                                     factor_beta_span=factor_beta_span,
                                                                                     time_period=time_period)
         factor_attribution_title = (f"Cumulative return attribution using rolling "
-                                    f"{factor_beta_span}-span beta of {beta_freq}-freq returns")
+                                    f"{factor_beta_span}-span beta of {freq_beta}-freq returns")
         qis.plot_time_series(df=factor_attribution.cumsum(0),
                              var_format='{:,.0%}',
                              legend_stats=qis.LegendStats.LAST_NONNAN,

@@ -73,7 +73,7 @@ def compute_rolling_returns(prices: Union[pd.DataFrame, pd.Series],
     compute rolling returns
     """
     if roll_freq is not None:
-        prices = prices.asfreq(roll_freq, mehtod='ffill')
+        prices = prices.asfreq(roll_freq, method='ffill')
     returns = prices.divide(prices.shift(periods=roll_periods)) - 1.0
     return returns
 

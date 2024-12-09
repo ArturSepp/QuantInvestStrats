@@ -71,7 +71,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     figs.append(fig)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
-    
+
     if backtest_name is not None:
         fig.suptitle(backtest_name, fontweight="bold", fontsize=8, color='blue')
 
@@ -261,10 +261,12 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         benchmark_name = multi_portfolio_data.portfolio_datas[benchmark_idx].ticker
         strategy_weights, benchmark_weights = multi_portfolio_data.get_aligned_weights(strategy_idx=strategy_idx,
                                                                                        benchmark_idx=benchmark_idx,
+                                                                                       is_grouped=is_grouped,
                                                                                        **kwargs)
 
         strategy_turnover, benchmark_turnover = multi_portfolio_data.get_aligned_turnover(strategy_idx=strategy_idx,
                                                                                           benchmark_idx=benchmark_idx,
+                                                                                          is_grouped=is_grouped,
                                                                                           **kwargs)
         for inst in strategy_weights.columns:
             df1 = pd.concat([strategy_weights[inst].rename(strategy_name),
@@ -277,9 +279,11 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                 figs.append(fig1)
                 qis.plot_time_series(df=df1, title='Exposures',
                                      legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                                     var_format='{:,.2%}',
                                      ax=axs[0], **kwargs)
                 qis.plot_time_series(df=df2, title='Turnover',
                                      legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                                     var_format='{:,.2%}',
                                      ax=axs[1], **kwargs)
 
             plt.close('all')

@@ -356,12 +356,10 @@ class PortfolioData:
             if add_total:
                 turnover = pd.concat([turnover.sum(axis=1).rename(self.nav.name), turnover], axis=1)
 
-        if roll_period is not None:
-            turnover = turnover.rolling(roll_period).sum()
-            if freq is not None:  # report at last freq
-                turnover = turnover.resample(freq).last()
-        elif freq is not None:
+        if freq is not None:  # first aggregate by freq
             turnover = turnover.resample(freq).sum()
+        if roll_period is not None:  # now aggregate by roll
+            turnover = turnover.rolling(roll_period).sum()
         if time_period is not None:
             turnover = time_period.locate(turnover)
         return turnover
@@ -391,12 +389,10 @@ class PortfolioData:
             if add_total:
                 costs = pd.concat([costs.sum(axis=1).rename(self.nav.name), costs], axis=1)
 
-        if roll_period is not None:
+        if freq is not None:  # first aggregate by freq
+            costs = costs.resample(freq).sum()
+        if roll_period is not None:  # now aggregate by roll period
             costs = costs.rolling(roll_period).sum()
-            if freq is not None:  # report at last freq
-                costs = costs.resample(freq).last()
-        elif freq is not None:
-                costs = costs.resample(freq).sum()
         if time_period is not None:
             costs = time_period.locate(costs)
         return costs
@@ -441,7 +437,7 @@ class PortfolioData:
     def compute_portfolio_benchmark_betas(self,
                                           benchmark_prices: pd.DataFrame,
                                           time_period: TimePeriod = None,
-                                          beta_freq: str = None,
+                                          freq_beta: str = None,
                                           factor_beta_span: int = 65  # quarter
                                           ) -> pd.DataFrame:
         """
@@ -455,14 +451,14 @@ class PortfolioData:
                                                                exposures=exposures,
                                                                benchmark_prices=benchmark_prices,
                                                                time_period=time_period,
-                                                               beta_freq=beta_freq,
+                                                               freq_beta=freq_beta,
                                                                factor_beta_span=factor_beta_span)
         return benchmark_betas
 
     def compute_portfolio_benchmark_attribution(self,
                                                 benchmark_prices: pd.DataFrame,
                                                 time_period: TimePeriod = None,
-                                                beta_freq: str = 'B',
+                                                freq_beta: str = 'B',
                                                 factor_beta_span: int = 63,  # quarter
                                                 residual_name: str = 'Alpha'
                                                 ) -> pd.DataFrame:
@@ -479,7 +475,7 @@ class PortfolioData:
                                                                              benchmark_prices=benchmark_prices,
                                                                              portfolio_nav=portfolio_nav,
                                                                              time_period=time_period,
-                                                                             beta_freq=beta_freq,
+                                                                             freq_beta=freq_beta,
                                                                              factor_beta_span=factor_beta_span,
                                                                              residual_name=residual_name)
         return joint_attrib
@@ -1133,7 +1129,7 @@ class PortfolioData:
                              ) -> None:
         factor_exposures = self.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
                                                                   time_period=time_period,
-                                                                  beta_freq=freq,
+                                                                  freq_beta=freq,
                                                                   factor_beta_span=beta_span)
         qis.plot_time_series(df=factor_exposures,
                              var_format='{:,.2f}',
@@ -1153,7 +1149,7 @@ class PortfolioData:
                                time_period: TimePeriod = None,
                                freq: str = 'B',
                                total_column: Optional[str] = 'Total',
-                               vol_span: int = 31  # span in number of freq-returns
+                               vol_span: Union[int, float] = 33 # span in number of freq-returns
                                ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
         if is_correlated:
             portfolio_vars = qis.compute_portfolio_correlated_var_by_groups(prices=self.prices,
@@ -1294,7 +1290,7 @@ class PortfolioData:
                          title: str = None,
                          add_top_bar_values: Optional[bool] = None,
                          total_column: Optional[str] = 'Total',
-                         vol_span: int = 33,  # span in number of freq-returns
+                         vol_span: Union[int, float] = 33,  # span in number of freq-returns
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> None:
@@ -1668,7 +1664,7 @@ class PortfolioInput:
     allocation_type: AllocationType = AllocationType.FIXED_WEIGHTS
     time_period: TimePeriod = None
     rebalance_freq: str = 'QE'
-    regime_freq: str = 'ME'
+    freq_regime: str = 'ME'
     returns_freq: str = 'ME'
     ewm_lambda: float = 0.92
     target_vol: float = None

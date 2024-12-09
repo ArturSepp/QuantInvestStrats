@@ -151,7 +151,7 @@ class MultiPortfolioData:
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
                           sharpe_rolling_window: int = 260,
-                          sharpe_freq: Optional[str] = None,
+                          freq_sharpe: Optional[str] = None,
                           sharpe_title: Optional[str] = None,
                           legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
@@ -166,7 +166,7 @@ class MultiPortfolioData:
 
         prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
 
-        kwargs = qis.update_kwargs(kwargs, dict(roll_freq=sharpe_freq))
+        kwargs = qis.update_kwargs(kwargs, dict(roll_freq=freq_sharpe))
         fig = ppd.plot_rolling_perf_stat(prices=prices,
                                          rolling_perf_stat=rolling_perf_stat,
                                          time_period=time_period,
@@ -440,22 +440,19 @@ class MultiPortfolioData:
                       time_period: TimePeriod = None,
                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                       turnover_rolling_period: Optional[int] = 260,
-                      turnover_freq: Optional[str] = 'B',
+                      freq_turnover: Optional[str] = 'B',
                       var_format: str = '{:.0%}',
                       ax: plt.Subplot = None,
                       **kwargs) -> None:
 
         turnover = []
         for portfolio in self.portfolio_datas:
-            turnover.append(portfolio.get_turnover(roll_period=None, freq=turnover_freq, is_agg=True).rename(portfolio.nav.name))
+            turnover.append(portfolio.get_turnover(roll_period=turnover_rolling_period, freq=freq_turnover, is_agg=True).rename(portfolio.nav.name))
         turnover = pd.concat(turnover, axis=1)
-        if turnover_rolling_period is not None:
-            turnover = turnover.rolling(turnover_rolling_period).sum()
         if time_period is not None:
             turnover = time_period.locate(turnover)
-        
         freq = pd.infer_freq(turnover.index)
-        turnover_title = f"{turnover_rolling_period}-preriod rolling {freq}-freq Turnover"
+        turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
         pts.plot_time_series(df=turnover,
                              var_format=var_format,
                              y_limits=(0.0, None),
@@ -468,7 +465,7 @@ class MultiPortfolioData:
 
     def plot_costs(self,
                    cost_rolling_period: Optional[int] = 260,
-                   cost_freq: Optional[str] = 'B',
+                   freq_cost: Optional[str] = 'B',
                    cost_title: Optional[str] = None,
                    benchmark: str = None,
                    time_period: TimePeriod = None,
@@ -479,13 +476,10 @@ class MultiPortfolioData:
                    **kwargs) -> None:
         costs = []
         for portfolio in self.portfolio_datas:
-            costs.append(portfolio.get_costs(roll_period=None, freq=cost_freq, is_agg=True, is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
+            costs.append(portfolio.get_costs(roll_period=cost_rolling_period, freq=freq_cost, is_agg=True, is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
         costs = pd.concat(costs, axis=1)
-        if cost_rolling_period is not None:
-            costs = costs.rolling(cost_rolling_period).sum()
         if time_period is not None:
             costs = time_period.locate(costs)
-
         freq = pd.infer_freq(costs.index)
         cost_title = cost_title or f"{cost_rolling_period}-period rolling {freq}-freq Costs %"
         pts.plot_time_series(df=costs,
@@ -503,7 +497,7 @@ class MultiPortfolioData:
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
-                          beta_freq: str = 'B',
+                          freq_beta: str = 'B',
                           factor_beta_span: int = 260,
                           var_format: str = '{:,.2f}',
                           axs: List[plt.Subplot] = None,
@@ -515,7 +509,7 @@ class MultiPortfolioData:
         factor_exposures = {factor: [] for factor in benchmark_prices.columns}
         for portfolio in self.portfolio_datas:
             factor_exposure = portfolio.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                          beta_freq=beta_freq,
+                                                                          freq_beta=freq_beta,
                                                                           factor_beta_span=factor_beta_span,
                                                                           time_period=time_period)
             for factor in factor_exposure.columns:
@@ -526,7 +520,7 @@ class MultiPortfolioData:
 
         for idx, factor in enumerate(benchmark_prices.columns):
             factor_exposure = pd.concat(factor_exposures[factor], axis=1)
-            factor_beta_title = f"{factor_beta_span}-span rolling Beta of {beta_freq}-freq returns to {factor}"
+            factor_beta_title = f"{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {factor}"
             pts.plot_time_series(df=factor_exposure,
                                  var_format=var_format,
                                  legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
@@ -871,27 +865,37 @@ class MultiPortfolioData:
                             benchmark_idx: int = 1,
                             freq: Optional[str] = 'B',
                             time_period: TimePeriod = None,
+                            is_grouped: bool = False,
                             **kwargs
                             ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-
-        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
-        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
+        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True, is_grouped=is_grouped)
+        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True, is_grouped=is_grouped)
         tickers_union = qis.merge_lists_unique(list1=strategy_weights.columns.to_list(), list2=benchmark_weights.columns.to_list())
+        if is_grouped and self.portfolio_datas[benchmark_idx].group_order is not None: # replace with ac order of benchmark
+            tickers_union = self.portfolio_datas[benchmark_idx].group_order
         strategy_weights = strategy_weights.reindex(columns=tickers_union)
         benchmark_weights = benchmark_weights.reindex(columns=tickers_union)
         return strategy_weights, benchmark_weights
 
     def get_aligned_turnover(self,
-                            strategy_idx: int = 0,
-                            benchmark_idx: int = 1,
-                            freq: Optional[str] = 'B',
-                            time_period: TimePeriod = None,
-                            **kwargs
-                            ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                             strategy_idx: int = 0,
+                             benchmark_idx: int = 1,
+                             turnover_rolling_period: Optional[int] = 260,
+                             freq_turnover: Optional[str] = 'B',
+                             time_period: TimePeriod = None,
+                             is_grouped: bool = False,
+                             **kwargs
+                             ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
-        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=None, add_total=False)
-        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period, freq=None, add_total=False)
+        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=freq_turnover,
+                                                                            roll_period=turnover_rolling_period,
+                                                                            add_total=False, is_grouped=is_grouped)
+        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period, freq=freq_turnover,
+                                                                              roll_period=turnover_rolling_period,
+                                                                              add_total=False, is_grouped=is_grouped)
         tickers_union = qis.merge_lists_unique(list1=strategy_turnover.columns.to_list(), list2=benchmark_turnover.columns.to_list())
+        if is_grouped and self.portfolio_datas[benchmark_idx].group_order is not None: # replace with ac order of benchmark
+            tickers_union = self.portfolio_datas[benchmark_idx].group_order
         strategy_turnover = strategy_turnover.reindex(columns=tickers_union)
         benchmark_turnover = benchmark_turnover.reindex(columns=tickers_union)
         return strategy_turnover, benchmark_turnover
