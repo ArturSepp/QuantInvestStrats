@@ -5,20 +5,79 @@ Implement core for contacenation of time series
 import warnings
 import numpy as np
 import pandas as pd
-from enum import Enum
 from typing import Optional, Union, List, Tuple
-
 # qis
 import qis.utils.df_ops as dfo
 import qis.utils.np_ops as npo
 import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
+import qis.models.linear.ewm as ewm
 
 
-class MergingMethods(Enum):
-    LEVELS = 1
-    RETURNS = 2
-    VOL_SCALED_RETURNS = 3
+def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataFrame],
+                                   pivot_returns: pd.Series,
+                                   span: int = 12,
+                                   af: float = 260,
+                                   is_to_log_returns: bool = False,
+                                   vol_adjustment: float = 1.15  # adjust vol of the bridge
+                                   ) -> Union[pd.Series, pd.DataFrame]:
+    """
+    backfill infrequent value using Brownian bridge with normals obtained using path of pivot_returns
+    """
+    # call recursion here
+    if isinstance(infrequent_returns, pd.DataFrame):
+        infrequent_return_backfills = {}
+        for column in infrequent_returns.columns:
+            infrequent_return_backfills[column] = interpolate_infrequent_returns(infrequent_returns=infrequent_returns[column],
+                                                                                 pivot_returns=pivot_returns,
+                                                                                 span=span,
+                                                                                 af=af,
+                                                                                 is_to_log_returns=is_to_log_returns,
+                                                                                 vol_adjustment=vol_adjustment)
+        infrequent_return_backfills = pd.DataFrame.from_dict(infrequent_return_backfills, orient='columns')
+        return infrequent_return_backfills
+
+    # transform to cumulative
+    if is_to_log_returns:
+        infrequent_returns = np.log(1.0+infrequent_returns)
+    infrequent_cumulative = infrequent_returns.cumsum()
+
+    # starting time
+    date0 = infrequent_returns.index[0]
+    # pivot brownian starting from date0
+    pivot_brownian = (pivot_returns - ewm.compute_ewm(data=pivot_returns, span=span)) / ewm.compute_ewm_vol(data=pivot_returns, span=span)
+    pivot_brownian = pivot_brownian.loc[date0:, ]
+    pivot_brownian = (pivot_brownian - np.nanmean(pivot_brownian)) / np.nanstd(pivot_brownian)  # path to (0, 1) brownian
+
+    # add running times
+    seconds_per_year = af * 24 * 60 * 60  # days, hours, minute, seconds
+    t = pd.Series((infrequent_returns.index - date0).total_seconds() / seconds_per_year, index=infrequent_returns.index)
+    t1 = t.shift(-1)
+    dt = t1 - t
+
+    # the index of df = index of pivot_brownian
+    df = pd.concat([pivot_brownian,
+                    infrequent_cumulative.rename('x_i'), infrequent_cumulative.shift(-1).rename('x_i+1'),
+                    t.rename('t_i'), t1.rename('t_i+1'), dt.rename('dt_i')], axis=1)
+    df['t'] = (df.index - date0).total_seconds() / seconds_per_year
+    df = df.ffill()  # ffill data to cover nans for infrequent series
+
+    # compute bridge mean and stdev
+    bridge_mean = ((df['t_i+1']-df['t']) * df['x_i'] + (df['t']-df['t_i']) * df['x_i+1'] ) / df['dt_i']
+    # extrapolate last values when df['x_i'] = df['x_i+1']
+    bridge_mean = bridge_mean.where(np.equal(df['x_i'], df['x_i+1']) == False, other=np.nan)
+    bridge_mean[infrequent_cumulative.index[-1]] = infrequent_cumulative.iloc[-1]  # enter last observed value
+    bridge_mean = bridge_mean.ffill()  # extrapolate last value
+
+    bridge_stdev = np.nanstd(infrequent_returns)*np.sqrt(((df['t_i+1']-df['t'])*(df['t']-df['t_i'])) / df['dt_i'])
+    # simulate backfill
+    infrequent_cumulative_backfill = bridge_mean + vol_adjustment*bridge_stdev * df[pivot_brownian.name]
+    # compute returns
+    infrequent_return_backfill = infrequent_cumulative_backfill.diff(1)
+    if is_to_log_returns:
+        infrequent_return_backfill = np.expm1(infrequent_return_backfill)
+
+    return infrequent_return_backfill
 
 
 def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent data

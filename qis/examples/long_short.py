@@ -3,12 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from enum import Enum
-
-# qis
 import qis as qis
 from qis import PerfParams, TimePeriod
-
-# project
 import yfinance as yf
 
 

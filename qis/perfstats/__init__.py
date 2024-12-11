@@ -81,7 +81,7 @@ from qis.perfstats.returns import (
 )
 
 from qis.perfstats.timeseries_bfill import (
-    MergingMethods,
+    interpolate_infrequent_returns,
     append_time_series,
     bfill_timeseries,
     df_fill_first_nan_by_cross_median,

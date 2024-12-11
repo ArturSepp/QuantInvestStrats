@@ -1,10 +1,12 @@
 # packages
 import pandas as pd
 import matplotlib.pyplot as plt
-import qis as qis
 from typing import Union, Dict, Tuple, Optional
 from enum import Enum
-from qis import PerfParams
+import qis.utils.df_str as dfs
+import qis.plots.utils as put
+from qis.plots.table import plot_df_table
+from qis.perfstats.config import PerfParams
 
 DATE_FORMAT = '%d%b%Y'  # 31Jan2020 - common across all reporting
 WEEK_DAYS_PER_YEAR = 260  # calendar days excluding weekends in a year
@@ -41,9 +43,9 @@ def get_summary_table_fig(data_start_dates: Union[pd.Series, pd.DataFrame],
                           ) -> plt.Subplot:
 
     if isinstance(data_start_dates, pd.Series):
-        summary_data = qis.series_to_str(ds=data_start_dates, var_format=DATE_FORMAT).to_frame()
+        summary_data = dfs.series_to_str(ds=data_start_dates, var_format=DATE_FORMAT).to_frame()
     elif isinstance(data_start_dates, pd.DataFrame):
-        summary_data = qis.df_to_str(df=data_start_dates, var_format=DATE_FORMAT)
+        summary_data = dfs.df_to_str(df=data_start_dates, var_format=DATE_FORMAT)
     else:
         raise TypeError(f"unsupported type {type(data_start_dates)}")
 
@@ -55,10 +57,10 @@ def get_summary_table_fig(data_start_dates: Union[pd.Series, pd.DataFrame],
     else:
         index_column_name = first_column_name
 
-    height = qis.calc_table_height(num_rows=len(summary_data.index))
+    height = put.calc_table_height(num_rows=len(summary_data.index))
     fig, ax = plt.subplots(1, 1, figsize=(figsize[0], height))
-    qis.plot_df_table(df=summary_data,
-                      index_column_name=index_column_name,
-                      ax=ax,
-                      **kwargs)
+    plot_df_table(df=summary_data,
+                  index_column_name=index_column_name,
+                  ax=ax,
+                  **kwargs)
     return fig
