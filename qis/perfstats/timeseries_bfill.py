@@ -28,7 +28,8 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
     if isinstance(infrequent_returns, pd.DataFrame):
         infrequent_return_backfills = {}
         for column in infrequent_returns.columns:
-            infrequent_return_backfills[column] = interpolate_infrequent_returns(infrequent_returns=infrequent_returns[column],
+            ds = infrequent_returns[column].dropna()
+            infrequent_return_backfills[column] = interpolate_infrequent_returns(infrequent_returns=ds,
                                                                                  pivot_returns=pivot_returns,
                                                                                  span=span,
                                                                                  af=af,
@@ -36,6 +37,10 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
                                                                                  vol_adjustment=vol_adjustment)
         infrequent_return_backfills = pd.DataFrame.from_dict(infrequent_return_backfills, orient='columns')
         return infrequent_return_backfills
+
+    # ensure no nans in infrequent_returns
+    if np.any(np.isnan(infrequent_returns)):
+        raise ValueError(f"infrequent_returns contains nans")
 
     # transform to cumulative
     if is_to_log_returns:
