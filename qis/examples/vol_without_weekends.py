@@ -13,10 +13,10 @@ def fetch_hourly_data(ticker: str = 'BTC-USD') -> pd.DataFrame:
     yf reports timestamps of bars at the start of the period: we shift it to the end of the period
     """
     asset = yf.Ticker(ticker)
-    ohlc_data = asset.history(period="730d", interval="1h")
+    ohlc_data = asset.history(period="1y", interval="1h")
     ohlc_data.index = [t + pd.Timedelta(minutes=60) for t in ohlc_data.index]
     ohlc_data = ohlc_data.rename({'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close'}, axis=1)
-    ohlc_data.index = ohlc_data.index.tz_convert('UTC')
+    ohlc_data.index = pd.to_datetime(ohlc_data.index).tz_convert('UTC')
     ohlc_data.index.name = 'timestamp'
     return ohlc_data
 
@@ -31,7 +31,9 @@ def compute_vols(prices: pd.Series,
     returns = np.log(prices).diff(1)
     init_value = np.nanvar(returns, axis=0)  # set initial value to average variance
     vol = qis.compute_ewm_vol(data=returns, span=span, af=365*24, init_value=init_value)
-    vol1 = qis.compute_ewm_vol(data=returns, span=span, af=260*24, init_value=init_value, is_exlude_weekends=True)
+
+    returns1 = returns.where(returns.index.dayofweek < 5, other=np.nan)
+    vol1 = qis.compute_ewm_vol(data=returns1, span=span, af=260*24, init_value=init_value)
     vols = pd.concat([vol.rename('including weekends'),
                       vol1.rename('excluding weekends')], axis=1)
     return vols

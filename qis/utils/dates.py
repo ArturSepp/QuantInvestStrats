@@ -954,18 +954,32 @@ def min_timestamp(timestamp1: Union[str, pd.Timestamp],
     return min_date
 
 
+def find_upto_date_from_datetime_index(index: pd.DatetimeIndex, date: pd.Timestamp) -> pd.Timestamp:
+    """
+    find upto date from datetime index without date being in datetime index
+    """
+    matched_index = pd.Series(index).sort_values().searchsorted(date, side='right')
+    # check left boundary
+    if matched_index == 0 and date != index[0]:
+        raise ValueError(f"date={date} is below first date of the index={index[0]}")
+    matched_date = index[matched_index - 1]
+    return matched_date
+
+
 class UnitTests(Enum):
-    DATES = 0
-    OFFSETS = 1
-    WEEK_DAY = 2
-    SAMPLE_DATES_IDX = 3
-    PERIOD_WITH_HOLIDAYS = 4
-    EOD_FREQ_HOUR = 5
-    FREQ_HOUR = 6
-    FREQ_REB = 7
-    FREQS = 8
-    REBALANCING_INDICATORS = 9
-    FIXED_MATURITY_ROLLS = 10
+    DATES = 1
+    OFFSETS = 2
+    WEEK_DAY = 3
+    SAMPLE_DATES_IDX = 4
+    PERIOD_WITH_HOLIDAYS = 5
+    EOD_FREQ_HOUR = 6
+    FREQ_HOUR = 7
+    FREQ_REB = 8
+    FREQS = 9
+    REBALANCING_INDICATORS = 10
+    FIXED_MATURITY_ROLLS = 11
+    TIMEPERIOD_INDEXER = 12
+    FIND_UPTO_DATE = 14
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -1094,10 +1108,32 @@ def run_unit_test(unit_test: UnitTests):
                                                         min_days_to_next_roll=56)  # 8 weeks before
         print(f"quarterly_rolls:\n{quarterly_rolls}")
 
+    elif unit_test == UnitTests.TIMEPERIOD_INDEXER:
+        time_period = TimePeriod('31Dec2023', '31Dec2024')
+        times_m = generate_dates_schedule(time_period=time_period, freq='ME')
+        times_q = generate_dates_schedule(time_period=time_period, freq='QE')
+        print(times_m)
+        print(times_q)
+        idx_q_at_m = times_m.get_indexer(target=times_q, method='ffill')
+        print(idx_q_at_m)
+        idx_m_at_q = times_q.get_indexer(target=times_m, method='ffill')
+        print(idx_m_at_q)
+        indextimes_m_at_q = [times_q[idx] for idx in idx_m_at_q]
+        print(indextimes_m_at_q)
+
+    elif unit_test == UnitTests.FIND_UPTO_DATE:
+        time_period = TimePeriod('31Dec2023', '31Dec2024')
+        times_q = generate_dates_schedule(time_period=time_period, freq='QE')
+        this_dates = [pd.Timestamp('31Dec2023'), pd.Timestamp('31Jan2024'), pd.Timestamp('31Mar2024'),
+                      pd.Timestamp('31Dec2024'), pd.Timestamp('31Dec2025')]
+        for this_date in this_dates:
+            matched_date = find_upto_date_from_datetime_index(index=times_q, date=this_date)
+            print(f"given={this_date}, matched={matched_date}")
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.FREQ_HOUR
+    unit_test = UnitTests.FIND_UPTO_DATE
 
     is_run_all_tests = False
     if is_run_all_tests:

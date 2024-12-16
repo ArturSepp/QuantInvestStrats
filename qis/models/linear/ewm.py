@@ -550,19 +550,13 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                 init_value: Union[float, np.ndarray, None] = None,
                 init_type: InitType = InitType.X0,
                 is_unit_vol_scaling: bool = False,
-                nan_backfill: NanBackfill = NanBackfill.FFILL,
-                is_exlude_weekends: bool = False
+                nan_backfill: NanBackfill = NanBackfill.FFILL
                 ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     ewm for pandas or series
     data dimension = t*n
     use gen data of pandas and np and call ewm_np with numa
     """
-    if is_exlude_weekends:  # exclude weekends: need to adjust af accordingly
-        if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-            if isinstance(data.index, pd.DatetimeIndex):
-                data = data.where(data.index.dayofweek < 5, other=np.nan)
-
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 
     if init_value is None:
@@ -605,17 +599,11 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     vol_floor_quantile: Optional[float] = None,  # to floor the volatility = 0.16
                     vol_floor_quantile_roll_period: int = 5*260,  # 5y for daily returns
                     warmup_period: Optional[int] = None,
-                    nan_backfill: NanBackfill = NanBackfill.FFILL,
-                    is_exlude_weekends: bool = False
+                    nan_backfill: NanBackfill = NanBackfill.FFILL
                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     implementation of ewm recursion for variance/volatility computation
     """
-    if is_exlude_weekends:  # exclude weekends: need to adjust af accordingly
-        if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-            if isinstance(data.index, pd.DatetimeIndex):
-                data = data.where(data.index.dayofweek < 5, other=np.nan)
-
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 
     if span is not None:

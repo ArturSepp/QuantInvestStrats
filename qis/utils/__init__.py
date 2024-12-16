@@ -27,7 +27,8 @@ from qis.utils.dates import (
     split_df_by_freq,
     generate_fixed_maturity_rolls,
     min_timestamp,
-    truncate_prior_to_start
+    truncate_prior_to_start,
+    find_upto_date_from_datetime_index
 )
 
 
