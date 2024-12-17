@@ -19,6 +19,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              rebalance_freq: Optional[str] = 'QE',
                              initial_nav: float = 100,
                              funding_rate: pd.Series = None,  # on positive / negative cash balances
+                             management_fee: float = None,
                              instruments_carry: pd.DataFrame = None,  # on nav
                              rebalancing_costs: Union[float, pd.Series] = None,  # rebalancing costs in bp
                              weight_implementation_lag: Optional[int] = None,  # applies for weight is pd.Dataframe
@@ -30,7 +31,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
     simulate portfolio given prices and weights
     include_start_date if index rebalanced at start date
     the safest weight is to pass weights as Dict or pd.Dataframe - this enforces the alignment with prices
-    does not rebalance_freq when dates are pd.DataFrmae
+    does not rebalance_freq when dates are pd.DataFrame
+    funding_rate is funding rate on cash annualised
+    management_fee is man fee on strategy nav annualised
     """
     if not isinstance(prices, pd.DataFrame):
         raise ValueError(f"prices type={type(prices)} must be pd.Dataframe")
@@ -84,6 +87,12 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         funding_rate_dt = qu.multiply_df_by_dt(df=funding_rate, dates=prices.index, lag=0)
     else:
         funding_rate_dt = pd.Series(0.0, index=prices.index)
+
+    if management_fee is not None:
+        management_fee_dt = qu.multiply_df_by_dt(df=pd.Series(management_fee, index=prices.index), dates=prices.index, lag=0)
+    else:
+        management_fee_dt = pd.Series(0.0, index=prices.index)
+
     if instruments_carry is not None:
         instruments_carry_dt = qu.multiply_df_by_dt(df=instruments_carry, dates=prices.index, lag=0)
     else:
@@ -97,6 +106,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                                                                                   weights=portfolio_weights.to_numpy(),
                                                                                   is_rebalancing=is_rebalancing.to_numpy(),
                                                                                   funding_rate_dt=funding_rate_dt.to_numpy(),
+                                                                                  management_fee_dt=management_fee_dt.to_numpy(),
                                                                                   instruments_carry_dt=instruments_carry_dt.to_numpy(),
                                                                                   initial_nav=initial_nav,
                                                                                   constant_trade_level=constant_trade_level,
@@ -123,6 +133,7 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
                                   weights: np.ndarray,
                                   is_rebalancing: np.ndarray,
                                   funding_rate_dt: np.ndarray = None,
+                                  management_fee_dt: np.ndarray = None,
                                   instruments_carry_dt: np.ndarray = None,
                                   initial_nav: float = 100.0,
                                   constant_trade_level: float = None,
@@ -135,6 +146,9 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
 
     if funding_rate_dt is None:
         funding_rate_dt = np.zeros(prices.shape[0])
+
+    if management_fee_dt is None:
+        management_fee_dt = np.zeros(prices.shape[0])
 
     # initialize
     current_rebalancing_idx = 0
@@ -165,7 +179,8 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
     for t in np.arange(1, prices.shape[0]):
         current_units = units[t - 1]
         current_prices = prices[t, :]
-        current_cash_balance = cash_balances[t-1] * (1.0 + funding_rate_dt[t])
+        management_fee = management_fee_dt[t]*nav[t-1]
+        current_cash_balance = cash_balances[t-1] * (1.0 + funding_rate_dt[t]) - management_fee
         
         if instruments_carry_dt is not None:
             carry = np.nansum(current_units * current_prices * instruments_carry_dt[t])
