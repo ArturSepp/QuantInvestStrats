@@ -686,7 +686,9 @@ class MultiPortfolioData:
                                                   asset_class_data=asset_class_data,
                                                   group_order=group_order,
                                                   total_column=total_column,
-                                                  is_exclude_interaction_term=is_exclude_interaction_term)
+                                                  is_exclude_interaction_term=is_exclude_interaction_term,
+                                                  strategy_name=self.portfolio_datas[strategy_idx].ticker or 'Strategy',
+                                                  benchmark_name=self.portfolio_datas[benchmark_idx].ticker or 'Benchmark')
         return totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return
 
     def plot_brinson_attribution(self,

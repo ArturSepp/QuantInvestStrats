@@ -21,8 +21,10 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
                                       asset_class_data: pd.Series,
                                       group_order: List[str] = None,
                                       total_column: str = 'Total Sum',
-                                      is_exclude_interaction_term: bool = True
-                                      ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                                      is_exclude_interaction_term: bool = True,
+                                      strategy_name: str = 'Strategy',
+                                      benchmark_name: str = 'Benchmark'
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     brinson attribution
     """
@@ -78,13 +80,13 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
     # create mean table: indexed by group
     totals_table = pd.DataFrame(index=grouped_strategy_pnl.columns.to_list() + [total_column])
 
-    totals_table['Strategy\nWeight Ave'] = dfa.agg_data_by_axis(df=grouped_strategy_weights,
+    totals_table[f"{strategy_name}\nWeight Ave"] = dfa.agg_data_by_axis(df=grouped_strategy_weights,
                                                                 agg_func=np.nanmean, total_column=total_column)
-    totals_table['Benchmark\nWeight Ave'] = dfa.agg_data_by_axis(df=grouped_benchmark_weights,
+    totals_table[f"{benchmark_name}\nWeight Ave"] = dfa.agg_data_by_axis(df=grouped_benchmark_weights,
                                                                  agg_func=np.nanmean, total_column=total_column)
-    totals_table['Strategy\nReturn Sum'] = dfa.agg_data_by_axis(df=grouped_strategy_pnl,
+    totals_table[f"{strategy_name}\nReturn Sum"] = dfa.agg_data_by_axis(df=grouped_strategy_pnl,
                                                                 agg_func=np.nansum, total_column=total_column)
-    totals_table['Benchmark\nReturn Sum'] = dfa.agg_data_by_axis(df=grouped_benchmark_pnl,
+    totals_table[f"{benchmark_name}\nReturn Sum"] = dfa.agg_data_by_axis(df=grouped_benchmark_pnl,
                                                                  agg_func=np.nansum, total_column=total_column)
     totals_table['Asset\nAllocation'] = dfa.agg_data_by_axis(df=grouped_allocation_return,
                                                              agg_func=np.nansum, total_column=total_column)

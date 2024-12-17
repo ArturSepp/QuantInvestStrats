@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from enum import Enum
 from dataclasses import dataclass
 from typing import NamedTuple, Dict, Union
-
 # qis
 from qis.utils.dates import TimePeriod
 

@@ -954,16 +954,55 @@ def min_timestamp(timestamp1: Union[str, pd.Timestamp],
     return min_date
 
 
-def find_upto_date_from_datetime_index(index: pd.DatetimeIndex, date: pd.Timestamp) -> pd.Timestamp:
+def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Timestamp]],
+                                       date: pd.Timestamp
+                                       ) -> Optional[pd.Timestamp]:
     """
     find upto date from datetime index without date being in datetime index
     """
     matched_index = pd.Series(index).sort_values().searchsorted(date, side='right')
     # check left boundary
     if matched_index == 0 and date != index[0]:
-        raise ValueError(f"date={date} is below first date of the index={index[0]}")
+        print(f"find_upto_date_from_datetime_index: date={date} is below first date of the index={index[0]}, "
+              f"returning None")
+        return None
     matched_date = index[matched_index - 1]
     return matched_date
+
+
+def create_rebalancing_indicators_from_freqs(rebalancing_freqs: Union[pd.Series, str],
+                                             time_period: TimePeriod,
+                                             tickers: List[str] = None,
+                                             include_start_date: bool = False,
+                                             include_end_date: bool = False
+                                             ) -> pd.DataFrame:
+    """
+    rebalancing_freq are series with data of type {'SPY': 'QE', 'TLT': 'ME'}
+    """
+    if isinstance(rebalancing_freqs, str):
+        if tickers is None:
+            raise TypeError(f"list of tickers must be provided")
+        dates_schedule = generate_dates_schedule(time_period=time_period,
+                                                     freq=rebalancing_freqs,
+                                                     include_start_date=include_start_date,
+                                                     include_end_date=include_end_date)
+        rebalancing_indicators = pd.DataFrame(1.0, index=dates_schedule, columns=tickers)
+
+    elif isinstance(rebalancing_freqs, pd.Series):
+        freqs_dict = rebalancing_freqs.groupby(rebalancing_freqs)
+        rebalancing_indicators = []
+        for freq, tickers in freqs_dict:
+            dates_schedule = generate_dates_schedule(time_period=time_period,
+                                                     freq=freq,
+                                                     include_start_date=include_start_date,
+                                                     include_end_date=include_end_date)
+            df = pd.DataFrame(1.0, index=dates_schedule, columns=tickers.index)
+            rebalancing_indicators.append(df)
+        rebalancing_indicators = pd.concat(rebalancing_indicators, axis=1).fillna(0.0)[rebalancing_freqs.index]
+
+    else:
+        raise NotImplementedError(f"type(rebalancing_freqs)={type(rebalancing_freqs)}")
+    return rebalancing_indicators
 
 
 class UnitTests(Enum):
@@ -980,6 +1019,7 @@ class UnitTests(Enum):
     FIXED_MATURITY_ROLLS = 11
     TIMEPERIOD_INDEXER = 12
     FIND_UPTO_DATE = 14
+    REBALANCING_FROM_FREQS = 15
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -1130,10 +1170,17 @@ def run_unit_test(unit_test: UnitTests):
             matched_date = find_upto_date_from_datetime_index(index=times_q, date=this_date)
             print(f"given={this_date}, matched={matched_date}")
 
+    elif unit_test == UnitTests.REBALANCING_FROM_FREQS:
+        time_period = TimePeriod('31Dec2023', '31Dec2024')
+        rebalancing_indicators = create_rebalancing_indicators_from_freqs(
+            rebalancing_freqs=pd.Series(dict(SPY='ME', TLT='QE', LQD='QE')),
+            time_period=time_period)
+        print(rebalancing_indicators)
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.FIND_UPTO_DATE
+    unit_test = UnitTests.REBALANCING_FROM_FREQS
 
     is_run_all_tests = False
     if is_run_all_tests:
