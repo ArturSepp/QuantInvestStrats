@@ -101,11 +101,11 @@ def run_unit_test(unit_test: UnitTests):
                                                          add_brinson_attribution=pnl_attribution,
                                                          add_exposures_pnl_attribution=pnl_attribution,
                                                          add_exposures_comp=pnl_attribution,
-                                                         add_strategy_factsheet=True, # for strategy factsheet
+                                                         add_strategy_factsheet=True,  # for strategy factsheet
                                                          add_grouped_exposures=False,  # for strategy factsheet
                                                          add_grouped_cum_pnl=False,  # for strategy factsheet
                                                          **fetch_default_report_kwargs(time_period=time_period,
-                                                                                       is_daily=True, add_rates_data=True))
+                                                                                       reporting_frequency=True, add_rates_data=True))
         """
 
         """

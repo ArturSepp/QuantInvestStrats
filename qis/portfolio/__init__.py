@@ -22,7 +22,8 @@ from qis.portfolio.reports.config import (FactsheetConfig,
                                           FACTSHEET_CONFIG_MONTHLY_DATA_SHORT_PERIOD,
                                           fetch_factsheet_config_kwargs,
                                           fetch_default_perf_params,
-                                          fetch_default_report_kwargs)
+                                          fetch_default_report_kwargs,
+                                          ReportingFrequency)
 
 from qis.portfolio.reports.brinson_attribution import (compute_brinson_attribution_table,
                                                        plot_brinson_attribution_table)

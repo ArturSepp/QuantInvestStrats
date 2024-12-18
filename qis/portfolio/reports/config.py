@@ -1,6 +1,7 @@
 """
 configuration for performance reports
 """
+from enum import Enum
 from typing import Dict, Any, Tuple, NamedTuple, Optional, List
 from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat
 import yfinance as yf
@@ -32,6 +33,12 @@ PERF_COLUMNS = (PerfStat.TOTAL_RETURN,
                 PerfStat.ALPHA_AN,
                 PerfStat.BETA,
                 PerfStat.R2)
+
+
+class ReportingFrequency(Enum):
+    DAILY = 1
+    MONTHLY = 2
+    QUARTERLY = 3
 
 
 class FactsheetConfig(NamedTuple):
@@ -102,6 +109,27 @@ FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
 FACTSHEET_CONFIG_MONTHLY_DATA_SHORT_PERIOD = FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD
 
 
+FACTSHEET_CONFIG_QUARTERLY_DATA_LONG_PERIOD = FactsheetConfig(freq='QE',
+                                                              freq_drawdown='ME',
+                                                              freq_reg='QE',
+                                                              vol_freq='QE',
+                                                              alpha_an_factor=4,
+                                                              freq_regime='QE',
+                                                              sharpe_rolling_window=12,
+                                                              vol_rolling_window=12,
+                                                              freq_sharpe='QE',
+                                                              turnover_rolling_period=4,
+                                                              freq_turnover='QE',
+                                                              cost_rolling_period=4,
+                                                              freq_cost='QE',
+                                                              freq_var='QE',
+                                                              var_span=12,
+                                                              is_norm_costs=True,
+                                                              factor_beta_span=12,
+                                                              freq_beta='QE',
+                                                              exposures_freq='QE')
+
+
 def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD,
                                   add_rates_data: bool = True
                                   ) -> Dict[str, Any]:
@@ -148,7 +176,7 @@ def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileReg
 
 
 def fetch_default_report_kwargs(time_period: Optional[TimePeriod],
-                                is_daily: bool = True,
+                                reporting_frequency: ReportingFrequency = ReportingFrequency.DAILY,
                                 long_threshold_years: float = 5.0,
                                 add_rates_data: bool = True
                                 ) -> Dict[str, Any]:
@@ -156,18 +184,24 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod],
     # use for number years > 5
     if time_period is not None:
         if time_period.get_time_period_an() > long_threshold_years:
-            if is_daily:
+            if reporting_frequency == ReportingFrequency.DAILY:
                 factsheet_config = FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD
-            else:
+            elif reporting_frequency == ReportingFrequency.QUARTERLY:
+                factsheet_config = FACTSHEET_CONFIG_QUARTERLY_DATA_LONG_PERIOD
+            else:  # default is monthly
                 factsheet_config = FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD
         else:
-            if is_daily:
+            if reporting_frequency == ReportingFrequency.DAILY:
                 factsheet_config = FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD
-            else:
+            elif reporting_frequency == ReportingFrequency.QUARTERLY:
+                factsheet_config = FACTSHEET_CONFIG_QUARTERLY_DATA_LONG_PERIOD
+            else:  # default is monthly
                 factsheet_config = FACTSHEET_CONFIG_MONTHLY_DATA_SHORT_PERIOD
     else:
-        if is_daily:
+        if reporting_frequency == ReportingFrequency.DAILY:
             factsheet_config = FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD
+        elif reporting_frequency == ReportingFrequency.QUARTERLY:
+            factsheet_config = FACTSHEET_CONFIG_QUARTERLY_DATA_LONG_PERIOD
         else:
             factsheet_config = FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD
 
