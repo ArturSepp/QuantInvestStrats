@@ -131,7 +131,7 @@ def infer_an_from_data(data: Union[pd.DataFrame, pd.Series], is_calendar: bool =
     else:
         freq = pd.infer_freq(data.index)
     if freq is None:
-        print(f"in infer_an_from_data: cannot infer {freq} - using 260")
+        print(f"in infer_an_from_data: cannot infer {freq} - using 260\n data.index={data.index}")
         return 260.0
     an, an_f = get_period_days(freq, is_calendar=is_calendar)
     return an_f
@@ -414,7 +414,7 @@ class TimePeriod:
 
     def get_time_period_an(self) -> float:  # annualised time period
         return get_time_to_maturity(maturity_time=self.end or pd.Timestamp.today(tz=self.tz),
-                                    value_time=self.start )
+                                    value_time=self.start)
 
 
 def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],
@@ -609,18 +609,18 @@ def generate_dates_schedule(time_period: TimePeriod,
             dates_schedule = pd.DatetimeIndex([x + pd.DateOffset(hours=hour_offset) for x in dates_schedule])
 
         if include_start_date:  # irrespective of hour offset
-            #if hour_offset is not None:
+            # if hour_offset is not None:
             #    this_start = time_period.start + pd.DateOffset(hours=hour_offset)
-            #else:
+            # else:
             this_start = time_period.start
             if dates_schedule[0] > this_start:
                 # create start date and append the dates schedule
                 dates_schedule = (pd.DatetimeIndex([this_start])).append(dates_schedule)
 
         if include_end_date:
-            #if hour_offset is not None:
+            # if hour_offset is not None:
             #    this_end = time_period.end + pd.DateOffset(hours=hour_offset)
-            #else:
+            # else:
             this_end = time_period.end
             if dates_schedule[-1] < this_end:  # append date scedule with last elemnt
                 dates_schedule = dates_schedule.append(pd.DatetimeIndex([this_end]))
@@ -870,15 +870,14 @@ def split_df_by_freq(df: pd.DataFrame,
     get sample start end dates as data
     """
     time_period = TimePeriod(start=df.index[0], end=df.index[-1])
-
     sample_dates = generate_sample_dates(time_period=time_period,
                                          freq=freq,
                                          overlap_frequency=overlap_frequency,
                                          include_start_date=include_start_date,
                                          include_end_date=include_end_date)
     df_split = {}
-    for row in sample_dates.itertuples():
-        df_split[row.end] = df[row.start:row.end]
+    for start, end in zip(sample_dates['start'], sample_dates['end']):
+        df_split[end] = df[start:end]
     return df_split
 
 
@@ -993,7 +992,7 @@ def create_rebalancing_indicators_from_freqs(rebalancing_freqs: Union[pd.Series,
         rebalancing_indicators = []
         for freq, tickers in freqs_dict:
             dates_schedule = generate_dates_schedule(time_period=time_period,
-                                                     freq=freq,
+                                                     freq=str(freq),
                                                      include_start_date=include_start_date,
                                                      include_end_date=include_end_date)
             df = pd.DataFrame(1.0, index=dates_schedule, columns=tickers.index)

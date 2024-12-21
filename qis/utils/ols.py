@@ -10,6 +10,38 @@ from statsmodels.regression.linear_model import RegressionResults as RegModel
 from typing import Tuple, Union
 
 
+def fit_multivariate_ols(x: pd.DataFrame,
+                         y: pd.Series,
+                         fit_intercept: bool = True,
+                         verbose: bool = True,
+                         beta_format: str = '{0:+0.2f}',
+                         alpha_format: str = '{0:+0.2f}',
+                         ) -> Tuple[pd.Series, pd.Series, str]:
+
+    x_, y_, cond = filter_x_y(x=x.to_numpy(), y=y.to_numpy())
+
+    xname = x.columns.to_list()
+    if fit_intercept:
+        x_ = sm.add_constant(x_)
+        xname = ['intercept'] + xname
+
+    fitted_model = sm.OLS(y_, x_).fit()
+    prediction = pd.Series(fitted_model.predict(x_), index=y.index[cond])
+    if verbose:
+        print(fitted_model.summary(yname=y.name or 'y', xname=xname))
+
+    params = pd.Series(fitted_model.params, index=xname)
+    try:
+        r2 = f", R\N{SUPERSCRIPT TWO}={fitted_model.rsquared:.0%}"
+    except:
+        r2 = f", R\N{SUPERSCRIPT TWO}=0.0%"
+    if fit_intercept:
+        reg_label = "y=" + f"{alpha_format.format(params.iloc[0])}" + "".join([f"{beta_format.format(x)}*{key}" for key, x in params.iloc[1:].to_dict().items()]) + r2
+    else:
+        reg_label = "y=" + "".join([f"{beta_format.format(x)}*{key}" for key, x in params.to_dict().items()]) + r2
+    return prediction, params, reg_label
+
+
 def fit_ols(x: np.ndarray,
             y: np.ndarray,
             order: int = 1,
@@ -18,6 +50,13 @@ def fit_ols(x: np.ndarray,
     """
     fit regression model
     """
+    x, y, cond = filter_x_y(x=x, y=y)
+    x1 = get_ols_x(x=x, order=order, fit_intercept=fit_intercept)
+    reg_model = sm.OLS(y, x1).fit()
+    return reg_model
+
+
+def filter_x_y(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     if x.ndim == 1:  # x is 1-dimensional
         cond = np.logical_and(np.isfinite(x), np.isfinite(y))
     else:
@@ -25,9 +64,7 @@ def fit_ols(x: np.ndarray,
         for idx in np.arange(1, x.shape[1]):
             cond = np.logical_and(cond, np.isfinite(x[:, idx]))
     x, y = x[cond], y[cond]
-    x1 = get_ols_x(x=x, order=order, fit_intercept=fit_intercept)
-    reg_model = sm.OLS(y, x1).fit()
-    return reg_model
+    return x, y, cond
 
 
 def estimate_ols_alpha_beta(x: Union[np.ndarray, pd.Series, pd.DataFrame],
@@ -160,6 +197,6 @@ def reg_model_params_to_str(reg_model: RegModel,
             except:
                 text_str = 'model cannot be estimated'
         else:
-            raise TypeError(f"order = {order} is not implemnted")
+            raise TypeError(f"order = {order} is not implemented")
 
     return text_str

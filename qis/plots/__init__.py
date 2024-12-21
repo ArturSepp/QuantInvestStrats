@@ -77,7 +77,9 @@ from qis.plots.pie import plot_pie
 
 from qis.plots.qqplot import plot_qq, plot_xy_qq
 
-from qis.plots.scatter import plot_scatter, plot_classification_scatter
+from qis.plots.scatter import (plot_scatter,
+                               plot_classification_scatter,
+                               plot_multivariate_scatter_with_prediction)
 
 from qis.plots.stackplot import plot_stack
 

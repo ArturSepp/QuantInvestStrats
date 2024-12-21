@@ -55,8 +55,6 @@ def plot_scatter(df: pd.DataFrame,
     """
     x-y scatter of df
     """
-    df = df.copy().dropna()
-
     if x is None:
         if len(df.columns) == 2 or (len(df.columns) == 3 and hue is not None):
             x = df.columns[0]
@@ -70,6 +68,12 @@ def plot_scatter(df: pd.DataFrame,
             y = value_name
             df = pd.melt(df, id_vars=[x], value_vars=df.columns.drop(x), var_name=hue,
                          value_name=value_name)
+
+    # drop nans
+    if hue is not None:
+        df = df[[x, y, hue]].dropna()
+    else:
+        df = df[[x, y]].dropna()
 
     if hue is not None and add_hue_model_label is None:  # override to true unless false
         add_hue_model_label = True
@@ -307,23 +311,6 @@ def calc_ci(x: np.ndarray, y: np.ndarray, y_model: np.ndarray) -> np.ndarray:
     return ci
 
 
-def get_random_data(is_random_beta: bool = True,
-                    n: int = 10000
-                    ) -> pd.DataFrame:
-
-    x = np.random.normal(0.0, 1.0, n)
-    eps = np.random.normal(0.0, 1.0, n)
-    if is_random_beta:
-        beta = np.random.normal(1.0, 1.0, n)*np.square(x)
-    else:
-        beta = np.ones(n)
-    y = beta*x + eps
-    df = pd.concat([pd.Series(x, name='x'), pd.Series(y, name='y')], axis=1)
-    df = df.sort_values(by='x', axis=0)
-
-    return df
-
-
 def estimate_classification_scatter(df: pd.DataFrame,
                                     x: Optional[str] = None,
                                     y: Optional[str] = None,
@@ -366,6 +353,92 @@ def estimate_classification_scatter(df: pd.DataFrame,
         y_rpeds.append(pd.Series(y_hue, index=x_hue))
     y_rpeds = pd.concat(y_rpeds).sort_index()
     return y_rpeds
+
+
+def plot_multivariate_scatter_with_prediction(df: pd.DataFrame,
+                                              x: List[str],
+                                              y: str,
+                                              x_axis_column: str,
+                                              hue: str = None,
+                                              xlabel: Union[str, bool, None] = True,
+                                              ylabel: Union[str, bool, None] = True,
+                                              full_sample_color: str = 'crimson',
+                                              linewidth: float = 1.5,
+                                              fit_intercept: bool = True,
+                                              verbose: bool = True,
+                                              xvar_format: str = '{:.0%}',
+                                              yvar_format: str = '{:.0%}',
+                                              title: str = None,
+                                              fontsize: int = 10,
+                                              legend_loc: str = 'upper left',
+                                              ax: plt.Subplot = None,
+                                              **kwargs
+                                              ) -> Optional[plt.Figure]:
+
+    prediction, params, reg_label = qu.fit_multivariate_ols(x=df[x], y=df[y], fit_intercept=fit_intercept, verbose=verbose)
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    else:
+        fig = None
+
+    sns.scatterplot(x=x_axis_column, y=y, data=df, hue=hue, ax=ax)
+
+    ds_pred = pd.Series(prediction.to_numpy(), index=df.loc[prediction.index, x_axis_column]).sort_index()
+    ax.plot(ds_pred.index, ds_pred.to_numpy(), color=full_sample_color, lw=linewidth, linestyle='-')
+
+    if isinstance(xlabel, bool):
+        if xlabel is True:
+            xlabel = f"x={x_axis_column}"
+        else:
+            xlabel = ''
+    if isinstance(ylabel, bool):
+        if ylabel is True:
+            ylabel = f"y={y}"
+        else:
+            ylabel = ''
+    qp.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, fontsize=fontsize, **kwargs)
+
+    qp.set_ax_ticks_format(ax=ax, xvar_format=xvar_format, yvar_format=yvar_format, fontsize=fontsize, **kwargs)
+
+    # add prediction and axis labels
+    labels = [f"prediction {reg_label}"]
+    colors = [full_sample_color]
+    leg = ax.get_legend()
+    for label, line in zip(leg.get_texts(), leg.get_lines()):
+        labels.append(label.get_text())
+        colors.append(line.get_color())
+
+    qp.set_legend(ax=ax,
+                  labels=labels,
+                  colors=colors,
+                  legend_loc=legend_loc,
+                  fontsize=fontsize,
+                  **kwargs)
+
+    if title is not None:
+        qp.set_title(ax=ax, title=title, fontsize=fontsize, **kwargs)
+
+    qp.set_spines(ax=ax, **kwargs)
+
+    return fig
+
+
+def get_random_data(is_random_beta: bool = True,
+                    n: int = 10000
+                    ) -> pd.DataFrame:
+
+    x = np.random.normal(0.0, 1.0, n)
+    eps = np.random.normal(0.0, 1.0, n)
+    if is_random_beta:
+        beta = np.random.normal(1.0, 1.0, n)*np.square(x)
+    else:
+        beta = np.ones(n)
+    y = beta*x + eps
+    df = pd.concat([pd.Series(x, name='x'), pd.Series(y, name='y')], axis=1)
+    df = df.sort_values(by='x', axis=0)
+
+    return df
 
 
 class UnitTests(Enum):

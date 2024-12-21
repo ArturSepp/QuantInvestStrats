@@ -201,6 +201,7 @@ from qis.utils.np_ops import (
 from qis.utils.ols import (
     estimate_alpha_beta_paired_dfs,
     estimate_ols_alpha_beta,
+    fit_multivariate_ols,
     fit_ols,
     get_ols_x,
     reg_model_params_to_str

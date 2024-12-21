@@ -431,7 +431,7 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
         output_covar[idx] = last_covar_ * np.outer(ewm_vol_, ewm_vol_)
         output_covar_norm[idx] = last_covar_
 
-    return output_covar_norm, output_covar, ewm_vol
+    return output_covar, output_covar_norm, ewm_vol
 
 
 # @njit
@@ -865,7 +865,7 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
                                     init_type: InitType = InitType.MEAN,
                                     annualize: bool = False,
                                     nan_backfill: NanBackfill = NanBackfill.FFILL
-                                    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                                    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
     """
     compute 1-d ewm beta for x and y
@@ -941,15 +941,23 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
     resid_var = pd.DataFrame(data=resid_var, index=y_data.index, columns=y_data.columns)
     x_var = pd.DataFrame(data=x_var, index=y_data.index)
 
-    return beta_xy, alpha, y_prediction, x_var, resid_var
+    # compute r2
+    y_var0 = y_data.subtract(compute_ewm(data=y_data, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill))
+    y_var = ewm_recursion(a=np.square(y_var0.to_numpy()), span=span, ewm_lambda=ewm_lambda,
+                          init_value=np.zeros(len(y_data.columns)), nan_backfill=nan_backfill)
+    ewm_r2 = 1.0 - np.divide(resid_var, y_var, where=np.greater(y_var, 0.0))
+    ewm_r2 = np.clip(ewm_r2, a_min=0.0, a_max=1.0)
+    ewm_r2 = pd.DataFrame(data=ewm_r2, index=y_data.index, columns=y_data.columns)
+
+    return beta_xy, alpha, y_prediction, x_var, resid_var, ewm_r2
 
 
-def compute_ewm_alpha_r2(y_data: pd.DataFrame,
-                         y_prediction: pd.DataFrame,
-                         span: Union[float, np.ndarray] = None,
-                         ewm_lambda: Union[float, np.ndarray] = 0.94,
-                         nan_backfill: NanBackfill = NanBackfill.FFILL
-                         ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compute_ewm_alpha_r2_given_prediction(y_data: pd.DataFrame,
+                                          y_prediction: pd.DataFrame,
+                                          span: Union[float, np.ndarray] = None,
+                                          ewm_lambda: Union[float, np.ndarray] = 0.94,
+                                          nan_backfill: NanBackfill = NanBackfill.FFILL
+                                          ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     """
     # 1 - adjust by mean
