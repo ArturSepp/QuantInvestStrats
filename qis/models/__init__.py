@@ -44,8 +44,6 @@ from qis.models.linear.ewm import (
     compute_one_factor_ewm_betas,
     compute_roll_mean,
     compute_rolling_mean_adj,
-    ewm_vol_assymetric,
-    ewm_vol_assymetric_np,
     set_init_dim1,
     set_init_dim2
 )

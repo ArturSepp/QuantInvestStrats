@@ -5,7 +5,7 @@ import time
 import numpy as np
 import pandas as pd
 from enum import Enum
-from typing import Union, Optional, Tuple, Callable, Dict
+from typing import Union, Optional, Tuple, Callable
 from numba import njit
 
 
@@ -515,6 +515,45 @@ def set_nans_for_warmup_period(a: Union[np.ndarray, pd.DataFrame],
         a = pd.DataFrame(a, index=a0.index, columns=a0.columns)
 
     return a
+
+
+def select_non_nan_x_y(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    select joint non-nan subset in x and y
+    """
+    assert x.shape[0] == y.shape[0]
+    if y.ndim == 1:
+        n_y = 1
+    else:
+        n_y = y.shape[1]
+
+    if x.ndim == 1:
+        n_x = 1
+    else:
+        n_x = x.shape[1]
+
+    # ensure no nans
+    if n_x == 1 and n_y == 1:
+        is_nan_cond = np.logical_or(np.isnan(x), np.isnan(y))
+        if np.any(is_nan_cond):
+            x = x[is_nan_cond == False]
+            y = y[is_nan_cond == False]
+    elif n_x == 1 and n_y > 1:
+        is_nan_cond = np.logical_or(np.isnan(x), np.isnan(y).any(axis=1))
+        if np.any(is_nan_cond):
+            x = x[is_nan_cond == False]
+            y = y[is_nan_cond == False, :]
+    elif n_x > 1 and n_y == 1:
+        is_nan_cond = np.logical_or(np.isnan(x).any(axis=1), np.isnan(y))
+        if np.any(is_nan_cond):
+            x = x[is_nan_cond == False, :]
+            y = y[is_nan_cond == False]
+    else:
+        is_nan_cond = np.logical_or(np.isnan(y).any(axis=1), np.isnan(x).any(axis=1))
+        if np.any(is_nan_cond):
+            x = x[is_nan_cond == False, :]
+            y = y[is_nan_cond == False, :]
+    return x, y
 
 
 class UnitTests(Enum):

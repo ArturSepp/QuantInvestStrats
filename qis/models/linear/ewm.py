@@ -399,8 +399,10 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
 
     # compute vols
     a_var = np.square(a)
-    ewm_vol = np.sqrt(ewm_recursion(a=a_var, ewm_lambda=ewm_lambda, init_value=np.nanmean(a_var, axis=0), nan_backfill=nan_backfill))
-    a_norm = np.divide(a, ewm_vol, where=np.greater(ewm_vol, 0.0))
+    ewm_vol = np.sqrt(ewm_recursion(a=a_var, ewm_lambda=ewm_lambda,
+                                    init_value=npo.nan_func_to_data(a=a_var, func=np.nanmean, axis=0),
+                                    nan_backfill=nan_backfill))
+    a_norm = np.divide(a, ewm_vol)
 
     # loop over rows
     for idx in range(0, t):  # row in x:
@@ -427,8 +429,9 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
         if nan_backfill == NanBackfill.NAN_FILL:  # fill zeros with nans
             last_covar_ = np.where(np.equal(last_covar_, zero_covar), np.nan, last_covar_)
 
-        ewm_vol_ = ewm_vol[idx]
-        output_covar[idx] = last_covar_ * np.outer(ewm_vol_, ewm_vol_)
+        # normalise to preserve vols for output_covar
+        norm_to_ewm_vols = ewm_vol[idx] / np.sqrt(np.diag(last_covar_))
+        output_covar[idx] = last_covar_ * np.outer(norm_to_ewm_vols, norm_to_ewm_vols)
         output_covar_norm[idx] = last_covar_
 
     return output_covar, output_covar_norm, ewm_vol

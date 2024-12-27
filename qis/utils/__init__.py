@@ -195,7 +195,8 @@ from qis.utils.np_ops import (
     to_finite_reciprocal,
     repeat_by_columns,
     repeat_by_rows,
-    set_nans_for_warmup_period
+    set_nans_for_warmup_period,
+    select_non_nan_x_y
 )
 
 from qis.utils.ols import (
