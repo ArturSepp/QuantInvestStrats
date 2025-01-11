@@ -7,8 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
-
+from typing import List, Optional, Tuple, Union, Dict
 # qis
 import qis as qis
 from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, RollingPerfStat
@@ -17,7 +16,6 @@ import qis.utils.df_groups as dfg
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.perfstats.regime_classifier as rcl
-
 # plots
 import qis.plots.time_series as pts
 import qis.plots.derived.prices as ppd
@@ -28,6 +26,7 @@ import qis.plots.derived.drawdowns as cdr
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 
 
+# default perf params
 PERF_PARAMS = PerfParams(freq='W-WED')
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
@@ -36,9 +35,15 @@ REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 class MultiPortfolioData:
     """
     data structure to unify multi portfolio reporting
+    portfolio_datas: List[PortfolioData]
+    benchmark_prices: Union[pd.DataFrame, pd.Series] = None  # Optional
+    pd_covars: Dict[pd.Timestamp, pd.DataFrame] = None  # annualised covariance matrix
+                                                        for investable universe for computing tracking error
     """
     portfolio_datas: List[PortfolioData]
     benchmark_prices: Union[pd.DataFrame, pd.Series] = None
+    pd_covars: Dict[pd.Timestamp, pd.DataFrame] = None
+    navs: pd.DataFrame = None   # computed internally
 
     def __post_init__(self):
         # default frequency is freq of backtests, can be non for strats at different freqs
@@ -82,7 +87,7 @@ class MultiPortfolioData:
             navs = pd.concat([self.benchmark_prices[benchmark].reindex(index=navs.index).ffill(), navs], axis=1)
         elif add_benchmarks_to_navs:
             navs = pd.concat([navs, self.benchmark_prices.reindex(index=navs.index).ffill()], axis=1).ffill()
-            
+
         if time_period is not None:
             navs = time_period.locate(navs)
         return navs
@@ -102,16 +107,170 @@ class MultiPortfolioData:
                        time_period: TimePeriod = None,
                        is_add_group_total: bool = False
                        ) -> pd.DataFrame:
-        prices = self.portfolio_datas[portfolio_idx].get_group_navs(time_period=time_period, is_add_group_total=is_add_group_total)
+        prices = self.portfolio_datas[portfolio_idx].get_group_navs(time_period=time_period,
+                                                                    is_add_group_total=is_add_group_total)
         if benchmark is not None:
             benchmark_price = self.get_benchmark_price(benchmark=self.benchmark_prices.columns[0],
                                                        time_period=time_period)
             prices = pd.concat([prices, benchmark_price], axis=1)
         return prices
 
-    """
-    plot methods
-    """
+    def get_ra_perf_table(self,
+                          benchmark: str = None,
+                          time_period: TimePeriod = None,
+                          drop_benchmark: bool = False,
+                          is_convert_to_str: bool = True,
+                          perf_params: PerfParams = PERF_PARAMS,
+                          perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+                          **kwargs
+                          ) -> pd.DataFrame:
+        if benchmark is None:
+            benchmark = self.benchmark_prices.columns[0]
+        prices = self.get_navs(benchmark=benchmark, time_period=time_period)
+        ra_perf_table = ppt.get_ra_perf_benchmark_columns(prices=prices,
+                                                          benchmark=benchmark,
+                                                          drop_benchmark=drop_benchmark,
+                                                          is_convert_to_str=is_convert_to_str,
+                                                          perf_params=perf_params,
+                                                          perf_columns=perf_columns,
+                                                          **kwargs)
+        return ra_perf_table
+
+    def get_aligned_weights(self,
+                            strategy_idx: int = 0,
+                            benchmark_idx: int = 1,
+                            freq: Optional[str] = 'B',
+                            time_period: TimePeriod = None,
+                            is_grouped: bool = False,
+                            **kwargs
+                            ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None,
+                                                                          is_input_weights=True, is_grouped=is_grouped)
+        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None,
+                                                                            is_input_weights=True,
+                                                                            is_grouped=is_grouped)
+        tickers_union = qis.merge_lists_unique(list1=strategy_weights.columns.to_list(),
+                                               list2=benchmark_weights.columns.to_list())
+        # replace with ac order of benchmark
+        if is_grouped and self.portfolio_datas[benchmark_idx].group_order is not None:
+            tickers_union = self.portfolio_datas[benchmark_idx].group_order
+        strategy_weights = strategy_weights.reindex(columns=tickers_union)
+        benchmark_weights = benchmark_weights.reindex(columns=tickers_union)
+        return strategy_weights, benchmark_weights
+
+    def get_aligned_turnover(self,
+                             strategy_idx: int = 0,
+                             benchmark_idx: int = 1,
+                             turnover_rolling_period: Optional[int] = 260,
+                             freq_turnover: Optional[str] = 'B',
+                             time_period: TimePeriod = None,
+                             is_grouped: bool = False,
+                             **kwargs
+                             ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+
+        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=freq_turnover,
+                                                                            roll_period=turnover_rolling_period,
+                                                                            add_total=False, is_grouped=is_grouped)
+        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period,
+                                                                              freq=freq_turnover,
+                                                                              roll_period=turnover_rolling_period,
+                                                                              add_total=False, is_grouped=is_grouped)
+        tickers_union = qis.merge_lists_unique(list1=strategy_turnover.columns.to_list(),
+                                               list2=benchmark_turnover.columns.to_list())
+        # replace with ac order of benchmark
+        if is_grouped and self.portfolio_datas[benchmark_idx].group_order is not None:
+            tickers_union = self.portfolio_datas[benchmark_idx].group_order
+        strategy_turnover = strategy_turnover.reindex(columns=tickers_union)
+        benchmark_turnover = benchmark_turnover.reindex(columns=tickers_union)
+        return strategy_turnover, benchmark_turnover
+
+    def compute_tracking_error_implied_by_covar(self,
+                                                strategy_idx: int = 0,
+                                                benchmark_idx: int = 1
+                                                ) -> pd.Series:
+        """
+        compute Ex ante  tracking error =
+        (strategy_weights - strategy_weights) @ covar @ (strategy_weights - strategy_weights).T
+        """
+        if self.pd_covars is None:
+            raise ValueError(f"must pass pd_covars")
+        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(freq=None, is_input_weights=True)
+        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(freq=None, is_input_weights=True)
+        covar_index = list(self.pd_covars.keys())
+        investable_assets = self.pd_covars[covar_index[0]].columns.to_list()
+        strategy_weights = strategy_weights.reindex(index=covar_index, columns=investable_assets).ffill().fillna(0.0)
+        benchmark_weights = benchmark_weights.reindex(index=covar_index, columns=investable_assets).ffill().fillna(0.0)
+
+        weight_diffs = benchmark_weights - strategy_weights
+        tracking_error = {}
+        for date, pd_covar in self.pd_covars.items():
+            w = weight_diffs.loc[date]
+            tracking_error[date] = np.sqrt(w @ pd_covar @ w.T)
+        tracking_error = pd.Series(tracking_error)
+        return tracking_error
+
+    def compute_tracking_error_table(self,
+                                     strategy_idx: int = 0,
+                                     benchmark_idx: int = 1,
+                                     freq: Optional[str] = 'B',
+                                     time_period: TimePeriod = None,
+                                     af: float = 260,
+                                     is_norm_costs: bool = True,
+                                     **kwargs
+                                     ) -> pd.DataFrame:
+        """
+        compute realised tracking error = mean(P&L diff) / std(P&L diff)
+        """
+        strategy_pnl = self.portfolio_datas[strategy_idx].get_attribution_table_by_instrument(time_period=time_period,
+                                                                                              freq=freq)
+        benchmark_pnl = self.portfolio_datas[benchmark_idx].get_attribution_table_by_instrument(time_period=time_period,
+                                                                                                freq=freq)
+
+        tickers_union = qis.merge_lists_unique(list1=strategy_pnl.columns.to_list(),
+                                               list2=benchmark_pnl.columns.to_list())
+        strategy_pnl = strategy_pnl.reindex(columns=tickers_union)
+        benchmark_pnl = benchmark_pnl.reindex(columns=tickers_union).reindex(index=strategy_pnl.index)
+        pnl_diff = strategy_pnl.subtract(benchmark_pnl)
+
+        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None,
+                                                                          is_input_weights=True)
+        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=None,
+                                                                            roll_period=None, add_total=False)
+        strategy_cost = self.portfolio_datas[strategy_idx].get_costs(time_period=time_period, freq=freq,
+                                                                     roll_period=None,
+                                                                     add_total=False, is_norm_costs=is_norm_costs)
+        strategy_ticker = self.portfolio_datas[strategy_idx].ticker
+
+        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None,
+                                                                            is_input_weights=True)
+        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period, freq=None,
+                                                                              roll_period=None, add_total=False)
+        benchmark_cost = self.portfolio_datas[benchmark_idx].get_costs(time_period=time_period, freq=freq,
+                                                                       roll_period=None,
+                                                                       add_total=False, is_norm_costs=is_norm_costs)
+        benchmark_ticker = self.portfolio_datas[benchmark_idx].ticker
+
+        # compute stats
+        total_strategy_perf = strategy_pnl.cumsum(0).iloc[-1, :].rename(f"{strategy_ticker} total perf")
+        total_benchmark_perf = benchmark_pnl.cumsum(0).iloc[-1, :].rename(f"{benchmark_ticker} total perf")
+        total_diff = total_strategy_perf.subtract(total_benchmark_perf).rename(
+            f"{strategy_ticker}-{benchmark_ticker} total perf")
+
+        tre = pd.Series(np.nanmean(pnl_diff, axis=0) / np.nanstd(pnl_diff, axis=0), index=tickers_union, name='TRE')
+
+        tre_table = pd.concat([total_diff, tre,
+                               total_strategy_perf, total_benchmark_perf,
+                               af * strategy_turnover.mean(0).rename(f"{strategy_ticker} an turnover"),
+                               af * benchmark_turnover.mean(0).rename(f"{benchmark_ticker} an turnover"),
+                               af * strategy_cost.mean(0).rename(f"{strategy_ticker} an cost"),
+                               af * benchmark_cost.mean(0).rename(f"{benchmark_ticker} an cost"),
+                               ], axis=1)
+
+        return tre_table
+
+    # """
+    # plot methods
+    # """
     def add_regime_shadows(self,
                            ax: plt.Subplot,
                            regime_benchmark: str,
@@ -144,7 +303,8 @@ class MultiPortfolioData:
                         ax=ax,
                         **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
+                                    regime_params=regime_params)
 
     def plot_rolling_perf(self,
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
@@ -172,6 +332,7 @@ class MultiPortfolioData:
                                          time_period=time_period,
                                          roll_periods=sharpe_rolling_window,
                                          legend_stats=legend_stats,
+                                         title=sharpe_title,
                                          trend_line=None,  # qis.TrendLine.ZERO_SHADOWS,
                                          ax=ax,
                                          **kwargs)
@@ -180,7 +341,7 @@ class MultiPortfolioData:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
                                     regime_params=regime_params)
         return fig
-    
+
     def plot_periodic_returns(self,
                               time_period: TimePeriod = None,
                               heatmap_freq: str = 'YE',
@@ -243,7 +404,8 @@ class MultiPortfolioData:
         prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         cdr.plot_rolling_drawdowns(prices=prices, dd_legend_type=dd_legend_type, ax=ax, **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
+                                    regime_params=regime_params)
 
     def plot_rolling_time_under_water(self,
                                       time_period: TimePeriod = None,
@@ -256,28 +418,8 @@ class MultiPortfolioData:
         prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         cdr.plot_rolling_time_under_water(prices=prices, dd_legend_type=dd_legend_type, ax=ax, **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index, regime_params=regime_params)
-
-    def get_ra_perf_table(self,
-                          benchmark: str = None,
-                          time_period: TimePeriod = None,
-                          drop_benchmark: bool = False,
-                          is_convert_to_str: bool = True,
-                          perf_params: PerfParams = PERF_PARAMS,
-                          perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
-                          **kwargs
-                          ) -> pd.DataFrame:
-        if benchmark is None:
-            benchmark = self.benchmark_prices.columns[0]
-        prices = self.get_navs(benchmark=benchmark, time_period=time_period)
-        ra_perf_table = ppt.get_ra_perf_benchmark_columns(prices=prices,
-                                                          benchmark=benchmark,
-                                                          drop_benchmark=drop_benchmark,
-                                                          is_convert_to_str=is_convert_to_str,
-                                                          perf_params=perf_params,
-                                                          perf_columns=perf_columns,
-                                                          **kwargs)
-        return ra_perf_table
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
+                                    regime_params=regime_params)
 
     def plot_ra_perf_table(self,
                            benchmark: str = None,
@@ -291,7 +433,8 @@ class MultiPortfolioData:
         if benchmark is None:
             benchmark = self.benchmark_prices.columns[0]
         prices = self.get_navs(benchmark=benchmark, time_period=time_period)
-        ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
+        ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark}: " \
+                        f"{qis.get_time_period(prices).to_str()}"
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=benchmark,
                                          perf_params=perf_params,
@@ -341,11 +484,12 @@ class MultiPortfolioData:
             benchmark_price = benchmark_price.reindex(index=strategy_prices.index, method='ffill')
             if add_ac:  # otherwise tables look too bad
                 ac_prices = pd.concat(ac_prices, axis=1)
-                prices = pd.concat([benchmark_price, strategy_prices, ac_prices],axis=1)
+                prices = pd.concat([benchmark_price, strategy_prices, ac_prices], axis=1)
             else:
                 prices = pd.concat([strategy_prices, benchmark_price], axis=1)
 
-        ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
+        ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to " \
+                        f"{benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
         ppt.plot_ra_perf_table_benchmark(prices=prices,
                                          benchmark=str(benchmark_price.name),
                                          perf_params=perf_params,
@@ -476,7 +620,8 @@ class MultiPortfolioData:
                    **kwargs) -> None:
         costs = []
         for portfolio in self.portfolio_datas:
-            costs.append(portfolio.get_costs(roll_period=cost_rolling_period, freq=freq_cost, is_agg=True, is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
+            costs.append(portfolio.get_costs(roll_period=cost_rolling_period, freq=freq_cost, is_agg=True,
+                                             is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
         costs = pd.concat(costs, axis=1)
         if time_period is not None:
             costs = time_period.locate(costs)
@@ -814,90 +959,3 @@ class MultiPortfolioData:
                                             regime_params=regime_params)
 
         return figs
-
-    def compute_tracking_error_table(self,
-                                     strategy_idx: int = 0,
-                                     benchmark_idx: int = 1,
-                                     freq: Optional[str] = 'B',
-                                     time_period: TimePeriod = None,
-                                     af: float = 260,
-                                     is_norm_costs: bool = True,
-                                     **kwargs
-                                     ) -> pd.DataFrame:
-
-        strategy_pnl = self.portfolio_datas[strategy_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
-        benchmark_pnl = self.portfolio_datas[benchmark_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
-
-        tickers_union = qis.merge_lists_unique(list1=strategy_pnl.columns.to_list(), list2=benchmark_pnl.columns.to_list())
-        strategy_pnl = strategy_pnl.reindex(columns=tickers_union)
-        benchmark_pnl = benchmark_pnl.reindex(columns=tickers_union).reindex(index=strategy_pnl.index)
-        pnl_diff = strategy_pnl.subtract(benchmark_pnl)
-
-        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
-        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=None, roll_period=None, add_total=False)
-        strategy_cost = self.portfolio_datas[strategy_idx].get_costs(time_period=time_period, freq=freq, roll_period=None,
-                                                                     add_total=False, is_norm_costs=is_norm_costs)
-        strategy_ticker = self.portfolio_datas[strategy_idx].ticker
-
-        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
-        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period, freq=None, roll_period=None, add_total=False)
-        benchmark_cost = self.portfolio_datas[benchmark_idx].get_costs(time_period=time_period, freq=freq, roll_period=None,
-                                                                       add_total=False, is_norm_costs=is_norm_costs)
-        benchmark_ticker = self.portfolio_datas[benchmark_idx].ticker
-
-        # compute stats
-        total_strategy_perf = strategy_pnl.cumsum(0).iloc[-1, :].rename(f"{strategy_ticker} total perf")
-        total_benchmark_perf = benchmark_pnl.cumsum(0).iloc[-1, :].rename(f"{benchmark_ticker} total perf")
-        total_diff = total_strategy_perf.subtract(total_benchmark_perf).rename(f"{strategy_ticker}-{benchmark_ticker} total perf")
-
-        tre = pd.Series(np.nanmean(pnl_diff, axis=0) / np.nanstd(pnl_diff, axis=0), index=tickers_union, name='TRE')
-
-        tre_table = pd.concat([total_diff, tre,
-                               total_strategy_perf, total_benchmark_perf,
-                               af*strategy_turnover.mean(0).rename(f"{strategy_ticker} an turnover"),
-                               af*benchmark_turnover.mean(0).rename(f"{benchmark_ticker} an turnover"),
-                               af*strategy_cost.mean(0).rename(f"{strategy_ticker} an cost"),
-                               af*benchmark_cost.mean(0).rename(f"{benchmark_ticker} an cost"),
-                               ], axis=1)
-
-        return tre_table
-
-    def get_aligned_weights(self,
-                            strategy_idx: int = 0,
-                            benchmark_idx: int = 1,
-                            freq: Optional[str] = 'B',
-                            time_period: TimePeriod = None,
-                            is_grouped: bool = False,
-                            **kwargs
-                            ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True, is_grouped=is_grouped)
-        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True, is_grouped=is_grouped)
-        tickers_union = qis.merge_lists_unique(list1=strategy_weights.columns.to_list(), list2=benchmark_weights.columns.to_list())
-        if is_grouped and self.portfolio_datas[benchmark_idx].group_order is not None: # replace with ac order of benchmark
-            tickers_union = self.portfolio_datas[benchmark_idx].group_order
-        strategy_weights = strategy_weights.reindex(columns=tickers_union)
-        benchmark_weights = benchmark_weights.reindex(columns=tickers_union)
-        return strategy_weights, benchmark_weights
-
-    def get_aligned_turnover(self,
-                             strategy_idx: int = 0,
-                             benchmark_idx: int = 1,
-                             turnover_rolling_period: Optional[int] = 260,
-                             freq_turnover: Optional[str] = 'B',
-                             time_period: TimePeriod = None,
-                             is_grouped: bool = False,
-                             **kwargs
-                             ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-
-        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=freq_turnover,
-                                                                            roll_period=turnover_rolling_period,
-                                                                            add_total=False, is_grouped=is_grouped)
-        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period, freq=freq_turnover,
-                                                                              roll_period=turnover_rolling_period,
-                                                                              add_total=False, is_grouped=is_grouped)
-        tickers_union = qis.merge_lists_unique(list1=strategy_turnover.columns.to_list(), list2=benchmark_turnover.columns.to_list())
-        if is_grouped and self.portfolio_datas[benchmark_idx].group_order is not None: # replace with ac order of benchmark
-            tickers_union = self.portfolio_datas[benchmark_idx].group_order
-        strategy_turnover = strategy_turnover.reindex(columns=tickers_union)
-        benchmark_turnover = benchmark_turnover.reindex(columns=tickers_union)
-        return strategy_turnover, benchmark_turnover

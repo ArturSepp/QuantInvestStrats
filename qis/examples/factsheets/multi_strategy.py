@@ -66,8 +66,8 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.VOLPARITY_SPAN:
-
-        time_period = qis.TimePeriod('31Dec2005', '16Oct2024')  # time period for portfolio reporting
+        # time period for portfolio reporting
+        time_period = qis.TimePeriod('31Dec2005', '10Jan2025')
 
         prices, benchmark_prices, group_data = fetch_universe_data()
         multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,

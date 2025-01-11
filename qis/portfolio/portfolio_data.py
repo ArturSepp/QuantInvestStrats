@@ -1216,7 +1216,11 @@ class PortfolioData:
                              ) -> None:
         weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped)
         if time_period is not None:
-            weights_1 = time_period.locate(weights).iloc[0, :]
+            weights_1 = time_period.locate(weights)
+            if len(weights_1.index) > 0:
+                weights_1 = weights_1.iloc[0, :]
+            else:
+                weights_1 = weights.iloc[-1, :]
         else:
             weights_1 = weights.iloc[-1, :]
         if add_top_bar_values is None:

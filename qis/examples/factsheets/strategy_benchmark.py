@@ -82,7 +82,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     # time period for portfolio reporting
-    time_period = qis.TimePeriod('31Dec2006', '06Dec2024')
+    time_period = qis.TimePeriod('31Dec2006', '10Jan2025')
     prices, benchmark_prices, group_data = fetch_universe_data()
     multi_portfolio_data = generate_volparity_multiportfolio(prices=prices,
                                                              benchmark_prices=benchmark_prices,
@@ -105,10 +105,7 @@ def run_unit_test(unit_test: UnitTests):
                                                          add_grouped_exposures=False,  # for strategy factsheet
                                                          add_grouped_cum_pnl=False,  # for strategy factsheet
                                                          **fetch_default_report_kwargs(time_period=time_period,
-                                                                                       reporting_frequency=True, add_rates_data=True))
-        """
-
-        """
+                                                                                       add_rates_data=True))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"strategy_benchmark_factsheet", orientation='landscape',
                              local_path=qis.local_path.get_output_path())

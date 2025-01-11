@@ -23,8 +23,10 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    prices = None
-    end_date = '16Oct2024'
+    end_date = '10Jan2025'  # performance repoting
+
+    prices = None  # if Noe, use yahoo finance data
+
     if unit_test == UnitTests.CORE_ETFS:
         benchmark = 'SPY'
         tickers = [benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
@@ -77,7 +79,6 @@ def run_unit_test(unit_test: UnitTests):
         prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
         prices = prices.rename(tickers, axis=1)
         time_period = qis.get_time_period(prices)
-
 
     else:
         raise NotImplementedError
