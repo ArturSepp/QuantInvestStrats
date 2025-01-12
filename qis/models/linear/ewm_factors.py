@@ -95,7 +95,7 @@ class LinearModel:
         """
         residuals, explained_returns = self.get_factor_alpha(lag=lag)
         ewm_residuals_2 = ewm.compute_ewm(data=np.square(residuals), span=span)
-        y_demean = self.y #- ewm.compute_ewm(data=self.y, span=span)
+        y_demean = self.y  #- ewm.compute_ewm(data=self.y, span=span)
         ewm_variance = ewm.compute_ewm(data=np.square(y_demean), span=span)
         r_2 = 1.0 - ewm_residuals_2.divide(ewm_variance)
         return r_2

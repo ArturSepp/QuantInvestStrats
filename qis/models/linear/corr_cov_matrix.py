@@ -6,13 +6,56 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from enum import Enum
-from typing import Tuple, List, Union, Optional
+from typing import Tuple, List, Union, Optional, Dict
 from numba import njit
 
 # qis
 import qis.utils.dates as da
 import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
+import qis.perfstats.returns as ret
+
+
+def estimate_rolling_ewma_covar(prices: pd.DataFrame,
+                                time_period: da.TimePeriod,  # when we start estimation
+                                returns_freq: str = 'W-WED',
+                                rebalancing_freq: str = 'QE',
+                                span: int = 52,
+                                is_apply_vol_normalised_returns: bool = False,
+                                demean: bool = True,
+                                apply_an_factor: bool = True
+                                ) -> Dict[pd.Timestamp, pd.DataFrame]:
+    """
+    compute ewma covar matrix: supporting for nans in prices
+    covar data frequency is rebalancing_freq for period time_period
+    output is dict[estimation timestamp, pd.Dataframe(estimated_covar)
+    """
+    returns = ret.to_returns(prices=prices, is_log_returns=True, drop_first=True, freq=returns_freq)
+    returns_np = returns.to_numpy()
+    if demean:
+        x = returns_np - ewm.compute_ewm(returns_np, span=span)
+    else:
+        x = returns_np
+
+    if is_apply_vol_normalised_returns:
+        covar_tensor_txy, _, _ = ewm.compute_ewm_covar_tensor_vol_norm_returns(a=x, span=span, nan_backfill=ewm.NanBackfill.ZERO_FILL)
+    else:
+        covar_tensor_txy = ewm.compute_ewm_covar_tensor(a=x, span=span, nan_backfill=ewm.NanBackfill.ZERO_FILL)
+
+    # create rebalancing schedule
+    rebalancing_schedule = da.generate_rebalancing_indicators(df=returns, freq=rebalancing_freq)
+
+    tickers = prices.columns.to_list()
+    covars = {}
+    if apply_an_factor:
+        an_factor = da.infer_an_from_data(data=returns)
+    else:
+        an_factor = 1.0
+    for idx, (date, value) in enumerate(rebalancing_schedule.items()):
+        if value and date >= time_period.start:
+            covar_t = pd.DataFrame(covar_tensor_txy[idx], index=tickers, columns=tickers)
+            covars[pd.Timestamp(date)] = an_factor*covar_t
+    return covars
 
 
 @njit

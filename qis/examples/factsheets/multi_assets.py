@@ -76,8 +76,7 @@ def run_unit_test(unit_test: UnitTests):
                    'HYG US Equity': 'HYG'
                    }
         from bbg_fetch import fetch_field_timeseries_per_tickers
-        prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
-        prices = prices.rename(tickers, axis=1)
+        prices = fetch_field_timeseries_per_tickers(tickers=tickers, field='PX_LAST', CshAdjNormal=True, freq='B').dropna()
         time_period = qis.get_time_period(prices)
 
     else:
@@ -91,7 +90,6 @@ def run_unit_test(unit_test: UnitTests):
     print(prices)
 
     kwargs = fetch_default_report_kwargs(time_period=time_period)
-
     fig = generate_multi_asset_factsheet(prices=prices,
                                          benchmark=benchmark,
                                          time_period=time_period,

@@ -8,7 +8,6 @@ implement winsorizing of time series data using ewm
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from numba import njit
 from enum import Enum
 from typing import Union, NamedTuple, Optional, Tuple
 from qis.models.linear.ewm import compute_ewm, compute_ewm_vol
@@ -154,7 +153,7 @@ def ewm_insample_winsorising(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
     lower_quantile = np.quantile(score, quantile_cut, axis=0)
     upper_quantile = np.quantile(score, 1.0-quantile_cut, axis=0)
-    #print(f"lower_quantile={lower_quantile}, upper_quantile={upper_quantile}")
+    # print(f"lower_quantile={lower_quantile}, upper_quantile={upper_quantile}")
 
     if nan_replacement_type == ReplacementType.EWMA_MEAN:
         replacement_cond = np.logical_or(score < lower_quantile, score > upper_quantile)
@@ -273,7 +272,7 @@ def ewm_winsdor_markovian_score(a: np.ndarray,
                     last_ewm = init_value
                     last_ewm2 = np.maximum(init_value*init_value, init_var)
             else:
-                new_nonnans = np.logical_and(np.isfinite(last_ewm)==False, np.isfinite(a_t)==True)
+                new_nonnans = np.logical_and(np.isfinite(last_ewm) == False, np.isfinite(a_t) == True)
                 if np.any(new_nonnans):
                     last_ewm = np.where(new_nonnans, init_value, last_ewm)
                     last_ewm2 = np.where(new_nonnans, np.maximum(init_value*init_value, init_var), last_ewm2)

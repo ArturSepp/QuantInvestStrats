@@ -175,7 +175,7 @@ def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileReg
     return perf_params, regime_params
 
 
-def fetch_default_report_kwargs(time_period: Optional[TimePeriod],
+def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
                                 reporting_frequency: ReportingFrequency = ReportingFrequency.DAILY,
                                 long_threshold_years: float = 5.0,
                                 add_rates_data: bool = True
