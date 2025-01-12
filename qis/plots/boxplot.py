@@ -84,9 +84,10 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
                 palette=palette,
                 linewidth=linewidth,
                 meanline=meanline,
+                showmeans=showmeans,
                 showfliers=showfliers,
                 medianprops={'visible': showmedians, 'color': 'black'},
-                showmeans=showmeans or meanline,
+                meanprops={'visible': showmeans or meanline, 'color': 'black'},
                 whis=whis,
                 ax=ax)
 
@@ -572,7 +573,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.DF_DICT
+    unit_test = UnitTests.DF_WEIGHTS
 
     is_run_all_tests = False
     if is_run_all_tests:

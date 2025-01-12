@@ -16,7 +16,8 @@ from qis import TimePeriod, MultiPortfolioData
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strategy_benchmark_factsheet_plt,
                                                                 generate_strategy_benchmark_active_perf_plt,
-                                                                generate_performance_attribution_report)
+                                                                generate_performance_attribution_report,
+                                                                weights_tracking_error_report)
 
 
 def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -77,8 +78,10 @@ class UnitTests(Enum):
     STRATEGY_BENCHMARK_PLT = 1
     PERFORMANCE_ATTRIBUTION = 2
     ACTIVE_PERFORMANCE = 3
+    TRACKING_ERROR = 4
 
 
+@qis.timer
 def run_unit_test(unit_test: UnitTests):
 
     # time period for portfolio reporting
@@ -126,12 +129,23 @@ def run_unit_test(unit_test: UnitTests):
                                                            is_long_only=True,
                                                            **fetch_default_report_kwargs(time_period=time_period))
 
+    elif unit_test == UnitTests.TRACKING_ERROR:
+        # compute pd_covras
+        pd_covars = qis.estimate_rolling_ewma_covar(prices=prices,
+                                                    time_period=time_period,
+                                                    returns_freq='W-WED',
+                                                    rebalancing_freq='ME',
+                                                    span=52)
+        multi_portfolio_data.pd_covars = pd_covars
+        weights_tracking_error_report(multi_portfolio_data=multi_portfolio_data,
+                                      time_period=time_period)
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.STRATEGY_BENCHMARK_PLT
+    unit_test = UnitTests.TRACKING_ERROR
 
     is_run_all_tests = False
     if is_run_all_tests:

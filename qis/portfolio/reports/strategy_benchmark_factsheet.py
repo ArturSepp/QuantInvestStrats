@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs
 
@@ -498,3 +498,130 @@ def generate_performance_attribution_report(multi_portfolio_data: MultiPortfolio
                                                              **kwargs)
 
     return figs
+
+
+def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
+                                  strategy_idx: int = 0,
+                                  benchmark_idx: int = 1,
+                                  time_period: TimePeriod = None,
+                                  perf_params: PerfParams = PERF_PARAMS,
+                                  regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                  figsize: Tuple[float, float] = (11.7, 8.3),
+                                  is_grouped: bool = True,
+                                  var_format: str = '{:.1%}',
+                                  **kwargs
+                                  ) -> Dict[str, plt.Figure]:
+
+    regime_benchmark = multi_portfolio_data.benchmark_prices.columns[0]
+    benchmark_price = multi_portfolio_data.benchmark_prices[regime_benchmark]
+
+    figs = {}
+    with sns.axes_style('darkgrid'):
+
+        # navs + ra table
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+        figs['navs'] = fig
+        multi_portfolio_data.plot_nav(regime_benchmark=regime_benchmark,
+                                      perf_params=perf_params,
+                                      regime_params=regime_params,
+                                      title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_params.freq}-returns",
+                                      ax=ax,
+                                      **kwargs)
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+        figs['ra_table'] = fig
+        multi_portfolio_data.plot_ac_ra_perf_table(benchmark_price=benchmark_price,
+                                                   perf_params=perf_params,
+                                                   is_grouped=False,
+                                                   ax=ax,
+                                                   **kwargs)
+
+        # strategy weights
+        strategy_data = multi_portfolio_data.portfolio_datas[strategy_idx]
+        exposures = strategy_data.get_weights(is_grouped=is_grouped, time_period=time_period, add_total=False,
+                                              is_input_weights=True)
+        fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
+        qis.set_suptitle(fig, title=f"{strategy_data.ticker} Weights")
+        figs['strategy_weights'] = fig
+        plot_exposures(exposures=exposures, ticker=strategy_data.ticker, var_format=var_format, axs=axs, **kwargs)
+
+        # strategy var
+        portfolio_vars, instrument_vars = strategy_data.compute_portfolio_vars(is_correlated=True,
+                                                                               time_period=time_period,
+                                                                               freq='ME',
+                                                                               total_column=strategy_data.ticker,
+                                                                               vol_span=12)
+        portfolio_vars = portfolio_vars.divide(np.nansum(portfolio_vars, axis=1, keepdims=True))
+        fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
+        qis.set_suptitle(fig, title=f"{strategy_data.ticker} Var")
+        figs['strategy_var'] = fig
+        plot_exposures(exposures=portfolio_vars, ticker=strategy_data.ticker, var_format=var_format, axs=axs, **kwargs)
+
+        # benchmark weights
+        benchmark_data = multi_portfolio_data.portfolio_datas[benchmark_idx]
+        benchmark_exposures = benchmark_data.get_weights(is_grouped=is_grouped, time_period=time_period, add_total=False,
+                                                         is_input_weights=True)
+        fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
+        qis.set_suptitle(fig, title=f"{benchmark_data.ticker} Weights")
+        figs['benchmark_weights'] = fig
+        plot_exposures(exposures=benchmark_exposures, ticker=benchmark_data.ticker, var_format=var_format, axs=axs, **kwargs)
+
+        # benchmark var
+        portfolio_vars, instrument_vars = benchmark_data.compute_portfolio_vars(is_correlated=True,
+                                                                                time_period=time_period,
+                                                                                freq='ME',
+                                                                                total_column=strategy_data.ticker,
+                                                                                vol_span=12)
+        portfolio_vars = portfolio_vars.divide(np.nansum(portfolio_vars, axis=1, keepdims=True))
+        fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
+        qis.set_suptitle(fig, title=f"{strategy_data.ticker} Var")
+        figs['benchmark_var'] = fig
+        plot_exposures(exposures=portfolio_vars, ticker=benchmark_data.ticker, var_format=var_format, axs=axs, **kwargs)
+
+        # turnover
+        fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
+        figs['turnover'] = fig
+        multi_portfolio_data.plot_turnover(ax=axs[0],
+                                           time_period=time_period,
+                                           turnover_rolling_period=260,
+                                           freq_turnover=None,
+                                           **kwargs)
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+        figs['tre_time_series'] = fig
+        multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
+                                                  benchmark_idx=benchmark_idx,
+                                                  ax=ax,
+                                                  time_period=time_period,
+                                                  **kwargs)
+
+    return figs
+
+
+def plot_exposures(exposures: pd.DataFrame,
+                   axs: List[plt.Subplot],
+                   ticker: str = None,
+                   var_format: str = '{:.1%}',
+                   **kwargs
+                   ) -> None:
+    colors = qis.get_n_sns_colors(n=len(exposures.columns))
+    qis.plot_stack(df=exposures,
+                   use_bar_plot=True,
+                   legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                   var_format=var_format,
+                   colors=colors,
+                   ax=axs[0],
+                   **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.01), ncols=2,
+                                                    framealpha=0.9)))
+
+    qis.df_boxplot_by_columns(df=exposures,
+                              hue_var_name='asset class',
+                              y_var_name='weights',
+                              ylabel='weights',
+                              showmedians=True,
+                              add_y_meadian_labels=True,
+                              yvar_format=var_format,
+                              y_limits=(0.0, None),
+                              colors=colors,
+                              ax=axs[1],
+                              **kwargs)

@@ -51,8 +51,9 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
         an_factor = da.infer_an_from_data(data=returns)
     else:
         an_factor = 1.0
+    start_date = time_period.start.tz_localize(tz=returns.index.tz)  # make sure tz is alined with rebalancing_schedule
     for idx, (date, value) in enumerate(rebalancing_schedule.items()):
-        if value and date >= time_period.start:
+        if value and date >= start_date:
             covar_t = pd.DataFrame(covar_tensor_txy[idx], index=tickers, columns=tickers)
             covars[date] = an_factor*covar_t
     return covars

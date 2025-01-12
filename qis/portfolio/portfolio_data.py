@@ -1149,7 +1149,7 @@ class PortfolioData:
                                time_period: TimePeriod = None,
                                freq: str = 'B',
                                total_column: Optional[str] = 'Total',
-                               vol_span: Union[int, float] = 33 # span in number of freq-returns
+                               vol_span: Union[int, float] = 33  # span in number of freq-returns
                                ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
         if is_correlated:
             portfolio_vars = qis.compute_portfolio_correlated_var_by_groups(prices=self.prices,

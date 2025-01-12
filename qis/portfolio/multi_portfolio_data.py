@@ -502,6 +502,23 @@ class MultiPortfolioData:
                                          ax=ax,
                                          **kwargs)
 
+    def plot_nav_with_dd(self,
+                         time_period: TimePeriod = None,
+                         perf_params: PerfParams = PERF_PARAMS,
+                         axs: List[plt.Subplot] = None,
+                         **kwargs
+                         ) -> None:
+        prices = self.get_navs(time_period=time_period)
+        if self.benchmark_prices is not None:
+            regime_benchmark_str = self.benchmark_prices.columns[0]
+        else:
+            regime_benchmark_str = None
+        ppd.plot_prices_with_dd(prices=prices,
+                                perf_params=perf_params,
+                                regime_benchmark_str=regime_benchmark_str,
+                                axs=axs,
+                                **kwargs)
+
     def plot_exposures(self,
                        benchmark: str = None,
                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
@@ -677,23 +694,6 @@ class MultiPortfolioData:
                                         regime_benchmark=regime_benchmark,
                                         index=factor_exposure.index,
                                         regime_params=regime_params)
-
-    def plot_nav_with_dd(self,
-                         time_period: TimePeriod = None,
-                         perf_params: PerfParams = PERF_PARAMS,
-                         axs: List[plt.Subplot] = None,
-                         **kwargs
-                         ) -> None:
-        prices = self.get_navs(time_period=time_period)
-        if self.benchmark_prices is not None:
-            regime_benchmark_str = self.benchmark_prices.columns[0]
-        else:
-            regime_benchmark_str = None
-        ppd.plot_prices_with_dd(prices=prices,
-                                perf_params=perf_params,
-                                regime_benchmark_str=regime_benchmark_str,
-                                axs=axs,
-                                **kwargs)
 
     def plot_returns_scatter(self,
                              benchmark: str,
@@ -959,3 +959,25 @@ class MultiPortfolioData:
                                             regime_params=regime_params)
 
         return figs
+
+    def plot_tre_time_series(self,
+                             strategy_idx: int = 0,
+                             benchmark_idx: int = 1,
+                             benchmark: str = None,
+                             regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                             time_period: TimePeriod = None,
+                             var_format: str = '{:.2%}',
+                             ax: plt.Subplot = None,
+                             **kwargs
+                             ) -> None:
+        tre = self.compute_tracking_error_implied_by_covar(strategy_idx=strategy_idx, benchmark_idx=benchmark_idx)
+        if time_period is not None:
+            tre = time_period.locate(tre)
+        pts.plot_time_series(df=tre,
+                             var_format=var_format,
+                             legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
+                             title='Tracking error',
+                             ax=ax,
+                             **kwargs)
+        if benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=tre.index, regime_params=regime_params)
