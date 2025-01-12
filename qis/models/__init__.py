@@ -13,6 +13,7 @@ from qis.models.linear.auto_corr import (
 
 from qis.models.linear.corr_cov_matrix import (
     CorrMatrixOutput,
+    estimate_rolling_ewma_covar,
     compute_ewm_corr_df,
     compute_ewm_corr_single,
     compute_masked_covar_corr,
