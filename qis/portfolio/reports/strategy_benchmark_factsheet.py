@@ -506,6 +506,7 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
                                   time_period: TimePeriod = None,
                                   perf_params: PerfParams = PERF_PARAMS,
                                   regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                  add_benchmarks_to_navs: bool = True,
                                   figsize: Tuple[float, float] = (11.7, 8.3),
                                   is_grouped: bool = True,
                                   var_format: str = '{:.1%}',
@@ -522,8 +523,11 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['navs'] = fig
         multi_portfolio_data.plot_nav(regime_benchmark=regime_benchmark,
+                                      time_period=time_period,
                                       perf_params=perf_params,
                                       regime_params=regime_params,
+                                      add_benchmarks_to_navs=add_benchmarks_to_navs,
+                                      x_date_freq='YE',
                                       title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_params.freq}-returns",
                                       ax=ax,
                                       **kwargs)
@@ -531,7 +535,9 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['ra_table'] = fig
         multi_portfolio_data.plot_ac_ra_perf_table(benchmark_price=benchmark_price,
+                                                   add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                    perf_params=perf_params,
+                                                   time_period=time_period,
                                                    is_grouped=False,
                                                    ax=ax,
                                                    **kwargs)
@@ -622,6 +628,7 @@ def plot_exposures(exposures: pd.DataFrame,
                               add_y_meadian_labels=True,
                               yvar_format=var_format,
                               y_limits=(0.0, None),
+                              x_rotation=90,
                               colors=colors,
                               ax=axs[1],
                               **kwargs)
