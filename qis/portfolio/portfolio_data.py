@@ -709,24 +709,32 @@ class PortfolioData:
     def compute_risk_contributions_implied_by_covar(self,
                                                     covar_dict: Dict[pd.Timestamp, pd.DataFrame],
                                                     group_data: pd.Series = None,
-                                                    group_order: List[str] = None
+                                                    group_order: List[str] = None,
+                                                    align_with_covar_dates: bool = True,
+                                                    freq: Optional[str] = None
                                                     ) -> pd.DataFrame:
         """
         compute risk contributions using covar_dict
         """
-        strategy_weights = self.get_weights(freq=None, is_input_weights=True)
+        strategy_weights = self.get_weights(freq=freq, is_input_weights=True)
         covar_index = list(covar_dict.keys())
-        strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
         strategy_rc = {}
-        for date, pd_covar in covar_dict.items():
-            strategy_rc[date] = compute_portfolio_risk_contributions(w=strategy_weights.loc[date], covar=pd_covar)
-        strategy_rc = pd.DataFrame.from_dict(strategy_rc, orient='index')
+        if align_with_covar_dates:
+            strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
+            for date, pd_covar in covar_dict.items():
+                strategy_rc[date] = compute_portfolio_risk_contributions(w=strategy_weights.loc[date], covar=pd_covar)
+        else:
+            for date, weights in strategy_weights.to_dict(orient='index').items():
+                last_covar_update_date = qis.find_upto_date_from_datetime_index(index=covar_index, date=date)
+                if last_covar_update_date is not None:
+                    strategy_rc[date] = compute_portfolio_risk_contributions(w=pd.Series(weights).fillna(0.0),
+                                                                             covar=covar_dict[last_covar_update_date])
 
+        strategy_rc = pd.DataFrame.from_dict(strategy_rc, orient='index')
         if group_data is not None:
             strategy_rc = dfg.agg_df_by_groups_ax1(strategy_rc, group_data=group_data, group_order=group_order)
 
         return strategy_rc
-
 
     # """
     # plotting methods

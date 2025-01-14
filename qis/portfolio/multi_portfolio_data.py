@@ -207,7 +207,7 @@ class MultiPortfolioData:
         for date, pd_covar in self.covar_dict.items():
             w = weight_diffs.loc[date]
             tracking_error[date] = np.sqrt(w @ pd_covar @ w.T)
-        tracking_error = pd.Series(tracking_error)
+        tracking_error = pd.Series(tracking_error, name='Tracking error')
         return tracking_error
 
     def compute_tracking_error_table(self,
@@ -427,10 +427,9 @@ class MultiPortfolioData:
                            time_period: TimePeriod = None,
                            perf_params: PerfParams = PERF_PARAMS,
                            perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
-                           is_df_out: bool = False,
                            ax: plt.Subplot = None,
                            **kwargs
-                           ) -> Optional[pd.DataFrame]:
+                           ) -> pd.DataFrame:
         if benchmark is None:
             benchmark = self.benchmark_prices.columns[0]
         prices = self.get_navs(time_period=time_period, benchmark=benchmark, add_benchmarks_to_navs=add_benchmarks_to_navs)
@@ -445,11 +444,9 @@ class MultiPortfolioData:
                                                               drop_benchmark=drop_benchmark,
                                                               title=ra_perf_title,
                                                               rotation_for_columns_headers=0,
-                                                              is_df_out=is_df_out,
                                                               ax=ax,
                                                               **kwargs)
-        if is_df_out:
-            return ra_perf_table
+        return ra_perf_table
 
     def plot_ac_ra_perf_table(self,
                               benchmark_price: pd.Series,

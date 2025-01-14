@@ -531,7 +531,8 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
                                       perf_params=perf_params,
                                       regime_params=regime_params,
                                       add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                      title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_params.freq}-returns",
+                                      title=f"Cumulative performance with background colors using bear/normal/bull "
+                                            f"regimes of {regime_benchmark} {regime_params.freq}-returns",
                                       ax=ax,
                                       **kwargs)
 
@@ -541,7 +542,6 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
                                                                 add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                                 perf_params=perf_params,
                                                                 time_period=time_period,
-                                                                is_df_out=True,
                                                                 ax=ax,
                                                                 **kwargs)
         dfs['ra_perf_table'] = ra_perf_table
@@ -559,18 +559,23 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
         plot_exposures(exposures_short=exposures_short,
                        exposures_long=exposures_long,
                        ylabel='Weights',
-                       var_format=var_format, y_limits=(0.0, None),
+                       var_format=var_format,
                        axs=axs,  **kwargs)
 
+        rc_kwargs = dict(covar_dict=multi_portfolio_data.covar_dict, freq='QE')
         # strategy risk contributions
-        risk_contributions_short = strategy_data.compute_risk_contributions_implied_by_covar(covar_dict=multi_portfolio_data.covar_dict,
-                                                                                             group_data=group_data_short,
-                                                                                             group_order=group_order_short)
-        risk_contributions_long = strategy_data.compute_risk_contributions_implied_by_covar(covar_dict=multi_portfolio_data.covar_dict,
-                                                                                             group_data=group_data,
-                                                                                             group_order=group_order)
+        risk_contributions_short = strategy_data.compute_risk_contributions_implied_by_covar(group_data=group_data_short,
+                                                                                             group_order=group_order_short,
+                                                                                             **rc_kwargs)
+        risk_contributions_long = strategy_data.compute_risk_contributions_implied_by_covar(group_data=group_data,
+                                                                                            group_order=group_order,
+                                                                                            **rc_kwargs)
+        # ungrouped
+        dfs['strategy_risk_contributions'] = strategy_data.compute_risk_contributions_implied_by_covar(**rc_kwargs)
+
+
         fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
-        qis.set_suptitle(fig, title=f"{strategy_data.ticker} Var")
+        qis.set_suptitle(fig, title=f"{strategy_data.ticker} Risk Contributions")
         figs['strategy_var'] = fig
         plot_exposures(exposures_short=qis.df_to_weight_allocation_sum1(risk_contributions_short),
                        exposures_long=qis.df_to_weight_allocation_sum1(risk_contributions_long),
@@ -591,18 +596,21 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
         plot_exposures(exposures_short=benchmark_exposures_short,
                        exposures_long=benchmark_exposures_long,
                        ylabel='Weights',
-                       var_format=var_format, y_limits=(0.0, None),
+                       var_format=var_format,
                        axs=axs, **kwargs)
 
         # benchmark var
         benchmark_risk_contributions_short = benchmark_data.compute_risk_contributions_implied_by_covar(
-            covar_dict=multi_portfolio_data.covar_dict,
             group_data=group_data_short,
-            group_order=group_order_short)
+            group_order=group_order_short,
+            **rc_kwargs)
         benchmark_risk_contributions_long = benchmark_data.compute_risk_contributions_implied_by_covar(
-            covar_dict=multi_portfolio_data.covar_dict,
             group_data=group_data,
-            group_order=group_order)
+            group_order=group_order,
+            **rc_kwargs)
+        # ungrouped
+        dfs['benchmark_risk_contributions'] = benchmark_data.compute_risk_contributions_implied_by_covar(**rc_kwargs)
+
         fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
         qis.set_suptitle(fig, title=f"{benchmark_data.ticker} Risk Contributions")
         figs['benchmark_var'] = fig
@@ -613,9 +621,9 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
                        axs=axs, **kwargs)
 
         # turnover
-        fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['turnover'] = fig
-        multi_portfolio_data.plot_turnover(ax=axs[0],
+        multi_portfolio_data.plot_turnover(ax=ax,
                                            time_period=time_period,
                                            #turnover_rolling_period=260,
                                            #freq_turnover=None,
@@ -660,5 +668,6 @@ def plot_exposures(exposures_short: pd.DataFrame,
                               yvar_format=var_format,
                               x_rotation=90,
                               colors=qis.get_n_sns_colors(n=len(exposures_long.columns)),
+                              y_limits=(0.0, None),
                               ax=axs[1],
                               **kwargs)

@@ -125,10 +125,9 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  fontsize: int = 10,
                                  transpose: bool = False,
                                  alpha_an_factor: float = None,
-                                 is_df_out: bool = False,
                                  ax: plt.Subplot = None,
                                  **kwargs
-                                 ) -> Union[plt.Figure, Tuple[plt.Figure, pd.DataFrame]]:
+                                 ) -> Tuple[Optional[plt.Figure], pd.DataFrame]:
     """
     plot ra perf table and get ra performance columns with data as string for tables
     """
@@ -149,10 +148,7 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                             fontsize=fontsize,
                             ax=ax,
                             **kwargs)
-    if is_df_out:
-        return fig, ra_perf_table
-    else:
-        return fig
+    return fig, ra_perf_table
 
 
 def plot_ra_perf_bars(prices: pd.DataFrame,

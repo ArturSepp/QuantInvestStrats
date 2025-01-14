@@ -48,16 +48,16 @@ qis.save_fig(fig, file_name='perf3', local_path="figures/")
 # add benchmark regression using excess returns for linear beta
 # regression frequency is specified using perf_params.freq_reg
 # regression alpha is multiplied using perf_params.alpha_an_factor
-fig = qis.plot_ra_perf_table_benchmark(prices=prices,
-                                       benchmark='SPY',
-                                       perf_columns=[PerfStat.TOTAL_RETURN, PerfStat.PA_RETURN, PerfStat.PA_EXCESS_RETURN,
-                                                     PerfStat.VOL, PerfStat.SHARPE_RF0,
-                                                     PerfStat.SHARPE_EXCESS, PerfStat.SORTINO_RATIO, PerfStat.CALMAR_RATIO,
-                                                     PerfStat.MAX_DD, PerfStat.MAX_DD_VOL,
-                                                     PerfStat.SKEWNESS, PerfStat.KURTOSIS,
-                                                     PerfStat.ALPHA_AN, PerfStat.BETA, PerfStat.R2],
-                                       title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')} benchmarked with SPY",
-                                       perf_params=perf_params)
+fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
+                                          benchmark='SPY',
+                                          perf_columns=[PerfStat.TOTAL_RETURN, PerfStat.PA_RETURN, PerfStat.PA_EXCESS_RETURN,
+                                                        PerfStat.VOL, PerfStat.SHARPE_RF0,
+                                                        PerfStat.SHARPE_EXCESS, PerfStat.SORTINO_RATIO, PerfStat.CALMAR_RATIO,
+                                                        PerfStat.MAX_DD, PerfStat.MAX_DD_VOL,
+                                                        PerfStat.SKEWNESS, PerfStat.KURTOSIS,
+                                                        PerfStat.ALPHA_AN, PerfStat.BETA, PerfStat.R2],
+                                          title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')} benchmarked with SPY",
+                                          perf_params=perf_params)
 # skip
 qis.save_fig(fig, file_name='perf4', local_path="figures/")
 
