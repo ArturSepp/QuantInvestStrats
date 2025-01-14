@@ -131,12 +131,12 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.TRACKING_ERROR:
         # compute pd_covras
-        pd_covars = qis.estimate_rolling_ewma_covar(prices=prices,
+        covar_dict = qis.estimate_rolling_ewma_covar(prices=prices,
                                                     time_period=time_period,
                                                     returns_freq='W-WED',
                                                     rebalancing_freq='ME',
                                                     span=52)
-        multi_portfolio_data.pd_covars = pd_covars
+        multi_portfolio_data.covar_dict = covar_dict
         weights_tracking_error_report(multi_portfolio_data=multi_portfolio_data,
                                       time_period=time_period)
 

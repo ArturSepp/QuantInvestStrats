@@ -210,3 +210,12 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
         instrument_vars = time_period.locate(instrument_vars)
         ac_vars = time_period.locate(ac_vars)
     return instrument_vars, ac_vars
+
+
+def compute_portfolio_risk_contributions(w: Union[np.ndarray, pd.Series],
+                                         covar: Union[np.ndarray, pd.DataFrame]
+                                         ) -> Union[np.ndarray, pd.Series]:
+    portfolio_vol = np.sqrt(w.T @ covar @ w)
+    marginal_risk_contribution = covar @ w.T
+    rc = np.multiply(marginal_risk_contribution, w) / portfolio_vol
+    return rc

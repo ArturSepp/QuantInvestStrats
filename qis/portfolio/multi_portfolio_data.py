@@ -25,7 +25,6 @@ import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.drawdowns as cdr
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 
-
 # default perf params
 PERF_PARAMS = PerfParams(freq='W-WED')
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
@@ -37,12 +36,12 @@ class MultiPortfolioData:
     data structure to unify multi portfolio reporting
     portfolio_datas: List[PortfolioData]
     benchmark_prices: Union[pd.DataFrame, pd.Series] = None  # Optional
-    pd_covars: Dict[pd.Timestamp, pd.DataFrame] = None  # annualised covariance matrix
+    covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None  # annualised covariance matrix
                                                         for investable universe for computing tracking error
     """
     portfolio_datas: List[PortfolioData]
     benchmark_prices: Union[pd.DataFrame, pd.Series] = None
-    pd_covars: Dict[pd.Timestamp, pd.DataFrame] = None
+    covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None
     navs: pd.DataFrame = None   # computed internally
 
     def __post_init__(self):
@@ -139,15 +138,17 @@ class MultiPortfolioData:
     def get_aligned_weights(self,
                             strategy_idx: int = 0,
                             benchmark_idx: int = 1,
-                            freq: Optional[str] = 'B',
+                            freq: Optional[str] = None,
+                            is_input_weights: bool = True,
                             time_period: TimePeriod = None,
                             is_grouped: bool = False,
                             **kwargs
                             ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None,
-                                                                          is_input_weights=True, is_grouped=is_grouped)
-        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None,
-                                                                            is_input_weights=True,
+        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=freq,
+                                                                          is_input_weights=is_input_weights,
+                                                                          is_grouped=is_grouped)
+        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq,
+                                                                            is_input_weights=is_input_weights,
                                                                             is_grouped=is_grouped)
         tickers_union = qis.merge_lists_unique(list1=strategy_weights.columns.to_list(),
                                                list2=benchmark_weights.columns.to_list())
@@ -192,18 +193,18 @@ class MultiPortfolioData:
         compute Ex ante  tracking error =
         (strategy_weights - strategy_weights) @ covar @ (strategy_weights - strategy_weights).T
         """
-        if self.pd_covars is None:
-            raise ValueError(f"must pass pd_covars")
+        if self.covar_dict is None:
+            raise ValueError(f"must pass covar_dict")
         strategy_weights = self.portfolio_datas[strategy_idx].get_weights(freq=None, is_input_weights=True)
         benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(freq=None, is_input_weights=True)
-        covar_index = list(self.pd_covars.keys())
-        investable_assets = self.pd_covars[covar_index[0]].columns.to_list()
+        covar_index = list(self.covar_dict.keys())
+        investable_assets = self.covar_dict[covar_index[0]].columns.to_list()
         strategy_weights = strategy_weights.reindex(index=covar_index, columns=investable_assets).ffill().fillna(0.0)
         benchmark_weights = benchmark_weights.reindex(index=covar_index, columns=investable_assets).ffill().fillna(0.0)
 
         weight_diffs = benchmark_weights - strategy_weights
         tracking_error = {}
-        for date, pd_covar in self.pd_covars.items():
+        for date, pd_covar in self.covar_dict.items():
             w = weight_diffs.loc[date]
             tracking_error[date] = np.sqrt(w @ pd_covar @ w.T)
         tracking_error = pd.Series(tracking_error)
@@ -232,8 +233,7 @@ class MultiPortfolioData:
         benchmark_pnl = benchmark_pnl.reindex(columns=tickers_union).reindex(index=strategy_pnl.index)
         pnl_diff = strategy_pnl.subtract(benchmark_pnl)
 
-        strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None,
-                                                                          is_input_weights=True)
+        # strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
         strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=None,
                                                                             roll_period=None, add_total=False)
         strategy_cost = self.portfolio_datas[strategy_idx].get_costs(time_period=time_period, freq=freq,
@@ -241,8 +241,7 @@ class MultiPortfolioData:
                                                                      add_total=False, is_norm_costs=is_norm_costs)
         strategy_ticker = self.portfolio_datas[strategy_idx].ticker
 
-        benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None,
-                                                                            is_input_weights=True)
+        # benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
         benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period, freq=None,
                                                                               roll_period=None, add_total=False)
         benchmark_cost = self.portfolio_datas[benchmark_idx].get_costs(time_period=time_period, freq=freq,
@@ -423,27 +422,34 @@ class MultiPortfolioData:
 
     def plot_ra_perf_table(self,
                            benchmark: str = None,
-                           time_period: TimePeriod = None,
                            drop_benchmark: bool = False,
+                           add_benchmarks_to_navs: bool = False,
+                           time_period: TimePeriod = None,
                            perf_params: PerfParams = PERF_PARAMS,
                            perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+                           is_df_out: bool = False,
                            ax: plt.Subplot = None,
                            **kwargs
-                           ) -> None:
+                           ) -> Optional[pd.DataFrame]:
         if benchmark is None:
             benchmark = self.benchmark_prices.columns[0]
-        prices = self.get_navs(benchmark=benchmark, time_period=time_period)
+        prices = self.get_navs(time_period=time_period, benchmark=benchmark, add_benchmarks_to_navs=add_benchmarks_to_navs)
+        if add_benchmarks_to_navs:
+            drop_benchmark = False
         ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark}: " \
                         f"{qis.get_time_period(prices).to_str()}"
-        ppt.plot_ra_perf_table_benchmark(prices=prices,
-                                         benchmark=benchmark,
-                                         perf_params=perf_params,
-                                         perf_columns=perf_columns,
-                                         drop_benchmark=drop_benchmark,
-                                         title=ra_perf_title,
-                                         rotation_for_columns_headers=0,
-                                         ax=ax,
-                                         **kwargs)
+        fig, ra_perf_table = ppt.plot_ra_perf_table_benchmark(prices=prices,
+                                                              benchmark=benchmark,
+                                                              perf_params=perf_params,
+                                                              perf_columns=perf_columns,
+                                                              drop_benchmark=drop_benchmark,
+                                                              title=ra_perf_title,
+                                                              rotation_for_columns_headers=0,
+                                                              is_df_out=is_df_out,
+                                                              ax=ax,
+                                                              **kwargs)
+        if is_df_out:
+            return ra_perf_table
 
     def plot_ac_ra_perf_table(self,
                               benchmark_price: pd.Series,

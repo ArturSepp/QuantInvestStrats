@@ -5,7 +5,7 @@ qis package implements analytics for visualisation of financial data, performanc
 reporting, analysis of quantitative strategies. 
 
 qis package is split into 5 main modules with the 
-dependecy path increasing sequentially as follows.
+dependency path increasing sequentially as follows.
 
 1. ```qis.utils``` is module containing low level utilities for operations with pandas, numpy, and datetimes.
 
@@ -62,16 +62,13 @@ Core dependencies:
     numpy = ">=1.22.4",
     scipy = ">=1.10",
     statsmodels = ">=0.13.5",
-    pandas = ">=1.5.2",
+    pandas = ">=2.2.0",
     matplotlib = ">=3.2.2",
     seaborn = ">=0.12.2"
 
 Optional dependencies:
     yfinance ">=0.1.38" (for getting test price data),
     pybloqs ">=1.2.13" (for producing html and pdf factsheets)
-
-To use pybloqs for pandas > 2.x, locate file "...\Lib\site-packages\pybloqs\jinja\table.html" and 
-change line 44 from {% for col_name, cell in row.iteritems() %} to {% for col_name, cell in row.items() %}
 
 
 ## **Examples** <a name="examples"></a>

@@ -20,17 +20,16 @@ import qis.utils.df_agg as dfa
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.perfstats.regime_classifier as rcl
-
 import qis.plots.time_series as pts
 import qis.plots.stackplot as pst
 import qis.plots.derived.prices as ppd
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.returns_heatmap as rhe
-
 import qis.models.linear.ewm_factors as ef
 from qis.models.linear.ewm import compute_ewm_vol
-from qis.portfolio.ewm_portfolio_risk import compute_portfolio_vol
+from qis.portfolio.ewm_portfolio_risk import compute_portfolio_vol, compute_portfolio_risk_contributions
+
 
 # default performance and regime params
 PERF_PARAMS = PerfParams(freq='W-WED')
@@ -249,7 +248,9 @@ class PortfolioData:
                     time_period: TimePeriod = None,
                     is_grouped: bool = False,
                     add_total: bool = False,
-                    freq: Optional[str] = 'W-WED'
+                    freq: Optional[str] = 'W-WED',
+                    group_data: pd.Series = None,
+                    group_order: List[str] = None
                     ) -> pd.DataFrame:
         if is_input_weights and self.input_weights is not None and isinstance(self.input_weights, pd.DataFrame):
             weights = self.input_weights.copy()
@@ -261,11 +262,15 @@ class PortfolioData:
             weights = weights.resample(freq).last().ffill()
 
         if is_grouped:
+            if group_data is None:
+                group_data = self.group_data
+            if group_order is None:
+                group_order = self.group_order
             weights = dfg.agg_df_by_groups_ax1(df=weights,
-                                               group_data=self.group_data,
+                                               group_data=group_data,
                                                agg_func=np.nansum,
                                                total_column=self.ticker if add_total else None,
-                                               group_order=self.group_order)
+                                               group_order=group_order)
         elif columns is not None:
             weights = weights[columns]
 
@@ -667,35 +672,65 @@ class PortfolioData:
             distribution_yield_rolling = time_period.locate(distribution_yield_rolling)
         return distributions_by_instrument_yield_rolling, distribution_yield, distribution_yield_rolling
 
-    def plot_distribution_yield(self,
-                                paid_dividends: pd.DataFrame,
-                                time_period: TimePeriod = None,
-                                div_rolling_freq: str = 'ME',
-                                div_rolling_period: int = 12,
-                                axs: List[plt.Subplot] = None,
-                                **kwargs
-                                ):
-        distributions_by_instrument_yield_12m, distribution_yield, distribution_yield_12m =\
-            self.compute_distribution_yield(paid_dividends=paid_dividends,
-                                            time_period=time_period,
-                                            div_rolling_freq=div_rolling_freq,
-                                            div_rolling_period=div_rolling_period)
-        if axs is None:
-            fig1, ax1 = plt.subplots(1, 1, figsize=(14, 10), constrained_layout=True)
-            fig2, ax2 = plt.subplots(1, 1, figsize=(14, 10), constrained_layout=True)
-            axs = [ax1, ax2]
+    def compute_portfolio_vars(self,
+                               is_correlated: bool = True,
+                               time_period: TimePeriod = None,
+                               freq: str = 'B',
+                               total_column: Optional[str] = 'Total',
+                               vol_span: Union[int, float] = 33,  # span in number of freq-returns
+                               group_data: pd.Series = None,
+                               group_order: List[str] = None
+                               ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+        if group_data is None:
+            group_data = self.group_data
+        if group_order is None:
+            group_order = self.group_order
+        if is_correlated:
+            portfolio_vars = qis.compute_portfolio_correlated_var_by_groups(prices=self.prices,
+                                                                            weights=self.get_weights(freq=freq),
+                                                                            group_data=group_data,
+                                                                            group_order=group_order,
+                                                                            freq=freq,
+                                                                            vol_span=vol_span,  # span in number of freq-returns
+                                                                            total_column=total_column,
+                                                                            time_period=time_period)
+            instrument_vars = None
+        else:
+            instrument_vars, portfolio_vars = qis.compute_portfolio_independent_var_by_ac(prices=self.prices,
+                                                                                          weights=self.get_weights(freq=freq),
+                                                                                          group_data=group_data,
+                                                                                          group_order=group_order,
+                                                                                          freq=freq,
+                                                                                          vol_span=vol_span,  # span in number of freq-returns
+                                                                                          total_column=total_column,
+                                                                                          time_period=time_period)
+        return portfolio_vars, instrument_vars
 
-        qis.plot_time_series(distribution_yield_12m,
-                             ax=axs[0],
-                             **kwargs)
-        qis.plot_stack(df=distributions_by_instrument_yield_12m.resample('ME').last(),
-                       use_bar_plot=True,
-                       ax=axs[1],
-                       **kwargs)
+    def compute_risk_contributions_implied_by_covar(self,
+                                                    covar_dict: Dict[pd.Timestamp, pd.DataFrame],
+                                                    group_data: pd.Series = None,
+                                                    group_order: List[str] = None
+                                                    ) -> pd.DataFrame:
+        """
+        compute risk contributions using covar_dict
+        """
+        strategy_weights = self.get_weights(freq=None, is_input_weights=True)
+        covar_index = list(covar_dict.keys())
+        strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
+        strategy_rc = {}
+        for date, pd_covar in covar_dict.items():
+            strategy_rc[date] = compute_portfolio_risk_contributions(w=strategy_weights.loc[date], covar=pd_covar)
+        strategy_rc = pd.DataFrame.from_dict(strategy_rc, orient='index')
 
-    """
-    plotting methods
-    """
+        if group_data is not None:
+            strategy_rc = dfg.agg_df_by_groups_ax1(strategy_rc, group_data=group_data, group_order=group_order)
+
+        return strategy_rc
+
+
+    # """
+    # plotting methods
+    # """
 
     def add_regime_shadows(self,
                            ax: plt.Subplot,
@@ -1144,34 +1179,6 @@ class PortfolioData:
         if add_zero_line:
             ax.axhline(0, color='black', lw=1)
 
-    def compute_portfolio_vars(self,
-                               is_correlated: bool = True,
-                               time_period: TimePeriod = None,
-                               freq: str = 'B',
-                               total_column: Optional[str] = 'Total',
-                               vol_span: Union[int, float] = 33  # span in number of freq-returns
-                               ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
-        if is_correlated:
-            portfolio_vars = qis.compute_portfolio_correlated_var_by_groups(prices=self.prices,
-                                                                            weights=self.get_weights(freq=freq),
-                                                                            group_data=self.group_data,
-                                                                            group_order=self.group_order,
-                                                                            freq=freq,
-                                                                            vol_span=vol_span,  # span in number of freq-returns
-                                                                            total_column=total_column,
-                                                                            time_period=time_period)
-            instrument_vars = None
-        else:
-            instrument_vars, portfolio_vars = qis.compute_portfolio_independent_var_by_ac(prices=self.prices,
-                                                                                          weights=self.get_weights(freq=freq),
-                                                                                          group_data=self.group_data,
-                                                                                          group_order=self.group_order,
-                                                                                          freq=freq,
-                                                                                          vol_span=vol_span,  # span in number of freq-returns
-                                                                                          total_column=total_column,
-                                                                                          time_period=time_period)
-        return portfolio_vars, instrument_vars
-
     def plot_portfolio_grouped_var(self,
                                    is_correlated: bool = True,
                                    regime_benchmark: str = None,
@@ -1405,6 +1412,31 @@ class PortfolioData:
                        ax=ax,
                        **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncols=2)))
 
+    def plot_distribution_yield(self,
+                                paid_dividends: pd.DataFrame,
+                                time_period: TimePeriod = None,
+                                div_rolling_freq: str = 'ME',
+                                div_rolling_period: int = 12,
+                                axs: List[plt.Subplot] = None,
+                                **kwargs
+                                ):
+        distributions_by_instrument_yield_12m, distribution_yield, distribution_yield_12m =\
+            self.compute_distribution_yield(paid_dividends=paid_dividends,
+                                            time_period=time_period,
+                                            div_rolling_freq=div_rolling_freq,
+                                            div_rolling_period=div_rolling_period)
+        if axs is None:
+            fig1, ax1 = plt.subplots(1, 1, figsize=(14, 10), constrained_layout=True)
+            fig2, ax2 = plt.subplots(1, 1, figsize=(14, 10), constrained_layout=True)
+            axs = [ax1, ax2]
+
+        qis.plot_time_series(distribution_yield_12m,
+                             ax=axs[0],
+                             **kwargs)
+        qis.plot_stack(df=distributions_by_instrument_yield_12m.resample('ME').last(),
+                       use_bar_plot=True,
+                       ax=axs[1],
+                       **kwargs)
 
 @dataclass
 class StrategySignalData:

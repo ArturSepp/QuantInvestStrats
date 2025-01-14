@@ -442,7 +442,7 @@ def to_nearest_values(a: np.ndarray,
                       is_sorted: bool = True
                       ) -> np.ndarray:
     """
-    map array of values to nearest elements
+    map array of values to nearest elements in array a
     """
     values_ = np.zeros_like(values)
     for idx, value in enumerate(values):

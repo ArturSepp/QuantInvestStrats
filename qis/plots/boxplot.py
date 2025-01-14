@@ -32,8 +32,8 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
              showmedians: bool = False,
              add_y_mean_labels: bool = False,
              add_xy_mean_labels: bool = False,
-             add_xy_med_labels: bool = False,
-             add_y_med_labels: bool = False,
+             add_xy_median_labels: bool = False,
+             add_y_median_labels: bool = False,
              x_rotation: Optional[int] = 0,
              legend_loc: Optional[str] = 'upper right',
              fontsize: int = 10,
@@ -79,7 +79,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
             palette = put.get_n_colors(n=len(df[x].unique()))
 
     sns.boxplot(x=x, y=y, data=df,
-                hue=hue,
+                hue=hue or x,
                 hue_order=hue_order,
                 palette=palette,
                 linewidth=linewidth,
@@ -163,7 +163,7 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
                         ha='center', va='center',
                         color='black', fontsize=fontsize)
 
-    elif add_y_med_labels or add_xy_med_labels:
+    elif add_y_median_labels or add_xy_median_labels:
         if continuous_x_col is None:
             raise ValueError(f"continuous_x_col must be given")
         df_by_x = df.groupby(x, sort=False)
@@ -171,8 +171,8 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
         for x_idx, (key, g_data) in enumerate(df_by_x):
             y_val = g_data[y].median()
             x_val = g_data[continuous_x_col].median()
-            if add_y_med_labels:
-                ax.text(x_idx, y_val, f"median={yvar_format.format(y_val)}\n\n",
+            if add_y_median_labels:
+                ax.text(x_idx, y_val, f"{yvar_format.format(y_val)}\n\n",
                         ha='center', va='center',
                         color='black', fontsize=fontsize)
             else:
@@ -283,6 +283,7 @@ def df_boxplot_by_columns(df: Union[pd.Series, pd.DataFrame],
                    ylabel=ylabel if show_ylabel else None,
                    xlabel=hue_var_name,
                    original_index=None,
+                   labels=df.columns.to_list(),
                    colors=colors,
                    title=title,
                    ax=ax,
@@ -424,7 +425,7 @@ def df_boxplot_by_classification_var(df: pd.DataFrame,
              meanline=meanline,
              medianline=medianline,
              add_xy_mean_labels=add_xy_mean_labels,
-             add_xy_med_labels=add_xy_med_labels,
+             add_xy_median_labels=add_xy_med_labels,
              labels=labels,
              colors=colors,
              ax=ax,
@@ -488,7 +489,7 @@ def df_dict_boxplot_by_classification_var(data_dict: Dict[Tuple[str, str], pd.Da
              meanline=meanline,
              medianline=medianline,
              add_xy_mean_labels=add_xy_mean_labels,
-             add_xy_med_labels=add_xy_med_labels,
+             add_xy_median_labels=add_xy_med_labels,
              labels=hue_order,
              colors=colors,
              ax=ax,
@@ -552,7 +553,7 @@ def run_unit_test(unit_test: UnitTests):
                               y_var_name='weights',
                               ylabel='weights',
                               showmedians=True,
-                              add_y_med_labels=True)
+                              add_y_median_labels=True)
 
     elif unit_test == UnitTests.DF_DICT:
         dfs = {'alts': prices, 'bal': 0.5*prices}
@@ -564,7 +565,7 @@ def run_unit_test(unit_test: UnitTests):
                                        ylabel='weights',
                                        legend_loc='upper center',
                                        showmedians=True,
-                                       add_y_med_labels=True,
+                                       add_y_median_labels=True,
                                        ncols=2,
                                        ax=ax)
 
