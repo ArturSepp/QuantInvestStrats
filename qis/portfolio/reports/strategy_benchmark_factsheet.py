@@ -637,7 +637,18 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
                                                   time_period=time_period,
                                                   **kwargs)
 
-        # risk contributions
+        # brinson
+        fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
+        figs['brinson'] = fig
+        axs = [axs[0], axs[1], None, None, None]
+        multi_portfolio_data.plot_brinson_attribution(strategy_idx=strategy_idx,
+                                                      benchmark_idx=benchmark_idx,
+                                                      time_period=time_period,
+                                                      freq=None,
+                                                      axs=axs,
+                                                      total_column='Total Sum',
+                                                      is_exclude_interaction_term=True,
+                                                      **kwargs)
 
     return figs, dfs
 
