@@ -22,10 +22,10 @@ bond_etfs = {'SHV': '3m UST',
              }
 # fetch prices and rename to dict values
 tickers = list(bond_etfs.keys())
-prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers].rename(bond_etfs, axis=1)
+prices = yf.download(tickers, start=None, end=None)['Close'][tickers].rename(bond_etfs, axis=1)
 
 # set parameters for computing performance stats including returns vols and regressions
-ust_3m_rate = yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0
+ust_3m_rate = yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
 perf_params = qis.PerfParams(freq='W-WED', rates_data=ust_3m_rate)
 
 # time period for performance measurement

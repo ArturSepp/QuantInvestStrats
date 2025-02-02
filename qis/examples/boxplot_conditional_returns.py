@@ -15,7 +15,7 @@ def run_unit_test(unit_test: UnitTests):
     if unit_test == UnitTests.RETURNS_BOXPLOT:
         asset = 'SPY'
         regime_benchmark = '^VIX'
-        prices = yf.download([asset, regime_benchmark], start=None, end=None)['Adj Close'].dropna()
+        prices = yf.download([asset, regime_benchmark], start=None, end=None)['Close'].dropna()
         prices = prices.asfreq('W-FRI', method='ffill')
         data = pd.concat([prices[asset].pct_change(),  # use returns over (t_0, t_1]
                           prices[regime_benchmark].shift(1)  # use level at t_0

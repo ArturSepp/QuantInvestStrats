@@ -170,20 +170,17 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     import matplotlib.pyplot as plt
-    import quant_strats.local_path as lp
-    local_path = lp.get_resource_path()
-
     if unit_test == UnitTests.UPDATE_DATA:
         from bbg_fetch import fetch_field_timeseries_per_tickers
         vix_tickers = ['VIX1D Index', 'VIX9D Index', 'VIX Index', 'VIX3M Index', 'VIX6M Index', 'VIX1Y Index']
         vols = 0.01 * fetch_field_timeseries_per_tickers(tickers=vix_tickers, field='PX_LAST', CshAdjNormal=True)
         print(vols)
-        qis.save_df_to_csv(df=vols, file_name='vix_indices', local_path=local_path)
+        qis.save_df_to_csv(df=vols, file_name='vix_indices')
 
     elif unit_test == UnitTests.RUN_REPORT:
-        df = qis.load_df_from_csv(file_name='vix_indices', local_path=local_path)
+        df = qis.load_df_from_csv(file_name='vix_indices')
         figs = econ_data_report(data=df)
-        qis.save_figs_to_pdf(figs, file_name='vix_indices', local_path=local_path)
+        qis.save_figs_to_pdf(figs, file_name='vix_indices')
 
     plt.show()
 

@@ -73,7 +73,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     ticker = 'SPY'
-    prices = yf.download(ticker, start=None, end=None)['Adj Close'].rename(ticker)
+    prices = yf.download(ticker, start=None, end=None)['Close'].rename(ticker)
 
     freq = 'ME'
     wo_type = WoType.BEST

@@ -13,7 +13,7 @@ ASSET = 'QQQ'
 CRYPTO = 'BTC-USD'
 tickers = [ASSET, CRYPTO]
 # fetch yahoo data
-prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers]
+prices = yf.download(tickers, start=None, end=None)['Close'][tickers]
 # resample to business days
 prices = prices.asfreq('B', method='ffill').dropna()
 # % returns

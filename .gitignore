@@ -142,7 +142,7 @@ dmypy.json
 .pyre/
 
 legacy/
-quant_strats/
+futures_strats/
 my_projects/
 testing/
 get_local_keys.py
@@ -152,3 +152,4 @@ qis/examples/figures/perf1.PNG
 qis/examples/figures/perf2.PNG
 qis/examples/figures/perf3.PNG
 
+/quant_strats/

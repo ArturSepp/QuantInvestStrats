@@ -11,7 +11,7 @@ class UnitTests(Enum):
 def run_unit_test(unit_test: UnitTests):
 
     tickers = ['SPY', 'QQQ', 'TLT', 'GLD']
-    prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers].dropna()
+    prices = yf.download(tickers, start=None, end=None)['Close'][tickers].dropna()
 
     if unit_test == UnitTests.CORR1:
         fig, ax = plt.subplots(1, 1, figsize=(7, 7), tight_layout=True)

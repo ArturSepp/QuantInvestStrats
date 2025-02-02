@@ -85,7 +85,7 @@ import qis
 
 # define tickers and fetch price data
 tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'SHY', 'LQD', 'HYG', 'GLD']
-prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers].dropna()
+prices = yf.download(tickers, start=None, end=None)['Close'][tickers].dropna()
 
 # plotting price data with minimum usage
 with sns.axes_style("darkgrid"):
@@ -103,7 +103,7 @@ with sns.axes_style("darkgrid"):
 
 ```python 
 # plot risk-adjusted performance table with excess Sharpe ratio
-ust_3m_rate = yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0
+ust_3m_rate = yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
 # set parameters for computing performance stats including returns vols and regressions
 perf_params = qis.PerfParams(freq='ME', freq_reg='QE', alpha_an_factor=4.0, rates_data=ust_3m_rate)
 # perf_columns is list to display different perfomance metrics from enumeration PerfStat

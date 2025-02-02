@@ -25,7 +25,7 @@ def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
                          GLD='Gold')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
-    prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
+    prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
     prices = prices.asfreq('B', method='ffill')
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, group_data

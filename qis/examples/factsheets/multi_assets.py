@@ -83,7 +83,7 @@ def run_unit_test(unit_test: UnitTests):
         raise NotImplementedError
 
     if prices is None:
-        prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Adj Close'][tickers]
+        prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
 
     prices = prices.asfreq('B', method='ffill')  # make B frequency
     prices = prices.dropna()

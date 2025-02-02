@@ -165,7 +165,7 @@ def run_unit_test(unit_test: UnitTests):
     LOCAL_PATH = "C://Users//artur//OneDrive//analytics//outputs//"
 
     # download spy prices
-    prices = yf.download(tickers=['SPY'], start=None, end=None, ignore_tz=True)['Adj Close'].rename('Realised')
+    prices = yf.download(tickers=['SPY'], start=None, end=None, ignore_tz=True)['Close'].rename('Realised')
 
     if unit_test == UnitTests.PLOT_BOOTSRAPPED_PRICES:
         # use small number of num_samples for illustration

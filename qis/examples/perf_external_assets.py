@@ -15,14 +15,14 @@ import qis
 svrpo = qis.load_df_from_csv(file_name='SVRPO_History', local_path=qis.get_resource_path())
 # spy etf as benchmark
 benchmark = 'SPY'
-spy = yf.download([benchmark], start=None, end=None)['Adj Close'].rename(benchmark)
+spy = yf.download([benchmark], start=None, end=None)['Close'].rename(benchmark)
 # merge
 prices = pd.concat([spy, svrpo], axis=1).dropna()
 # take last 3 years
 prices = prices.loc['2020':, :]
 
 # set parameters for computing performance stats including returns vols and regressions
-ust_3m_rate = yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0
+ust_3m_rate = yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
 perf_params = qis.PerfParams(freq='ME', freq_reg='W-WED', alpha_an_factor=52.0, rates_data=ust_3m_rate)
 
 # price perf

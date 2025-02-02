@@ -8,7 +8,7 @@ import yfinance as yf
 
 tickers_weights = dict(SPY=0.6, IEF=0.4)
 tickers = list(tickers_weights.keys())
-prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers]
+prices = yf.download(tickers, start=None, end=None)['Close'][tickers]
 prices = prices.asfreq('B', method='ffill').dropna()
 
 balanced_60_40a = qis.backtest_model_portfolio(prices=prices, weights=tickers_weights, rebalance_freq='QE',

@@ -7,7 +7,7 @@ from qis import PerfStat
 
 # define tickers and fetch price data
 tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'SHY', 'LQD', 'HYG', 'GLD']
-prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers].dropna()
+prices = yf.download(tickers, start=None, end=None)['Close'][tickers].dropna()
 
 # define frequencies for vol computations
 freqs = ['B', 'W-WED', 'ME', 'QE']

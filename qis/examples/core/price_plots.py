@@ -96,7 +96,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    ust_3m_rate = yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0
+    ust_3m_rate = yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
 
     if unit_test == UnitTests.ETF_DATA:
         regime_benchmark_str = 'SPY'
@@ -140,7 +140,7 @@ def run_unit_test(unit_test: UnitTests):
         perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=52)
         kwargs = dict(x_date_freq='ME', heatmap_freq='ME', date_format='%b-%y', perf_params=perf_params)
 
-    prices = yf.download(tickers, start=None, end=None)['Adj Close'][tickers].dropna()
+    prices = yf.download(tickers, start=None, end=None)['Close'][tickers].dropna()
 
     if time_period is not None:
         prices = time_period.locate(prices)

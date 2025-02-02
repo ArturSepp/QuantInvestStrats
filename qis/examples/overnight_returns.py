@@ -14,9 +14,9 @@ def compute_returns(ticker: str = 'SPY', time_period: qis.TimePeriod = None) -> 
     if time_period is not None:
         ohlc_data = time_period.locate(ohlc_data)
     # need to adjust open price for dividends
-    adjustment_ratio = ohlc_data['Adj Close'] / ohlc_data['Close']
+    adjustment_ratio = ohlc_data['Close'] / ohlc_data['Close']
     adjusted_open = adjustment_ratio.multiply(ohlc_data['Open'])
-    adjusted_close = ohlc_data['Adj Close']
+    adjusted_close = ohlc_data['Close']
     overnight_return = adjusted_open.divide(adjusted_close.shift(1)) - 1.0
     intraday_return = adjusted_close.divide(adjusted_open) - 1.0
     close_to_close_return = adjusted_close.divide(adjusted_close.shift(1)) - 1.0

@@ -138,7 +138,7 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
     """
     rates_data = None
     if add_rates_data:
-        rates_data = yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0
+        rates_data = yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
         if rates_data.empty:  # if online
             rates_data = None
 
@@ -166,7 +166,7 @@ def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileReg
     """
     by default we use 3m US rate
     """
-    rates_data = yf.download('^IRX', start=None, end=None)['Adj Close'].dropna() / 100.0
+    rates_data = yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
     if rates_data.empty:  # if online
         rates_data = None
     perf_params = PerfParams(freq='W-WED', freq_reg='W-WED', rates_data=rates_data)
