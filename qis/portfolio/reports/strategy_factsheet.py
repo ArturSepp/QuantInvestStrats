@@ -51,7 +51,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 is_1y_exposures: bool = False,
                                 is_grouped: Optional[bool] = None,
                                 dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
-                                is_norm_costs: bool = True,
+                                is_unit_based_traded_volume: bool = True,
                                 df_to_add: pd.DataFrame = None,
                                 factsheet_name: str = None,
                                 **kwargs
@@ -157,7 +157,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[10:12, :2])
     turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=turnover_rolling_period,
                                            freq=freq_turnover,
-                                           is_grouped=is_grouped)
+                                           is_grouped=is_grouped,
+                                           is_unit_based_traded_volume=is_unit_based_traded_volume)
     freq = pd.infer_freq(turnover.index)
     turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
     qis.plot_time_series(df=turnover,
@@ -175,7 +176,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     costs = portfolio_data.get_costs(time_period=time_period, roll_period=cost_rolling_period,
                                      freq=freq_cost,
                                      is_grouped=is_grouped,
-                                     is_norm_costs=is_norm_costs)
+                                     is_unit_based_traded_volume=is_unit_based_traded_volume)
     freq = pd.infer_freq(costs.index)
     costs_title = f"{cost_rolling_period}-period rolling {freq}-freq Costs"
     qis.plot_time_series(df=costs,
@@ -510,7 +511,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
         # costs
         with sns.axes_style("whitegrid"):
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None, is_norm_costs=is_norm_costs))
+            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None, is_unit_based_traded_volume=is_unit_based_traded_volume))
             portfolio_data.plot_performance_attribution(time_period=time_period,
                                                         attribution_metric=qis.AttributionMetric.COSTS,
                                                         ax=fig.add_subplot(gs[6, :2]),

@@ -249,14 +249,13 @@ def to_finite_ratio(x: Union[pd.Series, pd.DataFrame, np.ndarray],
     return x_y
 
 
-@njit
-def covar_to_corr(covar: np.ndarray) -> np.ndarray:
+def covar_to_corr(covar: Union[np.ndarray, pd.DataFrame]) -> Union[np.ndarray, pd.DataFrame]:
     """
     compute correlation out of covariance
     """
     inv_vol = np.reciprocal(np.sqrt(np.diag(covar)))
     norm = np.outer(inv_vol, inv_vol)
-    covar *= norm
+    covar = covar.multiply(norm)
     return covar
 
 

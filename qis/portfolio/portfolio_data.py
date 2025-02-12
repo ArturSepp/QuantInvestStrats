@@ -167,13 +167,13 @@ class PortfolioData:
                             add_total: bool = False,
                             time_period: TimePeriod = None,
                             is_net: bool = False,
-                            is_norm_costs: bool = True,
+                            is_unit_based_traded_volume: bool = True,
                             is_compounded: bool = False,
                             freq: Optional[str] = None
                             ) -> pd.DataFrame:
         pnl = self.instrument_pnl.copy()
         if is_net:
-            costs = self.get_costs(add_total=False, is_norm_costs=is_norm_costs)
+            costs = self.get_costs(add_total=False, is_unit_based_traded_volume=is_unit_based_traded_volume)
             pnl = pnl.subtract(costs)
         if add_total:
             pnl.insert(loc=0, value=pnl.sum(1), column='Total')
@@ -335,12 +335,17 @@ class PortfolioData:
                      is_vol_adjusted: bool = False,
                      add_total: bool = True,
                      vol_span: int = 33,
-                     freq: Optional[str] = None
+                     freq: Optional[str] = None,
+                     is_unit_based_traded_volume: bool = True
                      ) -> Union[pd.DataFrame, pd.Series]:
-        turnover = (self.units.diff(1).abs()).multiply(self.prices)
-        abs_exposure = self.units.multiply(self.prices).abs().sum(axis=1)
-        # turnover = turnover.divide(self.nav.to_numpy(), axis=0)
-        turnover = turnover.divide(abs_exposure.to_numpy(), axis=0)
+
+        if is_unit_based_traded_volume:  # for unit generated backtest
+            turnover = (self.units.diff(1).abs()).multiply(self.prices)
+            abs_exposure = self.units.multiply(self.prices).abs().sum(axis=1)
+            # turnover = turnover.divide(self.nav.to_numpy(), axis=0)
+            turnover = turnover.divide(abs_exposure.to_numpy(), axis=0)
+        else:  # for weight generated backtets
+            turnover = self.input_weights.diff(1).abs()
 
         if is_vol_adjusted:
             instrument_vols = compute_ewm_vol(data=qis.to_returns(self.prices, is_log_returns=True),
@@ -374,13 +379,13 @@ class PortfolioData:
                   is_grouped: bool = False,
                   time_period: TimePeriod = None,
                   add_total: bool = True,
-                  is_norm_costs: bool = True,
+                  is_unit_based_traded_volume: bool = True,
                   roll_period: Optional[int] = 260,
                   freq: Optional[str] = None
                   ) -> Union[pd.DataFrame, pd.Series]:
 
         costs = self.realized_costs
-        if is_norm_costs:
+        if is_unit_based_traded_volume:
             costs = costs.divide(self.nav.to_numpy(), axis=0)
         if is_agg:
             costs = pd.Series(np.nansum(costs, axis=1), index=self.nav.index, name=self.nav.name)
@@ -533,7 +538,7 @@ class PortfolioData:
     def get_performance_attribution_data(self,
                                          attribution_metric: AttributionMetric = AttributionMetric.PNL,
                                          time_period: TimePeriod = None,
-                                         is_norm_costs: bool = True,
+                                         is_unit_based_traded_volume: bool = True,
                                          **kwargs
                                          ) -> Union[pd.DataFrame, pd.Series]:
         if attribution_metric == AttributionMetric.PNL:
@@ -543,11 +548,11 @@ class PortfolioData:
         elif attribution_metric == AttributionMetric.INST_PNL:
             data = self.get_instruments_navs(time_period=time_period)
         elif attribution_metric == AttributionMetric.COSTS:
-            data = self.get_costs(is_agg=False, is_grouped=False, roll_period=None, is_norm_costs=is_norm_costs,
+            data = self.get_costs(is_agg=False, is_grouped=False, roll_period=None, is_unit_based_traded_volume=is_unit_based_traded_volume,
                                   add_total=False,
                                   time_period=time_period)
             data = data.sum(0)
-            #print(f"total costs, is_norm_costs={is_norm_costs} = {np.nansum(data)}")
+            #print(f"total costs, is_unit_based_traded_volume={is_unit_based_traded_volume} = {np.nansum(data)}")
         elif attribution_metric == AttributionMetric.TURNOVER:
             data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
                                      add_total=False,

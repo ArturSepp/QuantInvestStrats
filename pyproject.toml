@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qis"
-version = "3.0.2"
+version = "3.0.4"
 description = "Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
 license = "LICENSE.txt"
 authors = ["Artur Sepp <artursepp@gmail.com>"]

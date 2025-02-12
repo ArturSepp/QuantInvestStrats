@@ -216,7 +216,7 @@ class MultiPortfolioData:
                                      freq: Optional[str] = 'B',
                                      time_period: TimePeriod = None,
                                      af: float = 260,
-                                     is_norm_costs: bool = True,
+                                     is_unit_based_traded_volume: bool = True,
                                      **kwargs
                                      ) -> pd.DataFrame:
         """
@@ -238,7 +238,7 @@ class MultiPortfolioData:
                                                                             roll_period=None, add_total=False)
         strategy_cost = self.portfolio_datas[strategy_idx].get_costs(time_period=time_period, freq=freq,
                                                                      roll_period=None,
-                                                                     add_total=False, is_norm_costs=is_norm_costs)
+                                                                     add_total=False, is_unit_based_traded_volume=is_unit_based_traded_volume)
         strategy_ticker = self.portfolio_datas[strategy_idx].ticker
 
         # benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
@@ -246,7 +246,7 @@ class MultiPortfolioData:
                                                                               roll_period=None, add_total=False)
         benchmark_cost = self.portfolio_datas[benchmark_idx].get_costs(time_period=time_period, freq=freq,
                                                                        roll_period=None,
-                                                                       add_total=False, is_norm_costs=is_norm_costs)
+                                                                       add_total=False, is_unit_based_traded_volume=is_unit_based_traded_volume)
         benchmark_ticker = self.portfolio_datas[benchmark_idx].ticker
 
         # compute stats
@@ -606,12 +606,14 @@ class MultiPortfolioData:
                       turnover_rolling_period: Optional[int] = 260,
                       freq_turnover: Optional[str] = 'B',
                       var_format: str = '{:.0%}',
+                      is_unit_based_traded_volume: bool = True,
                       ax: plt.Subplot = None,
                       **kwargs) -> None:
 
         turnover = []
         for portfolio in self.portfolio_datas:
-            turnover.append(portfolio.get_turnover(roll_period=turnover_rolling_period, freq=freq_turnover, is_agg=True).rename(portfolio.nav.name))
+            turnover.append(portfolio.get_turnover(roll_period=turnover_rolling_period, freq=freq_turnover, is_agg=True,
+                                                   is_unit_based_traded_volume=is_unit_based_traded_volume).rename(portfolio.nav.name))
         turnover = pd.concat(turnover, axis=1)
         if time_period is not None:
             turnover = time_period.locate(turnover)
@@ -635,13 +637,13 @@ class MultiPortfolioData:
                    time_period: TimePeriod = None,
                    regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                    var_format: str = '{:.2%}',
-                   is_norm_costs: bool = True,
+                   is_unit_based_traded_volume: bool = True,
                    ax: plt.Subplot = None,
                    **kwargs) -> None:
         costs = []
         for portfolio in self.portfolio_datas:
             costs.append(portfolio.get_costs(roll_period=cost_rolling_period, freq=freq_cost, is_agg=True,
-                                             is_norm_costs=is_norm_costs).rename(portfolio.nav.name))
+                                             is_unit_based_traded_volume=is_unit_based_traded_volume).rename(portfolio.nav.name))
         costs = pd.concat(costs, axis=1)
         if time_period is not None:
             costs = time_period.locate(costs)

@@ -3,6 +3,8 @@ configuration for performance reports
 """
 from enum import Enum
 from typing import Dict, Any, Tuple, NamedTuple, Optional, List
+
+import qis
 from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat
 import yfinance as yf
 
@@ -61,7 +63,7 @@ class FactsheetConfig(NamedTuple):
     freq_turnover: str = 'B'   # daily freq
     cost_rolling_period: int = 260  # turnover = turnover.rolling(turnover_roll_period).sum()
     freq_cost: Optional[str] = 'B'  # for rolling costs
-    is_norm_costs: bool = True  # for long-only protfolio use nrmalised costs
+    is_unit_based_traded_volume: bool = True  # for long-only protfolio use nrmalised costs
     factor_beta_span: int = 52  # to compute rolling beta
     freq_beta: str = 'W-WED'  # for scatter plot
     exposures_freq: str = 'W-WED'  # for plotting strategy exposures
@@ -101,7 +103,7 @@ FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
                                                             freq_cost='ME',
                                                             freq_var='ME',
                                                             var_span=12,
-                                                            is_norm_costs=True,
+                                                            is_unit_based_traded_volume=True,
                                                             factor_beta_span=36,
                                                             freq_beta='ME',
                                                             exposures_freq='ME')
@@ -124,7 +126,7 @@ FACTSHEET_CONFIG_QUARTERLY_DATA_LONG_PERIOD = FactsheetConfig(freq='QE',
                                                               freq_cost='QE',
                                                               freq_var='QE',
                                                               var_span=12,
-                                                              is_norm_costs=True,
+                                                              is_unit_based_traded_volume=True,
                                                               factor_beta_span=12,
                                                               freq_beta='QE',
                                                               exposures_freq='QE')
@@ -178,7 +180,8 @@ def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileReg
 def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
                                 reporting_frequency: ReportingFrequency = ReportingFrequency.DAILY,
                                 long_threshold_years: float = 5.0,
-                                add_rates_data: bool = True
+                                add_rates_data: bool = True,
+                                is_unit_based_traded_volume: bool = True
                                 ) -> Dict[str, Any]:
 
     # use for number years > 5
@@ -207,6 +210,7 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
 
     kwargs = fetch_factsheet_config_kwargs(factsheet_config=factsheet_config,
                                            add_rates_data=add_rates_data)
+    kwargs = qis.update_kwargs(kwargs, dict(is_unit_based_traded_volume=is_unit_based_traded_volume))
     return kwargs
 
 

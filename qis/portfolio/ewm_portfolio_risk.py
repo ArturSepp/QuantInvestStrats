@@ -75,9 +75,11 @@ def compute_portfolio_vol(returns: pd.DataFrame,
                                               init_type=init_type,
                                               nan_backfill=nan_backfill)
 
+    if span is not None:
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+
     portfolio_vol = compute_portfolio_var_np(returns=returns_np,
                                              weights=weights_np,
-                                             span=span,
                                              ewm_lambda=ewm_lambda)
 
     if annualize:
@@ -215,6 +217,12 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
 def compute_portfolio_risk_contributions(w: Union[np.ndarray, pd.Series],
                                          covar: Union[np.ndarray, pd.DataFrame]
                                          ) -> Union[np.ndarray, pd.Series]:
+    if isinstance(covar, pd.DataFrame) and isinstance(w, pd.Series):  # make sure weights are alined
+        w = w.reindex(index=covar.index).fillna(0.0)
+    elif isinstance(covar, np.ndarray) and isinstance(w, np.ndarray):
+        assert covar.shape[0] == covar.shape[1] == w.shape[0]
+    else:
+        raise ValueError(f"unnsuported types {type(w)} and {type(covar)}")
     portfolio_vol = np.sqrt(w.T @ covar @ w)
     marginal_risk_contribution = covar @ w.T
     rc = np.multiply(marginal_risk_contribution, w) / portfolio_vol
