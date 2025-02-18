@@ -552,6 +552,7 @@ def run_unit_test(unit_test: UnitTests):
                               hue_var_name='instruments',
                               y_var_name='weights',
                               ylabel='weights',
+                              legend_loc=None,
                               showmedians=True,
                               add_y_median_labels=True)
 

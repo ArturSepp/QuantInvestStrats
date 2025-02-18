@@ -427,6 +427,9 @@ class MultiPortfolioData:
                            time_period: TimePeriod = None,
                            perf_params: PerfParams = PERF_PARAMS,
                            perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+                           strategy_idx: int = 0,
+                           benchmark_idx: int = 1,
+                           add_turnover: bool = False,
                            ax: plt.Subplot = None,
                            **kwargs
                            ) -> pd.DataFrame:
@@ -437,6 +440,14 @@ class MultiPortfolioData:
             drop_benchmark = False
         ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark}: " \
                         f"{qis.get_time_period(prices).to_str()}"
+        
+        if add_turnover:
+            turnover = self.get_turnover(time_period=time_period, **kwargs)
+            turnover = turnover.mean(axis=0).to_frame('Turnover')
+            df_to_add = qis.df_to_str(turnover, var_format='{:,.0%}')
+        else:
+            df_to_add = None
+            
         fig, ra_perf_table = ppt.plot_ra_perf_table_benchmark(prices=prices,
                                                               benchmark=benchmark,
                                                               perf_params=perf_params,
@@ -444,6 +455,7 @@ class MultiPortfolioData:
                                                               drop_benchmark=drop_benchmark,
                                                               title=ra_perf_title,
                                                               rotation_for_columns_headers=0,
+                                                              df_to_add=df_to_add,
                                                               ax=ax,
                                                               **kwargs)
         return ra_perf_table
@@ -598,7 +610,24 @@ class MultiPortfolioData:
                              **kwargs)
         if benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=diff.index, regime_params=regime_params)
-
+    
+    def get_turnover(self,
+                     time_period: TimePeriod = None,
+                     turnover_rolling_period: Optional[int] = 12,
+                     freq_turnover: Optional[str] = 'ME',
+                     is_unit_based_traded_volume: bool = True,
+                     **kwargs
+                     ):
+        turnover = []
+        for portfolio in self.portfolio_datas:
+            turnover.append(portfolio.get_turnover(roll_period=turnover_rolling_period, freq=freq_turnover, is_agg=True,
+                                                   is_unit_based_traded_volume=is_unit_based_traded_volume).rename(
+                portfolio.nav.name))
+        turnover = pd.concat(turnover, axis=1)
+        if time_period is not None:
+            turnover = time_period.locate(turnover)
+        return turnover
+        
     def plot_turnover(self,
                       benchmark: str = None,
                       time_period: TimePeriod = None,
@@ -609,14 +638,10 @@ class MultiPortfolioData:
                       is_unit_based_traded_volume: bool = True,
                       ax: plt.Subplot = None,
                       **kwargs) -> None:
-
-        turnover = []
-        for portfolio in self.portfolio_datas:
-            turnover.append(portfolio.get_turnover(roll_period=turnover_rolling_period, freq=freq_turnover, is_agg=True,
-                                                   is_unit_based_traded_volume=is_unit_based_traded_volume).rename(portfolio.nav.name))
-        turnover = pd.concat(turnover, axis=1)
-        if time_period is not None:
-            turnover = time_period.locate(turnover)
+        
+        turnover = self.get_turnover(turnover_rolling_period=turnover_rolling_period, freq_turnover=freq_turnover,
+                                     is_unit_based_traded_volume=is_unit_based_traded_volume,
+                                     time_period=time_period)
         freq = pd.infer_freq(turnover.index)
         turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
         pts.plot_time_series(df=turnover,

@@ -542,6 +542,7 @@ def weights_tracking_error_report(multi_portfolio_data: MultiPortfolioData,
                                                                 add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                                 perf_params=perf_params,
                                                                 time_period=time_period,
+                                                                add_turnover=True,
                                                                 ax=ax,
                                                                 **kwargs)
         dfs['ra_perf_table'] = ra_perf_table

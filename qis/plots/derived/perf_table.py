@@ -125,6 +125,8 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  fontsize: int = 10,
                                  transpose: bool = False,
                                  alpha_an_factor: float = None,
+                                 is_convert_to_str: bool = True,
+                                 df_to_add: pd.DataFrame = None,
                                  ax: plt.Subplot = None,
                                  **kwargs
                                  ) -> Tuple[Optional[plt.Figure], pd.DataFrame]:
@@ -138,10 +140,19 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                                   perf_columns=perf_columns,
                                                   column_header=column_header,
                                                   alpha_an_factor=alpha_an_factor,
+                                                  is_convert_to_str=is_convert_to_str,
                                                   **kwargs)
     if not drop_benchmark and special_rows_colors is None:
         special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
     kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
+    
+    if df_to_add is not None:
+        df_to_add = df_to_add.reindex(index=ra_perf_table.index)
+        if is_convert_to_str:
+            df_to_add = df_to_add.fillna('')
+        ra_perf_table = pd.concat([ra_perf_table, df_to_add], axis=1)
+
+
     fig = ptb.plot_df_table(df=ra_perf_table,
                             transpose=transpose,
                             special_columns_colors=special_columns_colors,
