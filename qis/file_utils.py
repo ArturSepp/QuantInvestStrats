@@ -231,17 +231,21 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
         if sheet_names is None:
             sheet_names = [f"Sheet {n+1}" for n, _ in enumerate(data)]
         for df, name in zip(data, sheet_names):
-            df = delocalize_df(df)
-            if transpose:
-                df = df.T
-            df.to_excel(excel_writer=excel_writer, sheet_name=name)
+            if df is not None:
+                df = delocalize_df(df)
+                if transpose:
+                    df = df.T
+                df.to_excel(excel_writer=excel_writer, sheet_name=name)
     elif isinstance(data, dict):  # publish with sheet names
         for key, df in data.items():
-            df = delocalize_df(df)
-            if transpose:
-                df = df.T
-            df.to_excel(excel_writer=excel_writer, sheet_name=key)
+            if df is not None:
+                df = delocalize_df(df)
+                if transpose:
+                    df = df.T
+                df.to_excel(excel_writer=excel_writer, sheet_name=key)
     else:
+        if data is None:
+            raise ValueError(f"None data")
         if transpose:
             data = data.T
         data = delocalize_df(data)

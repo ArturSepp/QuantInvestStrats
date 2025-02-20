@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qis"
-version = "3.0.5"
+version = "3.0.6"
 description = "Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
 license = "LICENSE.txt"
 authors = ["Artur Sepp <artursepp@gmail.com>"]
@@ -51,5 +51,6 @@ fsspec = ">=2022.11.0"
 yfinance = ">=0.1.38"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.0.0", "hatchling==1.27.0", "hatch-vcs"]
+#build-backend = "hatchling.build"
 build-backend = "poetry.core.masonry.api"
