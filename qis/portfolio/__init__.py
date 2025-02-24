@@ -27,6 +27,7 @@ from qis.portfolio.reports.config import (FactsheetConfig,
                                           ReportingFrequency)
 
 from qis.portfolio.reports.brinson_attribution import (compute_brinson_attribution_table,
+                                                       plot_brinson_totals_table,
                                                        plot_brinson_attribution_table)
 
 from qis.portfolio.reports.multi_assets_factsheet import (MultiAssetsReport, generate_multi_asset_factsheet)

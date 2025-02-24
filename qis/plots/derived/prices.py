@@ -64,7 +64,7 @@ def get_performance_labels_for_stats(prices: Union[pd.DataFrame, pd.Series],
 def plot_prices(prices: Union[pd.DataFrame, pd.Series],
                 perf_stats_labels: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, ),
                 perf_params: PerfParams = None,
-                regime_benchmark_str: str = None,  # to add regimes
+                regime_benchmark: str = None,  # to add regimes
                 pivot_prices: pd.Series = None,
                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
                 var_format: str = '{:,.1f}',
@@ -110,11 +110,11 @@ def plot_prices(prices: Union[pd.DataFrame, pd.Series],
                                ax=ax,
                                **kwargs)
 
-    if regime_benchmark_str is not None and regime_params is not None:
+    if regime_benchmark is not None and regime_params is not None:
         add_bnb_regime_shadows(ax=ax,
                                data_df=prices,
                                pivot_prices=pivot_prices,
-                               benchmark=regime_benchmark_str,
+                               benchmark=regime_benchmark,
                                regime_params=regime_params)
     return fig
 
@@ -123,7 +123,7 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                         perf_stats_labels: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL,
                                                              PerfStat.SHARPE_RF0),
                         perf_params: PerfParams = None,
-                        regime_benchmark_str: str = None,  # to add regimes
+                        regime_benchmark: str = None,  # to add regimes
                         pivot_prices: pd.Series = None,
                         regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
                         var_format: str = '{:,.1f}',
@@ -174,12 +174,12 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
     if remove_xticklabels_ax1:
         axs[0].set_xticklabels('')
 
-    if (regime_benchmark_str is not None or pivot_prices is not None) and regime_params is not None:
+    if (regime_benchmark is not None or pivot_prices is not None) and regime_params is not None:
         for ax in axs:
             add_bnb_regime_shadows(ax=ax,
                                    data_df=prices,
                                    pivot_prices=pivot_prices,
-                                   benchmark=regime_benchmark_str,
+                                   benchmark=regime_benchmark,
                                    regime_params=regime_params,
                                    perf_params=perf_params)
     return fig
@@ -190,7 +190,7 @@ def plot_prices_with_fundamentals(prices: Union[pd.DataFrame, pd.Series],
                                   mcap: Union[pd.DataFrame, pd.Series],
                                   perf_stats_labels: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, ),
                                   perf_params: PerfParams = None,
-                                  regime_benchmark_str: str = None,  # to add regimes
+                                  regime_benchmark: str = None,  # to add regimes
                                   pivot_prices: pd.Series = None,
                                   regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
                                   trend_line: put.TrendLine = put.TrendLine.AVERAGE,
@@ -242,12 +242,12 @@ def plot_prices_with_fundamentals(prices: Union[pd.DataFrame, pd.Series],
     axs[0].set_xticklabels('')
     axs[1].set_xticklabels('')
 
-    if regime_benchmark_str is not None and regime_params is not None:
+    if regime_benchmark is not None and regime_params is not None:
         for ax in axs:
             add_bnb_regime_shadows(ax=ax,
                                    data_df=prices,
                                    pivot_prices=pivot_prices,
-                                   benchmark=regime_benchmark_str,
+                                   benchmark=regime_benchmark,
                                    regime_params=regime_params,
                                    perf_params=perf_params)
     return fig
@@ -313,7 +313,7 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
                            roll_freq: str = None,
                            legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                            title: Optional[str] = None,
-                           regime_benchmark_str: str = None,
+                           regime_benchmark: str = None,
                            pivot_prices: pd.Series = None,
                            regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
                            perf_params: PerfParams = None,
@@ -337,11 +337,11 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
                                ax=ax,
                                **sop.update_kwargs(kwargs, dict(var_format=rolling_perf_stat.value[1])))
 
-    if regime_benchmark_str is not None and regime_params is not None:
+    if regime_benchmark is not None and regime_params is not None:
         add_bnb_regime_shadows(ax=ax,
                                data_df=prices.reindex(index=df.index, method='ffill'),
                                pivot_prices=pivot_prices,
-                               benchmark=regime_benchmark_str,
+                               benchmark=regime_benchmark,
                                regime_params=regime_params,
                                perf_params=perf_params)
 
@@ -373,7 +373,7 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.PRICE_WITH_DD:
         perf_params = PerfParams(freq='ME')
         plot_prices_with_dd(prices=prices,
-                            regime_benchmark_str=prices.columns[0],
+                            regime_benchmark=prices.columns[0],
                             perf_params=perf_params)
 
     plt.show()

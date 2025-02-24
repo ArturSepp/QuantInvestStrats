@@ -238,7 +238,8 @@ class MultiPortfolioData:
                                                                             roll_period=None, add_total=False)
         strategy_cost = self.portfolio_datas[strategy_idx].get_costs(time_period=time_period, freq=freq,
                                                                      roll_period=None,
-                                                                     add_total=False, is_unit_based_traded_volume=is_unit_based_traded_volume)
+                                                                     add_total=False,
+                                                                     is_unit_based_traded_volume=is_unit_based_traded_volume)
         strategy_ticker = self.portfolio_datas[strategy_idx].ticker
 
         # benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
@@ -246,7 +247,8 @@ class MultiPortfolioData:
                                                                               roll_period=None, add_total=False)
         benchmark_cost = self.portfolio_datas[benchmark_idx].get_costs(time_period=time_period, freq=freq,
                                                                        roll_period=None,
-                                                                       add_total=False, is_unit_based_traded_volume=is_unit_based_traded_volume)
+                                                                       add_total=False,
+                                                                       is_unit_based_traded_volume=is_unit_based_traded_volume)
         benchmark_ticker = self.portfolio_datas[benchmark_idx].ticker
 
         # compute stats
@@ -525,17 +527,17 @@ class MultiPortfolioData:
                          ) -> None:
         prices = self.get_navs(time_period=time_period)
         if self.benchmark_prices is not None:
-            regime_benchmark_str = self.benchmark_prices.columns[0]
+            regime_benchmark = self.benchmark_prices.columns[0]
         else:
-            regime_benchmark_str = None
+            regime_benchmark = None
         ppd.plot_prices_with_dd(prices=prices,
                                 perf_params=perf_params,
-                                regime_benchmark_str=regime_benchmark_str,
+                                regime_benchmark=regime_benchmark,
                                 axs=axs,
                                 **kwargs)
 
     def plot_exposures(self,
-                       benchmark: str = None,
+                       regime_benchmark: str = None,
                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                        time_period: TimePeriod = None,
                        var_format: str = '{:.0%}',
@@ -552,14 +554,14 @@ class MultiPortfolioData:
                              title='Portfolio net exposures',
                              ax=ax,
                              **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=exposures.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=exposures.index, regime_params=regime_params)
 
     def plot_instrument_pnl_diff(self,
                                  portfolio_idx1: int = 0,
                                  portfolio_idx2: int = 1,
                                  is_grouped: bool = True,
-                                 benchmark: str = None,
+                                 regime_benchmark: str = None,
                                  regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                  time_period: TimePeriod = None,
                                  var_format: str = '{:.0%}',
@@ -572,11 +574,12 @@ class MultiPortfolioData:
         diff = df1_.subtract(df2_)
 
         if is_grouped:
-            diff = dfg.agg_df_by_groups_ax1(diff,
-                                            group_data=self.portfolio_datas[portfolio_idx1].group_data,
-                                            agg_func=np.nansum,
-                                            total_column=f"{self.portfolio_datas[portfolio_idx1].nav.name}-{self.portfolio_datas[portfolio_idx2].nav.name}",
-                                            group_order=self.portfolio_datas[portfolio_idx1].group_order)
+            diff = dfg.agg_df_by_groups_ax1(
+                diff,
+                group_data=self.portfolio_datas[portfolio_idx1].group_data,
+                agg_func=np.nansum,
+                total_column=f"{self.portfolio_datas[portfolio_idx1].nav.name}-{self.portfolio_datas[portfolio_idx2].nav.name}",
+                group_order=self.portfolio_datas[portfolio_idx1].group_order)
         if time_period is not None:
             diff = time_period.locate(diff)
         diff = diff.cumsum(axis=0)
@@ -587,13 +590,13 @@ class MultiPortfolioData:
                              title=f"Cumulative p&l diff {self.portfolio_datas[portfolio_idx1].nav.name}-{self.portfolio_datas[portfolio_idx2].nav.name}",
                              ax=ax,
                              **sop.update_kwargs(kwargs, dict(legend_loc='lower left')))
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=diff.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=diff.index, regime_params=regime_params)
 
     def plot_exposures_diff(self,
                             portfolio_idx1: int = 0,
                             portfolio_idx2: int = 1,
-                            benchmark: str = None,
+                            regime_benchmark: str = None,
                             regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                             time_period: TimePeriod = None,
                             var_format: str = '{:.0%}',
@@ -608,8 +611,8 @@ class MultiPortfolioData:
                              title=f"Net exposure diff {self.portfolio_datas[portfolio_idx1].nav.name}-{self.portfolio_datas[portfolio_idx2].nav.name}",
                              ax=ax,
                              **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=diff.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=diff.index, regime_params=regime_params)
     
     def get_turnover(self,
                      time_period: TimePeriod = None,
@@ -629,7 +632,7 @@ class MultiPortfolioData:
         return turnover
         
     def plot_turnover(self,
-                      benchmark: str = None,
+                      regime_benchmark: str = None,
                       time_period: TimePeriod = None,
                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                       turnover_rolling_period: Optional[int] = 260,
@@ -651,14 +654,14 @@ class MultiPortfolioData:
                              title=turnover_title,
                              ax=ax,
                              **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=turnover.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=turnover.index, regime_params=regime_params)
 
     def plot_costs(self,
                    cost_rolling_period: Optional[int] = 260,
                    freq_cost: Optional[str] = 'B',
                    cost_title: Optional[str] = None,
-                   benchmark: str = None,
+                   regime_benchmark: str = None,
                    time_period: TimePeriod = None,
                    regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                    var_format: str = '{:.2%}',
@@ -681,8 +684,8 @@ class MultiPortfolioData:
                              title=cost_title,
                              ax=ax,
                              **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=costs.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=costs.index, regime_params=regime_params)
 
     def plot_factor_betas(self,
                           benchmark_prices: pd.DataFrame,
@@ -838,6 +841,8 @@ class MultiPortfolioData:
     def compute_brinson_attribution(self,
                                     strategy_idx: int = 0,
                                     benchmark_idx: int = 1,
+                                    group_data: Optional[pd.Series] = None,
+                                    group_order: Optional[List[str]] = None,
                                     freq: Optional[str] = None,
                                     total_column: str = 'Total Sum',
                                     time_period: TimePeriod = None,
@@ -850,15 +855,17 @@ class MultiPortfolioData:
         benchmark_pnl = self.portfolio_datas[benchmark_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
         benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
 
-        asset_class_data = self.portfolio_datas[strategy_idx].group_data
-        group_order = self.portfolio_datas[strategy_idx].group_order
+        if group_data is None:
+            group_data = self.portfolio_datas[strategy_idx].group_data
+        if group_order is None:
+            group_order = self.portfolio_datas[strategy_idx].group_order
 
         totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
             qis.compute_brinson_attribution_table(benchmark_pnl=benchmark_pnl,
                                                   strategy_pnl=strategy_pnl,
                                                   strategy_weights=strategy_weights,
                                                   benchmark_weights=benchmark_weights,
-                                                  asset_class_data=asset_class_data,
+                                                  asset_class_data=group_data,
                                                   group_order=group_order,
                                                   total_column=total_column,
                                                   is_exclude_interaction_term=is_exclude_interaction_term,
@@ -895,7 +902,6 @@ class MultiPortfolioData:
             is_exclude_interaction_term=is_exclude_interaction_term,
             axs=axs,
             **kwargs)
-
         return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inters
 
     def plot_weights_boxplot(self,
@@ -993,7 +999,7 @@ class MultiPortfolioData:
     def plot_tre_time_series(self,
                              strategy_idx: int = 0,
                              benchmark_idx: int = 1,
-                             benchmark: str = None,
+                             regime_benchmark: str = None,
                              regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                              time_period: TimePeriod = None,
                              var_format: str = '{:.2%}',
@@ -1009,5 +1015,5 @@ class MultiPortfolioData:
                              title='Tracking error',
                              ax=ax,
                              **kwargs)
-        if benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, index=tre.index, regime_params=regime_params)
+        if regime_benchmark is not None:
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=tre.index, regime_params=regime_params)

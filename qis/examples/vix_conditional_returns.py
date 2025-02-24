@@ -35,7 +35,7 @@ monthly_df = pd.concat([monthly_return, predictor_1, monthly_benchmark_vol_1, vi
 with sns.axes_style("darkgrid"):
     fig1, axs = plt.subplots(2, 3, figsize=(18, 9))
     qis.plot_prices_with_dd(prices=prices[[benchmark_name, strategy_name]],
-                            regime_benchmark_str=benchmark_name,
+                            regime_benchmark=benchmark_name,
                             perf_stats_labels=[PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, PerfStat.MAX_DD],
                             title=f"Performances of ShortVix (SPVXSPI Index) and SPX (SPXT Index)",
                             x_date_freq='YE',

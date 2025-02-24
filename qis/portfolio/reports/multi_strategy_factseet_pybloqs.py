@@ -281,19 +281,19 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     multi_portfolio_data.plot_exposures(ax=fig.add_subplot(gs[3, :2]),
                                         portfolio_idx=0,
                                         time_period=time_period,
-                                        benchmark=regime_benchmark,
+                                        regime_benchmark=regime_benchmark,
                                         regime_params=regime_params,
                                         **kwargs)
 
     multi_portfolio_data.plot_turnover(ax=fig.add_subplot(gs[4, :2]),
                                        time_period=time_period,
-                                       benchmark=regime_benchmark,
+                                       regime_benchmark=regime_benchmark,
                                        regime_params=regime_params,
                                        **kwargs)
 
     multi_portfolio_data.plot_costs(ax=fig.add_subplot(gs[5, :2]),
                                     time_period=time_period,
-                                    benchmark=regime_benchmark,
+                                    regime_benchmark=regime_benchmark,
                                     regime_params=regime_params,
                                     **kwargs)
 

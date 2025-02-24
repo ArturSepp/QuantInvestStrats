@@ -5,7 +5,7 @@ see https://en.wikipedia.org/wiki/Performance_attribution
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import qis as qis
 import qis.utils.df_groups as dfg
@@ -126,28 +126,11 @@ def plot_brinson_attribution_table(totals_table: pd.DataFrame,
                                    is_exclude_interaction_term: bool = True,
                                    axs: List[plt.Subplot] = (None, None, None, None, None),
                                    **kwargs):
-    for column in totals_table:
-        totals_table[column] = totals_table[column].apply(lambda x: var_format.format(x))
 
-    special_rows_colors = [(len(totals_table.index), 'steelblue')]
-    rows_edge_lines = [len(totals_table.columns)]  # line before totals
-
-    special_columns_colors = [(0, 'lightblue'),
-                              (len(totals_table.columns), 'steelblue')]
-    columns_edge_lines = [(1, 'black'),
-                          (3, 'black'),
-                          (5, 'black'),
-                          (8, 'black')]
-
-    fig_table = plot_df_table(df=totals_table,
-                              column_width=2.0,
-                              first_column_width=2.0,
-                              special_rows_colors=special_rows_colors,
-                              rows_edge_lines=rows_edge_lines,
-                              special_columns_colors=special_columns_colors,
-                              columns_edge_lines=columns_edge_lines,
-                              ax=axs[0],
-                              **kwargs)
+    fig_table = plot_brinson_totals_table(totals_table=totals_table,
+                                          var_format=var_format,
+                                          ax=axs[0],
+                                          **kwargs)
 
     # get total of allocation and selection:
     active_total = active_total.cumsum(axis=0)
@@ -183,3 +166,32 @@ def plot_brinson_attribution_table(totals_table: pd.DataFrame,
                                         **kwargs)
 
     return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inter
+
+
+def plot_brinson_totals_table(totals_table: pd.DataFrame,
+                              var_format: str = '{:.0%}',
+                              ax: Optional[plt.Subplot] = None,
+                              **kwargs
+                              ) -> Optional[plt.Figure]:
+    special_rows_colors = [(len(totals_table.index), 'steelblue')]
+    rows_edge_lines = [len(totals_table.columns)]  # line before totals
+
+    special_columns_colors = [(0, 'lightblue'),
+                              (len(totals_table.columns), 'steelblue')]
+    columns_edge_lines = [(1, 'black'),
+                          (3, 'black'),
+                          (5, 'black'),
+                          (8, 'black')]
+
+    totals_table = qis.df_to_str(df=totals_table, var_format=var_format)
+
+    fig_table = plot_df_table(df=totals_table,
+                              column_width=2.0,
+                              first_column_width=2.0,
+                              special_rows_colors=special_rows_colors,
+                              rows_edge_lines=rows_edge_lines,
+                              special_columns_colors=special_columns_colors,
+                              columns_edge_lines=columns_edge_lines,
+                              ax=ax,
+                              **kwargs)
+    return fig_table

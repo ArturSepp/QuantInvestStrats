@@ -17,8 +17,7 @@ from qis.portfolio.reports.config import fetch_default_report_kwargs
 from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strategy_benchmark_factsheet_plt,
                                                                 generate_strategy_benchmark_active_perf_plt,
                                                                 generate_performance_attribution_report,
-                                                                weights_tracking_error_report,
-                                                                weights_tracking_error_report_cross)
+                                                                weights_tracking_error_report_by_ac_subac)
 
 
 def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -35,7 +34,11 @@ def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
                          GLD='Gold')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
-    prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
+    # prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
+    from qis.test_data import load_etf_data
+    prices = load_etf_data()[tickers]
+    print(prices)
+
     prices = prices.asfreq('B', method='ffill')
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, group_data
@@ -80,7 +83,6 @@ class UnitTests(Enum):
     PERFORMANCE_ATTRIBUTION = 2
     ACTIVE_PERFORMANCE = 3
     TRACKING_ERROR = 4
-    TRACKING_ERROR_CROSS = 5
 
 
 @qis.timer
@@ -89,6 +91,8 @@ def run_unit_test(unit_test: UnitTests):
     # time period for portfolio reporting
     time_period = qis.TimePeriod('31Dec2006', '10Jan2025')
     prices, benchmark_prices, group_data = fetch_universe_data()
+
+
     multi_portfolio_data = generate_volparity_multiportfolio(prices=prices,
                                                              benchmark_prices=benchmark_prices,
                                                              group_data=group_data,
@@ -139,26 +143,21 @@ def run_unit_test(unit_test: UnitTests):
                                                     rebalancing_freq='ME',
                                                     span=52)
         multi_portfolio_data.covar_dict = covar_dict
-        weights_tracking_error_report(multi_portfolio_data=multi_portfolio_data,
-                                      time_period=time_period)
+        ac_group_data = multi_portfolio_data.portfolio_datas[0].group_data
+        asset_tickers = multi_portfolio_data.portfolio_datas[0].weights.columns
+        sub_ac_group_data = pd.Series(asset_tickers, index=asset_tickers)
 
-    elif unit_test == UnitTests.TRACKING_ERROR_CROSS:
-        # compute pd_covras
-        covar_dict = qis.estimate_rolling_ewma_covar(prices=prices,
-                                                    time_period=time_period,
-                                                    returns_freq='W-WED',
-                                                    rebalancing_freq='ME',
-                                                    span=52)
-        multi_portfolio_data.covar_dict = covar_dict
-        weights_tracking_error_report_cross(multi_portfolio_data=multi_portfolio_data,
-                                            time_period=time_period)
+        weights_tracking_error_report_by_ac_subac(multi_portfolio_data=multi_portfolio_data,
+                                                  ac_group_data=ac_group_data,
+                                                  sub_ac_group_data=sub_ac_group_data,
+                                                  time_period=time_period)
 
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.TRACKING_ERROR_CROSS
+    unit_test = UnitTests.TRACKING_ERROR
 
     is_run_all_tests = False
     if is_run_all_tests:

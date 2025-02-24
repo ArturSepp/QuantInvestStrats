@@ -16,7 +16,7 @@ from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs,
 
 
 def plot_scatter_regression(prices: pd.DataFrame,
-                            regime_benchmark_str: str,
+                            regime_benchmark: str,
                             regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
                             drop_benchmark: bool = True,
                             x_var_format: str = '{:.0%}',
@@ -41,7 +41,7 @@ def plot_scatter_regression(prices: pd.DataFrame,
 
     regmodel_out_dict = {}
     estimated_params = cre.estimate_cond_regression(prices=prices,
-                                                    benchmark=regime_benchmark_str,
+                                                    benchmark=regime_benchmark,
                                                     drop_benchmark=drop_benchmark,
                                                     regime_params=regime_params,
                                                     is_print_summary=is_print_summary,
@@ -52,8 +52,8 @@ def plot_scatter_regression(prices: pd.DataFrame,
     lines = []
     for (asset, pandas_out), marker, color_ in zip(regmodel_out_dict.items(), markers, colors):
 
-        pandas_out = pandas_out.sort_values(regime_benchmark_str)  # sort for line plot
-        sns.scatterplot(x=regime_benchmark_str,
+        pandas_out = pandas_out.sort_values(regime_benchmark)  # sort for line plot
+        sns.scatterplot(x=regime_benchmark,
                         y=asset,
                         hue=pandas_out[BenchmarkReturnsQuantilesRegime.REGIME_COLUMN],
                         data=pandas_out,
@@ -77,7 +77,7 @@ def plot_scatter_regression(prices: pd.DataFrame,
             line_marker = marker
             lines.append((asset, {'color': color_, 'linestyle': '-', 'marker': line_marker}))
 
-        sns.lineplot(x=regime_benchmark_str,
+        sns.lineplot(x=regime_benchmark,
                      y=cre.PREDICTION,
                      hue=pandas_out[BenchmarkReturnsQuantilesRegime.REGIME_COLUMN],
                      data=pandas_out,
@@ -89,7 +89,7 @@ def plot_scatter_regression(prices: pd.DataFrame,
     if add_last_date:
         label_x_y = {}
         for asset, df in regmodel_out_dict.items():
-            x = df[regime_benchmark_str].iloc[-1]
+            x = df[regime_benchmark].iloc[-1]
             y = df[asset].iloc[-1]
             label = f"Last {df.index[-1].strftime('%d-%b-%Y')}: x={x_var_format.format(x)}, y={x_var_format.format(y)}"
             label_x_y[label] = (x, y)
@@ -104,7 +104,7 @@ def plot_scatter_regression(prices: pd.DataFrame,
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: y_var_format.format(y)))
 
     if xlabel is None:
-        xlabel = f"x={regime_benchmark_str}"
+        xlabel = f"x={regime_benchmark}"
     if ylabel is None:
         if len(prices.columns) == 2:
             ylabel = f"y = {asset}"
@@ -133,14 +133,14 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.SCATTER_ALL:
         plot_scatter_regression(prices=prices,
-                                regime_benchmark_str='SPY',
+                                regime_benchmark='SPY',
                                 regime_params=regime_params,
                                 add_last_date=True,
                                 is_asset_detailed=False)
 
     elif unit_test == UnitTests.SCATTER_1:
         plot_scatter_regression(prices=prices[['SPY', 'TLT']],
-                                regime_benchmark_str='SPY',
+                                regime_benchmark='SPY',
                                 regime_params=regime_params,
                                 add_last_date=True,
                                 is_asset_detailed=True)

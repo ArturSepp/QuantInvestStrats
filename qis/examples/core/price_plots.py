@@ -28,7 +28,7 @@ RA_TABLE_COLUMNS = (PerfStat.START_DATE,
 
 
 def generate_performances(prices: pd.DataFrame,
-                          regime_benchmark_str: str,
+                          regime_benchmark: str,
                           perf_params: qis.PerfParams = None,
                           perf_columns: List[PerfStat] = RA_TABLE_COLUMNS,
                           heatmap_freq: str = 'YE',
@@ -43,7 +43,7 @@ def generate_performances(prices: pd.DataFrame,
     fig, ax = plt.subplots(1, 1, figsize=(12, 4), tight_layout=True)
 
     qis.plot_ra_perf_table_benchmark(prices=prices,
-                                     benchmark=regime_benchmark_str,
+                                     benchmark=regime_benchmark,
                                      perf_params=perf_params,
                                      perf_columns=perf_columns,
                                      title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')}",
@@ -61,7 +61,7 @@ def generate_performances(prices: pd.DataFrame,
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
         qis.plot_prices(prices=prices,
-                        regime_benchmark_str=regime_benchmark_str,
+                        regime_benchmark=regime_benchmark,
                         perf_params=perf_params,
                         title=f"Time series of $1 invested: {qis.get_time_period_label(prices, date_separator='-')}",
                         ax=ax,
@@ -69,7 +69,7 @@ def generate_performances(prices: pd.DataFrame,
 
         fig, axs = plt.subplots(2, 1, figsize=(7, 7))
         qis.plot_prices_with_dd(prices=prices,
-                                regime_benchmark_str=regime_benchmark_str,
+                                regime_benchmark=regime_benchmark,
                                 perf_params=perf_params,
                                 title=f"Time series of $1 invested: {qis.get_time_period_label(prices, date_separator='-')}",
                                 axs=axs,
@@ -77,7 +77,7 @@ def generate_performances(prices: pd.DataFrame,
 
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
         qis.plot_scatter_regression(prices=prices,
-                                    regime_benchmark_str=regime_benchmark_str,
+                                    regime_benchmark=regime_benchmark,
                                     regime_params=qis.BenchmarkReturnsQuantileRegimeSpecs(freq=perf_params.freq_reg),
                                     perf_params=perf_params,
                                     title=f"Regime Conditional Regression: {qis.get_time_period_label(prices, date_separator='-')}",
@@ -99,30 +99,30 @@ def run_unit_test(unit_test: UnitTests):
     ust_3m_rate = yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
 
     if unit_test == UnitTests.ETF_DATA:
-        regime_benchmark_str = 'SPY'
-        tickers = [regime_benchmark_str, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
+        regime_benchmark = 'SPY'
+        tickers = [regime_benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
 
     elif unit_test == UnitTests.CRYPTO_DATA:
-        regime_benchmark_str = 'BTC-USD'
-        tickers = [regime_benchmark_str, 'ETH-USD', 'SOL-USD']
-        regime_benchmark_str = 'BTC-USD'
-        tickers = [regime_benchmark_str, 'SPY', 'TLT', 'ETH-USD', 'SOL-USD']
+        regime_benchmark = 'BTC-USD'
+        tickers = [regime_benchmark, 'ETH-USD', 'SOL-USD']
+        regime_benchmark = 'BTC-USD'
+        tickers = [regime_benchmark, 'SPY', 'TLT', 'ETH-USD', 'SOL-USD']
 
     elif unit_test == UnitTests.TF_ETF:
-        regime_benchmark_str = 'SPY'
-        tickers = [regime_benchmark_str, 'DBMF', 'WTMF', 'CTA']
+        regime_benchmark = 'SPY'
+        tickers = [regime_benchmark, 'DBMF', 'WTMF', 'CTA']
 
     elif unit_test == UnitTests.ETFS:
-        regime_benchmark_str = 'AOR'
-        tickers = [regime_benchmark_str, 'SPY', 'PEX', 'PSP', 'GSG', 'COMT', 'REET', 'REZ']
+        regime_benchmark = 'AOR'
+        tickers = [regime_benchmark, 'SPY', 'PEX', 'PSP', 'GSG', 'COMT', 'REET', 'REZ']
 
     elif unit_test == UnitTests.COMMODITY_ETFS:
-        regime_benchmark_str = 'AOR'
-        tickers = [regime_benchmark_str, 'SPY', 'GLD', 'GSG', 'COMT', 'PDBC']
+        regime_benchmark = 'AOR'
+        tickers = [regime_benchmark, 'SPY', 'GLD', 'GSG', 'COMT', 'PDBC']
 
     elif unit_test == UnitTests.VOL_ETFS:
-        regime_benchmark_str = 'SPY'
-        tickers = [regime_benchmark_str, 'SVOL']
+        regime_benchmark = 'SPY'
+        tickers = [regime_benchmark, 'SVOL']
 
     else:
         raise NotImplementedError
@@ -146,7 +146,7 @@ def run_unit_test(unit_test: UnitTests):
         prices = time_period.locate(prices)
 
     generate_performances(prices=prices,
-                          regime_benchmark_str=regime_benchmark_str,
+                          regime_benchmark=regime_benchmark,
                           **kwargs)
 
     plt.show()

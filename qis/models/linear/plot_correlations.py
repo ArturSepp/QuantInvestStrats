@@ -97,7 +97,7 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
                                          var_format: str = '{:.0%}',
                                          legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                                          trend_line: put.TrendLine = put.TrendLine.AVERAGE,
-                                         regime_benchmark_str: str = None,
+                                         regime_benchmark: str = None,
                                          regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
                                          perf_params: PerfParams = None,
                                          ax: plt.Subplot = None,
@@ -124,16 +124,16 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
                          var_format=var_format,
                          ax=ax,
                          **kwargs)
-    if regime_benchmark_str is not None:
-        if regime_benchmark_str in prices.columns:
-            pivot_prices = prices[regime_benchmark_str].reindex(index=corr_pandas.index, method='ffill')
+    if regime_benchmark is not None:
+        if regime_benchmark in prices.columns:
+            pivot_prices = prices[regime_benchmark].reindex(index=corr_pandas.index, method='ffill')
         else:
-            raise KeyError(f"{regime_benchmark_str} not in {prices.columns}")
+            raise KeyError(f"{regime_benchmark} not in {prices.columns}")
 
-        if regime_benchmark_str is not None and regime_params is not None:
+        if regime_benchmark is not None and regime_params is not None:
             add_bnb_regime_shadows(ax=ax,
                                    pivot_prices=pivot_prices,
-                                   benchmark=regime_benchmark_str,
+                                   benchmark=regime_benchmark,
                                    regime_params=regime_params,
                                    perf_params=perf_params)
 
@@ -154,7 +154,7 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.CORR_MATRIX:
         fig, ax = plt.subplots(1, 1, figsize=(10, 10), constrained_layout=True)
-        plot_returns_corr_matrix_time_series(prices=prices, regime_benchmark_str='SPY', ax=ax)
+        plot_returns_corr_matrix_time_series(prices=prices, regime_benchmark='SPY', ax=ax)
 
     elif unit_test == UnitTests.EWMA_CORR:
         plot_returns_ewm_corr_table(prices=prices.iloc[:, :5])

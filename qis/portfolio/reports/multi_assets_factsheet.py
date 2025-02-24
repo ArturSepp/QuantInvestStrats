@@ -106,7 +106,7 @@ class MultiAssetsReport:
                                          **kwargs)
 
     def plot_ra_regime_table(self,
-                             regime_benchmark_str: str = None,
+                             regime_benchmark: str = None,
                              time_period: TimePeriod = None,
                              perf_columns: List[PerfStat] = PERF_COLUMNS,
                              columns_title: str = 'Programs',
@@ -122,7 +122,7 @@ class MultiAssetsReport:
             prices = time_period.locate(prices)
 
         cvar_table = qis.compute_bnb_regimes_pa_perf_table(prices=prices,
-                                                           benchmark=regime_benchmark_str,
+                                                           benchmark=regime_benchmark,
                                                            perf_params=self.perf_params,
                                                            regime_params=self.regime_params)
         table_data = pd.DataFrame(data=prices.columns, index=cvar_table.index, columns=[columns_title])
@@ -321,7 +321,7 @@ class MultiAssetsReport:
                                          roll_periods=sharpe_rolling_window,
                                          roll_freq=freq_sharpe,
                                          legend_stats=legend_stats,
-                                         regime_benchmark_str=regime_benchmark,
+                                         regime_benchmark=regime_benchmark,
                                          ax=ax,
                                          **kwargs)
         return fig

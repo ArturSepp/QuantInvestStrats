@@ -716,7 +716,8 @@ class PortfolioData:
                                                     group_data: pd.Series = None,
                                                     group_order: List[str] = None,
                                                     align_with_covar_dates: bool = True,
-                                                    freq: Optional[str] = None
+                                                    freq: Optional[str] = None,
+                                                    normalise: bool = False
                                                     ) -> pd.DataFrame:
         """
         compute risk contributions using covar_dict
@@ -738,7 +739,8 @@ class PortfolioData:
         strategy_rc = pd.DataFrame.from_dict(strategy_rc, orient='index')
         if group_data is not None:
             strategy_rc = dfg.agg_df_by_groups_ax1(strategy_rc, group_data=group_data, group_order=group_order)
-
+        if normalise:
+            strategy_rc = qis.df_to_weight_allocation_sum1(strategy_rc)
         return strategy_rc
 
     # """

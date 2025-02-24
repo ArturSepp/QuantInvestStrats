@@ -29,7 +29,7 @@ perf_params = qis.PerfParams(freq='ME', freq_reg='W-WED', alpha_an_factor=52.0, 
 with sns.axes_style("darkgrid"):
     fig1, axs = plt.subplots(2, 1, figsize=(10, 7))
     qis.plot_prices_with_dd(prices=prices,
-                            regime_benchmark_str=benchmark,
+                            regime_benchmark=benchmark,
                             x_date_freq='QE',
                             framealpha=0.9,
                             perf_params=perf_params,
