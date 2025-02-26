@@ -652,6 +652,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
                                                   benchmark_idx=benchmark_idx,
                                                   regime_benchmark=regime_benchmark,
+                                                  regime_params=regime_params,
                                                   ax=ax,
                                                   time_period=time_period,
                                                   **kwargs)
@@ -673,15 +674,17 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         figs['brinson_total_time_series'] = fig
         qis.plot_time_series(df=active_total.cumsum(axis=0),
                              title='Active total return',
+                             var_format='{:.0%}',
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                    index=grouped_allocation_return.index, regime_params=regime_params)
+                                                    index=active_total.index, regime_params=regime_params)
 
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['brinson_grouped_allocation_return'] = fig
         qis.plot_time_series(df=grouped_allocation_return.cumsum(axis=0),
                              title='Grouped allocation return',
+                             var_format='{:.0%}',
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
@@ -691,10 +694,11 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         figs['brinson_grouped_selection_return'] = fig
         qis.plot_time_series(df=grouped_selection_return.cumsum(axis=0),
                              title='Grouped selection return',
+                             var_format='{:.0%}',
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                    index=grouped_allocation_return.index, regime_params=regime_params)
+                                                    index=grouped_selection_return.index, regime_params=regime_params)
 
         # brinson by sub-asset class
         totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
@@ -715,6 +719,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         multi_portfolio_data.plot_turnover(ax=ax,
                                            time_period=time_period,
                                            regime_benchmark=regime_benchmark,
+                                           regime_params=regime_params,
                                            #turnover_rolling_period=260,
                                            #freq_turnover=None,
                                            **kwargs)
@@ -744,7 +749,7 @@ def plot_exposures_long_short_groups(exposures_short: pd.DataFrame,
                               y_var_name=ylabel,
                               ylabel=ylabel,
                               showmedians=True,
-                              add_y_median_labels=True,
+                              add_y_median_labels=False,
                               yvar_format=var_format,
                               x_rotation=90,
                               colors=qis.get_n_sns_colors(n=len(exposures_long.columns)),
@@ -803,7 +808,7 @@ def plot_exposures_strategy_vs_benchmark_boxplot(strategy_exposures: pd.DataFram
                                    y_var_name=ylabel,
                                    ylabel=ylabel,
                                    showmedians=True,
-                                   add_y_median_labels=True,
+                                   add_y_median_labels=False,
                                    yvar_format=var_format,
                                    x_rotation=90,
                                    title=title,

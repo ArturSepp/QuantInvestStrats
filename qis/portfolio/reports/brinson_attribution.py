@@ -174,7 +174,7 @@ def plot_brinson_totals_table(totals_table: pd.DataFrame,
                               **kwargs
                               ) -> Optional[plt.Figure]:
     special_rows_colors = [(len(totals_table.index), 'steelblue')]
-    rows_edge_lines = [len(totals_table.columns)]  # line before totals
+    rows_edge_lines = [len(totals_table.index)-1]  # line before totals
 
     special_columns_colors = [(0, 'lightblue'),
                               (len(totals_table.columns), 'steelblue')]

@@ -124,25 +124,26 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     elif trend_line in [TrendLine.TREND_LINE, TrendLine.TREND_LINE_SHADOWS]:
         for column, color in zip(columns, trend_line_colors):
             y = data1[column].dropna()
-            x0 = y.first_valid_index() or y.index[0]  # if all are nons
-            x1 = y.index[-1]
-            y0 = y[x0]
-            y1 = y.iloc[-1]
-            x = [x0, x1]
-            y = [y0, y1]
-            ax.plot(x, y,
-                    color=color,
-                    linestyle='--',
-                    transform=ax.transData,
-                    linewidth=linewidth)
+            if not y.empty:
+                x0 = y.first_valid_index()
+                x1 = y.index[-1]
+                y0 = y[x0]
+                y1 = y.iloc[-1]
+                x = [x0, x1]
+                y = [y0, y1]
+                ax.plot(x, y,
+                        color=color,
+                        linestyle='--',
+                        transform=ax.transData,
+                        linewidth=linewidth)
 
-            if trend_line == TrendLine.TREND_LINE_SHADOWS:
-                x_ = (data1.index - data1.index[0]).days
-                slope = (y1 - y0) / (x_[-1] - x_[0])
-                y_line = [slope * x + y0 for x in x_]
-                y = data1[column]
-                ax.fill_between(data1.index, y, y_line, where=y_line >= y,
-                                facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
+                if trend_line == TrendLine.TREND_LINE_SHADOWS:
+                    x_ = (data1.index - data1.index[0]).days
+                    slope = (y1 - y0) / (x_[-1] - x_[0])
+                    y_line = [slope * x + y0 for x in x_]
+                    y = data1[column]
+                    ax.fill_between(data1.index, y, y_line, where=y_line >= y,
+                                    facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
 
     # add last labels
     if last_label in [LastLabel.AVERAGE_VALUE, LastLabel.AVERAGE_VALUE_SORTED]:
