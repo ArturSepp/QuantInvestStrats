@@ -1002,6 +1002,7 @@ class MultiPortfolioData:
                              regime_benchmark: str = None,
                              regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                              time_period: TimePeriod = None,
+                             title: Optional[str] = 'Tracking error',
                              var_format: str = '{:.2%}',
                              ax: plt.Subplot = None,
                              **kwargs
@@ -1012,7 +1013,7 @@ class MultiPortfolioData:
         pts.plot_time_series(df=tre,
                              var_format=var_format,
                              legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                             title='Tracking error',
+                             title=title,
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:

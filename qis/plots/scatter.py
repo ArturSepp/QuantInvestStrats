@@ -92,7 +92,7 @@ def plot_scatter(df: pd.DataFrame,
         hue_ids = df[hue].unique()
         for idx, hue_id in enumerate(hue_ids):
             # estimate model equation
-            data_hue = df[df[hue] == hue_id].sort_values(by=x)
+            data_hue = df[df[hue] == hue_id].replace([np.inf, -np.inf], np.nan).dropna().sort_values(by=x)
             x_ = data_hue[x].to_numpy()
             y_ = data_hue[y].to_numpy()
             x1 = qu.get_ols_x(x=x_, order=order, fit_intercept=fit_intercept)

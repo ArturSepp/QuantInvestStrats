@@ -513,6 +513,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                               add_benchmarks_to_navs: bool = True,
                                               figsize: Tuple[float, float] = (11.7, 8.3),
                                               var_format: str = '{:.1%}',
+                                              add_titles: bool = True,
                                               **kwargs
                                               ) -> Tuple[Dict[str, plt.Figure], Dict[str, pd.DataFrame]]:
     """
@@ -528,13 +529,17 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         # navs + ra table
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['navs'] = fig
+        if add_titles:
+            title = f"Cumulative performance with background colors using bear/normal/bull "
+            f"regimes of {regime_benchmark} {regime_params.freq}-returns"
+        else:
+            title = None
         multi_portfolio_data.plot_nav(regime_benchmark=regime_benchmark,
                                       time_period=time_period,
                                       perf_params=perf_params,
                                       regime_params=regime_params,
                                       add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                      title=f"Cumulative performance with background colors using bear/normal/bull "
-                                            f"regimes of {regime_benchmark} {regime_params.freq}-returns",
+                                      title=title,
                                       ax=ax,
                                       **kwargs)
 
@@ -567,9 +572,11 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                                **weight_kwargs)
 
         # plot strategy and benchmark weights by ac
-        kwargs = qis.update_kwargs(kwargs, dict(strategy_ticker=strategy_ticker, benchmark_ticker=benchmark_ticker))
+        kwargs = qis.update_kwargs(kwargs, dict(strategy_ticker=f"(B) {strategy_ticker}",
+                                                benchmark_ticker=f"(A) {benchmark_ticker}"))
         fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
-        qis.set_suptitle(fig, title=f"Time series of weights by asset classes")
+        if add_titles:
+            qis.set_suptitle(fig, title=f"Time series of weights by asset classes")
         figs['strategy_benchmark_weights_stack'] = fig
         plot_exposures_strategy_vs_benchmark_stack(strategy_exposures=strategy_exposures_ac,
                                                    benchmark_exposures=benchmark_exposures_ac,
@@ -579,20 +586,24 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
 
         # boxplot by subac
         fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
-        qis.set_suptitle(fig, title=f"Boxplot of weights")
+        if add_titles:
+            qis.set_suptitle(fig, title=f"Boxplot of weights")
         figs['strategy_benchmark_weights_box'] = fig
         plot_exposures_strategy_vs_benchmark_boxplot(strategy_exposures=strategy_exposures_ac,
                                                      benchmark_exposures=benchmark_exposures_ac,
                                                      ax=axs[0],
                                                      ylabel='Weights',
                                                      title='(A) Weights by asset classes',
+                                                     hue_var_name='Asset Class',
                                                      var_format=var_format,
+                                                     allow_negative=True,
                                                      **kwargs)
         plot_exposures_strategy_vs_benchmark_boxplot(strategy_exposures=strategy_exposures_subac,
                                                      benchmark_exposures=benchmark_exposures_subac,
                                                      ax=axs[1],
                                                      ylabel='Weights',
                                                      title='(B) Weights by sub-asset classes',
+                                                     hue_var_name='Sub-Asset Class',
                                                      var_format=var_format,
                                                      **kwargs)
         # risk contributions
@@ -617,7 +628,8 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
 
         # stack for ac
         fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
-        qis.set_suptitle(fig, title=f"Time Series of risk contributions by asset classes")
+        if add_titles:
+            qis.set_suptitle(fig, title=f"Time Series of risk contributions by asset classes")
         figs['time_series_risk_contrib'] = fig
         plot_exposures_strategy_vs_benchmark_stack(strategy_exposures=strategy_risk_contributions_ac,
                                                    benchmark_exposures=benchmark_risk_contributions_ac,
@@ -627,13 +639,16 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
 
         # box plots for subac
         fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
-        qis.set_suptitle(fig, title=f"Boxplot of risk contributions")
+        if add_titles:
+            qis.set_suptitle(fig, title=f"Boxplot of risk contributions")
         figs['risk_contributions_boxplot'] = fig
         plot_exposures_strategy_vs_benchmark_boxplot(
             strategy_exposures=strategy_risk_contributions_ac,
             benchmark_exposures=benchmark_risk_contributions_ac,
             ax=axs[0],
             title='(A) Risk contributions by asset classes',
+            hue_var_name='Asset Class',
+            ylabel='Risk contributions',
             var_format=var_format,
             allow_negative=True,
             **kwargs)
@@ -642,6 +657,8 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
             benchmark_exposures=benchmark_risk_contributions_subac,
             ax=axs[1],
             title='(B) Risk contributions by sub-asset classes',
+            hue_var_name='Sub-Asset Class',
+            ylabel='Risk contributions',
             var_format=var_format,
             allow_negative=True,
             **kwargs)
@@ -649,10 +666,15 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         # tracking error
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['tre_time_series'] = fig
+        if add_titles:
+            title = 'Tracking Error'
+        else:
+            title = None
         multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
                                                   benchmark_idx=benchmark_idx,
                                                   regime_benchmark=regime_benchmark,
                                                   regime_params=regime_params,
+                                                  title=title,
                                                   ax=ax,
                                                   time_period=time_period,
                                                   **kwargs)
@@ -672,8 +694,13 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
 
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['brinson_total_time_series'] = fig
+        if add_titles:
+            title = 'Active total return'
+        else:
+            title = None
         qis.plot_time_series(df=active_total.cumsum(axis=0),
-                             title='Active total return',
+                             title=title,
+                             legend_stats=qis.LegendStats.LAST,
                              var_format='{:.0%}',
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
@@ -684,6 +711,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         figs['brinson_grouped_allocation_return'] = fig
         qis.plot_time_series(df=grouped_allocation_return.cumsum(axis=0),
                              title='Grouped allocation return',
+                             legend_stats=qis.LegendStats.LAST,
                              var_format='{:.0%}',
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
@@ -694,6 +722,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         figs['brinson_grouped_selection_return'] = fig
         qis.plot_time_series(df=grouped_selection_return.cumsum(axis=0),
                              title='Grouped selection return',
+                             legend_stats=qis.LegendStats.LAST,
                              var_format='{:.0%}',
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
