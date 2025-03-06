@@ -4,7 +4,7 @@
 qis package implements analytics for visualisation of financial data, performance
 reporting, analysis of quantitative strategies. 
 
-qis package is split into 5 main modules with the 
+The package is split into 5 main modules with the 
 dependency path increasing sequentially as follows.
 
 1. ```qis.utils``` is module containing low level utilities for operations with pandas, numpy, and datetimes.
