@@ -268,3 +268,4 @@ See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/master
 
 Please report any bugs or suggestions by opening an [issue](https://github.com/ArturSepp/QuantInvestStrats/issues).
 
+.
