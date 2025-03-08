@@ -16,13 +16,13 @@ tickers = [benchmark, 'SSO', 'IEF']
 prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
 prices = prices.asfreq('B', method='ffill').dropna()  # make B frequency
 
-rebalance_freq = 'B'  # each business day
+rebalancing_freq = 'B'  # each business day
 rebalancing_costs = 0.0010  # 10bp for rebalancing
 
 # 50/50 SSO/IEF
 unleveraged_portfolio = qis.backtest_model_portfolio(prices=prices[['SSO', 'IEF']],
                                                      weights={'SSO': 0.5, 'IEF': 0.5},
-                                                     rebalance_freq=rebalance_freq,
+                                                     rebalancing_freq=rebalancing_freq,
                                                      rebalancing_costs=rebalancing_costs,
                                                      ticker='50/50 SSO/IEF').get_portfolio_nav()
 
@@ -30,7 +30,7 @@ unleveraged_portfolio = qis.backtest_model_portfolio(prices=prices[['SSO', 'IEF'
 funding_rate = 0.01 + yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
 leveraged_portfolio = qis.backtest_model_portfolio(prices=prices[['SPY', 'IEF']],
                                                    weights={'SPY': 1.0, 'IEF': 0.5},
-                                                   rebalance_freq=rebalance_freq,
+                                                   rebalancing_freq=rebalancing_freq,
                                                    rebalancing_costs=rebalancing_costs,
                                                    funding_rate=funding_rate,
                                                    ticker='100/50 SPY/IEF').get_portfolio_nav()

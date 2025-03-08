@@ -15,7 +15,7 @@ from qis.portfolio.portfolio_data import PortfolioData
 
 def backtest_model_portfolio(prices: pd.DataFrame,
                              weights: Union[Dict[str, float], List[float], np.ndarray, pd.DataFrame, pd.Series],
-                             rebalance_freq: Optional[str] = 'QE',
+                             rebalancing_freq: Optional[str] = 'QE',
                              initial_nav: float = 100,
                              funding_rate: pd.Series = None,  # annualised on positive / negative cash balances
                              management_fee: float = None,  # annualised
@@ -30,7 +30,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
     simulate portfolio given prices and weights
     include_start_date if index rebalanced at start date
     the safest weight is to pass weights as Dict or pd.Dataframe - this enforces the alignment with prices
-    does not rebalance_freq when dates are pd.DataFrame
+    does not rebalancing_freq when dates are pd.DataFrame
     funding_rate is funding rate on cash annualised
     management_fee is man fee on strategy nav annualised
     """
@@ -55,7 +55,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
             raise ValueError(f"only single aray is allowed")
 
         is_rebalancing = qu.generate_rebalancing_indicators(df=prices,
-                                                            freq=rebalance_freq,
+                                                            freq=rebalancing_freq,
                                                             include_start_date=is_rebalanced_at_first_date)
 
         portfolio_rebalance_dates = is_rebalancing[is_rebalancing == True]
@@ -232,15 +232,15 @@ def run_unit_test(unit_test: UnitTests):
 
         portfolio_nav_1_0 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 0.0]),
-                                                     rebalance_freq='QE').get_portfolio_nav()
+                                                     rebalancing_freq='QE').get_portfolio_nav()
 
         portfolio_nav_5_5 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 0.5]),
-                                                     rebalance_freq='QE').get_portfolio_nav()
+                                                     rebalancing_freq='QE').get_portfolio_nav()
 
         portfolio_nav_0_1 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 1.0]),
-                                                     rebalance_freq='QE').get_portfolio_nav()
+                                                     rebalancing_freq='QE').get_portfolio_nav()
 
         portfolio_nav = pd.concat([portfolio_nav_1_0, portfolio_nav_5_5, portfolio_nav_0_1], axis=1)
         portfolio_nav.columns = ['x1=100, x2=0', 'x1=100, x2=50', 'x1=100, x2=100']
@@ -251,7 +251,7 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.COSTS:
         portfolio_nav = backtest_model_portfolio(prices=prices,
                                                  weights=np.array([1.0, 1.0]),
-                                                 rebalance_freq='QE')
+                                                 rebalancing_freq='QE')
 
         portfolio_nav.plot_pnl()
 

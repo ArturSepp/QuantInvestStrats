@@ -32,6 +32,8 @@ def float_to_str(x: float,
     elif isinstance(x, str):
         return x
     else:
+        if not isinstance(x, float):
+            raise ValueError(f"x must ne float not type={type(x)}")
         return var_format.format(x)
 
 

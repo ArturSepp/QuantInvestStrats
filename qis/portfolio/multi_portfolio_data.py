@@ -80,12 +80,17 @@ class MultiPortfolioData:
                  ) -> pd.DataFrame:
         """
         get portfolio navs
+        double check that benchmark is not part of portfolio
         """
         navs = self.navs
         if benchmark is not None:
-            navs = pd.concat([self.benchmark_prices[benchmark].reindex(index=navs.index).ffill(), navs], axis=1)
+            if benchmark not in navs.columns:
+                navs = pd.concat([self.benchmark_prices[benchmark].reindex(index=navs.index).ffill(), navs], axis=1)
         elif add_benchmarks_to_navs:
-            navs = pd.concat([navs, self.benchmark_prices.reindex(index=navs.index).ffill()], axis=1).ffill()
+            benchmarks = self.benchmark_prices.reindex(index=navs.index).ffill()
+            for benchmark in benchmarks.columns:
+                if benchmark not in navs.columns:
+                    navs = pd.concat([navs, benchmarks[benchmark]], axis=1)
 
         if time_period is not None:
             navs = time_period.locate(navs)
@@ -442,14 +447,14 @@ class MultiPortfolioData:
             drop_benchmark = False
         ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to {benchmark}: " \
                         f"{qis.get_time_period(prices).to_str()}"
-        
+
         if add_turnover:
             turnover = self.get_turnover(time_period=time_period, **kwargs)
             turnover = turnover.mean(axis=0).to_frame('Turnover')
             df_to_add = qis.df_to_str(turnover, var_format='{:,.0%}')
         else:
             df_to_add = None
-            
+
         fig, ra_perf_table = ppt.plot_ra_perf_table_benchmark(prices=prices,
                                                               benchmark=benchmark,
                                                               perf_params=perf_params,
@@ -499,11 +504,13 @@ class MultiPortfolioData:
             strategy_prices = pd.concat(strategy_prices, axis=1)
 
             benchmark_price = benchmark_price.reindex(index=strategy_prices.index, method='ffill')
+            if benchmark_price.name not in strategy_prices.columns:
+                prices = pd.concat([benchmark_price, strategy_prices], axis=1)
+            else:
+                prices = strategy_prices
             if add_ac:  # otherwise tables look too bad
                 ac_prices = pd.concat(ac_prices, axis=1)
-                prices = pd.concat([benchmark_price, strategy_prices, ac_prices], axis=1)
-            else:
-                prices = pd.concat([strategy_prices, benchmark_price], axis=1)
+                prices = pd.concat([prices, ac_prices], axis=1)
 
         ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to " \
                         f"{benchmark_price.name}: {qis.get_time_period(prices).to_str()}"

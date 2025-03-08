@@ -163,7 +163,7 @@ def run_unit_test(unit_test: UnitTests):
         # benchmark_prices = fetch_field_timeseries_per_tickers(tickers={'LQD US Equity': 'LQD'})
         delta1_portfolio = qis.backtest_model_portfolio(prices=prices,
                                                         weights=np.array([1.0]),
-                                                        rebalance_freq='SE',   # only at starts
+                                                        rebalancing_freq='SE',   # only at starts
                                                         rebalancing_costs=rebalancing_costs,
                                                         ticker='Delta1')
         figs = qis.generate_strategy_factsheet(portfolio_data=delta1_portfolio,

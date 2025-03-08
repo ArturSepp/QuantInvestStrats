@@ -138,7 +138,8 @@ class PortfolioData:
     NAV level getters
     """
 
-    def get_portfolio_nav(self, time_period: TimePeriod = None, freq: Optional[str] = None) -> pd.Series:
+    def get_portfolio_nav(self, time_period: TimePeriod = None, freq: Optional[str] = None,
+                          ticker: Optional[str] = None) -> pd.Series:
         """
         get nav using consistent function for all return computations
         """
@@ -148,6 +149,8 @@ class PortfolioData:
             nav_ = self.nav.copy()
         if freq is not None:
             nav_ = nav_.asfreq(freq=freq, method='ffill')
+        if ticker is not None:
+            nav_ = nav_.rename(ticker)
         return nav_
 
     def get_portfolio_nav_with_benchmark_prices(self,
@@ -1714,7 +1717,7 @@ class PortfolioInput:
     prices: pd.DataFrame = None  # mandatory but we set none for enumarators
     allocation_type: AllocationType = AllocationType.FIXED_WEIGHTS
     time_period: TimePeriod = None
-    rebalance_freq: str = 'QE'
+    rebalancing_freq: str = 'QE'
     freq_regime: str = 'ME'
     returns_freq: str = 'ME'
     ewm_lambda: float = 0.92
