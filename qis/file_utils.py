@@ -231,14 +231,14 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
         if sheet_names is None:
             sheet_names = [f"Sheet {n+1}" for n, _ in enumerate(data)]
         for df, name in zip(data, sheet_names):
-            if df is not None:
+            if df is not None and isinstance(df, pd.DataFrame):
                 df = delocalize_df(df)
                 if transpose:
                     df = df.T
                 df.to_excel(excel_writer=excel_writer, sheet_name=name)
     elif isinstance(data, dict):  # publish with sheet names
         for key, df in data.items():
-            if df is not None:
+            if df is not None and isinstance(df, pd.DataFrame):
                 df = delocalize_df(df)
                 if transpose:
                     df = df.T
@@ -482,7 +482,7 @@ def save_df_dict_to_csv(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFram
         file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
 
     for key, data in datasets.items():
-        if data is not None:
+        if data is not None and isinstance(data, pd.DataFrame):
             file_path = get_local_file_path(file_name=file_name,
                                             file_type=FileTypes.CSV,
                                             local_path=local_path,
@@ -535,16 +535,32 @@ def save_df_dict_to_sql(engine: Engine,
                         table_name: str,
                         dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame],
                         schema: Optional[str] = None,
-                        index_col: Optional[str] = INDEX_COLUMN
+                        index_col: Optional[str] = INDEX_COLUMN,
+                        if_exists: Literal["fail", "replace", "append"] | Literal["truncate-append"] = "fail",
                         ) -> None:
     """
     save pandas dict to sql engine
     """
     for key, df in dfs.items():
-        if df is not None:
+        if df is not None and isinstance(df, pd.DataFrame):
             if index_col is not None:
                 df = df.reset_index(names=index_col)
-            df.to_sql(f"{table_name}_{key}", engine, schema=schema, if_exists='replace')
+            if if_exists == "truncate-append":
+                schema_str = f"{schema}." if schema else ""
+                with engine.connect() as con:
+                    statement = text(f"TRUNCATE TABLE {schema_str}{table_name}_{key}")
+                    con.execute(statement)
+                    con.commit()
+                df.to_sql(
+                    f"{table_name}_{key}",
+                    engine,
+                    schema=schema,
+                    if_exists='append',
+                    method='multi',
+                    chunksize=1000
+                )
+            else:
+                df.to_sql(f"{table_name}_{key}", engine, schema=schema, if_exists=if_exists)
 
 
 @timer
@@ -553,19 +569,22 @@ def load_df_dict_from_sql(engine: Engine,
                           dataset_keys: List[Union[str, Enum, NamedTuple]],
                           schema: Optional[str] = None,
                           index_col: Optional[str] = INDEX_COLUMN,
-                          columns: Optional[List[str]] = None
+                          columns: Optional[List[str]] = None,
+                          drop_sql_index: bool = True
                           ) -> Dict[str, pd.DataFrame]:
     """
     pandas dict from csv files
     """
     pandas_dict = {}
     for key in dataset_keys:
+        # df will have index set by index_col with added column 'index' from sql
         df = pd.read_sql_table(table_name=f"{table_name}_{key}", con=engine, schema=schema,
                                index_col=index_col,
                                columns=columns)
-        if index_col is not None and index_col in df.columns:
-            df[index_col] = pd.to_datetime(df[index_col])
-            df = df.set_index(index_col)
+        if drop_sql_index:
+            df = df.drop('index', axis=1)
+            #  df[index_col] = pd.to_datetime(df[index_col])
+            #  df = df.set_index(index_col, drop=True)
         pandas_dict[key] = df
     return pandas_dict
 
@@ -672,7 +691,7 @@ def save_df_dict_to_feather(dfs: Dict[Union[str, Enum, NamedTuple], pd.DataFrame
     pandas dict to csv files
     """
     for key, df in dfs.items():
-        if df is not None:
+        if df is not None and isinstance(df, pd.DataFrame):
             file_path = get_local_file_path(file_name=file_name,
                                             file_type=FileTypes.FEATHER,
                                             local_path=local_path,
