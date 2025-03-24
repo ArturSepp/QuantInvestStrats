@@ -217,7 +217,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
     return fig
 
 
-def plot_vbars(df: pd.DataFrame,
+def plot_vbars(df: Union[pd.DataFrame, pd.Series],
                title: Optional[str] = None,
                fontsize: int = 10,
                add_bar_values: bool = True,
@@ -244,6 +244,8 @@ def plot_vbars(df: pd.DataFrame,
                **kwargs
                ) -> plt.Figure:
 
+    if isinstance(df, pd.Series):
+        df = df.to_frame()
     category_names = df.columns.to_list()
 
     if add_total_to_index and totals is not None:
@@ -516,7 +518,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.BARS
+    unit_test = UnitTests.VBAR_WEIGHTS
 
     is_run_all_tests = False
     if is_run_all_tests:

@@ -566,9 +566,9 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         # benchmark weights
         benchmark_data = multi_portfolio_data.portfolio_datas[benchmark_idx]
         benchmark_ticker = benchmark_data.ticker
-        benchmark_exposures_ac = benchmark_data.get_weights(group_data=ac_group_data, group_order=sub_ac_group_order,
+        benchmark_exposures_ac = benchmark_data.get_weights(group_data=ac_group_data, group_order=ac_group_order,
                                                             **weight_kwargs)
-        benchmark_exposures_subac = benchmark_data.get_weights(group_data=sub_ac_group_data, group_order=ac_group_order,
+        benchmark_exposures_subac = benchmark_data.get_weights(group_data=sub_ac_group_data, group_order=sub_ac_group_order,
                                                                **weight_kwargs)
 
         # plot strategy and benchmark weights by ac

@@ -80,6 +80,7 @@ class PortfolioData:
     benchmark_prices: pd.DataFrame = None  # can pass benchmark prices here
     ticker: str = None
     strategy_signal_data: StrategySignalData = None
+    covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None  # for computing risk contributions
 
     def __post_init__(self):
         if isinstance(self.nav, pd.DataFrame):
@@ -715,7 +716,7 @@ class PortfolioData:
         return portfolio_vars, instrument_vars
 
     def compute_risk_contributions_implied_by_covar(self,
-                                                    covar_dict: Dict[pd.Timestamp, pd.DataFrame],
+                                                    covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
                                                     group_data: pd.Series = None,
                                                     group_order: List[str] = None,
                                                     align_with_covar_dates: bool = True,
@@ -725,6 +726,11 @@ class PortfolioData:
         """
         compute risk contributions using covar_dict
         """
+        if covar_dict is None:
+            if self.covar_dict is None:
+                raise ValueError(f"must provide covar_dict")
+            else:
+                covar_dict = self.covar_dict
         strategy_weights = self.get_weights(freq=freq, is_input_weights=True)
         covar_index = list(covar_dict.keys())
         strategy_rc = {}
@@ -1236,10 +1242,13 @@ class PortfolioData:
                              add_top_bar_values: Optional[bool] = None,
                              time_period: TimePeriod = None,
                              title: str = None,
+                             group_data: pd.Series = None,
+                             group_order: List[str] = None,
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> None:
-        weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped)
+        weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped,
+                                   group_data=group_data, group_order=group_order)
         if time_period is not None:
             weights_1 = time_period.locate(weights)
             if len(weights_1.index) > 0:
@@ -1455,6 +1464,7 @@ class PortfolioData:
                        use_bar_plot=True,
                        ax=axs[1],
                        **kwargs)
+
 
 @dataclass
 class StrategySignalData:

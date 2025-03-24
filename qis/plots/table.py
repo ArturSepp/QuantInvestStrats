@@ -49,6 +49,7 @@ def plot_df_table(df: pd.DataFrame,
                   data_colors: List[Tuple[float, float, float]] = None,
                   diagonal_color: str = None,
                   rows_edge_lines: List[int] = None,
+                  rows_edge_color: str = 'blue',
                   columns_edge_lines: List[Tuple[int, str]] = None,
                   bold_font: bool = False,
                   linewidth: float = 0.5,  # table borders
@@ -211,7 +212,7 @@ def plot_df_table(df: pd.DataFrame,
 
     if rows_edge_lines is not None:
         for rows_edge_line in rows_edge_lines:
-            ax.axhline(y=rows_edge_line, color='black', alpha=0.5*alpha, lw=0.75)
+            ax.axhline(y=rows_edge_line, color=rows_edge_color, alpha=0.5*alpha, lw=0.75)
 
     if columns_edge_lines is not None:
         for columns_edge_line in columns_edge_lines:
