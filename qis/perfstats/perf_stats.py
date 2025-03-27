@@ -101,7 +101,8 @@ BENCHMARK_TABLE_COLUMNS = (PerfStat.PA_RETURN,
                            PerfStat.SKEWNESS,
                            PerfStat.ALPHA_AN,
                            PerfStat.BETA,
-                           PerfStat.R2)
+                           PerfStat.R2,
+                           PerfStat.ALPHA_PVALUE)
 
 BENCHMARK_TABLE_COLUMNS2 = (PerfStat.TOTAL_RETURN,
                             PerfStat.PA_RETURN,
@@ -271,14 +272,14 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     if perf_params.rates_data is not None:
         returns = ret.compute_excess_returns(returns=returns, rates_data=perf_params.rates_data)
 
-    alphas, betas, r2 = {}, {}, {}
+    alphas, betas, r2, alpha_pvalue = {}, {}, {}, {}
     for column in returns.columns:
         joint_data = returns[[benchmark, column]].dropna()
         if joint_data.empty or len(joint_data.index) < 2:
-            alphas[column], betas[column], r2[column] = np.nan, np.nan, np.nan
+            alphas[column], betas[column], r2[column], alpha_pvalue[column] = np.nan, np.nan, np.nan, np.nan
         else:
-            alphas[column], betas[column], r2[column] = ols.estimate_ols_alpha_beta(x=joint_data.iloc[:, 0],
-                                                                                    y=joint_data.iloc[:, 1])
+            alphas[column], betas[column], r2[column], alpha_pvalue[column] = ols.estimate_ols_alpha_beta(x=joint_data.iloc[:, 0],
+                                                                                                          y=joint_data.iloc[:, 1])
 
             # get vol and compute risk adjusted performance
     alpha_an_factor = alpha_an_factor or perf_params.alpha_an_factor
@@ -286,9 +287,12 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     ra_perf_table[PerfStat.ALPHA_AN.to_str()] = alpha_an_factor * pd.Series(alphas)
     ra_perf_table[PerfStat.BETA.to_str()] = pd.Series(betas)
     ra_perf_table[PerfStat.R2.to_str()] = pd.Series(r2)
+    ra_perf_table[PerfStat.ALPHA_PVALUE.to_str()] = pd.Series(alpha_pvalue)
 
     if drop_benchmark:
         ra_perf_table = ra_perf_table.drop([benchmark], axis=0)
+    else:  # set p-value of benchmark alpha to 1
+        ra_perf_table.loc[benchmark, PerfStat.ALPHA_PVALUE.to_str()] = 1.0
     return ra_perf_table
 
 

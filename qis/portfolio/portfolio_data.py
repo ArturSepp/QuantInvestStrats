@@ -215,7 +215,7 @@ class PortfolioData:
                        time_period: TimePeriod = None,
                        constant_trade_level: bool = False,
                        is_add_group_total: bool = False
-                       ) -> pd.DataFrame:
+                       ) -> Optional[pd.DataFrame]:
         """
         group total will exclude transaction costs so it is not equal to portfolio nav
         """
@@ -223,12 +223,17 @@ class PortfolioData:
             total_column = str(self.nav.name)
         else:
             total_column = None
-        grouped_pnl = dfg.agg_df_by_groups_ax1(df=self.get_instruments_pnl(time_period=time_period),
-                                               group_data=self.group_data,
-                                               agg_func=np.nansum,
-                                               total_column=total_column,
-                                               group_order=self.group_order)
-        group_navs = ret.returns_to_nav(returns=grouped_pnl, constant_trade_level=constant_trade_level)
+        df = self.get_instruments_pnl(time_period=time_period)
+        if df.empty:
+            print(f"instruments p&l is not available for time_period={time_period.to_str()}")
+            group_navs = None
+        else:
+            grouped_pnl = dfg.agg_df_by_groups_ax1(df=df,
+                                                   group_data=self.group_data,
+                                                   agg_func=np.nansum,
+                                                   total_column=total_column,
+                                                   group_order=self.group_order)
+            group_navs = ret.returns_to_nav(returns=grouped_pnl, constant_trade_level=constant_trade_level)
         return group_navs
 
     def get_total_nav_with_group_navs(self, time_period: TimePeriod = None) -> pd.DataFrame:

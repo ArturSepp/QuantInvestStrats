@@ -18,9 +18,10 @@ from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strateg
                                                                 generate_strategy_benchmark_active_perf_plt,
                                                                 generate_performance_attribution_report,
                                                                 weights_tracking_error_report_by_ac_subac)
+from qis.test_data import load_etf_data
 
 
-def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+def fetch_universe_data(live_prices: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     """
     define custom universe with asset class grouping
     """
@@ -34,10 +35,11 @@ def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
                          GLD='Gold')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
-    # prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
-    from qis.test_data import load_etf_data
-    prices = load_etf_data()[tickers]
-    print(prices)
+    if live_prices:
+        prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
+    else:
+        prices = load_etf_data()[tickers]
+        print(prices)
 
     prices = prices.asfreq('B', method='ffill')
     benchmark_prices = prices[['SPY', 'TLT']]
@@ -91,7 +93,6 @@ def run_unit_test(unit_test: UnitTests):
     # time period for portfolio reporting
     time_period = qis.TimePeriod('31Dec2006', '10Jan2025')
     prices, benchmark_prices, group_data = fetch_universe_data()
-
 
     multi_portfolio_data = generate_volparity_multiportfolio(prices=prices,
                                                              benchmark_prices=benchmark_prices,
@@ -157,7 +158,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.TRACKING_ERROR
+    unit_test = UnitTests.STRATEGY_BENCHMARK_PLT
 
     is_run_all_tests = False
     if is_run_all_tests:

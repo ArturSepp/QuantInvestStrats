@@ -71,27 +71,30 @@ def estimate_ols_alpha_beta(x: Union[np.ndarray, pd.Series, pd.DataFrame],
                             y: Union[np.ndarray, pd.Series],
                             order: int = 1,
                             fit_intercept: bool = True
-                            ) -> Tuple[float, float, float]:
+                            ) -> Tuple[float, float, float, float]:
     try:
         reg_model = fit_ols(x=x, y=y, order=order, fit_intercept=fit_intercept)
     except:
         warnings.warn(f"problem with x={x}, y={y}")
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
     if fit_intercept:
         if isinstance(reg_model.params, pd.Series):
             alpha = reg_model.params.iloc[0]
             beta = reg_model.params.iloc[1]
+            alpha_pvalue = reg_model.pvalues.iloc[0]
         else:
             alpha = reg_model.params[0]
             beta = reg_model.params[1]
+            alpha_pvalue = reg_model.pvalues[0]
     else:
         alpha = 0.0
+        alpha_pvalue = 0.0
         if isinstance(reg_model.params, pd.Series):
             beta = reg_model.params.iloc[0]
         else:
             beta = reg_model.params[0]
     r2 = reg_model.rsquared
-    return alpha, beta, r2
+    return alpha, beta, r2, alpha_pvalue
 
 
 def estimate_alpha_beta_paired_dfs(x: pd.DataFrame,
@@ -110,9 +113,9 @@ def estimate_alpha_beta_paired_dfs(x: pd.DataFrame,
     ncols = len(x.columns)
     alphas, betas = np.zeros(ncols), np.zeros(ncols)
     for idx in np.arange(ncols):
-        alphas[idx], betas[idx], _ = estimate_ols_alpha_beta(x=x_np[:, idx],
-                                                             y=y_np[:, idx],
-                                                             fit_intercept=fit_intercept)
+        alphas[idx], betas[idx], _, _ = estimate_ols_alpha_beta(x=x_np[:, idx],
+                                                                y=y_np[:, idx],
+                                                                fit_intercept=fit_intercept)
     alphas = pd.Series(alphas, index=x.columns)
     betas = pd.Series(betas, index=x.columns)
     return alphas, betas

@@ -497,7 +497,7 @@ class MultiPortfolioData:
                 navs_ = portfolio.get_portfolio_nav(time_period=time_period)  # navs include costs while group navs are cost free
                 ac_prices_ = portfolio.get_group_navs(time_period=time_period, is_add_group_total=False)
                 strategy_prices.append(navs_)
-                if add_ac:
+                if add_ac and ac_prices_ is not None:
                     ac_prices_.columns = [f"{portfolio_name}-{x}" for x in ac_prices_.columns]
                     ac_prices.append(ac_prices_)
                     rows_edge_lines.append(sum(rows_edge_lines)+len(ac_prices_.columns))
@@ -505,7 +505,7 @@ class MultiPortfolioData:
 
             benchmark_price = benchmark_price.reindex(index=strategy_prices.index, method='ffill')
             if benchmark_price.name not in strategy_prices.columns:
-                prices = pd.concat([benchmark_price, strategy_prices], axis=1)
+                prices = pd.concat([strategy_prices, benchmark_price], axis=1)
             else:
                 prices = strategy_prices
             if add_ac:  # otherwise tables look too bad

@@ -21,7 +21,8 @@ PERF_COLUMNS_RF0 = (PerfStat.TOTAL_RETURN,
                     PerfStat.SKEWNESS,
                     PerfStat.ALPHA_AN,
                     PerfStat.BETA,
-                    PerfStat.R2)
+                    PerfStat.R2,
+                    PerfStat.ALPHA_PVALUE)
 
 
 PERF_COLUMNS = (PerfStat.TOTAL_RETURN,
@@ -34,7 +35,8 @@ PERF_COLUMNS = (PerfStat.TOTAL_RETURN,
                 PerfStat.SKEWNESS,
                 PerfStat.ALPHA_AN,
                 PerfStat.BETA,
-                PerfStat.R2)
+                PerfStat.R2,
+                PerfStat.ALPHA_PVALUE)
 
 
 class ReportingFrequency(Enum):

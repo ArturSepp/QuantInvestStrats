@@ -152,7 +152,6 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
             df_to_add = df_to_add.fillna('')
         ra_perf_table = pd.concat([ra_perf_table, df_to_add], axis=1)
 
-
     fig = ptb.plot_df_table(df=ra_perf_table,
                             transpose=transpose,
                             special_columns_colors=special_columns_colors,
@@ -415,7 +414,7 @@ def plot_best_worst_returns(price: pd.Series,
 class UnitTests(Enum):
     PLOT_RA_PERF_TABLE = 1
     PLOT_RA_PERF_SCATTER = 2
-    PLOT_RA_PERF_TABLE_BENCHMARKS = 3
+    PLOT_RA_PERF_TABLE_BENCHMARK = 3
     PLOT_DESC_FREQ_TABLE = 4
     PLOT_SHARPE_BARPLOT = 5
     PLOT_SHARPE_BY_DATES = 6
@@ -444,7 +443,7 @@ def run_unit_test(unit_test: UnitTests):
         plot_ra_perf_scatter(prices=prices,
                              perf_params=perf_params)
 
-    elif unit_test == UnitTests.PLOT_RA_PERF_TABLE_BENCHMARKS:
+    elif unit_test == UnitTests.PLOT_RA_PERF_TABLE_BENCHMARK:
         perf_params = PerfParams(freq='ME')
         plot_ra_perf_table_benchmark(prices=prices,
                                      benchmark='SPY',
@@ -483,7 +482,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PLOT_TOP_BOTTOM_RETURNS
+    unit_test = UnitTests.PLOT_RA_PERF_TABLE_BENCHMARK
 
     is_run_all_tests = False
     if is_run_all_tests:
