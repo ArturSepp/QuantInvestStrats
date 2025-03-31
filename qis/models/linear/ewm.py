@@ -606,6 +606,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     implementation of ewm recursion for variance/volatility computation
+    vol_floor_quantile_roll_period will replace ewma estimate with quantile vol if vol < quantile vol
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 
@@ -634,7 +635,9 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     # apply quantile
     if vol_floor_quantile is not None:
         ewm_pd = pd.DataFrame(ewm)
-        ewm_quantiles = ewm_pd.rolling(vol_floor_quantile_roll_period, min_periods=100).quantile(vol_floor_quantile, interpolation="lower")
+        ewm_quantiles = ewm_pd.rolling(vol_floor_quantile_roll_period,
+                                       min_periods=int(0.2*vol_floor_quantile_roll_period)
+                                       ).quantile(vol_floor_quantile, interpolation="lower")
         vol_floor = ewm_quantiles.to_numpy()
         ewm = np.where(np.less(ewm, vol_floor), vol_floor, ewm)
 
@@ -657,7 +660,86 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         ewm = pd.DataFrame(data=ewm, index=data.index, columns=data.columns)
     elif isinstance(data, pd.Series):
         ewm = pd.Series(data=ewm, index=data.index, name=data.name)
+    return ewm
 
+
+def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
+                               num_lags: int = 3,
+                               span: Optional[Union[float, np.ndarray]] = None,
+                               ewm_lambda: Union[float, np.ndarray] = 0.94,
+                               mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+                               init_type: InitType = InitType.X0,
+                               init_value: Optional[Union[float, np.ndarray]] = None,
+                               apply_sqrt: bool = True,
+                               annualize: bool = False,
+                               af: Optional[float] = None,
+                               warmup_period: Optional[int] = None,
+                               nan_backfill: NanBackfill = NanBackfill.FFILL
+                               ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+    """
+    implementation of newey west vol estimator
+    implementation of ewm recursion for variance/volatility computation
+    vol_floor_quantile_roll_period will replace ewma estimate with quantile vol if vol < quantile vol
+    """
+    a = npo.to_finite_np(data=data, fill_value=np.nan)
+
+    if span is not None:
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+
+    if mean_adj_type != MeanAdjType.NONE:
+        a = compute_rolling_mean_adj(data=a,
+                                     mean_adj_type=mean_adj_type,
+                                     ewm_lambda=ewm_lambda,
+                                     init_type=init_type,
+                                     nan_backfill=nan_backfill)
+
+    # initial conditions
+    a = a
+    if init_value is None:
+        init_value = set_init_dim1(data=a, init_type=init_type)
+
+    if isinstance(data, pd.Series) or (isinstance(data, np.ndarray) and data.ndim == 1):
+        ewm_lambda = float(ewm_lambda)
+        if isinstance(init_value, np.ndarray):
+            init_value = float(init_value)
+
+    ewm0 = ewm_recursion(a=a, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+
+
+    # compute m recursions:
+    ewms = {}
+    for m in np.arange(num_lags):
+        # lagged value
+        if m == 0:
+            a_m = a
+        else:
+            a_m = np.empty_like(a)
+            a_m[m:] = a[:-m]
+            a_m[:m] = np.nan
+        ewms[m] = ewm_recursion(a=a*a_m, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+
+    ewm_
+
+
+    if warmup_period is not None:   # set to nan first nonnan in warmup_period
+        ewm = npo.set_nans_for_warmup_period(a=ewm, warmup_period=warmup_period)
+
+    if annualize or af is not None:
+        if af is None:
+            if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
+                af = da.infer_an_from_data(data=data)
+            else:
+                warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
+                af = 1.0
+        ewm = af * ewm
+
+    if apply_sqrt:
+        ewm = np.sqrt(ewm)
+
+    if isinstance(data, pd.DataFrame):
+        ewm = pd.DataFrame(data=ewm, index=data.index, columns=data.columns)
+    elif isinstance(data, pd.Series):
+        ewm = pd.Series(data=ewm, index=data.index, name=data.name)
     return ewm
 
 

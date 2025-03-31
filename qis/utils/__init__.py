@@ -111,7 +111,7 @@ from qis.utils.df_ops import (
     get_first_nonnan_values,
     get_last_nonnan_values,
     get_last_nonnan,
-    merge_on_column,
+    merge_dfs_on_column,
     compute_nans_zeros_ratio_after_first_non_nan,
     reindex_upto_last_nonnan,
     multiply_df_by_dt,

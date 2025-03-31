@@ -549,19 +549,21 @@ def df12_merge_with_tz(df1: pd.DataFrame,
     return dfs
 
 
-def merge_on_column(df1: pd.DataFrame,
-                    df2: pd.DataFrame,
-                    is_drop_y: bool = True
-                    ) -> pd.DataFrame:
+def merge_dfs_on_column(data_df: pd.DataFrame,
+                        index_df: pd.DataFrame,
+                        index_column_in_data_df: str = 'bbg_ticker'
+                        ) -> pd.DataFrame:
     """
-    merge on homogeneous column with preservation of indices and drop dublicated, _y columns
+    merge data_df with index_df using index_column_in_data_df
+    index_df
     """
-    joint_data = pd.merge(left=df1, right=df2,
-                          left_index=True, right_index=True,
-                          suffixes=('', '_y'), how='inner')
-    if is_drop_y:
-        unique_columns = sop.merge_lists_unique(list1=df1.columns.to_list(), list2=df2.columns.to_list())
-        joint_data = joint_data[unique_columns]
+    data_df.index.name = 'index1'  # rename index
+    index_df.index.name = 'index2'  # rename index
+    # align dfs by index_column_in_data_df
+    index_df_joint_data = index_df.reindex(index=data_df[index_column_in_data_df].to_list())
+    # merge aligned dfs with reset index
+    joint_data = pd.concat([data_df.reset_index(drop=False), index_df_joint_data.reset_index(drop=False)], axis=1)
+    joint_data = joint_data.set_index(data_df.index.name)
     return joint_data
 
 
@@ -588,6 +590,7 @@ class UnitTests(Enum):
     SCORES = 2
     NONNANINDEX = 3
     REINDEX_UPTO_LAST_NONAN = 4
+    MERGE_DFS_ON_COLUMNS = 5
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -643,10 +646,27 @@ def run_unit_test(unit_test: UnitTests):
         post_filled_up_nan = reindex_upto_last_nonnan(ds=ds, index=dates1, method='ffill')
         print(post_filled_up_nan)
 
+    elif unit_test == UnitTests.MERGE_DFS_ON_COLUMNS:
+        data_entries = {'Bond1': pd.Series(['AAA', 100.00, 'A3'], index=['bbg_ticker', 'face', 'raiting']),
+                        'Bond2': pd.Series(['AA', 100.00, 'A2'], index=['bbg_ticker', 'face', 'raiting']),
+                        'Bond3': pd.Series(['A', 100.00, 'A1'], index=['bbg_ticker', 'face', 'raiting']),
+                        'Bond4': pd.Series(['BBB', 100.00, 'B3'], index=['bbg_ticker', 'face', 'raiting'])}
+        data_df = pd.DataFrame.from_dict(data_entries, orient='index')
+
+        index_df = {'A': pd.Series([95.0], index=['price']),
+                    'AA': pd.Series([99.0], index=['price']),
+                    'AAA': pd.Series([101.0], index=['price']),
+                    'B': pd.Series([90.0], index=['price'])}
+        index_df = pd.DataFrame.from_dict(index_df, orient='index')
+        print(data_df)
+        print(index_df)
+        df = merge_dfs_on_column(data_df=data_df, index_df=index_df)
+        print(df)
+
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.REINDEX_UPTO_LAST_NONAN
+    unit_test = UnitTests.MERGE_DFS_ON_COLUMNS
 
     is_run_all_tests = False
     if is_run_all_tests:
