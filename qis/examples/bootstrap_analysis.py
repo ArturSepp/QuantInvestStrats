@@ -52,7 +52,7 @@ def plot_bootsrap_paths(prices: pd.Series,
     span = np.maximum(block_size, 5)
     ewma_vols = qis.compute_ewm_vol(data=log_returns,
                                     span=span,
-                                    af=252)
+                                    annualization_factor=252)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
         qis.set_suptitle(fig, title=f"EWMA-{span} span volatility of realized (red) and bootsrapped paths (gray)")

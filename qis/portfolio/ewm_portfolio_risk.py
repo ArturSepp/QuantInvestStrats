@@ -25,15 +25,15 @@ VAR99_SCALER_BP = VAR99 * 10000
 def limit_weights_to_max_var_limit(weights: np.ndarray,
                                    vols: np.ndarray,
                                    max_var_limit_bp: Union[np.ndarray, float] = 25.00,
-                                   af: float = 260
+                                   annualization_factor: float = 260
                                    ) -> np.ndarray:
     """
     limit weights to max weight_max_var_bp
-    use: var = 2.33 * abs(weight) * vols_annualised / sqrt(af)
-    then abs(weight) <= weight_max_var_limit_bp / (VAR99_SCALER_BP * vols_annualised / sqrt(af))
+    use: var = 2.33 * abs(weight) * vols_annualised / sqrt(annualization_factor)
+    then abs(weight) <= weight_max_var_limit_bp / (VAR99_SCALER_BP * vols_annualised / sqrt(annualization_factor))
     vols are annualised vols
     """
-    saf = np.sqrt(af)
+    saf = np.sqrt(annualization_factor)
     instrument_var = VAR99_SCALER_BP * np.abs(weights) * vols / saf
     cond = instrument_var > max_var_limit_bp
     if np.any(cond):

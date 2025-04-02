@@ -598,7 +598,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     init_value: Optional[Union[float, np.ndarray]] = None,
                     apply_sqrt: bool = True,
                     annualize: bool = False,
-                    af: Optional[float] = None,
+                    annualization_factor: Optional[float] = None,
                     vol_floor_quantile: Optional[float] = None,  # to floor the volatility = 0.16
                     vol_floor_quantile_roll_period: int = 5*260,  # 5y for daily returns
                     warmup_period: Optional[int] = None,
@@ -644,14 +644,14 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
         ewm = npo.set_nans_for_warmup_period(a=ewm, warmup_period=warmup_period)
 
-    if annualize or af is not None:
-        if af is None:
+    if annualize or annualization_factor is not None:
+        if annualization_factor is None:
             if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-                af = da.infer_an_from_data(data=data)
+                annualization_factor = da.infer_an_from_data(data=data)
             else:
                 warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
-                af = 1.0
-        ewm = af * ewm
+                annualization_factor = 1.0
+        ewm = annualization_factor * ewm
 
     if apply_sqrt:
         ewm = np.sqrt(ewm)
@@ -672,7 +672,7 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                init_value: Optional[Union[float, np.ndarray]] = None,
                                apply_sqrt: bool = True,
                                annualize: bool = False,
-                               af: Optional[float] = None,
+                               annualization_factor: Optional[float] = None,
                                warmup_period: Optional[int] = None,
                                nan_backfill: NanBackfill = NanBackfill.FFILL
                                ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
@@ -703,35 +703,27 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         if isinstance(init_value, np.ndarray):
             init_value = float(init_value)
 
-    ewm0 = ewm_recursion(a=a, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+    ewm = ewm_recursion(a=np.square(a), ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
 
-
-    # compute m recursions:
-    ewms = {}
-    for m in np.arange(num_lags):
+    # compute m recursions
+    for m in np.arange(1, num_lags):
         # lagged value
-        if m == 0:
-            a_m = a
-        else:
-            a_m = np.empty_like(a)
-            a_m[m:] = a[:-m]
-            a_m[:m] = np.nan
-        ewms[m] = ewm_recursion(a=a*a_m, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
-
-    ewm_
-
-
+        a_m = np.empty_like(a)
+        a_m[m:] = a[:-m]
+        a_m[:m] = np.nan
+        ewm_m = ewm_recursion(a=a*a_m, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+        ewm += (1.0-m/(num_lags+1))*ewm_m
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
         ewm = npo.set_nans_for_warmup_period(a=ewm, warmup_period=warmup_period)
 
-    if annualize or af is not None:
-        if af is None:
+    if annualize or annualization_factor is not None:
+        if annualization_factor is None:
             if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-                af = da.infer_an_from_data(data=data)
+                annualization_factor = da.infer_an_from_data(data=data)
             else:
                 warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
-                af = 1.0
-        ewm = af * ewm
+                annualization_factor = 1.0
+        ewm = annualization_factor * ewm
 
     if apply_sqrt:
         ewm = np.sqrt(ewm)

@@ -46,12 +46,12 @@ def get_current_time_with_tz(tz: Optional[str] = 'UTC',
 def get_time_to_maturity(maturity_time: pd.Timestamp,
                          value_time: pd.Timestamp,
                          is_floor_at_zero: bool = True,
-                         af: float = 365
+                         annualization_factor: float = 365
                          ) -> float:
     """
     return annualised difference between mat_date and value_time
     """
-    seconds_per_year = af * 24 * 60 * 60  # days, hours, minute, seconds
+    seconds_per_year = annualization_factor * 24 * 60 * 60  # days, hours, minute, seconds
     ttm = (maturity_time - value_time).total_seconds() / seconds_per_year
     if is_floor_at_zero and ttm < 0.0:
         ttm = 0.0

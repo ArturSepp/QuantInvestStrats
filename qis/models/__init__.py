@@ -41,6 +41,7 @@ from qis.models.linear.ewm import (
     compute_ewm_sharpe_from_prices,
     compute_ewm_std1_norm,
     compute_ewm_vol,
+    compute_ewm_newey_west_vol,
     compute_ewm_xy_beta_tensor,
     compute_one_factor_ewm_betas,
     compute_roll_mean,

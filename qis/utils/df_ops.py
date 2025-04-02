@@ -312,7 +312,7 @@ def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
                       dates: Union[pd.DatetimeIndex, pd.Index] = None,
                       lag: Optional[int] = None,
                       is_actual_calendar_dt: bool = True,
-                      af: float = 365.0
+                      annualization_factor: float = 365.0
                       ) -> Union[pd.DataFrame, pd.Series]:
     """
     to compute rate adjustment with data - rate:
@@ -336,9 +336,9 @@ def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
     # apply dt multiplication
     if len(df.index) > 1:
         if is_actual_calendar_dt:
-            delta = np.append(0.0, (df.index[1:] - df.index[:-1]).days / af)
+            delta = np.append(0.0, (df.index[1:] - df.index[:-1]).days / annualization_factor)
         else:
-            delta = 1.0 / af
+            delta = 1.0 / annualization_factor
         df = df.multiply(delta, axis=0)
     else:
         warnings.warn(f"in adjust_data_with_dt: lengh of data index is one - cannot adjust by dt")

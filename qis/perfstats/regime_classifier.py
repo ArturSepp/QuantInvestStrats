@@ -41,7 +41,7 @@ def compute_regime_avg(sampled_returns_with_regime_id: pd.DataFrame,
 
     """
     compute conditional means by the regime ids
-    compute normalized prices attributions = af*freq*cvar
+    compute normalized prices attributions = annualization_factor*freq*cvar
     """
     # compute mean by regimes
     regime_means, norm_q = compute_mean_freq_regimes(sampled_returns_with_regime_id=sampled_returns_with_regime_id)

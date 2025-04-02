@@ -30,10 +30,10 @@ def compute_vols(prices: pd.Series,
     """
     returns = np.log(prices).diff(1)
     init_value = np.nanvar(returns, axis=0)  # set initial value to average variance
-    vol = qis.compute_ewm_vol(data=returns, span=span, af=365*24, init_value=init_value)
+    vol = qis.compute_ewm_vol(data=returns, span=span, annualization_factor=365*24, init_value=init_value)
 
     returns1 = returns.where(returns.index.dayofweek < 5, other=np.nan)
-    vol1 = qis.compute_ewm_vol(data=returns1, span=span, af=260*24, init_value=init_value)
+    vol1 = qis.compute_ewm_vol(data=returns1, span=span, annualization_factor=260*24, init_value=init_value)
     vols = pd.concat([vol.rename('including weekends'),
                       vol1.rename('excluding weekends')], axis=1)
     return vols

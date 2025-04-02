@@ -107,7 +107,7 @@ def plot_strategies_prices(nav_data: pd.DataFrame,
                            ) -> None:
 
     nav_returns = qis.to_returns(prices=nav_data)
-    eod_ewm_vol = qis.compute_ewm_vol(data=nav_returns, span=vol_span, mean_adj_type=qis.MeanAdjType.NONE, af=vol_af)
+    eod_ewm_vol = qis.compute_ewm_vol(data=nav_returns, span=vol_span, mean_adj_type=qis.MeanAdjType.NONE, annualization_factor=vol_af)
 
     # trim plot data
     nav_data = time_period.locate(nav_data)

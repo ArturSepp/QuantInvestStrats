@@ -49,7 +49,7 @@ def fetch_hf_ohlc(ticker: str = 'SPY',
 
 def estimate_hf_vol(ticker: str = 'SPY',
                     agg_freq: str = 'B',
-                    af: float = 260,
+                    annualization_factor: float = 260,
                     freqs: List[str] = ['1d', '1h', '30m', '15m', '5m'],
                     ohlc_estimator_type: OhlcEstimatorType = OhlcEstimatorType.PARKINSON
                     ) -> pd.DataFrame:
@@ -60,20 +60,20 @@ def estimate_hf_vol(ticker: str = 'SPY',
         vols[freq] = qis.estimate_hf_ohlc_vol(ohlc_data=ohlc_data,
                                               ohlc_estimator_type=ohlc_estimator_type,
                                               agg_freq=agg_freq,
-                                              af=af*AF_MULTIPLIERS[freq])
+                                              annualization_factor=annualization_factor*AF_MULTIPLIERS[freq])
     vols = pd.DataFrame.from_dict(vols, orient='columns').dropna()
     return vols
 
 
 def plot_hf_vols(ticker: str = 'SPY',
                  agg_freq: str = 'B',
-                 af: float = 260,
+                 annualization_factor: float = 260,
                  freqs: List[str] = ['1d', '1h', '30m', '15m', '5m'],
                  ohlc_estimator_type: OhlcEstimatorType = OhlcEstimatorType.PARKINSON
                  ):
     vols = estimate_hf_vol(ticker=ticker,
                            agg_freq=agg_freq,
-                           af=af,
+                           annualization_factor=annualization_factor,
                            freqs=freqs,
                            ohlc_estimator_type=ohlc_estimator_type)
 
@@ -101,13 +101,13 @@ def run_unit_test(unit_test: UnitTests):
 
     elif unit_test == UnitTests.HF_VOL:
         # use small number of num_samples for illustration
-        df = estimate_hf_vol(ticker='SPY', agg_freq='B', af=260)
+        df = estimate_hf_vol(ticker='SPY', agg_freq='B', annualization_factor=260)
         print(df)
         df.plot()
 
     elif unit_test == UnitTests.PLOT_HF_VOL:
-        # plot_hf_vols(ticker='SPY', agg_freq='B', af=260)
-        plot_hf_vols(ticker='ETH-USD', agg_freq='D', af=365,
+        # plot_hf_vols(ticker='SPY', agg_freq='B', annualization_factor=260)
+        plot_hf_vols(ticker='ETH-USD', agg_freq='D', annualization_factor=365,
                      ohlc_estimator_type=OhlcEstimatorType.CLOSE_TO_CLOSE)
 
     plt.show()

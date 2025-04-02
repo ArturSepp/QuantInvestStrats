@@ -17,7 +17,7 @@ import qis.models.linear.ewm as ewm
 def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataFrame],
                                    pivot_returns: pd.Series,
                                    span: int = 12,
-                                   af: float = 260,
+                                   annualization_factor: float = 260,
                                    is_to_log_returns: bool = False,
                                    vol_adjustment: float = 1.15  # adjust vol of the bridge
                                    ) -> Union[pd.Series, pd.DataFrame]:
@@ -32,7 +32,7 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
             infrequent_return_backfills[column] = interpolate_infrequent_returns(infrequent_returns=ds,
                                                                                  pivot_returns=pivot_returns,
                                                                                  span=span,
-                                                                                 af=af,
+                                                                                 annualization_factor=annualization_factor,
                                                                                  is_to_log_returns=is_to_log_returns,
                                                                                  vol_adjustment=vol_adjustment)
         infrequent_return_backfills = pd.DataFrame.from_dict(infrequent_return_backfills, orient='columns')
@@ -55,7 +55,7 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
     pivot_brownian = (pivot_brownian - np.nanmean(pivot_brownian)) / np.nanstd(pivot_brownian)  # path to (0, 1) brownian
 
     # add running times
-    seconds_per_year = af * 24 * 60 * 60  # days, hours, minute, seconds
+    seconds_per_year = annualization_factor * 24 * 60 * 60  # days, hours, minute, seconds
     t = pd.Series((infrequent_returns.index - date0).total_seconds() / seconds_per_year, index=infrequent_returns.index)
     t1 = t.shift(-1)
     dt = t1 - t

@@ -56,7 +56,7 @@ def estimate_ohlc_var(ohlc_data: pd.DataFrame,  # must contain ohlc columnes
 
 def estimate_hf_ohlc_vol(ohlc_data: pd.DataFrame,
                          ohlc_estimator_type: OhlcEstimatorType = OhlcEstimatorType.PARKINSON,
-                         af: float = None,  # annualisation factor highly recomended
+                         annualization_factor: float = None,  # annualisation factor highly recomended
                          is_exclude_weekends: bool = False,  # for crypto
                          agg_freq: Optional[str] = 'B'
                          ) -> pd.Series:
@@ -69,10 +69,10 @@ def estimate_hf_ohlc_vol(ohlc_data: pd.DataFrame,
     if agg_freq is not None:
         sample_var = sample_var.resample(agg_freq).mean()
 
-    if af is None:
-        af = qis.infer_an_from_data(data=sample_var)
+    if annualization_factor is None:
+        annualization_factor = qis.infer_an_from_data(data=sample_var)
 
-    vols = np.sqrt(af*sample_var)
+    vols = np.sqrt(annualization_factor*sample_var)
     if is_exclude_weekends:
         vols = vols[vols.index.dayofweek < 5]
     return vols

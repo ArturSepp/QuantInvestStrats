@@ -24,7 +24,7 @@ def simulate_vol_target_strats(prices: Union[pd.DataFrame, pd.Series],
     ewm_vol = ewm.compute_ewm_vol(data=log_returns,
                                   span=vol_span,
                                   mean_adj_type=ewm.MeanAdjType.NONE,
-                                  af=vol_af)
+                                  annualization_factor=vol_af)
     # vol target weights
     weights_100 = qu.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
     nav_weights = weights_100.multiply(vol_target)

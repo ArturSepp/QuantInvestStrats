@@ -220,7 +220,7 @@ class MultiPortfolioData:
                                      benchmark_idx: int = 1,
                                      freq: Optional[str] = 'B',
                                      time_period: TimePeriod = None,
-                                     af: float = 260,
+                                     annualization_factor: float = 260,
                                      is_unit_based_traded_volume: bool = True,
                                      **kwargs
                                      ) -> pd.DataFrame:
@@ -266,10 +266,10 @@ class MultiPortfolioData:
 
         tre_table = pd.concat([total_diff, tre,
                                total_strategy_perf, total_benchmark_perf,
-                               af * strategy_turnover.mean(0).rename(f"{strategy_ticker} an turnover"),
-                               af * benchmark_turnover.mean(0).rename(f"{benchmark_ticker} an turnover"),
-                               af * strategy_cost.mean(0).rename(f"{strategy_ticker} an cost"),
-                               af * benchmark_cost.mean(0).rename(f"{benchmark_ticker} an cost"),
+                               annualization_factor * strategy_turnover.mean(0).rename(f"{strategy_ticker} an turnover"),
+                               annualization_factor * benchmark_turnover.mean(0).rename(f"{benchmark_ticker} an turnover"),
+                               annualization_factor * strategy_cost.mean(0).rename(f"{strategy_ticker} an cost"),
+                               annualization_factor * benchmark_cost.mean(0).rename(f"{benchmark_ticker} an cost"),
                                ], axis=1)
 
         return tre_table
