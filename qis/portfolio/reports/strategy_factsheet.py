@@ -40,8 +40,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 fontsize: int = 4,
                                 weight_change_sample_size: int = 20,
                                 weight_report_time_period: TimePeriod = None,
-                                add_current_position_var_risk_sheet: bool = True,
-                                add_weights_turnover_sheet: bool = True,
+                                add_current_position_var_risk_sheet: bool = False,
+                                add_weights_turnover_sheet: bool = False,
                                 add_grouped_exposures: bool = False,
                                 add_grouped_cum_pnl: bool = False,
                                 add_weight_change_report: bool = False,
@@ -608,8 +608,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
         fig = qis.generate_price_history_report(prices=portfolio_data.prices,
                                                 **qis.update_kwargs(kwargs, dict(fontsize=4, figsize=figsize,
-                                                                                 perf_columns=perf_columns,
-                                                                                 df_to_add=df_to_add)))
+                                                                                 perf_columns=perf_columns)))
         fig.suptitle('Program Instrument Universe', fontweight="bold", fontsize=8, color='blue')
         figs.append(fig)
 

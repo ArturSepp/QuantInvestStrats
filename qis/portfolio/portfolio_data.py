@@ -339,6 +339,8 @@ class PortfolioData:
     def get_turnover(self,
                      is_agg: bool = False,
                      is_grouped: bool = False,
+                     group_data: pd.Series = None,
+                     group_order: List[str] = None,
                      time_period: TimePeriod = None,
                      roll_period: Optional[int] = 260,
                      is_vol_adjusted: bool = False,
@@ -366,11 +368,15 @@ class PortfolioData:
             turnover = pd.Series(np.nansum(turnover, axis=1), index=turnover.index, name=self.nav.name)
             turnover = turnover.reindex(index=self.nav.index)
         elif is_grouped:  # agg by groups
+            if group_data is None:
+                group_data = self.group_data
+            if group_order is None:
+                group_order = self.group_order
             turnover = dfg.agg_df_by_groups_ax1(df=turnover,
-                                                group_data=self.group_data,
+                                                group_data=group_data,
                                                 agg_func=np.nansum,
                                                 total_column=str(self.nav.name) if add_total else None,
-                                                group_order=self.group_order)
+                                                group_order=group_order)
         else:
             if add_total:
                 turnover = pd.concat([turnover.sum(axis=1).rename(self.nav.name), turnover], axis=1)
@@ -1493,6 +1499,13 @@ class StrategySignalData:
         for key, df in data_dict.items():
             if df is not None:
                 data_dict[key] = time_period.locate(df)
+        return StrategySignalData(**data_dict)
+
+    def rename_data(self, names_map: Dict[str, str]) -> StrategySignalData:
+        data_dict = asdict(self)
+        for key, df in data_dict.items():
+            if df is not None:
+                data_dict[key] = df.rename(names_map, axis=1)
         return StrategySignalData(**data_dict)
 
     def get_current_signal_by_groups(self, group_data: pd.Series,

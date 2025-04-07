@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple, Literal
 from enum import Enum
 
 # qis
+import qis as qis
 import qis.utils.df_ops as dfo
 import qis.perfstats.returns as ret
 import qis.plots.time_series as pts
@@ -51,7 +52,10 @@ class LinearModel:
         factor_exposures = pd.DataFrame.from_dict(factor_exposures)
         return factor_exposures
 
-    def get_asset_factor_betas(self, asset: str = None) -> pd.DataFrame:
+    def get_asset_factor_betas(self,
+                               time_period: TimePeriod = None,
+                               asset: str = None
+                               ) -> pd.DataFrame:
         """
         return df of asset exposures to factors
         """
@@ -61,6 +65,8 @@ class LinearModel:
         for factor, factor_exp in self.loadings.items():
             exps[factor] = factor_exp[asset]
         exps = pd.DataFrame.from_dict(exps)
+        if time_period is not None:
+            exps = time_period.locate(exps)
         return exps
 
     def get_asset_factor_attribution(self, asset: str = None, add_total: bool = True) -> pd.DataFrame:
@@ -247,6 +253,18 @@ def compute_benchmarks_beta_attribution(portfolio_nav: pd.Series,
     return joint_attrib
 
 
+def estimate_linear_model(price: pd.Series, hedges: pd.DataFrame,
+                          freq: str = 'W-WED',
+                          span: int = 26,
+                          mean_adj_type: MeanAdjType = MeanAdjType.NONE
+                          ) -> EwmLinearModel:
+    y = qis.to_returns(price.to_frame(), freq=freq, is_log_returns=True, drop_first=True)
+    x = qis.to_returns(hedges, freq=freq, is_log_returns=True, drop_first=True)
+    ewm_linear_model = EwmLinearModel(x=x.reindex(index=y.index), y=y)
+    ewm_linear_model.fit(span=span, is_x_correlated=True, mean_adj_type=mean_adj_type)
+    return ewm_linear_model
+
+
 class UnitTests(Enum):
     MODEL = 1
     ATTRIBUTION = 2
@@ -313,3 +331,5 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
+
+

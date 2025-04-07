@@ -4,8 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Callable, Optional, Dict, Union
 from enum import Enum
-
-import qis
 # qis
 import qis.utils.dates as da
 import qis.utils.df_str as dfs
@@ -106,7 +104,7 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
             df[perf_column.to_str(**kwargs)] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
                                                                  var_format=perf_column.to_format(**kwargs))
         else:
-            df[perf_column.to_str(**kwargs)] = ra_perf_table[perf_column.to_str()]
+            df[perf_column.to_str()] = ra_perf_table[perf_column.to_str()]
 
     if drop_benchmark:
         df = df.drop(benchmark, axis=0)

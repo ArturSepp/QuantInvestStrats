@@ -47,8 +47,13 @@ class MultiAssetsReport:
         self.perf_params = perf_params
         self.regime_params = regime_params
 
-    def get_prices(self, benchmark: str = None, time_period: TimePeriod = None) -> pd.DataFrame:
-        if benchmark is not None and benchmark not in self.prices.columns:
+    def get_prices(self,
+                   benchmark: str = None,
+                   add_benchmarks_to_navs: bool = False,
+                   time_period: TimePeriod = None) -> pd.DataFrame:
+        if add_benchmarks_to_navs:
+            prices = pd.concat([self.benchmark_prices, self.prices], axis=1)
+        elif benchmark is not None and benchmark not in self.prices.columns:
             if isinstance(self.benchmark_prices, pd.Series):
                 prices = pd.concat([self.benchmark_prices, self.prices], axis=1)
             else:
@@ -82,6 +87,7 @@ class MultiAssetsReport:
 
     def plot_ra_perf_table(self,
                            benchmark: str,
+                           add_benchmarks_to_navs: bool = False,
                            time_period: TimePeriod = None,
                            perf_columns: List[PerfStat] = qis.BENCHMARK_TABLE_COLUMNS,
                            perf_params: PerfParams = None,
@@ -89,8 +95,10 @@ class MultiAssetsReport:
                            ax: plt.Subplot = None,
                            **kwargs
                            ) -> None:
-        prices = self.get_prices(benchmark, time_period=time_period)
-        title = title or f"RA performance table for {self.perf_params.freq_vol}-freq returns with beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
+        prices = self.get_prices(benchmark=benchmark, add_benchmarks_to_navs=add_benchmarks_to_navs,
+                                 time_period=time_period)
+        title = title or f"RA performance table for {self.perf_params.freq_vol}-freq returns with" \
+                         f" beta to {benchmark}: {qis.get_time_period(prices).to_str()}"
         #if len(prices.columns) >= 12:
         #    local_kwargs = qis.update_kwargs(kwargs, dict(fontsize=3, pad=10, bbox=(0, -0.4, 1.0, 1.6)))
         #else:
@@ -153,7 +161,8 @@ class MultiAssetsReport:
                  perf_params: PerfParams = None,
                  ax: plt.Subplot = None,
                  **kwargs) -> None:
-        prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark)
+        prices = self.get_prices(time_period=time_period, benchmark=regime_benchmark,
+                                 add_benchmarks_to_navs=add_benchmarks_to_navs)
         prices0 = prices
         if not add_benchmarks_to_navs and regime_benchmark in prices.columns:
             prices0 = prices0.drop(regime_benchmark, axis=1)
@@ -194,6 +203,7 @@ class MultiAssetsReport:
         self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, data_df=prices)
 
     def plot_annual_returns(self,
+                            add_benchmarks_to_navs: bool = False,
                             heatmap_freq: str = 'YE',
                             date_format: str = '%Y',
                             time_period: TimePeriod = None,
@@ -205,7 +215,8 @@ class MultiAssetsReport:
                                         new_kwargs=dict(fontsize=table_fontsize,
                                                         square=False,
                                                         x_rotation=90))
-        qis.plot_periodic_returns_table(prices=self.get_prices(time_period=time_period),
+        qis.plot_periodic_returns_table(prices=self.get_prices(time_period=time_period,
+                                                               add_benchmarks_to_navs=add_benchmarks_to_navs),
                                         freq=heatmap_freq,
                                         ax=ax,
                                         title=title or f"{heatmap_freq} Returns",
@@ -214,11 +225,12 @@ class MultiAssetsReport:
 
     def plot_corr_table(self,
                         corr_freq: str = 'W-WED',
+                        add_benchmarks_to_navs: bool = True,
                         time_period: TimePeriod = None,
                         ax: plt.Subplot = None,
                         **kwargs
                         ) -> None:
-        prices = self.get_prices(time_period=time_period)
+        prices = self.get_prices(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
         if len(prices.columns) == 1:  # cannot compute corr
             return
         if len(prices.columns) >= 12:
@@ -381,11 +393,12 @@ class MultiAssetsReport:
                               time_period: TimePeriod = None,
                               benchmark: Optional[str] = None,
                               perf_column: PerfStat = PerfStat.SHARPE_RF0,
+                              add_benchmarks_to_navs: bool = True,
                               title: str = None,
                               ax: plt.Subplot = None,
                               **kwargs
                               ) -> None:
-        prices = self.get_prices(benchmark=benchmark, time_period=time_period)
+        prices = self.get_prices(benchmark=benchmark, add_benchmarks_to_navs=add_benchmarks_to_navs, time_period=time_period)
         qis.plot_ra_perf_bars(prices=prices,
                               benchmark=benchmark,
                               perf_column=perf_column,
@@ -406,6 +419,8 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                    fontsize: int = 3,
                                    factsheet_name: str = None,
+                                   performance_bars: Tuple[PerfStat, PerfStat] = (PerfStat.SHARPE_RF0, PerfStat.MAX_DD),
+                                   drop_1y_ra_perf_table: bool = True,
                                    **kwargs
                                    ) -> plt.Figure:
     # use passed benchmark
@@ -490,16 +505,22 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                             **kwargs)
 
     report.plot_performance_bars(ax=fig.add_subplot(gs[0:2, 2]),
-                                 perf_column=PerfStat.SHARPE_RF0, **kwargs)
+                                 add_benchmarks_to_navs=add_benchmarks_to_navs,
+                                 benchmark=benchmark,
+                                 perf_column=performance_bars[0], **kwargs)
     report.plot_performance_bars(ax=fig.add_subplot(gs[0:2, 3]),
-                                 perf_column=PerfStat.MAX_DD, **kwargs)
+                                 add_benchmarks_to_navs=add_benchmarks_to_navs,
+                                 benchmark=benchmark,
+                                 perf_column=performance_bars[1], **kwargs)
 
-    if len(prices.columns) >= 8:
+    if drop_1y_ra_perf_table or len(prices.columns) >= 8:
         report.plot_ra_perf_table(benchmark=benchmark,
+                                  add_benchmarks_to_navs=add_benchmarks_to_navs,
                                   ax=fig.add_subplot(gs[2:4, 2:]),
                                   **kwargs)
     else:  # plot two tables
         report.plot_ra_perf_table(benchmark=benchmark,
+                                  add_benchmarks_to_navs=add_benchmarks_to_navs,
                                   ax=fig.add_subplot(gs[2, 2:]),
                                   **kwargs)
 
@@ -513,14 +534,17 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                   **local_kwargs)
 
     report.plot_annual_returns(ax=fig.add_subplot(gs[4:6, 2:]),
+                               add_benchmarks_to_navs=add_benchmarks_to_navs,
                                heatmap_freq=heatmap_freq,
                                **kwargs)
 
     report.plot_corr_table(freq=perf_params.freq,
+                           add_benchmarks_to_navs=add_benchmarks_to_navs,
                            ax=fig.add_subplot(gs[6:8, 2]),
                            **kwargs)
     report.plot_corr_table(freq=perf_params.freq,
                            ax=fig.add_subplot(gs[6:8, 3]),
+                           add_benchmarks_to_navs=add_benchmarks_to_navs,
                            **qis.update_kwargs(kwargs, dict(time_period=time_period1)))
 
     report.plot_regime_data(benchmark=benchmark,

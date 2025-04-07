@@ -56,8 +56,8 @@ from qis.models.linear.ewm_factors import (LinearModel,
                                            EwmLinearModel,
                                            compute_portfolio_benchmark_betas,
                                            compute_portfolio_benchmark_beta_alpha_attribution,
-                                           compute_benchmarks_beta_attribution
-                                           )
+                                           compute_benchmarks_beta_attribution,
+                                           estimate_linear_model)
 
 from qis.models.linear.pca import(
     compute_eigen_portfolio_weights,

@@ -649,7 +649,8 @@ class MultiPortfolioData:
                       ax: plt.Subplot = None,
                       **kwargs) -> None:
         
-        turnover = self.get_turnover(turnover_rolling_period=turnover_rolling_period, freq_turnover=freq_turnover,
+        turnover = self.get_turnover(turnover_rolling_period=turnover_rolling_period,
+                                     freq_turnover=freq_turnover,
                                      is_unit_based_traded_volume=is_unit_based_traded_volume,
                                      time_period=time_period)
         freq = pd.infer_freq(turnover.index)

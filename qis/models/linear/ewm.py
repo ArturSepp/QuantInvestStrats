@@ -664,7 +664,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
 
 def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
-                               num_lags: int = 3,
+                               num_lags: int = 2,
                                span: Optional[Union[float, np.ndarray]] = None,
                                ewm_lambda: Union[float, np.ndarray] = 0.94,
                                mean_adj_type: MeanAdjType = MeanAdjType.NONE,
@@ -675,7 +675,8 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                annualization_factor: Optional[float] = None,
                                warmup_period: Optional[int] = None,
                                nan_backfill: NanBackfill = NanBackfill.FFILL
-                               ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+                               ) -> Tuple[Union[pd.DataFrame, pd.Series, np.ndarray],
+                                          Union[pd.DataFrame, pd.Series, np.ndarray]]:
     """
     implementation of newey west vol estimator
     implementation of ewm recursion for variance/volatility computation
@@ -694,7 +695,6 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                      nan_backfill=nan_backfill)
 
     # initial conditions
-    a = a
     if init_value is None:
         init_value = set_init_dim1(data=a, init_type=init_type)
 
@@ -703,18 +703,40 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         if isinstance(init_value, np.ndarray):
             init_value = float(init_value)
 
-    ewm = ewm_recursion(a=np.square(a), ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+    if span is not None:
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    ewm_lambda_1 = 1.0 - ewm_lambda
 
+    def matrix_recursion(a_m: np.ndarray) -> np.ndarray:
+        t = a.shape[0]
+        last_covar = np.zeros((a.shape[1], a.shape[1]))
+        ewm_m = np.zeros_like(a_m)
+        for idx in range(0, t):
+            r_ij = np.outer(a[idx], a_m[idx])
+            covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
+            fill_value = last_covar
+            last_covar = np.where(np.isfinite(covar), covar, fill_value)
+            ewm_m[idx, :] = np.diag(last_covar) + np.diag(np.transpose(last_covar))
+        return ewm_m
+
+    ewm0 = ewm_recursion(a=np.square(a), ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+    nw_adjustment = np.zeros_like(ewm0)
     # compute m recursions
-    for m in np.arange(1, num_lags):
+    for m in np.arange(1, num_lags+1):
         # lagged value
         a_m = np.empty_like(a)
         a_m[m:] = a[:-m]
         a_m[:m] = np.nan
-        ewm_m = ewm_recursion(a=a*a_m, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
-        ewm += (1.0-m/(num_lags+1))*ewm_m
+        # qqq
+        ewm_m = matrix_recursion(a_m=a_m)
+        nw_adjustment += (1.0-m/(num_lags+1))*ewm_m
+
+    ewm_nw = ewm0 + nw_adjustment
+    nw_ratio = np.divide(ewm_nw, ewm0, where=ewm0 > 0.0)
+
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
-        ewm = npo.set_nans_for_warmup_period(a=ewm, warmup_period=warmup_period)
+        ewm_nw = npo.set_nans_for_warmup_period(a=ewm_nw, warmup_period=warmup_period)
+        nw_ratio = npo.set_nans_for_warmup_period(a=nw_ratio, warmup_period=warmup_period)
 
     if annualize or annualization_factor is not None:
         if annualization_factor is None:
@@ -723,16 +745,18 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
             else:
                 warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
                 annualization_factor = 1.0
-        ewm = annualization_factor * ewm
+        ewm_nw = annualization_factor * ewm_nw
 
     if apply_sqrt:
-        ewm = np.sqrt(ewm)
+        ewm_nw = np.sqrt(ewm_nw)
 
     if isinstance(data, pd.DataFrame):
-        ewm = pd.DataFrame(data=ewm, index=data.index, columns=data.columns)
+        ewm_nw = pd.DataFrame(data=ewm_nw, index=data.index, columns=data.columns)
+        nw_ratio = pd.DataFrame(data=nw_ratio, index=data.index, columns=data.columns)
     elif isinstance(data, pd.Series):
-        ewm = pd.Series(data=ewm, index=data.index, name=data.name)
-    return ewm
+        ewm_nw = pd.Series(data=ewm_nw, index=data.index, name=data.name)
+        nw_ratio = pd.Series(data=nw_ratio, index=data.index, name=data.name)
+    return ewm_nw, nw_ratio
 
 
 def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],

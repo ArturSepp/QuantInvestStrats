@@ -507,6 +507,8 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                               ac_group_order: List[str] = None,
                                               sub_ac_group_data: pd.Series = None,
                                               sub_ac_group_order: List[str] = None,
+                                              turnover_groups: pd.Series = None,
+                                              turnover_order: List[str] = None,
                                               time_period: TimePeriod = None,
                                               perf_params: PerfParams = PERF_PARAMS,
                                               regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,

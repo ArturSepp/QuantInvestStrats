@@ -82,22 +82,22 @@ def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiP
         b_ra_perf_table = p.Block([p.Paragraph(f"Risk-adjusted Performance table for {key}", **KWARGS_TITLE),
                                     p.Block(table,
                                             formatters=[
-                                                tf.FmtPercent(n_decimals=2, columns=[PerfStat.TOTAL_RETURN.to_str(**kwargs),
-                                                                                     PerfStat.PA_RETURN.to_str(**kwargs),
-                                                                                     PerfStat.VOL.to_str(**kwargs),
-                                                                                     PerfStat.MAX_DD.to_str(**kwargs),
-                                                                                     PerfStat.ALPHA_AN.to_str(**kwargs),
-                                                                                     PerfStat.R2.to_str(**kwargs)
+                                                tf.FmtPercent(n_decimals=2, columns=[PerfStat.TOTAL_RETURN.to_str(),
+                                                                                     PerfStat.PA_RETURN.to_str(),
+                                                                                     PerfStat.VOL.to_str(),
+                                                                                     PerfStat.MAX_DD.to_str(),
+                                                                                     PerfStat.ALPHA_AN.to_str(),
+                                                                                     PerfStat.R2.to_str()
                                                                                      ], apply_to_header_and_index=False),
                                                 fmt_highlight_base,
                                                 fmt_highlight_index,
                                                 tf.FmtReplaceNaN(value=''),
-                                                tf.FmtHeatmap(columns=[PerfStat.PA_RETURN.to_str(**kwargs),
-                                                                       PerfStat.SHARPE_EXCESS.to_str(**kwargs),
-                                                                       PerfStat.ALPHA_AN.to_str(**kwargs),
-                                                                       PerfStat.BETA.to_str(**kwargs)]),
-                                                tf.FmtHeatmap(columns=[PerfStat.MAX_DD.to_str(**kwargs),
-                                                                       PerfStat.SKEWNESS.to_str(**kwargs)], max_color=(255,0,255)),
+                                                tf.FmtHeatmap(columns=[PerfStat.PA_RETURN.to_str(),
+                                                                       PerfStat.SHARPE_EXCESS.to_str(),
+                                                                       PerfStat.ALPHA_AN.to_str(),
+                                                                       PerfStat.BETA.to_str()]),
+                                                tf.FmtHeatmap(columns=[PerfStat.MAX_DD.to_str(),
+                                                                       PerfStat.SKEWNESS.to_str()], max_color=(255,0,255)),
                                                 tf.FmtAddCellBorder(each=1.0,
                                                                     columns=ra_perf_table.columns.to_list()[:1],
                                                                     color=tf.colors.GREY,
@@ -114,7 +114,7 @@ def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiP
     fig_size = qis.get_df_table_size(df=ra_perf_table)
     fig_perf_bar, axs = plt.subplots(1, len(perf_columns), figsize=(12, 1.2*fig_size[1]), constrained_layout=True)
     for idx, perf_column in enumerate(perf_columns):
-        df = ra_perf_table[perf_column.to_str(**kwargs)].to_frame()
+        df = ra_perf_table[perf_column.to_str()].to_frame()
         colors = qis.compute_heatmap_colors(a=df.to_numpy())
         qis.plot_vbars(df=df,
                        var_format=perf_column.to_format(**kwargs),
@@ -132,7 +132,8 @@ def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiP
 
     # 3. regime conditional
     fig_size = qis.get_df_table_size(df=ra_perf_table)
-    fig_perf_regime, axs = plt.subplots(1, len(multi_portfolio_data.benchmark_prices.columns), figsize=(12, 1.2*fig_size[1]), constrained_layout=True)
+    fig_perf_regime, axs = plt.subplots(1, len(multi_portfolio_data.benchmark_prices.columns),
+                                        figsize=(12, 1.2*fig_size[1]), constrained_layout=True)
     if len(multi_portfolio_data.benchmark_prices.columns) == 1:
         axs = [axs]
     for idx, benchmark in enumerate(multi_portfolio_data.benchmark_prices.columns):
@@ -195,7 +196,7 @@ def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiP
         x_limits = (np.nanmin(xy[param_name]), np.nanmax(xy[param_name]))
 
         fig_scatter1, ax = plt.subplots(1, 1, figsize=(14, 4.5), constrained_layout=True)
-        qis.plot_scatter(df=xy, x=param_name, y=PerfStat.SHARPE_EXCESS.to_str(**kwargs), hue=hue_name,
+        qis.plot_scatter(df=xy, x=param_name, y=PerfStat.SHARPE_EXCESS.to_str(), hue=hue_name,
                          title=f"Sharpe",
                          var_format='{:.2f}',
                          x_limits=x_limits,
@@ -207,7 +208,7 @@ def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiP
         blocks.append(b_fig_scatter1)
 
         fig_scatter2, ax = plt.subplots(1, 1, figsize=(14, 4.5), constrained_layout=True)
-        qis.plot_scatter(df=xy, x=param_name, y=PerfStat.MAX_DD.to_str(**kwargs), hue=hue_name,
+        qis.plot_scatter(df=xy, x=param_name, y=PerfStat.MAX_DD.to_str(), hue=hue_name,
                          title=f"Max DD",
                          var_format='{:.2%}',
                          x_limits=x_limits,
