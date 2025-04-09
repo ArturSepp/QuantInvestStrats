@@ -60,6 +60,8 @@ class MultiAssetsReport:
                 prices = pd.concat([self.benchmark_prices[benchmark], self.prices], axis=1)
         else:
             prices = self.prices
+        # check in case
+        prices = prices.loc[:, ~prices.columns.duplicated(keep='first')]
         if time_period is not None:
             prices = time_period.locate(prices)
         return prices
@@ -68,7 +70,7 @@ class MultiAssetsReport:
                            regime_benchmark: str,
                            data_df: pd.DataFrame,
                            time_period: TimePeriod = None,
-                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS
+                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = None
                            ) -> None:
         if isinstance(self.benchmark_prices, pd.Series):
             pivot_prices = self.benchmark_prices
@@ -83,7 +85,7 @@ class MultiAssetsReport:
                                    data_df=data_df,
                                    pivot_prices=pivot_prices,
                                    benchmark=regime_benchmark,
-                                   regime_params=regime_params)
+                                   regime_params=regime_params or self.regime_params)
 
     def plot_ra_perf_table(self,
                            benchmark: str,
@@ -334,6 +336,7 @@ class MultiAssetsReport:
                                          roll_freq=freq_sharpe,
                                          legend_stats=legend_stats,
                                          regime_benchmark=regime_benchmark,
+                                         regime_params=self.regime_params,
                                          ax=ax,
                                          **kwargs)
         return fig
@@ -417,7 +420,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    heatmap_freq: str = 'YE',
                                    time_period: TimePeriod = None,  # time period for reporting
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                   fontsize: int = 3,
+                                   fontsize: int = 4,
                                    factsheet_name: str = None,
                                    performance_bars: Tuple[PerfStat, PerfStat] = (PerfStat.SHARPE_RF0, PerfStat.MAX_DD),
                                    drop_1y_ra_perf_table: bool = True,

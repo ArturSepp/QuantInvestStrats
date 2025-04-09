@@ -223,7 +223,7 @@ def compute_periodic_returns(prices: pd.DataFrame,
 
     if add_total:
         if freq == 'ME':
-            total_name = total_name or 'last 12m'
+            total_name = total_name or 'YTD'
         elif freq == 'YE':
             total_name = total_name or 'Total'
         else:

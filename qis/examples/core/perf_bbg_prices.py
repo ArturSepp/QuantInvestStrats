@@ -22,15 +22,44 @@ def run_report():
         'BNPXOV3U Index': 'BNP 3M Long DHhedged Puts'
         }
 
+    benchmark = 'SPTR Index'
+    tickers = {
+        benchmark: benchmark,
+        'BNPIV1EE Index': 'BNP Europe 1Y Volatility',
+        'BNPIV1UE Index': 'BNP US 1Y Volatility',
+        'BNPXVO3A Index': 'BNP VOLA 3 Index',
+        'AIJPVT1U Index': 'JPM Volatility Trend Following',
+        'JPOSLVUS Index': 'JPM US Long Variance',
+        'JPOSPRU2 Index': 'JPM US Put Ratio',
+        'JPOSTUDN Index': 'JPM US Equity Tail Hedge',
+        'JPRC85BE Index': 'JPM Dynamic 85% Rolling Collar EU',
+        'JPRC85BU Index': 'JPM Dynamic 85% Rolling Collar US',
+        'JPUSVXCR Index': 'JPM US Volatility Call Ratio'
+    }
+
+    benchmark = 'HYG US Equity'
+    tickers = {
+        benchmark: benchmark,
+        'NMVVR1EL Index': 'IRVING1 EUR',
+        'NMVVR1UL Index': 'IRVING1 USD',
+        'NMVVR1L Index': 'IRVING1',
+        'BNPXLVRE Index': 'BNP Long Rates Vol EUR',
+        'BNPXLVRU Index': 'BNP Long Rates Vol USD',
+        'BXIIULSV Index': 'Barclays Long Rates Vol',
+        'BXIIUGNT Index': 'Barclays Gamma Neutral Vol',
+        'BXIIUENT Index': 'Barclays Triangle Vol'
+    }
+
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
-    qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
+    # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2019', '15Nov2024')
-    kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
+    time_period = qis.TimePeriod('31Dec2024', '07Apr2025')
+    #kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
+    kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD)
 
     fig = qis.generate_multi_asset_factsheet(prices=prices,
-                                             benchmark='SPTR Index',
+                                             benchmark=benchmark,
                                              time_period=time_period,
                                              **kwargs)
     qis.save_figs_to_pdf(figs=[fig],
@@ -70,7 +99,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PRICE
+    unit_test = UnitTests.REPORT
 
     is_run_all_tests = False
     if is_run_all_tests:
