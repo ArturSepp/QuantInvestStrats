@@ -690,6 +690,7 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     if mean_adj_type != MeanAdjType.NONE:
         a = compute_rolling_mean_adj(data=a,
                                      mean_adj_type=mean_adj_type,
+                                     span=span,
                                      ewm_lambda=ewm_lambda,
                                      init_type=init_type,
                                      nan_backfill=nan_backfill)
@@ -819,7 +820,7 @@ def compute_rolling_mean_adj(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                              mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
                              span: Union[float, np.ndarray] = None,
                              ewm_lambda: Union[float, np.ndarray] = 0.94,
-                             init_type: InitType = InitType.MEAN,
+                             init_type: InitType = InitType.X0,
                              init_value: Union[float, np.ndarray, None] = None,
                              nan_backfill: NanBackfill = NanBackfill.FFILL
                              ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
