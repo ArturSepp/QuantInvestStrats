@@ -9,7 +9,8 @@ import seaborn as sns
 from typing import Tuple, List, Dict, Optional
 import qis as qis
 from qis import TimePeriod, BenchmarkReturnsQuantileRegimeSpecs
-from qis.portfolio.portfolio_data import PortfolioData, StrategySignalData
+from qis.portfolio.portfolio_data import PortfolioData
+from qis.portfolio.signal_data import StrategySignalData
 
 
 def generate_weight_change_report(portfolio_data: PortfolioData,

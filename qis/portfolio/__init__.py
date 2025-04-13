@@ -2,8 +2,8 @@
 from qis.portfolio.portfolio_data import (PortfolioData,
                                           PortfolioInput,
                                           AttributionMetric,
-                                          SnapshotPeriod,
-                                          StrategySignalData)
+                                          SnapshotPeriod)
+from qis.portfolio.signal_data import StrategySignalData
 
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 

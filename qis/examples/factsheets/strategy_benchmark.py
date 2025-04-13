@@ -147,10 +147,12 @@ def run_unit_test(unit_test: UnitTests):
         ac_group_data = multi_portfolio_data.portfolio_datas[0].group_data
         asset_tickers = multi_portfolio_data.portfolio_datas[0].weights.columns
         sub_ac_group_data = pd.Series(asset_tickers, index=asset_tickers)
-
+        turnover_groups = multi_portfolio_data.portfolio_datas[0].group_data
+        multi_portfolio_data.portfolio_datas[0].benchmark_prices = multi_portfolio_data.benchmark_prices
         weights_tracking_error_report_by_ac_subac(multi_portfolio_data=multi_portfolio_data,
                                                   ac_group_data=ac_group_data,
                                                   sub_ac_group_data=sub_ac_group_data,
+                                                  turnover_groups=turnover_groups,
                                                   time_period=time_period)
 
     plt.show()
@@ -158,7 +160,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.STRATEGY_BENCHMARK_PLT
+    unit_test = UnitTests.TRACKING_ERROR
 
     is_run_all_tests = False
     if is_run_all_tests:

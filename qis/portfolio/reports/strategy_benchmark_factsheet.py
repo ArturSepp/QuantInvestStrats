@@ -746,7 +746,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
 
         # turnover
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
-        figs['turnover'] = fig
+        figs['joint_turnover'] = fig
         multi_portfolio_data.plot_turnover(ax=ax,
                                            time_period=time_period,
                                            regime_benchmark=regime_benchmark,
@@ -754,6 +754,20 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                            #turnover_rolling_period=260,
                                            #freq_turnover=None,
                                            **kwargs)
+        # group turnover
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+        figs['group_turnover'] = fig
+        multi_portfolio_data.portfolio_datas[strategy_idx].plot_turnover(ax=ax,
+                                                                         time_period=time_period,
+                                                                         regime_benchmark=regime_benchmark,
+                                                                         regime_params=regime_params,
+                                                                         is_grouped=True,
+                                                                         group_data=turnover_groups,
+                                                                         group_order=turnover_order,
+                                                                         add_total=False,
+                                                                         #turnover_rolling_period=260,
+                                                                         #freq_turnover=None,
+                                                                         **kwargs)
 
     return figs, dfs
 
