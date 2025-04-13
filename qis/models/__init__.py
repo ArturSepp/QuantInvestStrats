@@ -47,7 +47,8 @@ from qis.models.linear.ewm import (
     compute_roll_mean,
     compute_rolling_mean_adj,
     set_init_dim1,
-    set_init_dim2
+    set_init_dim2,
+    compute_ewm_covar_newey_west
 )
 
 from qis.models.linear.ewm_convolution import ConvolutionType, SignalAggType, ewm_xy_convolution

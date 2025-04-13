@@ -345,6 +345,7 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
                      is_log=is_logs[0],
                      y_limits=y_limits,
                      ylabel=ylabel1,
+                     fontsize=fontsize,
                      ax=ax,
                      **kwargs)
 
@@ -358,15 +359,16 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
                      is_log=is_logs[1],
                      y_limits=y_limits_ax2,
                      ylabel=ylabel2,
+                     fontsize=fontsize,
                      ax=ax_twin,
                      **kwargs)
+
+    ax.tick_params(axis='x', which='both', bottom=False)
 
     put.set_ax_ticks_format(ax=ax, fontsize=fontsize, xvar_format=None, yvar_format=var_format, set_ticks=False,
                             yvar_major_ticks=yvar_major_ticks1, x_rotation=x_rotation, **kwargs)
     put.set_ax_ticks_format(ax=ax_twin, fontsize=fontsize, xvar_format=None, yvar_format=var_format_yax2, set_ticks=False,
                             yvar_major_ticks=yvar_major_ticks2, x_rotation=x_rotation, **kwargs)
-
-    ax.tick_params(axis='x', which='both', bottom=False)
 
     if legend_loc is not None:
         if legend_labels is None:

@@ -237,6 +237,7 @@ def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series, np.ndarra
 
 @njit
 def compute_ewm_covar(a: np.ndarray,
+                      b: np.ndarray = None,
                       span: Union[int, np.ndarray] = None,
                       ewm_lambda: float = 0.94,
                       covar0: np.ndarray = None,
@@ -245,7 +246,13 @@ def compute_ewm_covar(a: np.ndarray,
                       ) -> np.ndarray:
     """
     compute ewm covariance matrix
+    b is optional, when given the covar is cross product a and b
     """
+    if b is None:
+        b = a
+    else:
+        assert a.shape[0] == b.shape[0]
+        assert a.shape[1] == b.shape[1]
 
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
@@ -263,7 +270,7 @@ def compute_ewm_covar(a: np.ndarray,
 
     last_covar = covar
     if a.ndim == 1:  # ndarry array
-        r_ij = np.outer(a, a)
+        r_ij = np.outer(a, b)
         covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
         if nan_backfill == NanBackfill.FFILL:
             fill_value = last_covar
@@ -277,8 +284,7 @@ def compute_ewm_covar(a: np.ndarray,
     else:  # loop over rows
         t = a.shape[0]
         for idx in range(0, t):  # row in x:
-            row = a[idx]
-            r_ij = np.outer(row, row)
+            r_ij = np.outer(a[idx], b[idx])
             covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
 
             if nan_backfill == NanBackfill.FFILL:
@@ -290,19 +296,57 @@ def compute_ewm_covar(a: np.ndarray,
 
             last_covar = np.where(np.isfinite(covar), covar, fill_value)
 
-            if is_corr:
-                if np.nansum(np.diag(last_covar)) > 1e-10:
-                    inv_vol = np.reciprocal(np.sqrt(np.diag(last_covar)))
-                    norm = np.outer(inv_vol, inv_vol)
-                else:
-                    norm = np.identity(n)
-                last_covar_ = norm * last_covar
+        # for covar normalise
+        if is_corr:
+            if np.nansum(np.diag(last_covar)) > 1e-10:
+                inv_vol = np.reciprocal(np.sqrt(np.diag(last_covar)))
+                norm = np.outer(inv_vol, inv_vol)
             else:
-                last_covar_ = last_covar
-
-            covar = last_covar_
+                norm = np.identity(n)
+            covar = norm * last_covar
+        else:
+            covar = last_covar
 
     return covar
+
+
+@njit
+def compute_ewm_covar_newey_west(a: np.ndarray,
+                                 num_lags: int = 2,
+                                 span: Union[int, np.ndarray] = None,
+                                 ewm_lambda: float = 0.94,
+                                 covar0: np.ndarray = None,
+                                 is_corr: bool = False,
+                                 nan_backfill: NanBackfill = NanBackfill.FFILL
+                                 ) -> np.ndarray:
+    """
+    implementation of newey west covar estimator
+    """
+    ewm0 = compute_ewm_covar(a=a, span=span, ewm_lambda=ewm_lambda, covar0=covar0, is_corr=False, nan_backfill=nan_backfill)
+    # compute m recursions
+    if num_lags > 0:
+        nw_adjustment = np.zeros_like(ewm0)
+        for m in np.arange(1, num_lags+1):
+            # lagged value
+            a_m = np.empty_like(a)
+            a_m[m:] = a[:-m]
+            a_m[:m] = np.nan
+            ewm_m1 = compute_ewm_covar(a=a, b=a_m, span=span)
+            # ewm_m2 = compute_ewm_covar(a=a_m, b=a, span=span)
+            nw_adjustment += (1.0-m/(num_lags+1))*(ewm_m1 + np.transpose(ewm_m1))
+        ewm_nw = ewm0 + nw_adjustment
+    else:
+        ewm_nw = ewm0
+
+    if is_corr:
+        if np.nansum(np.diag(ewm_nw)) > 1e-10:
+            inv_vol = np.reciprocal(np.sqrt(np.diag(ewm_nw)))
+            norm = np.outer(inv_vol, inv_vol)
+        else:
+            norm = np.identity(a.shape[1])
+        ewm_nw = norm * ewm_nw
+
+    return ewm_nw
 
 
 @njit
@@ -663,6 +707,27 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     return ewm
 
 
+@njit
+def matrix_recursion(a: np.ndarray,
+                     a_m: np.ndarray,
+                     span: Optional[Union[float, np.ndarray]] = None,
+                     ewm_lambda: Union[float, np.ndarray] = 0.94
+                     ) -> np.ndarray:
+    if span is not None:
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    ewm_lambda_1 = 1.0 - ewm_lambda
+    t = a.shape[0]
+    last_covar = np.zeros((a.shape[1], a.shape[1]))
+    ewm_m = np.zeros_like(a_m)
+    for idx in range(0, t):
+        r_ij = np.outer(a[idx], a_m[idx])
+        covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
+        fill_value = last_covar
+        last_covar = np.where(np.isfinite(covar), covar, fill_value)
+        ewm_m[idx, :] = np.diag(last_covar) + np.diag(np.transpose(last_covar))
+    return ewm_m
+
+
 def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                num_lags: int = 2,
                                span: Optional[Union[float, np.ndarray]] = None,
@@ -704,36 +769,25 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         if isinstance(init_value, np.ndarray):
             init_value = float(init_value)
 
-    if span is not None:
-        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-    ewm_lambda_1 = 1.0 - ewm_lambda
-
-    def matrix_recursion(a_m: np.ndarray) -> np.ndarray:
-        t = a.shape[0]
-        last_covar = np.zeros((a.shape[1], a.shape[1]))
-        ewm_m = np.zeros_like(a_m)
-        for idx in range(0, t):
-            r_ij = np.outer(a[idx], a_m[idx])
-            covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-            fill_value = last_covar
-            last_covar = np.where(np.isfinite(covar), covar, fill_value)
-            ewm_m[idx, :] = np.diag(last_covar) + np.diag(np.transpose(last_covar))
-        return ewm_m
-
     ewm0 = ewm_recursion(a=np.square(a), ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
-    nw_adjustment = np.zeros_like(ewm0)
-    # compute m recursions
-    for m in np.arange(1, num_lags+1):
-        # lagged value
-        a_m = np.empty_like(a)
-        a_m[m:] = a[:-m]
-        a_m[:m] = np.nan
-        # qqq
-        ewm_m = matrix_recursion(a_m=a_m)
-        nw_adjustment += (1.0-m/(num_lags+1))*ewm_m
 
-    ewm_nw = ewm0 + nw_adjustment
-    nw_ratio = np.divide(ewm_nw, ewm0, where=ewm0 > 0.0)
+    if num_lags == 0:
+        ewm_nw = ewm0
+        nw_ratio = np.ones_like(ewm0)
+    else:
+        nw_adjustment = np.zeros_like(ewm0)
+        # compute m recursions
+        for m in np.arange(1, num_lags+1):
+            # lagged value
+            a_m = np.empty_like(a)
+            a_m[m:] = a[:-m]
+            a_m[:m] = np.nan
+            ewm_m = matrix_recursion(a=a, a_m=a_m, span=span)
+            nw_adjustment += (1.0-m/(num_lags+1))*ewm_m
+
+        ewm_nw = ewm0 + nw_adjustment
+        nw_ratio = np.divide(ewm_nw, ewm0, where=ewm0 > 0.0)
+        nw_ratio = np.where(nw_ratio > 0.0, nw_ratio, 1.0)
 
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
         ewm_nw = npo.set_nans_for_warmup_period(a=ewm_nw, warmup_period=warmup_period)
