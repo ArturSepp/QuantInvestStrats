@@ -1504,13 +1504,13 @@ class PortfolioData:
         freq = pd.infer_freq(turnover.index)
         turnover_title = title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
         qis.plot_time_series(df=turnover,
-                             var_format='{:,.2%}',
+                             var_format='{:,.1%}',
                              y_limits=(0.0, None),
                              legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                              title=turnover_title,
                              ax=ax,
                              **kwargs)
-        if regime_benchmark is not None:
+        if regime_benchmark is not None and self.benchmark_prices is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=turnover.index,
                                     regime_params=regime_params)
 

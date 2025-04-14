@@ -513,6 +513,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                               perf_params: PerfParams = PERF_PARAMS,
                                               regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                               add_benchmarks_to_navs: bool = True,
+                                              tre_max_clip: Optional[float] = None,
                                               figsize: Tuple[float, float] = (11.7, 8.3),
                                               var_format: str = '{:.1%}',
                                               add_titles: bool = True,
@@ -758,6 +759,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                   group_order=ac_group_order,
                                                   regime_benchmark=regime_benchmark,
                                                   regime_params=regime_params,
+                                                  tre_max_clip=tre_max_clip,
                                                   title=title,
                                                   ax=ax,
                                                   time_period=time_period,
@@ -785,6 +787,9 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                                          group_order=turnover_order,
                                                                          add_total=False,
                                                                          **kwargs)
+        if regime_benchmark is not None:
+            multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
+                                                    index=grouped_selection_return.index, regime_params=regime_params)
         if not add_titles:
             ax.title.set_visible(False)
     return figs, dfs

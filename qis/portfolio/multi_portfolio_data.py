@@ -195,7 +195,8 @@ class MultiPortfolioData:
                                                 benchmark_idx: int = 1,
                                                 is_grouped: bool = False,
                                                 group_data: pd.Series = None,
-                                                group_order: List[str] = None
+                                                group_order: List[str] = None,
+                                                total_column: Optional[str] = 'Total'
                                                 ) -> Union[pd.Series, pd.DataFrame]:
         """
         compute Ex ante  tracking error =
@@ -224,7 +225,7 @@ class MultiPortfolioData:
                 group_order = self.portfolio_datas[strategy_idx].group_order
             group_dict = dfg.get_group_dict(group_data=group_data,
                                             group_order=group_order,
-                                            total_column='Total')
+                                            total_column=total_column)
             tracking_error = {key: {} for key in group_dict.keys()}
             for date, pd_covar in self.covar_dict.items():
                 w = weight_diffs.loc[date]
@@ -645,7 +646,7 @@ class MultiPortfolioData:
                              **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=diff.index, regime_params=regime_params)
-    
+
     def get_turnover(self,
                      time_period: TimePeriod = None,
                      turnover_rolling_period: Optional[int] = 12,
@@ -662,7 +663,7 @@ class MultiPortfolioData:
         if time_period is not None:
             turnover = time_period.locate(turnover)
         return turnover
-        
+
     def plot_turnover(self,
                       regime_benchmark: str = None,
                       time_period: TimePeriod = None,
@@ -673,7 +674,7 @@ class MultiPortfolioData:
                       is_unit_based_traded_volume: bool = True,
                       ax: plt.Subplot = None,
                       **kwargs) -> None:
-        
+
         turnover = self.get_turnover(turnover_rolling_period=turnover_rolling_period,
                                      freq_turnover=freq_turnover,
                                      is_unit_based_traded_volume=is_unit_based_traded_volume,
@@ -1039,13 +1040,25 @@ class MultiPortfolioData:
                              regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                              time_period: TimePeriod = None,
                              title: Optional[str] = 'Tracking error',
+                             total_column: Optional[str] = 'Total',
                              var_format: str = '{:.2%}',
+                             tre_max_clip: Optional[float] = None,
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> None:
         tre = self.compute_tracking_error_implied_by_covar(strategy_idx=strategy_idx, benchmark_idx=benchmark_idx,
                                                            is_grouped=is_grouped, group_data=group_data,
-                                                           group_order=group_order)
+                                                           group_order=group_order,
+                                                           total_column=total_column)
+        if tre_max_clip is not None:
+            if isinstance(tre, pd.DataFrame):  # skip total_column from trimming
+                tre_columns = tre.columns.to_list()
+                if total_column in tre:
+                    tre_columns.remove(total_column)
+                tre[tre_columns] = tre[tre_columns].clip(upper=tre_max_clip)
+            else:
+                tre = tre.clip(upper=tre_max_clip)
+
         if time_period is not None:
             tre = time_period.locate(tre)
         pts.plot_time_series(df=tre,
