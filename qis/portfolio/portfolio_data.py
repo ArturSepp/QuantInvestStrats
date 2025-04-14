@@ -1484,10 +1484,10 @@ class PortfolioData:
                       group_data: pd.Series = None,
                       group_order: List[str] = None,
                       time_period: TimePeriod = None,
-                      roll_period: Optional[int] = 260,
+                      turnover_rolling_period: Optional[int] = 260,
+                      freq_turnover: Optional[str] = 'B',
                       add_total: bool = True,
                       title: str = None,
-                      freq: Optional[str] = None,
                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
                       ax: plt.Subplot = None,
                       **kwargs
@@ -1497,14 +1497,15 @@ class PortfolioData:
                                      group_data=group_data,
                                      group_order=group_order,
                                      time_period=time_period,
-                                     roll_period=roll_period,
+                                     roll_period=turnover_rolling_period,
                                      add_total=add_total,
-                                     freq=freq,
+                                     freq=freq_turnover,
                                      **kwargs)
-        turnover_title = title or f"{roll_period}-period rolling {freq}-freq Turnover"
+        freq = pd.infer_freq(turnover.index)
+        turnover_title = title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
         qis.plot_time_series(df=turnover,
                              var_format='{:,.2%}',
-                             # y_limits=(0.0, None),
+                             y_limits=(0.0, None),
                              legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                              title=turnover_title,
                              ax=ax,

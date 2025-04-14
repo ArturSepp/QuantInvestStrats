@@ -665,22 +665,6 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
             allow_negative=True,
             **kwargs)
 
-        # tracking error
-        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
-        figs['tre_time_series'] = fig
-        if add_titles:
-            title = 'Tracking Error'
-        else:
-            title = None
-        multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
-                                                  benchmark_idx=benchmark_idx,
-                                                  regime_benchmark=regime_benchmark,
-                                                  regime_params=regime_params,
-                                                  title=title,
-                                                  ax=ax,
-                                                  time_period=time_period,
-                                                  **kwargs)
-
         # brinson by asset class
         totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
             multi_portfolio_data.compute_brinson_attribution(strategy_idx=strategy_idx,
@@ -744,6 +728,41 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         figs['brinson_table_subac'] = qis.plot_brinson_totals_table(totals_table=totals_table, **kwargs)
         dfs['brinson_table_subac'] = totals_table
 
+        # tracking error
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+        figs['tre_time_series'] = fig
+        if add_titles:
+            title = 'Tracking Error'
+        else:
+            title = None
+        multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
+                                                  benchmark_idx=benchmark_idx,
+                                                  regime_benchmark=regime_benchmark,
+                                                  regime_params=regime_params,
+                                                  title=title,
+                                                  ax=ax,
+                                                  time_period=time_period,
+                                                  **kwargs)
+
+        # group tracking error
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+        figs['tre_group_time_series'] = fig
+        if add_titles:
+            title = 'Asset Class Tracking Error'
+        else:
+            title = None
+        multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
+                                                  benchmark_idx=benchmark_idx,
+                                                  is_grouped=True,
+                                                  group_data=ac_group_data,
+                                                  group_order=ac_group_order,
+                                                  regime_benchmark=regime_benchmark,
+                                                  regime_params=regime_params,
+                                                  title=title,
+                                                  ax=ax,
+                                                  time_period=time_period,
+                                                  **kwargs)
+
         # turnover
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['joint_turnover'] = fig
@@ -751,9 +770,9 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                            time_period=time_period,
                                            regime_benchmark=regime_benchmark,
                                            regime_params=regime_params,
-                                           #turnover_rolling_period=260,
-                                           #freq_turnover=None,
                                            **kwargs)
+        if not add_titles:
+            ax.title.set_visible(False)
         # group turnover
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['group_turnover'] = fig
@@ -765,10 +784,9 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                                          group_data=turnover_groups,
                                                                          group_order=turnover_order,
                                                                          add_total=False,
-                                                                         #turnover_rolling_period=260,
-                                                                         #freq_turnover=None,
                                                                          **kwargs)
-
+        if not add_titles:
+            ax.title.set_visible(False)
     return figs, dfs
 
 

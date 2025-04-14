@@ -192,8 +192,11 @@ class MultiPortfolioData:
 
     def compute_tracking_error_implied_by_covar(self,
                                                 strategy_idx: int = 0,
-                                                benchmark_idx: int = 1
-                                                ) -> pd.Series:
+                                                benchmark_idx: int = 1,
+                                                is_grouped: bool = False,
+                                                group_data: pd.Series = None,
+                                                group_order: List[str] = None
+                                                ) -> Union[pd.Series, pd.DataFrame]:
         """
         compute Ex ante  tracking error =
         (strategy_weights - strategy_weights) @ covar @ (strategy_weights - strategy_weights).T
@@ -208,11 +211,33 @@ class MultiPortfolioData:
         benchmark_weights = benchmark_weights.reindex(index=covar_index, columns=investable_assets).ffill().fillna(0.0)
 
         weight_diffs = benchmark_weights - strategy_weights
-        tracking_error = {}
-        for date, pd_covar in self.covar_dict.items():
-            w = weight_diffs.loc[date]
-            tracking_error[date] = np.sqrt(w @ pd_covar @ w.T)
-        tracking_error = pd.Series(tracking_error, name='Tracking error')
+        if not is_grouped:
+            tracking_error = {}
+            for date, pd_covar in self.covar_dict.items():
+                w = weight_diffs.loc[date]
+                tracking_error[date] = np.sqrt(w @ pd_covar @ w.T)
+            tracking_error = pd.Series(tracking_error, name='Tracking error')
+        else:
+            if group_data is None:
+                group_data = self.portfolio_datas[strategy_idx].group_data
+            if group_order is None:
+                group_order = self.portfolio_datas[strategy_idx].group_order
+            group_dict = dfg.get_group_dict(group_data=group_data,
+                                            group_order=group_order,
+                                            total_column='Total')
+            tracking_error = {key: {} for key in group_dict.keys()}
+            for date, pd_covar in self.covar_dict.items():
+                w = weight_diffs.loc[date]
+                for key, tickers in group_dict.items():
+                    w_g = w.loc[tickers]
+                    pd_covar_g = pd_covar.loc[tickers, tickers]
+                    tracking_error[key][date] = np.sqrt(w_g @ pd_covar_g @ w_g.T)
+            # merge
+            tracking_error_pd = {}
+            for key in group_dict.keys():
+                tracking_error_pd[key] = pd.Series(tracking_error[key], name=key)
+            tracking_error = pd.DataFrame.from_dict(tracking_error_pd, orient='columns')
+
         return tracking_error
 
     def compute_tracking_error_table(self,
@@ -1007,6 +1032,9 @@ class MultiPortfolioData:
     def plot_tre_time_series(self,
                              strategy_idx: int = 0,
                              benchmark_idx: int = 1,
+                             is_grouped: bool = False,
+                             group_data: pd.Series = None,
+                             group_order: List[str] = None,
                              regime_benchmark: str = None,
                              regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                              time_period: TimePeriod = None,
@@ -1015,13 +1043,16 @@ class MultiPortfolioData:
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> None:
-        tre = self.compute_tracking_error_implied_by_covar(strategy_idx=strategy_idx, benchmark_idx=benchmark_idx)
+        tre = self.compute_tracking_error_implied_by_covar(strategy_idx=strategy_idx, benchmark_idx=benchmark_idx,
+                                                           is_grouped=is_grouped, group_data=group_data,
+                                                           group_order=group_order)
         if time_period is not None:
             tre = time_period.locate(tre)
         pts.plot_time_series(df=tre,
                              var_format=var_format,
                              legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
                              title=title,
+                             y_limits=(0.0, None),
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:
