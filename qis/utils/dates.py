@@ -28,6 +28,9 @@ CALENDAR_DAYS_IN_MONTH = 30
 CALENDAR_DAYS_PER_YEAR_SHARPE = 365.25  # for total return computations for Sharpe
 
 
+DEFAULT_TRADING_YEAR_DAYS = 252  # How mny trading days we assume per year, see get_period_days()
+
+
 def get_current_time_with_tz(tz: Optional[str] = 'UTC',
                              days_offset: int = None,
                              normalize: bool = True,
@@ -67,7 +70,7 @@ def get_period_days(freq: str = 'B',
     an_f will return the number of period in year
     consistent with using 252 for vol annualization
     """
-    an_days = 365 if is_calendar else 252
+    an_days = 365 if is_calendar else DEFAULT_TRADING_YEAR_DAYS
     if freq in ['1M']:
         days = 1.0 / 24.0 / 60.0
         an_f = an_days * 24.0 * 60.0
@@ -117,7 +120,7 @@ def get_period_days(freq: str = 'B',
         days = an_days
         an_f = 1.0
     else:
-        raise TypeError(f'freq={freq} is not impelemnted')
+        raise TypeError(f'freq={freq} is not implemented')
 
     return days, an_f
 
