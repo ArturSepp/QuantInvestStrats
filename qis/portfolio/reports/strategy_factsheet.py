@@ -38,7 +38,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 sharpe_rolling_window: int = 260,
                                 add_benchmarks_to_navs: bool = False,
                                 figsize: Tuple[float, float] = (8.5, 11.7),  # A4 for portrait
-                                fontsize: int = 4,
+                                fontsize: int = 5,
                                 weight_change_sample_size: int = 20,
                                 add_current_position_var_risk_sheet: bool = False,
                                 add_weights_turnover_sheet: bool = False,

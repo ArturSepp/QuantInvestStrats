@@ -27,7 +27,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        group_data: pd.Series = None,
                                        add_group_exposures_and_pnl: bool = False,
                                        add_strategy_factsheets: bool = False,
-                                       fontsize: int = 4,
+                                       fontsize: int = 5,
                                        **kwargs
                                        ) -> List[plt.Figure]:
     """

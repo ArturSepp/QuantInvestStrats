@@ -23,7 +23,7 @@ class UnitTests(Enum):
 
 def run_unit_test(unit_test: UnitTests):
 
-    end_date = '10Jan2025'  # performance repoting
+    end_date = '17Apr2025'  # performance repoting
 
     prices = None  # if Noe, use yahoo finance data
 

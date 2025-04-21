@@ -232,7 +232,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        heatmap_freq: str = 'YE',
                                        figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                        is_grouped: bool = False,
-                                       fontsize: int = 4,
+                                       fontsize: int = 5,
                                        **kwargs
                                        ) -> plt.Figure:
     """

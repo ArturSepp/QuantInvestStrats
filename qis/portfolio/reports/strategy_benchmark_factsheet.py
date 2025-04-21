@@ -35,7 +35,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               add_exposures_comp: bool = False,
                                               is_grouped: Optional[bool] = None,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                              fontsize: int = 4,
+                                              fontsize: int = 5,
                                               **kwargs
                                               ) -> List[plt.Figure]:
     """

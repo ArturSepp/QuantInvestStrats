@@ -15,6 +15,9 @@ import qis.plots.utils as put
 
 
 def plot_line(df: Union[pd.Series, pd.DataFrame],
+              x: str = None,
+              y: str = None,
+              hue: str = None,
               linestyles: List[str] = None,
               linestyle: Any = '-',
               linewidth: float = 1.0,
@@ -37,7 +40,13 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
               ax: plt.Subplot = None,
               **kwargs
               ) -> Optional[plt.Figure]:
-
+    """
+    line plot wrapper for sns, lineplot
+    plot df using index
+    x: str = None: x column
+    y: str = None: y column
+    hue: str = None: hue
+    """
     if isinstance(df, pd.DataFrame):
         pass
     elif isinstance(df, pd.Series):
@@ -45,22 +54,40 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
     else:
         raise TypeError(f"unsuported data type {type(df)}")
 
+    if x is not None:
+        if y is None:
+            raise ValueError(f"y column must be given with x column")
+        else:
+            if hue is not None:
+                df = df[[x, y, hue]]
+            else:
+                df = df[[x, y]]
+
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = None
 
     if colors is None:
-        colors = put.get_n_colors(n=len(df.columns), **kwargs)
+        if hue is None:
+            colors = put.get_n_colors(n=len(df.columns), **kwargs)
+        else:
+            colors = put.get_n_colors(n=len(df[hue].unique()), **kwargs)
 
-    sns.lineplot(data=df, palette=colors, dashes=False, markers=markers, linestyle=linestyle, linewidth=linewidth, ax=ax)
+    sns.lineplot(data=df, x=x, y=y, hue=hue,
+                 palette=colors, dashes=False, markers=markers, linestyle=linestyle, linewidth=linewidth,
+                 style=hue,
+                 ax=ax)
 
     if title is not None:
         put.set_title(ax=ax, title=title, fontsize=fontsize, **kwargs)
 
     if legend_loc is not None:
         if legend_labels is None:
-            legend_labels = put.get_legend_lines(data=df, legend_stats=legend_stats, var_format=yvar_format)
+            if hue is None:
+                legend_labels = put.get_legend_lines(data=df, legend_stats=legend_stats, var_format=yvar_format)
+            else:
+                h, legend_labels = ax.get_legend_handles_labels()
         put.set_legend(ax=ax,
                        labels=legend_labels,
                        colors=colors,

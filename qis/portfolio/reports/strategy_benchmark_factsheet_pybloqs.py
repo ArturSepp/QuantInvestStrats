@@ -33,7 +33,7 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
                                                        heatmap_freq: str = 'YE',
                                                        weight_freq: str = 'ME',
                                                        is_input_weights: bool = True,
-                                                       fontsize: int = 4,
+                                                       fontsize: int = 5,
                                                        **kwargs
                                                        ) -> p.VStack:
     """

@@ -420,7 +420,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    heatmap_freq: str = 'YE',
                                    time_period: TimePeriod = None,  # time period for reporting
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                   fontsize: int = 4,
+                                   fontsize: int = 5,
                                    factsheet_name: str = None,
                                    performance_bars: Tuple[PerfStat, PerfStat] = (PerfStat.SHARPE_RF0, PerfStat.MAX_DD),
                                    drop_1y_ra_perf_table: bool = True,
