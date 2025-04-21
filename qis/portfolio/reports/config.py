@@ -70,7 +70,7 @@ class FactsheetConfig(NamedTuple):
     freq_beta: str = 'W-WED'  # for scatter plot
     exposures_freq: str = 'W-WED'  # for plotting strategy exposures
     # general data
-    perf_columns: List[PerfStat] = PERF_COLUMNS
+    perf_columns: List[PerfStat] = PERF_COLUMNS_RF0
     perf_stats_labels: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0,)
     short: bool = True  # ra columns
     # next depend on report time period

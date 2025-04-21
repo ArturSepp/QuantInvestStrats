@@ -39,6 +39,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 add_benchmarks_to_navs: bool = False,
                                 figsize: Tuple[float, float] = (8.5, 11.7),  # A4 for portrait
                                 fontsize: int = 5,
+                                heatmap_fontsize: int = 4,
                                 weight_change_sample_size: int = 20,
                                 add_current_position_var_risk_sheet: bool = False,
                                 add_weights_turnover_sheet: bool = False,
@@ -228,7 +229,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     portfolio_data.plot_monthly_returns_heatmap(ax=ax,
                                                 time_period=time_period,
                                                 title='Monthly Returns',
-                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize, date_format='%Y')))
+                                                **qis.update_kwargs(kwargs, dict(fontsize=heatmap_fontsize,
+                                                                                 date_format='%Y')))
 
     # periodic returns
     ax = fig.add_subplot(gs[4:6, 2:])

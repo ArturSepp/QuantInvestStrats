@@ -36,6 +36,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               is_grouped: Optional[bool] = None,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 5,
+                                              heatmap_fontsize: int = 4,
                                               **kwargs
                                               ) -> List[plt.Figure]:
     """
@@ -144,7 +145,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
-                                     new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=False))
+                                     new_kwargs=dict(fontsize=heatmap_fontsize, square=False,
+                                                     x_rotation=90, transpose=False))
     if add_benchmarks_to_navs:
         benchmark_prices = multi_portfolio_data.benchmark_prices
     else:
