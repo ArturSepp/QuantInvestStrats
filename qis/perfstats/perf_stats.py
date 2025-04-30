@@ -177,10 +177,11 @@ def compute_risk_table(prices: pd.DataFrame,
                           PerfStat.NUM_OBS.to_str(): len(nd_sampled_returns)
                           }
             # compute max dd on business day schedule
-            max_dd = compute_max_dd(prices=dd_sampled_prices[asset].dropna())
+            max_dd, current_dd = compute_max_current_drawdown(prices=dd_sampled_prices[asset].dropna())
             rel_returns = sampled_price.pct_change().dropna()
             asset_dict.update({
                 PerfStat.MAX_DD.to_str(): max_dd,
+                PerfStat.CURRENT_DD.to_str(): current_dd,
                 PerfStat.MAX_DD_VOL.to_str(): max_dd / vol if vol > 0.0 else 0.0,
                 PerfStat.WORST.to_str(): np.min(rel_returns),
                 PerfStat.BEST.to_str(): np.max(rel_returns),
@@ -384,13 +385,17 @@ def compute_rolling_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Ser
     return drawdown, time_under_water
 
 
-def compute_max_dd(prices: Union[pd.DataFrame, pd.Series]) -> np.ndarray:
+def compute_max_current_drawdown(prices: Union[pd.DataFrame, pd.Series]) -> Tuple[np.ndarray, np.ndarray]:
     """
-    compute realized max drawdown
+    compute realized max and last drawdown
     """
     max_dd_data = compute_rolling_drawdowns(prices=prices)
     max_dds = np.min(max_dd_data.to_numpy(), axis=0)
-    return max_dds
+    if isinstance(prices, pd.DataFrame):
+        current_dds = max_dd_data.iloc[-1, :].to_numpy()
+    else:
+        current_dds = max_dd_data.iloc[-1]
+    return max_dds, current_dds
 
 
 def compute_avg_max_dd(ds: pd.Series,
@@ -496,7 +501,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.DRAWDOWN_STATS_TABLE
+    unit_test = UnitTests.RA_PERF_TABLE
 
     is_run_all_tests = False
     if is_run_all_tests:

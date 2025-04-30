@@ -1,13 +1,16 @@
+"""
+analytics for computing auto-correlations
+"""
 # packages
 import numpy as np
 import pandas as pd
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional, List
 from numba import njit
 from statsmodels.tsa.stattools import pacf, acf
 
 # qis
 from qis.models.linear.ewm import MeanAdjType, compute_rolling_mean_adj, compute_ewm, NanBackfill
-from qis.utils.np_ops import np_apply_along_axis
+from qis.utils.df_freq import df_resample_at_int_index
 
 
 def estimate_acf_from_path(path: pd.Series, nlags: int = 10) -> Tuple[pd.Series, pd.Series]:
@@ -93,6 +96,20 @@ def compute_path_lagged_corr(a1: np.ndarray,
 
 
 @njit
+def compute_path_lagged_corr_given_lags(a1: np.ndarray,
+                                        a2: np.ndarray,
+                                        lags: List[int] = (1, 5, 10, )
+                                        ) -> np.ndarray:
+    """
+    compute correlation between a1 and a2 at num_lags
+    """
+    acorr = np.zeros(len(lags))
+    for idx, lag in enumerate(lags):
+        acorr[idx] = np.corrcoef(a1[lag:], a2[:-lag], rowvar=False)[0][1]
+    return acorr
+
+
+@njit
 def compute_path_autocorr(a: np.ndarray,
                           num_lags: int = 20
                           ) -> np.ndarray:
@@ -108,6 +125,25 @@ def compute_path_autocorr(a: np.ndarray,
         for path in np.arange(nb_path):
             a_ = a[:, path]
             acfs[:, path] = compute_path_lagged_corr(a1=a_, a2=a_, num_lags=num_lags)
+    return acfs
+
+
+@njit
+def compute_path_autocorr_given_lags(a: np.ndarray,
+                                     lags: List[int] = (1, 5, 10, )
+                                     ) -> np.ndarray:
+    """
+    given data = df.to_numpy() of a compute column vise
+    """
+    is_1d = (a.ndim == 1)
+    if is_1d:
+        acfs = compute_path_lagged_corr_given_lags(a1=a, a2=a, lags=lags)
+    else:
+        nb_path = a.shape[1]
+        acfs = np.zeros((nb_path, len(lags)))
+        for path in np.arange(nb_path):
+            a_ = a[:, path]
+            acfs[path, :] = compute_path_lagged_corr_given_lags(a1=a_, a2=a_, lags=lags)
     return acfs
 
 
@@ -276,3 +312,33 @@ def compute_ewm_vector_autocorr_df(data: Union[pd.DataFrame, pd.Series],
     else:
         autocorr = pd.Series(autocorr[:, 0], index=data.index, name=data.name)
     return autocorr
+
+
+def compute_autocorrelation_at_int_periods(data: pd.DataFrame,
+                                           span: int = 30,
+                                           is_returns: bool = True,
+                                           demean: bool = True,
+                                           ewma_smoothin_span: Optional[int] = None
+                                           ) -> pd.Series:
+    """
+    compute autocorrelation of data resampled at integer periods
+    """
+    if is_returns:
+        # resample with sums
+        resampled_data = df_resample_at_int_index(df=data, func=np.nansum, sample_size=span)
+    else:
+        # resample at last value
+        resampled_data = df_resample_at_int_index(df=data, func=lambda x: x.iloc[-1], sample_size=span)
+
+    if demean:
+        resampled_data = resampled_data-np.nanmean(resampled_data, axis=0, keepdims=True)
+
+    if ewma_smoothin_span is None:
+        # compute autorcorr for lags = [0, 1] and report the last value
+        autocorr = compute_path_autocorr(a=resampled_data.to_numpy(), num_lags=2)
+        autocorr = pd.Series(autocorr[-1], index=data.columns)
+    else:
+        raise NotImplementedError
+
+    return autocorr
+

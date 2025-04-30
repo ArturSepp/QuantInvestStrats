@@ -250,7 +250,7 @@ def compute_ewm_covar(a: np.ndarray,
     """
     if b is None:
         b = a
-    else:
+    else:  # must use numba >= 0.61.2
         assert a.shape[0] == b.shape[0]
         assert a.shape[1] == b.shape[1]
 

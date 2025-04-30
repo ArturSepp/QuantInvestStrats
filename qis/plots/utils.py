@@ -1535,6 +1535,16 @@ def set_labels_frequency(ax: plt.Axes, labels_frequency: int = 5) -> None:
             label.set_visible(False)
 
 
+def scale_ax_bar_width(ax: plt.Subplot, scale: float = 0.5) -> None:
+    """
+    shrink or enlarge width of bars for barplot
+    """
+    for patch in ax.patches:
+        current_width = patch.get_width()
+        diff = current_width*(1.0-scale)
+        patch.set_width(current_width*scale)
+        patch.set_x(patch.get_x() + diff * .5)
+
 
 class UnitTests(Enum):
     DUMMY_LINE = 1

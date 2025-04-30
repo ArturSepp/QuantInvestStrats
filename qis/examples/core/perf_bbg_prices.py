@@ -22,6 +22,19 @@ def run_report():
         'BNPXOV3U Index': 'BNP 3M Long DHhedged Puts'
         }
 
+    benchmark = 'HYG US Equity'
+    tickers = {
+        benchmark: benchmark,
+        'NMVVR1EL Index': 'IRVING1 EUR',
+        'NMVVR1UL Index': 'IRVING1 USD',
+        'NMVVR1L Index': 'IRVING1',
+        'BNPXLVRE Index': 'BNP Long Rates Vol EUR',
+        'BNPXLVRU Index': 'BNP Long Rates Vol USD',
+        'BXIIULSV Index': 'Barclays Long Rates Vol',
+        'BXIIUGNT Index': 'Barclays Gamma Neutral Vol',
+        'BXIIUENT Index': 'Barclays Triangle Vol'
+    }
+    
     benchmark = 'SPTR Index'
     tickers = {
         benchmark: benchmark,
@@ -37,26 +50,24 @@ def run_report():
         'JPUSVXCR Index': 'JPM US Volatility Call Ratio'
     }
 
-    benchmark = 'HYG US Equity'
+    benchmark = 'XNDX Index'
     tickers = {
         benchmark: benchmark,
-        'NMVVR1EL Index': 'IRVING1 EUR',
-        'NMVVR1UL Index': 'IRVING1 USD',
-        'NMVVR1L Index': 'IRVING1',
-        'BNPXLVRE Index': 'BNP Long Rates Vol EUR',
-        'BNPXLVRU Index': 'BNP Long Rates Vol USD',
-        'BXIIULSV Index': 'Barclays Long Rates Vol',
-        'BXIIUGNT Index': 'Barclays Gamma Neutral Vol',
-        'BXIIUENT Index': 'Barclays Triangle Vol'
+        'BNPXTHUE Index': 'Thalia',
+        'BNPXTHUN Index': 'Thalia Neutral',
+        'BNPXTDUE Index': 'Thalia Dynamic',
+        'BNPXTDUN Index': 'Thalia Neutral Dynamic',
+        'BNPXLVRU Index': 'BNP Long Rates Vol USD'
     }
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2024', '07Apr2025')
-    #kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
-    kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD)
+    time_period = qis.TimePeriod('31Dec2021', '17Apr2025')
+    # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
+    # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
+    kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD, add_rates_data=False)
 
     fig = qis.generate_multi_asset_factsheet(prices=prices,
                                              benchmark=benchmark,

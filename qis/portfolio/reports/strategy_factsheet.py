@@ -277,6 +277,85 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     figs = [fig]
 
+    if add_weights_turnover_sheet:
+        # qqq
+        fig = plt.figure(figsize=figsize, constrained_layout=True)
+        fig.suptitle(f"{portfolio_data.nav.name} current position profile", fontweight="bold", fontsize=8, color='blue')
+        figs.append(fig)
+        gs = fig.add_gridspec(nrows=7, ncols=4, wspace=0.0, hspace=0.0)
+
+        # current position
+        with sns.axes_style("whitegrid"):
+            portfolio_data.plot_current_weights(is_grouped=False,
+                                                ax=fig.add_subplot(gs[0, :2]), **kwargs)
+            portfolio_data.plot_current_weights(is_grouped=True,
+                                                ax=fig.add_subplot(gs[0, 2:]), **kwargs)
+
+        # change in position
+        with sns.axes_style("whitegrid"):
+            portfolio_data.plot_last_weights_change(is_grouped=False,
+                                                    ax=fig.add_subplot(gs[1, :2]), **kwargs)
+            portfolio_data.plot_last_weights_change(is_grouped=True,
+                                                    ax=fig.add_subplot(gs[1, 2:]), **kwargs)
+
+        # weights for ytd performance attribution
+        with sns.axes_style("whitegrid"):
+            portfolio_data.plot_current_weights(is_grouped=False,
+                                                time_period=ytd_attribution_time_period,
+                                                ax=fig.add_subplot(gs[2, :2]),
+                                                **kwargs)
+            portfolio_data.plot_current_weights(is_grouped=True,
+                                                time_period=ytd_attribution_time_period,
+                                                ax=fig.add_subplot(gs[2, 2:]),
+                                                **kwargs)
+
+        # total and ytd performance attribution
+        with sns.axes_style("whitegrid"):
+            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
+            portfolio_data.plot_performance_attribution(time_period=time_period,
+                                                        attribution_metric=qis.AttributionMetric.PNL,
+                                                        ax=fig.add_subplot(gs[3, :2]),
+                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
+                                                        attribution_metric=qis.AttributionMetric.PNL,
+                                                        ax=fig.add_subplot(gs[3, 2:]),
+                                                        **local_kwargs)
+        # turnover
+        with sns.axes_style("whitegrid"):
+            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
+            portfolio_data.plot_performance_attribution(time_period=time_period,
+                                                        attribution_metric=qis.AttributionMetric.TURNOVER,
+                                                        ax=fig.add_subplot(gs[4, :2]),
+                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
+                                                        attribution_metric=qis.AttributionMetric.TURNOVER,
+                                                        ax=fig.add_subplot(gs[4, 2:]),
+                                                        **local_kwargs)
+
+        # vol adjusted turnover
+        with sns.axes_style("whitegrid"):
+            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
+            portfolio_data.plot_performance_attribution(time_period=time_period,
+                                                        attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
+                                                        ax=fig.add_subplot(gs[5, :2]),
+                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
+                                                        attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
+                                                        ax=fig.add_subplot(gs[5, 2:]),
+                                                        **local_kwargs)
+
+        # costs
+        with sns.axes_style("whitegrid"):
+            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None, is_unit_based_traded_volume=is_unit_based_traded_volume))
+            portfolio_data.plot_performance_attribution(time_period=time_period,
+                                                        attribution_metric=qis.AttributionMetric.COSTS,
+                                                        ax=fig.add_subplot(gs[6, :2]),
+                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
+                                                        attribution_metric=qis.AttributionMetric.COSTS,
+                                                        ax=fig.add_subplot(gs[6, 2:]),
+                                                        **local_kwargs)
+
     if add_current_position_var_risk_sheet:
         # qqq
         fig = plt.figure(figsize=figsize, constrained_layout=True)
@@ -444,84 +523,6 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                             regime_params=regime_params,
                                             **kwargs)
         """
-    if add_weights_turnover_sheet:
-        # qqq
-        fig = plt.figure(figsize=figsize, constrained_layout=True)
-        fig.suptitle(f"{portfolio_data.nav.name} current position profile", fontweight="bold", fontsize=8, color='blue')
-        figs.append(fig)
-        gs = fig.add_gridspec(nrows=7, ncols=4, wspace=0.0, hspace=0.0)
-
-        # current position
-        with sns.axes_style("whitegrid"):
-            portfolio_data.plot_current_weights(is_grouped=False,
-                                                ax=fig.add_subplot(gs[0, :2]), **kwargs)
-            portfolio_data.plot_current_weights(is_grouped=True,
-                                                ax=fig.add_subplot(gs[0, 2:]), **kwargs)
-
-        # change in position
-        with sns.axes_style("whitegrid"):
-            portfolio_data.plot_last_weights_change(is_grouped=False,
-                                                    ax=fig.add_subplot(gs[1, :2]), **kwargs)
-            portfolio_data.plot_last_weights_change(is_grouped=True,
-                                                    ax=fig.add_subplot(gs[1, 2:]), **kwargs)
-
-        # weights for ytd performance attribution
-        with sns.axes_style("whitegrid"):
-            portfolio_data.plot_current_weights(is_grouped=False,
-                                                time_period=ytd_attribution_time_period,
-                                                ax=fig.add_subplot(gs[2, :2]),
-                                                **kwargs)
-            portfolio_data.plot_current_weights(is_grouped=True,
-                                                time_period=ytd_attribution_time_period,
-                                                ax=fig.add_subplot(gs[2, 2:]),
-                                                **kwargs)
-
-        # total and ytd performance attribution
-        with sns.axes_style("whitegrid"):
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.PNL,
-                                                        ax=fig.add_subplot(gs[3, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.PNL,
-                                                        ax=fig.add_subplot(gs[3, 2:]),
-                                                        **local_kwargs)
-        # turnover
-        with sns.axes_style("whitegrid"):
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.TURNOVER,
-                                                        ax=fig.add_subplot(gs[4, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.TURNOVER,
-                                                        ax=fig.add_subplot(gs[4, 2:]),
-                                                        **local_kwargs)
-
-        # vol adjusted turnover
-        with sns.axes_style("whitegrid"):
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
-                                                        ax=fig.add_subplot(gs[5, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
-                                                        ax=fig.add_subplot(gs[5, 2:]),
-                                                        **local_kwargs)
-
-        # costs
-        with sns.axes_style("whitegrid"):
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None, is_unit_based_traded_volume=is_unit_based_traded_volume))
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.COSTS,
-                                                        ax=fig.add_subplot(gs[6, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.COSTS,
-                                                        ax=fig.add_subplot(gs[6, 2:]),
-                                                        **local_kwargs)
 
     if add_current_signal_report and portfolio_data.strategy_signal_data is not None:
         fig = qis.generate_current_signal_report(portfolio_data=portfolio_data,

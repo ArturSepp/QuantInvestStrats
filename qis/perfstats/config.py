@@ -42,7 +42,7 @@ class PerfStat(ColVar, Enum):
     NUM_OBS = ColVar(name='Num Obs', short_n='Num\nObs', value_type=ValueType.INT)
 
     # computed in compute_pa_return_dict
-    TOTAL_RETURN = ColVar(name='Total', short_n='Total return', value_type=ValueType.PERCT)
+    TOTAL_RETURN = ColVar(name='Total', short_n='Total return', value_type=ValueType.PERCT0)
     PA_RETURN = ColVar(name='P.a. return', short='P.a.', short_n='P.a.\nreturn', value_type=ValueType.PERCT)
     AN_LOG_RETURN = ColVar(name='An. log return', short_n='An. log-return', value_type=ValueType.PERCT)
     AN_LOG_RETURN_EXCESS = ColVar(name='An. log return ex', short_n='An. log-return ex', value_type=ValueType.PERCT)
@@ -67,9 +67,10 @@ class PerfStat(ColVar, Enum):
     SORTINO_RATIO = ColVar(name='Sortino', short_n='Sortino', value_type=ValueType.SHARPE)
     CALMAR_RATIO = ColVar(name='Calmar', short_n='Calmar', value_type=ValueType.SHARPE)
 
-    MAX_DD = ColVar(name='Max DD', short='MaxDD', short_n='Max DD', value_type=ValueType.PERCT0)
+    MAX_DD = ColVar(name='Max DD', short='MaxDD', short_n='Max\nDD', value_type=ValueType.PERCT0)
+    CURRENT_DD = ColVar(name='Current DD', short='CurDD', short_n='Current\nDD', value_type=ValueType.PERCT0)
     MAX_DD_VOL = ColVar(name='Max DD/Vol', short='MaxDD/Vol', short_n='Max DD\n/Vol', value_type=ValueType.FLOAT)
-    SKEWNESS = ColVar(name='Skewness', short='Skew', short_n='Skew', value_type=ValueType.FLOAT)
+    SKEWNESS = ColVar(name='Skewness', short='Skew', short_n='Skew', value_type=ValueType.FLOAT2)
     KURTOSIS = ColVar(name='Kurtosis', short_n='Kurt', value_type=ValueType.FLOAT)
     NORMTEST = ColVar(name='P-val', short_n='P-val', value_type=ValueType.FLOAT4)
     WORST = ColVar(name='Worst', short_n='Worst', value_type=ValueType.PERCT)
@@ -112,7 +113,7 @@ class PerfStat(ColVar, Enum):
     # linear ml
     ALPHA = ColVar(name='Alpha', short_n='Alpha', value_type=ValueType.PERCT)
     ALPHA_AN = ColVar(name='An Alpha', short_n='Alpha', value_type=ValueType.PERCT)
-    BETA = ColVar(name='Beta', short_n='Beta', value_type=ValueType.FLOAT2)
+    BETA = ColVar(name='Beta', short_n='Beta', value_type=ValueType.FLOAT)
     R2 = ColVar(name='R2', short_n='R2', value_type=ValueType.PERCT0)
     ALPHA_PVALUE = ColVar(name='p-Alpha', short_n='p-Alpha', value_type=ValueType.FLOAT2)
 

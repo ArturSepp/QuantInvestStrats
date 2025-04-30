@@ -1,7 +1,10 @@
-# biult in
+"""
+analytics for plotting price data
+"""
+# packages
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Optional, Union, List, Tuple
+from typing import Union, List, Tuple, Optional
 from enum import Enum
 
 # qis
@@ -62,7 +65,7 @@ def get_performance_labels_for_stats(prices: Union[pd.DataFrame, pd.Series],
 
 
 def plot_prices(prices: Union[pd.DataFrame, pd.Series],
-                perf_stats_labels: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, ),
+                perf_stats_labels: Optional[List[PerfStat]] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, ),
                 perf_params: PerfParams = None,
                 regime_benchmark: str = None,  # to add regimes
                 pivot_prices: pd.Series = None,
@@ -84,12 +87,15 @@ def plot_prices(prices: Union[pd.DataFrame, pd.Series],
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
 
-    legend_labels = get_performance_labels_for_stats(prices=prices,
-                                                     perf_stats_labels=perf_stats_labels,
-                                                     perf_params=perf_params,
-                                                     digits_to_show=digits_to_show,
-                                                     sharpe_format=sharpe_format,
-                                                     **kwargs)
+    if perf_stats_labels is not None:
+        legend_labels = get_performance_labels_for_stats(prices=prices,
+                                                         perf_stats_labels=perf_stats_labels,
+                                                         perf_params=perf_params,
+                                                         digits_to_show=digits_to_show,
+                                                         sharpe_format=sharpe_format,
+                                                         **kwargs)
+    else:
+        legend_labels = prices.columns.to_list()
 
     if resample_freq is not None:
         prices = prices.asfreq(resample_freq, method='ffill')

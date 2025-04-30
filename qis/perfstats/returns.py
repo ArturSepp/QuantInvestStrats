@@ -362,7 +362,7 @@ def compute_net_return(gross_return: pd.Series,
                               test_elements=perf_fee_cristalization_schedule,
                               assume_unique=True)
 
-    nav_data = pd.DataFrame(data=0,
+    nav_data = pd.DataFrame(data=0.0,
                             index=gross_return.index,
                             columns=['Net Return', 'NAV', 'GAV', 'PF', 'HWM', 'CPF'])
     nav_data.insert(loc=0, column='gross return', value=gross_return.to_numpy())

@@ -29,6 +29,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   marker: Optional[str] = 'o',
                   exact_marker: str = "v",
                   y_limits: Tuple[Optional[float], Optional[float]] = None,
+                  add_zero_line: bool = False,
                   ax: plt.Subplot = None,
                   **kwargs
                   ) -> Optional[plt.Figure]:
@@ -108,6 +109,9 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
         put.set_ax_ticks_format(ax=ax, fontsize=fontsize, **kwargs)
     put.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, fontsize=fontsize, **kwargs)
     put.set_spines(ax=ax, **kwargs)
+
+    if add_zero_line:
+        ax.axhline(0, color='black', lw=1)
 
     return fig
 

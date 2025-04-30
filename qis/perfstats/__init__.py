@@ -31,7 +31,7 @@ from qis.perfstats.perf_stats import (
     compute_rolling_drawdowns,
     compute_rolling_drawdown_time_under_water,
     compute_info_ratio_table,
-    compute_max_dd,
+    compute_max_current_drawdown,
     compute_performance_table,
     compute_ra_perf_table,
     compute_ra_perf_table_with_benchmark,

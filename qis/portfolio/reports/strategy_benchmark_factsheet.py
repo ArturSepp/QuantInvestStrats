@@ -777,6 +777,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                            **kwargs)
         if not add_titles:
             ax.title.set_visible(False)
+
         # group turnover
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['group_turnover'] = fig
@@ -794,6 +795,24 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                     index=grouped_selection_return.index, regime_params=regime_params)
         if not add_titles:
             ax.title.set_visible(False)
+
+        # pdf of returns
+        freqs = dict(Monthly='ME', Quarterly='QE', Annual='YE')
+        fig, axs = plt.subplots(1, len(freqs.keys()), figsize=figsize, tight_layout=True)
+        figs['returns_pdfs'] = fig
+        navs = multi_portfolio_data.get_navs(time_period=time_period, add_benchmarks_to_navs=False)
+        for idx, (key, freq) in enumerate(freqs.items()):
+            returns = qis.to_returns(prices=navs, freq=freq, drop_first=True)
+            qis.plot_histogram(df=returns,
+                               xvar_format='{:.0%}',
+                               add_bar_at_peak=True,
+                               desc_table_type=qis.DescTableType.NONE,
+                               title=f"({qis.idx_to_alphabet(idx+1)}) {key} Returns",
+                               xlabel='return',
+                               ax=axs[idx])
+            #if not add_titles:
+            #    ax.title.set_visible(False)
+
     return figs, dfs
 
 

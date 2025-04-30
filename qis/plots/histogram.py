@@ -48,6 +48,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    x_min_max_quantiles: Tuple[Optional[float], Optional[float]] = None,
                    clip: Tuple[Optional[float], Optional[float]] = None,
                    add_last_value: bool = False,
+                   add_bar_at_peak: bool = False,
                    add_total_sample_pdf: bool = False,  # concat total
                    total_sample_name: str = 'Universe',
                    annualize_vol: bool = False,
@@ -59,13 +60,12 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    **kwargs
                    ) -> Optional[plt.Figure]:
 
-    df = df.copy()
-
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = None
 
+    df = df.copy()
     if isinstance(df, pd.DataFrame):
         n = len(df.columns)
     elif isinstance(df, pd.Series):
@@ -150,6 +150,12 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
             percentile = stats.percentileofscore(a=column_data, score=column_data[-1], kind='rank')
             label = f"{label}\nrank={'{:.0%}'.format(0.01*percentile)}"
             put.autolabel(ax=ax, rects=rects, xpos='right', label0=label, color=colors[idx], fontsize=fontsize)
+
+    if add_bar_at_peak:
+        for idx, column in enumerate(df.columns):
+            data = ax.lines[idx].get_xydata()
+            xy_max = data[np.where(data[:, 1] == max(data[:, 1]))][0]
+            ax.vlines(xy_max[0], 0.0, xy_max[1], color=colors[idx], linestyle='dashed')
 
     norm_lable = None
     if add_norm_std_pdf or add_data_std_pdf:
@@ -259,6 +265,7 @@ def trunc_dens(x: np.ndarray,
 
 class UnitTests(Enum):
     TEST = 1
+    RETURNS = 2
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -280,12 +287,22 @@ def run_unit_test(unit_test: UnitTests):
                        **global_kwargs)
         # ax.locator_params(nbins=10, axis='x')
 
+    elif unit_test == UnitTests.RETURNS:
+        from qis.test_data import load_etf_data
+        prices = load_etf_data().dropna()
+        returns = qis.to_returns(prices=prices[['EEM', 'SPY']], freq='QE')
+        plot_histogram(df=returns,
+                       xvar_format='{:.0%}',
+                       add_bar_at_peak=True,
+                       desc_table_type=dsc.DescTableType.NONE
+                       )
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.TEST
+    unit_test = UnitTests.RETURNS
 
     is_run_all_tests = False
     if is_run_all_tests:

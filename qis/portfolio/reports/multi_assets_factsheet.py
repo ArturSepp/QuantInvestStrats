@@ -50,7 +50,8 @@ class MultiAssetsReport:
     def get_prices(self,
                    benchmark: str = None,
                    add_benchmarks_to_navs: bool = False,
-                   time_period: TimePeriod = None) -> pd.DataFrame:
+                   time_period: TimePeriod = None
+                   ) -> pd.DataFrame:
         if add_benchmarks_to_navs:
             prices = pd.concat([self.benchmark_prices, self.prices], axis=1)
         elif benchmark is not None and benchmark not in self.prices.columns:
@@ -221,9 +222,11 @@ class MultiAssetsReport:
                                                                add_benchmarks_to_navs=add_benchmarks_to_navs),
                                         freq=heatmap_freq,
                                         ax=ax,
-                                        title=title or f"{heatmap_freq} Returns",
+                                        title=None,
                                         date_format=date_format,
                                         **local_kwargs)
+        title = title or f"{heatmap_freq} Returns"
+        qis.set_title(ax=ax, title=title, **kwargs)
 
     def plot_corr_table(self,
                         corr_freq: str = 'W-WED',

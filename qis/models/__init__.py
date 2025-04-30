@@ -1,14 +1,17 @@
 
 from qis.models.linear.auto_corr import (
     compute_path_lagged_corr,
+    compute_path_lagged_corr_given_lags,
     compute_path_autocorr,
+    compute_path_autocorr_given_lags,
     compute_autocorr_df,
     compute_ewm_matrix_autocorr,
     compute_ewm_matrix_autocorr_df,
     estimate_acf_from_path,
     estimate_acf_from_paths,
     compute_ewm_vector_autocorr,
-    compute_ewm_vector_autocorr_df
+    compute_ewm_vector_autocorr_df,
+    compute_autocorrelation_at_int_periods
 )
 
 from qis.models.linear.corr_cov_matrix import (
