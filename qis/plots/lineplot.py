@@ -1,16 +1,13 @@
 """
 line plot
 """
-
 # packages
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import List, Union, Tuple, Optional, Any
+from typing import List, Union, Tuple, Optional, Dict
 from enum import Enum
-
-# qis
 import qis.plots.utils as put
 
 
@@ -19,7 +16,7 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
               y: str = None,
               hue: str = None,
               linestyles: List[str] = None,
-              linestyle: Any = '-',
+              linestyle: str = '-',
               linewidth: float = 1.0,
               legend_title: str = None,
               legend_loc: Optional[Union[str, bool]] = 'upper left',
@@ -118,6 +115,89 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
 
     if is_log:
         ax.set_yscale('log')
+
+    return fig
+
+
+def plot_lines_list(xy_datas: Dict[str, pd.DataFrame],
+                    data_labels: List[List[str]],
+                    colors: List[str] = None,
+                    markers: List[str] = None,
+                    is_fill_annotations: bool = False,
+                    xvar_format: str = '{:.1f}',
+                    yvar_format: str = '{:.1f}',
+                    xlabel: str = None,
+                    ylabel: str = None,
+                    title: str = None,
+                    fontsize: int = 10,
+                    x_limits: Tuple[Union[float, None], Union[float, None]] = None,
+                    y_limits: Tuple[Union[float, None], Union[float, None]] = None,
+                    legend_loc: str = 'upper left',
+                    ax: plt.Subplot = None,
+                    **kwargs
+                    ) -> plt.Figure:
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+
+    if colors is None:
+        colors = put.get_n_colors(n=len(xy_datas.keys()))
+
+    for idx, (key, xy) in enumerate(xy_datas.items()):
+        color = colors[idx]
+        labels = data_labels[idx]
+
+        if markers is not None:
+            marker = markers[idx]
+        else:
+            marker = 'None'
+        sns.lineplot(x=xy.columns[0], y=xy.columns[1], data=xy, marker=marker, color=color, ax=ax)
+
+        for label, x, y in zip(labels, xy.iloc[:, 0].to_numpy(), xy.iloc[:, 1].to_numpy()):
+            if label != '':
+                x_offset = 1
+                y_offset = 1
+                if is_fill_annotations:
+                    ax.annotate(
+                        label,
+                        xy=(x, y), xytext=(x_offset, y_offset),
+                        textcoords='offset points', ha='right', va='bottom',
+                        bbox=dict(boxstyle='round, pad=0.5', fc='blue', alpha=0.75),
+                        arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'),
+                        fontsize=fontsize)
+                else:
+                    ax.annotate(
+                        label,
+                        xy=(x, y), xytext=(x_offset, y_offset),
+                        textcoords='offset points', ha='right', va='bottom',
+                        fontsize=fontsize)
+
+    if y_limits is not None:
+        put.set_y_limits(ax=ax, y_limits=y_limits)
+
+    if x_limits is not None:
+        put.set_x_limits(ax=ax, x_limits=x_limits)
+
+    put.set_ax_ticks_format(ax=ax, fontsize=fontsize, xvar_format=xvar_format, yvar_format=yvar_format)
+    put.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, fontsize=fontsize, **kwargs)
+
+    if title is not None:
+        put.set_title(ax=ax, title=title, fontsize=fontsize)
+
+    if legend_loc is not None:
+        legend_labels = list(xy_datas.keys())
+        put.set_legend(ax=ax,
+                       labels=legend_labels,
+                       colors=colors,
+                       legend_loc=legend_loc,
+                       markers=markers,
+                       fontsize=fontsize,
+                       **kwargs)
+    else:
+        ax.legend().set_visible(False)
+
+    put.set_spines(ax=ax, **kwargs)
 
     return fig
 

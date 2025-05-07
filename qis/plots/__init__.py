@@ -72,7 +72,7 @@ from qis.plots.histogram import plot_histogram, PdfType
 
 from qis.plots.histplot2d import plot_histplot2d
 
-from qis.plots.lineplot import plot_line
+from qis.plots.lineplot import plot_line, plot_lines_list
 
 from qis.plots.pie import plot_pie
 
@@ -96,7 +96,6 @@ from qis.plots.table import (
 )
 
 from qis.plots.time_series import (
-    plot_lines_list,
     plot_time_series,
     plot_time_series_2ax
 )

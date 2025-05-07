@@ -44,5 +44,7 @@ from qis.portfolio.reports.strategy_signal_factsheet import (generate_weight_cha
                                                              generate_current_signal_report,
                                                              generate_strategy_signal_factsheet_by_instrument)
 
+from qis.portfolio.reports.overlays_smart_diversification import SmartDiversificationReport
+
 # disable requirements for pyblogs
 # from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pyblogs

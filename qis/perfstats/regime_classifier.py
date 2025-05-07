@@ -255,6 +255,7 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
                                       prices: pd.DataFrame,
                                       benchmark: str,
                                       perf_params: PerfParams,
+                                      drop_benchmark: bool = False,
                                       **kwargs
                                       ) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
 
@@ -268,7 +269,8 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
                                                      freq=self.regime_params.freq,
                                                      is_report_pa_returns=True,
                                                      is_use_benchmark_means=False,
-                                                     regime_ids=self.get_regime_ids())
+                                                     regime_ids=self.get_regime_ids(),
+                                                     drop_benchmark=drop_benchmark)
 
 
 ####################################
@@ -356,15 +358,32 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
 
 
 def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
-                                      benchmark: str,
+                                      benchmark: str = None,
+                                      benchmark_price: pd.Series = None,
                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
                                       perf_params: PerfParams = None,
+                                      drop_benchmark: bool = False,
                                       **kwargs
                                       ) -> pd.DataFrame:
 
         """
         compute regime conditional returns, regime conditional Sharpes and total performance
         """
+        if benchmark is None and benchmark_price is None:
+            raise ValueError(f"provide either benchmark name in prices or benchmark_price")
+        if benchmark is not None and benchmark_price is None: # check if benchmark in prices
+            if benchmark not in prices.columns:
+                raise ValueError(f"{benchmark} is not in {prices.columns.to_list()}")
+        elif benchmark_price is not None:  # check if to add benchmark to prices
+            if benchmark not in prices.columns:
+                if not isinstance(benchmark_price, pd.Series):
+                    raise ValueError(f"benchmark_price must be pd.Series not {type(benchmark_price)}")
+                benchmark_price = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
+                prices = pd.concat([benchmark_price, prices], axis=1)
+                benchmark = benchmark_price.name
+            else:  # use benchmark in prices
+                pass
+
         if regime_params is None:
             regime_params = BenchmarkReturnsQuantileRegimeSpecs()
         regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
@@ -372,6 +391,7 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
         regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(prices=prices,
                                                                                               benchmark=benchmark,
                                                                                               perf_params=perf_params,
+                                                                                              drop_benchmark=drop_benchmark,
                                                                                               **regime_params._asdict())
         return regimes_pa_perf_table
 

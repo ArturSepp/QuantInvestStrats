@@ -15,7 +15,8 @@ import qis.plots.scatter as psc
 import qis.plots.table as ptb
 import qis.plots.utils as put
 from qis.plots.bars import plot_bars, plot_vbars
-
+from qis.perfstats.regime_classifier import RegimeClassifier, BenchmarkReturnsQuantileRegimeSpecs, \
+    BenchmarkReturnsQuantilesRegime, VolQuantileRegimeSpecs, BenchmarkVolsQuantilesRegime, compute_bnb_regimes_pa_perf_table
 
 def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                         perf_params: PerfParams = None,
@@ -193,7 +194,9 @@ def plot_ra_perf_bars(prices: pd.DataFrame,
 
 def plot_ra_perf_scatter(prices: pd.DataFrame,
                          benchmark: str = None,
+                         benchmark_price: pd.Series = None,
                          perf_params: PerfParams = None,
+                         regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
                          x_var: PerfStat = PerfStat.MAX_DD,
                          y_var: PerfStat = PerfStat.PA_RETURN,
                          hue_data: pd.Series = None,
@@ -202,19 +205,34 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
                          order: int = 1,
                          add_universe_model_label: bool = True,
                          ci: Optional[int] = 95,
+                         compute_regime_sharpes: bool = False,
+                         drop_benchmark: bool = False,
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> plt.Figure:
     """
     scatter plot of performance stats
     """
-    if benchmark is not None:
-        ra_perf_table = rpt.compute_ra_perf_table_with_benchmark(prices=prices,
-                                                                 benchmark=benchmark,
-                                                                 perf_params=perf_params,
-                                                                 **kwargs)
+    if compute_regime_sharpes:
+        if benchmark is None and benchmark_price is None:
+            raise ValueError(f"benchmark or benchmark_price must be given")
+        ra_perf_table = compute_bnb_regimes_pa_perf_table(prices=prices,
+                                                          benchmark=benchmark,
+                                                          benchmark_price=benchmark_price,
+                                                          regime_params=regime_params,
+                                                          perf_params=perf_params,
+                                                          drop_benchmark=drop_benchmark,
+                                                          **kwargs)
     else:
-        ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
+        if benchmark is not None or benchmark_price is not None:
+            ra_perf_table = rpt.compute_ra_perf_table_with_benchmark(prices=prices,
+                                                                     benchmark=benchmark,
+                                                                     benchmark_price=benchmark_price,
+                                                                     perf_params=perf_params,
+                                                                     drop_benchmark=drop_benchmark,
+                                                                     **kwargs)
+        else:
+            ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
 
     xy = ra_perf_table[[x_var.to_str(), y_var.to_str()]]
     if x_filters is not None:

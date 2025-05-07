@@ -803,13 +803,14 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         navs = multi_portfolio_data.get_navs(time_period=time_period, add_benchmarks_to_navs=False)
         for idx, (key, freq) in enumerate(freqs.items()):
             returns = qis.to_returns(prices=navs, freq=freq, drop_first=True)
-            qis.plot_histogram(df=returns,
-                               xvar_format='{:.0%}',
-                               add_bar_at_peak=True,
-                               desc_table_type=qis.DescTableType.NONE,
-                               title=f"({qis.idx_to_alphabet(idx+1)}) {key} Returns",
-                               xlabel='return',
-                               ax=axs[idx])
+            if len(returns.index) > 3:
+                qis.plot_histogram(df=returns,
+                                   xvar_format='{:.0%}',
+                                   add_bar_at_peak=True,
+                                   desc_table_type=qis.DescTableType.NONE,
+                                   title=f"({qis.idx_to_alphabet(idx+1)}) {key} Returns",
+                                   xlabel='return',
+                                   ax=axs[idx])
             #if not add_titles:
             #    ax.title.set_visible(False)
 
