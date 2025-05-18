@@ -113,7 +113,7 @@ class PerfStat(ColVar, Enum):
     # linear ml
     ALPHA = ColVar(name='Alpha', short_n='Alpha', value_type=ValueType.PERCT)
     ALPHA_AN = ColVar(name='An Alpha', short_n='Alpha', value_type=ValueType.PERCT)
-    BETA = ColVar(name='Beta', short_n='Beta', value_type=ValueType.FLOAT)
+    BETA = ColVar(name='Beta', short_n='Beta', value_type=ValueType.FLOAT2)
     R2 = ColVar(name='R2', short_n='R2', value_type=ValueType.PERCT0)
     ALPHA_PVALUE = ColVar(name='p-Alpha', short_n='p-Alpha', value_type=ValueType.FLOAT2)
 

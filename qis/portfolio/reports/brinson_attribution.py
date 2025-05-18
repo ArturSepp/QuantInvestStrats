@@ -73,8 +73,9 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
 
     if is_exclude_interaction_term:
         # exlude by allocation half to allocation and selection
-        grouped_allocation_return = grouped_allocation_return + 0.5 * grouped_interaction_return
-        grouped_selection_return = grouped_selection_return + 0.5 * grouped_interaction_return
+        # grouped_allocation_return = grouped_allocation_return + 0.5 * grouped_interaction_return
+        # grouped_selection_return = grouped_selection_return + 0.5 * grouped_interaction_return
+        grouped_selection_return = grouped_selection_return + grouped_interaction_return
         grouped_interaction_return = 0.0 * grouped_interaction_return
 
     # create mean table: indexed by group
