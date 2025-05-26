@@ -36,7 +36,8 @@ from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 
 from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strategy_benchmark_factsheet_plt,
                                                                 generate_strategy_benchmark_active_perf_plt,
-                                                                plot_exposures_strategy_vs_benchmark_stack)
+                                                                plot_exposures_strategy_vs_benchmark_stack,
+                                                                weights_tracking_error_report_by_ac_subac)
 
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 

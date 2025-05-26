@@ -96,7 +96,7 @@ SMALL_TABLE_COLUMNS = (PerfStat.TOTAL_RETURN,
 
 BENCHMARK_TABLE_COLUMNS = (PerfStat.PA_RETURN,
                            PerfStat.VOL,
-                           PerfStat.SHARPE_EXCESS,
+                           PerfStat.SHARPE_RF0,
                            PerfStat.MAX_DD,
                            PerfStat.SKEWNESS,
                            PerfStat.ALPHA_AN,

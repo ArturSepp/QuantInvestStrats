@@ -17,7 +17,7 @@ import qis.perfstats.returns as ret
 
 
 def estimate_rolling_ewma_covar(prices: pd.DataFrame,
-                                time_period: da.TimePeriod,  # when we start estimation
+                                time_period: da.TimePeriod = None,  # when we start estimation
                                 returns_freq: str = 'W-WED',
                                 rebalancing_freq: str = 'QE',
                                 span: int = 52,
@@ -51,7 +51,10 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
         an_factor = da.infer_an_from_data(data=returns)
     else:
         an_factor = 1.0
-    start_date = time_period.start.tz_localize(tz=returns.index.tz)  # make sure tz is alined with rebalancing_schedule
+    if time_period is not None:
+        start_date = time_period.start.tz_localize(tz=returns.index.tz)  # make sure tz is alined with rebalancing_schedule
+    else:
+        start_date = rebalancing_schedule.index[0]
     for idx, (date, value) in enumerate(rebalancing_schedule.items()):
         if value and date >= start_date:
             covar_t = pd.DataFrame(covar_tensor_txy[idx], index=tickers, columns=tickers)

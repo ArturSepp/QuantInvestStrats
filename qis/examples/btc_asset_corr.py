@@ -11,6 +11,7 @@ import yfinance as yf
 # define asset and cryptocurrency
 ASSET = 'QQQ'
 CRYPTO = 'BTC-USD'
+
 tickers = [ASSET, CRYPTO]
 # fetch yahoo data
 prices = yf.download(tickers, start=None, end=None)['Close'][tickers]

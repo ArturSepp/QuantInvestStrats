@@ -47,7 +47,7 @@ def plot_scatter(df: pd.DataFrame,
                  full_sample_label: str = 'Full sample: ',
                  add_45line: bool = False,
                  r2_only: bool = False,
-                 legend_loc: str = 'upper left',
+                 legend_loc: Optional[str] = 'upper left',
                  value_name: str = 'value_name',
                  ax: plt.Subplot = None,
                  **kwargs
