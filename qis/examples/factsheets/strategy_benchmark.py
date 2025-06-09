@@ -140,10 +140,10 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.TRACKING_ERROR:
         # compute pd_covras
         covar_dict = qis.estimate_rolling_ewma_covar(prices=prices,
-                                                    time_period=time_period,
-                                                    returns_freq='W-WED',
-                                                    rebalancing_freq='ME',
-                                                    span=52)
+                                                     time_period=time_period,
+                                                     returns_freq='W-WED',
+                                                     rebalancing_freq='ME',
+                                                     span=52)
         multi_portfolio_data.covar_dict = covar_dict
         ac_group_data = multi_portfolio_data.portfolio_datas[0].group_data
         asset_tickers = multi_portfolio_data.portfolio_datas[0].weights.columns

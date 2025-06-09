@@ -248,7 +248,7 @@ def get_first_nonnan_values(df: Union[np.ndarray, pd.Series, pd.DataFrame]) -> U
             values = get_non_nan_values_series(sdata=df)
 
     elif isinstance(df, np.ndarray):
-        x0 = df[0, :]
+        x0 = df[0]
         if np.all(np.isnan(x0) == False):  # first entries are non nan -> most expected
             values = x0
         else:

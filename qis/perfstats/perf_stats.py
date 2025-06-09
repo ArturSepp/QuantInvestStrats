@@ -151,27 +151,35 @@ def compute_risk_table(prices: pd.DataFrame,
     if perf_params is None:
         perf_params = PerfParams()
 
-    sampled_prices = ret.prices_at_freq(prices=prices, freq=perf_params.freq_vol)
+    sampled_prices_vol = ret.prices_at_freq(prices=prices, freq=perf_params.freq_vol)
 
     # drawdowns are computed using its own freq
     if perf_params.freq_vol == perf_params.freq_drawdown:
-        dd_sampled_prices = sampled_prices
+        dd_sampled_prices = sampled_prices_vol
     else:
         dd_sampled_prices = ret.prices_at_freq(prices=prices, freq=perf_params.freq_drawdown)
 
-    vol_dt = np.sqrt(da.infer_an_from_data(data=sampled_prices))
+    # skeweness computed at own frequency
+    if perf_params.freq_vol == perf_params.freq_skeweness:
+        sampled_prices_skew = sampled_prices_vol
+    else:
+        sampled_prices_skew = ret.prices_at_freq(prices=prices, freq=perf_params.freq_skeweness)
+
+    vol_dt = np.sqrt(da.infer_an_from_data(data=sampled_prices_vol))
     dict_data = {}
-    for asset in sampled_prices:
-        sampled_price = sampled_prices[asset].dropna()
+    for asset in sampled_prices_vol:
+        sampled_price = sampled_prices_vol[asset].dropna()
+        sampled_price_skew = sampled_prices_skew[asset].dropna()
         if len(sampled_price.index) > 1:
-            sampled_returns = ret.to_returns(prices=sampled_price, return_type=perf_params.return_type, drop_first=True)
-            nd_sampled_returns = sampled_returns.to_numpy()
+            nd_sampled_returns = ret.to_returns(prices=sampled_price, return_type=perf_params.return_type, drop_first=True).to_numpy()
+            sampled_returns_skew = ret.to_returns(prices=sampled_price_skew, return_type=perf_params.return_type, drop_first=True).to_numpy()
+
             vol = vol_dt * np.std(nd_sampled_returns, ddof=1)
             downside_vol = vol_dt * np.std(nd_sampled_returns[nd_sampled_returns < 0.0], ddof=1)
 
             asset_dict = {PerfStat.VOL.to_str(): vol,
                           PerfStat.DOWNSIDE_VOL.to_str(): downside_vol,
-                          PerfStat.AVG_LOG_RETURN.to_str(): np.nanmean(sampled_returns),
+                          PerfStat.AVG_LOG_RETURN.to_str(): np.nanmean(nd_sampled_returns),
                           PerfStat.START_DATE.to_str(): sampled_price.index[0],
                           PerfStat.END_DATE.to_str(): sampled_price.index[-1],
                           PerfStat.NUM_OBS.to_str(): len(nd_sampled_returns)
@@ -185,8 +193,8 @@ def compute_risk_table(prices: pd.DataFrame,
                 PerfStat.MAX_DD_VOL.to_str(): max_dd / vol if vol > 0.0 else 0.0,
                 PerfStat.WORST.to_str(): np.min(rel_returns),
                 PerfStat.BEST.to_str(): np.max(rel_returns),
-                PerfStat.SKEWNESS.to_str(): skew(nd_sampled_returns, bias=False),
-                PerfStat.KURTOSIS.to_str(): kurtosis(nd_sampled_returns, bias=False)
+                PerfStat.SKEWNESS.to_str(): skew(sampled_returns_skew, bias=False),
+                PerfStat.KURTOSIS.to_str(): kurtosis(sampled_returns_skew, bias=False)
             })
         else:  # no required data
             asset_dict = {PerfStat.VOL.to_str(): np.nan,

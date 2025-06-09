@@ -1546,6 +1546,21 @@ def scale_ax_bar_width(ax: plt.Subplot, scale: float = 0.5) -> None:
         patch.set_x(patch.get_x() + diff * .5)
 
 
+def get_table_lines_for_group_data(group_data: pd.Series) -> List[int]:
+    """
+    get indices for plotting table lines indicating groups
+    """
+    hline_rows = []
+    group0 = group_data.iloc[0]
+    for idx, group in enumerate(group_data.to_list()):
+        if group == group0:
+            pass
+        else:
+            hline_rows.append(idx)
+        group0 = group
+    return hline_rows
+
+
 class UnitTests(Enum):
     DUMMY_LINE = 1
     LEGEND_LINES = 2

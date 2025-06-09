@@ -30,7 +30,6 @@ from qis.models.linear.ewm import compute_ewm_vol
 from qis.portfolio.signal_data import StrategySignalData
 from qis.portfolio.ewm_portfolio_risk import compute_portfolio_vol, compute_portfolio_risk_contributions
 
-
 # default performance and regime params
 PERF_PARAMS = PerfParams(freq='W-WED')
 REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
@@ -155,9 +154,9 @@ class PortfolioData:
         return nav_
 
     def get_portfolio_nav_with_benchmark_prices(self,
-                                               time_period: TimePeriod = None,
-                                               freq: Optional[str] = None
-                                               ) -> pd.DataFrame:
+                                                time_period: TimePeriod = None,
+                                                freq: Optional[str] = None
+                                                ) -> pd.DataFrame:
         """
         get nav using consistent function for all return computations
         """
@@ -564,18 +563,19 @@ class PortfolioData:
         elif attribution_metric == AttributionMetric.INST_PNL:
             data = self.get_instruments_navs(time_period=time_period)
         elif attribution_metric == AttributionMetric.COSTS:
-            data = self.get_costs(is_agg=False, is_grouped=False, roll_period=None, is_unit_based_traded_volume=is_unit_based_traded_volume,
+            data = self.get_costs(is_agg=False, is_grouped=False, roll_period=None,
+                                  is_unit_based_traded_volume=is_unit_based_traded_volume,
                                   add_total=False,
                                   time_period=time_period)
             data = data.sum(0)
-            #print(f"total costs, is_unit_based_traded_volume={is_unit_based_traded_volume} = {np.nansum(data)}")
+            # print(f"total costs, is_unit_based_traded_volume={is_unit_based_traded_volume} = {np.nansum(data)}")
         elif attribution_metric == AttributionMetric.TURNOVER:
             data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
                                      add_total=False,
                                      time_period=time_period)
             an = qis.infer_an_from_data(data=data)
-            data = an*data.mean(0)
-            #print(f"total turnover = {np.nansum(data)}")
+            data = an * data.mean(0)
+            # print(f"total turnover = {np.nansum(data)}")
         elif attribution_metric == AttributionMetric.VOL_ADJUSTED_TURNOVER:
             data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
                                      add_total=False, is_vol_adjusted=True,
@@ -683,7 +683,8 @@ class PortfolioData:
         distributions_by_instrument_yield = distributions_by_instrument.divide(nav, axis=0)
         # resample at 'ME' and compute rolling sum
         distributions_by_instrument_yield_freq = distributions_by_instrument_yield.resample(div_rolling_freq).sum()
-        distributions_by_instrument_yield_rolling = distributions_by_instrument_yield_freq.fillna(0.0).rolling(div_rolling_period).sum()
+        distributions_by_instrument_yield_rolling = distributions_by_instrument_yield_freq.fillna(0.0).rolling(
+            div_rolling_period).sum()
         # find total distributions
         distribution_yield = distributions_by_instrument_yield_freq.sum(1)
         distribution_yield_rolling = distributions_by_instrument_yield_rolling.sum(1)
@@ -712,7 +713,8 @@ class PortfolioData:
                                                                             group_data=group_data,
                                                                             group_order=group_order,
                                                                             freq=freq,
-                                                                            vol_span=vol_span,  # span in number of freq-returns
+                                                                            vol_span=vol_span,
+                                                                            # span in number of freq-returns
                                                                             total_column=total_column,
                                                                             time_period=time_period)
             instrument_vars = None
@@ -722,10 +724,42 @@ class PortfolioData:
                                                                                           group_data=group_data,
                                                                                           group_order=group_order,
                                                                                           freq=freq,
-                                                                                          vol_span=vol_span,  # span in number of freq-returns
+                                                                                          vol_span=vol_span,
+                                                                                          # span in number of freq-returns
                                                                                           total_column=total_column,
                                                                                           time_period=time_period)
         return portfolio_vars, instrument_vars
+
+    def compute_ex_anti_portfolio_vol_implied_by_covar(self,
+                                                       covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
+                                                       align_with_covar_dates: bool = True,
+                                                       freq: Optional[str] = None
+                                                       ) -> pd.Series:
+        """
+        compute portfolio ex-anti portfolio vol using covar_dict
+        """
+        if covar_dict is None:
+            if self.covar_dict is None:
+                raise ValueError(f"must provide covar_dict")
+            else:
+                covar_dict = self.covar_dict
+        strategy_weights = self.get_weights(freq=freq, is_input_weights=True)
+        covar_index = list(covar_dict.keys())
+        portfolio_vol = {}
+        if align_with_covar_dates:
+            strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
+            for date, pd_covar in covar_dict.items():
+                w = strategy_weights.loc[date]
+                portfolio_vol[date] = np.sqrt(w.T @ pd_covar @ w)
+        else:
+            for date, weights in strategy_weights.to_dict(orient='index').items():
+                last_covar_update_date = qis.find_upto_date_from_datetime_index(index=covar_index, date=date)
+                if last_covar_update_date is not None:
+                    w = pd.Series(weights).fillna(0.0)
+                    pd_covar = covar_dict[last_covar_update_date]
+                    portfolio_vol[date] = np.sqrt(w.T @ pd_covar @ w)
+        portfolio_vol = pd.Series(portfolio_vol, name=self.ticker)
+        return portfolio_vol
 
     def compute_risk_contributions_implied_by_covar(self,
                                                     covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
@@ -1152,18 +1186,25 @@ class PortfolioData:
                                      time_period: TimePeriod = None,
                                      attribution_metric: AttributionMetric = AttributionMetric.PNL,
                                      add_top_bar_values: Optional[bool] = None,
-                                     remove_zero_data: bool = False,
+                                     remove_zero_data: bool = True,
+                                     shorten_instrument_names: bool = True,
                                      ax: plt.Subplot = None,
                                      **kwargs
                                      ) -> None:
         """
         performance attribution for p&l and risk
+        shorten_instrument_names: keep 15 strings to improve axis alignment
         """
         data = self.get_performance_attribution_data(attribution_metric=attribution_metric,
                                                      time_period=time_period,
                                                      **kwargs)
         if remove_zero_data:
-            data = data.replace({0.0: np.nan}).dropna()
+            # data = data.replace({0.0: np.nan}).dropna()
+            data[np.isclose(data, 0.0)] = np.nan
+            data = data.dropna()
+
+        if shorten_instrument_names:
+            data.index = [x[:15] for x in data.index]
 
         if add_top_bar_values is None:
             if isinstance(data, pd.Series) and len(data.index) <= 20:
@@ -1459,7 +1500,7 @@ class PortfolioData:
                                 axs: List[plt.Subplot] = None,
                                 **kwargs
                                 ):
-        distributions_by_instrument_yield_12m, distribution_yield, distribution_yield_12m =\
+        distributions_by_instrument_yield_12m, distribution_yield, distribution_yield_12m = \
             self.compute_distribution_yield(paid_dividends=paid_dividends,
                                             time_period=time_period,
                                             div_rolling_freq=div_rolling_freq,

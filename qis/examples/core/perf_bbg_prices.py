@@ -60,11 +60,27 @@ def run_report():
         'BNPXLVRU Index': 'BNP Long Rates Vol USD'
     }
 
+    benchmark = 'SPTR Index'
+    tickers = {
+        benchmark: benchmark,
+        'AIJPMT1U Index': 'JPM Macro Trend',
+        'AIJPLT3U Index': 'JPM Cross Trend',
+        'AIJPXSK1 Index': 'JPM XA Skeweness',
+        'NEIXCTAT Index': 'SG Trend'
+    }
+
+    benchmark = 'SPTR Index'
+    tickers = {
+        benchmark: benchmark,
+        'JPQGM4W1 Index': 'JPM Factor1',
+        'JPQTR4W1 Index': 'JPM Factor2'
+    }
+
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2021', '17Apr2025')
+    time_period = qis.TimePeriod('31Dec2019', '06Jun2025')
     # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
     # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
     kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD, add_rates_data=False)

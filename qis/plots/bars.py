@@ -233,6 +233,8 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
                xmin_shift: Optional[float] = None,  # add shift to x-axis to left
                add_bar_value_at_mid: bool = True,
                add_total_bar: bool = True,
+               total_bar_linewidth: int = 2,
+               total_bar_linestyle: str = '-',
                add_total_to_index: bool = False,
                add_total_to_left: bool = False,
                is_category_names_colors: bool = True,
@@ -240,10 +242,14 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
                x_limits: Tuple[Union[float, None], Union[float, None]] = None,
                reverse_columns: bool = True,
                rows_edge_lines: List[int] = None,
+               axvline_color: Optional[str] = 'orange',
+               xlabel: str = None,
                ax: plt.Subplot = None,
                **kwargs
                ) -> plt.Figure:
-
+    """
+    adopted for vertical bars
+    """
     if isinstance(df, pd.Series):
         df = df.to_frame()
     category_names = df.columns.to_list()
@@ -251,23 +257,28 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     if add_total_to_index and totals is not None:
         df.index = [f"{x} {var_format.format(total)}" for x, total in zip(df.index, totals)]
 
+    # plot results = {index, column data as list}
     results = {rdata[0]: rdata[1].to_list() for rdata in df.iterrows()}
 
     labels = list(results.keys())
     np_data = np.array(list(results.values()))
-    totals = np.sum(np_data, axis=1)
+    if totals is None:
+        totals = np.sum(np_data, axis=1)
 
     if colors is None:
-        if is_category_names_colors:
+        if is_category_names_colors:  # heatmap for  color bars
             if len(df.columns) == 1:
-                colors = put.compute_heatmap_colors(a=df.to_numpy())
+                colors = put.compute_heatmap_colors(a=df.to_numpy(), axis=0)
             else:
                 colors = put.compute_heatmap_colors(a=np.sum(df.to_numpy(), axis=1))
-        else:
+        else:  # same colors for all bars
             colors = put.get_n_colors(n=len(df.columns))
     else:
-        legend_colors = colors
-        colors = np.tile(colors, len(category_names))
+        if is_category_names_colors:  # same colors for all bars
+            legend_colors = colors
+            colors = np.tile(colors, len(category_names))
+        else:  # colors are given for each index
+            pass
 
     if ax is None:
         height = put.calc_table_height(num_rows=len(df.index), scale=0.30)
@@ -355,7 +366,8 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
 
     if add_total_bar:
         for idx, total in enumerate(totals):
-            ax.vlines(x=total, ymin=idx-0.25, ymax=idx+0.25, linestyle='-', color='black', linewidth=2)
+            ax.vlines(x=total, ymin=idx-0.25, ymax=idx+0.25, linestyle=total_bar_linestyle, color='black',
+                      linewidth=total_bar_linewidth)
 
     if add_total_to_left:
         widths = np.nansum(np.where(np_data > 0.0, np_data, 0.0), axis=1)
@@ -372,12 +384,19 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     if legend_colors is not None:
         legend_colors = legend_colors
     else:
-        legend_colors = colors
+        if is_category_names_colors: # cannot define on heatmap
+            legend_colors = None
+        else:
+            legend_colors = colors
 
     # reverse
     if reverse_columns:
         legend_labels = legend_labels[::-1]
-        legend_colors = legend_colors[::-1]
+        if legend_colors is not None:
+            legend_colors = legend_colors[::-1]
+
+    # remove padding
+    ax.margins(y=0.01)
 
     put.set_legend(ax=ax,
                    labels=legend_labels,
@@ -387,6 +406,7 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
                    bbox_to_anchor=bbox_to_anchor,
                    fontsize=fontsize,
                    **kwargs)
+
     # increase line width
     for line in ax.get_legend().get_lines():
         line.set_linewidth(5.0)
@@ -396,7 +416,8 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
 
     # ax.xaxis.set_visible(False)
     ax.grid(zorder=0, axis='x')
-    ax.axvline(x=0, linewidth=2, color='orange')
+    if axvline_color is not None:
+        ax.axvline(x=0, linewidth=2, color=axvline_color)
 
     x_labels = [var_format.format(x) for x in ax.get_xticks()]
     put.set_ax_tick_labels(ax=ax,
@@ -405,6 +426,9 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
                            fontsize=fontsize,
                            x_rotation=x_rotation,
                            **kwargs)
+
+    if xlabel is not None:
+        put.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=None, fontsize=fontsize, **kwargs)
 
     put.set_spines(ax=ax, **kwargs)
 

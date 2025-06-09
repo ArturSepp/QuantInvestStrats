@@ -611,6 +611,26 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                      hue_var_name='Sub-Asset Class',
                                                      var_format=var_format,
                                                      **kwargs)
+        # portfolio vol
+        strategy_ex_anti_vol = strategy_data.compute_ex_anti_portfolio_vol_implied_by_covar(
+            covar_dict=multi_portfolio_data.covar_dict)
+        benchmark_ex_anti_vol = benchmark_data.compute_ex_anti_portfolio_vol_implied_by_covar(
+            covar_dict=multi_portfolio_data.covar_dict)
+
+        ex_anti_vols = pd.concat([strategy_ex_anti_vol, benchmark_ex_anti_vol], axis=1)
+        dfs['ex_anti_vols'] = ex_anti_vols
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+        if add_titles:
+            qis.set_suptitle(fig, title=f"Ex-anti portfolio volatility")
+        figs['ex_anti_vols'] = fig
+        qis.plot_time_series(df=ex_anti_vols,
+                             var_format='{:.2%}',
+                             ax=ax,
+                             **kwargs)
+        if regime_benchmark is not None:
+            multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
+                                                    index=ex_anti_vols.index, regime_params=regime_params)
+
         # risk contributions
         rc_kwargs = dict(covar_dict=multi_portfolio_data.covar_dict, freq='QE', normalise=True)
         strategy_risk_contributions_ac = strategy_data.compute_risk_contributions_implied_by_covar(

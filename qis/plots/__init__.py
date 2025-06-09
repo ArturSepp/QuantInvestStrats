@@ -47,7 +47,8 @@ from qis.plots.utils import (
     get_df_table_size,
     reset_xticks,
     set_labels_frequency,
-    scale_ax_bar_width
+    scale_ax_bar_width,
+    get_table_lines_for_group_data
 )
 
 from qis.plots.bars import plot_bars, plot_vbars

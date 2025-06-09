@@ -191,6 +191,7 @@ class PerfParams:
     """
     freq: str = None
     freq_vol: str = 'ME'  # volatility of Sharpe
+    freq_skeweness: str = 'ME'  # volatility of skeweness
     freq_drawdown: str = 'D'
     freq_reg: str = 'QE'  # for quadratic/linear regressions
     freq_excess_return: str = 'ME'
