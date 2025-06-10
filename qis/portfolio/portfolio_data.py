@@ -749,14 +749,15 @@ class PortfolioData:
         if align_with_covar_dates:
             strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
             for date, pd_covar in covar_dict.items():
-                w = strategy_weights.loc[date]
+                # align with covar matrix
+                w = strategy_weights.loc[date].reindex(index=pd_covar.columns).fillna(0.0)
                 portfolio_vol[date] = np.sqrt(w.T @ pd_covar @ w)
         else:
             for date, weights in strategy_weights.to_dict(orient='index').items():
                 last_covar_update_date = qis.find_upto_date_from_datetime_index(index=covar_index, date=date)
                 if last_covar_update_date is not None:
-                    w = pd.Series(weights).fillna(0.0)
                     pd_covar = covar_dict[last_covar_update_date]
+                    w = pd.Series(weights).reindex(index=pd_covar.columns).fillna(0.0)
                     portfolio_vol[date] = np.sqrt(w.T @ pd_covar @ w)
         portfolio_vol = pd.Series(portfolio_vol, name=self.ticker)
         return portfolio_vol

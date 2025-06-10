@@ -169,7 +169,8 @@ def plot_backfill_history(backfill_data: pd.DataFrame,
     fig.update_layout(
         autosize=False,
         width=1000,
-        height=1000,
+        height=1100,
+        yaxis=dict(tickfont=dict(size=10)),
         margin=dict(
             l=50,
             r=50,
