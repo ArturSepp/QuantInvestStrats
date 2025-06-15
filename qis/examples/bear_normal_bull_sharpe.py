@@ -16,7 +16,18 @@ regime_classifier = qis.BenchmarkReturnsQuantilesRegime(regime_params=regime_par
 
 # regime diversification
 with sns.axes_style("darkgrid"):
-    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+    fig, axs = plt.subplots(1, 2, figsize=(16, 7))
+
+    qis.plot_prices(prices=prices,
+                    perf_params=perf_params,
+                    is_log=False,
+                    ax=axs[0])
+    qis.add_bnb_regime_shadows(ax=axs[0],
+                               data_df=prices,
+                               pivot_prices=prices[regime_benchmark],
+                               benchmark=regime_benchmark,
+                               regime_params=regime_params)
+
     title = f"Sharpe ratio split to {regime_benchmark} Bear/Normal/Bull {regime_params.freq}-freq regimes"
     qis.plot_regime_data(regime_classifier=regime_classifier,
                          prices=prices,
@@ -27,7 +38,7 @@ with sns.axes_style("darkgrid"):
                          perf_params=perf_params,
                          drop_benchmark=False,
                          title=title,
-                         ax=ax)
+                         ax=axs[1])
 
 # smart diversification curves
 sd_report = qis.SmartDiversificationReport(principal_nav=prices[regime_benchmark],
