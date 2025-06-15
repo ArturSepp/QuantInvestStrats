@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple, Literal
+from typing import Dict, Optional, Tuple, Literal, Union
 from enum import Enum
 
 # qis
@@ -26,10 +26,14 @@ class LinearModel:
     y =  loadings^T @ x
     """
     x: pd.DataFrame  # t, x_n factors
-    y: pd.DataFrame  # t, y_m factors
+    y: Union[pd.DataFrame, pd.Series]  # t, y_m factors
     loadings: Dict[str, pd.DataFrame] = None  # estimated factor loadings
 
     def __post_init__(self):
+
+        if isinstance(self.y, pd.Series):
+            self.y = self.y.to_frame()
+
         if self.loadings is not None:
             str_factors = list(self.loadings.keys())
             assert str_factors == self.x.columns.to_list()

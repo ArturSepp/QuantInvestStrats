@@ -28,7 +28,7 @@ class RegimeType(Enum):
 class RegimeData(Enum):
     REGIME_AVG = 'Average'
     REGIME_PA = 'P.a.'
-    REGIME_SHARPE = 'Sharpe'
+    REGIME_SHARPE = '-Sharpe'
 
 
 class PerfStat(ColVar, Enum):
@@ -85,9 +85,9 @@ class PerfStat(ColVar, Enum):
     NORMAL_PA = ColVar(name='Normal P.a.', short_n='Normal\nP.a.', value_type=ValueType.PERCT)
     BULL_PA = ColVar(name='Bull P.a.', short_n='Bull\nP.a.', value_type=ValueType.PERCT)
 
-    BEAR_SHARPE = ColVar(name='Bear Sharpe', short_n='Bear\nSharpe', value_type=ValueType.SHARPE)
-    NORMAL_SHARPE = ColVar(name='Normal Sharpe', short_n='Normal\nSharpe', value_type=ValueType.SHARPE)
-    BULL_SHARPE = ColVar(name='Bull Sharpe', short_n='Bull\nSharpe', value_type=ValueType.SHARPE)
+    BEAR_SHARPE = ColVar(name='Bear-Sharpe', short_n='Bear-\nSharpe', value_type=ValueType.SHARPE)
+    NORMAL_SHARPE = ColVar(name='Normal-Sharpe', short_n='Normal-\nSharpe', value_type=ValueType.SHARPE)
+    BULL_SHARPE = ColVar(name='Bull-Sharpe', short_n='Bull-\nSharpe', value_type=ValueType.SHARPE)
 
     BEAR_CORR = ColVar(name='Bear Correlation', short_n='Bear\nCorrelation', value_type=ValueType.FLOAT)
     NORMAL_CORR = ColVar(name='Normal Correlation', short_n='Normal\nCorrelation', value_type=ValueType.FLOAT)

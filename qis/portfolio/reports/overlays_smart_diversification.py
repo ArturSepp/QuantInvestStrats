@@ -418,7 +418,7 @@ def create_overlay_portfolio_curve(principal_nav: pd.Series,
                                    principal_weight: float = 1.0,
                                    max_overlay_weight: float = 1.0,
                                    rebalancing_freq: str = 'QE',
-                                   is_principal_weight_fixed: bool = True,
+                                   is_principal_weight_fixed: bool = True
                                    ) -> pd.DataFrame:
     """
     compute overlays for weights from 0% to 100%
