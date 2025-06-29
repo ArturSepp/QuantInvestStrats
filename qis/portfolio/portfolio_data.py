@@ -732,7 +732,6 @@ class PortfolioData:
 
     def compute_ex_anti_portfolio_vol_implied_by_covar(self,
                                                        covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
-                                                       align_with_covar_dates: bool = True,
                                                        freq: Optional[str] = None
                                                        ) -> pd.Series:
         """
@@ -743,10 +742,11 @@ class PortfolioData:
                 raise ValueError(f"must provide covar_dict")
             else:
                 covar_dict = self.covar_dict
-        strategy_weights = self.get_weights(freq=freq, is_input_weights=True)
+        is_input_weights = True if freq is None else False
+        strategy_weights = self.get_weights(freq=freq, is_input_weights=is_input_weights)
         covar_index = list(covar_dict.keys())
         portfolio_vol = {}
-        if align_with_covar_dates:
+        if freq is None:  # align with covar
             strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
             for date, pd_covar in covar_dict.items():
                 # align with covar matrix
@@ -766,7 +766,6 @@ class PortfolioData:
                                                     covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
                                                     group_data: pd.Series = None,
                                                     group_order: List[str] = None,
-                                                    align_with_covar_dates: bool = True,
                                                     freq: Optional[str] = None,
                                                     normalise: bool = False
                                                     ) -> pd.DataFrame:
@@ -778,10 +777,11 @@ class PortfolioData:
                 raise ValueError(f"must provide covar_dict")
             else:
                 covar_dict = self.covar_dict
-        strategy_weights = self.get_weights(freq=freq, is_input_weights=True)
+        is_input_weights = True if freq is None else False
+        strategy_weights = self.get_weights(freq=freq, is_input_weights=is_input_weights)
         covar_index = list(covar_dict.keys())
         strategy_rc = {}
-        if align_with_covar_dates:
+        if freq is None:  # align with covar dates
             strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
             for date, pd_covar in covar_dict.items():
                 strategy_rc[date] = compute_portfolio_risk_contributions(w=strategy_weights.loc[date], covar=pd_covar)
