@@ -938,6 +938,54 @@ class MultiPortfolioData:
             **kwargs)
         return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inters
 
+    def get_grouped_weights(self,
+                            is_input_weights: bool = True,
+                            time_period: TimePeriod = None,
+                            group_data: pd.Series = None,
+                            freq: str = 'W-WED',
+                            group_order: List[str] = None
+                            ) -> Dict[str, pd.DataFrame]:
+        """
+        compute dictionary of ac weights
+        each portfolio may have different group data and group order
+        """
+        ac_weights_by_portfolios = {}
+        group_set = []  # keep track of groups
+        for portfolio in self.portfolio_datas:
+            weights = portfolio.get_weights(is_input_weights=is_input_weights, time_period=time_period, freq=freq)
+            if group_data is None:
+                group_data_ = portfolio.group_data
+            else:
+                group_data_ = group_data
+            if group_order is None:
+                group_order_ = portfolio.group_order
+            else:
+                group_order_ = group_order
+            group_set.append(list(np.unique(group_data_.to_list())))
+            ac_weights_by_portfolios[portfolio.ticker] = dfg.agg_df_by_groups_ax1(df=weights,
+                                                                                  group_data=group_data_,
+                                                                                  agg_func=np.nansum,
+                                                                                  total_column=None,
+                                                                                  group_order=group_order_)
+        data_groups = set(sop.to_flat_list(group_set))
+        if group_order is not None:
+            groups = sop.merge_lists_unique(list1=group_order, list2=data_groups)
+        else:
+            groups = data_groups
+        ac_weights_by_groups = {group: [] for group in groups}
+
+        # append portfolio by group weights as series
+        for group in groups:
+            for portfolio in self.portfolio_datas:
+                this = ac_weights_by_portfolios[portfolio.ticker]
+                if group in this.columns:
+                    ac_weights_by_groups[group].append(this[group].rename(portfolio.ticker))
+        weights_by_groups = {}
+        for group in groups:
+            if len(ac_weights_by_groups[group]) > 0:
+                weights_by_groups[group] = pd.concat(ac_weights_by_groups[group], axis=1)
+        return weights_by_groups
+
     def plot_weights_boxplot(self,
                              strategy_idx: int = 0,
                              benchmark_idx: int = 1,

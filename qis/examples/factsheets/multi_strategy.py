@@ -77,7 +77,10 @@ def run_unit_test(unit_test: UnitTests):
                                                                  vol_target=0.15,
                                                                  rebalancing_costs=0.0010  # per traded volume
                                                                  )
+        weights = multi_portfolio_data.get_grouped_weights(group_data=group_data)
+        print(weights)
 
+        return
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period,
                                                   add_group_exposures_and_pnl=True,

@@ -25,6 +25,7 @@ def plot_scatter(df: pd.DataFrame,
                  title: Optional[str] = None,
                  annotation_labels: List[str] = None,
                  annotation_colors: List[str] = None,
+                 annotation_markers: List[str] = None,
                  annotation_color: Optional[str] = 'red',
                  add_universe_model_label: bool = True,
                  add_universe_model_prediction: bool = False,
@@ -185,14 +186,17 @@ def plot_scatter(df: pd.DataFrame,
             colors = len(df.index) * [annotation_color]
         else:
             colors = df['color']
-        for label, x_, y_, color in zip(annotation_labels, df[x], df[y], colors):
+        if annotation_markers is None:
+            annotation_markers = len(df.index) * ['o']
+
+        for label, x_, y_, color, marker in zip(annotation_labels, df[x], df[y], colors, annotation_markers):
             ax.annotate(label,
                         xy=(x_, y_), xytext=(1, 1),
                         textcoords='offset points', ha='left', va='bottom',
                         color=color,
                         fontsize=fontsize)
             if label != '':
-                ax.scatter(x=x_, y=y_, c=color, s=20)
+                ax.scatter(x=x_, y=y_, c=color, s=20, marker=marker)
 
     if add_45line:  # make equal:
         ymin, ymax = ax.get_ylim()

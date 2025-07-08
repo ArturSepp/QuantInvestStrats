@@ -40,6 +40,28 @@ with sns.axes_style("darkgrid"):
                          title=title,
                          ax=axs[1])
 
+# scatter plot
+with sns.axes_style("darkgrid"):
+    fig, axs = plt.subplots(1, 2, figsize=(16, 7))
+
+    qis.plot_ra_perf_scatter(prices=prices,
+                             benchmark=regime_benchmark,
+                             x_var=qis.PerfStat.VOL,
+                             y_var=qis.PerfStat.PA_RETURN,
+                             annotation_labels=prices.columns.to_list(),
+                             title=f"Total return vs vol",
+                             ci=None,
+                             ax=axs[0])
+    qis.plot_ra_perf_scatter(prices=prices,
+                             benchmark=regime_benchmark,
+                             x_var=qis.PerfStat.BEAR_SHARPE,
+                             y_var=qis.PerfStat.SHARPE_RF0,
+                             annotation_labels=prices.columns.to_list(),
+                             title=f"Total Sharpe vs Bear-Sharpe",
+                             ci=None,
+                             ax=axs[1])
+
+
 # smart diversification curves
 sd_report = qis.SmartDiversificationReport(principal_nav=prices[regime_benchmark],
                                            overlay_navs=prices.drop(regime_benchmark, axis=1),

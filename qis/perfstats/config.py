@@ -77,6 +77,7 @@ class PerfStat(ColVar, Enum):
     BEST = ColVar(name='Best', short_n='Best', value_type=ValueType.PERCT)
     POSITIVE = ColVar(name='Positive', short_n='Positive', value_type=ValueType.PERCT)
 
+    # regime conditional performances
     BEAR_AVG = ColVar(name='Bear Avg', short_n='Bear\nAvg', value_type=ValueType.PERCT)
     NORMAL_AVG = ColVar(name='Normal Avg', short_n='Normal\nAvg', value_type=ValueType.PERCT)
     BULL_AVG = ColVar(name='Bull Avg', short_n='Bull\nAvg', value_type=ValueType.PERCT)
@@ -89,11 +90,7 @@ class PerfStat(ColVar, Enum):
     NORMAL_SHARPE = ColVar(name='Normal-Sharpe', short_n='Normal-\nSharpe', value_type=ValueType.SHARPE)
     BULL_SHARPE = ColVar(name='Bull-Sharpe', short_n='Bull-\nSharpe', value_type=ValueType.SHARPE)
 
-    BEAR_CORR = ColVar(name='Bear Correlation', short_n='Bear\nCorrelation', value_type=ValueType.FLOAT)
-    NORMAL_CORR = ColVar(name='Normal Correlation', short_n='Normal\nCorrelation', value_type=ValueType.FLOAT)
-    BULL_CORR = ColVar(name='Bull Correlation', short_n='Bull\nCorrelation', value_type=ValueType.FLOAT)
-    TOTAL_CORR = ColVar(name='Total Correlation', short_n='Total\nCorrelation', value_type=ValueType.FLOAT)
-
+    # stats related
     AVG = ColVar(name='Avg', short_n='Avg', value_type=ValueType.FLOAT)
     T_STAT = ColVar(name='T-stat', short_n='T-stat', value_type=ValueType.FLOAT)
     STD = ColVar(name='Std', short_n='Std', value_type=ValueType.FLOAT)
@@ -118,9 +115,13 @@ class PerfStat(ColVar, Enum):
     ALPHA_PVALUE = ColVar(name='p-Alpha', short_n='p-Alpha', value_type=ValueType.FLOAT2)
 
 
-"""
-Most common table columns
-"""
+# regime conditional vars
+REGIME_CONDITIONAL_PERFS = (PerfStat.BEAR_AVG, PerfStat.NORMAL_AVG, PerfStat.BULL_AVG,
+                            PerfStat.BEAR_PA, PerfStat.NORMAL_PA, PerfStat.BULL_PA,
+                            PerfStat.BEAR_SHARPE, PerfStat.NORMAL_SHARPE, PerfStat.BULL_SHARPE)
+
+
+#  Most common table columns
 
 FULL_TABLE_COLUMNS = (PerfStat.START_DATE,
                       PerfStat.END_DATE,

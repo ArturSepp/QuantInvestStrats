@@ -61,7 +61,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     if isinstance(benchmark_prices, pd.Series):
         benchmark_prices = benchmark_prices.to_frame()
 
-    benchmark_prices = benchmark_prices.reindex(index=portfolio_data.nav.index, method='ffill')
+    benchmark_prices = benchmark_prices.sort_index().reindex(index=portfolio_data.nav.index, method='ffill')
     if regime_benchmark is None:
         regime_benchmark = benchmark_prices.columns[0]
 

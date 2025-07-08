@@ -207,13 +207,15 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
                      folder_name: str = None,
                      key: str = None,
                      add_current_date: bool = False,
-                     sheet_names: List[str] = None,
+                     sheet_names: Union[List[str], str] = None,
                      transpose: bool = False,
                      if_sheet_exists: Optional[Literal['error', 'new', 'replace', 'overlay']] = 'replace'
                      ) -> str:
     """
     pandas or list of pandas to one excel
     if_sheet_exists only for append mode
+    mode = w: write new file
+    mode = a: append to existing file
     """
     if mode == 'w':
         if_sheet_exists = None
@@ -249,7 +251,14 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
         if transpose:
             data = data.T
         data = delocalize_df(data)
-        data.to_excel(excel_writer=excel_writer)
+        if sheet_names is not None:
+            if isinstance(sheet_names, str):
+                sheet_name = sheet_names
+            else:
+                sheet_name = sheet_names[0]
+        else:
+            sheet_name = 'Sheet1'
+        data.to_excel(excel_writer=excel_writer, sheet_name=sheet_name)
 
     excel_writer.close()
 
@@ -548,7 +557,7 @@ def save_df_dict_to_sql(engine: Engine,
             if if_exists == "truncate-append":
                 schema_str = f"{schema}." if schema else ""
                 with engine.connect() as con:
-                    statement = text(f"TRUNCATE TABLE {schema_str}{table_name}_{key}")
+                    statement = f"TRUNCATE TABLE {schema_str}{table_name}_{key}"
                     con.execute(statement)
                     con.commit()
                 df.to_sql(

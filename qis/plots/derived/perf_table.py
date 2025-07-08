@@ -9,14 +9,14 @@ import qis.utils.dates as da
 import qis.utils.df_str as dfs
 import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
-from qis.perfstats.config import PerfStat, PerfParams
+from qis.perfstats.config import PerfStat, PerfParams, REGIME_CONDITIONAL_PERFS
 import qis.perfstats.perf_stats as rpt
 import qis.plots.scatter as psc
 import qis.plots.table as ptb
 import qis.plots.utils as put
 from qis.plots.bars import plot_bars, plot_vbars
-from qis.perfstats.regime_classifier import RegimeClassifier, BenchmarkReturnsQuantileRegimeSpecs, \
-    BenchmarkReturnsQuantilesRegime, VolQuantileRegimeSpecs, BenchmarkVolsQuantilesRegime, compute_bnb_regimes_pa_perf_table
+from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs, compute_bnb_regimes_pa_perf_table
+
 
 def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                         perf_params: PerfParams = None,
@@ -144,7 +144,7 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
     if not drop_benchmark and special_rows_colors is None:
         special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
     kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
-    
+
     if df_to_add is not None:
         df_to_add = df_to_add.reindex(index=ra_perf_table.index)
         if is_convert_to_str:
@@ -169,7 +169,6 @@ def plot_ra_perf_bars(prices: pd.DataFrame,
                       ax: plt.Subplot = None,
                       **kwargs
                       ) -> plt.Figure:
-
     if benchmark is None:
         ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
     else:
@@ -199,13 +198,15 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
                          regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
                          x_var: PerfStat = PerfStat.MAX_DD,
                          y_var: PerfStat = PerfStat.PA_RETURN,
+                         x_var_multiplicative_adjustment: pd.Series = None,
+                         y_var_multiplicative_adjustment: pd.Series = None,
                          hue_data: pd.Series = None,
                          yvar_format: str = None,
                          x_filters: Tuple[Optional[float], Optional[float]] = None,
                          order: int = 1,
+                         full_sample_order: int = 1,
                          add_universe_model_label: bool = True,
                          ci: Optional[int] = 95,
-                         compute_regime_sharpes: bool = False,
                          drop_benchmark: bool = False,
                          ax: plt.Subplot = None,
                          **kwargs
@@ -213,9 +214,9 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
     """
     scatter plot of performance stats
     """
-    if compute_regime_sharpes:
+    if x_var in REGIME_CONDITIONAL_PERFS or y_var in REGIME_CONDITIONAL_PERFS:
         if benchmark is None and benchmark_price is None:
-            raise ValueError(f"benchmark or benchmark_price must be given")
+            raise ValueError(f"benchmark or benchmark_price must be given for regime conditional performance")
         ra_perf_table = compute_bnb_regimes_pa_perf_table(prices=prices,
                                                           benchmark=benchmark,
                                                           benchmark_price=benchmark_price,
@@ -234,12 +235,17 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
         else:
             ra_perf_table = rpt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
 
-    xy = ra_perf_table[[x_var.to_str(), y_var.to_str()]]
+    xy = ra_perf_table[[x_var.to_str(), y_var.to_str()]].copy()
+    if x_var_multiplicative_adjustment is not None:
+        xy[x_var.to_str()] *= x_var_multiplicative_adjustment
+    if y_var_multiplicative_adjustment is not None:
+        xy[y_var.to_str()] *= y_var_multiplicative_adjustment
+
     if x_filters is not None:
         if x_filters[0] is not None:
-            xy = xy.iloc[xy[x_var.to_str()].to_numpy()>x_filters[0], :]
+            xy = xy.iloc[xy[x_var.to_str()].to_numpy() > x_filters[0], :]
         if x_filters[1] is not None:
-            xy = xy.iloc[xy[x_var.to_str()].to_numpy()<x_filters[1], :]
+            xy = xy.iloc[xy[x_var.to_str()].to_numpy() < x_filters[1], :]
 
     # fu.save_df_to_excel(xy, file_name='xy')
     if hue_data is not None:
@@ -253,6 +259,7 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
                            yvar_format=yvar_format or y_var.to_format(**kwargs),
                            add_universe_model_label=add_universe_model_label,
                            order=order,
+                           full_sample_order=full_sample_order,
                            ci=ci,
                            ax=ax,
                            **kwargs)
@@ -315,10 +322,10 @@ def plot_ra_perf_annual_matrix(price: pd.Series,
     yearly_dfs = {}
     for idx, start in enumerate(dates_schedule[:-min_lag]):
         yearly_df = {}
-        for idxx, end in enumerate(dates_schedule[idx+min_lag:]):
+        for idxx, end in enumerate(dates_schedule[idx + min_lag:]):
             price_ = da.TimePeriod(start, end).locate(price)
             ra_perf_table = rpt.compute_ra_perf_table(prices=price_, perf_params=perf_params)
-            #print(f"{start} to {end}")
+            # print(f"{start} to {end}")
             # yearly_df[end.strftime(date_format)] = f"{start} to {end}"
             if is_shift_by_day:
                 this = da.shift_date_by_day(date=end, backward=False)
@@ -356,7 +363,6 @@ def plot_desc_freq_table(df: pd.DataFrame,
                          ax: plt.Subplot = None,
                          **kwargs
                          ) -> plt.Figure:
-
     data_table = rpt.compute_desc_freq_table(df=df,
                                              freq=freq,
                                              agg_func=agg_func)
@@ -384,7 +390,7 @@ def plot_top_bottom_performers(prices: pd.DataFrame,
                                ) -> Optional[plt.Subplot]:
     returns = ret.to_total_returns(prices=prices).sort_values().dropna()
 
-    if num_assets is not None and len(returns.index) > 2*num_assets:
+    if num_assets is not None and len(returns.index) > 2 * num_assets:
         returns = pd.concat([returns.iloc[:num_assets], returns.iloc[-num_assets:]])
 
     fig = plot_bars(df=returns,
@@ -410,7 +416,7 @@ def plot_best_worst_returns(price: pd.Series,
                             ) -> Optional[plt.Subplot]:
     returns = ret.to_returns(price, freq=freq).sort_values().dropna()
 
-    if len(returns.index) > 2*num_returns:
+    if len(returns.index) > 2 * num_returns:
         returns = pd.concat([returns.iloc[:num_returns], returns.iloc[-num_returns:]])
 
     returns.index = [t.strftime(date_format) for t in returns.index]
@@ -440,7 +446,6 @@ class UnitTests(Enum):
 
 
 def run_unit_test(unit_test: UnitTests):
-
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
     print(prices)
