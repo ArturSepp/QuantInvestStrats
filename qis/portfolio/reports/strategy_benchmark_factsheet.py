@@ -33,7 +33,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               add_grouped_cum_pnl: bool = False,  # for strategy factsheet
                                               add_tracking_error_table: bool = False,
                                               add_exposures_comp: bool = False,
-                                              is_grouped: Optional[bool] = None,
+                                              is_grouped: Optional[bool] = True,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 5,
                                               heatmap_fontsize: int = 4,
@@ -42,6 +42,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     """
     report designed for 1 strategy and 1 benchmark report using matplotlib figure
     multi_portfolio_data = [stragegy portfolio, benchmark strategy portfolio]
+    is_grouped sets report of annual returns by asset classes or portfolio instruments if their number is less than 10
     1 page: generate the stragegy portfolio factsheet
     2 page: generate the comparision to benchmark
     """
@@ -53,6 +54,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
             is_grouped = True
         else:
             is_grouped = False
+    else:
+        if is_grouped is False:
+            if len(multi_portfolio_data.portfolio_datas[0].get_weights().columns) >= 10:  # tables look too bad
+                is_grouped = True
 
     # set reporting time period here
     if time_period is None:

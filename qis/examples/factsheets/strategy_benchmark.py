@@ -163,7 +163,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.TRACKING_ERROR
+    unit_test = UnitTests.STRATEGY_BENCHMARK_PLT
 
     is_run_all_tests = False
     if is_run_all_tests:
