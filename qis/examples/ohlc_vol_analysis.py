@@ -22,7 +22,7 @@ def fetch_hf_ohlc(ticker: str = 'SPY',
     asset = yf.Ticker(ticker)
     if interval == '1d':  # close to close
         # ohlc_data = asset.history(period="730d", interval='1d')
-        ohlc_data = yf.download(tickers=ticker, start=None, end=None, ignore_tz=True)
+        ohlc_data = yf.download(tickers=ticker, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)
         ohlc_data.index = ohlc_data.index.tz_localize('UTC')
     elif interval == '1h':
         ohlc_data = asset.history(period="730d", interval="1h")

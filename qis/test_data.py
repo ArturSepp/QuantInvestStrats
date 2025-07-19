@@ -27,8 +27,7 @@ def run_unit_test(unit_test: UnitTests):
 
     if unit_test == UnitTests.ETF_PRICES:
         prices = yf.download(tickers=['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD'],
-                             start=None, end=None,
-                             ignore_tz=True)['Close']
+                             start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close']
         print(prices)
         fu.save_df_to_csv(df=prices, file_name='etf_prices', local_path=RESOURCE_PATH)
 

@@ -482,7 +482,7 @@ def np_nonan_weighted_avg(a: np.ndarray, weights: np.ndarray) -> float:
 
 def set_nans_for_warmup_period(a: Union[np.ndarray, pd.DataFrame],
                                warmup_period: Union[int, np.ndarray]
-                               ) -> Union[int, np.ndarray]:
+                               ) -> Union[np.ndarray, pd.DataFrame]:
     """
     set nans for array a as warmup_period
     warmup_period starts from the first nonnan in a

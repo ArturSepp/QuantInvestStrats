@@ -6,7 +6,7 @@ import qis as qis
 # create price data
 regime_benchmark = 'SPY'
 tickers = [regime_benchmark, 'TLT', 'LQD', 'HYG', 'GLD']
-prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
+prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
 prices = prices.asfreq('B', method='ffill').dropna()  # align
 
 # define performance regime params and regime_classifier

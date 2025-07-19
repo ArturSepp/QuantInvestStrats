@@ -7,7 +7,7 @@ import qis as qis
 
 # define tickers and fetch price data
 tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'SHY', 'LQD', 'HYG', 'GLD']
-prices = yf.download(tickers, start=None, end=None)['Close'][tickers].dropna()
+prices = yf.download(tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers].dropna()
 
 # minimum usage
 with sns.axes_style("darkgrid"):
@@ -28,7 +28,7 @@ qis.save_fig(fig, file_name='perf2', local_path="figures/")
 # risk-adjusted performance table with specified data entries
 # add rates for excess Sharpe
 from qis import PerfStat
-ust_3m_rate = yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0
+ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
 
 # set parameters for computing performance stats including returns vols and regressions
 perf_params = qis.PerfParams(freq='ME', freq_reg='QE', alpha_an_factor=4.0, rates_data=ust_3m_rate)

@@ -10,7 +10,7 @@ import qis
 
 
 def compute_returns(ticker: str = 'SPY', time_period: qis.TimePeriod = None) -> Tuple[pd.Series, pd.Series, pd.Series]:
-    ohlc_data = yf.download(tickers=ticker, start=None, end=None, ignore_tz=True)
+    ohlc_data = yf.download(tickers=ticker, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)
     if time_period is not None:
         ohlc_data = time_period.locate(ohlc_data)
     # need to adjust open price for dividends

@@ -13,7 +13,7 @@ tickers_weights_with = {'SPY': 0.6-0.5*btc_weight, 'IEF': 0.4-0.5*btc_weight, 'B
 
 
 tickers = list(tickers_weights_wo.keys())
-prices = yf.download(tickers, start=None, end=None)['Close'][tickers].asfreq('B', method='ffill').dropna()
+prices = yf.download(tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers].asfreq('B', method='ffill').dropna()
 prices = prices.loc['31Dec2018':, :]
 
 balanced_60_40_wo = qis.backtest_model_portfolio(prices=prices, weights=tickers_weights_wo, rebalancing_freq='QE',

@@ -24,13 +24,13 @@ def run_unit_test(unit_test: UnitTests):
     time_period = TimePeriod('31Dec2021', '19Sep2022')
 
     if unit_test == UnitTests.LONG_IEF_SHORT_LQD:
-        prices = yf.download(tickers=['IEF', 'LQD', 'LQDH', 'IGIB'], start=None, end=None)['Close']
+        prices = yf.download(tickers=['IEF', 'LQD', 'LQDH', 'IGIB'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close']
         prices = time_period.locate(prices)
         rets = qis.to_returns(prices=prices, is_first_zero=True)
         navs1 = qis.returns_to_nav(returns=4.0*(rets.iloc[:, 0] - rets.iloc[:, 1]).rename('4x(Long 10y ETF / Short IG ETF)'))
         navs2 = qis.returns_to_nav(returns=-4.0*rets.iloc[:, 2].rename('4x(Short LQDH)'))
         navs3 = qis.returns_to_nav(returns=4.0*(0.5*rets.iloc[:, 0] - rets.iloc[:, 3]).rename('4x(Long 10y ETF / Short IGIB)'))
-        spy = time_period.locate(yf.download(tickers=['SPY'])['Close'])
+        spy = time_period.locate(yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'])
         prices2 = pd.concat([navs1, navs2, navs3, spy], axis=1)
 
         with sns.axes_style('darkgrid'):

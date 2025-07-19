@@ -14,7 +14,7 @@ CRYPTO = 'BTC-USD'
 
 tickers = [ASSET, CRYPTO]
 # fetch yahoo data
-prices = yf.download(tickers, start=None, end=None)['Close'][tickers]
+prices = yf.download(tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
 # resample to business days
 prices = prices.asfreq('B', method='ffill').dropna()
 # % returns

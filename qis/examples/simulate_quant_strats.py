@@ -226,7 +226,7 @@ def run_unit_test(unit_test: UnitTests):
     import yfinance as yf
 
     if unit_test == UnitTests.BTC_SIMULATION:
-        prices = yf.download(tickers=['BTC-USD'], start=None, end=None)['Close'].rename('BTC').dropna()
+        prices = yf.download(tickers=['BTC-USD'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename('BTC').dropna()
 
         time_period = qis.TimePeriod('31Dec2015', '21Jun2023')
         figs = create_time_series_report(prices=prices, time_period=time_period, vol_target=0.5, vol_af=360)
@@ -234,7 +234,7 @@ def run_unit_test(unit_test: UnitTests):
                             add_current_date=True, local_path=None)
 
     elif unit_test == UnitTests.SPY_SIMULATION:
-        prices = yf.download(tickers=['SPY'], start=None, end=None)['Close'].rename('SPY').dropna()
+        prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename('SPY').dropna()
         time_period = qis.TimePeriod('31Dec2019', '15Aug2024')
         figs = create_time_series_report(prices=prices, time_period=time_period, vol_target=0.15, vol_af=260)
         fu.save_figs_to_pdf(figs=figs, file_name='spy_analysis', orientation='landscape',

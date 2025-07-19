@@ -81,7 +81,7 @@ def run_unit_test(unit_test: UnitTests):
     time_period = qis.TimePeriod('01Jan1996', None)
 
     if unit_test == UnitTests.VIX_SPY:
-        prices = yf.download(['SPY', '^VIX'], start=None, end=None)['Close']
+        prices = yf.download(['SPY', '^VIX'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close']
         fig = plot_vol_vs_underlying(spot=prices['SPY'].rename('S&P500'),
                                      vol=prices['^VIX'].rename('VIX'),
                                      time_period=time_period)

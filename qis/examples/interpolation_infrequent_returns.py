@@ -25,7 +25,7 @@ def run_unit_test(unit_test: UnitTests):
         pivot = 'SPY'
         asset = 'QQQ'
         tickers = [pivot, asset]
-        prices = yf.download(tickers=tickers, start=None, end=None)['Close']
+        prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close']
 
     elif unit_test == UnitTests.BBG:
         from bbg_fetch import fetch_field_timeseries_per_tickers

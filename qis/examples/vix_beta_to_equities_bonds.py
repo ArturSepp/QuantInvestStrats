@@ -9,10 +9,10 @@ import qis
 from qis import PortfolioData
 
 # load VIX ETH
-vix = yf.download(tickers=['VXX'], start=None, end=None, ignore_tz=True)['Close'].asfreq('B', method='ffill').rename('Long VIX ETF')
+vix = yf.download(tickers=['VXX'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].asfreq('B', method='ffill').rename('Long VIX ETF')
 
 # load becnhmarks benchmarks
-benchmark_prices = yf.download(tickers=['SPY', 'TLT'], start=None, end=None, ignore_tz=True)['Close'].asfreq('B', method='ffill')
+benchmark_prices = yf.download(tickers=['SPY', 'TLT'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].asfreq('B', method='ffill')
 
 # create long-only portfolio using vix nav
 vix_portfolio = PortfolioData(nav=vix)
@@ -20,7 +20,7 @@ vix_portfolio = PortfolioData(nav=vix)
 # set timeperiod for analysis
 time_period = qis.TimePeriod('31Dec2021', None)
 perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', alpha_an_factor=52.0,
-                             rates_data=yf.download('^IRX', start=None, end=None)['Close'].dropna() / 100.0)
+                             rates_data=yf.download('^IRX', start="1959-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0)
 regime_params = qis.BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
 prices = pd.concat([vix, benchmark_prices], axis=1).sort_index().dropna()

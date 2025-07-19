@@ -8,7 +8,7 @@ import qis
 tickers = ['SPY', 'TLT', 'GLD']
 
 # fetch prices
-prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
+prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
 prices = prices.asfreq('B', method='ffill').dropna() # make B frequency
 returns = qis.to_returns(prices, freq='ME', drop_first=True)
 returns['month'] = returns.index.month

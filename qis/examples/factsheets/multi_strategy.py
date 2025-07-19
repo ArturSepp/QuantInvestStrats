@@ -25,7 +25,7 @@ def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
                          GLD='Gold')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
-    prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
+    prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
     prices = prices.asfreq('B', method='ffill')
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, group_data
@@ -80,7 +80,6 @@ def run_unit_test(unit_test: UnitTests):
         weights = multi_portfolio_data.get_grouped_weights(group_data=group_data)
         print(weights)
 
-        return
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period,
                                                   add_group_exposures_and_pnl=True,

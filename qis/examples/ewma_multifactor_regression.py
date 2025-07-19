@@ -8,7 +8,7 @@ import qis as qis
 from qis import EwmLinearModel
 
 tickers = ['SPY', 'TLT', 'GLD']
-prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
+prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
 prices = prices.asfreq('B', method='ffill').dropna()  # make B frequency and align
 returns = qis.to_returns(prices, is_log_returns=True, drop_first=True, freq='ME')
 x = returns[['SPY', 'TLT']]

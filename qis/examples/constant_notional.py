@@ -16,7 +16,7 @@ import qis
 
 # load dprice data for given ticker
 ticker = 'SPY'
-price = yf.download(ticker, start=None, end=None)['Close'].rename(ticker)
+price = yf.download(ticker, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename(ticker)
 price = price.loc['2016':]
 price_np = price.to_numpy()
 

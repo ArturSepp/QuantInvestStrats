@@ -36,7 +36,7 @@ def fetch_universe_data(live_prices: bool = True) -> Tuple[pd.DataFrame, pd.Data
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
     if live_prices:
-        prices = yf.download(tickers=tickers, start=None, end=None, ignore_tz=True)['Close'][tickers]
+        prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
     else:
         prices = load_etf_data()[tickers]
         print(prices)
