@@ -164,8 +164,10 @@ def separate_number_from_string(string: str) -> List[str]:
 class UnitTests(Enum):
     FLATTEN = 1
     LIST = 2
-    MERGE = 3
-    STRINGS = 4
+    LIST_INTERSECTION = 3
+    MERGE = 4
+    LIST_DIFF = 5
+    STRINGS = 6
 
 
 def run_unit_test(unit_test: UnitTests):
@@ -180,6 +182,16 @@ def run_unit_test(unit_test: UnitTests):
         rows_edge_lines = list(itertools.accumulate(10 * [5]))
         print(rows_edge_lines)
 
+    elif unit_test == UnitTests.LIST_INTERSECTION:
+        list2 = ['EQ', 'HUI', 'Metals']
+        list1 = ['EQ', 'BD', 'STIR', 'FX', 'Energies', 'Metals', 'Ags']
+        groups = list_intersection(list_check=list1, list_sample=list2)
+        print('groups1')
+        print(groups)
+        groups = list_intersection(list_check=list2, list_sample=list1)
+        print('groups2')
+        print(groups)
+
     elif unit_test == UnitTests.MERGE:
         list2 = ['EQ', 'HUI']
         list1 = ['EQ', 'BD', 'STIR', 'FX', 'Energies', 'Metals', 'Ags']
@@ -190,6 +202,14 @@ def run_unit_test(unit_test: UnitTests):
         print('groups2')
         print(groups)
 
+    elif unit_test == UnitTests.LIST_DIFF:
+        list2 = ['EQ', 'HUI']
+        list1 = ['EQ', 'BD', 'STIR', 'FX', 'Energies', 'Metals', 'Ags']
+        this = list_diff(list_check=list1, list_sample=list2)
+        print(this)
+        this = list_diff(list_check=list2, list_sample=list1)
+        print(this)
+
     elif unit_test == UnitTests.STRINGS:
         string = '123me45you0000me7+33.3'
         this = separate_number_from_string(string)
@@ -198,7 +218,7 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.STRINGS
+    unit_test = UnitTests.LIST_INTERSECTION
 
     is_run_all_tests = False
     if is_run_all_tests:
@@ -206,5 +226,3 @@ if __name__ == '__main__':
             run_unit_test(unit_test=unit_test)
     else:
         run_unit_test(unit_test=unit_test)
-
-

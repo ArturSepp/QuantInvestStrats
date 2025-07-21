@@ -25,11 +25,14 @@ class LinearModel:
     core class to store and process of data for different linear signals of shape:
     y =  loadings^T @ x
     """
-    x: pd.DataFrame  # t, x_n factors
+    x: Union[pd.DataFrame, pd.Series] # t, x_n factors
     y: Union[pd.DataFrame, pd.Series]  # t, y_m factors
     loadings: Dict[str, pd.DataFrame] = None  # estimated factor loadings
 
     def __post_init__(self):
+
+        if isinstance(self.x, pd.Series):
+            self.x = self.x.to_frame()
 
         if isinstance(self.y, pd.Series):
             self.y = self.y.to_frame()
@@ -260,13 +263,17 @@ def compute_benchmarks_beta_attribution(portfolio_nav: pd.Series,
     return joint_attrib
 
 
-def estimate_linear_model(price: pd.Series, hedges: pd.DataFrame,
+def estimate_linear_model(asset_prices: Union[pd.Series, pd.DataFrame],
+                          factor_prices: Union[pd.Series, pd.DataFrame],
                           freq: str = 'W-WED',
                           span: int = 26,
                           mean_adj_type: MeanAdjType = MeanAdjType.NONE
                           ) -> EwmLinearModel:
-    y = qis.to_returns(price.to_frame(), freq=freq, is_log_returns=True, drop_first=True)
-    x = qis.to_returns(hedges, freq=freq, is_log_returns=True, drop_first=True)
+    """
+    estimate linear model with price = y and hedges = x
+    """
+    y = qis.to_returns(asset_prices, freq=freq, is_log_returns=True, drop_first=True)
+    x = qis.to_returns(factor_prices, freq=freq, is_log_returns=True, drop_first=True)
     ewm_linear_model = EwmLinearModel(x=x.reindex(index=y.index), y=y)
     ewm_linear_model.fit(span=span, is_x_correlated=True, mean_adj_type=mean_adj_type)
     return ewm_linear_model

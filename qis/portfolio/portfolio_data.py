@@ -767,7 +767,8 @@ class PortfolioData:
                                                     group_data: pd.Series = None,
                                                     group_order: List[str] = None,
                                                     freq: Optional[str] = None,
-                                                    normalise: bool = False
+                                                    normalise: bool = False,
+                                                    time_period: TimePeriod = None
                                                     ) -> pd.DataFrame:
         """
         compute risk contributions using covar_dict
@@ -778,7 +779,7 @@ class PortfolioData:
             else:
                 covar_dict = self.covar_dict
         is_input_weights = True if freq is None else False
-        strategy_weights = self.get_weights(freq=freq, is_input_weights=is_input_weights)
+        strategy_weights = self.get_weights(freq=freq, is_input_weights=is_input_weights, time_period=time_period)
         covar_index = list(covar_dict.keys())
         strategy_rc = {}
         if freq is None:  # align with covar dates

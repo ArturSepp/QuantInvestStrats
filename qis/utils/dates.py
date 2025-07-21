@@ -6,6 +6,7 @@ support for bespoke frequencies: M-FRI, Q-FRI
 
 from __future__ import annotations  # to allow class method annotations
 
+import warnings
 import datetime as dt
 import re
 import pandas as pd
@@ -965,8 +966,8 @@ def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Ti
     matched_index = pd.Series(index).sort_values().searchsorted(date, side='right')
     # check left boundary
     if matched_index == 0 and date != index[0]:
-        print(f"find_upto_date_from_datetime_index: date={date} is below first date of the index={index[0]}, "
-              f"returning None")
+        warnings.warn(f"find_upto_date_from_datetime_index: date={date} is below first date of the index={index[0]}, "
+                 f"returning None", stacklevel=2)
         return None
     matched_date = index[matched_index - 1]
     return matched_date

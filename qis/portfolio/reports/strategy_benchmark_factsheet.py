@@ -638,7 +638,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                     index=ex_anti_vols.index, regime_params=regime_params)
 
         # risk contributions
-        rc_kwargs = dict(covar_dict=multi_portfolio_data.covar_dict, freq='QE', normalise=True)
+        rc_kwargs = dict(covar_dict=multi_portfolio_data.covar_dict, freq='QE', normalise=True, time_period=time_period)
         strategy_risk_contributions_ac = strategy_data.compute_risk_contributions_implied_by_covar(
             group_data=ac_group_data,
             group_order=ac_group_order,

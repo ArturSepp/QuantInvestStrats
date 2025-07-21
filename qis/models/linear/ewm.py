@@ -119,12 +119,12 @@ def ewm_recursion(a: np.ndarray,
 
     if is_start_from_first_nonan:
         if is_1d:  # cannot use np.where
-            last_ewm = init_value if np.isfinite(a[0]) else np.nan
+            ewm[0] = init_value if np.isfinite(a[0]) else np.nan
         else:
-            last_ewm = np.where(np.isfinite(a[0]), init_value, np.nan)
+            ewm[0] = np.where(np.isfinite(a[0]), init_value, np.nan)
     else:
-        last_ewm = init_value
-    ewm[0] = last_ewm
+        ewm[0] = init_value
+    last_ewm = ewm[0]
 
     # recurse from 1
     for t in np.arange(1, a.shape[0]):
@@ -1090,7 +1090,8 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
         an = da.infer_an_from_data(data=x_data)
         resid_var = an * resid_var
         x_var = an * x_var
-
+    else:
+        an = 1.0
     beta_xy = pd.DataFrame(data=beta_xy, index=y_data.index, columns=y_data.columns)
     alpha = pd.DataFrame(data=ewm_alpha, index=y_data.index, columns=y_data.columns)
     y_prediction = pd.DataFrame(data=y_prediction, index=y_data.index, columns=y_data.columns)
@@ -1099,8 +1100,8 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
 
     # compute r2
     y_var0 = y_data.subtract(compute_ewm(data=y_data, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill))
-    y_var = ewm_recursion(a=np.square(y_var0.to_numpy()), span=span, ewm_lambda=ewm_lambda,
-                          init_value=np.zeros(len(y_data.columns)), nan_backfill=nan_backfill)
+    y_var = an * ewm_recursion(a=np.square(y_var0.to_numpy()), span=span, ewm_lambda=ewm_lambda,
+                               init_value=np.zeros(len(y_data.columns)), nan_backfill=nan_backfill)
     ewm_r2 = 1.0 - np.divide(resid_var, y_var, where=np.greater(y_var, 0.0))
     ewm_r2 = np.clip(ewm_r2, a_min=0.0, a_max=1.0)
     ewm_r2 = pd.DataFrame(data=ewm_r2, index=y_data.index, columns=y_data.columns)
