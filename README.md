@@ -1,8 +1,32 @@
 
-## **Quantitative Investment Strategies: QIS** <a name="analytics"></a>
+## 🚀 **Quantitative Investment Strategies: QIS**
 
-qis package implements analytics for visualisation of financial data, performance
-reporting, analysis of quantitative strategies. 
+> qis package implements analytics for visualisation of financial data, performance
+reporting, factsheets and analysis of quantitative strategies.
+
+---
+
+| 📊 Metric | 🔢 Value |
+|-----------|----------|
+| PyPI Version | ![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square) |
+| Python Versions | ![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square) |
+| License | ![License](https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square)|
+
+
+### 📈 Package Statistics
+
+| 📊 Metric | 🔢 Value |
+|-----------|----------|
+| Total Downloads | [![Total](https://pepy.tech/badge/qis)](https://pepy.tech/project/qis) |
+| Monthly | ![Monthly](https://pepy.tech/badge/qis/month) |
+| Weekly | ![Weekly](https://pepy.tech/badge/qis/week) |
+| GitHub Stars | ![GitHub stars](https://img.shields.io/github/stars/ArturSepp/QuantInvestStrats?style=flat-square&logo=github) |
+| GitHub Forks | ![GitHub forks](https://img.shields.io/github/forks/ArturSepp/QuantInvestStrats?style=flat-square&logo=github) |
+
+
+
+## **Quantitative Investment Strategies: QIS** <a name="analytics"></a>
+ 
 
 The package is split into 5 main modules with the 
 dependency path increasing sequentially as follows.
