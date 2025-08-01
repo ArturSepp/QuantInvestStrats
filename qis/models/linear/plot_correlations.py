@@ -1,15 +1,16 @@
-
 # packages
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from enum import Enum
 from typing import Optional, Union
 
+import qis
 # qis
 import qis.utils.dates as da
-import qis.utils.np_ops as npn
-
+import qis.utils.np_ops as npo
+import qis.utils.df_str as dfs
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfParams, ReturnTypes
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
@@ -41,10 +42,10 @@ def plot_returns_corr_table(prices: pd.DataFrame,
     corr = ccm.compute_masked_covar_corr(data=returns, is_covar=False)
     if is_fig_out:
         return phe.plot_heatmap(df=corr,
-                               var_format=var_format,
-                               cmap=cmap,
-                               ax=ax,
-                               **kwargs)
+                                var_format=var_format,
+                                cmap=cmap,
+                                ax=ax,
+                                **kwargs)
     else:
         return corr
 
@@ -74,7 +75,7 @@ def plot_returns_ewm_corr_table(prices: pd.DataFrame,
     if is_last:
         ar = corr[-1]
     else:
-        ar = npn.tensor_mean(corr)
+        ar = npo.tensor_mean(corr)
 
     df = pd.DataFrame(ar, index=prices.columns, columns=prices.columns)
     fig = phe.plot_heatmap(df=df,
@@ -103,7 +104,6 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
                                          ax: plt.Subplot = None,
                                          **kwargs
                                          ) -> None:
-
     """
     plot time series of returns correlations infered from prices
     """
@@ -138,14 +138,103 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
                                    perf_params=perf_params)
 
 
+def plot_corr_matrix_from_covar(covar: pd.DataFrame,
+                                corr_format: str = '{:.2f}',
+                                vol_format: str = '{:.1%}',
+                                cmap: str = 'PiYG',
+                                title: Optional[Union[str, bool]] = True,
+                                ax: plt.Subplot = None,
+                                **kwargs
+                                ) -> Optional[plt.Figure]:
+
+    """Plot a correlation matrix heatmap with volatilities on the diagonal.
+
+    Creates a lower-triangular correlation matrix heatmap where the diagonal
+    displays volatilities (standard deviations) and the lower triangle shows
+    correlations between variables. The upper triangle is masked (empty).
+
+    Args:
+        covar (pd.DataFrame): Covariance matrix with variables as both index
+            and columns. Must be a square symmetric matrix.
+        corr_format (str, optional): Format string for correlation values
+            in the lower triangle. Defaults to '{:.2f}'.
+        vol_format (str, optional): Format string for volatility values
+            on the diagonal. Defaults to '{:.1%}'.
+        cmap (str, optional): Colormap name for the heatmap. Defaults to 'PiYG'.
+        title (Optional[Union[str, bool]], optional): Title for the plot.
+            If True, uses default title. If False or None, no title is shown.
+            If string, uses the provided title. Defaults to True.
+        ax (plt.Subplot, optional): Matplotlib axes object to plot on.
+            If None, creates a new figure. Defaults to None.
+        **kwargs: Additional keyword arguments passed to the underlying
+            heatmap plotting function.
+
+    Returns:
+        Optional[plt.Figure]: Figure object containing the heatmap if ax is None,
+            otherwise None when plotting on provided axes.
+
+    Note:
+        The function converts the covariance matrix to correlations using
+        npo.covar_to_corr() and extracts volatilities as the square root
+        of diagonal covariance elements. Grid lines are added around each
+        cell for better visual separation.
+    """
+    corr = npo.covar_to_corr(covar)
+    # add nans to upper diagonal
+    mask = np.zeros_like(corr, dtype=bool)
+    mask[np.triu_indices_from(mask)] = True
+    corr_flt = pd.DataFrame(index=covar.index, columns=covar.columns, dtype=float)
+    corr_flt[mask == False] = corr
+    # replace diagonal with vol
+    mask = np.eye(covar.shape[0], dtype=bool)
+    vols = np.sqrt(np.diag(covar))
+    corr_flt[mask] = np.diag(vols)
+
+    # Create a custom annotation matrix: empty strings on the diagonal, values off-diagonal
+    annot = np.full(corr_flt.shape, "", dtype=object)
+    for i in range(corr_flt.shape[0]):
+        for j in range(corr_flt.shape[1]):
+            if i > j:
+                annot[i, j] = corr_format.format(corr_flt.iloc[i, j])  # format as string with 2 decimals
+            elif i == j:
+                annot[i, j] = vol_format.format(corr_flt.iloc[i, j])  # format as string with 2 decimals
+
+    if title is not None:
+        if not isinstance(title, str):
+            if title is True:
+                title = 'Diagonal: volatilities; Lower diagonal: correlations'
+            else:
+                title = None
+
+    # Plot heatmap with custom annotations
+    fig = phe.plot_heatmap(df=corr_flt,
+                           annot=annot,
+                           cmap=cmap,
+                           var_format=None,
+                           vmin=-1, vmax=1, center=0,
+                           title=title,
+                           ax=ax,
+                           **kwargs)
+    if ax is None:
+        ax = fig.axes[0]
+
+    for vline_column in np.arange(1, len(covar.columns)+1):
+        for hline_row in np.arange(1, len(covar.columns)+1):
+            ax.vlines([hline_row-1], hline_row-1, hline_row, lw=1)
+            ax.hlines([vline_column-1], vline_column-1, vline_column, lw=1)
+            ax.vlines([hline_row], hline_row-1, hline_row, lw=1)
+            ax.hlines([vline_column], vline_column-1, vline_column, lw=1)
+    return fig
+
+
 class UnitTests(Enum):
     CORR_TABLE = 1
     CORR_MATRIX = 2
     EWMA_CORR = 3
+    PLOT_CORR_FROM_COVAR = 4
 
 
 def run_unit_test(unit_test: UnitTests):
-
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
@@ -159,12 +248,17 @@ def run_unit_test(unit_test: UnitTests):
     elif unit_test == UnitTests.EWMA_CORR:
         plot_returns_ewm_corr_table(prices=prices.iloc[:, :5])
 
+    elif unit_test == UnitTests.PLOT_CORR_FROM_COVAR:
+        returns = ret.to_returns(prices=prices, freq='ME')
+        covar = 12.0 * ccm.compute_masked_covar_corr(data=returns, is_covar=True)
+        plot_corr_matrix_from_covar(covar)
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CORR_MATRIX
+    unit_test = UnitTests.PLOT_CORR_FROM_COVAR
 
     is_run_all_tests = False
     if is_run_all_tests:

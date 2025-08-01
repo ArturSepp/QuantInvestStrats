@@ -38,7 +38,7 @@ def compute_periodic_returns_by_row_table(prices: pd.Series,
 
     returns_table = returns_table.reindex(sorted(returns_table.columns), axis=1)
 
-    #map months column: concat create multiindex columns
+    # map months column: concat create multiindex columns
     if column_period == 'ME':
 
         returns_table.columns = returns_table.columns.get_level_values(0).map(MONTH_MAP)

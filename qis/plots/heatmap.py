@@ -1,12 +1,12 @@
 """
 heatmap plots
 """
-
+import numpy as np
 # packages
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import List, Optional
+from typing import List, Optional, Union
 from enum import Enum
 
 # qis
@@ -30,6 +30,7 @@ def plot_heatmap(df: pd.DataFrame,
                  vmax: float = None,
                  labelpad: int = 50,
                  ylabel: str = '',
+                 annot: Union[bool, np.ndarray] = True,
                  ax: plt.Subplot = None,
                  **kwargs
                  ) -> Optional[plt.Figure]:
@@ -53,10 +54,12 @@ def plot_heatmap(df: pd.DataFrame,
 
     if var_format is not None:
         var_format = var_format.replace('{:', '').replace('}', '')  # no {}
+    else:
+        var_format = ""
 
     sns.heatmap(data=df,
                 center=0,
-                annot=True,
+                annot=annot,
                 fmt=var_format,
                 cmap=cmap,
                 alpha=alpha,
