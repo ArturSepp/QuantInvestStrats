@@ -1,5 +1,4 @@
-
-## 🚀 **Quantitative Investment Strategies: QIS**
+# 🚀 **Quantitative Investment Strategies: QIS**
 
 > qis package implements analytics for visualisation of financial data, performance
 reporting, factsheets and analysis of quantitative strategies.
