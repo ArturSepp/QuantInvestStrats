@@ -1,2 +1,14 @@
-# This tells Linguist to ignore all files with the .ipynb extension when calculating language statistics
+# Exclude Jupyter notebooks from language detection
 *.ipynb linguist-detectable=false
+
+# Mark documentation and examples as non-code
+docs/* linguist-documentation
+examples/* linguist-documentation
+*.md linguist-documentation
+
+# Ensure Python is properly detected
+*.py linguist-language=Python
+
+# Exclude generated or data files
+*.json linguist-generated=true
+*.csv linguist-generated=true
