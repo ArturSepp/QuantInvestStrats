@@ -73,7 +73,8 @@ from qis.models.linear.pca import(
 from qis.models.linear.plot_correlations import(
     plot_returns_corr_matrix_time_series,
     plot_returns_corr_table,
-    plot_returns_ewm_corr_table
+    plot_returns_ewm_corr_table,
+    plot_corr_matrix_from_covar
 )
 
 from qis.models.linear.ra_returns import(

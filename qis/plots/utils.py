@@ -1256,7 +1256,7 @@ def get_n_mlt_colors(n: int,
 
 
 def get_n_hatch(n: int) -> List[str]:
-    all_hatch = ["//", "\ \\", "-", "+", "x", "o", "O", ".", "*","|"]
+    all_hatch = ["//", "\\", "-", "+", "x", "o", "O", ".", "*","|"]
     return all_hatch[:n]
 
 
