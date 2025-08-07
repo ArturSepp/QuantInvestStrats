@@ -292,3 +292,29 @@ See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/master
 Please report any bugs or suggestions by opening an [issue](https://github.com/ArturSepp/QuantInvestStrats/issues).
 
 .
+## BibTeX Citation
+
+If you use BloombergFetch in your research, please cite it as:
+
+```bibtex
+@software{sepp2024qis,
+  author={Sepp, Artur},
+  title={Qua: A Python Package for Bloomberg Terminal Data Access},
+  year={2024},
+  url={https://github.com/ArturSepp/BloombergFetch},
+  version={1.0.27}
+}
+```
+
+# BibTeX Citations for QIS (Quantitative Investment Strategies) Package
+
+If you use QIS in your research, please cite it as:
+
+```bibtex
+@software{sepp2024qis,
+  title={qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies},
+  author={Sepp, Artur},
+  year={2024},
+  url={https://github.com/ArturSepp/QuantInvestStrats}
+}
+```
