@@ -1,5 +1,5 @@
 """
-statsmodels wrappers for ols analysis
+statsmodels wrappers for ols and regression analysis
 """
 # packages
 import warnings

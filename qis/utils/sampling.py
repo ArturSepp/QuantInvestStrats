@@ -97,21 +97,26 @@ def get_data_samples_df(data: Union[pd.DataFrame, pd.Series],
     return data_samples_df
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     SAMPLE_DATES = 1
     SPLIT_TO_SAMPLES = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.SAMPLE_DATES:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.SAMPLE_DATES:
         time_period = TimePeriod(start='31Dec2018', end='31Dec2020')
 
         ts_index = time_period.to_pd_datetime_index(freq='ME')
         train_live_samples = split_to_train_live_samples(ts_index=ts_index, model_update_freq='ME', roll_period=12)
         train_live_samples.print()
 
-    elif unit_test == UnitTests.SPLIT_TO_SAMPLES:
+    elif local_test == LocalTests.SPLIT_TO_SAMPLES:
         time_period = TimePeriod(start='31Dec2010', end='31Dec2020')
 
         ts_index = time_period.to_pd_datetime_index(freq='B')
@@ -125,11 +130,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.SPLIT_TO_SAMPLES
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.SPLIT_TO_SAMPLES)

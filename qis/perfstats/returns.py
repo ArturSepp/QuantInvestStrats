@@ -670,7 +670,7 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
     return bfilled_data
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     TO_ZERO_NONNAN = 1
     VOL_SAMPLE = 2
     ADJUST_PORTFOLIO_PA_RETURNS = 3
@@ -678,13 +678,18 @@ class UnitTests(Enum):
     ROLLING_RETURNS = 5
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     import qis.plots.time_series as pts
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
-    if unit_test == UnitTests.TO_ZERO_NONNAN:
+    if local_test == LocalTests.TO_ZERO_NONNAN:
         np.random.seed(2)  # freeze seed
         dates = pd.date_range(start='31Dec2020', end='07Jan2021', freq='B')
         n = 3
@@ -707,13 +712,13 @@ def run_unit_test(unit_test: UnitTests):
         navs = returns_to_nav(returns=returns, init_period=None)
         print(f"navs with init_period = None:\n{navs}")
 
-    elif unit_test == UnitTests.VOL_SAMPLE:
+    elif local_test == LocalTests.VOL_SAMPLE:
         vols = compute_sampled_vols(prices=prices,
                                     freq_return='B',
                                     freq_vol='ME')
         print(vols)
 
-    elif unit_test == UnitTests.ADJUST_PORTFOLIO_PA_RETURNS:
+    elif local_test == LocalTests.ADJUST_PORTFOLIO_PA_RETURNS:
         returns = prices.pct_change()
 
         portfolio_price = returns_to_nav(returns=returns.sum(1)).rename('portfolio')
@@ -731,7 +736,7 @@ def run_unit_test(unit_test: UnitTests):
                              title='Original vs Adjusted NAVs')
         print(asset_prices_adj)
 
-    elif unit_test == UnitTests.NET_RETURN:
+    elif local_test == LocalTests.NET_RETURN:
         nav = prices['SPY'].dropna()
         print(nav)
         net_navs = get_net_navs(navs=nav)
@@ -742,11 +747,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.NET_RETURN
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.NET_RETURN)

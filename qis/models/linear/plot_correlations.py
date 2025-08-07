@@ -227,28 +227,33 @@ def plot_corr_matrix_from_covar(covar: pd.DataFrame,
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     CORR_TABLE = 1
     CORR_MATRIX = 2
     EWMA_CORR = 3
     PLOT_CORR_FROM_COVAR = 4
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
-    if unit_test == UnitTests.CORR_TABLE:
+    if local_test == LocalTests.CORR_TABLE:
         plot_returns_corr_table(prices=prices)
 
-    elif unit_test == UnitTests.CORR_MATRIX:
+    elif local_test == LocalTests.CORR_MATRIX:
         fig, ax = plt.subplots(1, 1, figsize=(10, 10), constrained_layout=True)
         plot_returns_corr_matrix_time_series(prices=prices, regime_benchmark='SPY', ax=ax)
 
-    elif unit_test == UnitTests.EWMA_CORR:
+    elif local_test == LocalTests.EWMA_CORR:
         plot_returns_ewm_corr_table(prices=prices.iloc[:, :5])
 
-    elif unit_test == UnitTests.PLOT_CORR_FROM_COVAR:
+    elif local_test == LocalTests.PLOT_CORR_FROM_COVAR:
         returns = ret.to_returns(prices=prices, freq='ME')
         covar = 12.0 * ccm.compute_masked_covar_corr(data=returns, is_covar=True)
         plot_corr_matrix_from_covar(covar)
@@ -258,11 +263,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PLOT_CORR_FROM_COVAR
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.PLOT_CORR_FROM_COVAR)

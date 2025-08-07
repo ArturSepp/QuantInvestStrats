@@ -120,25 +120,30 @@ def plot_scatter_regression(prices: pd.DataFrame,
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     SCATTER_ALL = 1
     SCATTER_1 = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
     regime_params = BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
 
-    if unit_test == UnitTests.SCATTER_ALL:
+    if local_test == LocalTests.SCATTER_ALL:
         plot_scatter_regression(prices=prices,
                                 regime_benchmark='SPY',
                                 regime_params=regime_params,
                                 add_last_date=True,
                                 is_asset_detailed=False)
 
-    elif unit_test == UnitTests.SCATTER_1:
+    elif local_test == LocalTests.SCATTER_1:
         plot_scatter_regression(prices=prices[['SPY', 'TLT']],
                                 regime_benchmark='SPY',
                                 regime_params=regime_params,
@@ -150,11 +155,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.SCATTER_1
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.SCATTER_1)

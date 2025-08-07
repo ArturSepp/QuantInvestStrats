@@ -211,16 +211,21 @@ def compute_df_desc_data(df: pd.DataFrame,
     return desc_data
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     STACK = 1
     NAN_MEAN = 2
     TEST3 = 3
     DESC_DF = 4
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.STACK:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.STACK:
         df = pd.DataFrame(data=[[0, 1], [2, 3]],
                           index=['cat', 'dog'],
                           columns=['weight', 'height'])
@@ -233,7 +238,7 @@ def run_unit_test(unit_test: UnitTests):
         melted = pd.melt(df, value_vars=df.columns, var_name='myVarname', value_name='myValname')
         print(melted)
 
-    elif unit_test == UnitTests.NAN_MEAN:
+    elif local_test == LocalTests.NAN_MEAN:
 
         # 4 * 3 matrix
         a = np.array([[np.nan, np.nan, np.nan],
@@ -258,7 +263,7 @@ def run_unit_test(unit_test: UnitTests):
         # pd_a_pd = pd_a.apply(lambda x: np.nanstd(x), axis=1)
         print(f"lambda_std\n{lambda_std};")
 
-    elif unit_test == UnitTests.TEST3:
+    elif local_test == LocalTests.TEST3:
         df = pd.DataFrame({'Date': ['2015-05-08', '2015-05-07', '2015-05-06', '2015-05-05', '2015-05-08', '2015-05-07',
                                     '2015-05-06', '2015-05-05'],
                            'Sym': ['aapl', 'aapl', 'aapl', 'aapl', 'aaww', 'aaww', 'aaww', 'aaww'],
@@ -268,7 +273,7 @@ def run_unit_test(unit_test: UnitTests):
         df['Data4'] = df['Data3'].groupby(df['Date']).transform('sum')
         print(df)
 
-    elif unit_test == UnitTests.DESC_DF:
+    elif local_test == LocalTests.DESC_DF:
         df = pd.DataFrame({'Date': ['2015-05-08', '2015-05-07', '2015-05-06', '2015-05-05', '2015-05-08', '2015-05-07',
                                     '2015-05-06', '2015-05-05'],
                            'Data2': [11, 8, 10, 15, 110, 60, 100, 40],
@@ -280,11 +285,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.DESC_DF
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.DESC_DF)

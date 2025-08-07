@@ -348,7 +348,7 @@ def plot_sorted_periodic_returns(prices: pd.DataFrame,
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     PERIODIC_RETURNS_BY_ROW = 1
     RETURNS_HEATMAP = 2
     RETURNS_TABLE = 3
@@ -357,18 +357,23 @@ class UnitTests(Enum):
     SORTED_PERIODIC_RETURNS_TABLE = 6
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
-    if unit_test == UnitTests.PERIODIC_RETURNS_BY_ROW:
+    if local_test == LocalTests.PERIODIC_RETURNS_BY_ROW:
         periodic_returns_table = compute_periodic_returns_by_row_table(prices=prices['SPY'],
                                                                        heatmap_freq='YE',
                                                                        column_period='ME')
         print(periodic_returns_table)
 
-    elif unit_test == UnitTests.RETURNS_HEATMAP:
+    elif local_test == LocalTests.RETURNS_HEATMAP:
         periodic_returns_table = compute_periodic_returns_table(prices=prices['SPY'],
                                                                 column_period='ME',
                                                                 is_add_annual_column=True,
@@ -382,7 +387,7 @@ def run_unit_test(unit_test: UnitTests):
                              is_add_annual_column=True,
                              is_inverse_order=True)
 
-    elif unit_test == UnitTests.RETURNS_TABLE:
+    elif local_test == LocalTests.RETURNS_TABLE:
         time_period_dict = {'Q1': da.TimePeriod(start='31Dec2019', end='31Mar2020'),
                             'Q2': da.TimePeriod(start='31Mar2020', end='30Jun2020'),
                             'YTD': da.TimePeriod(start='31Dec2019', end='30Jun2020')}
@@ -393,7 +398,7 @@ def run_unit_test(unit_test: UnitTests):
                            transpose=False,
                            is_inverse_order=True)
 
-    elif unit_test == UnitTests.PERIODIC_RETURNS_TABLE:
+    elif local_test == LocalTests.PERIODIC_RETURNS_TABLE:
 
         time_period = None
 
@@ -404,7 +409,7 @@ def run_unit_test(unit_test: UnitTests):
                                                 x_rotation=90,
                                                 df_out_name='heatmap1y')
 
-    elif unit_test == UnitTests.PERIODIC_RETURNS_TABLE_A:
+    elif local_test == LocalTests.PERIODIC_RETURNS_TABLE_A:
 
         time_period = da.TimePeriod(start='28Feb2010', end='31Jan2021')
         plot_periodic_returns_table(prices=prices,
@@ -414,7 +419,7 @@ def run_unit_test(unit_test: UnitTests):
                                                 x_rotation=90,
                                                 df_out_name='heatmap1y')
 
-    elif unit_test == UnitTests.SORTED_PERIODIC_RETURNS_TABLE:
+    elif local_test == LocalTests.SORTED_PERIODIC_RETURNS_TABLE:
         time_period = da.TimePeriod(start='28Feb2010', end='31Jan2021')
         plot_sorted_periodic_returns(prices=prices.iloc[:, :20],
                                      time_period=time_period,
@@ -428,11 +433,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PERIODIC_RETURNS_BY_ROW
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.PERIODIC_RETURNS_BY_ROW)

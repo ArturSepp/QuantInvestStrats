@@ -1008,7 +1008,7 @@ def create_rebalancing_indicators_from_freqs(rebalancing_freqs: Union[pd.Series,
     return rebalancing_indicators
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     DATES = 1
     OFFSETS = 2
     WEEK_DAY = 3
@@ -1025,9 +1025,14 @@ class UnitTests(Enum):
     REBALANCING_FROM_FREQS = 15
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.DATES:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.DATES:
         time_period = TimePeriod(start='31Dec2019', end='31Dec2020')
         print("time_period.to_str() = ")
         print(time_period.to_str())
@@ -1042,7 +1047,7 @@ def run_unit_test(unit_test: UnitTests):
         print("time_period.get_period_dates_str(freq='ME', tz='America/New_York') = ")
         print(time_period.to_period_dates_str(freq='ME'))
 
-    elif unit_test == UnitTests.OFFSETS:
+    elif local_test == LocalTests.OFFSETS:
         date = pd.Timestamp('28Feb2023')
         print(date-pd.offsets.Day(30))
         print(date-pd.offsets.MonthEnd(1))
@@ -1051,12 +1056,12 @@ def run_unit_test(unit_test: UnitTests):
         print(date-pd.offsets.Day(365))
         print(date-pd.offsets.BYearBegin(1))
 
-    elif unit_test == UnitTests.WEEK_DAY:
+    elif local_test == LocalTests.WEEK_DAY:
         time_period = TimePeriod(start='01Jun2022', end='22Jun2022')
         sample_dates = generate_sample_dates(time_period=time_period, freq='D')
         print(get_weekday(sample_dates.index))
 
-    elif unit_test == UnitTests.SAMPLE_DATES_IDX:
+    elif local_test == LocalTests.SAMPLE_DATES_IDX:
         time_period = TimePeriod(start='31Dec2004', end='31Dec2020')
         population_dates = time_period.to_pd_datetime_index(freq='ME')
         sample_dates = time_period.to_pd_datetime_index(freq='QE')
@@ -1072,7 +1077,7 @@ def run_unit_test(unit_test: UnitTests):
         print('sampled_population_dates')
         print(population_dates[sample_dates_idx])
 
-    elif unit_test == UnitTests.PERIOD_WITH_HOLIDAYS:
+    elif local_test == LocalTests.PERIOD_WITH_HOLIDAYS:
 
         time_period = TimePeriod(start='01Jan2020', end='22Jan2020')
         holidays = pd.DatetimeIndex(data=['20200113', '20200120', '20200214', '20200217',
@@ -1081,12 +1086,12 @@ def run_unit_test(unit_test: UnitTests):
         dates = time_period.to_period_dates_str(freq='B', holidays=holidays)
         print(dates)
 
-    elif unit_test == UnitTests.EOD_FREQ_HOUR:
+    elif local_test == LocalTests.EOD_FREQ_HOUR:
         time_period = TimePeriod(pd.Timestamp('2022-11-10', tz='UTC'), pd.Timestamp('2023-03-03', tz='UTC'))
         rebalancing_times = generate_dates_schedule(time_period=time_period, freq='h')
         print(rebalancing_times)
 
-    elif unit_test == UnitTests.FREQ_HOUR:
+    elif local_test == LocalTests.FREQ_HOUR:
 
         # hour frequency with timestamp with no hour
         time_period = TimePeriod(pd.Timestamp('2022-11-10', tz='UTC'), pd.Timestamp('2022-11-16', tz='UTC'))
@@ -1102,7 +1107,7 @@ def run_unit_test(unit_test: UnitTests):
         rebalancing_times = generate_dates_schedule(time_period=time_period, freq='h')
         print(rebalancing_times)
 
-    elif unit_test == UnitTests.FREQ_REB:
+    elif local_test == LocalTests.FREQ_REB:
         dates_schedule = generate_dates_schedule(time_period=TimePeriod('2023-05-01 08:00:00', '2023-05-30 10:00:00', tz='UTC'),
                                                  freq='2W-FRI', hour_offset=8,
                                                  include_start_date=True,
@@ -1114,7 +1119,7 @@ def run_unit_test(unit_test: UnitTests):
                                                  include_end_date=False)
         print(dates_schedule)
 
-    elif unit_test == UnitTests.FREQS:
+    elif local_test == LocalTests.FREQS:
         freq_map = FreqMap.BQ
         freq_map.print()
         freq = freq_map.to_freq()
@@ -1122,14 +1127,14 @@ def run_unit_test(unit_test: UnitTests):
         n_bus_days = freq_map.to_n_bus_days()
         print(n_bus_days)
 
-    elif unit_test == UnitTests.REBALANCING_INDICATORS:
+    elif local_test == LocalTests.REBALANCING_INDICATORS:
         pd_index = pd.date_range(start='31Dec2020', end='31Dec2021', freq='W-MON')
         data = pd.DataFrame(range(len(pd_index)), index=pd_index, columns=['aaa'])
         rebalancing_schedule = generate_rebalancing_indicators(df=data, freq='M-FRI')
         print(rebalancing_schedule)
         print(rebalancing_schedule[rebalancing_schedule == True])
 
-    elif unit_test == UnitTests.FIXED_MATURITY_ROLLS:
+    elif local_test == LocalTests.FIXED_MATURITY_ROLLS:
         time_period = TimePeriod('01Oct2022', '21Feb2023', tz='UTC')
         """
         weekly_rolls = generate_fixed_maturity_rolls(time_period=time_period, freq='h', roll_freq='W-FRI',
@@ -1151,7 +1156,7 @@ def run_unit_test(unit_test: UnitTests):
                                                         min_days_to_next_roll=56)  # 8 weeks before
         print(f"quarterly_rolls:\n{quarterly_rolls}")
 
-    elif unit_test == UnitTests.TIMEPERIOD_INDEXER:
+    elif local_test == LocalTests.TIMEPERIOD_INDEXER:
         time_period = TimePeriod('31Dec2023', '31Dec2024')
         times_m = generate_dates_schedule(time_period=time_period, freq='ME')
         times_q = generate_dates_schedule(time_period=time_period, freq='QE')
@@ -1164,7 +1169,7 @@ def run_unit_test(unit_test: UnitTests):
         indextimes_m_at_q = [times_q[idx] for idx in idx_m_at_q]
         print(indextimes_m_at_q)
 
-    elif unit_test == UnitTests.FIND_UPTO_DATE:
+    elif local_test == LocalTests.FIND_UPTO_DATE:
         time_period = TimePeriod('31Dec2023', '31Dec2024')
         times_q = generate_dates_schedule(time_period=time_period, freq='QE')
         this_dates = [pd.Timestamp('31Dec2023'), pd.Timestamp('31Jan2024'), pd.Timestamp('31Mar2024'),
@@ -1173,7 +1178,7 @@ def run_unit_test(unit_test: UnitTests):
             matched_date = find_upto_date_from_datetime_index(index=times_q, date=this_date)
             print(f"given={this_date}, matched={matched_date}")
 
-    elif unit_test == UnitTests.REBALANCING_FROM_FREQS:
+    elif local_test == LocalTests.REBALANCING_FROM_FREQS:
         time_period = TimePeriod('31Dec2023', '31Dec2024')
         rebalancing_indicators = create_rebalancing_indicators_from_freqs(
             rebalancing_freqs=pd.Series(dict(SPY='ME', TLT='QE', LQD='QE')),
@@ -1183,11 +1188,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.REBALANCING_FROM_FREQS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.REBALANCING_FROM_FREQS)

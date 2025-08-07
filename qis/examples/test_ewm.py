@@ -82,7 +82,7 @@ def ewm_covar_tensor_nans():
     covar_tensor_txy = qis.compute_ewm_covar_tensor(a=a, span=200, nan_backfill=qis.NanBackfill.NAN_FILL)
     print(covar_tensor_txy)
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     TIME_COMP_WITH_PANDAS_EWM = 1
     VOL_COMP_WITH_PANDAS_EWM = 2
     EWMA_NP = 3
@@ -95,17 +95,22 @@ class UnitTests(Enum):
     EWMA_COVAR_TENSOR_NANS = 10
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     np.random.seed(1)
 
-    if unit_test == UnitTests.TIME_COMP_WITH_PANDAS_EWM:
+    if local_test == LocalTests.TIME_COMP_WITH_PANDAS_EWM:
         time_comp_with_pandas_ewm()
 
-    elif unit_test == UnitTests.VOL_COMP_WITH_PANDAS_EWM:
+    elif local_test == LocalTests.VOL_COMP_WITH_PANDAS_EWM:
         vol_comp_with_pandas_ewm()
 
-    elif unit_test == UnitTests.EWMA_COVAR_TENSOR_NANS:
+    elif local_test == LocalTests.EWMA_COVAR_TENSOR_NANS:
         ewm_covar_tensor_nans()
 
     else:  # apply same data for these tests
@@ -115,7 +120,7 @@ def run_unit_test(unit_test: UnitTests):
         ewm_lambda3 = np.array([0.94, 0.50, 0.10])
         plot_data, title = None, None
 
-        if unit_test == UnitTests.EWMA_NP:
+        if local_test == LocalTests.EWMA_NP:
             ewm1 = qm.ewm_recursion(a=data.iloc[:, 0].to_numpy(dtype=np.double), ewm_lambda=ewm_lambda, init_value=0.0)
             print(ewm1)
 
@@ -125,7 +130,7 @@ def run_unit_test(unit_test: UnitTests):
             ewm3 = qm.ewm_recursion(a=data.to_numpy(), ewm_lambda=ewm_lambda3, init_value=np.zeros(len(data.columns)))
             print(ewm3)
 
-        elif unit_test == UnitTests.EWMA_DF:
+        elif local_test == LocalTests.EWMA_DF:
 
             ewm_df1 = qm.compute_ewm(data=data.iloc[:, 0], ewm_lambda=ewm_lambda, init_type=qm.InitType.MEAN)
             print(ewm_df1)
@@ -146,7 +151,7 @@ def run_unit_test(unit_test: UnitTests):
             plot_data = pd.concat([data, ewm_df3], axis=1)
             title = 'ewm'
 
-        elif unit_test == UnitTests.EWMA_MEAN:
+        elif local_test == LocalTests.EWMA_MEAN:
 
             datas = {'np1': data.iloc[:, 0].to_numpy(), 'np': data.to_numpy(), 'series': data.iloc[:, 0], 'df': data}
 
@@ -164,7 +169,7 @@ def run_unit_test(unit_test: UnitTests):
             plot_data = pd.concat([data, ewm_mean, ewm_data], axis=1)
             title = 'ewm-mean'
 
-        elif unit_test == UnitTests.EWMA_VOL:
+        elif local_test == LocalTests.EWMA_VOL:
 
             datas = {'np1': data.iloc[:, 0].to_numpy(), 'np': data.to_numpy(), 'series': data.iloc[:, 0], 'df': data}
 
@@ -180,7 +185,7 @@ def run_unit_test(unit_test: UnitTests):
             plot_data = pd.concat([np.power(data, 2), ewm_data], axis=1)
             title = 'ewm vol'
 
-        elif unit_test == UnitTests.EWMA_BETA:
+        elif local_test == LocalTests.EWMA_BETA:
 
             cross_xy_types = [qm.CrossXyType.COVAR, qm.CrossXyType.BETA, qm.CrossXyType.CORR]
 
@@ -196,7 +201,7 @@ def run_unit_test(unit_test: UnitTests):
             plot_data = pd.concat([data, ewm_data], axis=1)
             title = 'ewm beta'
 
-        elif unit_test == UnitTests.EWMA_AUTO_CORR:
+        elif local_test == LocalTests.EWMA_AUTO_CORR:
             plot_data = qm.compute_ewm_matrix_autocorr_df(data=data,
                                                           ewm_lambda=ewm_lambda,
                                                           mean_adj_type=qm.MeanAdjType.NONE,
@@ -219,11 +224,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.EWMA_COVAR_TENSOR_NANS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.EWMA_COVAR_TENSOR_NANS)

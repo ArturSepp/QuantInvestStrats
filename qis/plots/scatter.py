@@ -445,25 +445,30 @@ def get_random_data(is_random_beta: bool = True,
     return df
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     SCATTER = 1
     CLASSIFICATION_SCATTER = 2
     CLASSIFICATION_REGRESSION = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     np.random.seed(2)
     df = get_random_data(n=100000)
     print(df)
 
-    if unit_test == UnitTests.SCATTER:
+    if local_test == LocalTests.SCATTER:
         plot_scatter(df=df)
 
-    elif unit_test == UnitTests.CLASSIFICATION_SCATTER:
+    elif local_test == LocalTests.CLASSIFICATION_SCATTER:
         plot_classification_scatter(df=df, x='x', y='y')
 
-    elif unit_test == UnitTests.CLASSIFICATION_REGRESSION:
+    elif local_test == LocalTests.CLASSIFICATION_REGRESSION:
         y_rpeds = estimate_classification_scatter(df=df, x='x', y='y')
         plot_classification_scatter(df=df, x='x', y='y')
         print(y_rpeds)
@@ -474,11 +479,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CLASSIFICATION_REGRESSION
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.CLASSIFICATION_REGRESSION)

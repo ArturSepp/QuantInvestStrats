@@ -78,19 +78,24 @@ def generate_equity_bond_portfolio(prices: pd.DataFrame,
     return volparity_portfolio
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     VOLPARITY_PORTFOLIO = 1
     EQUITY_BOND = 2
     DELTA1_STRATEGY = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    time_period = qis.TimePeriod('31Dec2005', '21Apr2025')  # time period for portfolio reporting
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    time_period = qis.TimePeriod('31Dec2005', '04Aug2025')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2022', time_period.end)
     rebalancing_costs = 0.0010  # per traded volume
 
-    if unit_test == UnitTests.VOLPARITY_PORTFOLIO:
+    if local_test == LocalTests.VOLPARITY_PORTFOLIO:
 
         prices, benchmark_prices, group_data = fetch_universe_data()
         portfolio_data = generate_volparity_portfolio(prices=prices,
@@ -99,37 +104,30 @@ def run_unit_test(unit_test: UnitTests):
                                                       span=30,
                                                       vol_target=0.15,
                                                       rebalancing_costs=rebalancing_costs)
+        is_extended = False
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                                benchmark_prices=benchmark_prices,
                                                time_period=time_period,
-                                               add_current_position_var_risk_sheet=True,
-                                               add_weights_turnover_sheet=True,
-                                               add_grouped_exposures=False,
-                                               add_grouped_cum_pnl=False,
-                                               add_weight_change_report=False,
-                                               add_current_signal_report=False,
-                                               add_instrument_history_report=True,
+                                               add_grouped_weights_sheet=True,
+                                               add_performance_risk_attribution_sheet=True,
+                                               add_current_position_var_risk_sheet=is_extended,
+                                               add_grouped_exposures=is_extended,
+                                               add_grouped_cum_pnl=is_extended,
+                                               add_current_signal_report=is_extended,
+                                               add_instrument_history_report=is_extended,
+                                               add_weight_change_report=is_extended,
+                                               weights_change_lag=60,
                                                **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_long",
                              local_path=qis.local_path.get_output_path())
+        """
         qis.save_fig(fig=figs[0], file_name=f"strategy1", local_path=qis.local_path.get_output_path())
         qis.save_fig(fig=figs[1], file_name=f"strategy2", local_path=qis.local_path.get_output_path())
         qis.save_fig(fig=figs[2], file_name=f"strategy3", local_path=qis.local_path.get_output_path())
+        """
 
-        """
-        figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                               benchmark_prices=benchmark_prices,
-                                               time_period=time_period_short,
-                                               add_current_position_var_risk_sheet=True,
-                                               add_grouped_exposures=True,
-                                               add_grouped_cum_pnl=True,
-                                               **fetch_default_report_kwargs(time_period=time_period_short))
-        qis.save_figs_to_pdf(figs=figs,
-                             file_name=f"{portfolio_data.nav.name}_strategy_factsheet_short",
-                             local_path=qis.local_path.get_output_path())
-        """
-    elif unit_test == UnitTests.EQUITY_BOND:
+    elif local_test == LocalTests.EQUITY_BOND:
         prices, benchmark_prices, group_data = fetch_equity_bond()
         portfolio_data = generate_equity_bond_portfolio(prices=prices,
                                                         weights=[0.6, 0.4],
@@ -155,7 +153,7 @@ def run_unit_test(unit_test: UnitTests):
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
                              local_path=qis.local_path.get_output_path())
 
-    elif unit_test == UnitTests.DELTA1_STRATEGY:
+    elif local_test == LocalTests.DELTA1_STRATEGY:
         from bbg_fetch import fetch_field_timeseries_per_tickers
         prices = fetch_field_timeseries_per_tickers(tickers={'UISYMH5S Index': 'CDX_HY'})
         benchmark_prices = fetch_field_timeseries_per_tickers(tickers={'HYG US Equity': 'HYG'})
@@ -180,11 +178,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.VOLPARITY_PORTFOLIO
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.VOLPARITY_PORTFOLIO)

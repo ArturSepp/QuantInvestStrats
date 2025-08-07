@@ -243,16 +243,21 @@ def matrix_regularization(covar: np.ndarray, cut: float = 1e-5) -> np.ndarray:
     return covar_a
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     CORR = 1
     EWMA_CORR_MATRIX = 2
     PLOT_CORR_MATRIX = 3
     MATRIX_REGULARIZATION = 4
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.CORR:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.CORR:
         t = 100
         n = 4
         data = np.random.normal(0, 1.0, (t, n))
@@ -260,7 +265,7 @@ def run_unit_test(unit_test: UnitTests):
         corrs = corr_to_pivot_row(pivot=pivot, data=data, is_normalized=True)
         print(corrs)
 
-    elif unit_test == UnitTests.EWMA_CORR_MATRIX:
+    elif local_test == LocalTests.EWMA_CORR_MATRIX:
         dates = pd.date_range(start='12/31/2018', end='12/31/2019', freq='B')
         n = 3
         mean = [-2.0, -1.0, 0.0]
@@ -280,7 +285,7 @@ def run_unit_test(unit_test: UnitTests):
         print('corr_last')
         print(corr[:, :, -1])
 
-    elif unit_test == UnitTests.PLOT_CORR_MATRIX:
+    elif local_test == LocalTests.PLOT_CORR_MATRIX:
 
         dates = pd.date_range(start='31Dec2020', end='31Dec2021', freq='B')
         n = 3
@@ -295,7 +300,7 @@ def run_unit_test(unit_test: UnitTests):
                              legend_stats=pts.LegendStats.AVG_LAST,
                              trend_line=pts.TrendLine.AVERAGE)
 
-    elif unit_test == UnitTests.MATRIX_REGULARIZATION:
+    elif local_test == LocalTests.MATRIX_REGULARIZATION:
         covar = np.array([[1.0, -0.01, 0.01],
                          [-0.01, 0.5, 0.005],
                          [0.01, 0.005, 0.0001]])
@@ -307,11 +312,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.MATRIX_REGULARIZATION
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.MATRIX_REGULARIZATION)

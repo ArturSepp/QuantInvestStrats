@@ -1016,7 +1016,7 @@ class MultiPortfolioData:
                                      time_period: TimePeriod = None,
                                      regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
                                      total_name: str = 'Total',
-                                     exposures_freq: Optional[str] = 'W-WED',
+                                     weights_freq: Optional[str] = 'W-WED',
                                      figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                      **kwargs
                                      ) -> List[plt.Figure]:
@@ -1029,13 +1029,13 @@ class MultiPortfolioData:
         grouped_exposures_aggs = {}  # dict[portfolio, Dict[group, pd.Dataframe]]
         grouped_pnls_aggs = {}
         for portfolio_data in self.portfolio_datas:
-            grouped_exposures_agg, grouped_exposures_by_inst = portfolio_data.get_grouped_long_short_exposures(time_period=time_period,
-                                                                                                               exposures_freq=exposures_freq,
+            grouped_weights_agg, grouped_weights_by_inst = portfolio_data.get_grouped_long_short_weights(time_period=time_period,
+                                                                                                               weights_freq=weights_freq,
                                                                                                                total_name=total_name)
             grouped_pnls_agg, grouped_pnls_by_inst = portfolio_data.get_grouped_cum_pnls(time_period=time_period,
                                                                                          total_name=total_name)
 
-            grouped_exposures_aggs[portfolio_data.ticker] = grouped_exposures_agg
+            grouped_exposures_aggs[portfolio_data.ticker] = grouped_weights_agg
             grouped_pnls_aggs[portfolio_data.ticker] = grouped_pnls_agg
 
         group_exposures_by_portfolio = {group: {} for group in group_order}

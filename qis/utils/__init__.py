@@ -199,7 +199,7 @@ from qis.utils.np_ops import (
     select_non_nan_x_y
 )
 
-from qis.utils.ols import (
+from qis.utils.regression import (
     estimate_alpha_beta_paired_dfs,
     estimate_ols_alpha_beta,
     fit_multivariate_ols,

@@ -264,8 +264,6 @@ class PortfolioData:
             weights = self.input_weights.copy()
         else:
             weights = self.weights.copy()
-        if time_period is not None:
-            weights = time_period.locate(weights)
         if freq is not None:
             weights = weights.resample(freq).last().ffill()
 
@@ -282,30 +280,59 @@ class PortfolioData:
         elif columns is not None:
             weights = weights[columns]
 
+        if time_period is not None:
+            weights = time_period.locate(weights)
+
         return weights
 
-    def get_grouped_long_short_exposures(self,
-                                         time_period: TimePeriod = None,
-                                         total_name: str = 'Total',
-                                         exposures_freq: Optional[str] = 'W-WED'
-                                         ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
-        """
-        compute grouped net long / short exposures
+    def get_grouped_long_short_weights(self,
+                                       time_period: TimePeriod = None,
+                                       total_name: str = 'Total',
+                                       weights_freq: Optional[str] = 'W-WED',
+                                       total_column: Optional[str] = None
+                                       ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+        """Computes grouped net long/short exposures by instrument groups.
+
+        Groups portfolio weights by predefined instrument categories and calculates
+        aggregate exposure metrics including total exposure, net long positions, and
+        net short positions for each group.
+
+        Args:
+            time_period: Time period for which to calculate exposures. If None,
+                uses the full available time series.
+            total_name: Column name for the total exposure aggregation. 
+                Defaults to 'Total'.
+            weights_freq: Frequency for resampling exposures data. 
+                Defaults to 'W-WED' (weekly on Wednesday).
+            total_column: Column name for total in group dictionary. If None,
+                no total column is included in grouping.
+        Returns:
+            A tuple containing:
+                - grouped_weights_agg: Dictionary mapping group names to DataFrames
+                  with columns for total, net long, and net short exposures.
+                - grouped_weights_by_inst: Dictionary mapping group names to 
+                  DataFrames containing individual instrument exposures within 
+                  each group.
+
+        Note:
+            Positive exposures represent long positions, negative exposures 
+            represent short positions. Net long sums only positive values,
+            net short sums only negative values.
         """
         group_dict = dfg.get_group_dict(group_data=self.group_data,
                                         group_order=self.group_order,
-                                        total_column=None)
-        all_exposures = self.get_weights(time_period=time_period, freq=exposures_freq)
-        grouped_exposures_by_inst = {}
-        grouped_exposures_agg = {}
+                                        total_column=total_column)
+        all_exposures = self.get_weights(time_period=time_period, freq=weights_freq)
+        grouped_weights_by_inst = {}
+        grouped_weights_agg = {}
         for group, tickers in group_dict.items():
             exposures_by_inst = all_exposures[tickers]
-            grouped_exposures_by_inst[group] = exposures_by_inst
+            grouped_weights_by_inst[group] = exposures_by_inst
             total = dfa.nansum(exposures_by_inst, axis=1).rename(total_name)
             net_long = dfa.nansum_positive(exposures_by_inst, axis=1).rename('Net Long')
             net_short = dfa.nansum_negative(exposures_by_inst, axis=1).rename('Net Short')
-            grouped_exposures_agg[group] = pd.concat([total, net_long, net_short], axis=1)
-        return grouped_exposures_agg, grouped_exposures_by_inst
+            grouped_weights_agg[group] = pd.concat([total, net_long, net_short], axis=1)
+        return grouped_weights_agg, grouped_weights_by_inst
 
     def get_grouped_cum_pnls(self,
                              total_name: str = 'Total',
@@ -536,7 +563,7 @@ class PortfolioData:
 
     def get_instruments_pnl_risk_attribution(self,
                                              time_period: TimePeriod = None
-                                             ) -> pd.DataFrame:
+                                             ) -> pd.Series:
         pnl = self.get_instruments_pnl(time_period=time_period)
         # portfolio_pnl = pnl.sum(axis=1)
 

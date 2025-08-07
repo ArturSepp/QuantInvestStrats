@@ -263,14 +263,19 @@ def trunc_dens(x: np.ndarray,
     return d_support, d_dens
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     TEST = 1
     RETURNS = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.TEST:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.TEST:
         np.random.seed(1)
         n_instruments = 100
         m_samples = 2
@@ -287,7 +292,7 @@ def run_unit_test(unit_test: UnitTests):
                        **global_kwargs)
         # ax.locator_params(nbins=10, axis='x')
 
-    elif unit_test == UnitTests.RETURNS:
+    elif local_test == LocalTests.RETURNS:
         from qis.test_data import load_etf_data
         prices = load_etf_data().dropna()
         returns = qis.to_returns(prices=prices[['EEM', 'SPY']], freq='QE')
@@ -302,11 +307,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.RETURNS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.RETURNS)

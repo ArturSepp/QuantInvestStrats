@@ -12,7 +12,7 @@ from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_fa
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     CORE_ETFS = 1
     BTC_SQQQ = 2
     HEDGED_ETFS = 3
@@ -21,28 +21,33 @@ class UnitTests(Enum):
     HYG_ETFS = 6
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     end_date = '21Apr2025'  # performance repoting
 
     prices = None  # if Noe, use yahoo finance data
 
-    if unit_test == UnitTests.CORE_ETFS:
+    if local_test == LocalTests.CORE_ETFS:
         benchmark = 'SPY'
         tickers = [benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
         time_period = qis.TimePeriod('31Dec2007', end_date)  # time period for reporting
 
-    elif unit_test == UnitTests.BTC_SQQQ:
+    elif local_test == LocalTests.BTC_SQQQ:
         benchmark = 'QQQ'
         tickers = [benchmark, 'BTC-USD', 'TQQQ', 'SQQQ']
         time_period = qis.TimePeriod('31Dec2019', end_date)
 
-    elif unit_test == UnitTests.HEDGED_ETFS:
+    elif local_test == LocalTests.HEDGED_ETFS:
         benchmark = 'SPY'
         tickers = [benchmark, 'SHY', 'LQDH', 'HYGH', 'FLOT']
         time_period = qis.TimePeriod('27May2014', end_date)
 
-    elif unit_test == UnitTests.BBG:
+    elif local_test == LocalTests.BBG:
         benchmark = 'SPTR'
         tickers = {'SPTR Index': benchmark,
                    'SGEPMLU Index': 'SG AI long/short', 'SGEPMLUL Index': 'SG AI long', 'SGEPMLUS Index': 'SG AI short',
@@ -56,7 +61,7 @@ def run_unit_test(unit_test: UnitTests):
         prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
         prices = prices.rename(tickers, axis=1)
 
-    elif unit_test == UnitTests.RATES_FUTURES:
+    elif local_test == LocalTests.RATES_FUTURES:
         benchmark = '2y UST'
         tickers = {'TU1 Comdty': benchmark,
                    'ED5 Comdty': 'USD IR',
@@ -69,7 +74,7 @@ def run_unit_test(unit_test: UnitTests):
         prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
         prices = prices.rename(tickers, axis=1)
 
-    elif unit_test == UnitTests.HYG_ETFS:
+    elif local_test == LocalTests.HYG_ETFS:
         benchmark = 'IBOXHY'
         tickers = {'IBOXHY Index': benchmark,
                    'HYDB US Equity': 'HYDB',
@@ -104,11 +109,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CORE_ETFS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.CORE_ETFS)

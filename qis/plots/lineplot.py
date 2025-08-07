@@ -202,14 +202,19 @@ def plot_lines_list(xy_datas: Dict[str, pd.DataFrame],
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     LINEPLOT = 1
     MOVE_DATA = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.LINEPLOT:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.LINEPLOT:
         x = np.linspace(0, 14, 100)
         y = np.sin(x)
         data = pd.Series(y, index=x, name='data')
@@ -220,7 +225,7 @@ def run_unit_test(unit_test: UnitTests):
                   linestyle='dotted',
                   ax=axs[1], **global_kwargs)
 
-    elif unit_test == UnitTests.MOVE_DATA:
+    elif local_test == LocalTests.MOVE_DATA:
         with sns.axes_style("darkgrid"):
             fig, axs = plt.subplots(2, 1, figsize=(12, 6))
             global_kwargs = dict(fontsize=12, linewidth=2.0, weight='normal', markersize=2)
@@ -252,11 +257,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.MOVE_DATA
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.MOVE_DATA)

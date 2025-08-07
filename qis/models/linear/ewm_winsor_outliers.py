@@ -307,12 +307,17 @@ def ewm_winsdor_markovian_score(a: np.ndarray,
     return clean_a, ewm, ewm2, score
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     TEST1 = 1
     MARKOVIAN_WINDSOR = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     np.random.seed(2) #freeze seed
 
@@ -326,7 +331,7 @@ def run_unit_test(unit_test: UnitTests):
                         columns=['x'+str(m+1) for m in range(n)])
     # data = pd.Series(data=data_np, index=dates, name='data')
 
-    if unit_test == UnitTests.TEST1:
+    if local_test == LocalTests.TEST1:
         winsor_data = ewm_insample_winsorising(data=data,
                                                ewm_lambda=0.94,
                                                nan_replacement_type=ReplacementType.EWMA_MEAN,
@@ -345,7 +350,7 @@ def run_unit_test(unit_test: UnitTests):
                              trend_line=qis.TrendLine.AVERAGE,
                              var_format='{:.2f}')
 
-    elif unit_test == UnitTests.MARKOVIAN_WINDSOR:
+    elif local_test == LocalTests.MARKOVIAN_WINDSOR:
         clean_x, ewm, ewm2, score = ewm_winsdor_markovian_score(a=data.to_numpy(), span=7,
                                                                 init_value=0.0,
                                                                 init_var=0.1*np.ones(len(data.columns)))
@@ -362,11 +367,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.MARKOVIAN_WINDSOR
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.MARKOVIAN_WINDSOR)

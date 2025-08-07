@@ -124,20 +124,25 @@ def generate_performances(prices: pd.DataFrame,
     r.save(report_file_name)
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     ETF_DATA = 1
     CRYPTO_DATA = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
 
-    if unit_test == UnitTests.ETF_DATA:
+    if local_test == LocalTests.ETF_DATA:
         regime_benchmark = 'SPY'
         tickers = [regime_benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
 
-    elif unit_test == UnitTests.CRYPTO_DATA:
+    elif local_test == LocalTests.CRYPTO_DATA:
         regime_benchmark = 'BTC-USD'
         tickers = [regime_benchmark, 'ETH-USD', 'SOL-USD']
 
@@ -168,11 +173,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.ETF_DATA
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.ETF_DATA)

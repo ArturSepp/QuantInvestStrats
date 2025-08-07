@@ -156,24 +156,29 @@ def plot_top_drawdowns_paths(price: pd.Series,
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     DRAWDOWN_TS = 1
     ROLLING_TIME = 2
     PLOT_TOP_DRAWDOWNS = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data() # .dropna()
 
-    if unit_test == UnitTests.DRAWDOWN_TS:
+    if local_test == LocalTests.DRAWDOWN_TS:
         plot_rolling_drawdowns(prices=prices)
 
-    elif unit_test == UnitTests.ROLLING_TIME:
+    elif local_test == LocalTests.ROLLING_TIME:
         plot_rolling_time_under_water(prices=prices)
 
-    elif unit_test == UnitTests.PLOT_TOP_DRAWDOWNS:
+    elif local_test == LocalTests.PLOT_TOP_DRAWDOWNS:
         # plot_top_drawdowns_ts(price=prices['TLT'], freq='D')
         plot_top_drawdowns_paths(price=prices['TLT'], highlight_ongoing=True, freq='D')
 
@@ -182,11 +187,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.DRAWDOWN_TS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.DRAWDOWN_TS)

@@ -80,7 +80,7 @@ def generate_volparity_multiportfolio(prices: pd.DataFrame,
     return multi_portfolio_data
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     STRATEGY_BENCHMARK_PLT = 1
     PERFORMANCE_ATTRIBUTION = 2
     ACTIVE_PERFORMANCE = 3
@@ -88,7 +88,12 @@ class UnitTests(Enum):
 
 
 @qis.timer
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     # time period for portfolio reporting
     time_period = qis.TimePeriod('31Dec2006', '21Apr2025')
@@ -103,7 +108,7 @@ def run_unit_test(unit_test: UnitTests):
                                                              rebalancing_costs=0.0010  # per traded volume
                                                              )
 
-    if unit_test == UnitTests.STRATEGY_BENCHMARK_PLT:
+    if local_test == LocalTests.STRATEGY_BENCHMARK_PLT:
         pnl_attribution = True
         figs = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=multi_portfolio_data,
                                                          backtest_name='Vol Parity Portfolio vs Equal Weight',
@@ -125,19 +130,19 @@ def run_unit_test(unit_test: UnitTests):
             qis.save_fig(fig=figs[1], file_name=f"brinson_attribution", local_path=qis.local_path.get_output_path())
             qis.save_fig(fig=figs[2], file_name=f"pnl_attribution", local_path=qis.local_path.get_output_path())
 
-    elif unit_test == UnitTests.PERFORMANCE_ATTRIBUTION:
+    elif local_test == LocalTests.PERFORMANCE_ATTRIBUTION:
         figs = generate_performance_attribution_report(multi_portfolio_data=multi_portfolio_data,
                                                        time_period=TimePeriod('31Dec2021', None),
                                                        **fetch_default_report_kwargs(time_period=time_period))
 
-    elif unit_test == UnitTests.ACTIVE_PERFORMANCE:
+    elif local_test == LocalTests.ACTIVE_PERFORMANCE:
         figs = generate_strategy_benchmark_active_perf_plt(multi_portfolio_data=multi_portfolio_data,
                                                            time_period=time_period,
                                                            figsize=(11, 6),
                                                            is_long_only=True,
                                                            **fetch_default_report_kwargs(time_period=time_period))
 
-    elif unit_test == UnitTests.TRACKING_ERROR:
+    elif local_test == LocalTests.TRACKING_ERROR:
         # compute pd_covras
         covar_dict = qis.estimate_rolling_ewma_covar(prices=prices,
                                                      time_period=time_period,
@@ -163,11 +168,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.STRATEGY_BENCHMARK_PLT
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.STRATEGY_BENCHMARK_PLT)

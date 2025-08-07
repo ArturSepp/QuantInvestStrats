@@ -60,12 +60,17 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
     return multi_portfolio_data
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
         MULTI_PORTFOLIO = 1
         STRATEGY_BENCHMARK = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     time_period = qis.TimePeriod('31Dec2005', '21Apr2025')  # time period for portfolio reporting
 
@@ -78,7 +83,7 @@ def run_unit_test(unit_test: UnitTests):
                                                              rebalancing_costs=0.0010  # per traded volume
                                                              )
 
-    if unit_test == UnitTests.MULTI_PORTFOLIO:
+    if local_test == LocalTests.MULTI_PORTFOLIO:
 
         report = generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period,
@@ -88,7 +93,7 @@ def run_unit_test(unit_test: UnitTests):
         report.save(filename)
         print(f"saved allocation report to {filename}")
 
-    elif unit_test == UnitTests.STRATEGY_BENCHMARK:
+    elif local_test == LocalTests.STRATEGY_BENCHMARK:
 
         report = generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data=multi_portfolio_data,
                                                                     strategy_idx=-1,
@@ -103,11 +108,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.STRATEGY_BENCHMARK
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.STRATEGY_BENCHMARK)

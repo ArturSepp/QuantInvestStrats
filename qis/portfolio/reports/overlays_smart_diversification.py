@@ -442,11 +442,16 @@ def create_overlay_portfolio_curve(principal_nav: pd.Series,
     return portfolio_navs
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     CURVE = 1
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data()
@@ -454,7 +459,7 @@ def run_unit_test(unit_test: UnitTests):
     overlays = ['TLT', 'GLD']
     prices = prices[['SPY']+overlays].dropna()
 
-    if unit_test == UnitTests.CURVE:
+    if local_test == LocalTests.CURVE:
 
         sd_report = SmartDiversificationReport(principal_nav=prices.iloc[:, 0], overlay_navs=prices[overlays])
 
@@ -469,12 +474,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CURVE
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
-
+    run_local_test(local_test=LocalTests.CURVE)

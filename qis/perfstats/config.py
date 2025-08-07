@@ -240,23 +240,21 @@ class PerfParams:
         return this_copy
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     PERFORMANCE_STAT = 1
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.PERFORMANCE_STAT:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.PERFORMANCE_STAT:
         print(PerfStat.TOTAL_RETURN)
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PERFORMANCE_STAT
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.PERFORMANCE_STAT)

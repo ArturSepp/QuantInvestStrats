@@ -155,7 +155,7 @@ def get_test_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return prices, fund_data
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     PLOT_PRICE_BOOTSTRAP = 1
     PLOT_EW_INDEX = 2
     FIT_AR_MODEL = 3
@@ -164,23 +164,28 @@ class UnitTests(Enum):
     PLOT_JOINT_BOOTSTRAP = 6
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
-    if unit_test == UnitTests.PLOT_PRICE_BOOTSTRAP:
+    if local_test == LocalTests.PLOT_PRICE_BOOTSTRAP:
         plot_price_bootrstrap(prices['SPY'])
 
-    elif unit_test == UnitTests.PLOT_EW_INDEX:
+    elif local_test == LocalTests.PLOT_EW_INDEX:
         plot_ew_index_bootrstrap(prices)
 
-    elif unit_test == UnitTests.FIT_AR_MODEL:
+    elif local_test == LocalTests.FIT_AR_MODEL:
         data = fu.load_df_from_csv(file_name='UNI_Uniswap_cmc', folder_name='crypto/instruments')
         unit_volume = np.divide(data['volume'], data['close']).rename('unit volume')
         estimate_ar_model(data=unit_volume)
 
-    elif unit_test == UnitTests.AR_RESIDUALS:
+    elif local_test == LocalTests.AR_RESIDUALS:
         prices, fund_data = get_test_data()
         residuals, intercept, beta = bts.compute_ar_residuals(data=fund_data)
         residuals = pd.DataFrame(residuals, index=fund_data.index, columns=fund_data.columns)
@@ -188,12 +193,12 @@ def run_unit_test(unit_test: UnitTests):
                              legend_stats=pts.LegendStats.AVG_STD,
                              var_format='{:,.0f}')
 
-    elif unit_test == UnitTests.PLOT_AR_BOOTSTRAP:
+    elif local_test == LocalTests.PLOT_AR_BOOTSTRAP:
         prices, fund_data = get_test_data()
         data = fund_data.iloc[:, 1]
         plot_ar_bootstrap(data=data)
 
-    elif unit_test == UnitTests.PLOT_JOINT_BOOTSTRAP:
+    elif local_test == LocalTests.PLOT_JOINT_BOOTSTRAP:
         plot_joint_bootstrap()
 
     plt.show()
@@ -201,11 +206,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.FIT_AR_MODEL
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.FIT_AR_MODEL)

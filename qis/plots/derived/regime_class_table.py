@@ -65,17 +65,22 @@ def plot_quantile_class_table(data: pd.DataFrame,
                       **kwargs)
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     QUANTILE_CLASS_TABLE = 1
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
     returns = prices.asfreq('QE', method='ffill').pct_change().dropna()
 
-    if unit_test == UnitTests.QUANTILE_CLASS_TABLE:
+    if local_test == LocalTests.QUANTILE_CLASS_TABLE:
         plot_quantile_class_table(data=returns, x_column='SPY', num_buckets=4, hue_name='quantile regime')
 
     plt.show()
@@ -83,11 +88,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.QUANTILE_CLASS_TABLE
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.QUANTILE_CLASS_TABLE)

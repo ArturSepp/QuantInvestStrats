@@ -159,7 +159,7 @@ def add_bnb_regime_shadows(ax: plt.Subplot,
         ax.set_xlim(price_data_index[0], regime_ids.index[-1])
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     BNB_REGIME = 1
     VOL_REGIME = 2
     BNB_REGIME_SHADOWS = 3
@@ -167,7 +167,12 @@ class UnitTests(Enum):
     AVG_PLOT = 5
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
@@ -176,7 +181,7 @@ def run_unit_test(unit_test: UnitTests):
 
     perf_params = PerfParams()
 
-    if unit_test == UnitTests.BNB_REGIME:
+    if local_test == LocalTests.BNB_REGIME:
         regime_params = BenchmarkReturnsQuantileRegimeSpecs()
         regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
         regime_ids = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices, benchmark='SPY')
@@ -214,7 +219,7 @@ def run_unit_test(unit_test: UnitTests):
                          bbox_to_anchor=None,
                          **kwargs)
 
-    elif unit_test == UnitTests.VOL_REGIME:
+    elif local_test == LocalTests.VOL_REGIME:
         regime_params = VolQuantileRegimeSpecs()
         perf_params = PerfParams()
         regime_classifier = BenchmarkVolsQuantilesRegime(regime_params=regime_params)
@@ -241,7 +246,7 @@ def run_unit_test(unit_test: UnitTests):
                          is_use_vbar=False,
                          **kwargs)
 
-    elif unit_test == UnitTests.BNB_REGIME_SHADOWS:
+    elif local_test == LocalTests.BNB_REGIME_SHADOWS:
         import qis.plots.time_series as pts
         with sns.axes_style('white'):
             fig, ax = plt.subplots(1, 1, figsize=(10, 10), constrained_layout=True)
@@ -253,14 +258,14 @@ def run_unit_test(unit_test: UnitTests):
                                    regime_params=BenchmarkReturnsQuantileRegimeSpecs(),
                                    perf_params=PerfParams())
 
-    elif unit_test == UnitTests.BNB_PERF_TABLE:
+    elif local_test == LocalTests.BNB_PERF_TABLE:
         df = compute_bnb_regimes_pa_perf_table(prices=prices,
                                                benchmark='SPY',
                                                regime_params=BenchmarkReturnsQuantileRegimeSpecs(),
                                                perf_params=PerfParams())
         print(df)
 
-    elif unit_test == UnitTests.AVG_PLOT:
+    elif local_test == LocalTests.AVG_PLOT:
         regime_params = VolQuantileRegimeSpecs()
         perf_params = PerfParams()
         regime_classifier = BenchmarkVolsQuantilesRegime(regime_params=regime_params)
@@ -279,11 +284,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.BNB_REGIME
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.BNB_REGIME)

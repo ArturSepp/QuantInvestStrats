@@ -10,7 +10,7 @@ from enum import Enum
 
 # qis
 import qis.utils.dates as da
-import qis.utils.ols as ols
+import qis.utils.regression as ols
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfStat, PerfParams
 
@@ -487,40 +487,38 @@ def compute_drawdowns_stats_table(price: pd.Series,
     return df
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     RA_PERF_TABLE = 1
     DRAWDOWN = 2
     DRAWDOWN_STATS_TABLE = 3
     TOP_BOTTOM = 4
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data() # .dropna()
 
-    if unit_test == UnitTests.RA_PERF_TABLE:
+    if local_test == LocalTests.RA_PERF_TABLE:
         perf_params = PerfParams(freq='B')
         table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
         print(table)
         print(table.columns)
 
-    elif unit_test == UnitTests.DRAWDOWN:
+    elif local_test == LocalTests.DRAWDOWN:
         dd_data = compute_rolling_drawdowns(prices=prices['SPY'])
         print(dd_data)
 
-    elif unit_test == UnitTests.DRAWDOWN_STATS_TABLE:
+    elif local_test == LocalTests.DRAWDOWN_STATS_TABLE:
         df = compute_drawdowns_stats_table(price=prices['SPY'])
         print(df)
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.RA_PERF_TABLE
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.RA_PERF_TABLE)

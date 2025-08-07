@@ -1,5 +1,8 @@
 """
 local_path uses setting.yaml to return absolute path for file/folder paths
+use:
+git update-index --skip-worktree optimalportfolios/settings.yaml
+
 example usage:
 import local_path as lp
 lp.get_resource_path()

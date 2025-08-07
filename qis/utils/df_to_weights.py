@@ -227,17 +227,22 @@ def compute_long_short_ind(data: np.ndarray,
     return signal
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     CONV = 1
     EW_ALLOC = 2
     AC_EQUAL_WEIGHT_ALLOCATION = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     import qis.utils.df_ops as dfo
 
-    if unit_test == UnitTests.CONV:
+    if local_test == LocalTests.CONV:
         constituent_dict = {'f1': np.array((0, np.nan, 1, 1)),
                             'f2': np.array((0, np.nan, np.nan, 1)),
                             'f3': np.array((0, np.nan, 1, 1)),
@@ -282,7 +287,7 @@ def run_unit_test(unit_test: UnitTests):
                                                        return_df=True)
         print(f"ac_conv_pd:\n{ac_conv_pd}")
 
-    elif unit_test == UnitTests.EW_ALLOC:
+    elif local_test == LocalTests.EW_ALLOC:
         constituent_dict = {'f1': np.array((0, np.nan, 2, 3)),
                             'f2': np.array((0, np.nan, np.nan, 4)),
                             'f3': np.array((0, np.nan, 1, 1)),
@@ -295,7 +300,7 @@ def run_unit_test(unit_test: UnitTests):
         weights = df_to_equal_weight_allocation(constituent_prices)
         print(weights)
 
-    elif unit_test == UnitTests.AC_EQUAL_WEIGHT_ALLOCATION:
+    elif local_test == LocalTests.AC_EQUAL_WEIGHT_ALLOCATION:
         universe_data = dict(SPY='Equities',
                              QQQ='Equities',
                              EEM='Equities',
@@ -323,11 +328,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.AC_EQUAL_WEIGHT_ALLOCATION
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.AC_EQUAL_WEIGHT_ALLOCATION)

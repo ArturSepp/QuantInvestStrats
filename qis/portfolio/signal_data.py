@@ -11,7 +11,7 @@ from qis.utils.dates import TimePeriod
 from qis.utils.df_str import date_to_str
 from qis.utils.df_groups import get_group_dict
 from qis.utils.df_melt import melt_df_by_columns
-from qis.utils.ols import fit_ols
+from qis.utils.regression import fit_ols
 from qis.utils.df_freq import df_resample_at_int_index, df_resample_at_freq
 
 

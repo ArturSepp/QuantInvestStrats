@@ -375,13 +375,18 @@ def bootstrap_price_fundamental_data(price_datas: Dict[str, Union[pd.Series, pd.
     return bootstrap_prices, bootstrap_fundamentals
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     DATA_LIST = 1
     DATA_SERIES = 2
     BTC = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     # simulate t*n data
     dates = pd.date_range(start='12/31/2018', end='12/31/2019', freq='B')
@@ -392,20 +397,20 @@ def run_unit_test(unit_test: UnitTests):
                         columns=['x'+str(m+1) for m in range(n)])
     print(data)
 
-    if unit_test == UnitTests.DATA_LIST:
+    if local_test == LocalTests.DATA_LIST:
         bt_lists = bootstrap_data(data=data,
                                   bootsrap_type=BootsrapType.STATIONARY,
                                   bootsrap_output=BootsrapOutput.DF_TO_LIST_ARRAYS)
         for this in bt_lists:
             print(this)
 
-    elif unit_test == UnitTests.DATA_SERIES:
+    elif local_test == LocalTests.DATA_SERIES:
         bt_data = bootstrap_data(data=data.iloc[:, 0],
                                  bootsrap_type=BootsrapType.STATIONARY,
                                  bootsrap_output=BootsrapOutput.SERIES_TO_DF)
         print(bt_data)
 
-    elif unit_test == UnitTests.BTC:
+    elif local_test == LocalTests.BTC:
         from legacy.crypto.data.apis.coinmetric_ import load_btc_price
         pivot_prices = load_btc_price().dropna()
         bt_data = bootstrap_price_data(prices=pivot_prices,
@@ -416,11 +421,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.BTC
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.BTC)

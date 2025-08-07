@@ -216,16 +216,21 @@ def plot_strategies_returns_scatter(nav_data: pd.DataFrame,
                                  **kwargs)
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     BTC_SIMULATION = 1
     SPY_SIMULATION = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     import yfinance as yf
 
-    if unit_test == UnitTests.BTC_SIMULATION:
+    if local_test == LocalTests.BTC_SIMULATION:
         prices = yf.download(tickers=['BTC-USD'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename('BTC').dropna()
 
         time_period = qis.TimePeriod('31Dec2015', '21Jun2023')
@@ -233,7 +238,7 @@ def run_unit_test(unit_test: UnitTests):
         fu.save_figs_to_pdf(figs=figs, file_name='btc_analysis', orientation='landscape',
                             add_current_date=True, local_path=None)
 
-    elif unit_test == UnitTests.SPY_SIMULATION:
+    elif local_test == LocalTests.SPY_SIMULATION:
         prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename('SPY').dropna()
         time_period = qis.TimePeriod('31Dec2019', '15Aug2024')
         figs = create_time_series_report(prices=prices, time_period=time_period, vol_target=0.15, vol_af=260)
@@ -245,11 +250,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.SPY_SIMULATION
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.SPY_SIMULATION)

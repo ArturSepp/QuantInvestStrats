@@ -300,10 +300,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         strategy_name = multi_portfolio_data.portfolio_datas[strategy_idx].ticker
         benchmark_name = multi_portfolio_data.portfolio_datas[benchmark_idx].ticker
         strategy_grouped_exposures_agg, strategy_grouped_exposures_by_inst = \
-            multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_long_short_exposures(time_period=time_period)
+            multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_long_short_weights(time_period=time_period)
 
         benchmark_grouped_exposures_agg, benchmark_grouped_exposures_by_inst = \
-            multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_long_short_exposures(time_period=time_period)
+            multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_long_short_weights(time_period=time_period)
 
         strategy_grouped_pnls_agg, strategy_grouped_pnls_by_inst \
             = multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_cum_pnls(time_period=time_period)

@@ -137,18 +137,23 @@ def melt_signed_paired_df(observations: pd.DataFrame,
     return data_out
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     PD_MELT = 1
     SCATTER_DATA = 2
     MELT_DF_BY_COLUMNS = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna().asfreq('QE', method='ffill')
     returns = prices.pct_change()
 
-    if unit_test == UnitTests.PD_MELT:
+    if local_test == LocalTests.PD_MELT:
         df = pd.DataFrame(data=[[0, 1, 2.5, 0], [2, 3, 5.0, 0], [np.nan, 1, 1, 1]],
                           index=['cat', 'dog', 'missing'],
                           columns=['weight', 'height', 'age', 'sex'])
@@ -162,22 +167,15 @@ def run_unit_test(unit_test: UnitTests):
         box_data = melt_df_by_columns(df=df, x_index_var_name='animal', hue_var_name='hue_features', y_var_name='observations')
         print(f"box_data=\n{box_data}")
 
-    elif unit_test == UnitTests.SCATTER_DATA:
+    elif local_test == LocalTests.SCATTER_DATA:
         scatter_data = melt_scatter_data_with_xvar(df=returns, xvar_str='SPY')
         print(scatter_data)
 
-    elif unit_test == UnitTests.MELT_DF_BY_COLUMNS:
+    elif local_test == LocalTests.MELT_DF_BY_COLUMNS:
         box_data = melt_df_by_columns(df=returns)
         print(box_data)
 
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PD_MELT
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.PD_MELT)

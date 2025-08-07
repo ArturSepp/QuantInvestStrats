@@ -354,29 +354,34 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     PERFORMANCE_LABELS = 1
     PRICE = 2
     PRICE_WITH_DD = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
-    if unit_test == UnitTests.PERFORMANCE_LABELS:
+    if local_test == LocalTests.PERFORMANCE_LABELS:
         this = get_performance_labels_for_stats(prices=prices, perf_stats_labels=[PerfStat.PA_RETURN,
                                                                                   PerfStat.VOL,
                                                                                   PerfStat.SHARPE_RF0,
                                                                                   PerfStat.MAX_DD])
         print(this)
 
-    elif unit_test == UnitTests.PRICE:
+    elif local_test == LocalTests.PRICE:
         perf_params = PerfParams(freq='B')
         plot_prices(prices=prices, perf_params=perf_params)
 
-    elif unit_test == UnitTests.PRICE_WITH_DD:
+    elif local_test == LocalTests.PRICE_WITH_DD:
         perf_params = PerfParams(freq='ME')
         plot_prices_with_dd(prices=prices,
                             regime_benchmark=prices.columns[0],
@@ -387,11 +392,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PERFORMANCE_LABELS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.PERFORMANCE_LABELS)

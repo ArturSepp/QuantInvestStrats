@@ -585,7 +585,7 @@ def reindex_upto_last_nonnan(ds: pd.Series,
     return filled_ds
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     ALIGN = 1
     SCORES = 2
     NONNANINDEX = 3
@@ -593,9 +593,14 @@ class UnitTests(Enum):
     MERGE_DFS_ON_COLUMNS = 5
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.ALIGN:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.ALIGN:
 
         desc_dict1 = {'f0': (0.5, 0.5), 'f1': (0.5, 0.5), 'f2': (0.5, 0.5), 'f3': (0.5, 0.5), 'f4': (0.5, 0.5)}
         df1 = pd.DataFrame.from_dict(desc_dict1, orient='index', columns=['as1', 'as2'])
@@ -614,7 +619,7 @@ def run_unit_test(unit_test: UnitTests):
         print(f"df1_=\n{df1_}")
         print(f"df2_=\n{df2_}")
 
-    elif unit_test == UnitTests.SCORES:
+    elif local_test == LocalTests.SCORES:
         np.random.seed(1)
         nrows, ncols = 20, 5
         df = pd.DataFrame(data=np.random.normal(0.0, 1.0, size=(nrows, ncols)),
@@ -623,7 +628,7 @@ def run_unit_test(unit_test: UnitTests):
         percentiles = compute_last_score(df=df)
         print(percentiles)
 
-    elif unit_test == UnitTests.NONNANINDEX:
+    elif local_test == LocalTests.NONNANINDEX:
 
         values = [1.0, np.nan, 3.0, 4.0, np.nan, 6.0, np.nan, np.nan]
         dates = pd.date_range(start='1Jan2020', periods=len(values))
@@ -632,7 +637,7 @@ def run_unit_test(unit_test: UnitTests):
         last_non_nan = get_first_last_nonnan_index(df=df, is_first=False)
         print(last_non_nan)
 
-    elif unit_test == UnitTests.REINDEX_UPTO_LAST_NONAN:
+    elif local_test == LocalTests.REINDEX_UPTO_LAST_NONAN:
 
         values = [1.0, np.nan, 3.0, 4.0, np.nan, 6.0, np.nan, 1.0]
         dates = pd.date_range(start='1Jan2020', periods=len(values))
@@ -646,7 +651,7 @@ def run_unit_test(unit_test: UnitTests):
         post_filled_up_nan = reindex_upto_last_nonnan(ds=ds, index=dates1, method='ffill')
         print(post_filled_up_nan)
 
-    elif unit_test == UnitTests.MERGE_DFS_ON_COLUMNS:
+    elif local_test == LocalTests.MERGE_DFS_ON_COLUMNS:
         data_entries = {'Bond1': pd.Series(['AAA', 100.00, 'A3'], index=['bbg_ticker', 'face', 'raiting']),
                         'Bond2': pd.Series(['AA', 100.00, 'A2'], index=['bbg_ticker', 'face', 'raiting']),
                         'Bond3': pd.Series(['A', 100.00, 'A1'], index=['bbg_ticker', 'face', 'raiting']),
@@ -666,11 +671,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.MERGE_DFS_ON_COLUMNS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.MERGE_DFS_ON_COLUMNS)

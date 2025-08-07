@@ -162,22 +162,27 @@ def econ_data_report(data: pd.DataFrame,
     return figs
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     UPDATE_DATA = 1
     RUN_REPORT = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     import matplotlib.pyplot as plt
-    if unit_test == UnitTests.UPDATE_DATA:
+    if local_test == LocalTests.UPDATE_DATA:
         from bbg_fetch import fetch_field_timeseries_per_tickers
         vix_tickers = ['VIX1D Index', 'VIX9D Index', 'VIX Index', 'VIX3M Index', 'VIX6M Index', 'VIX1Y Index']
         vols = 0.01 * fetch_field_timeseries_per_tickers(tickers=vix_tickers, field='PX_LAST', CshAdjNormal=True)
         print(vols)
         qis.save_df_to_csv(df=vols, file_name='vix_indices')
 
-    elif unit_test == UnitTests.RUN_REPORT:
+    elif local_test == LocalTests.RUN_REPORT:
         df = qis.load_df_from_csv(file_name='vix_indices')
         figs = econ_data_report(data=df)
         qis.save_figs_to_pdf(figs, file_name='vix_indices')
@@ -187,11 +192,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.RUN_REPORT
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.RUN_REPORT)

@@ -892,7 +892,7 @@ def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
     return file_path
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     LOCAL_PATHS = 1
     FOLDER_FILES = 2
     NAMES = 3
@@ -900,25 +900,30 @@ class UnitTests(Enum):
     UNIVERSE = 5
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.LOCAL_PATHS:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.LOCAL_PATHS:
         print(get_paths())
         print(platform.system())
         print(OUTPUT_PATH)
 
-    elif unit_test == UnitTests.FOLDER_FILES:
+    elif local_test == LocalTests.FOLDER_FILES:
         get_all_folder_files(folder_path="C://")
 
-    elif unit_test == UnitTests.NAMES:
+    elif local_test == LocalTests.NAMES:
         file_name = join_file_name_parts(['head', 'tails'])
         print(file_name)
 
-    elif unit_test == UnitTests.DATA_FILE:
+    elif local_test == LocalTests.DATA_FILE:
         file_path = get_local_file_path(file_name='ETH', file_type=FileTypes.CSV)
         print(file_path)
 
-    elif unit_test == UnitTests.UNIVERSE:
+    elif local_test == LocalTests.UNIVERSE:
         file_path = get_local_file_path(file_name='ETH',
                                         folder_name='bitmex',
                                         key='1d',
@@ -928,11 +933,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.UNIVERSE
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.UNIVERSE)

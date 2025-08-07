@@ -172,20 +172,25 @@ def df_resample_at_int_index(df: pd.DataFrame,
     return df
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     AS_FREQ = 1
     RESAMPLE = 2
     INT_INDEX = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     time_period = da.TimePeriod('1Jan2020', '05Jan2021')
     daily_index = time_period.to_pd_datetime_index(freq='B')
     df = pd.DataFrame(data=np.tile(np.array([1.0, 2.0]), (len(daily_index), 1)), index=daily_index, columns=['1', '2'])
     print(df)
 
-    if unit_test == UnitTests.AS_FREQ:
+    if local_test == LocalTests.AS_FREQ:
         freq_data = df_asfreq(df=df, freq='YE')
         print(freq_data)
         freq_data = df_asfreq(df=df, freq='YE', include_end_date=True)
@@ -196,7 +201,7 @@ def run_unit_test(unit_test: UnitTests):
         print(freq_data_s)
         print(type(freq_data_s.index))
 
-    elif unit_test == UnitTests.RESAMPLE:
+    elif local_test == LocalTests.RESAMPLE:
 
         time_period1 = da.TimePeriod('1Jan2020', '1Jan2021')
         other_index = time_period1.to_pd_datetime_index(freq='QE')
@@ -209,7 +214,7 @@ def run_unit_test(unit_test: UnitTests):
         print(freq_data2)
         print(freq_data2.index)
 
-    elif unit_test == UnitTests.INT_INDEX:
+    elif local_test == LocalTests.INT_INDEX:
         # df1 = df_resample_at_int_index(df=df, sample_size=21)
         # print(df1)
         df2 = df_resample_at_int_index(df=df.cumsum(0), func=None, sample_size=21)
@@ -219,11 +224,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.INT_INDEX
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.INT_INDEX)

@@ -71,23 +71,28 @@ def plot_vol_vs_underlying(spot: pd.Series, vol: pd.Series, time_period: qis.Tim
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     VIX_SPY = 1
     USDJPY = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     time_period = qis.TimePeriod('01Jan1996', None)
 
-    if unit_test == UnitTests.VIX_SPY:
+    if local_test == LocalTests.VIX_SPY:
         prices = yf.download(['SPY', '^VIX'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close']
         fig = plot_vol_vs_underlying(spot=prices['SPY'].rename('S&P500'),
                                      vol=prices['^VIX'].rename('VIX'),
                                      time_period=time_period)
         qis.save_fig(fig, file_name='spx_vix')
 
-    elif unit_test == UnitTests.USDJPY:
+    elif local_test == LocalTests.USDJPY:
         # need to use bloomberg data
         from bbg_fetch import fetch_fields_timeseries_per_ticker
         spot = fetch_fields_timeseries_per_ticker(ticker='USDJPY Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY')
@@ -99,11 +104,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.VIX_SPY
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.VIX_SPY)

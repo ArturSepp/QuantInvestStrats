@@ -155,26 +155,31 @@ def plot_autocorr_in_block_size(prices: pd.Series,
     return figs
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     PLOT_BOOTSRAPPED_PRICES = 1
     PLOT_AUTOCORR_BLOCKSIZES = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
     # to save pds
     LOCAL_PATH = "C://Users//artur//OneDrive//analytics//outputs//"
 
     # download spy prices
     prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename('Realised')
 
-    if unit_test == UnitTests.PLOT_BOOTSRAPPED_PRICES:
+    if local_test == LocalTests.PLOT_BOOTSRAPPED_PRICES:
         # use small number of num_samples for illustration
         figs = plot_bootsrap_paths(prices=prices,
                                    block_size=30,
                                    num_samples=50)
         qis.save_figs_to_pdf(figs, file_name='bootstrap_illustrations', local_path=LOCAL_PATH)
 
-    elif unit_test == UnitTests.PLOT_AUTOCORR_BLOCKSIZES:
+    elif local_test == LocalTests.PLOT_AUTOCORR_BLOCKSIZES:
         # block_size = 1 corresponds to iid sampling
         figs = plot_autocorr_in_block_size(prices=prices,
                                            block_sizes=[1, 2, 5, 10, 20, 40, 60, 120, 180],
@@ -186,11 +191,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PLOT_AUTOCORR_BLOCKSIZES
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.PLOT_AUTOCORR_BLOCKSIZES)

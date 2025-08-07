@@ -433,7 +433,7 @@ def plot_best_worst_returns(price: pd.Series,
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     PLOT_RA_PERF_TABLE = 1
     PLOT_RA_PERF_SCATTER = 2
     PLOT_RA_PERF_TABLE_BENCHMARK = 3
@@ -445,12 +445,17 @@ class UnitTests(Enum):
     PLOT_TOP_BOTTOM_RETURNS = 9
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
     print(prices)
 
-    if unit_test == UnitTests.PLOT_RA_PERF_TABLE:
+    if local_test == LocalTests.PLOT_RA_PERF_TABLE:
 
         perf_params = PerfParams(freq='B')
         prices = prices.iloc[:, :5]
@@ -458,29 +463,29 @@ def run_unit_test(unit_test: UnitTests):
                            perf_columns=rpt.COMPACT_TABLE_COLUMNS,
                            perf_params=perf_params)
 
-    elif unit_test == UnitTests.PLOT_RA_PERF_SCATTER:
+    elif local_test == LocalTests.PLOT_RA_PERF_SCATTER:
 
         perf_params = PerfParams(freq='B')
         plot_ra_perf_scatter(prices=prices,
                              perf_params=perf_params)
 
-    elif unit_test == UnitTests.PLOT_RA_PERF_TABLE_BENCHMARK:
+    elif local_test == LocalTests.PLOT_RA_PERF_TABLE_BENCHMARK:
         perf_params = PerfParams(freq='ME')
         plot_ra_perf_table_benchmark(prices=prices,
                                      benchmark='SPY',
                                      perf_params=perf_params,
                                      transpose=False)
 
-    elif unit_test == UnitTests.PLOT_DESC_FREQ_TABLE:
+    elif local_test == LocalTests.PLOT_DESC_FREQ_TABLE:
         freq_data = plot_desc_freq_table(df=prices,
                                          freq='YE',
                                          agg_func=np.mean)
         print(freq_data)
 
-    elif unit_test == UnitTests.PLOT_SHARPE_BARPLOT:
+    elif local_test == LocalTests.PLOT_SHARPE_BARPLOT:
         plot_ra_perf_bars(prices=prices, perf_column=PerfStat.MAX_DD)
 
-    elif unit_test == UnitTests.PLOT_SHARPE_BY_DATES:
+    elif local_test == LocalTests.PLOT_SHARPE_BY_DATES:
         prices = prices
 
         time_period_dict = {'1y': da.TimePeriod(start='30Jun2019', end='30Jun2020'),
@@ -489,13 +494,13 @@ def run_unit_test(unit_test: UnitTests):
         plot_ra_perf_by_dates(prices=prices,
                               time_period_dict=time_period_dict)
 
-    elif unit_test == UnitTests.PLOT_PERF_FOR_START_END_PERIOD:
+    elif local_test == LocalTests.PLOT_PERF_FOR_START_END_PERIOD:
         plot_ra_perf_annual_matrix(price=prices.iloc[:, 0])
 
-    elif unit_test == UnitTests.PLOT_TOP_BOTTOM_PERFORMERS:
+    elif local_test == LocalTests.PLOT_TOP_BOTTOM_PERFORMERS:
         plot_top_bottom_performers(prices=prices, num_assets=2)
 
-    elif unit_test == UnitTests.PLOT_TOP_BOTTOM_RETURNS:
+    elif local_test == LocalTests.PLOT_TOP_BOTTOM_RETURNS:
         plot_best_worst_returns(price=prices.iloc[:, 0])
 
     plt.show()
@@ -503,11 +508,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.PLOT_RA_PERF_TABLE_BENCHMARK
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.PLOT_RA_PERF_TABLE_BENCHMARK)

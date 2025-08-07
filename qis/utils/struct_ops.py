@@ -161,7 +161,7 @@ def separate_number_from_string(string: str) -> List[str]:
     return groups
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     FLATTEN = 1
     LIST = 2
     LIST_INTERSECTION = 3
@@ -170,19 +170,24 @@ class UnitTests(Enum):
     STRINGS = 6
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.FLATTEN:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.FLATTEN:
         items = [[1, 2], [[3]], 4]
         flat_items = flatten(items)
         [print(item) for item in flat_items]
         print(to_flat_list(items))
 
-    elif unit_test == UnitTests.LIST:
+    elif local_test == LocalTests.LIST:
         rows_edge_lines = list(itertools.accumulate(10 * [5]))
         print(rows_edge_lines)
 
-    elif unit_test == UnitTests.LIST_INTERSECTION:
+    elif local_test == LocalTests.LIST_INTERSECTION:
         list2 = ['EQ', 'HUI', 'Metals']
         list1 = ['EQ', 'BD', 'STIR', 'FX', 'Energies', 'Metals', 'Ags']
         groups = list_intersection(list_check=list1, list_sample=list2)
@@ -192,7 +197,7 @@ def run_unit_test(unit_test: UnitTests):
         print('groups2')
         print(groups)
 
-    elif unit_test == UnitTests.MERGE:
+    elif local_test == LocalTests.MERGE:
         list2 = ['EQ', 'HUI']
         list1 = ['EQ', 'BD', 'STIR', 'FX', 'Energies', 'Metals', 'Ags']
         groups = merge_lists_unique(list1=list1, list2=list2)
@@ -202,7 +207,7 @@ def run_unit_test(unit_test: UnitTests):
         print('groups2')
         print(groups)
 
-    elif unit_test == UnitTests.LIST_DIFF:
+    elif local_test == LocalTests.LIST_DIFF:
         list2 = ['EQ', 'HUI']
         list1 = ['EQ', 'BD', 'STIR', 'FX', 'Energies', 'Metals', 'Ags']
         this = list_diff(list_check=list1, list_sample=list2)
@@ -210,7 +215,7 @@ def run_unit_test(unit_test: UnitTests):
         this = list_diff(list_check=list2, list_sample=list1)
         print(this)
 
-    elif unit_test == UnitTests.STRINGS:
+    elif local_test == LocalTests.STRINGS:
         string = '123me45you0000me7+33.3'
         this = separate_number_from_string(string)
         print(this)
@@ -218,11 +223,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.LIST_INTERSECTION
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.LIST_INTERSECTION)

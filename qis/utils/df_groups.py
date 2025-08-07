@@ -260,13 +260,18 @@ def convert_df_column_to_df_by_groups(df: pd.DataFrame,
     return df1
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     GROUP = 1
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.GROUP:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.GROUP:
 
         group_data = pd.Series(dict(SPY='Equities', QQQ='Equities', EEM='Equities', TLT='Bonds',
                                     IEF='Bonds', SHY='Bonds', LQD='Credit', HYG='HighYield', GLD='Gold'))
@@ -285,11 +290,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.GROUP
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.GROUP)

@@ -85,27 +85,32 @@ def plot_hf_vols(ticker: str = 'SPY',
                              ax=ax)
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     HF_PRICES = 1
     HF_VOL = 2
     PLOT_HF_VOL = 3
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.HF_PRICES:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.HF_PRICES:
         intervals = ['1h', '30m', '15m', '1m']
         # 'BTC-USD'
         df = fetch_hf_ohlc(ticker='ETH-USD', interval='5m')
         print(df)
 
-    elif unit_test == UnitTests.HF_VOL:
+    elif local_test == LocalTests.HF_VOL:
         # use small number of num_samples for illustration
         df = estimate_hf_vol(ticker='SPY', agg_freq='B', annualization_factor=260)
         print(df)
         df.plot()
 
-    elif unit_test == UnitTests.PLOT_HF_VOL:
+    elif local_test == LocalTests.PLOT_HF_VOL:
         # plot_hf_vols(ticker='SPY', agg_freq='B', annualization_factor=260)
         plot_hf_vols(ticker='ETH-USD', agg_freq='D', annualization_factor=365,
                      ohlc_estimator_type=OhlcEstimatorType.CLOSE_TO_CLOSE)
@@ -115,11 +120,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.HF_PRICES
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.HF_PRICES)

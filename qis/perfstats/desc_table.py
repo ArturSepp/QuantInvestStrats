@@ -136,16 +136,21 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     return descriptive_table
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     TABLE = 1
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     returns = load_etf_data().dropna().asfreq('QE').pct_change()
 
-    if unit_test == UnitTests.TABLE:
+    if local_test == LocalTests.TABLE:
         df = compute_desc_table(df=returns,
                                 desc_table_type=DescTableType.EXTENSIVE,
                                 var_format='{:.2f}',
@@ -156,11 +161,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.TABLE
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.TABLE)

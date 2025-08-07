@@ -555,7 +555,7 @@ def select_non_nan_x_y(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.nda
     return x, y
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     SHIFT_TEST = 1
     CUM_POWER = 2
     ROLLING = 3
@@ -564,9 +564,14 @@ class UnitTests(Enum):
     NEAREST = 6
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.SHIFT_TEST:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.SHIFT_TEST:
         test_array = np.array([str(n) for n in range(10)])
         print('test_array')
         print(test_array)
@@ -581,7 +586,7 @@ def run_unit_test(unit_test: UnitTests):
             print(roll_fill_type)
             print(np_shift(a=test_array, shift=-2, roll_fill_type=roll_fill_type))
 
-    elif unit_test == UnitTests.CUM_POWER:
+    elif local_test == LocalTests.CUM_POWER:
         tic = time.perf_counter()
         for _ in np.arange(20):
             b = compute_expanding_power(n=10000000, power_lambda=0.97, reverse_columns=True)
@@ -589,12 +594,12 @@ def run_unit_test(unit_test: UnitTests):
         print(f"{toc - tic} secs to run")
         print(b)
 
-    elif unit_test == UnitTests.ROLLING:
+    elif local_test == LocalTests.ROLLING:
         x = np.array([1.0, 2.0, np.nan, np.nan, 3.0, 4.0, 5.0])
         xx = running_mean(x=x, n=2)
         print(xx)
 
-    elif unit_test == UnitTests.WA:
+    elif local_test == LocalTests.WA:
         x = np.array([1.0, 2.0, np.nan, np.nan, 3.0, 4.0, 5.0])
         weights = np.arange(len(x))
         print(x)
@@ -602,7 +607,7 @@ def run_unit_test(unit_test: UnitTests):
         xx = np_nonan_weighted_avg(a=x, weights=weights)
         print(xx)
 
-    elif unit_test == UnitTests.ARRAY_RANK:
+    elif local_test == LocalTests.ARRAY_RANK:
         a = np.array([1.0, 2.0, 10.0, 20.0, 3.0, 4.0, 5.0])
         array_rank = np.argsort(a).argsort()  # ranks by smallest value
         print(np.argsort(a))
@@ -610,7 +615,7 @@ def run_unit_test(unit_test: UnitTests):
         array_idx_rank = dict(sorted(array_idx_rank.items()))  # sort by rank
         print(array_idx_rank)
 
-    elif unit_test == UnitTests.NEAREST:
+    elif local_test == LocalTests.NEAREST:
         a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         print(a)
         print(f"x={2.1}, nearest={find_nearest(a=a, value=2.1)}")
@@ -620,11 +625,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.SHIFT_TEST
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.SHIFT_TEST)

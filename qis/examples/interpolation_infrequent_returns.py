@@ -9,25 +9,30 @@ from enum import Enum
 import qis as qis
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     YF = 1
     BBG = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     pd.set_option('display.max_rows', 500)
     pd.set_option('display.max_columns', 500)
     pd.set_option('display.width', 1000)
 
-    if unit_test == UnitTests.YF:
+    if local_test == LocalTests.YF:
         import yfinance as yf
         pivot = 'SPY'
         asset = 'QQQ'
         tickers = [pivot, asset]
         prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close']
 
-    elif unit_test == UnitTests.BBG:
+    elif local_test == LocalTests.BBG:
         from bbg_fetch import fetch_field_timeseries_per_tickers
         pivot = 'SPTR Index'
         asset = 'XNDX Index'
@@ -67,11 +72,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.YF
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.YF)

@@ -108,17 +108,22 @@ def run_price():
                             start_to_one=False)
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     REPORT = 1
     PRICE = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.REPORT:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.REPORT:
         run_report()
 
-    elif unit_test == UnitTests.PRICE:
+    elif local_test == LocalTests.PRICE:
         run_price()
 
     plt.show()
@@ -126,14 +131,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.REPORT
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
-
-
-plt.show()
+    run_local_test(local_test=LocalTests.REPORT)

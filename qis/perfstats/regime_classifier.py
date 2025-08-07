@@ -396,19 +396,24 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
         return regimes_pa_perf_table
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     BNB_REGIME = 1
     BNB_PERF_TABLE = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     from qis.test_data import load_etf_data
     prices = load_etf_data().dropna()
 
     perf_params = PerfParams()
 
-    if unit_test == UnitTests.BNB_REGIME:
+    if local_test == LocalTests.BNB_REGIME:
         regime_params = BenchmarkReturnsQuantileRegimeSpecs()
         regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
         regime_ids = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices, benchmark='SPY')
@@ -420,7 +425,7 @@ def run_unit_test(unit_test: UnitTests):
         print(f"regime_means:\n{cond_perf_table}")
         print(f"regime_pa:\n{regime_datas}")
 
-    elif unit_test == UnitTests.BNB_PERF_TABLE:
+    elif local_test == LocalTests.BNB_PERF_TABLE:
         df = compute_bnb_regimes_pa_perf_table(prices=prices,
                                                benchmark='SPY',
                                                regime_params=BenchmarkReturnsQuantileRegimeSpecs(),
@@ -433,11 +438,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.BNB_PERF_TABLE
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.BNB_PERF_TABLE)

@@ -85,7 +85,7 @@ def generate_performances(prices: pd.DataFrame,
                                     **kwargs)
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     ETF_DATA = 1
     CRYPTO_DATA = 2
     TF_ETF = 3
@@ -94,33 +94,38 @@ class UnitTests(Enum):
     VOL_ETFS = 6
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
 
-    if unit_test == UnitTests.ETF_DATA:
+    if local_test == LocalTests.ETF_DATA:
         regime_benchmark = 'SPY'
         tickers = [regime_benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
 
-    elif unit_test == UnitTests.CRYPTO_DATA:
+    elif local_test == LocalTests.CRYPTO_DATA:
         regime_benchmark = 'BTC-USD'
         tickers = [regime_benchmark, 'ETH-USD', 'SOL-USD']
         regime_benchmark = 'BTC-USD'
         tickers = [regime_benchmark, 'SPY', 'TLT', 'ETH-USD', 'SOL-USD']
 
-    elif unit_test == UnitTests.TF_ETF:
+    elif local_test == LocalTests.TF_ETF:
         regime_benchmark = 'SPY'
         tickers = [regime_benchmark, 'DBMF', 'WTMF', 'CTA']
 
-    elif unit_test == UnitTests.ETFS:
+    elif local_test == LocalTests.ETFS:
         regime_benchmark = 'AOR'
         tickers = [regime_benchmark, 'SPY', 'PEX', 'PSP', 'GSG', 'COMT', 'REET', 'REZ']
 
-    elif unit_test == UnitTests.COMMODITY_ETFS:
+    elif local_test == LocalTests.COMMODITY_ETFS:
         regime_benchmark = 'AOR'
         tickers = [regime_benchmark, 'SPY', 'GLD', 'GSG', 'COMT', 'PDBC']
 
-    elif unit_test == UnitTests.VOL_ETFS:
+    elif local_test == LocalTests.VOL_ETFS:
         regime_benchmark = 'SPY'
         tickers = [regime_benchmark, 'SVOL']
 
@@ -154,11 +159,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.VOL_ETFS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.VOL_ETFS)

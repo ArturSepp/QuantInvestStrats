@@ -31,6 +31,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               xvar_format: str = '{:.1%}',
               yvar_format: str = '{:,.2f}',
               x_rotation: int = 90,
+              total_rotation: int = 0,
               skip_y_axis: bool = False,
               legend_loc: Optional[str] = 'upper center',
               bbox_to_anchor: Optional[Tuple[float, float]] = None,
@@ -46,6 +47,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               ylabel: str = None,
               reverse_columns: bool = False,
               is_sns: bool = True,
+              alpha: float = 0.9,
               add_avg_line: bool = False,
               is_horizontal: bool = False,
               labels_frequency: Optional[int] = None,
@@ -68,10 +70,10 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         if isinstance(df, pd.Series):
             colors = [series_color]
         else:
-            if stacked:
-                n = len(df.columns)
-            else:
-                n = len(df.index)
+            #if stacked:
+            n = len(df.columns)
+            #else:
+            #    n = len(df.index)
             colors = put.get_n_colors(n=n, **kwargs)
 
     # use str for dates with plot.bar
@@ -102,6 +104,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                         palette=colors[:len(df1[var_name].unique())],
                         edgecolor='none',
                         orient='h' if is_horizontal else 'v',
+                        alpha=alpha,
                         ax=ax)
         else:
             if is_horizontal:
@@ -122,11 +125,13 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         y_loc = y+.3*height if height > 0.0 else y+0.8*height
         if add_bar_values:
             if height != 0:
-                ax.annotate(text=yvar_format.format(height), xy=(x_loc, y_loc), fontsize=fontsize, weight='normal')
+                ax.annotate(text=yvar_format.format(height), xy=(x_loc, y_loc), fontsize=fontsize, weight='normal',
+                            rotation=total_rotation)
         elif add_top_bar_values:
             if height != 0:
                 ymin, ymax = ax.get_ylim()
-                ax.annotate(text=yvar_format.format(height), xy=(x_loc, 0.95*ymax), fontsize=fontsize, weight='normal')
+                ax.annotate(text=yvar_format.format(height), xy=(x_loc, 0.95*ymax), fontsize=fontsize, weight='normal',
+                            rotation=total_rotation)
 
         if x not in x_locs:
             x_locs.append(x)  # take only one location per asset
@@ -448,7 +453,7 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     BARS = 1
     BARS2 = 2
     TOP_BOTTOM_RETURNS = 3
@@ -456,9 +461,14 @@ class UnitTests(Enum):
     MONTHLY_RETURNS_BARS = 5
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.BARS:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.BARS:
         n = 11
         index = [f"id{x+1} {x**2}" for x in range(n)]
         df1 = pd.DataFrame(np.linspace(0.0, 1.0, n), index=index, columns=['part1'])
@@ -466,7 +476,7 @@ def run_unit_test(unit_test: UnitTests):
         df = pd.concat([df1, df2], axis=1)
         plot_bars(df=df, stacked=True)
 
-    elif unit_test == UnitTests.BARS2:
+    elif local_test == LocalTests.BARS2:
 
         n = 11
         index = [f"id{x+1} {x**2}" for x in range(n)]
@@ -486,7 +496,7 @@ def run_unit_test(unit_test: UnitTests):
                       ax=ax)
         put.align_y_limits_ax12(ax1=axs[0], ax2=axs[1], is_invisible_y_ax2=True)
 
-    elif unit_test == UnitTests.TOP_BOTTOM_RETURNS:
+    elif local_test == LocalTests.TOP_BOTTOM_RETURNS:
 
         from qis.test_data import load_etf_data
         import qis.perfstats.returns as ret
@@ -503,7 +513,7 @@ def run_unit_test(unit_test: UnitTests):
                   x_rotation=90,
                   ax=ax)
 
-    elif unit_test == UnitTests.VBAR_WEIGHTS:
+    elif local_test == LocalTests.VBAR_WEIGHTS:
         desc_dict = {'f1': (0.5, 0.5),
                      'f2': (0.7, 0.3),
                      'f3': (1.0, 0.0),
@@ -520,7 +530,7 @@ def run_unit_test(unit_test: UnitTests):
                    add_bar_value_at_mid=False,
                    add_total_bar=False)
 
-    elif unit_test == UnitTests.MONTHLY_RETURNS_BARS:
+    elif local_test == LocalTests.MONTHLY_RETURNS_BARS:
         from qis.test_data import load_etf_data
         import qis.perfstats.returns as ret
 
@@ -542,11 +552,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.VBAR_WEIGHTS
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.VBAR_WEIGHTS)

@@ -68,7 +68,7 @@ class FactsheetConfig(NamedTuple):
     is_unit_based_traded_volume: bool = True  # for long-only protfolio use nrmalised costs
     factor_beta_span: int = 52  # to compute rolling beta
     freq_beta: str = 'W-WED'  # for scatter plot
-    exposures_freq: str = 'W-WED'  # for plotting strategy exposures
+    weights_freq: str = 'W-WED'  # for plotting strategy exposures
     # general data
     perf_columns: List[PerfStat] = PERF_COLUMNS_RF0
     perf_stats_labels: List[PerfStat] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0,)
@@ -108,7 +108,7 @@ FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
                                                             is_unit_based_traded_volume=True,
                                                             factor_beta_span=36,
                                                             freq_beta='ME',
-                                                            exposures_freq='ME')
+                                                            weights_freq='ME')
 
 FACTSHEET_CONFIG_MONTHLY_DATA_SHORT_PERIOD = FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD
 
@@ -131,7 +131,7 @@ FACTSHEET_CONFIG_QUARTERLY_DATA_LONG_PERIOD = FactsheetConfig(freq='QE',
                                                               is_unit_based_traded_volume=True,
                                                               factor_beta_span=12,
                                                               freq_beta='QE',
-                                                              exposures_freq='QE')
+                                                              weights_freq='QE')
 
 
 def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD,

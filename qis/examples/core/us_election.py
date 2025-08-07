@@ -202,27 +202,32 @@ def plot_conditional_performances(dfs: Dict[str, pd.DataFrame], title: str) -> p
     return fig
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     ELECTION_RESULTS = 1
     ELECTION_DATES = 2
     UNCONDITIONAL_PERFORMANCES = 3
     CONDITIONAL_PERFORMANCES = 4
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
 
-    if unit_test == UnitTests.ELECTION_RESULTS:
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
+
+    if local_test == LocalTests.ELECTION_RESULTS:
         df = pd.DataFrame.from_dict(US_ELECTION_RESULTS, orient='index')
         print(df)
 
-    elif unit_test == UnitTests.ELECTION_DATES:
+    elif local_test == LocalTests.ELECTION_DATES:
         dates = generate_us_election_dates()
         print(dates)
 
         before_after_dates = generate_before_after_dates(dates)
         print(before_after_dates)
 
-    elif unit_test == UnitTests.UNCONDITIONAL_PERFORMANCES:
+    elif local_test == LocalTests.UNCONDITIONAL_PERFORMANCES:
         tickers = {'SPX Index': 'S&P 500',
                    'DXY Curncy': 'DXY',
                    'TY1 Comdty': 'UST 10y bond future'}
@@ -233,7 +238,7 @@ def run_unit_test(unit_test: UnitTests):
             figs.append(fig)
         qis.save_figs_to_pdf(figs, file_name='election_perf_unconditional', local_path=qis.get_output_path())
 
-    elif unit_test == UnitTests.CONDITIONAL_PERFORMANCES:
+    elif local_test == LocalTests.CONDITIONAL_PERFORMANCES:
         tickers = {'SPX Index': 'S&P 500',
                    'DXY Curncy': 'DXY',
                    'TY1 Comdty': 'UST 10y bond future'}
@@ -263,11 +268,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.CONDITIONAL_PERFORMANCES
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.CONDITIONAL_PERFORMANCES)

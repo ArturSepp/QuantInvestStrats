@@ -211,12 +211,17 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
     return nav, units, effective_weights, realized_costs
 
 
-class UnitTests(Enum):
+class LocalTests(Enum):
     BLENDED = 1
     COSTS = 2
 
 
-def run_unit_test(unit_test: UnitTests):
+def run_local_test(local_test: LocalTests):
+    """Run local tests for development and debugging purposes.
+
+    These are integration tests that download real data and generate reports.
+    Use for quick verification during development.
+    """
 
     import matplotlib.pyplot as plt
     import qis.plots.derived.prices as ppd
@@ -228,7 +233,7 @@ def run_unit_test(unit_test: UnitTests):
     # prices.iloc[:200, :] = np.nan
     print(prices)
     
-    if unit_test == UnitTests.BLENDED:
+    if local_test == LocalTests.BLENDED:
 
         portfolio_nav_1_0 = backtest_model_portfolio(prices=prices,
                                                      weights=np.array([1.0, 0.0]),
@@ -248,7 +253,7 @@ def run_unit_test(unit_test: UnitTests):
         fig, ax = plt.subplots(1, 1, figsize=(12, 10))
         ppd.plot_prices(prices=portfolio_nav, ax=ax)
 
-    elif unit_test == UnitTests.COSTS:
+    elif local_test == LocalTests.COSTS:
         portfolio_nav = backtest_model_portfolio(prices=prices,
                                                  weights=np.array([1.0, 1.0]),
                                                  rebalancing_freq='QE')
@@ -260,11 +265,4 @@ def run_unit_test(unit_test: UnitTests):
 
 if __name__ == '__main__':
 
-    unit_test = UnitTests.BLENDED
-
-    is_run_all_tests = False
-    if is_run_all_tests:
-        for unit_test in UnitTests:
-            run_unit_test(unit_test=unit_test)
-    else:
-        run_unit_test(unit_test=unit_test)
+    run_local_test(local_test=LocalTests.BLENDED)
