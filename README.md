@@ -306,7 +306,7 @@ If you use BloombergFetch in your research, please cite it as:
 }
 ```
 
-# BibTeX Citations for QIS (Quantitative Investment Strategies) Package
+## BibTeX Citations for QIS (Quantitative Investment Strategies) Package
 
 If you use QIS in your research, please cite it as:
 
