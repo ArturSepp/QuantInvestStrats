@@ -500,7 +500,7 @@ class PortfolioData:
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
         exposures = self.get_weights().reindex(index=instrument_prices.index, method='ffill')
-        benchmark_betas = ef.compute_portfolio_benchmark_ewm_betas(instrument_prices=instrument_prices,
+        benchmark_betas = ef.compute_portfolio_ewm_benchmark_betas(instrument_prices=instrument_prices,
                                                                    weights=exposures,
                                                                    benchmark_prices=benchmark_prices,
                                                                    time_period=time_period,

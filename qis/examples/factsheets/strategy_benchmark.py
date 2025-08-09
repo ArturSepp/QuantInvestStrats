@@ -10,14 +10,13 @@ from typing import Tuple
 from enum import Enum
 import yfinance as yf
 import qis as qis
-from qis import TimePeriod, MultiPortfolioData
+from qis import TimePeriod, MultiPortfolioData, weights_tracking_error_report_by_ac_subac
 
 # reporting
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strategy_benchmark_factsheet_plt,
                                                                 generate_strategy_benchmark_active_perf_plt,
-                                                                generate_performance_attribution_report,
-                                                                weights_tracking_error_report_by_ac_subac)
+                                                                generate_performance_attribution_report)
 from qis.test_data import load_etf_data
 
 

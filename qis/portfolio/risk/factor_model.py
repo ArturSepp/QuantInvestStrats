@@ -244,10 +244,12 @@ class LinearModel:
             weight_last_update_date = find_upto_date_from_datetime_index(index=weights.index, date=date)
             last_weight = weights.loc[weight_last_update_date, :]
             last_betas = self.get_loadings_at_date(date=date)
+            last_betas = last_betas.loc[:, last_weight.index]  # align with weight
             portfolio_betas = last_betas @ last_weight
+            portfolio_betas = portfolio_betas.reindex(index=covar.index).fillna(0.0)  # fill missing factor exposures
             rc = np.multiply(covar @ portfolio_betas.T, portfolio_betas)
             factor_rcs[date] = rc
-            idio_vars[date]  = last_weight.T @ np.diag(self.residual_vars.loc[date, :]) @ last_weight
+            idio_vars[date]  = last_weight.T @ np.diag(self.residual_vars.loc[date, last_weight.index]) @ last_weight
 
         factor_rcs = pd.DataFrame.from_dict(factor_rcs, orient='index')
         idio_vars = pd.Series(idio_vars)
