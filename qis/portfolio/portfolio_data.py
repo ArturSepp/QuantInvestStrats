@@ -12,8 +12,7 @@ from enum import Enum
 
 # qis
 import qis as qis
-from qis import (TimePeriod, PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantileRegimeSpecs,
-                 RollingPerfStat, compute_portfolio_risk_contributions)
+from qis import TimePeriod, PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantileRegimeSpecs, RollingPerfStat
 import qis.utils.df_groups as dfg
 import qis.utils.df_agg as dfa
 import qis.perfstats.returns as ret
@@ -25,10 +24,11 @@ import qis.plots.derived.prices as ppd
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.returns_heatmap as rhe
-import qis.portfolio.risk.ewm_factor_model as ef
 from qis.models.linear.ewm import compute_ewm_vol
+import qis.portfolio.risk.ewm_factor_model as ef
 from qis.portfolio.signal_data import StrategySignalData
 from qis.portfolio.risk.ewm_covar_risk import compute_portfolio_vol
+from qis.portfolio.risk.contributions import compute_portfolio_risk_contributions
 
 # default performance and regime params
 PERF_PARAMS = PerfParams(freq='W-WED')

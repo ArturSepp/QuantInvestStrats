@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from typing import Union, Dict, Literal, Tuple
-
-from qis import TimePeriod
+from typing import Union, Dict, Literal, Tuple, Optional
+# qis
+from qis import TimePeriod, find_upto_date_from_datetime_index
 from qis.models.linear import ewm as ewm
 from qis.perfstats import returns as ret
 from qis.plots import time_series as pts
@@ -104,15 +104,17 @@ class LinearModel:
     """
 
     x: Union[pd.DataFrame, pd.Series] # t, x_n factors
-    y: Union[pd.DataFrame, pd.Series]  # t, y_m factors
+    y: Union[pd.DataFrame, pd.Series] # t, y_m factors
     loadings: Dict[str, pd.DataFrame] = None  # estimated factor loadings
+    x_covars: Optional[Dict[pd.Timestamp, pd.DataFrame]] = None  # variances of x factors
+    residual_vars: Optional[pd.DataFrame] = None  # residual variance of y
 
     def __post_init__(self):
 
         if isinstance(self.x, pd.Series):
             self.x = self.x.to_frame()
 
-        if isinstance(self.y, pd.Series):
+        if self.y is not None and isinstance(self.y, pd.Series):
             self.y = self.y.to_frame()
 
         if self.loadings is not None:
@@ -134,13 +136,24 @@ class LinearModel:
         """Get loadings for a specific factor."""
         return self.loadings[factor]
 
+    def get_loadings_at_date(self, date: pd.Timestamp) -> pd.DataFrame:
+        if self.loadings is None:
+            raise ValueError
+        betas = {}
+        for factor, df in self.loadings.items():
+            last_update_date = find_upto_date_from_datetime_index(index=df.index, date=date)
+            betas[factor] = df.loc[last_update_date, :]
+        betas = pd.DataFrame.from_dict(betas, orient='index')  # index by factor
+        return betas
+
     def compute_agg_factor_exposures(self,
                                      weights: pd.DataFrame
                                      ) -> pd.DataFrame:
         """Compute aggregate factor exposures by multiplying loadings with weights."""
         factor_exposures = {}
         for factor, loading in self.loadings.items():
-            factor_exposures[factor] = loading.multiply(weights).sum(axis=1)
+            weights1 = weights.reindex(index=loading.index).ffill()
+            factor_exposures[factor] = loading.multiply(weights1).sum(axis=1)
         factor_exposures = pd.DataFrame.from_dict(factor_exposures)
         return factor_exposures
 
@@ -203,12 +216,52 @@ class LinearModel:
         corr_pd = pd.DataFrame(corr, index=self.y.columns, columns=self.y.columns)
         return corr_pd, avg_corr
 
+    def compute_factor_risk_contribution(self, weights: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Compute factor risk contributions and their ratios for portfolio weights over time.
+
+        Calculates the contribution of each factor to portfolio risk using factor loadings,
+        covariance matrices, and residual variances. Returns both absolute contributions
+        and normalized ratios.
+
+        Args:
+            weights: Portfolio weights DataFrame with dates as index and assets as columns.
+
+        Returns:
+            Tuple containing:
+                - factor_rcs: DataFrame of absolute factor risk contributions including idiosyncratic risk
+                - factor_rcs_ratios: DataFrame of risk contribution ratios (normalized to sum to 1)
+
+        Raises:
+            ValueError: If x_covars or residual_vars are not provided.
+        """
+        if self.x_covars is None:
+            raise ValueError(f"self.x_covars must be provided")
+        if self.residual_vars is None:
+            raise ValueError(f"self.residual_vars must be provided")
+        factor_rcs = {}
+        idio_vars = {}
+        for date, covar in self.x_covars.items():
+            weight_last_update_date = find_upto_date_from_datetime_index(index=weights.index, date=date)
+            last_weight = weights.loc[weight_last_update_date, :]
+            last_betas = self.get_loadings_at_date(date=date)
+            portfolio_betas = last_betas @ last_weight
+            rc = np.multiply(covar @ portfolio_betas.T, portfolio_betas)
+            factor_rcs[date] = rc
+            idio_vars[date]  = last_weight.T @ np.diag(self.residual_vars.loc[date, :]) @ last_weight
+
+        factor_rcs = pd.DataFrame.from_dict(factor_rcs, orient='index')
+        idio_vars = pd.Series(idio_vars)
+        factor_rcs['Idiosyncratic'] = idio_vars
+        factor_rcs_ratios = factor_rcs.divide(np.nansum(factor_rcs, axis=1, keepdims=True)).fillna(0.0)
+        return factor_rcs, factor_rcs_ratios
+
     def plot_factor_loadings(self,
                              factor: str,
                              var_format: str = '{:,.2f}',
                              time_period: TimePeriod = None,
                              ax: plt.Subplot = None,
-                             **kwargs):
+                             **kwargs
+                             ) -> None:
         """Plot factor loadings time series."""
         df = self.loadings[factor]
         if time_period is not None:
@@ -239,11 +292,12 @@ def compute_benchmarks_beta_attribution_from_prices(portfolio_nav: pd.Series,
 
 
 def compute_benchmarks_beta_attribution_from_returns(portfolio_returns: pd.Series,
-                                                    benchmark_returns: pd.DataFrame,
-                                                    portfolio_benchmark_betas: pd.DataFrame,
-                                                    residual_name: str = 'Alpha',
-                                                    time_period: TimePeriod = None
-                                                    ) -> pd.DataFrame:
+                                                     benchmark_returns: pd.DataFrame,
+                                                     portfolio_benchmark_betas: pd.DataFrame,
+                                                     residual_name: str = 'Alpha',
+                                                     time_period: TimePeriod = None,
+                                                     total_name: Optional[str] = None
+                                                     ) -> pd.DataFrame:
     """Compute benchmark attribution from return data using pre-calculated betas."""
     if isinstance(benchmark_returns, pd.Series):
         benchmark_returns = benchmark_returns.to_frame()
@@ -253,7 +307,9 @@ def compute_benchmarks_beta_attribution_from_returns(portfolio_returns: pd.Serie
     total_attrib = x_attribution.sum(axis=1)
     residual = np.subtract(portfolio_returns, total_attrib)
     joint_attrib = pd.concat([x_attribution, residual.rename(residual_name)], axis=1)
+    if total_name is not None:
+        joint_attrib = pd.concat([portfolio_returns.rename(total_name), joint_attrib], axis=1)
     if time_period is not None:
         joint_attrib = time_period.locate(joint_attrib)
-        joint_attrib[0, :] = 0.0
+    joint_attrib.iloc[0, :] = 0.0
     return joint_attrib

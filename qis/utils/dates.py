@@ -960,14 +960,35 @@ def min_timestamp(timestamp1: Union[str, pd.Timestamp],
 def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Timestamp]],
                                        date: pd.Timestamp
                                        ) -> Optional[pd.Timestamp]:
-    """
-    find upto date from datetime index without date being in datetime index
+    """Finds the latest date in the index that is on or before the specified date.
+
+    Uses binary search to efficiently find the largest date in the index that is
+    less than or equal to the target date, even when the target date is not
+    present in the index.
+
+    Args:
+        index: DatetimeIndex or list of timestamps to search within.
+        date: Target date to find the latest preceding date for.
+
+    Returns:
+        The latest timestamp in index that is <= date, or None if date is before
+        the first timestamp in the index.
+
+    Warns:
+        UserWarning: If the target date is before the first date in the index.
+
+    Example:
+        >>> index = pd.date_range('2023-01-01', periods=5, freq='D')
+        >>> find_upto_date_from_datetime_index(index, pd.Timestamp('2023-01-03'))
+        Timestamp('2023-01-03 00:00:00', freq='D')
+        >>> find_upto_date_from_datetime_index(index, pd.Timestamp('2023-01-02 12:00'))
+        Timestamp('2023-01-02 00:00:00', freq='D')
     """
     matched_index = pd.Series(index).sort_values().searchsorted(date, side='right')
     # check left boundary
     if matched_index == 0 and date != index[0]:
         warnings.warn(f"find_upto_date_from_datetime_index: date={date} is below first date of the index={index[0]}, "
-                 f"returning None", stacklevel=2)
+                      f"returning None", stacklevel=2)
         return None
     matched_date = index[matched_index - 1]
     return matched_date
