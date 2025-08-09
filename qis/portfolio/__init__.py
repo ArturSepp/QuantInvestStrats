@@ -1,19 +1,30 @@
 
+from qis.portfolio.risk.factor_model import (LinearModel,
+                                             compute_benchmarks_beta_attribution_from_prices,
+                                             compute_benchmarks_beta_attribution_from_returns)
+
+from qis.portfolio.risk.ewm_factor_model import (EwmLinearModel,
+                                                 compute_portfolio_ewm_benchmark_betas,
+                                                 compute_portfolio_benchmark_ewm_beta_alpha_attribution,
+                                                 estimate_ewm_factor_model)
+
 from qis.portfolio.portfolio_data import (PortfolioData,
                                           PortfolioInput,
                                           AttributionMetric,
                                           SnapshotPeriod)
+
 from qis.portfolio.signal_data import StrategySignalData
 
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 
-from qis.portfolio.ewm_portfolio_risk import (limit_weights_to_max_var_limit,
-                                              compute_portfolio_var_np,
-                                              compute_portfolio_vol,
-                                              compute_portfolio_correlated_var_by_groups,
-                                              compute_portfolio_independent_var_by_ac,
-                                              compute_portfolio_risk_contributions,
-                                              compute_benchamark_portfolio_risk_contributions)
+from qis.portfolio.risk.ewm_covar_risk import (limit_weights_to_max_var_limit,
+                                               compute_portfolio_var_np,
+                                               compute_portfolio_vol,
+                                               compute_portfolio_correlated_var_by_groups,
+                                               compute_portfolio_independent_var_by_ac)
+
+from qis.portfolio.risk.contributions import (compute_portfolio_risk_contributions,
+                                              compute_benchmark_portfolio_risk_contributions)
 
 from qis.portfolio.backtester import (backtest_model_portfolio, backtest_rebalanced_portfolio)
 

@@ -13,7 +13,7 @@ from enum import Enum
 # qis
 import qis as qis
 from qis import (TimePeriod, PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantileRegimeSpecs,
-                 RollingPerfStat)
+                 RollingPerfStat, compute_portfolio_risk_contributions)
 import qis.utils.df_groups as dfg
 import qis.utils.df_agg as dfa
 import qis.perfstats.returns as ret
@@ -25,10 +25,10 @@ import qis.plots.derived.prices as ppd
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.returns_heatmap as rhe
-import qis.models.linear.ewm_factors as ef
+import qis.portfolio.risk.ewm_factor_model as ef
 from qis.models.linear.ewm import compute_ewm_vol
 from qis.portfolio.signal_data import StrategySignalData
-from qis.portfolio.ewm_portfolio_risk import compute_portfolio_vol, compute_portfolio_risk_contributions
+from qis.portfolio.risk.ewm_covar_risk import compute_portfolio_vol
 
 # default performance and regime params
 PERF_PARAMS = PerfParams(freq='W-WED')
@@ -408,12 +408,13 @@ class PortfolioData:
             if add_total:
                 turnover = pd.concat([turnover.sum(axis=1).rename(self.nav.name), turnover], axis=1)
 
-        if freq is not None:  # first aggregate by freq
-            turnover = turnover.resample(freq).sum()
-        if roll_period is not None:  # now aggregate by roll
-            turnover = turnover.rolling(roll_period).sum()
-        if time_period is not None:
-            turnover = time_period.locate(turnover)
+        if not turnover.empty:  # it may happen for undefined groupings
+            if freq is not None:  # first aggregate by freq
+                turnover = turnover.resample(freq).sum()
+            if roll_period is not None:  # now aggregate by roll
+                turnover = turnover.rolling(roll_period).sum()
+            if time_period is not None:
+                turnover = time_period.locate(turnover)
         return turnover
 
     def get_costs(self,
@@ -499,12 +500,12 @@ class PortfolioData:
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
         exposures = self.get_weights().reindex(index=instrument_prices.index, method='ffill')
-        benchmark_betas = ef.compute_portfolio_benchmark_betas(instrument_prices=instrument_prices,
-                                                               exposures=exposures,
-                                                               benchmark_prices=benchmark_prices,
-                                                               time_period=time_period,
-                                                               freq_beta=freq_beta,
-                                                               factor_beta_span=factor_beta_span)
+        benchmark_betas = ef.compute_portfolio_benchmark_ewm_betas(instrument_prices=instrument_prices,
+                                                                   weights=exposures,
+                                                                   benchmark_prices=benchmark_prices,
+                                                                   time_period=time_period,
+                                                                   freq_beta=freq_beta,
+                                                                   factor_beta_span=factor_beta_span)
         return benchmark_betas
 
     def compute_portfolio_benchmark_attribution(self,
@@ -520,16 +521,16 @@ class PortfolioData:
         """
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-        exposures = self.get_weights().reindex(index=instrument_prices.index, method='ffill')
+        weights = self.get_weights().reindex(index=instrument_prices.index, method='ffill')
         portfolio_nav = self.get_portfolio_nav().reindex(index=instrument_prices.index, method='ffill')
-        joint_attrib = ef.compute_portfolio_benchmark_beta_alpha_attribution(instrument_prices=instrument_prices,
-                                                                             exposures=exposures,
-                                                                             benchmark_prices=benchmark_prices,
-                                                                             portfolio_nav=portfolio_nav,
-                                                                             time_period=time_period,
-                                                                             freq_beta=freq_beta,
-                                                                             factor_beta_span=factor_beta_span,
-                                                                             residual_name=residual_name)
+        joint_attrib = ef.compute_portfolio_benchmark_ewm_beta_alpha_attribution(instrument_prices=instrument_prices,
+                                                                                 weights=weights,
+                                                                                 benchmark_prices=benchmark_prices,
+                                                                                 portfolio_nav=portfolio_nav,
+                                                                                 time_period=time_period,
+                                                                                 freq_beta=freq_beta,
+                                                                                 factor_beta_span=factor_beta_span,
+                                                                                 residual_name=residual_name)
         return joint_attrib
 
     """
@@ -815,9 +816,10 @@ class PortfolioData:
                 strategy_rc[date] = compute_portfolio_risk_contributions(w=strategy_weights.loc[date], covar=pd_covar)
         else:
             for date, weights in strategy_weights.to_dict(orient='index').items():
-                last_covar_update_date = qis.find_upto_date_from_datetime_index(index=covar_index, date=date)
-                if last_covar_update_date is not None:
-                    strategy_rc[date] = compute_portfolio_risk_contributions(w=pd.Series(weights).fillna(0.0),
+                if date > covar_index[0]:
+                    last_covar_update_date = qis.find_upto_date_from_datetime_index(index=covar_index, date=date)
+                    if last_covar_update_date is not None:
+                        strategy_rc[date] = compute_portfolio_risk_contributions(w=pd.Series(weights).fillna(0.0),
                                                                              covar=covar_dict[last_covar_update_date])
 
         strategy_rc = pd.DataFrame.from_dict(strategy_rc, orient='index')
@@ -1571,18 +1573,19 @@ class PortfolioData:
                                      add_total=add_total,
                                      freq=freq_turnover,
                                      **kwargs)
-        freq = pd.infer_freq(turnover.index)
-        turnover_title = title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
-        qis.plot_time_series(df=turnover,
-                             var_format='{:,.1%}',
-                             y_limits=(0.0, None),
-                             legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                             title=turnover_title,
-                             ax=ax,
-                             **kwargs)
-        if regime_benchmark is not None and self.benchmark_prices is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=turnover.index,
-                                    regime_params=regime_params)
+        if not turnover.empty:
+            freq = pd.infer_freq(turnover.index)
+            turnover_title = title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
+            qis.plot_time_series(df=turnover,
+                                 var_format='{:,.1%}',
+                                 y_limits=(0.0, None),
+                                 legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                                 title=turnover_title,
+                                 ax=ax,
+                                 **kwargs)
+            if regime_benchmark is not None and self.benchmark_prices is not None:
+                self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=turnover.index,
+                                        regime_params=regime_params)
 
 
 @njit

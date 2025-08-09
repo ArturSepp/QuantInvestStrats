@@ -105,6 +105,7 @@ def add_classification(df: pd.DataFrame,
                        **kwargs
                        ) -> Tuple[pd.DataFrame, List[str]]:
 
+    df = df.copy()
     df = df.sort_values(by=class_var_col)
     class_var, labels = x_bins_cut(a=df[class_var_col],
                                    bins=bins,
@@ -112,7 +113,6 @@ def add_classification(df: pd.DataFrame,
                                    xvar_format=xvar_format,
                                    bucket_prefix=bucket_prefix,
                                    **kwargs)
-    df = df.copy()
     df[hue_name] = class_var
     if is_to_str:
         df[hue_name] = df[hue_name].astype(str)

@@ -27,11 +27,16 @@ def limit_weights_to_max_var_limit(weights: np.ndarray,
                                    max_var_limit_bp: Union[np.ndarray, float] = 25.00,
                                    annualization_factor: float = 260
                                    ) -> np.ndarray:
-    """
-    limit weights to max weight_max_var_bp
-    use: var = 2.33 * abs(weight) * vols_annualised / sqrt(annualization_factor)
-    then abs(weight) <= weight_max_var_limit_bp / (VAR99_SCALER_BP * vols_annualised / sqrt(annualization_factor))
-    vols are annualised vols
+    """Limits portfolio weights to stay within maximum VaR limits per instrument.
+
+    Args:
+        weights: Portfolio weights array.
+        vols: Annualized volatilities for each instrument.
+        max_var_limit_bp: Maximum VaR limit in basis points (default 25bp).
+        annualization_factor: Factor for annualizing returns (default 260 for daily).
+
+    Returns:
+        Adjusted weights that satisfy VaR constraints.
     """
     saf = np.sqrt(annualization_factor)
     instrument_var = VAR99_SCALER_BP * np.abs(weights) * vols / saf
@@ -57,8 +62,22 @@ def compute_portfolio_vol(returns: pd.DataFrame,
                           annualization_factor: float = None,
                           nan_backfill: NanBackfill = NanBackfill.FFILL
                           ) -> pd.Series:
-    """
-    compute portfolio vol using ewm filter
+    """Computes portfolio volatility using exponentially weighted moving average filter.
+
+    Args:
+        returns: Asset returns DataFrame.
+        weights: Portfolio weights DataFrame (lagged by 1 period internally).
+        span: EWM span for covariance estimation.
+        ewm_lambda: EWM decay parameter (default 0.94).
+        is_return_vol: If True, returns volatility; if False, returns variance.
+        mean_adj_type: Type of mean adjustment to apply.
+        init_type: Initialization type for EWM.
+        annualize: Whether to annualize the volatility.
+        annualization_factor: Factor for annualizing (inferred if None).
+        nan_backfill: Method for handling NaN values.
+
+    Returns:
+        Time series of portfolio volatility or variance.
     """
     # align index and columns
     weights, returns = weights.align(other=returns, join='inner')
@@ -106,7 +125,17 @@ def compute_portfolio_var_np(returns: np.ndarray,
                              span: Union[int, float, np.ndarray] = None,
                              ewm_lambda: Union[float, np.ndarray] = 0.94
                              ) -> np.ndarray:
+    """Computes portfolio variance using EWM covariance matrix (numba optimized).
 
+    Args:
+        returns: Asset returns array of shape (T, N).
+        weights: Portfolio weights array of shape (T, N).
+        span: EWM span for covariance estimation.
+        ewm_lambda: EWM decay parameter (default 0.94).
+
+    Returns:
+        Array of portfolio variances over time.
+    """
     t = returns.shape[0]  # time dimension
     n = returns.shape[1]  # space dimension
 
@@ -141,10 +170,21 @@ def compute_portfolio_correlated_var_by_groups(prices: pd.DataFrame,
                                                time_period: da.TimePeriod = None,
                                                mean_adj_type: MeanAdjType = MeanAdjType.NONE
                                                ) -> pd.DataFrame:
-    """
-    portfolio VAR accounting for correlations
-    by the default var is max daily loss in bp
-    if group_data is provided the var is split into groups
+    """Computes portfolio VaR accounting for correlations, optionally grouped by categories.
+
+    Args:
+        prices: Asset price DataFrame.
+        weights: Portfolio weights DataFrame.
+        group_data: Optional Series for grouping assets by categories.
+        group_order: Order of groups in output.
+        total_column: Name for total portfolio column.
+        freq: Frequency for return calculation (default 'B' for business daily).
+        vol_span: EWM span for volatility estimation (default 33).
+        time_period: Optional time period filter.
+        mean_adj_type: Type of mean adjustment to apply.
+
+    Returns:
+        DataFrame of VaR values by group over time.
     """
     returns = ret.to_returns(prices=prices, freq=freq, is_log_returns=True)
 
@@ -184,10 +224,21 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
                                             time_period: da.TimePeriod = None,
                                             mean_adj_type: MeanAdjType = MeanAdjType.NONE
                                             ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    portfolio VAR accounting for correlations
-    by the default var is max daily loss in bp
-    if group_data is provided the var is split into groups
+    """Computes portfolio VaR assuming assets are independent (no correlations).
+
+    Args:
+        prices: Asset price DataFrame.
+        weights: Portfolio weights DataFrame.
+        group_data: Optional Series for grouping assets by categories.
+        group_order: Order of groups in output.
+        total_column: Name for total portfolio column.
+        freq: Frequency for return calculation (default 'B' for business daily).
+        vol_span: EWM span for volatility estimation (default 33).
+        time_period: Optional time period filter.
+        mean_adj_type: Type of mean adjustment to apply.
+
+    Returns:
+        Tuple of (instrument-level VaR DataFrame, aggregated VaR by group DataFrame).
     """
     returns = ret.to_returns(prices=prices, freq=freq, is_log_returns=True)
     vols = compute_ewm_vol(data=returns,
@@ -212,41 +263,3 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
         instrument_vars = time_period.locate(instrument_vars)
         ac_vars = time_period.locate(ac_vars)
     return instrument_vars, ac_vars
-
-
-def compute_portfolio_risk_contributions(w: Union[np.ndarray, pd.Series],
-                                         covar: Union[np.ndarray, pd.DataFrame]
-                                         ) -> Union[np.ndarray, pd.Series]:
-
-    if isinstance(covar, pd.DataFrame) and isinstance(w, pd.Series):  # make sure weights are alined
-        w = w.reindex(index=covar.index).fillna(0.0)
-    elif isinstance(covar, np.ndarray) and isinstance(w, np.ndarray):
-        assert covar.shape[0] == covar.shape[1] == w.shape[0]
-    else:
-        raise ValueError(f"unnsuported types {type(w)} and {type(covar)}")
-    portfolio_vol = np.sqrt(w.T @ covar @ w)
-    marginal_risk_contribution = covar @ w.T
-    rc = np.multiply(marginal_risk_contribution, w) / portfolio_vol
-    return rc
-
-
-def compute_benchamark_portfolio_risk_contributions(w_portfolio: Union[np.ndarray, pd.Series],
-                                                    w_benchmark: Union[np.ndarray, pd.Series],
-                                                    covar: Union[np.ndarray, pd.DataFrame],
-                                                    is_independent_risk: bool = False
-                                                    ) -> Union[np.ndarray, pd.Series]:
-    if isinstance(covar, pd.DataFrame) and isinstance(w_portfolio, pd.Series):  # make sure weights are alined
-        w_portfolio = w_portfolio.reindex(index=covar.index).fillna(0.0)
-    elif isinstance(covar, pd.DataFrame) and isinstance(w_benchmark, pd.Series):  # make sure weights are alined
-        w_benchmark = w_benchmark.reindex(index=covar.index).fillna(0.0)
-    elif isinstance(covar, np.ndarray) and isinstance(w_portfolio, np.ndarray) and isinstance(w_benchmark, np.ndarray):
-        assert covar.shape[0] == covar.shape[1] == w_portfolio.shape[0] == w_benchmark.shape[0]
-    else:
-        raise ValueError(f"unnsuported types {type(w_portfolio)}, {type(w_benchmark)} and {type(covar)}")
-    if is_independent_risk:
-        rc = np.sqrt(np.multiply(np.square(w_portfolio-w_benchmark),  np.diag(covar)))
-    else:
-        portfolio_vol = np.sqrt(w_benchmark.T @ covar @ w_benchmark)
-        marginal_risk_contribution = covar @ (w_portfolio-w_benchmark).T
-        rc = np.multiply(marginal_risk_contribution, (w_portfolio-w_benchmark)) / portfolio_vol
-    return rc

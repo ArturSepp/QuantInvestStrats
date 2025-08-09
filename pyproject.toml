@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qis"
-version = "3.3.4"
+version = "3.3.6"
 description = "Quantitative Investment Strategies (QIS) package implements Python analytics for visualisation of financial data, performance reporting, analysis of quantitative strategies"
 readme = "README.md"
 license = {file = "LICENSE.txt"}

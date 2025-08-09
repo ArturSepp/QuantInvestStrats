@@ -168,4 +168,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.STRATEGY_BENCHMARK_PLT)
+    run_local_test(local_test=LocalTests.TRACKING_ERROR)

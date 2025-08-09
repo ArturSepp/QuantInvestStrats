@@ -108,11 +108,11 @@ def run_local_test(local_test: LocalTests):
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                                benchmark_prices=benchmark_prices,
                                                time_period=time_period,
-                                               add_grouped_weights_sheet=True,
-                                               add_performance_risk_attribution_sheet=True,
-                                               add_current_position_var_risk_sheet=is_extended,
+                                               add_current_position_var_risk_sheet=True,
+                                               add_grouped_weights_sheet=is_extended,
                                                add_grouped_exposures=is_extended,
                                                add_grouped_cum_pnl=is_extended,
+                                               add_performance_risk_attribution_sheet=is_extended,
                                                add_current_signal_report=is_extended,
                                                add_instrument_history_report=is_extended,
                                                add_weight_change_report=is_extended,
@@ -145,8 +145,6 @@ def run_local_test(local_test: LocalTests):
 
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                                benchmark_prices=benchmark_prices,
-                                               add_grouped_exposures=True,
-                                               add_grouped_cum_pnl=True,
                                                time_period=TimePeriod('31Dec2019', time_period_short),
                                                **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
@@ -166,7 +164,7 @@ def run_local_test(local_test: LocalTests):
                                                         ticker='Delta1')
         figs = qis.generate_strategy_factsheet(portfolio_data=delta1_portfolio,
                                                benchmark_prices=benchmark_prices,
-                                               add_current_position_var_risk_sheet=False,
+                                               add_current_position_var_risk_sheet=True,
                                                time_period=time_period,
                                                **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,

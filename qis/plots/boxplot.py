@@ -2,6 +2,7 @@
 boxplot
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -314,8 +315,8 @@ def df_dict_boxplot_by_columns(dfs: Dict[str, Union[pd.Series, pd.DataFrame]],
         box_data[hue] = key
         box_datas.append(box_data)
     box_datas = pd.concat(box_datas, axis=0)
-    #if colors is None:
-    #    colors = put.compute_heatmap_colors(a=np.nanmean(df.to_numpy(), axis=0))
+    if colors is None:
+        colors = put.get_n_colors(n=len(dfs.keys()), **kwargs)
 
     fig = plot_box(df=box_datas,
                    x=hue_var_name,
@@ -399,6 +400,7 @@ def df_boxplot_by_classification_var(df: pd.DataFrame,
     """
     use x as classification var and plod box plot relative to quatiles of x
     """
+    df = df.dropna()
     scatter_data, _ = dfc.add_quantile_classification(df=df, x_column=x,
                                                       hue_name=x_hue_name,
                                                       num_buckets=num_buckets,

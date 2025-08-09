@@ -211,7 +211,7 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
     num_days = compute_num_days(prices=prices)
 
     if perf_params.rates_data is not None:
-        excess_return_pa = compute_pa_excess_returns(returns=to_returns(prices,
+        excess_return_pa = compute_pa_excess_compounded_returns(returns=to_returns(prices,
                                                                         return_type=ReturnTypes.RELATIVE,
                                                                         is_first_zero=True),
                                                      rates_data=perf_params.rates_data,
@@ -245,28 +245,40 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
     return return_dict
 
 
+def compute_excess_return_navs(prices: Union[pd.Series, pd.DataFrame],
+                               rates_data: pd.Series,
+                               first_date: pd.Timestamp = None
+                               ) -> Union[pd.Series, pd.DataFrame]:
+    # get returns and subtract average rate between dt times:
+    returns = to_returns(prices=prices, is_first_zero=True)
+    excess_returns = compute_excess_returns(returns=returns, rates_data=rates_data)
+    navs = returns_to_nav(returns=excess_returns, first_date=first_date)
+    return navs
+
+
 def compute_excess_returns(returns: Union[pd.Series, pd.DataFrame],
                            rates_data: pd.Series
                            ) -> Union[pd.Series, pd.DataFrame]:
     # get returns and subtract average rate between dt times:
     rates_dt = dfo.multiply_df_by_dt(df=rates_data, dates=returns.index, lag=None)
+    returns0 = returns.copy()
     if isinstance(returns, pd.Series):
-        returns = returns.to_frame(name=returns.name)
-    excess_returns = returns.subtract(rates_dt.to_numpy(), axis=0)
+        returns0 = returns0.to_frame(name=returns.name)
+    excess_returns = returns0.subtract(rates_dt.to_numpy(), axis=0)
     if isinstance(returns, pd.Series):
         excess_returns = excess_returns.iloc[:, 0]
     return excess_returns
 
 
-def compute_pa_excess_returns(returns: Union[pd.Series, pd.DataFrame],
-                              rates_data: pd.Series,
-                              first_date: pd.Timestamp = None,
-                              annualize_less_1y: bool = False
-                              ) -> Union[np.ndarray, float]:
+def compute_pa_excess_compounded_returns(returns: Union[pd.Series, pd.DataFrame],
+                                         rates_data: pd.Series,
+                                         first_date: pd.Timestamp = None,
+                                         annualize_less_1y: bool = False
+                                         ) -> Union[np.ndarray, float]:
     excess_returns = compute_excess_returns(returns=returns, rates_data=rates_data)
     prices = returns_to_nav(returns=excess_returns, first_date=first_date)
     compounded_return_pa = compute_pa_return(prices=prices, annualize_less_1y=annualize_less_1y)
-    if isinstance(returns, pd.Series):
+    if isinstance(compounded_return_pa, np.ndarray):
         compounded_return_pa = compounded_return_pa[0]
     return compounded_return_pa
 

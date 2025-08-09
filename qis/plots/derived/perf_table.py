@@ -341,7 +341,7 @@ def plot_ra_perf_annual_matrix(price: pd.Series,
         df = dfs.df_to_str(yearly_dfs, var_format=perf_column.to_format(**kwargs))
         fig = ptb.plot_df_table(df=df,
                                 add_index_as_column=True,
-                                index_column_name='Start \ End',
+                                index_column_name=r'Start \ End',
                                 fontsize=fontsize,
                                 data_colors=data_colors,
                                 ax=ax,
