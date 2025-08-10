@@ -350,8 +350,13 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         # outputs with risk model
         if risk_model is not None:
 
+            # factor - level
+            out_dict = risk_model.compute_active_factor_risk(portfolio_weights=multi_portfolio_data.portfolio_datas[strategy_idx].get_weights(),
+                                                             benchmark_weights=multi_portfolio_data.portfolio_datas[benchmark_idx].get_weights())
+
             # strategy factor betas
-            strategy_factor_betas = risk_model.compute_agg_factor_exposures(weights=multi_portfolio_data.portfolio_datas[strategy_idx].get_weights())
+            strategy_factor_betas = out_dict['portfolio_exposures']
+            # strategy_factor_betas = risk_model.compute_agg_factor_exposures(weights=multi_portfolio_data.portfolio_datas[strategy_idx].get_weights())
             fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
             figs['strategy_factor_betas'] = fig
             qis.plot_time_series(df=strategy_factor_betas,
@@ -362,7 +367,8 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
                                                         index=strategy_factor_betas.index, regime_params=regime_params)
             # benchmark factor betas
-            benchmark_factor_betas = risk_model.compute_agg_factor_exposures(weights=multi_portfolio_data.portfolio_datas[benchmark_idx].get_weights())
+            benchmark_factor_betas = out_dict['benchmark_exposures']
+            # benchmark_factor_betas = risk_model.compute_agg_factor_exposures(weights=multi_portfolio_data.portfolio_datas[benchmark_idx].get_weights())
             fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
             figs['benchmark_factor_betas'] = fig
             qis.plot_time_series(df=benchmark_factor_betas,
@@ -372,6 +378,23 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
             if regime_benchmark is not None:
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
                                                         index=benchmark_factor_betas.index, regime_params=regime_params)
+
+            # active exposure
+            fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+            figs['active_exposure'] = fig
+            qis.plot_stack(df=out_dict['active_exposures'],
+                           legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                           title=f"{strategy_ticker} vs {benchmark_ticker} active exposure",
+                           var_format='{:,.2f}',
+                           ax=ax)
+            # active factor risk
+            fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+            figs['factor_risk_contributions_rc'] = fig
+            qis.plot_stack(df=out_dict['factor_risk_contributions_rc'],
+                           legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                           title=f"{strategy_ticker} vs {benchmark_ticker} active risk contribution %",
+                           var_format='{:,.2%}',
+                           ax=ax)
 
             # strategy attribution
             portfolio_returns = qis.to_returns(prices=multi_portfolio_data.portfolio_datas[strategy_idx].get_portfolio_nav().reindex(
@@ -464,33 +487,6 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
             if regime_benchmark is not None:
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
                                                         index=benchmark_portfolio_var.index, regime_params=regime_params)
-
-            # factor - level
-            out_dict = risk_model.compute_active_factor_risk(portfolio_weights=multi_portfolio_data.portfolio_datas[strategy_idx].get_weights(),
-                                                             benchmark_weights=multi_portfolio_data.portfolio_datas[benchmark_idx].get_weights())
-            # active exposure
-            fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
-            figs['active_exposure'] = fig
-            df = out_dict['active_exposures']
-            qis.plot_time_series(df=df,
-                                 title=f"{strategy_ticker} vs {benchmark_ticker} active exposure",
-                                 var_format='{:,.2%}',
-                                 ax=ax)
-            if regime_benchmark is not None:
-                multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                        index=df.index, regime_params=regime_params)
-
-            # active factor risk
-            fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
-            figs['factor_risk_contributions_rc'] = fig
-            df = out_dict['factor_risk_contributions_rc']
-            qis.plot_time_series(df=df,
-                                 title=f"{strategy_ticker} vs {benchmark_ticker} active risk contribution %",
-                                 var_format='{:,.2%}',
-                                 ax=ax)
-            if regime_benchmark is not None:
-                multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                        index=df.index, regime_params=regime_params)
 
     return figs, dfs
 

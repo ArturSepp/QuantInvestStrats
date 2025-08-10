@@ -150,6 +150,25 @@ def plot_stack(df: pd.DataFrame,
     return fig
 
 
+def create_sample_portfolio_data() -> pd.DataFrame:
+    """Create sample portfolio data for demonstration"""
+    dates = pd.date_range('2010-01-01', periods=120, freq='ME')
+
+    # Sample portfolio weights (can be positive or negative)
+    np.random.seed(42)
+    assets = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'META']
+
+    # Generate random weights that sum to approximately 100% (allowing for some leverage)
+    weights_data = []
+    for i in range(len(dates)):
+        weights = np.random.normal(20, 15, len(assets))  # Can be negative (short positions)
+        weights = weights / weights.sum() * 100  # Normalize to sum to 100%
+        weights_data.append(weights)
+
+    weights_df = pd.DataFrame(weights_data, columns=assets, index=dates)
+    return weights_df
+
+
 class LocalTests(Enum):
     WEIGHTS = 1
 
@@ -160,21 +179,29 @@ def run_local_test(local_test: LocalTests):
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
-
     if local_test == LocalTests.WEIGHTS:
-        from qis.test_data import load_etf_data
 
-        prices = load_etf_data().dropna().loc['2020':, :]
-        weights = prices.divide(np.sum(prices, axis=1), axis=0)
-        fig, ax = plt.subplots(1, 1, figsize=(8, 6), tight_layout=True)
+        weights = create_sample_portfolio_data()
 
+        fig, axs = plt.subplots(2, 1, figsize=(8, 10), tight_layout=True)
         plot_stack(df=weights,
                    stacked=False,
+                   use_bar_plot=True,
                    x_rotation=90,
                    yvar_format='{:,.0%}',
                    date_format='%b-%y',
                    fontsize=6,
-                   ax=ax)
+                   ax=axs[0])
+
+        plot_stack(df=weights,
+                   stacked=False,
+                   use_bar_plot=False,
+                   x_rotation=90,
+                   yvar_format='{:,.0%}',
+                   date_format='%b-%y',
+                   fontsize=6,
+                   ax=axs[1])
+
     plt.show()
 
 
