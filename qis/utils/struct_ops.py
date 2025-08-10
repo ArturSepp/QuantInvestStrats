@@ -11,6 +11,25 @@ from typing import Dict, Tuple, List, Any, NamedTuple, Union, Optional
 def list_intersection(list_check: Union[List[Any], pd.Index],
                       list_sample: Union[List[Any], pd.Index]
                       ) -> List[Any]:
+    """Find the intersection of elements between two lists or pandas Index objects.
+
+    Returns elements from list_sample that are also present in list_check,
+    maintaining the order from list_sample.
+
+    Args:
+        list_check (Union[List[Any], pd.Index]): The reference list/Index to check
+            against for membership.
+        list_sample (Union[List[Any], pd.Index]): The list/Index to filter based
+            on elements present in list_check.
+
+    Returns:
+        List[Any]: A list containing elements from list_sample that exist in
+            list_check. Returns empty list if no intersection found.
+
+    Example:
+        >>> list_intersection([1, 2, 3], [2, 3, 4, 5])
+        [2, 3]
+    """
     list_out = list(filter(lambda x: x in list_check, list_sample))
     if list_out is None:
         list_out = []
@@ -20,6 +39,25 @@ def list_intersection(list_check: Union[List[Any], pd.Index],
 def list_diff(list_check: List[Any],
               list_sample: List[Any]
               ) -> List[Any]:
+    """Find elements in list_sample that are not present in list_check.
+
+    Returns the difference between two lists, maintaining the order from
+    list_sample for elements not found in list_check.
+
+    Args:
+        list_check (List[Any]): The reference list to check against for exclusion.
+        list_sample (List[Any]): The list to filter, excluding elements that
+            exist in list_check.
+
+    Returns:
+        List[Any]: A list containing elements from list_sample that do not
+            exist in list_check. Returns empty list if all elements are found
+            in list_check.
+
+    Example:
+        >>> list_diff([1, 2, 3], [2, 3, 4, 5])
+        [4, 5]
+    """
     list_out = list(filter(lambda x: x not in list_check, list_sample))
     if list_out is None:
         list_out = []
@@ -29,6 +67,25 @@ def list_diff(list_check: List[Any],
 def merge_lists_unique(list1: List[Any],
                        list2: List[Any]
                        ) -> List[Any]:
+    """Merge two lists while preserving all unique elements from both lists.
+
+    Combines two lists by first finding their intersection, then appending
+    unique elements from each list. The result contains all unique elements
+    from both input lists without duplicates.
+
+    Args:
+        list1 (List[Any]): The first list to merge.
+        list2 (List[Any]): The second list to merge.
+
+    Returns:
+        List[Any]: A merged list containing all unique elements from both
+            input lists. Order is: intersection elements first, followed by
+            unique elements from list1, then unique elements from list2.
+
+    Example:
+        >>> merge_lists_unique([1, 2, 3], [2, 3, 4, 5])
+        [2, 3, 1, 4, 5]
+    """
     list_out = list_intersection(list_check=list2, list_sample=list1)
     list_diffs1 = list_diff(list_check=list_out, list_sample=list1)
     list_diffs2 = list_diff(list_check=list_out, list_sample=list2)
