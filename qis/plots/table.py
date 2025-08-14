@@ -18,7 +18,7 @@ COLUMN_WIDTH = 2.0  # cm ?
 FIRST_COLUMN_WIDTH = 3.0
 
 
-def plot_df_table(df: pd.DataFrame,
+def plot_df_table(df: Union[pd.DataFrame, pd.Series],
                   add_index_as_column: bool = True,
                   column_width: float = COLUMN_WIDTH,
                   row_height: float = ROW_HIGHT,
@@ -62,6 +62,8 @@ def plot_df_table(df: pd.DataFrame,
     plot dataframe as maotplotlib table
     """
     df = df.copy()  # data object will be changed
+    if isinstance(df, pd.Series):
+        df = df.to_frame()
     if transpose:
         t_data = df.T
         if add_index_as_column:

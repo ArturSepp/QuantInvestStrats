@@ -1343,11 +1343,11 @@ def rand_cmap(nlabels: int,
     return random_colormap
 
 
-def get_cmap_colors(n: int, cmap: str = 'RdYlGn') -> List[str]:
+def get_cmap_colors(n: int, cmap: str = 'RdYlGn') -> List[Tuple[float,...]]:
     """
     Returns a list of matplotlib cmap colors
     """
-    cmap = plt.cm.get_cmap(cmap, n)
+    cmap = plt.get_cmap(cmap, n)
     colors = [cmap(n_) for n_ in range(n)]
     return colors
 
