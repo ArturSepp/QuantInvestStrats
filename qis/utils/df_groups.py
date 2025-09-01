@@ -137,7 +137,10 @@ def agg_df_by_groups(df: pd.DataFrame,
         for key, group_columns in group_dict.items():
             if len(group_columns) > 0:
                 agg_grouped_datas.append(agg_func(df[group_columns], axis=axis).rename(key))
-        agg_grouped_data = pd.concat(agg_grouped_datas, axis=1)
+        if len(agg_grouped_datas) > 0:
+            agg_grouped_data = pd.concat(agg_grouped_datas, axis=1)
+        else:
+            agg_grouped_data = pd.DataFrame()
 
     else:  # just take the group
         if group in group_dict.keys():

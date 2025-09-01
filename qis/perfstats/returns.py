@@ -181,7 +181,7 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
         raise ValueError(f"not supperted type={type(prices)}")
 
     if prices.empty:
-        print(f"in compute_pa_return_dict: {prices} is all nans")
+        warnings.warn(f"in compute_returns_dict(): {prices} is all nans", stacklevel=2)
         if isinstance(prices, pd.Series):
             n = 1
         else:

@@ -83,7 +83,8 @@ def plot_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
 
 
 def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
-                                  benchmark: str,
+                                  benchmark: Optional[str] = None,
+                                  benchmark_price: Optional[pd.Series] = None,
                                   drop_benchmark: bool = False,
                                   perf_params: PerfParams = None,
                                   perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
@@ -96,6 +97,7 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
     """
     ra_perf_table = rpt.compute_ra_perf_table_with_benchmark(prices=prices,
                                                              benchmark=benchmark,
+                                                             benchmark_price=benchmark_price,
                                                              perf_params=perf_params,
                                                              **kwargs)
     df = pd.DataFrame(index=ra_perf_table.index)
@@ -114,7 +116,8 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
 
 
 def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
-                                 benchmark: str,
+                                 benchmark: Optional[str] = None,
+                                 benchmark_price: Optional[pd.Series] = None,
                                  drop_benchmark: bool = False,
                                  perf_params: PerfParams = None,
                                  perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
@@ -134,6 +137,7 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
     """
     ra_perf_table = get_ra_perf_benchmark_columns(prices=prices,
                                                   benchmark=benchmark,
+                                                  benchmark_price=benchmark_price,
                                                   drop_benchmark=drop_benchmark,
                                                   perf_params=perf_params,
                                                   perf_columns=perf_columns,

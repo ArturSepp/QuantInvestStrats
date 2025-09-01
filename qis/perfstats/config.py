@@ -190,7 +190,7 @@ class PerfParams:
     """
     contain key parameters for computing risk adjusted performance
     """
-    freq: str = None
+    freq: str = None  # if pass this will be default for all
     freq_vol: str = 'ME'  # volatility of Sharpe
     freq_skeweness: str = 'ME'  # volatility of skeweness
     freq_drawdown: str = 'D'
@@ -207,6 +207,7 @@ class PerfParams:
             self.freq_vol = self.freq
             self.freq_drawdown = self.freq_drawdown or self.freq
             self.freq_excess_return = self.freq
+            self.freq_reg = self.freq
         else:
             self.freq = 'ME'
             self.freq_vol = self.freq_vol

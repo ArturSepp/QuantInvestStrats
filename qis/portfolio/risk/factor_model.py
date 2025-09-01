@@ -336,32 +336,33 @@ class LinearModel:
             # Find the most recent portfolio weights available up to the current date
             weight_last_update_date = find_upto_date_from_datetime_index(index=portfolio_weights.index, date=date)
 
-            portfolio_weights_t = portfolio_weights.loc[weight_last_update_date, :]
-            benchmark_weights_t = benchmark_weights.loc[weight_last_update_date, :]
-            asset_betas_t = self.get_loadings_at_date(date=date).reindex(columns=joint_assets).fillna(0.0)
-            idiosyncratic_var_t = residual_vars.loc[date, :]
+            if weight_last_update_date in portfolio_weights.index and weight_last_update_date in benchmark_weights.index:
+                portfolio_weights_t = portfolio_weights.loc[weight_last_update_date, :]
+                benchmark_weights_t = benchmark_weights.loc[weight_last_update_date, :]
+                asset_betas_t = self.get_loadings_at_date(date=date).reindex(columns=joint_assets).fillna(0.0)
+                idiosyncratic_var_t = residual_vars.loc[date, :]
 
-            """
-            # todo: marginal risk by position and groupped risks
-            marginal_risk, systematic_marginal, idiosyncratic_marginal = calculate_marginal_active_risk(
-                portfolio_weights=portfolio_weights_t.to_numpy(),
-                benchmark_weights=benchmark_weights_t.to_numpy(),
-                asset_betas=asset_betas_t.to_numpy(),
-                factor_covar=factor_covar.to_numpy(),
-                idiosyncratic_var=idiosyncratic_var_t.to_numpy())
-            """
-            # Calculate factor exposures
-            portfolio_exposures = asset_betas_t @ portfolio_weights_t
-            benchmark_exposures = asset_betas_t @ benchmark_weights_t
-            active_exposures = portfolio_exposures - benchmark_exposures
-            factor_marginal_risks = 2.0 * factor_covar @ active_exposures
-            factor_risk_contributions = factor_marginal_risks * active_exposures
+                """
+                # todo: marginal risk by position and groupped risks
+                marginal_risk, systematic_marginal, idiosyncratic_marginal = calculate_marginal_active_risk(
+                    portfolio_weights=portfolio_weights_t.to_numpy(),
+                    benchmark_weights=benchmark_weights_t.to_numpy(),
+                    asset_betas=asset_betas_t.to_numpy(),
+                    factor_covar=factor_covar.to_numpy(),
+                    idiosyncratic_var=idiosyncratic_var_t.to_numpy())
+                """
+                # Calculate factor exposures
+                portfolio_exposures = asset_betas_t @ portfolio_weights_t
+                benchmark_exposures = asset_betas_t @ benchmark_weights_t
+                active_exposures = portfolio_exposures - benchmark_exposures
+                factor_marginal_risks = 2.0 * factor_covar @ active_exposures
+                factor_risk_contributions = factor_marginal_risks * active_exposures
 
-            portfolio_exposures_ts[date] = portfolio_exposures
-            benchmark_exposures_ts[date] = benchmark_exposures
-            active_exposures_ts[date] = active_exposures
-            factor_marginal_risks_ts[date] = factor_marginal_risks
-            factor_risk_contributions_ts[date] = factor_risk_contributions
+                portfolio_exposures_ts[date] = portfolio_exposures
+                benchmark_exposures_ts[date] = benchmark_exposures
+                active_exposures_ts[date] = active_exposures
+                factor_marginal_risks_ts[date] = factor_marginal_risks
+                factor_risk_contributions_ts[date] = factor_risk_contributions
 
         # Convert dictionaries to DataFrames with dates as index
         portfolio_exposures = pd.DataFrame.from_dict(portfolio_exposures_ts, orient='index')

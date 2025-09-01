@@ -76,11 +76,30 @@ def run_report():
         'JPQTR4W1 Index': 'JPM Factor2'
     }
 
+    benchmark = 'SPTR Index'
+    tickers = {
+        benchmark: benchmark,
+        'UISYMH5S Index': 'CDX UBS',
+        'DBCDIG5F Index': 'CDX DB long',
+        'DBCDIG0S Index': 'CDX DB short',
+    }
+
+    benchmark = 'SPTR Index'
+    tickers = {
+        benchmark: benchmark,
+        'DBBNE05Y Index': 'DBBNE05Y',
+        'DBBNE10Y Index': 'DBBNE10Y',
+        'DBBNE15Y Index': 'DBBNE15Y',
+        'DBBNU05Y Index': 'DBBNU05Y',
+        'DBCUU10Y Index': 'DBCUU10Y',
+        'DBBNU15Y Index': 'DBBNU15Y'
+    }
+
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2019', '06Jun2025')
+    time_period = qis.TimePeriod('31Dec2019', '29Aug2025')
     # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
     # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
     kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD, add_rates_data=False)

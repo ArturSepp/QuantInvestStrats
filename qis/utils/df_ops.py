@@ -228,7 +228,7 @@ def get_first_nonnan_values(df: Union[np.ndarray, pd.Series, pd.DataFrame]) -> U
         else:
             nonnan_column_data = sdata[~sdata.isnull()]
             if nonnan_column_data.empty:
-                warnings.warn(f"all nans in {df}")
+                warnings.warn(f"all nans in {df}", stacklevel=2)
                 values = np.nan
             else:
                 values = nonnan_column_data.iloc[0]

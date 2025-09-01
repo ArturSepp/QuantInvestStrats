@@ -1,11 +1,12 @@
 """
 heatmap plots
 """
-import numpy as np
 # packages
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 from typing import List, Optional, Union
 from enum import Enum
 
@@ -17,7 +18,7 @@ def plot_heatmap(df: pd.DataFrame,
                  transpose: bool = False,
                  inverse: bool = False,
                  date_format: Optional[str] = '%Y',
-                 cmap: str = 'RdYlGn',
+                 cmap: Union[str, ListedColormap] = 'RdYlGn',
                  var_format: Optional[str] = '{:.1%}',
                  alpha: float = 1.0,
                  fontsize: int = 10,

@@ -228,7 +228,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     if add_brinson_attribution:
         with sns.axes_style("darkgrid"):
             fig1 = plt.figure(figsize=figsize, constrained_layout=True)
-            this_name = backtest_name if backtest_name is None else ''
+            this_name = backtest_name if backtest_name is not None else ''
             fig1.suptitle(f'{this_name} Brinson performance attribution report', fontweight="bold", fontsize=8, color='blue')
             figs.append(fig1)
             gs = fig1.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)

@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 from typing import Tuple, List, Optional
 
 import qis as qis
-import qis.utils.df_groups as dfg
+from qis.utils.df_groups import agg_df_by_groups
+from qis.utils.struct_ops import assert_list_subset
 import qis.utils.df_agg as dfa
 import qis.plots.time_series as pts
 from qis.plots.table import plot_df_table
@@ -28,37 +29,41 @@ def compute_brinson_attribution_table(benchmark_pnl: pd.DataFrame,
     """
     brinson attribution
     """
+    # make sure asset class data is contained for both strategy and benchmark
+    assert_list_subset(large_list=asset_class_data.index.to_list(), list_sample=strategy_pnl.columns.to_list())
+    assert_list_subset(large_list=asset_class_data.index.to_list(), list_sample=benchmark_pnl.columns.to_list())
+
     # 1 get grouped pnl
-    grouped_strategy_pnl = dfg.agg_df_by_groups(df=strategy_pnl,
+    grouped_strategy_pnl = agg_df_by_groups(df=strategy_pnl,
+                                            group_data=asset_class_data,
+                                            group_order=group_order,
+                                            agg_func=dfa.nansum)
+
+    grouped_benchmark_pnl = agg_df_by_groups(df=benchmark_pnl,
+                                             group_data=asset_class_data,
+                                             group_order=group_order,
+                                             agg_func=dfa.nansum)
+
+    # 2. get grouped weights
+    grouped_strategy_weights = agg_df_by_groups(df=strategy_weights,
                                                 group_data=asset_class_data,
                                                 group_order=group_order,
                                                 agg_func=dfa.nansum)
 
-    grouped_benchmark_pnl = dfg.agg_df_by_groups(df=benchmark_pnl,
+    grouped_benchmark_weights = agg_df_by_groups(df=benchmark_weights,
                                                  group_data=asset_class_data,
                                                  group_order=group_order,
                                                  agg_func=dfa.nansum)
-
-    # 2. get grouped weights
-    grouped_strategy_weights = dfg.agg_df_by_groups(df=strategy_weights,
-                                                    group_data=asset_class_data,
-                                                    group_order=group_order,
-                                                    agg_func=dfa.nansum)
-
-    grouped_benchmark_weights = dfg.agg_df_by_groups(df=benchmark_weights,
-                                                     group_data=asset_class_data,
-                                                     group_order=group_order,
-                                                     agg_func=dfa.nansum)
 
     # active return by instrument
     active_return = strategy_pnl - benchmark_pnl
     # active return by group
     is_revaluate_active_return = False
     if is_revaluate_active_return:
-        grouped_active_return = dfg.agg_df_by_groups(df=active_return,
-                                                     group_data=asset_class_data,
-                                                     group_order=group_order,
-                                                     agg_func=dfa.nansum)
+        grouped_active_return = agg_df_by_groups(df=active_return,
+                                                 group_data=asset_class_data,
+                                                 group_order=group_order,
+                                                 agg_func=dfa.nansum)
     else:
         grouped_active_return = grouped_strategy_pnl - grouped_benchmark_pnl
 
