@@ -79,20 +79,27 @@ def run_report():
     benchmark = 'SPTR Index'
     tickers = {
         benchmark: benchmark,
-        'UISYMH5S Index': 'CDX UBS',
-        'DBCDIG5F Index': 'CDX DB long',
-        'DBCDIG0S Index': 'CDX DB short',
-    }
-
-    benchmark = 'SPTR Index'
-    tickers = {
-        benchmark: benchmark,
         'DBBNE05Y Index': 'DBBNE05Y',
         'DBBNE10Y Index': 'DBBNE10Y',
         'DBBNE15Y Index': 'DBBNE15Y',
         'DBBNU05Y Index': 'DBBNU05Y',
         'DBCUU10Y Index': 'DBCUU10Y',
         'DBBNU15Y Index': 'DBBNU15Y'
+    }
+
+    benchmark = 'SPTR Index'
+    tickers = {
+        benchmark: benchmark,
+        'CICMCI5B Index': 'CDX IG Citi',
+        'UISYMI5S Index': 'CDX IG UBS shortable',
+        'DBCDIG5F Index': 'CDX IG DB long fixed',
+        'DBCDIG5L Index': 'CDX IG DB long variable',
+        'DBCDIG5S Index': 'CDX IG DB short',
+        'CICMCH5B Index': 'CDX HY Citi',
+        'UISYMH5S Index': 'CDX HY UBS shortable',
+        'DBCDHYLG Index': 'CDX HY DB long fixed',
+        'DBCDHY5A Index': 'CDX HY DB long variable',
+        # 'DBCDHY5S Index': 'CDX HY DB short'
     }
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()

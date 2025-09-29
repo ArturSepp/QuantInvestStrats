@@ -854,7 +854,7 @@ def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],
             x = data
         else:  # convert to pandas
             x = pd.DataFrame(data=data)
-        mean = x.expanding(min_periods=1, axis=0).mean()  # apply pandas expanding
+        mean = x.expanding(min_periods=1).mean()  # apply pandas expanding
         if isinstance(data, np.ndarray):  # return of np.ndarray data type
             mean = mean.to_numpy()
 

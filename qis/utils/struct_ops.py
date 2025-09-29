@@ -127,10 +127,10 @@ def list_to_unique_and_dub(lsdata: List) -> Tuple[List, List]:
     return unique, dublicated
 
 
-def assert_list_unique(lsdata: List[str]) -> None:
+def assert_list_unique(lsdata: List[str], name: str = '') -> None:
     unique, duplicated = list_to_unique_and_dub(lsdata=lsdata)
     if len(duplicated) > 0:
-        raise ValueError(f"list has duplicated elements = {duplicated}")
+        raise ValueError(f"list {name} has duplicated elements = {duplicated}")
 
 
 def move_item_to_first(lsdata: List[Any], item: Any) -> List[Any]:
