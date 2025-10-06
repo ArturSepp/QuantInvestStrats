@@ -183,7 +183,12 @@ class LinearModel:
             attribution = pd.concat([total, attribution], axis=1)
         return attribution
 
-    def get_factor_alpha(self, lag: Literal[0, 1] = 1, span: Optional[int] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def get_factor_alpha(self,
+                         x: Optional[pd.DataFrame] = None,
+                         y: Optional[pd.DataFrame] = None,
+                         lag: Literal[0, 1] = 1,
+                         span: Optional[int] = None
+                         ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Calculate factor alpha and explained returns.
 
         Args:
@@ -192,12 +197,18 @@ class LinearModel:
         Returns:
             Tuple of (factor_alpha, explained_returns).
         """
-        explained_returns = pd.DataFrame(0.0, index=self.y.index, columns=self.y.columns)
-        for factor in self.x.columns:
-            factor_betas = self.loadings[factor]
-            explained_return = (factor_betas.shift(lag)).multiply(self.x[factor].to_numpy(), axis=0)
+        if x is None:
+            x = self.x
+        if y is None:
+            y = self.y
+        assert x.index.equals(y.index)
+
+        explained_returns = pd.DataFrame(0.0, index=y.index, columns=y.columns)
+        for factor in x.columns:
+            factor_betas = self.loadings[factor].reindex(index=x.index).ffill()
+            explained_return = (factor_betas.shift(lag)).multiply(x[factor].to_numpy(), axis=0)
             explained_returns = explained_returns.add(explained_return)
-        factor_alpha = self.y.subtract(explained_returns)
+        factor_alpha = y.subtract(explained_returns)
         if span is not None:
             factor_alpha = ewm.compute_ewm(data=factor_alpha, span=span)
         return factor_alpha, explained_returns
