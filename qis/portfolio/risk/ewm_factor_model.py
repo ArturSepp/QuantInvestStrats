@@ -27,7 +27,8 @@ class EwmLinearModel(LinearModel):
             ewm_lambda: float = 0.94,
             is_x_correlated: bool = True,
             mean_adj_type: MeanAdjType = MeanAdjType.NONE,
-            init_type: InitType = InitType.MEAN
+            init_type: InitType = InitType.MEAN,
+            warmup_period: int = 20  # to avoid excessive betas at start,
             ) -> None:
         """Estimate time series EWM betas using exponential weighting.
 
@@ -58,7 +59,8 @@ class EwmLinearModel(LinearModel):
         betas_ts = ewm.compute_ewm_xy_beta_tensor(x=x.to_numpy(),
                                                   y=y.to_numpy(),
                                                   ewm_lambda=ewm_lambda,
-                                                  is_x_correlated=is_x_correlated)
+                                                  is_x_correlated=is_x_correlated,
+                                                  warmup_period=warmup_period)
         # factor_loadings = {factor_id: pd.DataFrame(factor loadings)}
         loadings = dfo.np_txy_tensor_to_pd_dict(np_tensor_txy=betas_ts,
                                                 dateindex=x.index,

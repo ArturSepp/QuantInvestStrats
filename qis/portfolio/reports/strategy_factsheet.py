@@ -123,7 +123,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
-    # under watre
+    # under water
     ax = fig.add_subplot(gs[4:6, :2])
     qis.plot_rolling_time_under_water(prices=joint_prices,
                                       title='Running Time under Water',

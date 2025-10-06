@@ -183,7 +183,7 @@ class LinearModel:
             attribution = pd.concat([total, attribution], axis=1)
         return attribution
 
-    def get_factor_alpha(self, lag: Literal[0, 1] = 1) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def get_factor_alpha(self, lag: Literal[0, 1] = 1, span: Optional[int] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Calculate factor alpha and explained returns.
 
         Args:
@@ -198,6 +198,8 @@ class LinearModel:
             explained_return = (factor_betas.shift(lag)).multiply(self.x[factor].to_numpy(), axis=0)
             explained_returns = explained_returns.add(explained_return)
         factor_alpha = self.y.subtract(explained_returns)
+        if span is not None:
+            factor_alpha = ewm.compute_ewm(data=factor_alpha, span=span)
         return factor_alpha, explained_returns
 
     def get_model_ewm_r2(self, span: int = 52, lag: Literal[0, 1] = 0) -> pd.DataFrame:
@@ -207,6 +209,7 @@ class LinearModel:
         y_demean = self.y  #- ewm.compute_ewm(data=self.y, span=span)
         ewm_variance = ewm.compute_ewm(data=np.square(y_demean), span=span)
         r_2 = 1.0 - ewm_residuals_2.divide(ewm_variance)
+        r_2 = r_2.clip(0.0, 1.0)
         return r_2
 
     def get_model_residuals_corrs(self, span: int = 52) -> Tuple[pd.DataFrame, pd.Series]:
