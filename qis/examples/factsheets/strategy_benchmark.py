@@ -108,17 +108,18 @@ def run_local_test(local_test: LocalTests):
                                                              )
 
     if local_test == LocalTests.STRATEGY_BENCHMARK_PLT:
-        pnl_attribution = True
+        pnl_attribution = False
         figs = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=multi_portfolio_data,
                                                          backtest_name='Vol Parity Portfolio vs Equal Weight',
                                                          time_period=time_period,
                                                          add_brinson_attribution=pnl_attribution,
                                                          add_exposures_pnl_attribution=pnl_attribution,
                                                          add_exposures_comp=pnl_attribution,
-                                                         add_strategy_factsheet=True,  # for strategy factsheet
+                                                         add_strategy_factsheet=False,  # for strategy factsheet
                                                          add_grouped_exposures=False,  # for strategy factsheet
                                                          add_grouped_cum_pnl=False,  # for strategy factsheet
                                                          is_grouped=True,
+                                                         add_joint_instrument_history_report=False,
                                                          **fetch_default_report_kwargs(time_period=time_period,
                                                                                        add_rates_data=True))
         qis.save_figs_to_pdf(figs=figs,
@@ -167,4 +168,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.TRACKING_ERROR)
+    run_local_test(local_test=LocalTests.STRATEGY_BENCHMARK_PLT)

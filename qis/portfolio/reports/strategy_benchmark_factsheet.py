@@ -37,6 +37,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 5,
                                               heatmap_fontsize: int = 4,
+                                              add_joint_instrument_history_report: bool = False,
                                               **kwargs
                                               ) -> List[plt.Figure]:
     """
@@ -151,50 +152,29 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
                                      new_kwargs=dict(fontsize=heatmap_fontsize, square=False,
-                                                     x_rotation=90, transpose=False))
-    if add_benchmarks_to_navs:
-        benchmark_prices = multi_portfolio_data.benchmark_prices
+                                                     x_rotation=90, transpose=True))
+
+    # periodic returns
+    multi_portfolio_data.plot_periodic_returns(add_benchmarks_to_navs=add_benchmarks_to_navs,
+                                                                  ax=fig.add_subplot(gs[4:6, 2:4]),
+                                                                  **local_kwargs)
+
+    # regime data for 1 or two benchmarks
+    if len(multi_portfolio_data.benchmark_prices.columns) == 1:
+        benchmark_prices_ = {benchmark_price.name: fig.add_subplot(gs[6:8, 2:4])}
     else:
-        benchmark_prices = None
-    multi_portfolio_data.portfolio_datas[0].plot_periodic_returns(is_grouped=is_grouped,
-                                                                  benchmark_prices=benchmark_prices,
-                                                                  ax=fig.add_subplot(gs[4:6, 2]),
-                                                                  **local_kwargs)
-
-    multi_portfolio_data.portfolio_datas[1].plot_periodic_returns(is_grouped=is_grouped,
-                                                                  benchmark_prices=benchmark_prices,
-                                                                  ax=fig.add_subplot(gs[4:6, 3]),
-                                                                  **local_kwargs)
-
-    # gross comparision
-    post_title = f"Sharpe ratio split to {str(benchmark_price.name)} Bear/Normal/Bull {regime_params.freq}-freq regimes"
-    """
-    multi_portfolio_data.portfolio_datas[0].plot_regime_data(benchmark_price=benchmark_price,
-                                                             is_grouped=False,
-                                                             title=f"{multi_portfolio_data.portfolio_datas[0].nav.name} {post_title}",
-                                                             perf_params=perf_params,
-                                                             regime_params=regime_params,
-                                                             ax=fig.add_subplot(gs[6:8, 2]),
-                                                             **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
-    """
-    multi_portfolio_data.plot_regime_data(benchmark=str(benchmark_price.name),
-                                          add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                          is_grouped=False,
-                                          title=f"{post_title}",
-                                          perf_params=perf_params,
-                                          regime_params=regime_params,
-                                          ax=fig.add_subplot(gs[6:8, 2]),
-                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
-
-    # strategy by asset class
-    multi_portfolio_data.portfolio_datas[0].plot_regime_data(benchmark_price=benchmark_price,
-                                                             add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                                             is_grouped=False,
-                                                             title=f"{multi_portfolio_data.portfolio_datas[0].nav.name} {post_title}",
-                                                             perf_params=perf_params,
-                                                             regime_params=regime_params,
-                                                             ax=fig.add_subplot(gs[6:8, 3]),
-                                                             **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
+        benchmark_prices_ = {multi_portfolio_data.benchmark_prices.columns[0]: fig.add_subplot(gs[6:8, 2]),
+                             multi_portfolio_data.benchmark_prices.columns[1]: fig.add_subplot(gs[6:8, 3])}
+    for benchmark_, ax_ in benchmark_prices_.items():
+        post_title = f"Sharpe ratio in {benchmark_} Bear/Normal/Bull {regime_params.freq}-freq regimes"
+        multi_portfolio_data.plot_regime_data(benchmark=benchmark_,
+                                              add_benchmarks_to_navs=add_benchmarks_to_navs,
+                                              is_grouped=False,
+                                              title=f"{post_title}",
+                                              perf_params=perf_params,
+                                              regime_params=regime_params,
+                                              ax=ax_,
+                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
 
     # vol regimes
     """
@@ -339,6 +319,21 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=df.index, regime_params=regime_params)
                 qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
+    if add_joint_instrument_history_report:
+        perf_columns = (qis.PerfStat.START_DATE, qis.PerfStat.END_DATE, qis.PerfStat.PA_RETURN,
+                        qis.PerfStat.VOL, qis.PerfStat.SHARPE_RF0,
+                        qis.PerfStat.MAX_DD, qis.PerfStat.MAX_DD_VOL, qis.PerfStat.SKEWNESS)
+
+        joint_prices = pd.concat([multi_portfolio_data.portfolio_datas[strategy_idx].prices,
+                                  multi_portfolio_data.portfolio_datas[benchmark_idx].prices],
+                                 axis=1)
+        joint_prices = joint_prices.loc[:, ~joint_prices.columns.duplicated(keep='first')]
+        fig = qis.generate_price_history_report(prices=joint_prices,
+                                                **qis.update_kwargs(kwargs, dict(fontsize=4, figsize=figsize,
+                                                                                 perf_columns=perf_columns)))
+        fig.suptitle('Instruments in Joint Universe', fontweight="bold", fontsize=8, color='blue')
+        figs.append(fig)
+
     if add_strategy_factsheet:
         for portfolio_data in multi_portfolio_data.portfolio_datas:
             figs.append(generate_strategy_factsheet(portfolio_data=portfolio_data,
@@ -351,6 +346,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                     **kwargs  # time period will be in kwargs
                                                     ))
         figs = qis.to_flat_list(figs)
+
     return figs
 
 

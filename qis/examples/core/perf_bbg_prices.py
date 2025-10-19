@@ -1,4 +1,5 @@
 # packages
+import pandas as pd
 import matplotlib.pyplot as plt
 import qis as qis
 from enum import Enum
@@ -102,14 +103,27 @@ def run_report():
         # 'DBCDHY5S Index': 'CDX HY DB short'
     }
 
+    benchmark = 'AOR US Equity'
+    tickers = {
+        benchmark: benchmark,
+        'HFRXGL Index': 'HFRXGL Index',
+        'HFRIFWI Index': 'HFRIFWI Index',
+        'GMSGRMU ID Equity': 'Graham',
+        'WINTFUI ID Equity': 'Winton',
+        'BHMG LN Equity': 'Brevan',
+        'OMEIUSA ID Equity': 'Jupiter'
+    }
+
+
+
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2019', '29Aug2025')
+    time_period = qis.TimePeriod('30Sep2018', '30Sep2025')
     # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
     # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
-    kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD, add_rates_data=False)
+    kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD, add_rates_data=False)
 
     fig = qis.generate_multi_asset_factsheet(prices=prices,
                                              benchmark=benchmark,
@@ -145,6 +159,10 @@ def run_local_test(local_test: LocalTests):
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
+    pd.set_option('display.max_rows', 500)
+    pd.set_option('display.max_columns', 500)
+    pd.set_option('display.width', 1000)
+
 
     if local_test == LocalTests.REPORT:
         run_report()
