@@ -3,9 +3,7 @@ configuration for performance reports
 """
 from enum import Enum
 from typing import Dict, Any, Tuple, NamedTuple, Optional, List
-
-import qis
-from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat
+from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat, update_kwargs
 import yfinance as yf
 
 # default params have no risk-free rate
@@ -78,7 +76,8 @@ class FactsheetConfig(NamedTuple):
     heatmap_freq: str = 'YE'  # for heatmap
     x_date_freq: str = 'YE'  # for time series plots
     date_format: str = '%b-%y'  # for dates
-
+    digits_to_show: int = 2  # for pa table
+    sharpe_digits: int = 2
 
 # create enumerations
 FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD = FactsheetConfig()
@@ -138,7 +137,8 @@ FACTSHEET_CONFIG_QUARTERLY_DATA_LONG_PERIOD = FactsheetConfig(freq='QE',
 
 
 def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD,
-                                  add_rates_data: bool = True
+                                  add_rates_data: bool = True,
+                                  override: Dict[str, Any] = None
                                   ) -> Dict[str, Any]:
     """
     return kwargs for factsheet reports
@@ -166,6 +166,8 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
 
     kwargs.pop('freq')  # remove frequency as some methods have default freq
     kwargs.update(dict(perf_params=perf_params, regime_params=regime_params))
+    if override is not None:
+        kwargs = update_kwargs(kwargs, override)
     return kwargs
 
 
@@ -215,7 +217,7 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
 
     kwargs = fetch_factsheet_config_kwargs(factsheet_config=factsheet_config,
                                            add_rates_data=add_rates_data)
-    kwargs = qis.update_kwargs(kwargs, dict(is_unit_based_traded_volume=is_unit_based_traded_volume))
+    kwargs = update_kwargs(kwargs, dict(is_unit_based_traded_volume=is_unit_based_traded_volume))
     return kwargs
 
 

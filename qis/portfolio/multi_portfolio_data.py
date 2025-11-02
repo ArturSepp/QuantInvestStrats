@@ -385,6 +385,7 @@ class MultiPortfolioData:
                               **kwargs
                               ) -> None:
         prices = self.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
+        kwargs = qis.update_kwargs(kwargs, dict(hline_rows=[2]))
         rhe.plot_periodic_returns_table(prices=prices,
                                         freq=heatmap_freq,
                                         ax=ax,
