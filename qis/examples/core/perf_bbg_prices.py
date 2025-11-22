@@ -114,13 +114,22 @@ def run_report():
         'OMEIUSA ID Equity': 'Jupiter'
     }
 
+    benchmark = 'SPTGGUT Index'
+    tickers = {
+        benchmark: benchmark,
+        'NEIXCTAT Index': 'SG Trend',
+        'NEIXCTA Index': 'SG CTA',
+        'HFRIMTF Index': 'HFRI TF',
+        'BHCTA Index': 'BBG CTA',
+        'HFRXM Index': 'HFRX Macro/CTA'
+    }
 
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('30Sep2018', '30Sep2025')
+    time_period = qis.TimePeriod('31Dec2014', '31Oct2025')
     # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
     # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
     kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD, add_rates_data=False)

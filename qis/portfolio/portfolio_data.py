@@ -99,7 +99,7 @@ class PortfolioData:
         if self.group_order is None:
             self.group_order = list(self.group_data.unique())
         if self.benchmark_prices is not None:
-            self.ibenchmark_prices = self.benchmark_prices.reindex(index=self.nav.index, method='ffill')
+            self.benchmark_prices = self.benchmark_prices.reindex(index=self.nav.index, method='ffill')
         if self.ticker is None:
             self.ticker = str(self.nav.name)
 
@@ -1639,7 +1639,7 @@ class PortfolioInput:
     ewm_lambda: float = 0.92
     target_vol: float = None
 
-    def update(self, new: Dict[Any, Any]):
+    def update(self, new: Dict[str, Any]):
         for key, value in new.items():
             if hasattr(self, key):
                 setattr(self, key, value)

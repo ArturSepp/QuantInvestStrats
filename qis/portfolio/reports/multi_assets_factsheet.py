@@ -467,9 +467,10 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
 
     if time_period is not None:
         report_period = time_period.to_str()
+        time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=time_period.locate(prices)))
     else:
         report_period = qis.get_time_period(df=prices).to_str()
-    time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
+        time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
 
     factsheet_name = factsheet_name or f"Multi-asset report: {report_period}"
     qis.set_suptitle(fig=fig, title=factsheet_name, fontsize=8)

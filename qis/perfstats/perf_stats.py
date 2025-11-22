@@ -237,8 +237,10 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     perf_table[PerfStat.SHARPE_LOG_EXCESS.to_str()] = perf_table[PerfStat.AN_LOG_RETURN_EXCESS.to_str()] / vol
     perf_table[PerfStat.SHARPE_APR.to_str()] = perf_table[PerfStat.APR.to_str()] / vol
 
-    perf_table[PerfStat.SORTINO_RATIO.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.DOWNSIDE_VOL.to_str()]
-    perf_table[PerfStat.CALMAR_RATIO.to_str()] = -1.0*perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.MAX_DD.to_str()]
+    if PerfStat.DOWNSIDE_VOL.to_str() in risk_table.columns:
+        perf_table[PerfStat.SORTINO_RATIO.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.DOWNSIDE_VOL.to_str()]
+    if PerfStat.MAX_DD.to_str() in risk_table.columns:
+        perf_table[PerfStat.CALMAR_RATIO.to_str()] = -1.0*perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.MAX_DD.to_str()]
 
     # merge the two meta on dates
     ra_perf_table = pd.merge(left=perf_table, right=risk_table,

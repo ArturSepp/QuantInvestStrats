@@ -188,7 +188,8 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
                                 reporting_frequency: ReportingFrequency = ReportingFrequency.DAILY,
                                 long_threshold_years: float = 5.0,
                                 add_rates_data: bool = True,
-                                is_unit_based_traded_volume: bool = True
+                                is_unit_based_traded_volume: bool = True,
+                                override: Dict[str, Any] = None
                                 ) -> Dict[str, Any]:
 
     # use for number years > 5
@@ -218,6 +219,8 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
     kwargs = fetch_factsheet_config_kwargs(factsheet_config=factsheet_config,
                                            add_rates_data=add_rates_data)
     kwargs = update_kwargs(kwargs, dict(is_unit_based_traded_volume=is_unit_based_traded_volume))
+    if override is not None:
+        kwargs = update_kwargs(kwargs, override)
     return kwargs
 
 
