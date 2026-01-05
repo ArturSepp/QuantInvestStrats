@@ -96,7 +96,8 @@ def compute_regimes_pa_perf_table_from_sampled_returns(sampled_returns_with_regi
     regime_pa_columns = regime_pa.columns
 
     # compute standardized ra _ perf table
-    ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
+    # ra_perf_table = pt.compute_ra_perf_table(prices=prices, perf_params=perf_params)
+    ra_perf_table = pt.compute_ra_perf_table_with_benchmark(prices=prices, benchmark=benchmark, perf_params=perf_params)
 
     if additive_pa_returns_to_pa_total:  # use pa return to normalize conditional an returns
         total_sum = regime_pa[regime_pa_columns].sum(1)

@@ -101,6 +101,8 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
                                                              perf_params=perf_params,
                                                              **kwargs)
     df = pd.DataFrame(index=ra_perf_table.index)
+    df_str = pd.DataFrame(index=ra_perf_table.index)
+    df_num = pd.DataFrame(index=ra_perf_table.index)
     for perf_column in perf_columns:
         if is_convert_to_str:
             # here we can shorten the performance var for outputs

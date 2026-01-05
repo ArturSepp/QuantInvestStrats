@@ -28,7 +28,7 @@ def run_local_test(local_test: LocalTests):
     Use for quick verification during development.
     """
 
-    end_date = '21Apr2025'  # performance repoting
+    end_date = '31Dec2025'  # performance repoting
 
     prices = None  # if Noe, use yahoo finance data
 

@@ -996,7 +996,7 @@ def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Ti
 
 def create_rebalancing_indicators_from_freqs(rebalancing_freqs: Union[pd.Series, str],
                                              time_period: TimePeriod,
-                                             tickers: List[str] = None,
+                                             tickers: Union[List[str], pd.Index] = None,
                                              include_start_date: bool = False,
                                              include_end_date: bool = False
                                              ) -> pd.DataFrame:

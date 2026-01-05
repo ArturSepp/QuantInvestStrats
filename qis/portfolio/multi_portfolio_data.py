@@ -41,7 +41,7 @@ class MultiPortfolioData:
     """
     portfolio_datas: List[PortfolioData]
     benchmark_prices: Union[pd.DataFrame, pd.Series] = None
-    covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None
+    covar_dict: Optional[Dict[pd.Timestamp, pd.DataFrame]] = None
     navs: pd.DataFrame = None   # computed internally
 
     def __post_init__(self):

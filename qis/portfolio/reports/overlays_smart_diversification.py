@@ -2,6 +2,7 @@
 reporting anatytics for smart diversification frontier of futures_strats and portfolios
 """
 # packages
+import warnings
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -252,11 +253,15 @@ class SmartDiversificationReport:
                                          **kwargs
                                          ) -> plt.Figure:
 
+        if y_var.to_str() == x_var.to_str():
+            raise ValueError('x_var and y_var cannot be the same')
+
         if principal_nav is None:
             principal_nav = self.principal_nav
 
         xy_datas = {}
         data_labels = []
+        y_0 = None
         for idx, asset in enumerate(self.overlay_navs.columns):
             max_overlay_weight = 1.0
             if constraints is not None:
@@ -279,8 +284,15 @@ class SmartDiversificationReport:
                 y = xy[y_var.to_str()].to_numpy()
                 x = xy[x_var.to_str()].to_numpy()
                 x_lin = np.linspace(start=x[0], stop=x[-1], num=len(x)) # replace x with smooth linear grid
-                poly = np.polyfit(x_lin, y, 3)
-                xy[y_var.to_str()] = np.poly1d(poly)(x_lin)
+                poly_coeffs = safe_polyfit(x_lin, y, 3)
+                y_smooth = np.poly1d(poly_coeffs)(x_lin)
+                # Adjust to match endpoint
+                if y_0 is None:
+                    y_0 = y[0]
+                y_smooth += np.linspace(0, y_0 - y_smooth[0], len(x_lin))
+                y_smooth[0] = y_0
+
+                xy[y_var.to_str()] = y_smooth
                 xy[x_var.to_str()] = x_lin
 
             portfolio_labels = ['' for _ in xy.index]
@@ -382,7 +394,7 @@ class SmartDiversificationReport:
                 y_curve = np.poly1d(curve_poly)(x_lin)  # fill in
                 sns.lineplot(x=x_lin, y=y_curve, marker='None', color='blue', ax=ax)
             except np.linalg.LinAlgError:
-                print(f"SVD did not converge in Linear Least Squares")
+                warnings.warn(f"SVD did not converge in Linear Least Squares")
 
         return fig
 
@@ -440,6 +452,37 @@ def create_overlay_portfolio_curve(principal_nav: pd.Series,
         portfolio_navs.append(portfolio_nav)
     portfolio_navs = pd.concat(portfolio_navs, axis=1)
     return portfolio_navs
+
+
+def safe_polyfit(x, y, degree=3) -> np.ndarray:
+    """Robust polynomial fitting with fallback"""
+    # Remove NaN values
+    mask = ~(np.isnan(x) | np.isnan(y))
+    x_clean = x[mask]
+    y_clean = y[mask]
+
+    if len(x_clean) < degree + 1:
+        # Not enough points for requested degree
+        degree = max(1, len(x_clean) - 1)
+    """
+    # Normalize x for numerical stability
+    x_mean, x_std = np.mean(x_clean), np.std(x_clean)
+    if x_std > 0:
+        x_norm = (x_clean - x_mean) / x_std
+    else:
+        x_norm = x_clean - x_mean
+    """
+    # Try fitting with decreasing polynomial degrees
+    for deg in range(degree, 0, -1):
+        try:
+            poly = np.polyfit(x_clean, y_clean, deg)
+            return poly
+        except np.linalg.LinAlgError:
+            warnings.warn(f"SVD did not converge in Linear Least Squares")
+            continue
+
+    # Ultimate fallback: return mean
+    return np.array([np.mean(y_clean)])
 
 
 class LocalTests(Enum):

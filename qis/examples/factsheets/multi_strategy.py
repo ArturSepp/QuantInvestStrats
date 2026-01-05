@@ -72,7 +72,7 @@ def run_local_test(local_test: LocalTests):
 
     if local_test == LocalTests.VOLPARITY_SPAN:
         # time period for portfolio reporting
-        time_period = qis.TimePeriod('31Dec2005', '21Apr2025')
+        time_period = qis.TimePeriod('31Dec2005', '31Dec2025')
 
         prices, benchmark_prices, group_data = fetch_universe_data()
         multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,

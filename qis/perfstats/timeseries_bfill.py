@@ -130,8 +130,8 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             if np.all(newer.isna()): # all new data is none, use old
                 bfill_data = older
             else:
-                older_start = dfo.get_first_last_nonnan_index(older)
-                newer_start = dfo.get_first_last_nonnan_index(newer)
+                older_start = dfo.get_nonnan_index(older)
+                newer_start = dfo.get_nonnan_index(newer)
                 # print(f"{column}\n{older_start}\n{newer_start}")
                 if older_start < newer_start:  # bffill
                     bffill_part = older[:newer_start].iloc[:-1]  # first filerr to newer start and out of last overlap
@@ -146,7 +146,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             bfill_data = bfill_data.iloc[bfill_data.index.duplicated(keep='last') == False]
 
         if fill_method is not None:
-            start = dfo.get_first_last_nonnan_index(bfill_data)
+            start = dfo.get_nonnan_index(bfill_data)
             if fill_method == 'to_zero':
                 bfill_data[start:] = bfill_data[start:].fillna(value=0.0)
             else:
@@ -248,7 +248,7 @@ def df_fill_first_nan_by_cross_median(df: pd.DataFrame,
         df = df.replace(0.0, np.nan)
 
     # for each column find first nonan
-    first_nonnan_index = dfo.get_first_before_nonnan_index(df)
+    first_nonnan_index = dfo.get_nonnan_index(df)
     merged_data = pd.DataFrame(index=df.index, columns=df.columns)
     for idx, column in enumerate(df.columns):
         its_first_nonnan_index = first_nonnan_index[idx]

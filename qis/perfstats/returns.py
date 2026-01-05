@@ -612,8 +612,7 @@ def to_zero_first_nonnan_returns(returns: Union[pd.Series, pd.DataFrame],
 
     if init_period is not None:
         if init_period == 1:
-            returns = returns.copy()
-            first_before_nonnan_index = dfo.get_first_before_nonnan_index(df=returns)
+            first_before_nonnan_index = dfo.get_nonnan_index(df=returns, position='first')
             first_date = returns.index[0]
             if isinstance(returns, pd.Series):
                 if first_before_nonnan_index >= first_date:
@@ -666,8 +665,8 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
         is_series_out = True
         prices = prices.to_frame()
 
-    first_date = dfo.get_first_last_nonnan_index(df=prices, is_first=True)
-    last_date = dfo.get_first_last_nonnan_index(df=prices, is_first=False)
+    first_date = dfo.get_nonnan_index(df=prices, position='first')
+    last_date = dfo.get_nonnan_index(df=prices, position='last')
     good_parts = []
     for idx, column in enumerate(prices.columns):
         good_price = prices.loc[first_date[idx]:last_date[idx], column]

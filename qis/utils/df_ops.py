@@ -10,7 +10,6 @@ from typing import Union, List, Optional, Dict, Tuple, Type, Any, Literal
 from enum import Enum
 # qis
 import qis.utils.np_ops as npo
-import qis.utils.struct_ops as sop
 
 
 def df_zero_like(df: pd.DataFrame) -> pd.DataFrame:
@@ -97,36 +96,6 @@ def norm_df_by_ax_mean(data: Union[np.ndarray, pd.DataFrame],
     return norm_data
 
 
-def get_first_before_nonnan_index(df: Union[pd.Series, pd.DataFrame],
-                                  return_index_for_all_nans: int = -1  # last = -1, first = 0
-                                  ) -> Union[pd.Timestamp, List[pd.Timestamp]]:
-    """
-    return first index if no nans in pandas
-    """
-    if isinstance(df, pd.DataFrame):
-        first_before_nonnan_index = []
-        for column in df:
-            column_data = df[column]
-            non_nan_data = column_data.loc[np.isnan(column_data.to_numpy()) == False]
-            if not non_nan_data.empty:  # returns first index of nan
-                fist_nonnan_index = non_nan_data.index[0]
-            else:  # all values are nans so return the last index of original data
-                fist_nonnan_index = df.index[return_index_for_all_nans]
-
-            first_before_nonnan_index.append(fist_nonnan_index)
-
-    elif isinstance(df, pd.Series):
-        non_nan_data = df.loc[np.isnan(df.to_numpy()) == False]
-        if not non_nan_data.empty:
-            first_before_nonnan_index = non_nan_data.index[0]
-        else:
-            first_before_nonnan_index = df.index[return_index_for_all_nans]
-    else:
-        raise ValueError(f"unsoported data type = {type(df)}")
-
-    return first_before_nonnan_index
-
-
 def drop_first_nan_data(df: Union[pd.Series, pd.DataFrame],
                         is_oldest: bool = True  # the olderst, the eldest (all non nnans)
                         ) -> Union[pd.Series, pd.DataFrame]:
@@ -134,7 +103,7 @@ def drop_first_nan_data(df: Union[pd.Series, pd.DataFrame],
     drop data before first nonnan either at max or at min for pandas
     the rest of data can still contain occasional nans
     """
-    first_nonnan_index = get_first_before_nonnan_index(df=df)
+    first_nonnan_index = get_nonnan_index(df=df, position='first')
 
     if isinstance(df, pd.DataFrame):
         if is_oldest:
@@ -148,46 +117,38 @@ def drop_first_nan_data(df: Union[pd.Series, pd.DataFrame],
     return new_data
 
 
-def get_first_last_nonnan_index(df: Union[pd.Series, pd.DataFrame],
-                                is_first: bool = True
-                                ) -> Union[pd.Timestamp, np.ndarray]:
+def get_nonnan_index(df: Union[pd.Series, pd.DataFrame],
+                     position: Literal['first', 'last'] = 'first',  # 'first' or 'last'
+                     return_index_for_all_nans: int = -1
+                     ) -> Union[pd.Timestamp, List[pd.Timestamp]]:
     """
-    for given time series df or series:
-    find the first date of non-nan value if  is_first=True
-    find the last date of non-nan value
-    return pd.Timestamp or np.nan
+    Get the first or last non-NaN index for each column/series.
+
+    Parameters
+    ----------
+    df : pd.Series or pd.DataFrame
+    position : str
+        'first' or 'last' - which non-NaN index to find
+    return_index_for_all_nans : int
+        Index position to return if all NaN (-1 for last, 0 for first)
     """
-    def get_series_non_nan(ds: pd.Series) -> pd.Timestamp:
-        null_ind = ds.isnull()
-        good_ind = null_ind == False
-        if np.all(good_ind):
-            if is_first:  # no nans nans return first:
-                fist_nonnan_index = ds.index[0]
-            else:  # last
-                fist_nonnan_index = ds.index[-1]
-        elif np.all(null_ind):
-            if is_first:  # all nans return last:
-                fist_nonnan_index = ds.index[-1]
-            else:
-                fist_nonnan_index = ds.index[0]
+
+    def get_index(series: pd.Series) -> pd.Timestamp:
+        mask = series.notna()
+        if mask.any():
+            if position == 'first':
+                return mask.idxmax()
+            else:  # 'last'
+                return series[mask].index[-1]
         else:
-            if is_first:
-                fist_nonnan_index = ds[good_ind].index[0]
-            else:
-                fist_nonnan_index = ds[good_ind].index[-1]
-        return fist_nonnan_index
+            return series.index[return_index_for_all_nans]
 
     if isinstance(df, pd.Series):
-        fist_nonnan_index = get_series_non_nan(df)
+        return get_index(df)
     elif isinstance(df, pd.DataFrame):
-        values = []
-        for column in df:
-            values.append(get_series_non_nan(df[column]))
-        fist_nonnan_index = np.array(values)
+        return [get_index(df[col]) for col in df.columns]
     else:
-        raise ValueError(f"unsupported data type = {type(df)}")
-
-    return fist_nonnan_index
+        raise TypeError(f"Unsupported data type: {type(df)}")
 
 
 def compute_nans_zeros_ratio_after_first_non_nan(df: Union[pd.Series, pd.DataFrame],
@@ -569,13 +530,13 @@ def merge_dfs_on_column(data_df: pd.DataFrame,
 
 def reindex_upto_last_nonnan(ds: pd.Series,
                              index: pd.DatetimeIndex,
-                             method: str = 'ffill'
+                             method: Literal["backfill", "bfill", "ffill", "pad", "nearest"] | None = 'ffill'
                              ) -> pd.Series:
     """
     apply ffill up to the last value
     """
     filled_ds = ds.reindex(index=index, method=method)
-    last_non_nan = get_first_last_nonnan_index(df=ds, is_first=False)
+    last_non_nan = get_nonnan_index(df=ds, position='last')
     if filled_ds.index[-1] > last_non_nan:
         if last_non_nan in filled_ds.index:
             idx = filled_ds.index.get_loc(last_non_nan)  # find idx
@@ -584,91 +545,3 @@ def reindex_upto_last_nonnan(ds: pd.Series,
             filled_ds.loc[last_non_nan:] = np.nan
     return filled_ds
 
-
-class LocalTests(Enum):
-    ALIGN = 1
-    SCORES = 2
-    NONNANINDEX = 3
-    REINDEX_UPTO_LAST_NONAN = 4
-    MERGE_DFS_ON_COLUMNS = 5
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    if local_test == LocalTests.ALIGN:
-
-        desc_dict1 = {'f0': (0.5, 0.5), 'f1': (0.5, 0.5), 'f2': (0.5, 0.5), 'f3': (0.5, 0.5), 'f4': (0.5, 0.5)}
-        df1 = pd.DataFrame.from_dict(desc_dict1, orient='index', columns=['as1', 'as2'])
-
-        desc_dict2 = {'f1': (1.0, 1.0), 'f2': (1.0, 1.0), 'f5': (1.0, 1.0), 'f6': (1.0, 1.0)}
-        df2 = pd.DataFrame.from_dict(desc_dict2, orient='index', columns=['as1', 'as3'])
-
-        print(f"df1=\n{df1}")
-        print(f"df2=\n{df2}")
-
-        df1_, df2_ = align_df1_to_df2(df1=df1, df2=df2, join='outer', axis=0)
-        print(f"df1_=\n{df1_}")
-        print(f"df2_=\n{df2_}")
-
-        df1_, df2_ = align_df1_to_df2(df1=df1, df2=df2, join='outer', axis=None)
-        print(f"df1_=\n{df1_}")
-        print(f"df2_=\n{df2_}")
-
-    elif local_test == LocalTests.SCORES:
-        np.random.seed(1)
-        nrows, ncols = 20, 5
-        df = pd.DataFrame(data=np.random.normal(0.0, 1.0, size=(nrows, ncols)),
-                          columns=[f"id{n + 1}" for n in range(ncols)])
-        print(df)
-        percentiles = compute_last_score(df=df)
-        print(percentiles)
-
-    elif local_test == LocalTests.NONNANINDEX:
-
-        values = [1.0, np.nan, 3.0, 4.0, np.nan, 6.0, np.nan, np.nan]
-        dates = pd.date_range(start='1Jan2020', periods=len(values))
-        df = pd.Series({d: v for d, v in zip(dates, values)})
-        print(df)
-        last_non_nan = get_first_last_nonnan_index(df=df, is_first=False)
-        print(last_non_nan)
-
-    elif local_test == LocalTests.REINDEX_UPTO_LAST_NONAN:
-
-        values = [1.0, np.nan, 3.0, 4.0, np.nan, 6.0, np.nan, 1.0]
-        dates = pd.date_range(start='1Jan2020', periods=len(values))
-        ds = pd.Series({d: v for d, v in zip(dates, values)})
-        print(ds)
-
-        dates1 = pd.date_range(start='1Jan2020', periods=len(values)+2)
-        post_filled = ds.reindex(index=dates1, method='ffill')
-        print(post_filled)
-
-        post_filled_up_nan = reindex_upto_last_nonnan(ds=ds, index=dates1, method='ffill')
-        print(post_filled_up_nan)
-
-    elif local_test == LocalTests.MERGE_DFS_ON_COLUMNS:
-        data_entries = {'Bond1': pd.Series(['AAA', 100.00, 'A3'], index=['bbg_ticker', 'face', 'raiting']),
-                        'Bond2': pd.Series(['AA', 100.00, 'A2'], index=['bbg_ticker', 'face', 'raiting']),
-                        'Bond3': pd.Series(['A', 100.00, 'A1'], index=['bbg_ticker', 'face', 'raiting']),
-                        'Bond4': pd.Series(['BBB', 100.00, 'B3'], index=['bbg_ticker', 'face', 'raiting'])}
-        data_df = pd.DataFrame.from_dict(data_entries, orient='index')
-
-        index_df = {'A': pd.Series([95.0], index=['price']),
-                    'AA': pd.Series([99.0], index=['price']),
-                    'AAA': pd.Series([101.0], index=['price']),
-                    'B': pd.Series([90.0], index=['price'])}
-        index_df = pd.DataFrame.from_dict(index_df, orient='index')
-        print(data_df)
-        print(index_df)
-        df = merge_dfs_on_column(data_df=data_df, index_df=index_df)
-        print(df)
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.MERGE_DFS_ON_COLUMNS)

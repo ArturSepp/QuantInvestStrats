@@ -270,7 +270,8 @@ def load_df_from_excel(file_name: str,
                        folder_name: str = None,
                        key: str = None,
                        is_index: bool = True,
-                       delocalize: bool = False  # excel data may have local time which are unwanted
+                       delocalize: bool = False,  # excel data may have local time which are unwanted
+                       header: int = 0
                        ) -> pd.DataFrame:
     """
     one file, one sheet to pandas
@@ -286,7 +287,7 @@ def load_df_from_excel(file_name: str,
         raise FileNotFoundError(f"file data {file_path} nor found")
 
     index_col = 0 if is_index else None
-    df = excel_reader.parse(sheet_name=sheet_name, index_col=index_col)
+    df = excel_reader.parse(sheet_name=sheet_name, index_col=index_col, header=header)
 
     if is_index and delocalize:
         df = delocalize_df(df)
@@ -890,6 +891,25 @@ def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
     print(f"""<a href=r"{file_path}">link</a>""")
     print(f"created PDF doc: {file_path}")
     return file_path
+
+
+def check_df_for_duplicated_columns_index(df: pd.DataFrame) -> bool:
+    # Check for duplicated columns
+    duplicated_columns = df.columns[df.columns.duplicated()].tolist()
+    if duplicated_columns:
+        unique_dupes = list(set(duplicated_columns))
+        raise AssertionError(
+            f"Found {len(duplicated_columns)} duplicated column(s): {unique_dupes}"
+        )
+
+    # Check for duplicated index
+    duplicated_index = df.index[df.index.duplicated()].tolist()
+    if duplicated_index:
+        unique_dupes = list(set(duplicated_index))
+        raise AssertionError(
+            f"Found {len(duplicated_index)} duplicated index value(s): {unique_dupes}"
+        )
+    return True
 
 
 class LocalTests(Enum):

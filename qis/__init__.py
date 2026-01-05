@@ -31,7 +31,8 @@ from qis.file_utils import (
     save_df_to_parquet,
     save_fig,
     save_figs,
-    timer
+    timer,
+    check_df_for_duplicated_columns_index
 )
 
 from qis.utils.__init__ import *

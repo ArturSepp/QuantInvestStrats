@@ -36,8 +36,8 @@ def list_intersection(list_check: Union[List[Any], pd.Index],
     return list_out
 
 
-def list_diff(list_check: List[Any],
-              list_sample: List[Any]
+def list_diff(list_check: Union[List[Any], pd.Index],
+              list_sample: Union[List[Any], pd.Index]
               ) -> List[Any]:
     """Find elements in list_sample that are not present in list_check.
 
@@ -64,8 +64,8 @@ def list_diff(list_check: List[Any],
     return list_out
 
 
-def merge_lists_unique(list1: List[Any],
-                       list2: List[Any]
+def merge_lists_unique(list1: Union[List[Any], pd.Index],
+                       list2: Union[List[Any], pd.Index]
                        ) -> List[Any]:
     """Merge two lists while preserving all unique elements from both lists.
 
@@ -96,8 +96,8 @@ def merge_lists_unique(list1: List[Any],
     return list_out
 
 
-def assert_list_subset(large_list: List[Any],  # larger list
-                       list_sample: List[Any],  # smaller list,
+def assert_list_subset(large_list: Union[List[Any], pd.Index],  # larger list
+                       list_sample: Union[List[Any], pd.Index],  # smaller list,
                        is_stop: bool = True,
                        message: str = ''
                        ) -> bool:
@@ -112,7 +112,7 @@ def assert_list_subset(large_list: List[Any],  # larger list
     return output
 
 
-def list_to_unique_and_dub(lsdata: List) -> Tuple[List, List]:
+def list_to_unique_and_dub(lsdata: Union[List[Any], pd.Index]) -> Tuple[List, List]:
     """
     find unique and dublicates in list
     """
@@ -127,13 +127,13 @@ def list_to_unique_and_dub(lsdata: List) -> Tuple[List, List]:
     return unique, dublicated
 
 
-def assert_list_unique(lsdata: List[str], name: str = '') -> None:
+def assert_list_unique(lsdata: Union[List[str], pd.Index], name: str = '') -> None:
     unique, duplicated = list_to_unique_and_dub(lsdata=lsdata)
     if len(duplicated) > 0:
         raise ValueError(f"list {name} has duplicated elements = {duplicated}")
 
 
-def move_item_to_first(lsdata: List[Any], item: Any) -> List[Any]:
+def move_item_to_first(lsdata: Union[List[Any], pd.Index], item: Any) -> List[Any]:
     out_list = lsdata.copy()
     out_list.remove(item)
     out_list = [item]+out_list

@@ -268,10 +268,10 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     if benchmark is not None and benchmark_price is None:  # check if benchmark in prices
         if benchmark not in prices.columns:
             raise ValueError(f"{benchmark} is not in {prices.columns.to_list()}")
-    elif benchmark_price is not None:  # check if to add benchmark to prices
-        if benchmark not in prices.columns:
-            if not isinstance(benchmark_price, pd.Series):
-                raise ValueError(f"benchmark_price must be pd.Series not {type(benchmark_price)}")
+    elif benchmark_price is not None:  # check if to add benchmark to prces
+        if not isinstance(benchmark_price, pd.Series):
+            raise ValueError(f"benchmark_price must be pd.Series not {type(benchmark_price)}")
+        if benchmark is None and benchmark_price.name not in prices.columns:
             benchmark_price = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
             prices = pd.concat([benchmark_price, prices], axis=1)
             benchmark = benchmark_price.name

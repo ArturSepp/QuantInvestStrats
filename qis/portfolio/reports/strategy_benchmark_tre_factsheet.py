@@ -63,11 +63,21 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
 
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['ra_table'] = fig
+        dfs['nav'] = multi_portfolio_data.get_navs(time_period=time_period, add_benchmarks_to_navs=add_benchmarks_to_navs)
+        multi_portfolio_data.plot_ra_perf_table(benchmark_price=benchmark_price,
+                                                                add_benchmarks_to_navs=add_benchmarks_to_navs,
+                                                                perf_params=perf_params,
+                                                                time_period=time_period,
+                                                                add_turnover=True,
+                                                                ax=ax,
+                                                                **kwargs)
+        # ra perf table without strings
         ra_perf_table = multi_portfolio_data.plot_ra_perf_table(benchmark_price=benchmark_price,
                                                                 add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                                 perf_params=perf_params,
                                                                 time_period=time_period,
                                                                 add_turnover=True,
+                                                                is_convert_to_str=False,
                                                                 ax=ax,
                                                                 **kwargs)
         dfs['ra_perf_table'] = ra_perf_table
@@ -228,6 +238,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
                                                     index=active_total.index, regime_params=regime_params)
+        dfs['brinson_active_total'] = active_total.cumsum(axis=0)
 
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['brinson_grouped_allocation_return'] = fig
@@ -299,6 +310,12 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                   ax=ax,
                                                   time_period=time_period,
                                                   **kwargs)
+        dfs['ac_tracking_error'] = multi_portfolio_data.compute_tracking_error_implied_by_covar(strategy_idx=strategy_idx,
+                                                                                                benchmark_idx=benchmark_idx,
+                                                                                                is_grouped=True,
+                                                                                                group_data=ac_group_data,
+                                                                                                group_order=ac_group_order,
+                                                                                                total_column='Total')
 
         # turnover
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
@@ -328,6 +345,14 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                     index=grouped_selection_return.index, regime_params=regime_params)
         if not add_titles:
             ax.title.set_visible(False)
+
+        dfs['ac_turnover'] = multi_portfolio_data.portfolio_datas[strategy_idx].get_turnover(is_agg=False,
+                                                                                             is_grouped=True,
+                                                                                             group_data=turnover_groups,
+                                                                                             group_order=turnover_order,
+                                                                                             time_period=time_period,
+                                                                                             add_total=False,
+                                                                                             **kwargs)
 
         # pdf of returns
         freqs = dict(Monthly='ME', Quarterly='QE', Annual='YE')
