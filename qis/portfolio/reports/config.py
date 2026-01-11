@@ -3,12 +3,12 @@ configuration for performance reports
 """
 from enum import Enum
 from typing import Dict, Any, Tuple, NamedTuple, Optional, List
-from qis import PerfParams, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, PerfStat, update_kwargs
+from qis import PerfParams, BenchmarkReturnsQuantilesRegime, TimePeriod, PerfStat, update_kwargs
 import yfinance as yf
 
 # default params have no risk-free rate
-PERF_PARAMS = PerfParams(freq='W-WED', freq_reg='W-WED', alpha_an_factor=52, rates_data=None)
-REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
+PERF_PARAMS = PerfParams(freq='W-WED', freq_reg='W-WED', rates_data=None)
+regime_classifier = BenchmarkReturnsQuantilesRegime(freq='QE')
 
 PERF_COLUMNS_RF0 = (PerfStat.TOTAL_RETURN,
                     PerfStat.PA_RETURN,
@@ -55,7 +55,6 @@ class FactsheetConfig(NamedTuple):
     freq_reg: str = 'W-WED'  # for beta regressions
     freq_var: str = 'B'  # for var computations
     var_span: float = 33.0 # for var computations
-    alpha_an_factor: float = 52 # for W-WED returns
     freq_regime: str = 'QE'  # for regime frequency
     sharpe_rolling_window: int = 156  # 3y of weekly returns
     freq_sharpe: str = 'W-WED'  # for rolling sharpe
@@ -85,8 +84,7 @@ FACTSHEET_CONFIG_DAILY_DATA_LONG_PERIOD = FactsheetConfig()
 FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD = FactsheetConfig(heatmap_freq='ME',
                                                            x_date_freq='ME',
                                                            freq_regime='W-WED',
-                                                           freq_reg='W-WED',
-                                                           alpha_an_factor=52
+                                                           freq_reg='W-WED'
                                                            )
 
 
@@ -94,7 +92,6 @@ FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD = FactsheetConfig(freq='ME',
                                                             freq_drawdown='ME',
                                                             freq_reg='ME',
                                                             vol_freq='ME',
-                                                            alpha_an_factor=12,
                                                             freq_regime='QE',
                                                             sharpe_rolling_window=36,
                                                             vol_rolling_window=13,
@@ -118,7 +115,6 @@ FACTSHEET_CONFIG_QUARTERLY_DATA_LONG_PERIOD = FactsheetConfig(freq='QE',
                                                               freq_drawdown='ME',
                                                               freq_reg='QE',
                                                               vol_freq='QE',
-                                                              alpha_an_factor=4,
                                                               freq_regime='QE',
                                                               sharpe_rolling_window=12,
                                                               vol_rolling_window=12,
@@ -153,9 +149,8 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
                              freq_vol=factsheet_config.vol_freq,
                              freq_drawdown=factsheet_config.freq_drawdown,
                              freq_reg=factsheet_config.freq_reg,
-                             alpha_an_factor=factsheet_config.alpha_an_factor,
                              rates_data=rates_data)
-    regime_params = BenchmarkReturnsQuantileRegimeSpecs(freq=factsheet_config.freq_regime)
+    regime_classifier = BenchmarkReturnsQuantilesRegime(freq=factsheet_config.freq_regime)
     kwargs = factsheet_config._asdict()
 
     if add_rates_data:
@@ -165,13 +160,13 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
         kwargs['perf_stats_labels'] = (PerfStat.PA_RETURN, PerfStat.VOL, PerfStat.SHARPE_RF0, )
 
     kwargs.pop('freq')  # remove frequency as some methods have default freq
-    kwargs.update(dict(perf_params=perf_params, regime_params=regime_params))
+    kwargs.update(dict(perf_params=perf_params, regime_classifier=regime_classifier))
     if override is not None:
         kwargs = update_kwargs(kwargs, override)
     return kwargs
 
 
-def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileRegimeSpecs]:
+def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantilesRegime]:
     """
     by default we use 3m US rate
     """
@@ -179,9 +174,9 @@ def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantileReg
     if rates_data.empty:  # if online
         rates_data = None
     perf_params = PerfParams(freq='W-WED', freq_reg='W-WED', rates_data=rates_data)
-    regime_params = BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
+    regime_classifier = BenchmarkReturnsQuantilesRegime(freq='QE')
 
-    return perf_params, regime_params
+    return perf_params, regime_classifier
 
 
 def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,

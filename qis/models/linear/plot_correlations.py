@@ -13,7 +13,7 @@ import qis.utils.np_ops as npo
 import qis.utils.df_str as dfs
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfParams, ReturnTypes
-from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
+from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime
 
 import qis.plots.time_series as pts
 import qis.plots.utils as put
@@ -99,7 +99,7 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
                                          legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
                                          trend_line: put.TrendLine = put.TrendLine.AVERAGE,
                                          regime_benchmark: str = None,
-                                         regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                                         regime_classifier: BenchmarkReturnsQuantilesRegime = None,
                                          perf_params: PerfParams = None,
                                          ax: plt.Subplot = None,
                                          **kwargs
@@ -130,11 +130,11 @@ def plot_returns_corr_matrix_time_series(prices: pd.DataFrame,
         else:
             raise KeyError(f"{regime_benchmark} not in {prices.columns}")
 
-        if regime_benchmark is not None and regime_params is not None:
+        if regime_benchmark is not None and regime_classifier is not None:
             add_bnb_regime_shadows(ax=ax,
                                    pivot_prices=pivot_prices,
                                    benchmark=regime_benchmark,
-                                   regime_params=regime_params,
+                                   regime_classifier=regime_classifier,
                                    perf_params=perf_params)
 
 

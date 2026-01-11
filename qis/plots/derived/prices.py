@@ -14,7 +14,7 @@ import qis.utils.struct_ops as sop
 import qis.perfstats.perf_stats as pt
 from qis.models.stats.rolling_stats import RollingPerfStat, compute_rolling_perf_stat
 from qis.perfstats.config import PerfStat, PerfParams
-from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs
+from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime
 
 import qis.plots.derived.drawdowns as dra
 import qis.plots.time_series as pts
@@ -69,7 +69,7 @@ def plot_prices(prices: Union[pd.DataFrame, pd.Series],
                 perf_params: PerfParams = None,
                 regime_benchmark: str = None,  # to add regimes
                 pivot_prices: pd.Series = None,
-                regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
+                regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                 var_format: str = '{:,.1f}',
                 digits_to_show: int = 1,
                 sharpe_format: str = '{:.2f}',
@@ -116,12 +116,12 @@ def plot_prices(prices: Union[pd.DataFrame, pd.Series],
                                ax=ax,
                                **kwargs)
 
-    if regime_benchmark is not None and regime_params is not None:
+    if regime_benchmark is not None and regime_classifier is not None:
         add_bnb_regime_shadows(ax=ax,
                                data_df=prices,
                                pivot_prices=pivot_prices,
                                benchmark=regime_benchmark,
-                               regime_params=regime_params)
+                               regime_classifier=regime_classifier)
     return fig
 
 
@@ -131,7 +131,7 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                         perf_params: PerfParams = None,
                         regime_benchmark: str = None,  # to add regimes
                         pivot_prices: pd.Series = None,
-                        regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
+                        regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                         var_format: str = '{:,.1f}',
                         dd_format: str = '{:.0%}',
                         digits_to_show: int = 1,
@@ -180,13 +180,13 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
     if remove_xticklabels_ax1:
         axs[0].set_xticklabels('')
 
-    if (regime_benchmark is not None or pivot_prices is not None) and regime_params is not None:
+    if (regime_benchmark is not None or pivot_prices is not None) and regime_classifier is not None:
         for ax in axs:
             add_bnb_regime_shadows(ax=ax,
                                    data_df=prices,
                                    pivot_prices=pivot_prices,
                                    benchmark=regime_benchmark,
-                                   regime_params=regime_params,
+                                   regime_classifier=regime_classifier,
                                    perf_params=perf_params)
     return fig
 
@@ -198,7 +198,7 @@ def plot_prices_with_fundamentals(prices: Union[pd.DataFrame, pd.Series],
                                   perf_params: PerfParams = None,
                                   regime_benchmark: str = None,  # to add regimes
                                   pivot_prices: pd.Series = None,
-                                  regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
+                                  regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                                   trend_line: put.TrendLine = put.TrendLine.AVERAGE,
                                   var_format: str = '{:,.1f}',
                                   digits_to_show: int = 2,
@@ -248,13 +248,13 @@ def plot_prices_with_fundamentals(prices: Union[pd.DataFrame, pd.Series],
     axs[0].set_xticklabels('')
     axs[1].set_xticklabels('')
 
-    if regime_benchmark is not None and regime_params is not None:
+    if regime_benchmark is not None and regime_classifier is not None:
         for ax in axs:
             add_bnb_regime_shadows(ax=ax,
                                    data_df=prices,
                                    pivot_prices=pivot_prices,
                                    benchmark=regime_benchmark,
-                                   regime_params=regime_params,
+                                   regime_classifier=regime_classifier,
                                    perf_params=perf_params)
     return fig
 
@@ -321,7 +321,7 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
                            title: Optional[str] = None,
                            regime_benchmark: str = None,
                            pivot_prices: pd.Series = None,
-                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
+                           regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                            perf_params: PerfParams = None,
                            ax: plt.Subplot = None,
                            **kwargs
@@ -343,12 +343,12 @@ def plot_rolling_perf_stat(prices: Union[pd.Series, pd.DataFrame],
                                ax=ax,
                                **sop.update_kwargs(kwargs, dict(var_format=rolling_perf_stat.value[1])))
 
-    if regime_benchmark is not None and regime_params is not None:
+    if regime_benchmark is not None and regime_classifier is not None:
         add_bnb_regime_shadows(ax=ax,
                                data_df=prices.reindex(index=df.index, method='ffill'),
                                pivot_prices=pivot_prices,
                                benchmark=regime_benchmark,
-                               regime_params=regime_params,
+                               regime_classifier=regime_classifier,
                                perf_params=perf_params)
 
     return fig

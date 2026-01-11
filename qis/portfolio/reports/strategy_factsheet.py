@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Tuple, Optional, List, Union
 import qis as qis
-from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs
+from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
-from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
 
 
 def generate_strategy_factsheet(portfolio_data: PortfolioData,
@@ -22,7 +22,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 ytd_attribution_time_period: TimePeriod = qis.get_ytd_time_period(),
                                 weight_report_time_period: TimePeriod = None,
                                 perf_params: PerfParams = PERF_PARAMS,
-                                regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                                 regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
                                 weights_freq: Optional[str] = 'W-WED',  #'W-WED',
                                 turnover_rolling_period: int = 260,
@@ -108,10 +108,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[0:2, :2])
     qis.plot_prices(prices=joint_prices,
                     perf_params=perf_params,
-                    title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_params.freq}-returns",
+                    title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
                     ax=ax,
                     **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # dd
@@ -120,7 +120,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                title='Running Drawdowns',
                                dd_legend_type=dd_legend_type,
                                ax=ax, **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # under water
@@ -129,7 +129,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                       title='Running Time under Water',
                                       dd_legend_type=dd_legend_type,
                                       ax=ax, **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # rolling performance
@@ -141,7 +141,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      time_period=time_period,
                                      ax=ax,
                                      **qis.update_kwargs(kwargs, dict(trend_line=qis.TrendLine.ZERO_SHADOWS)))
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # exposures
@@ -173,7 +173,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                          title=turnover_title,
                          ax=ax,
                          **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # costs
@@ -191,7 +191,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                          title=costs_title,
                          ax=ax,
                          **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # ra perf table
@@ -219,7 +219,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         # change regression to weekly
         time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
         if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
-            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED', fontsize=fontsize))
+            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
         else:
             local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
         portfolio_data.plot_ra_perf_table(ax=ax,
@@ -251,7 +251,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                     benchmark_price=benchmark_prices[regime_benchmark],
                                     time_period=time_period,
                                     perf_params=perf_params,
-                                    regime_params=regime_params,
+                                    regime_classifier=regime_classifier,
                                     ax=fig.add_subplot(gs[6:8, 2:]),
                                     **kwargs)
 
@@ -276,7 +276,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                          title='Number of investable and invested instruments',
                          ax=ax,
                          **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
     qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     figs = [fig]
@@ -363,7 +363,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                   is_correlated=False,
                                                   time_period=time_period,
                                                   **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # var time series - correlted
@@ -372,7 +372,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                   is_correlated=True,
                                                   time_period=time_period,
                                                   **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # vol time series
@@ -382,7 +382,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                            time_period=time_period,
                                            ax=ax,
                                            **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # benchmark betas
@@ -398,7 +398,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                              title=factor_beta_title,
                              ax=ax,
                              **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # beta attribution
@@ -415,7 +415,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                              title=factor_attribution_title,
                              ax=ax,
                              **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
         qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
         """
         # returns scatter
@@ -434,8 +434,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                         benchmark_price=benchmark_prices[regime_benchmark],
                                         is_grouped=is_grouped,
                                         time_period=time_period,
-                                        freq=regime_params.freq,
-                                        regime_params=regime_params,
+                                        freq=regime_classifier.freq,
+                                        regime_classifier=regime_classifier,
                                         **kwargs)
         """
         if len(benchmark_prices.columns) > 1:
@@ -444,8 +444,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                             benchmark_price=benchmark_prices.iloc[:, 1],
                                             is_grouped=is_grouped,
                                             time_period=time_period,
-                                            freq=regime_params.freq,
-                                            regime_params=regime_params,
+                                            freq=regime_classifier.freq,
+                                            regime_classifier=regime_classifier,
                                             **kwargs)
         """
 
@@ -618,10 +618,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # set 1y time period for exposures
     if is_1y_exposures:
         time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
-        regime_params1 = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
+        regime_classifier1 = BenchmarkReturnsQuantilesRegime(freq='ME')
     else:
         time_period1 = weight_report_time_period or time_period
-        regime_params1 = regime_params
+        regime_classifier1 = regime_classifier
 
     if add_grouped_exposures:
         grouped_weights_agg, grouped_weights_by_inst = portfolio_data.get_grouped_long_short_weights(time_period=time_period1)
@@ -644,7 +644,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      ax=ax,
                                      **local_kwargs)
                 qis.add_bnb_regime_shadows(ax=ax, pivot_prices=time_period1.locate(pivot_prices),
-                                           regime_params=regime_params1)
+                                           regime_classifier=regime_classifier1)
                 qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
                 ax.axhline(0, color='black', linewidth=0.5)
 
@@ -670,7 +670,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      **local_kwargs)
                 qis.add_bnb_regime_shadows(ax=ax,
                                            pivot_prices=time_period1.locate(pivot_prices),
-                                           regime_params=regime_params1)
+                                           regime_classifier=regime_classifier1)
                 qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     if add_instrument_history_report:

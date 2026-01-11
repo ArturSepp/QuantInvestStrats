@@ -7,8 +7,8 @@ import pandas as pd
 from enum import Enum
 
 # qis
-import qis.utils.dates as da
 import qis.models.linear.ewm as ewm
+from qis.utils.annualisation import get_annualization_factor
 
 
 class ConvolutionType(Enum):
@@ -38,7 +38,7 @@ def ewm_xy_convolution(returns: pd.DataFrame,
     assumed frequency is daily
     """
 
-    signal_span, _ = da.get_period_days(freq=freq, is_calendar=True)
+    signal_span = get_annualization_factor(freq=freq)
 
     if not np.isclose(signal_span, 1):
         ewm_lambda = 1.0 - 2.0 / (signal_span + 1.0)

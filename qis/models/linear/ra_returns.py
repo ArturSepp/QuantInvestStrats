@@ -9,7 +9,7 @@ from scipy.stats import laplace
 from typing import Union, Optional, Tuple
 from enum import Enum
 # qis
-import qis.utils.dates as da
+from qis.utils.annualisation import get_annualization_factor
 import qis.utils.np_ops as npo
 import qis.models.linear.ewm as ewm
 
@@ -93,7 +93,8 @@ class SignalMapType(Enum):
     ExpCDF = 3
 
 
-def map_signal_to_weight(signals: pd.DataFrame, signal_map_type: SignalMapType = SignalMapType.NormalCDF,
+def map_signal_to_weight(signals: pd.DataFrame,
+                         signal_map_type: SignalMapType = SignalMapType.NormalCDF,
                          loc: Union[float, pd.DataFrame] = 0.0,
                          scale: Union[float, np.ndarray] = 1.0,
                          tail_level: Union[float, np.ndarray] = 1.0,
@@ -235,7 +236,7 @@ def compute_sum_freq_ra_returns(returns: Union[pd.Series, pd.DataFrame],
         sum_rolling_ra_returns = ra_returns.resample(freq).sum()
 
         if is_norm:
-            n_daily, _ = da.get_period_days(freq=freq, is_calendar=False)
+            n_daily = get_annualization_factor(freq=freq)
             sum_rolling_ra_returns = sum_rolling_ra_returns.divide(np.sqrt(n_daily))
     else:
         sum_rolling_ra_returns = ra_returns

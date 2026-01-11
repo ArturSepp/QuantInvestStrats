@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 from typing import List, Optional, Tuple, Dict
 
 import qis as qis
-from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs
+from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.risk.factor_model import LinearModel
-from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
 
 
 def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfolioData,
@@ -26,7 +26,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                               risk_model: LinearModel = None,
                                               time_period: TimePeriod = None,
                                               perf_params: PerfParams = PERF_PARAMS,
-                                              regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                              regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                                               add_benchmarks_to_navs: bool = True,
                                               tre_max_clip: Optional[float] = None,
                                               figsize: Tuple[float, float] = (11.7, 8.3),
@@ -49,13 +49,13 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         figs['navs'] = fig
         if add_titles:
             title = f"Cumulative performance with background colors using bear/normal/bull "
-            f"regimes of {regime_benchmark} {regime_params.freq}-returns"
+            f"regimes of {regime_benchmark} {regime_classifier.freq}-returns"
         else:
             title = None
         multi_portfolio_data.plot_nav(regime_benchmark=regime_benchmark,
                                       time_period=time_period,
                                       perf_params=perf_params,
-                                      regime_params=regime_params,
+                                      regime_classifier=regime_classifier,
                                       add_benchmarks_to_navs=add_benchmarks_to_navs,
                                       title=title,
                                       ax=ax,
@@ -152,7 +152,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                              **kwargs)
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                    index=ex_anti_vols.index, regime_params=regime_params)
+                                                    index=ex_anti_vols.index, regime_classifier=regime_classifier)
 
         # risk contributions
         rc_kwargs = dict(covar_dict=multi_portfolio_data.covar_dict, freq='QE', normalise=True, time_period=time_period)
@@ -237,7 +237,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                    index=active_total.index, regime_params=regime_params)
+                                                    index=active_total.index, regime_classifier=regime_classifier)
         dfs['brinson_active_total'] = active_total.cumsum(axis=0)
 
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
@@ -249,7 +249,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                    index=grouped_allocation_return.index, regime_params=regime_params)
+                                                    index=grouped_allocation_return.index, regime_classifier=regime_classifier)
 
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['brinson_grouped_selection_return'] = fig
@@ -260,7 +260,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                              ax=ax, **kwargs)
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                    index=grouped_selection_return.index, regime_params=regime_params)
+                                                    index=grouped_selection_return.index, regime_classifier=regime_classifier)
 
         # brinson by sub-asset class
         totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
@@ -285,7 +285,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
                                                   benchmark_idx=benchmark_idx,
                                                   regime_benchmark=regime_benchmark,
-                                                  regime_params=regime_params,
+                                                  regime_classifier=regime_classifier,
                                                   title=title,
                                                   ax=ax,
                                                   time_period=time_period,
@@ -304,7 +304,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                   group_data=ac_group_data,
                                                   group_order=ac_group_order,
                                                   regime_benchmark=regime_benchmark,
-                                                  regime_params=regime_params,
+                                                  regime_classifier=regime_classifier,
                                                   tre_max_clip=tre_max_clip,
                                                   title=title,
                                                   ax=ax,
@@ -323,7 +323,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         multi_portfolio_data.plot_turnover(ax=ax,
                                            time_period=time_period,
                                            regime_benchmark=regime_benchmark,
-                                           regime_params=regime_params,
+                                           regime_classifier=regime_classifier,
                                            **kwargs)
         if not add_titles:
             ax.title.set_visible(False)
@@ -334,7 +334,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         multi_portfolio_data.portfolio_datas[strategy_idx].plot_turnover(ax=ax,
                                                                          time_period=time_period,
                                                                          regime_benchmark=regime_benchmark,
-                                                                         regime_params=regime_params,
+                                                                         regime_classifier=regime_classifier,
                                                                          is_grouped=True,
                                                                          group_data=turnover_groups,
                                                                          group_order=turnover_order,
@@ -342,7 +342,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                                          **kwargs)
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                    index=grouped_selection_return.index, regime_params=regime_params)
+                                                    index=grouped_selection_return.index, regime_classifier=regime_classifier)
         if not add_titles:
             ax.title.set_visible(False)
 
@@ -390,7 +390,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                  ax=ax)
             if regime_benchmark is not None:
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                        index=strategy_factor_betas.index, regime_params=regime_params)
+                                                        index=strategy_factor_betas.index, regime_classifier=regime_classifier)
             # benchmark factor betas
             benchmark_factor_betas = out_dict['benchmark_exposures']
             # benchmark_factor_betas = risk_model.compute_agg_factor_exposures(weights=multi_portfolio_data.portfolio_datas[benchmark_idx].get_weights())
@@ -402,7 +402,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                  ax=ax)
             if regime_benchmark is not None:
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                        index=benchmark_factor_betas.index, regime_params=regime_params)
+                                                        index=benchmark_factor_betas.index, regime_classifier=regime_classifier)
 
             # active exposure
             fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
@@ -437,7 +437,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                  ax=ax)
             if regime_benchmark is not None:
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                        index=attributions.index, regime_params=regime_params)
+                                                        index=attributions.index, regime_classifier=regime_classifier)
 
             # benchmark attribution
             portfolio_returns = qis.to_returns(prices=multi_portfolio_data.portfolio_datas[benchmark_idx].get_portfolio_nav().reindex(
@@ -455,7 +455,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                  ax=ax)
             if regime_benchmark is not None:
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                        index=attributions.index, regime_params=regime_params)
+                                                        index=attributions.index, regime_classifier=regime_classifier)
 
             # strategy risk attribution
             factor_rcs_ratios, strategy_factor_risk_contrib_idio, factor_risk_contrib, strategy_portfolio_var = \
@@ -501,7 +501,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                  ax=ax)
             if regime_benchmark is not None:
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                        index=strategy_portfolio_var.index, regime_params=regime_params)
+                                                        index=strategy_portfolio_var.index, regime_classifier=regime_classifier)
 
             fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
             figs['benchmark_portfolio_vars'] = fig
@@ -511,7 +511,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                  ax=ax)
             if regime_benchmark is not None:
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
-                                                        index=benchmark_portfolio_var.index, regime_params=regime_params)
+                                                        index=benchmark_portfolio_var.index, regime_classifier=regime_classifier)
 
     return figs, dfs
 

@@ -19,9 +19,9 @@ vix_portfolio = PortfolioData(nav=vix)
 
 # set timeperiod for analysis
 time_period = qis.TimePeriod('31Dec2021', None)
-perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', alpha_an_factor=52.0,
+perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED',
                              rates_data=yf.download('^IRX', start="1959-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0)
-regime_params = qis.BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
+regime_classifier = qis.BenchmarkReturnsQuantilesRegime(freq='ME')
 
 prices = pd.concat([vix, benchmark_prices], axis=1).sort_index().dropna()
 prices = time_period.locate(prices)
@@ -38,7 +38,7 @@ with sns.axes_style("darkgrid"):
                     is_log=True,
                     ax=axs[0],
                     **kwargs)
-    qis.add_bnb_regime_shadows(ax=axs[0], pivot_prices=prices['SPY'], regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=axs[0], pivot_prices=prices['SPY'], regime_classifier=regime_classifier)
 
     # plot vix betas to benchmarks
     span = 63  # use 3m for half-live
@@ -50,7 +50,7 @@ with sns.axes_style("darkgrid"):
                          title='VIX ETF benchmark multi-variate betas',
                          ax=axs[1],
                          **kwargs)
-    qis.add_bnb_regime_shadows(ax=axs[1], pivot_prices=prices['SPY'], regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=axs[1], pivot_prices=prices['SPY'], regime_classifier=regime_classifier)
 
     # plot performance attribution to betas
     factor_attribution = vix_portfolio.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
@@ -63,7 +63,7 @@ with sns.axes_style("darkgrid"):
                          ax=axs[2],
                          **kwargs)
     pivot_prices = benchmark_prices['SPY'].reindex(index=factor_attribution.index, method='ffill')
-    qis.add_bnb_regime_shadows(ax=axs[2], pivot_prices=prices['SPY'], regime_params=regime_params)
+    qis.add_bnb_regime_shadows(ax=axs[2], pivot_prices=prices['SPY'], regime_classifier=regime_classifier)
 
     qis.align_x_limits_axs(axs=axs, is_invisible_xs=True)
 

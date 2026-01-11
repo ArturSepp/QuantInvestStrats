@@ -9,10 +9,10 @@ from typing import Callable, Union, Dict, Tuple, Any, Optional, Literal
 from enum import Enum
 
 # qis
-import qis.utils.dates as da
 import qis.utils.regression as ols
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfStat, PerfParams
+from qis.utils.annualisation import get_annualization_factor, infer_an_from_data
 
 STANDARD_TABLE_COLUMNS = (PerfStat.START_DATE,
                           PerfStat.END_DATE,
@@ -165,7 +165,7 @@ def compute_risk_table(prices: pd.DataFrame,
     else:
         sampled_prices_skew = ret.prices_at_freq(prices=prices, freq=perf_params.freq_skeweness)
 
-    vol_dt = np.sqrt(da.infer_an_from_data(data=sampled_prices_vol))
+    vol_dt = np.sqrt(infer_an_from_data(data=sampled_prices_vol))
     dict_data = {}
     for asset in sampled_prices_vol:
         sampled_price = sampled_prices_vol[asset].dropna()
@@ -254,7 +254,6 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
                                          benchmark_price: pd.Series = None,
                                          perf_params: PerfParams = None,
                                          is_log_returns: bool = False,
-                                         alpha_an_factor: float = None,
                                          freq_reg: str = None,
                                          drop_benchmark: bool = False,
                                          **kwargs
@@ -284,7 +283,9 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     ra_perf_table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
 
     # compute benchmark regression
-    returns = ret.to_returns(prices=prices, freq=freq_reg or perf_params.freq_reg, is_log_returns=is_log_returns)
+    # qqq
+    freq = freq_reg or perf_params.freq_reg
+    returns = ret.to_returns(prices=prices, freq=freq, is_log_returns=is_log_returns)
 
     # use excess returns if rates data is given
     if perf_params.rates_data is not None:
@@ -299,8 +300,7 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
             alphas[column], betas[column], r2[column], alpha_pvalue[column] = ols.estimate_ols_alpha_beta(x=joint_data.iloc[:, 0],
                                                                                                           y=joint_data.iloc[:, 1])
 
-            # get vol and compute risk adjusted performance
-    alpha_an_factor = alpha_an_factor or perf_params.alpha_an_factor
+    alpha_an_factor = get_annualization_factor(freq=freq)
     ra_perf_table[PerfStat.ALPHA.to_str()] = pd.Series(alphas)
     ra_perf_table[PerfStat.ALPHA_AN.to_str()] = alpha_an_factor * pd.Series(alphas)
     ra_perf_table[PerfStat.BETA.to_str()] = pd.Series(betas)
@@ -341,7 +341,7 @@ def compute_te_ir_errors(return_diffs: pd.DataFrame) -> Tuple[pd.Series, pd.Seri
     """
     compute information ratio from return diffs
     """
-    vol_dt = np.sqrt(da.infer_an_from_data(return_diffs))
+    vol_dt = np.sqrt(infer_an_from_data(return_diffs))
     avg = np.nanmean(return_diffs, axis=0)
     vol = np.nanstd(return_diffs, axis=0, ddof=1)
     ir = vol_dt * np.divide(avg, vol, where=np.greater(vol, 0.0))
@@ -491,9 +491,10 @@ def compute_drawdowns_stats_table(price: pd.Series,
 
 class LocalTests(Enum):
     RA_PERF_TABLE = 1
-    DRAWDOWN = 2
-    DRAWDOWN_STATS_TABLE = 3
-    TOP_BOTTOM = 4
+    RA_PERF_TABLE_WITH_BENCHMARK = 2
+    DRAWDOWN = 3
+    DRAWDOWN_STATS_TABLE = 4
+    TOP_BOTTOM = 5
 
 
 def run_local_test(local_test: LocalTests):
@@ -502,6 +503,9 @@ def run_local_test(local_test: LocalTests):
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
+    pd.set_option('display.max_rows', 500)
+    pd.set_option('display.max_columns', 500)
+    pd.set_option('display.width', 1000)
 
     from qis.test_data import load_etf_data
     prices = load_etf_data() # .dropna()
@@ -510,7 +514,11 @@ def run_local_test(local_test: LocalTests):
         perf_params = PerfParams(freq='B')
         table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
         print(table)
-        print(table.columns)
+
+    elif local_test == LocalTests.RA_PERF_TABLE_WITH_BENCHMARK:
+        perf_params = PerfParams(freq='ME')
+        table = compute_ra_perf_table_with_benchmark(prices=prices, benchmark=prices.columns[0], perf_params=perf_params)
+        print(table)
 
     elif local_test == LocalTests.DRAWDOWN:
         dd_data = compute_rolling_drawdowns(prices=prices['SPY'])
@@ -523,4 +531,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.RA_PERF_TABLE)
+    run_local_test(local_test=LocalTests.RA_PERF_TABLE_WITH_BENCHMARK)

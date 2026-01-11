@@ -9,16 +9,16 @@ import matplotlib.pyplot as plt
 from typing import Tuple, List
 # qis
 import qis as qis
-from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantileRegimeSpecs
+from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 
 
 def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        time_period: TimePeriod = None,
                                        perf_params: PerfParams = PERF_PARAMS,
-                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                       regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                                        regime_benchmark: str = None,
                                        backtest_name: str = None,
                                        heatmap_freq: str = 'YE',
@@ -60,15 +60,15 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                   time_period=time_period,
                                   regime_benchmark=regime_benchmark,
                                   perf_params=perf_params,
-                                  regime_params=regime_params,
+                                  regime_classifier=regime_classifier,
                                   add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                  title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_params.freq}-returns",
+                                  title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
                                   **kwargs)
 
     multi_portfolio_data.plot_drawdowns(ax=fig.add_subplot(gs[1, :2]),
                                         time_period=time_period,
                                         regime_benchmark=regime_benchmark,
-                                        regime_params=regime_params,
+                                        regime_classifier=regime_classifier,
                                         dd_legend_type=qis.DdLegendType.SIMPLE,
                                         add_benchmarks_to_navs=add_benchmarks_to_navs,
                                         title='Running Drawdowns',
@@ -77,7 +77,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     multi_portfolio_data.plot_rolling_time_under_water(ax=fig.add_subplot(gs[2, :2]),
                                                        time_period=time_period,
                                                        regime_benchmark=regime_benchmark,
-                                                       regime_params=regime_params,
+                                                       regime_classifier=regime_classifier,
                                                        add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                        title='Rolling time under water',
                                                        **kwargs)
@@ -85,7 +85,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     multi_portfolio_data.plot_rolling_perf(ax=fig.add_subplot(gs[3, :2]),
                                            time_period=time_period,
                                            regime_benchmark=regime_benchmark,
-                                           regime_params=regime_params,
+                                           regime_classifier=regime_classifier,
                                            add_benchmarks_to_navs=add_benchmarks_to_navs,
                                            **kwargs)
 
@@ -93,19 +93,19 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                         portfolio_idx=0,
                                         time_period=time_period,
                                         regime_benchmark=regime_benchmark,
-                                        regime_params=regime_params,
+                                        regime_classifier=regime_classifier,
                                         **kwargs)
 
     multi_portfolio_data.plot_turnover(ax=fig.add_subplot(gs[5, :2]),
                                        time_period=time_period,
                                        regime_benchmark=regime_benchmark,
-                                       regime_params=regime_params,
+                                       regime_classifier=regime_classifier,
                                        **kwargs)
 
     multi_portfolio_data.plot_costs(ax=fig.add_subplot(gs[6, :2]),
                                     time_period=time_period,
                                     regime_benchmark=regime_benchmark,
-                                    regime_params=regime_params,
+                                    regime_classifier=regime_classifier,
                                     **kwargs)
 
     multi_portfolio_data.plot_performance_bars(ax=fig.add_subplot(gs[0, 2]),
@@ -138,7 +138,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     multi_portfolio_data.plot_ra_perf_table(ax=fig.add_subplot(gs[3, 2:]),
                                             perf_params=perf_params,
                                             time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
-                                            **qis.update_kwargs(kwargs, dict(fontsize=fontsize, alpha_an_factor=52, freq_reg='W-WED')))
+                                            **qis.update_kwargs(kwargs, dict(fontsize=fontsize, freq_reg='W-WED')))
     """
     multi_portfolio_data.plot_corr_table(ax=fig.add_subplot(gs[3, 2:]),
                                          time_period=time_period,
@@ -151,14 +151,14 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                               is_grouped=is_grouped,
                                               time_period=time_period,
                                               perf_params=perf_params,
-                                              regime_params=regime_params,
+                                              regime_classifier=regime_classifier,
                                               benchmark=multi_portfolio_data.benchmark_prices.columns[0],
                                               **kwargs)
         multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 3]),
                                               is_grouped=is_grouped,
                                               time_period=time_period,
                                               perf_params=perf_params,
-                                              regime_params=regime_params,
+                                              regime_classifier=regime_classifier,
                                               benchmark=multi_portfolio_data.benchmark_prices.columns[1],
                                               **kwargs)
     else:
@@ -166,7 +166,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                               is_grouped=is_grouped,
                                               time_period=time_period,
                                               perf_params=perf_params,
-                                              regime_params=regime_params,
+                                              regime_classifier=regime_classifier,
                                               benchmark=multi_portfolio_data.benchmark_prices.columns[0],
                                               **kwargs)
     if len(multi_portfolio_data.benchmark_prices.columns) > 1:
@@ -176,7 +176,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                benchmark_prices=benchmark_prices,
                                                time_period=time_period,
                                                regime_benchmark=regime_benchmark,
-                                               regime_params=regime_params,
+                                               regime_classifier=regime_classifier,
                                                **kwargs)
     else:
         multi_portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[5, 2:]),
@@ -188,14 +188,14 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                time_period=time_period,
                                                benchmark_prices=multi_portfolio_data.benchmark_prices,
                                                regime_benchmark=regime_benchmark,
-                                               regime_params=regime_params,
+                                               regime_classifier=regime_classifier,
                                                **kwargs)
 
     figs = [fig]
     if add_group_exposures_and_pnl:
         figs1 = multi_portfolio_data.plot_group_exposures_and_pnl(time_period=time_period,
                                                                   regime_benchmark=regime_benchmark,
-                                                                  regime_params=regime_params,
+                                                                  regime_classifier=regime_classifier,
                                                                   **kwargs)
         figs.append(figs1)
 
@@ -204,7 +204,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
             figs.append(generate_strategy_factsheet(portfolio_data=portfolio_data,
                                                     benchmark_prices=multi_portfolio_data.benchmark_prices,
                                                     perf_params=perf_params,
-                                                    regime_params=regime_params,
+                                                    regime_classifier=regime_classifier,
                                                     add_grouped_exposures=is_grouped,
                                                     time_period=time_period,
                                                     **kwargs

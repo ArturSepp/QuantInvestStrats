@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Union, List, Optional, Tuple
 import qis as qis
-from qis import TimePeriod, PerfStat, PerfParams, RegimeData, RollingPerfStat, LegendStats, BenchmarkReturnsQuantileRegimeSpecs
-from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
+from qis import TimePeriod, PerfStat, PerfParams, RegimeData, RollingPerfStat, LegendStats, BenchmarkReturnsQuantilesRegime
+from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
 
 
 PERF_COLUMNS = (
@@ -38,14 +38,14 @@ class MultiAssetsReport:
                  prices: pd.DataFrame,
                  benchmark_prices: Union[pd.Series, pd.DataFrame],
                  perf_params: PerfParams = PERF_PARAMS,
-                 regime_params: qis.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS
+                 regime_classifier: qis.BenchmarkReturnsQuantilesRegime = regime_classifier
                  ):
 
         # make sure it is consistent
         self.prices = prices
         self.benchmark_prices = benchmark_prices.reindex(index=prices.index, method='ffill')
         self.perf_params = perf_params
-        self.regime_params = regime_params
+        self.regime_classifier = regime_classifier
 
     def get_prices(self,
                    benchmark: str = None,
@@ -71,7 +71,7 @@ class MultiAssetsReport:
                            regime_benchmark: str,
                            data_df: pd.DataFrame,
                            time_period: TimePeriod = None,
-                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = None
+                           regime_classifier: BenchmarkReturnsQuantilesRegime = None
                            ) -> None:
         if isinstance(self.benchmark_prices, pd.Series):
             pivot_prices = self.benchmark_prices
@@ -86,7 +86,7 @@ class MultiAssetsReport:
                                    data_df=data_df,
                                    pivot_prices=pivot_prices,
                                    benchmark=regime_benchmark,
-                                   regime_params=regime_params or self.regime_params)
+                                   regime_classifier=regime_classifier or self.regime_classifier)
 
     def plot_ra_perf_table(self,
                            benchmark: str,
@@ -135,7 +135,7 @@ class MultiAssetsReport:
         cvar_table = qis.compute_bnb_regimes_pa_perf_table(prices=prices,
                                                            benchmark=regime_benchmark,
                                                            perf_params=self.perf_params,
-                                                           regime_params=self.regime_params)
+                                                           regime_classifier=self.regime_classifier)
         table_data = pd.DataFrame(data=prices.columns, index=cvar_table.index, columns=[columns_title])
 
         for perf_column in perf_columns:
@@ -339,7 +339,7 @@ class MultiAssetsReport:
                                          roll_freq=freq_sharpe,
                                          legend_stats=legend_stats,
                                          regime_benchmark=regime_benchmark,
-                                         regime_params=self.regime_params,
+                                         regime_classifier=self.regime_classifier,
                                          ax=ax,
                                          **kwargs)
         return fig
@@ -357,9 +357,8 @@ class MultiAssetsReport:
                          ax: plt.Subplot = None,
                          **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=benchmark)
-        title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {self.regime_params.freq}-freq regimes"
-        regime_classifier = qis.BenchmarkReturnsQuantilesRegime(regime_params=self.regime_params)
-        qis.plot_regime_data(regime_classifier=regime_classifier,
+        title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {self.regime_classifier.freq}-freq regimes"
+        qis.plot_regime_data(regime_classifier=self.regime_classifier,
                              prices=prices,
                              benchmark=benchmark,
                              is_conditional_sharpe=is_conditional_sharpe,
@@ -380,8 +379,8 @@ class MultiAssetsReport:
                          **kwargs
                          ) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=benchmark)
-        title = title or f"Boxplot of average {self.regime_params.freq}-freq return conditional on volatility regime of {str(benchmark)}"
-        regime_classifier = qis.BenchmarkVolsQuantilesRegime(regime_params=qis.VolQuantileRegimeSpecs(freq=self.regime_params.freq))
+        title = title or f"Boxplot of average {self.regime_classifier.freq}-freq return conditional on volatility regime of {str(benchmark)}"
+        regime_classifier = qis.BenchmarkVolsQuantilesRegime(freq=self.regime_classifier.freq)
         if len(prices.columns) >= 6:
             ncols = 1
         else:
@@ -419,7 +418,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    benchmark: str = None,
                                    add_benchmarks_to_navs: bool = True,
                                    perf_params: PerfParams = PERF_PARAMS,
-                                   regime_params: qis.BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                   regime_classifier: qis.BenchmarkReturnsQuantilesRegime = regime_classifier,
                                    heatmap_freq: str = 'YE',
                                    time_period: TimePeriod = None,  # time period for reporting
                                    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
@@ -449,7 +448,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     report = MultiAssetsReport(prices=prices,
                                benchmark_prices=benchmark_prices,
                                perf_params=perf_params,
-                               regime_params=regime_params)
+                               regime_classifier=regime_classifier)
 
     # overwrite local_kwargs with kwargs is they are provided
     local_kwargs = dict(linewidth=0.5,
@@ -477,7 +476,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
 
     report.plot_nav(regime_benchmark=benchmark,
                     add_benchmarks_to_navs=add_benchmarks_to_navs,
-                    title=f"Cumulative performance with background colors using bear/normal/bull regimes of {benchmark} {regime_params.freq}-returns",
+                    title=f"Cumulative performance with background colors using bear/normal/bull regimes of {benchmark} {regime_classifier.freq}-returns",
                     ax=fig.add_subplot(gs[:2, :2]),
                     **kwargs)
 
@@ -533,7 +532,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
 
         # change regression to weekly
         if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
-            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, alpha_an_factor=52, freq_reg='W-WED'))
+            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED'))
         else:
             local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1))
         report.plot_ra_perf_table(benchmark=benchmark,

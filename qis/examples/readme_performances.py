@@ -31,7 +31,7 @@ from qis import PerfStat
 ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
 
 # set parameters for computing performance stats including returns vols and regressions
-perf_params = qis.PerfParams(freq='ME', freq_reg='QE', alpha_an_factor=4.0, rates_data=ust_3m_rate)
+perf_params = qis.PerfParams(freq='ME', freq_reg='QE', rates_data=ust_3m_rate)
 # perf_columns is list to display different perfomance metrics from enumeration PerfStat
 fig = qis.plot_ra_perf_table(prices=prices,
                              perf_columns=[PerfStat.TOTAL_RETURN, PerfStat.PA_RETURN, PerfStat.PA_EXCESS_RETURN,
@@ -47,7 +47,7 @@ qis.save_fig(fig, file_name='perf3', local_path="figures/")
 
 # add benchmark regression using excess returns for linear beta
 # regression frequency is specified using perf_params.freq_reg
-# regression alpha is multiplied using perf_params.alpha_an_factor
+# regression alpha is multiplied using alpha_an_factor
 fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
                                           benchmark='SPY',
                                           perf_columns=[PerfStat.TOTAL_RETURN, PerfStat.PA_RETURN, PerfStat.PA_EXCESS_RETURN,

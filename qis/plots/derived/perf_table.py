@@ -15,7 +15,7 @@ import qis.plots.scatter as psc
 import qis.plots.table as ptb
 import qis.plots.utils as put
 from qis.plots.bars import plot_bars, plot_vbars
-from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs, compute_bnb_regimes_pa_perf_table
+from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime, compute_bnb_regimes_pa_perf_table
 
 
 def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
@@ -128,7 +128,6 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  column_header: str = 'Asset',
                                  fontsize: int = 10,
                                  transpose: bool = False,
-                                 alpha_an_factor: float = None,
                                  is_convert_to_str: bool = True,
                                  df_to_add: pd.DataFrame = None,
                                  ax: plt.Subplot = None,
@@ -144,7 +143,6 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                                   perf_params=perf_params,
                                                   perf_columns=perf_columns,
                                                   column_header=column_header,
-                                                  alpha_an_factor=alpha_an_factor,
                                                   is_convert_to_str=is_convert_to_str,
                                                   **kwargs)
     if not drop_benchmark and special_rows_colors is None:
@@ -201,7 +199,7 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
                          benchmark: str = None,
                          benchmark_price: pd.Series = None,
                          perf_params: PerfParams = None,
-                         regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                         regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                          x_var: PerfStat = PerfStat.MAX_DD,
                          y_var: PerfStat = PerfStat.PA_RETURN,
                          x_var_multiplicative_adjustment: pd.Series = None,
@@ -226,7 +224,7 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
         ra_perf_table = compute_bnb_regimes_pa_perf_table(prices=prices,
                                                           benchmark=benchmark,
                                                           benchmark_price=benchmark_price,
-                                                          regime_params=regime_params,
+                                                          regime_classifier=regime_classifier,
                                                           perf_params=perf_params,
                                                           drop_benchmark=drop_benchmark,
                                                           **kwargs)

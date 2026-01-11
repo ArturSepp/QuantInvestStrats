@@ -100,7 +100,7 @@ def run_local_test(local_test: LocalTests):
                                          time_period=time_period,
                                          **kwargs)
     qis.save_figs_to_pdf(figs=[fig],
-                         file_name=f"multiasset_report", orientation='landscape',
+                         file_name=f"multiasset_report",
                          local_path=qis.local_path.get_output_path())
     qis.save_fig(fig=fig, file_name=f"multiassets", local_path=qis.local_path.get_output_path())
 

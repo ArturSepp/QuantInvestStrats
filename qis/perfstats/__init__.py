@@ -13,7 +13,9 @@ from qis.perfstats.config import (
     TRE_TABLE_COLUMNS
 )
 
-from qis.perfstats.cond_regression import estimate_cond_regression, get_regime_regression_params
+from qis.perfstats.cond_regression import (ConditionalRegressionColumns,
+                                            estimate_cond_regression,
+                                            get_regime_regression_params)
 
 from qis.perfstats.desc_table import DescTableType, compute_desc_table
 
@@ -41,11 +43,10 @@ from qis.perfstats.perf_stats import (
 )
 
 from qis.perfstats.regime_classifier import (
-    BenchmarkReturnsQuantileRegimeSpecs,
     BenchmarkReturnsQuantilesRegime,
     BenchmarkVolsQuantilesRegime,
+    BenchmarkReturnsPositiveNegativeRegime,
     RegimeClassifier,
-    VolQuantileRegimeSpecs,
     compute_bnb_regimes_pa_perf_table,
     compute_mean_freq_regimes,
     compute_regime_avg,

@@ -10,12 +10,12 @@ from matplotlib.ticker import FuncFormatter
 
 # qis
 import qis.plots.utils as put
-from qis.perfstats.regime_classifier import BenchmarkReturnsQuantileRegimeSpecs, BenchmarkReturnsQuantilesRegime
+from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime, BenchmarkReturnsQuantilesRegime
 
 
 def plot_regime_pdf(prices: pd.DataFrame,
                     benchmark: str,
-                    regime_params: BenchmarkReturnsQuantileRegimeSpecs = BenchmarkReturnsQuantileRegimeSpecs(),
+                    regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                     ax: plt.Subplot = None,
                     var_format: str = '{:.0%}',
                     is_histogram: bool = False,
@@ -32,10 +32,10 @@ def plot_regime_pdf(prices: pd.DataFrame,
     else:
         fig = None
 
-    regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
+    regime_classifier = BenchmarkReturnsQuantilesRegime()
     sampled_returns_with_regime_id = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices,
                                                                                               benchmark=benchmark,
-                                                                                              **regime_params._asdict())
+                                                                                              **regime_classifier._asdict())
 
     if is_histogram:
         sns.histplot(data=sampled_returns_with_regime_id,

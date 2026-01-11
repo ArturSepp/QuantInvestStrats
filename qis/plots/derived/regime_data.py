@@ -10,8 +10,9 @@ from enum import Enum
 # qis
 import qis.utils.df_cut as dfc
 from qis.perfstats.config import RegimeData, PerfParams
-from qis.perfstats.regime_classifier import RegimeClassifier, BenchmarkReturnsQuantileRegimeSpecs, \
-    BenchmarkReturnsQuantilesRegime, VolQuantileRegimeSpecs, BenchmarkVolsQuantilesRegime, compute_bnb_regimes_pa_perf_table
+from qis.perfstats.regime_classifier import (RegimeClassifier,
+                                             BenchmarkReturnsQuantilesRegime, BenchmarkVolsQuantilesRegime,
+                                             BenchmarkVolsQuantilesRegime, compute_bnb_regimes_pa_perf_table)
 import qis.plots.bars as pba
 import qis.plots.boxplot as bxp
 
@@ -120,15 +121,14 @@ def add_bnb_regime_shadows(ax: plt.Subplot,
                            data_df: pd.DataFrame = None,
                            benchmark: str = None,
                            pivot_prices: pd.Series = None,
-                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                           regime_classifier: BenchmarkReturnsQuantilesRegime = None,
                            is_force_lim: bool = True,
                            alpha: float = 0.3,
                            **kwargs
                            ) -> None:
 
-    if regime_params is None:
-        regime_params = BenchmarkReturnsQuantileRegimeSpecs()
-    regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
+    if regime_classifier is None:
+        regime_classifier = BenchmarkReturnsQuantilesRegime()
 
     if pivot_prices is not None:
         benchmark = pivot_prices.name
@@ -142,9 +142,9 @@ def add_bnb_regime_shadows(ax: plt.Subplot,
 
     regime_ids = regime_classifier.compute_sampled_returns_with_regime_id(prices=pivot_prices,
                                                                           benchmark=benchmark,
-                                                                          **regime_params._asdict())
+                                                                          **regime_classifier.to_dict())
 
-    regime_id_color = regime_classifier.class_data_to_colors(regime_data=regime_ids[RegimeClassifier.REGIME_COLUMN])
+    regime_id_color = regime_classifier.class_data_to_colors(regime_data=regime_ids[regime_classifier.REGIME_COLUMN])
 
     # fill in the first date before the class date
     price_data_index = pivot_prices.index
@@ -182,8 +182,7 @@ def run_local_test(local_test: LocalTests):
     perf_params = PerfParams()
 
     if local_test == LocalTests.BNB_REGIME:
-        regime_params = BenchmarkReturnsQuantileRegimeSpecs()
-        regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
+        regime_classifier = BenchmarkReturnsQuantilesRegime()
         regime_ids = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices, benchmark='SPY')
         print(f"regime_ids:\n{regime_ids}")
 
@@ -220,9 +219,8 @@ def run_local_test(local_test: LocalTests):
                          **kwargs)
 
     elif local_test == LocalTests.VOL_REGIME:
-        regime_params = VolQuantileRegimeSpecs()
         perf_params = PerfParams()
-        regime_classifier = BenchmarkVolsQuantilesRegime(regime_params=regime_params)
+        regime_classifier = BenchmarkVolsQuantilesRegime()
         regime_ids = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices, benchmark='SPY')
         print(f"regime_ids:\n{regime_ids}")
 
@@ -255,20 +253,19 @@ def run_local_test(local_test: LocalTests):
             add_bnb_regime_shadows(ax=ax,
                                    data_df=prices,
                                    benchmark='SPY',
-                                   regime_params=BenchmarkReturnsQuantileRegimeSpecs(),
+                                   regime_classifier=BenchmarkReturnsQuantilesRegime(),
                                    perf_params=PerfParams())
 
     elif local_test == LocalTests.BNB_PERF_TABLE:
         df = compute_bnb_regimes_pa_perf_table(prices=prices,
                                                benchmark='SPY',
-                                               regime_params=BenchmarkReturnsQuantileRegimeSpecs(),
+                                               regime_classifier=BenchmarkReturnsQuantilesRegime(),
                                                perf_params=PerfParams())
         print(df)
 
     elif local_test == LocalTests.AVG_PLOT:
-        regime_params = VolQuantileRegimeSpecs()
         perf_params = PerfParams()
-        regime_classifier = BenchmarkVolsQuantilesRegime(regime_params=regime_params)
+        regime_classifier = BenchmarkVolsQuantilesRegime()
 
         with sns.axes_style('white'):
             fig, ax = plt.subplots(1, 1, figsize=(7, 7), constrained_layout=True)

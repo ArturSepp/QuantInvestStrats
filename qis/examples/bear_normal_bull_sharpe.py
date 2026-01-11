@@ -11,8 +11,7 @@ prices = prices.asfreq('B', method='ffill').dropna()  # align
 
 # define performance regime params and regime_classifier
 perf_params = qis.PerfParams()
-regime_params = qis.BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
-regime_classifier = qis.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
+regime_classifier = qis.BenchmarkReturnsQuantilesRegime(freq='QE')
 
 # regime diversification
 with sns.axes_style("darkgrid"):
@@ -26,9 +25,9 @@ with sns.axes_style("darkgrid"):
                                data_df=prices,
                                pivot_prices=prices[regime_benchmark],
                                benchmark=regime_benchmark,
-                               regime_params=regime_params)
+                               regime_classifier=regime_classifier)
 
-    title = f"Sharpe ratio split to {regime_benchmark} Bear/Normal/Bull {regime_params.freq}-freq regimes"
+    title = f"Sharpe ratio split to {regime_benchmark} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
     qis.plot_regime_data(regime_classifier=regime_classifier,
                          prices=prices,
                          benchmark=regime_benchmark,
@@ -66,7 +65,7 @@ with sns.axes_style("darkgrid"):
 sd_report = qis.SmartDiversificationReport(principal_nav=prices[regime_benchmark],
                                            overlay_navs=prices.drop(regime_benchmark, axis=1),
                                            perf_params=perf_params,
-                                           regime_params=regime_params)
+                                           regime_classifier=regime_classifier)
 with sns.axes_style('darkgrid'):
     fig, axs = plt.subplots(1, 2, figsize=(16, 7), tight_layout=True)
     sd_report.plot_smart_diversification_curve(x_var=qis.PerfStat.BEAR_SHARPE,

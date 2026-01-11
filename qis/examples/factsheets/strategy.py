@@ -145,7 +145,7 @@ def run_local_test(local_test: LocalTests):
 
         figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                                benchmark_prices=benchmark_prices,
-                                               time_period=TimePeriod('31Dec2019', time_period_short),
+                                               time_period=TimePeriod('31Dec2019', time_period_short.end),
                                                **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",

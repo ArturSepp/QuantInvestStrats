@@ -76,9 +76,10 @@ def generate_performances(prices: pd.DataFrame,
                                 **kwargs)
 
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        regime_classifier = qis.BenchmarkReturnsQuantilesRegime(freq=perf_params.freq_reg)
         qis.plot_scatter_regression(prices=prices,
                                     regime_benchmark=regime_benchmark,
-                                    regime_params=qis.BenchmarkReturnsQuantileRegimeSpecs(freq=perf_params.freq_reg),
+                                    regime_classifier=regime_classifier,
                                     perf_params=perf_params,
                                     title=f"Regime Conditional Regression: {qis.get_time_period_label(prices, date_separator='-')}",
                                     ax=ax,
@@ -138,11 +139,11 @@ def run_local_test(local_test: LocalTests):
         time_period = qis.TimePeriod('31Dec2015', None)
         time_period = qis.TimePeriod('16Oct2014', None)
         # time_period = qis.TimePeriod('31Dec2017', '31Mar2023')
-        perf_params = qis.PerfParams(freq='W-WED', freq_reg='ME', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=12)
+        perf_params = qis.PerfParams(freq='W-WED', freq_reg='ME', freq_drawdown='B', rates_data=ust_3m_rate)
         kwargs = dict(x_date_freq='YE', heatmap_freq='YE', date_format='%Y', perf_params=perf_params)
     else:
         time_period = qis.TimePeriod('31Dec2022', None)
-        perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', freq_drawdown='B', rates_data=ust_3m_rate, alpha_an_factor=52)
+        perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED', freq_drawdown='B', rates_data=ust_3m_rate)
         kwargs = dict(x_date_freq='ME', heatmap_freq='ME', date_format='%b-%y', perf_params=perf_params)
 
     prices = yf.download(tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers].dropna()

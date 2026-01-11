@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Tuple, List, Dict, Optional
 import qis as qis
-from qis import TimePeriod, BenchmarkReturnsQuantileRegimeSpecs
+from qis import TimePeriod, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
 from qis.portfolio.signal_data import StrategySignalData
 
@@ -128,7 +128,7 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                                                      time_period: TimePeriod,
                                                      figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                                      fontsize: int = 4,
-                                                     regime_params: BenchmarkReturnsQuantileRegimeSpecs = None,
+                                                     regime_classifier: BenchmarkReturnsQuantilesRegime = None,
                                                      **kwargs
                                                      ) -> List[plt.Figure]:
 
@@ -186,7 +186,7 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                                      **kwargs)
             qis.add_bnb_regime_shadows(ax=axs[idx][0],
                                        pivot_prices=navs[instrument].reindex(index=df.index, method='ffill'),
-                                       regime_params=regime_params)
+                                       regime_classifier=regime_classifier)
 
             qis.plot_histogram(df=df1,
                                # trend_line=qis.TrendLine.ZERO_SHADOWS,

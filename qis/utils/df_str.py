@@ -138,9 +138,8 @@ def df_to_str(df: pd.DataFrame,
 
         if isinstance(var_formats, list):
             if not len(var_formats) == len(df.columns):
-                raise ValueError(f"match len of var_formats {var_formats} with {df.columns}")
+                raise ValueError(f"match length of var_formats {var_formats} with {df.columns}")
         elif isinstance(var_formats, dict):
-
             if var_format is not None:  # use var_format as pivot
                 var_formats_missing = {x: var_format for x in df.columns}
                 var_formats = qis.update_kwargs(var_formats_missing, var_formats)

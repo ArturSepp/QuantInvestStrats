@@ -14,9 +14,9 @@ from typing import Optional, Dict
 
 # qis
 import qis as qis
-from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantileRegimeSpecs
+from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-from qis.portfolio.reports.config import PERF_PARAMS, REGIME_PARAMS
+from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
 from qis.portfolio.reports.config import KWARGS_SUPTITLE, KWARGS_TITLE, KWARGS_TEXT, KWARGS_FOOTNOTE
 
 
@@ -27,7 +27,7 @@ def generate_strategy_benchmark_factsheet_with_pyblogs(multi_portfolio_data: Mul
                                                        time_period: TimePeriod = None,
                                                        time_period_last: TimePeriod = None,
                                                        perf_params: PerfParams = PERF_PARAMS,
-                                                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                                       regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                                                        benchmark: str = None,
                                                        backtest_name: str = None,
                                                        heatmap_freq: str = 'YE',

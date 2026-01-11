@@ -1,4 +1,7 @@
 
+from qis.utils.annualisation import (get_annualization_factor,
+                                     infer_an_from_data)
+
 from qis.utils.dates import (
     TimePeriod,
     generate_dates_schedule,
@@ -6,7 +9,6 @@ from qis.utils.dates import (
     set_rebalancing_timeindex_on_given_timeindex,
     generate_sample_dates,
     get_month_days,
-    get_period_days,
     get_sample_dates_idx,
     get_time_period,
     get_time_period_label,
@@ -16,7 +18,6 @@ from qis.utils.dates import (
     get_year_quarter,
     get_ytd_time_period,
     get_time_to_maturity,
-    infer_an_from_data,
     is_leap_year,
     months_between,
     separate_number_from_string,

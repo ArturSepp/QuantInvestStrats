@@ -15,7 +15,7 @@ import qis.utils.df_freq as dff
 import qis.utils.np_ops as npo
 import qis.utils.df_ops as dfo
 from qis.perfstats.config import PerfStat, ReturnTypes, PerfParams
-from qis.utils.dates import CALENDAR_DAYS_PER_YEAR_SHARPE
+from qis.utils.annualisation import infer_an_from_data, CALENDAR_DAYS_PER_YEAR_SHARPE
 
 
 def compute_num_days(prices: Union[pd.DataFrame, pd.Series]) -> int:
@@ -322,7 +322,7 @@ def compute_sampled_vols(prices: Union[pd.DataFrame, pd.Series],
         vols = pd.DataFrame.from_dict(vol_samples, orient='index').iloc[:, 0].rename(prices.name)
     else:
         vols = pd.DataFrame.from_dict(vol_samples, orient='index', columns=prices.columns)
-    vols = vols.multiply(np.sqrt(da.infer_an_from_data(sampled_returns)))
+    vols = vols.multiply(np.sqrt(infer_an_from_data(sampled_returns)))
 
     return vols
 

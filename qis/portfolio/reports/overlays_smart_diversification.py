@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, Union, List, Optional, Tuple
 import qis as qis
-from qis import PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs, BenchmarkReturnsQuantilesRegime, PerfParams
+from qis import PerfStat, RegimeData, BenchmarkReturnsQuantilesRegime, PerfParams
 
-REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='QE')
+regime_classifier = BenchmarkReturnsQuantilesRegime(freq='QE')
 PERF_PARAMS = PerfParams(freq='ME')
 
 
@@ -38,16 +38,16 @@ class SmartDiversificationReport:
     """
     overlay_navs: pd.DataFrame
     principal_nav: pd.Series = None
-    regime_params: BenchmarkReturnsQuantileRegimeSpecs = None
+    regime_classifier: BenchmarkReturnsQuantilesRegime = None
     perf_params: PerfParams = None
     benchmark_description: str = None
 
     def __post_init__(self):
-        if self.regime_params is None:
-            self.regime_params = REGIME_PARAMS
+        if self.regime_classifier is None:
+            self.regime_classifier = regime_classifier
         if self.perf_params is None:
             self.perf_params = PERF_PARAMS
-        self.regime_classifier = BenchmarkReturnsQuantilesRegime(regime_params=self.regime_params)
+        self.regime_classifier = BenchmarkReturnsQuantilesRegime()
 
     def compute_smart_diversification_curve(self,
                                             principal_nav: pd.Series,
@@ -120,11 +120,11 @@ class SmartDiversificationReport:
         if ax is None:
             ax = fig.axes[0]
         """
-        classification_data = sdi.create_regime_classification(regime_params=self.regime_params,
+        classification_data = sdi.create_regime_classification(regime_classifier=self.regime_classifier,
                                                                pivot_prices=principal_nav)
 
         qis.add_regime_shadows_to_ax(ax=ax,
-                                     regime_params=self.regime_params,
+                                     regime_classifier=self.regime_classifier,
                                      classification_data=classification_data,
                                      pivot_prices=principal_nav,
                                      price_data_index=principal_nav.index)

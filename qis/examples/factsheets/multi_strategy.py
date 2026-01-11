@@ -94,7 +94,6 @@ def run_local_test(local_test: LocalTests):
 
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"volparity_span_factsheet_long",
-                             orientation='landscape',
                              local_path=qis.local_path.get_output_path())
 
         time_period_short = TimePeriod('31Dec2019', time_period.end)
@@ -104,7 +103,6 @@ def run_local_test(local_test: LocalTests):
                                                   **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"volparity_span_factsheet_short",
-                             orientation='landscape',
                              local_path=qis.local_path.get_output_path())
     # plt.show()
 

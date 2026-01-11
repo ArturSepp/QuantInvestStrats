@@ -23,7 +23,7 @@ prices = prices.loc['2020':, :]
 
 # set parameters for computing performance stats including returns vols and regressions
 ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
-perf_params = qis.PerfParams(freq='ME', freq_reg='W-WED', alpha_an_factor=52.0, rates_data=ust_3m_rate)
+perf_params = qis.PerfParams(freq='ME', freq_reg='W-WED', rates_data=ust_3m_rate)
 
 # price perf
 with sns.axes_style("darkgrid"):

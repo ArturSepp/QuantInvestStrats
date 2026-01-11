@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union, Dict
 # qis
 import qis as qis
-from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantileRegimeSpecs, TimePeriod, RollingPerfStat
+from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantilesRegime, TimePeriod, RollingPerfStat
 import qis.utils.struct_ops as sop
 import qis.utils.df_groups as dfg
 import qis.perfstats.returns as ret
@@ -27,7 +27,6 @@ from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 
 # default perf params
 PERF_PARAMS = PerfParams(freq='W-WED')
-REGIME_PARAMS = BenchmarkReturnsQuantileRegimeSpecs(freq='ME')
 
 
 @dataclass
@@ -307,7 +306,7 @@ class MultiPortfolioData:
                            ax: plt.Subplot,
                            regime_benchmark: str,
                            index: pd.Index = None,
-                           regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS
+                           regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime()
                            ) -> None:
         """
         add regime shadows using regime_benchmark
@@ -315,13 +314,13 @@ class MultiPortfolioData:
         pivot_prices = self.benchmark_prices[regime_benchmark]
         if index is not None:
             pivot_prices = pivot_prices.reindex(index=index, method='ffill')
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_params=regime_params)
+        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
 
     def plot_nav(self,
                  time_period: TimePeriod = None,
                  regime_benchmark: str = None,
                  perf_params: PerfParams = PERF_PARAMS,
-                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                 regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                  add_benchmarks_to_navs: bool = False,
                  ax: plt.Subplot = None,
                  **kwargs) -> None:
@@ -336,7 +335,7 @@ class MultiPortfolioData:
                         **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
-                                    regime_params=regime_params)
+                                    regime_classifier=regime_classifier)
 
     def plot_rolling_perf(self,
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,
@@ -346,7 +345,7 @@ class MultiPortfolioData:
                           freq_sharpe: Optional[str] = None,
                           sharpe_title: Optional[str] = None,
                           legend_stats: pts.LegendStats = pts.LegendStats.AVG_LAST,
-                          regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                          regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                           add_benchmarks_to_navs: bool = False,
                           ax: plt.Subplot = None,
                           **kwargs
@@ -371,7 +370,7 @@ class MultiPortfolioData:
 
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
-                                    regime_params=regime_params)
+                                    regime_classifier=regime_classifier)
         return fig
 
     def plot_periodic_returns(self,
@@ -428,7 +427,7 @@ class MultiPortfolioData:
 
     def plot_drawdowns(self,
                        time_period: TimePeriod = None,
-                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                       regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                        regime_benchmark: str = None,
                        dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
                        add_benchmarks_to_navs: bool = False,
@@ -438,11 +437,11 @@ class MultiPortfolioData:
         cdr.plot_rolling_drawdowns(prices=prices, dd_legend_type=dd_legend_type, ax=ax, **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
-                                    regime_params=regime_params)
+                                    regime_classifier=regime_classifier)
 
     def plot_rolling_time_under_water(self,
                                       time_period: TimePeriod = None,
-                                      regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                      regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                                       regime_benchmark: str = None,
                                       dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
                                       add_benchmarks_to_navs: bool = False,
@@ -452,7 +451,7 @@ class MultiPortfolioData:
         cdr.plot_rolling_time_under_water(prices=prices, dd_legend_type=dd_legend_type, ax=ax, **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
-                                    regime_params=regime_params)
+                                    regime_classifier=regime_classifier)
 
     def plot_ra_perf_table(self,
                            benchmark: str = None,
@@ -572,7 +571,7 @@ class MultiPortfolioData:
 
     def plot_exposures(self,
                        regime_benchmark: str = None,
-                       regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                       regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                        time_period: TimePeriod = None,
                        var_format: str = '{:.0%}',
                        ax: plt.Subplot = None,
@@ -589,14 +588,14 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=exposures.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=exposures.index, regime_classifier=regime_classifier)
 
     def plot_instrument_pnl_diff(self,
                                  portfolio_idx1: int = 0,
                                  portfolio_idx2: int = 1,
                                  is_grouped: bool = True,
                                  regime_benchmark: str = None,
-                                 regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                 regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                                  time_period: TimePeriod = None,
                                  var_format: str = '{:.0%}',
                                  ax: plt.Subplot = None,
@@ -625,13 +624,13 @@ class MultiPortfolioData:
                              ax=ax,
                              **sop.update_kwargs(kwargs, dict(legend_loc='lower left')))
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=diff.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=diff.index, regime_classifier=regime_classifier)
 
     def plot_exposures_diff(self,
                             portfolio_idx1: int = 0,
                             portfolio_idx2: int = 1,
                             regime_benchmark: str = None,
-                            regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                            regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                             time_period: TimePeriod = None,
                             var_format: str = '{:.0%}',
                             ax: plt.Subplot = None,
@@ -646,7 +645,7 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=diff.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=diff.index, regime_classifier=regime_classifier)
 
     def get_turnover(self,
                      time_period: TimePeriod = None,
@@ -668,7 +667,7 @@ class MultiPortfolioData:
     def plot_turnover(self,
                       regime_benchmark: str = None,
                       time_period: TimePeriod = None,
-                      regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                      regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                       turnover_rolling_period: Optional[int] = 260,
                       freq_turnover: Optional[str] = 'B',
                       var_format: str = '{:.0%}',
@@ -690,7 +689,7 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=turnover.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=turnover.index, regime_classifier=regime_classifier)
 
     def plot_costs(self,
                    cost_rolling_period: Optional[int] = 260,
@@ -698,7 +697,7 @@ class MultiPortfolioData:
                    cost_title: Optional[str] = None,
                    regime_benchmark: str = None,
                    time_period: TimePeriod = None,
-                   regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                   regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                    var_format: str = '{:.2%}',
                    is_unit_based_traded_volume: bool = True,
                    ax: plt.Subplot = None,
@@ -720,13 +719,13 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=costs.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=costs.index, regime_classifier=regime_classifier)
 
     def plot_factor_betas(self,
                           benchmark_prices: pd.DataFrame,
                           regime_benchmark: str = None,
                           time_period: TimePeriod = None,
-                          regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                          regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                           freq_beta: str = 'B',
                           factor_beta_span: int = 260,
                           var_format: str = '{:,.2f}',
@@ -761,7 +760,7 @@ class MultiPortfolioData:
                 self.add_regime_shadows(ax=axs[idx],
                                         regime_benchmark=regime_benchmark,
                                         index=factor_exposure.index,
-                                        regime_params=regime_params)
+                                        regime_classifier=regime_classifier)
 
     def plot_returns_scatter(self,
                              benchmark: str,
@@ -841,7 +840,7 @@ class MultiPortfolioData:
                          is_conditional_sharpe: bool = True,
                          is_use_vbar: bool = False,
                          perf_params: PerfParams = PERF_PARAMS,
-                         regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                         regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                          title: str = None,
                          legend_loc: Optional[str] = 'upper center',
                          ax: plt.Subplot = None,
@@ -857,8 +856,7 @@ class MultiPortfolioData:
             else:
                 var_format = '{:.2%}'
 
-        title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {regime_params.freq}-freq regimes"
-        regime_classifier = rcl.BenchmarkReturnsQuantilesRegime(regime_params=regime_params)
+        title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
         qis.plot_regime_data(regime_classifier=regime_classifier,
                              prices=prices,
                              benchmark=benchmark,
@@ -866,7 +864,6 @@ class MultiPortfolioData:
                              regime_data_to_plot=regime_data_to_plot,
                              var_format=var_format,
                              is_use_vbar=is_use_vbar,
-                             regime_params=regime_params,
                              legend_loc=legend_loc,
                              perf_params=perf_params,
                              title=title,
@@ -1015,7 +1012,7 @@ class MultiPortfolioData:
     def plot_group_exposures_and_pnl(self,
                                      regime_benchmark: str = None,
                                      time_period: TimePeriod = None,
-                                     regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                                     regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                                      total_name: str = 'Total',
                                      weights_freq: Optional[str] = 'W-WED',
                                      figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
@@ -1075,7 +1072,7 @@ class MultiPortfolioData:
                     self.add_regime_shadows(ax=ax,
                                             regime_benchmark=regime_benchmark,
                                             index=exposures_agg.index,
-                                            regime_params=regime_params)
+                                            regime_classifier=regime_classifier)
 
         return figs
 
@@ -1086,7 +1083,7 @@ class MultiPortfolioData:
                              group_data: pd.Series = None,
                              group_order: List[str] = None,
                              regime_benchmark: str = None,
-                             regime_params: BenchmarkReturnsQuantileRegimeSpecs = REGIME_PARAMS,
+                             regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                              time_period: TimePeriod = None,
                              title: Optional[str] = 'Tracking error',
                              total_column: Optional[str] = 'Total',
@@ -1118,4 +1115,4 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=tre.index, regime_params=regime_params)
+            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=tre.index, regime_classifier=regime_classifier)

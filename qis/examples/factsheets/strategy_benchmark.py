@@ -161,7 +161,7 @@ def run_local_test(local_test: LocalTests):
                                                               turnover_groups=turnover_groups,
                                                               time_period=time_period)
         qis.save_figs_to_pdf(figs=figs,
-                             file_name=f"strategy_benchmark_tracking_error", orientation='landscape',
+                             file_name=f"strategy_benchmark_tracking_error",
                              local_path=qis.local_path.get_output_path())
     plt.show()
 

@@ -93,9 +93,10 @@ def generate_performances(prices: pd.DataFrame,
                                 **kwargs)
 
         fig5, ax = plt.subplots(1, 1, figsize=(8, 6))
+        regime_classifier = qis.BenchmarkReturnsQuantilesRegime(freq=perf_params.freq_reg)
         qis.plot_scatter_regression(prices=prices,
                                     regime_benchmark=regime_benchmark,
-                                    regime_params=qis.BenchmarkReturnsQuantileRegimeSpecs(freq=perf_params.freq_reg),
+                                    regime_classifier=regime_classifier,
                                     perf_params=perf_params,
                                     title=f"Regime Conditional Regression: {qis.get_time_period_label(prices, date_separator='-')}",
                                     ax=ax,

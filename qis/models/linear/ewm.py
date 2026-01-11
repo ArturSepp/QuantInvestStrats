@@ -10,7 +10,7 @@ from typing import Union, Tuple, Optional
 from enum import Enum
 
 # qis
-import qis.utils.dates as da
+from qis.utils.annualisation import infer_an_from_data
 import qis.utils.np_ops as npo
 
 
@@ -691,7 +691,7 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     if annualize or annualization_factor is not None:
         if annualization_factor is None:
             if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-                annualization_factor = da.infer_an_from_data(data=data)
+                annualization_factor = infer_an_from_data(data=data)
             else:
                 warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
                 annualization_factor = 1.0
@@ -796,7 +796,7 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     if annualize or annualization_factor is not None:
         if annualization_factor is None:
             if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-                annualization_factor = da.infer_an_from_data(data=data)
+                annualization_factor = infer_an_from_data(data=data)
             else:
                 warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
                 annualization_factor = 1.0
@@ -1087,7 +1087,7 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
                               init_value=set_init_dim1(data=resid2, init_type=init_type))
 
     if annualize:
-        an = da.infer_an_from_data(data=x_data)
+        an = infer_an_from_data(data=x_data)
         resid_var = an * resid_var
         x_var = an * x_var
     else:
@@ -1142,7 +1142,7 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
                        ) -> pd.DataFrame:
 
     x = npo.to_finite_np(data=returns, fill_value=0.0)
-    an = da.infer_an_from_data(data=returns)
+    an = infer_an_from_data(data=returns)
     san = np.sqrt(an)
     if initial_sharpes is not None:
         initial_vol = 0.1
