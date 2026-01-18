@@ -222,12 +222,12 @@ def signal_mapping_properties():
     axes[2].plot(x_values, weights_no_decay['signal'],
                  label='No tail decay', linewidth=2, alpha=0.8)
 
-    for decay in [0.5, 1.0, 2.0]:
+    for decay in [0.5, 2.0, 4.0]:
         weights_decay = map_signal_to_weight(
             signals=signals_df,
             signal_map_type=SignalMapType.ExpCDF,
             loc=0.0, scale=1.0, tail_level=1.0,
-            slope_right=0.5, slope_left=0.5,
+            slope_right=0.3, slope_left=0.3,
             tail_decay_right=decay, tail_decay_left=decay
         )
         axes[2].plot(x_values, weights_decay['signal'],
@@ -301,18 +301,18 @@ def signal_mapping_properties2():
     weights_no_decay = map_signal_to_weight(
         signals=signals_df,
         signal_map_type=SignalMapType.ExpCDF,
-        loc=0.0, scale=1.0, tail_level=1.0,
-        slope_right=0.5, slope_left=0.5
+        loc=0.0, scale=1.5, tail_level=1.5,
+        slope_right=1.0, slope_left=1.0
     )
     axes[2].plot(x_values, weights_no_decay['signal'],
                  label='No tail decay', linewidth=2, alpha=0.8)
 
-    for decay in [0.5, 1.0, 2.0]:
+    for decay in [1.0, 5.0, 10.0]:
         weights_decay = map_signal_to_weight(
             signals=signals_df,
             signal_map_type=SignalMapType.ExpCDF,
-            loc=0.0, scale=1.0, tail_level=1.0,
-            slope_right=0.5, slope_left=0.5,
+            loc=0.0, scale=1.5, tail_level=1.5,
+            slope_right=1.0, slope_left=1.0,
             tail_decay_right=decay, tail_decay_left=decay
         )
         axes[2].plot(x_values, weights_decay['signal'],

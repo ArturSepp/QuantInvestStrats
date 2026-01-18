@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from enum import Enum
 from typing import Optional
-from qis.utils.annualisation import infer_an_from_data
+from qis.utils.annualisation import infer_annualisation_factor_from_df
 
 
 class OhlcEstimatorType(Enum):
@@ -70,7 +70,7 @@ def estimate_hf_ohlc_vol(ohlc_data: pd.DataFrame,
         sample_var = sample_var.resample(agg_freq).mean()
 
     if annualization_factor is None:
-        annualization_factor = infer_an_from_data(data=sample_var)
+        annualization_factor = infer_annualisation_factor_from_df(data=sample_var)
 
     vols = np.sqrt(annualization_factor*sample_var)
     if is_exclude_weekends:

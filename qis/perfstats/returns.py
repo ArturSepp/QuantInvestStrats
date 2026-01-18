@@ -15,7 +15,7 @@ import qis.utils.df_freq as dff
 import qis.utils.np_ops as npo
 import qis.utils.df_ops as dfo
 from qis.perfstats.config import PerfStat, ReturnTypes, PerfParams
-from qis.utils.annualisation import infer_an_from_data, CALENDAR_DAYS_PER_YEAR_SHARPE
+from qis.utils.annualisation import infer_annualisation_factor_from_df, CALENDAR_DAYS_PER_YEAR_SHARPE
 
 
 def compute_num_days(prices: Union[pd.DataFrame, pd.Series]) -> int:
@@ -322,7 +322,7 @@ def compute_sampled_vols(prices: Union[pd.DataFrame, pd.Series],
         vols = pd.DataFrame.from_dict(vol_samples, orient='index').iloc[:, 0].rename(prices.name)
     else:
         vols = pd.DataFrame.from_dict(vol_samples, orient='index', columns=prices.columns)
-    vols = vols.multiply(np.sqrt(infer_an_from_data(sampled_returns)))
+    vols = vols.multiply(np.sqrt(infer_annualisation_factor_from_df(sampled_returns)))
 
     return vols
 
@@ -586,43 +586,65 @@ def portfolio_returns_to_nav(returns: pd.DataFrame,
     return nav
 
 
-def compute_grouped_nav(returns: pd.DataFrame,
-                        init_period: Union[int, None] = None,
-                        init_value: float = 1.0,
-                        freq: Optional[str] = None
-                        ) -> pd.Series:
-    """
-    use implementation returns_to_nav()
-    """
-    grouped_nav = portfolio_returns_to_nav(returns=returns,
-                                           init_period=init_period,
-                                           init_value=init_value,
-                                           freq=freq)
-    return grouped_nav
-
-
 def to_zero_first_nonnan_returns(returns: Union[pd.Series, pd.DataFrame],
                                  init_period: Union[int, None] = 1
                                  ) -> Union[pd.Series, pd.DataFrame]:
     """
-    replace first nonnan return with zero
+    Replace first nonnan return with zero, or when init_period=0,
+    set the value before first non-nan to zero if it exists and is NaN.
+
+    Parameters
+    ----------
+    returns : pd.Series or pd.DataFrame
+        Returns data with potential NaN values
+    init_period : int or None
+        - 0: find first non-NaN, then set previous value to zero if it's NaN
+        - 1: set first non-NaN value to zero
+        - None: no modification
     """
-    if init_period is not None and not isinstance(init_period, int):
+
+    if init_period is None:
+        return returns
+
+    if not isinstance(init_period, int):
         raise ValueError(f"init_period must be integer")
 
-    if init_period is not None:
-        if init_period == 1:
-            first_before_nonnan_index = dfo.get_nonnan_index(df=returns, position='first')
-            first_date = returns.index[0]
-            if isinstance(returns, pd.Series):
-                if first_before_nonnan_index >= first_date:
-                    returns[first_before_nonnan_index] = 0.0
-            else:
-                for first_before_nonnan_index_, column in zip(first_before_nonnan_index, returns.columns):
-                    if first_before_nonnan_index_ >= first_date:
-                        returns.loc[first_before_nonnan_index_, column] = 0.0
+    # noinspection PyTypeChecker
+    returns: Union[pd.Series, pd.DataFrame] = returns.copy(deep=True)
+
+    if init_period == 0:
+        first_nonnan_index = dfo.get_nonnan_index(df=returns, position='first')
+
+        if isinstance(returns, pd.Series):
+            # Find position of first non-NaN
+            idx_pos = returns.index.get_loc(first_nonnan_index)
+            # If there's a previous index and it's NaN, set it to zero
+            if idx_pos > 0:
+                prev_idx = returns.index[idx_pos - 1]
+                if pd.isna(returns.loc[prev_idx]):
+                    returns.iloc[prev_idx] = 0.0
         else:
-            warnings.warn(f"in returns_to_nav init_period={init_period} is not supported")
+            for first_nonnan_index_, column in zip(first_nonnan_index, returns.columns):
+                # Find position of first non-NaN for this column
+                idx_pos = returns.index.get_loc(first_nonnan_index_)
+                # If there's a previous index and it's NaN, set it to zero
+                if idx_pos > 0:
+                    prev_idx = returns.index[idx_pos - 1]
+                    if pd.isna(returns.loc[prev_idx, column]):
+                        returns.loc[prev_idx, column] = 0.0
+
+    elif init_period == 1:
+        first_nonnan_index = dfo.get_nonnan_index(df=returns, position='first')
+        first_date = returns.index[0]
+        if isinstance(returns, pd.Series):
+            if first_nonnan_index >= first_date:
+                returns.loc[first_nonnan_index] = 0.0
+        else:
+            for first_nonnan_index_, column in zip(first_nonnan_index, returns.columns):
+                if first_nonnan_index_ >= first_date:
+                    returns.loc[first_nonnan_index_, column] = 0.0
+    else:
+        warnings.warn(f"in to_zero_first_nonnan_returns init_period={init_period} is not supported")
 
     return returns
 
@@ -671,7 +693,7 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
     for idx, column in enumerate(prices.columns):
         good_price = prices.loc[first_date[idx]:last_date[idx], column]
         if method is not None:
-            good_price = good_price.ffill()
+            good_price = good_price.infer_objects(copy=False).ffill()
         good_parts.append(good_price)
     bfilled_data = pd.concat(good_parts, axis=1)
     if bfilled_data.index[0] > prices.index[0]:

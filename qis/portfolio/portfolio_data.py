@@ -28,7 +28,7 @@ import qis.portfolio.risk.ewm_factor_model as ef
 from qis.portfolio.signal_data import StrategySignalData
 from qis.portfolio.risk.ewm_covar_risk import compute_portfolio_vol
 from qis.portfolio.risk.contributions import compute_portfolio_risk_contributions
-from qis.utils.annualisation import infer_an_from_data
+from qis.utils.annualisation import infer_annualisation_factor_from_df
 
 # default performance and regime params
 PERF_PARAMS = PerfParams(freq='W-WED')
@@ -601,14 +601,14 @@ class PortfolioData:
             data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
                                      add_total=False,
                                      time_period=time_period)
-            an = infer_an_from_data(data=data)
+            an = infer_annualisation_factor_from_df(data=data)
             data = an * data.mean(0)
             # print(f"total turnover = {np.nansum(data)}")
         elif attribution_metric == AttributionMetric.VOL_ADJUSTED_TURNOVER:
             data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
                                      add_total=False, is_vol_adjusted=True,
                                      time_period=time_period)
-            an = infer_an_from_data(data=data)
+            an = infer_annualisation_factor_from_df(data=data)
             data = an * data.mean(0)
 
         else:

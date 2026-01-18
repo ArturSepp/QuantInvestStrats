@@ -1,6 +1,7 @@
 
 from qis.utils.annualisation import (get_annualization_factor,
-                                     infer_an_from_data)
+                                     infer_annualisation_factor_from_df,
+                                     get_annualisation_conversion_factor)
 
 from qis.utils.dates import (
     TimePeriod,

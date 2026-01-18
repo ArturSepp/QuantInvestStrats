@@ -147,7 +147,7 @@ def get_annualization_factor(freq: str,
         return base_factor / multiplier
 
 
-def infer_an_from_data(data: Union[pd.DataFrame, pd.Series]) -> float:
+def infer_annualisation_factor_from_df(data: Union[pd.DataFrame, pd.Series]) -> float:
     """
     infer annualization factor for vol
     """
@@ -155,9 +155,38 @@ def infer_an_from_data(data: Union[pd.DataFrame, pd.Series]) -> float:
         freq = None
     else:
         freq = pd.infer_freq(data.index)
+        
     if freq is None:
-        print(f"in infer_an_from_data: cannot infer {freq} - using 260\n data.index={data.index}")
-        return 260.0
+        warnings.warn(
+            f"in infer_annualisation_factor_from_df: cannot infer {freq} - using {BUS_DAYS_PER_YEAR}\n data.index={data.index}",
+            UserWarning,
+            stacklevel=2
+        )
+        return BUS_DAYS_PER_YEAR
     alpha_an_factor = get_annualization_factor(freq=freq)
     return alpha_an_factor
 
+
+def get_annualisation_conversion_factor(from_freq: str, to_freq: str) -> float:
+    """
+    Get factor to convert between pandas frequencies.
+
+    Args:
+        from_freq: Source frequency
+        to_freq: Target frequency
+
+    Returns:
+        Conversion factor (multiply source data by this factor)
+
+    Examples:
+        >>> get_annualisation_conversion_factor('QE', 'ME')  # Quarterly to Monthly
+        0.3333333333333333
+        >>> get_annualisation_conversion_factor('ME', 'QE')  # Monthly to Quarterly
+        3.0
+        >>> get_annualisation_conversion_factor('B', 'ME')  # Business Daily to Monthly
+        21.666666666666668
+    """
+    from_periods = get_annualization_factor(from_freq)
+    to_periods = get_annualization_factor(to_freq)
+
+    return from_periods / to_periods

@@ -12,7 +12,7 @@ from enum import Enum
 import qis.utils.regression as ols
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfStat, PerfParams
-from qis.utils.annualisation import get_annualization_factor, infer_an_from_data
+from qis.utils.annualisation import get_annualization_factor, infer_annualisation_factor_from_df
 
 STANDARD_TABLE_COLUMNS = (PerfStat.START_DATE,
                           PerfStat.END_DATE,
@@ -165,7 +165,7 @@ def compute_risk_table(prices: pd.DataFrame,
     else:
         sampled_prices_skew = ret.prices_at_freq(prices=prices, freq=perf_params.freq_skeweness)
 
-    vol_dt = np.sqrt(infer_an_from_data(data=sampled_prices_vol))
+    vol_dt = np.sqrt(infer_annualisation_factor_from_df(data=sampled_prices_vol))
     dict_data = {}
     for asset in sampled_prices_vol:
         sampled_price = sampled_prices_vol[asset].dropna()
@@ -254,7 +254,6 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
                                          benchmark_price: pd.Series = None,
                                          perf_params: PerfParams = None,
                                          is_log_returns: bool = False,
-                                         freq_reg: str = None,
                                          drop_benchmark: bool = False,
                                          **kwargs
                                          ) -> pd.DataFrame:
@@ -283,9 +282,7 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     ra_perf_table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
 
     # compute benchmark regression
-    # qqq
-    freq = freq_reg or perf_params.freq_reg
-    returns = ret.to_returns(prices=prices, freq=freq, is_log_returns=is_log_returns)
+    returns = ret.to_returns(prices=prices, freq=perf_params.freq_reg, is_log_returns=is_log_returns)
 
     # use excess returns if rates data is given
     if perf_params.rates_data is not None:
@@ -300,7 +297,7 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
             alphas[column], betas[column], r2[column], alpha_pvalue[column] = ols.estimate_ols_alpha_beta(x=joint_data.iloc[:, 0],
                                                                                                           y=joint_data.iloc[:, 1])
 
-    alpha_an_factor = get_annualization_factor(freq=freq)
+    alpha_an_factor = get_annualization_factor(freq=perf_params.freq_reg)
     ra_perf_table[PerfStat.ALPHA.to_str()] = pd.Series(alphas)
     ra_perf_table[PerfStat.ALPHA_AN.to_str()] = alpha_an_factor * pd.Series(alphas)
     ra_perf_table[PerfStat.BETA.to_str()] = pd.Series(betas)
@@ -309,7 +306,7 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
 
     if drop_benchmark:
         ra_perf_table = ra_perf_table.drop([benchmark], axis=0)
-    else:  # set p-value of benchmark alpha to 1
+    else:  # set p-value of benchmark alpha to 1.0
         ra_perf_table.loc[benchmark, PerfStat.ALPHA_PVALUE.to_str()] = 1.0
     return ra_perf_table
 
@@ -341,7 +338,7 @@ def compute_te_ir_errors(return_diffs: pd.DataFrame) -> Tuple[pd.Series, pd.Seri
     """
     compute information ratio from return diffs
     """
-    vol_dt = np.sqrt(infer_an_from_data(return_diffs))
+    vol_dt = np.sqrt(infer_annualisation_factor_from_df(return_diffs))
     avg = np.nanmean(return_diffs, axis=0)
     vol = np.nanstd(return_diffs, axis=0, ddof=1)
     ir = vol_dt * np.divide(avg, vol, where=np.greater(vol, 0.0))

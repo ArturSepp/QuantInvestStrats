@@ -9,7 +9,7 @@ from scipy.stats import skew, kurtosis, percentileofscore, normaltest
 from enum import Enum
 
 # qis
-from qis.utils.annualisation import infer_an_from_data
+from qis.utils.annualisation import infer_annualisation_factor_from_df
 from qis.perfstats.config import PerfStat
 
 
@@ -55,7 +55,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     descriptive_table[PerfStat.AVG.to_str()] = [var_format.format(x) for x in mean]
 
     if annualize_vol:
-        an_factor = infer_an_from_data(data=df)
+        an_factor = infer_annualisation_factor_from_df(data=df)
         vol = std * np.sqrt(an_factor)
         descriptive_table[PerfStat.STD_AN.to_str()] = [var_format.format(x) for x in vol]
     else:

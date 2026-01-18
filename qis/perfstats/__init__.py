@@ -57,7 +57,6 @@ from qis.perfstats.returns import (
     adjust_navs_to_portfolio_pa,
     compute_excess_returns,
     compute_excess_return_navs,
-    compute_grouped_nav,
     compute_net_return,
     compute_num_years,
     compute_pa_excess_compounded_returns,

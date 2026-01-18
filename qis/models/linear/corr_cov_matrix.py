@@ -14,7 +14,7 @@ import qis.utils.dates as da
 import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
 import qis.perfstats.returns as ret
-from qis.utils.annualisation import infer_an_from_data
+from qis.utils.annualisation import infer_annualisation_factor_from_df
 
 
 def estimate_rolling_ewma_covar(prices: pd.DataFrame,
@@ -49,7 +49,7 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
     tickers = prices.columns.to_list()
     covars = {}
     if apply_an_factor:
-        an_factor = infer_an_from_data(data=returns)
+        an_factor = infer_annualisation_factor_from_df(data=returns)
     else:
         an_factor = 1.0
     if time_period is not None:

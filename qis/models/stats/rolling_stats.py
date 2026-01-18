@@ -11,7 +11,7 @@ from enum import Enum
 
 # qis
 import qis.perfstats.returns as ret
-from qis.utils.annualisation import infer_an_from_data
+from qis.utils.annualisation import infer_annualisation_factor_from_df
 import qis.models.linear.ewm as ewm
 
 
@@ -93,7 +93,7 @@ def compute_rolling_vols(prices: Union[pd.Series, pd.DataFrame],
                         roll_periods: int = 260
                         ) -> Union[pd.Series, pd.DataFrame]:
     log_returns = ret.to_returns(prices=prices, freq=roll_freq, is_log_returns=True, drop_first=False)
-    saf = np.sqrt(infer_an_from_data(data=log_returns))
+    saf = np.sqrt(infer_annualisation_factor_from_df(data=log_returns))
     vols = saf * log_returns.rolling(roll_periods).apply(lambda x: np.nanstd(x, ddof=1))
     return vols
 
@@ -112,14 +112,14 @@ def compute_rolling_sharpes(prices: Union[pd.Series, pd.DataFrame],
                             roll_periods: int = 260
                             ) -> Union[pd.Series, pd.DataFrame]:
     log_returns = ret.to_returns(prices=prices, freq=roll_freq, is_log_returns=True, drop_first=False)
-    saf = np.sqrt(infer_an_from_data(data=log_returns))
+    saf = np.sqrt(infer_annualisation_factor_from_df(data=log_returns))
     sharpes = log_returns.rolling(roll_periods).apply(lambda x: compute_sharpe(x, saf=saf))
     return sharpes
 
 
 def compute_sharpe(log_returns: Union[pd.Series, pd.DataFrame], saf: float = None) -> np.ndarray:
     if saf is None:
-        saf = np.sqrt(infer_an_from_data(data=log_returns))
+        saf = np.sqrt(infer_annualisation_factor_from_df(data=log_returns))
     mean = np.expm1(np.nanmean(log_returns.to_numpy()))
     vol = np.nanstd(log_returns.to_numpy(), ddof=1)
     if np.greater(vol, 0.0):

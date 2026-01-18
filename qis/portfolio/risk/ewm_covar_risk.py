@@ -15,7 +15,7 @@ import qis.utils.df_agg as dfa
 import qis.perfstats.returns as ret
 from qis.models.linear.ewm import (MeanAdjType, InitType, NanBackfill, compute_rolling_mean_adj,
                                    compute_ewm_vol, compute_ewm_covar)
-from qis.utils.annualisation import infer_an_from_data
+from qis.utils.annualisation import infer_annualisation_factor_from_df
 
 
 VAR99 = 2.3263
@@ -105,7 +105,7 @@ def compute_portfolio_vol(returns: pd.DataFrame,
     if annualize:
         if annualization_factor is None:
             if isinstance(weights, pd.DataFrame):
-                annualization_factor = infer_an_from_data(data=weights)
+                annualization_factor = infer_annualisation_factor_from_df(data=weights)
             else:
                 warnings.warn(f"in compute_ewm: annualization_factor for np array, default is 1")
                 annualization_factor = 1.0
