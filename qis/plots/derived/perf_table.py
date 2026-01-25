@@ -90,6 +90,7 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
                                   perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
                                   column_header: str = 'Asset',
                                   is_convert_to_str: bool = True,
+                                  df_to_add: pd.DataFrame = None,
                                   **kwargs
                                   ) -> pd.DataFrame:
     """
@@ -113,6 +114,13 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
 
     if drop_benchmark:
         df = df.drop(benchmark, axis=0)
+
+    if df_to_add is not None:
+        df_to_add = df_to_add.reindex(index=ra_perf_table.index)
+        if is_convert_to_str:
+            df_to_add = df_to_add.fillna('')
+        df = pd.concat([df, df_to_add], axis=1)
+
     df.index.name = column_header
     return df
 
@@ -129,7 +137,6 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                  fontsize: int = 10,
                                  transpose: bool = False,
                                  is_convert_to_str: bool = True,
-                                 df_to_add: pd.DataFrame = None,
                                  ax: plt.Subplot = None,
                                  **kwargs
                                  ) -> Tuple[Optional[plt.Figure], pd.DataFrame]:
@@ -148,12 +155,6 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
     if not drop_benchmark and special_rows_colors is None:
         special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
     kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
-
-    if df_to_add is not None:
-        df_to_add = df_to_add.reindex(index=ra_perf_table.index)
-        if is_convert_to_str:
-            df_to_add = df_to_add.fillna('')
-        ra_perf_table = pd.concat([ra_perf_table, df_to_add], axis=1)
 
     fig = ptb.plot_df_table(df=ra_perf_table,
                             transpose=transpose,

@@ -951,6 +951,19 @@ class PortfolioData:
                                     regime_classifier=regime_classifier)
         return fig
 
+    def compute_ra_perf_table(self,
+                              time_period: TimePeriod = None,
+                              perf_params: PerfParams = None,
+                              perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+                              **kwargs
+                              ) -> pd.DataFrame:
+        prices = self.get_portfolio_nav(time_period=time_period).to_frame()
+        ra_perf_table = ppt.get_ra_perf_columns(prices=prices,
+                                                perf_params=perf_params,
+                                                perf_columns=perf_columns,
+                                                **kwargs)
+        return ra_perf_table
+
     def plot_ra_perf_table(self,
                            benchmark_price: Union[pd.Series, pd.DataFrame] = None,
                            benchmark: str = None,

@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 from statsmodels import api as sm
 from typing import Union, List, Tuple, Optional
-from enum import Enum
 
 # qis
 import qis.plots as qp
@@ -43,13 +42,12 @@ def plot_scatter(df: pd.DataFrame,
                  y_limits: Tuple[Optional[float], Optional[float]] = None,
                  xticks: List[str] = None,
                  fontsize: int = 10,
-                 linewidth: float = 1.5,
+                 linewidth: int = 1,
                  markersize: int = 4,
                  full_sample_label: str = 'Full sample: ',
                  add_45line: bool = False,
-                 r2_only: bool = False,
+                 align_axis: bool = False,
                  legend_loc: Optional[str] = 'upper left',
-                 value_name: str = 'value_name',
                  ax: plt.Subplot = None,
                  **kwargs
                  ) -> plt.Figure:
@@ -66,9 +64,19 @@ def plot_scatter(df: pd.DataFrame,
             y = df.columns[1]
         else:  # melting to column value_name with hue = all columns ba t x
             hue = 'hue'
-            y = value_name
             df = pd.melt(df, id_vars=[x], value_vars=df.columns.drop(x), var_name=hue,
-                         value_name=value_name)
+                         value_name=y)
+
+    if isinstance(xlabel, bool):
+        if xlabel is True:
+            xlabel = f"x={x}"
+        else:
+            xlabel = 'x'
+    if isinstance(ylabel, bool):
+        if ylabel is True:
+            ylabel = f"y={y}"
+        else:
+            ylabel = 'y'
 
     # drop nans
     if hue is not None:
@@ -84,6 +92,27 @@ def plot_scatter(df: pd.DataFrame,
     else:
         fig = None
 
+    def plot_regression_with_model(x_col, y_col, data, reg_model, x_vals, color, ax,
+                                   ci=None, order=1, markersize=20, linewidth=2):
+        """Helper to plot scatter + regression line consistently"""
+        # Plot scatter
+        sns.scatterplot(x=x_col, y=y_col, data=data, color=color, s=markersize, ax=ax)
+
+        if order > 0:
+            if ci is not None:
+                # Use regplot for CI band only (hide its line)
+                sns.regplot(x=x_col, y=y_col, data=data,
+                            ci=ci, order=order, truncate=True,
+                            color=color,
+                            scatter=False,  # Don't plot scatter again
+                            line_kws={'linewidth': 0},  # Hide regplot's line
+                            ax=ax)
+
+            # Plot custom regression line from our model
+            x1_pred = qu.get_ols_x(x=x_vals, order=order, fit_intercept=reg_model.params.shape[0] > order)
+            prediction = reg_model.predict(x1_pred)
+            ax.plot(x_vals, prediction, color=color, lw=linewidth, linestyle='-')
+
     estimated_reg_models = {}
     if hue is not None:
         if colors is None:
@@ -92,7 +121,7 @@ def plot_scatter(df: pd.DataFrame,
 
         hue_ids = df[hue].unique()
         for idx, hue_id in enumerate(hue_ids):
-            # estimate model equation
+            # Estimate model
             data_hue = df[df[hue] == hue_id].replace([np.inf, -np.inf], np.nan).dropna().sort_values(by=x)
             x_ = data_hue[x].to_numpy()
             y_ = data_hue[y].to_numpy()
@@ -100,33 +129,26 @@ def plot_scatter(df: pd.DataFrame,
             reg_model = sm.OLS(y_, x1).fit()
             estimated_reg_models[hue_id] = reg_model
 
-            # plot data points
-            sns.scatterplot(x=x, y=y, data=data_hue, color=palette[idx], s=markersize, ax=ax)
-
-            if order > 0:  # plot prediction
-                if ci is not None: # not possible to control reg equation in regplot, only use for ci
-                    sns.regplot(x=x, y=y, data=data_hue,
-                                ci=ci,
-                                order=order, truncate=True,
-                                color=palette[idx],
-                                scatter_kws={'s': markersize},
-                                line_kws={'linewidth': linewidth},
-                                ax=ax)
-                else:
-                    prediction = reg_model.predict(x1)
-                    ax.plot(x_, prediction, color=palette[idx], lw=linewidth, linestyle='-')
+            # Plot
+            plot_regression_with_model(x, y, data_hue, reg_model, x_, palette[idx], ax,
+                                       ci=ci, order=order, markersize=markersize, linewidth=linewidth)
 
     else:
         if full_sample_order is None:
             pass
-        elif full_sample_order == 0:  # just scatter plot
-            sns.scatterplot(x=x, y=y, data=df,
-                            # ci=ci,
-                            s=markersize, color=full_sample_color, ax=ax)
-        else:  # regplot add scatter and ml lines even if order is == 0
-            sns.regplot(x=x, y=y, data=df, ci=ci, order=full_sample_order, color=full_sample_color,
-                        scatter_kws={'s': markersize},
-                        line_kws={'linewidth': linewidth}, ax=ax)
+        elif full_sample_order == 0:
+            sns.scatterplot(x=x, y=y, data=df, s=markersize, color=full_sample_color, ax=ax)
+        else:
+            # Estimate model for consistency
+            data_clean = df[[x, y]].replace([np.inf, -np.inf], np.nan).dropna().sort_values(by=x)
+            x_ = data_clean[x].to_numpy()
+            y_ = data_clean[y].to_numpy()
+            x1 = qu.get_ols_x(x=x_, order=full_sample_order, fit_intercept=fit_intercept)
+            reg_model = sm.OLS(y_, x1).fit()
+
+            # Plot
+            plot_regression_with_model(x, y, data_clean, reg_model, x_, full_sample_color, ax,
+                                       ci=ci, order=full_sample_order, markersize=markersize, linewidth=linewidth)
 
     # add ml equations to labels
     legend_labels = []
@@ -152,7 +174,7 @@ def plot_scatter(df: pd.DataFrame,
 
             if add_universe_model_label:
                 text_str = f"{full_sample_label} " \
-                           f"{qu.reg_model_params_to_str(reg_model=reg_model, order=full_sample_order, r2_only=False, fit_intercept=fit_intercept, **kwargs)}"
+                           f"{qu.reg_model_params_to_str(reg_model=reg_model, order=full_sample_order, fit_intercept=fit_intercept, **kwargs)}"
                 legend_labels.append(text_str)
                 legend_colors.append(full_sample_color)
 
@@ -166,7 +188,7 @@ def plot_scatter(df: pd.DataFrame,
                 if add_hue_model_label:
                     reg_model = estimated_reg_models[hue_id]
                     text_str = (f"{hue_id}: " 
-                                f"{qu.reg_model_params_to_str(reg_model=reg_model, order=order, r2_only=r2_only, fit_intercept=fit_intercept, **kwargs)}")
+                                f"{qu.reg_model_params_to_str(reg_model=reg_model, order=order, fit_intercept=fit_intercept, **kwargs)}")
                 else:
                     text_str = hue_id
                 legend_labels.append(text_str)
@@ -198,15 +220,17 @@ def plot_scatter(df: pd.DataFrame,
             if label != '':
                 ax.scatter(x=x_, y=y_, c=color, s=20, marker=marker)
 
-    if add_45line:  # make equal:
+    if align_axis or add_45line:
         ymin, ymax = ax.get_ylim()
         xmin, xmax = ax.get_xlim()
         min = ymin if ymin < xmin else xmin
         max = ymax if ymax > xmax else xmax
         ax.set_xlim(min, max)
         ax.set_ylim(min, max)
-        x = np.linspace(*ax.get_xlim())
-        ax.plot(x, x, color='black', lw=1, linestyle='--')
+
+        if add_45line:
+            x = np.linspace(*ax.get_xlim())
+            ax.plot(x, x, color='black', lw=1, linestyle='--')
 
     if x_limits is not None:
         qp.set_x_limits(ax=ax, x_limits=x_limits)
@@ -219,16 +243,6 @@ def plot_scatter(df: pd.DataFrame,
     else:
         qp.set_ax_tick_labels(ax=ax, x_rotation=0, fontsize=fontsize)
 
-    if isinstance(xlabel, bool):
-        if xlabel is True:
-            xlabel = f"x={x}"
-        else:
-            xlabel = ''
-    if isinstance(ylabel, bool):
-        if ylabel is True:
-            ylabel = f"y={y}"
-        else:
-            ylabel = ''
     qp.set_ax_xy_labels(ax=ax, xlabel=xlabel, ylabel=ylabel, fontsize=fontsize, **kwargs)
 
     qp.set_ax_ticks_format(ax=ax, xvar_format=xvar_format, yvar_format=yvar_format, fontsize=fontsize, **kwargs)
@@ -323,7 +337,7 @@ def estimate_classification_scatter(df: pd.DataFrame,
                                     bins: np.ndarray = np.array([-3.0, -1.5, 0.0, 1.5, 3.0]),
                                     order: int = 1,
                                     fit_intercept: bool = False,
-                                    ) -> pd.Series:
+                                    ) -> pd.DataFrame:
     """
     add bin classification using x_column
     """
@@ -426,57 +440,3 @@ def plot_multivariate_scatter_with_prediction(df: pd.DataFrame,
     qp.set_spines(ax=ax, **kwargs)
 
     return fig
-
-
-def get_random_data(is_random_beta: bool = True,
-                    n: int = 10000
-                    ) -> pd.DataFrame:
-
-    x = np.random.normal(0.0, 1.0, n)
-    eps = np.random.normal(0.0, 1.0, n)
-    if is_random_beta:
-        beta = np.random.normal(1.0, 1.0, n)*np.square(x)
-    else:
-        beta = np.ones(n)
-    y = beta*x + eps
-    df = pd.concat([pd.Series(x, name='x'), pd.Series(y, name='y')], axis=1)
-    df = df.sort_values(by='x', axis=0)
-
-    return df
-
-
-class LocalTests(Enum):
-    SCATTER = 1
-    CLASSIFICATION_SCATTER = 2
-    CLASSIFICATION_REGRESSION = 3
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    np.random.seed(2)
-    df = get_random_data(n=100000)
-    print(df)
-
-    if local_test == LocalTests.SCATTER:
-        plot_scatter(df=df)
-
-    elif local_test == LocalTests.CLASSIFICATION_SCATTER:
-        plot_classification_scatter(df=df, x='x', y='y')
-
-    elif local_test == LocalTests.CLASSIFICATION_REGRESSION:
-        y_rpeds = estimate_classification_scatter(df=df, x='x', y='y')
-        plot_classification_scatter(df=df, x='x', y='y')
-        print(y_rpeds)
-        y_rpeds.plot()
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.CLASSIFICATION_REGRESSION)

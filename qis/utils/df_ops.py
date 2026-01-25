@@ -404,7 +404,7 @@ def dfs_to_upper_lower_diag(df_upper: pd.DataFrame,
     nb must be square matrizes
     """
     nrows = len(df_upper.index)
-    out = df_upper.copy()
+    out: pd.DataFrame = df_upper.copy()
     for i in range(nrows):
         out.iloc[i, i] = diagonal.iloc[i]
         for j in range(nrows):
@@ -545,3 +545,9 @@ def reindex_upto_last_nonnan(ds: pd.Series,
             filled_ds.loc[last_non_nan:] = np.nan
     return filled_ds
 
+
+def df_align_to_common_index(df1: pd.DataFrame, df2: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    common_index = df1.index.intersection(df2.index, sort=False)  # Preserves order from df1.index
+    df1 = df1.loc[common_index]
+    df2 = df2.loc[common_index]
+    return df1, df2

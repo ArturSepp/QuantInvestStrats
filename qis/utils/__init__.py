@@ -117,7 +117,8 @@ from qis.utils.df_ops import (
     reindex_upto_last_nonnan,
     multiply_df_by_dt,
     norm_df_by_ax_mean,
-    np_txy_tensor_to_pd_dict
+    np_txy_tensor_to_pd_dict,
+    df_align_to_common_index
 )
 
 from qis.utils.df_str import (

@@ -147,6 +147,7 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
             for k, cell in mpl_table._cells.items():
                 if k[0] > 0 and k[1] == heatmap_column:  # skip first row
                     cell.set_facecolor(colors[k[0]-1])
+                    cell.set_alpha(alpha)
 
     if heatmap_rows is not None:
         for heatmap_row in heatmap_rows:
@@ -156,6 +157,7 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
             for k, cell in mpl_table._cells.items():
                 if k[1] > 0 and k[0] == heatmap_row+1:  # heatmap_row is not counting first headers
                     cell.set_facecolor(colors[k[1]-1])
+                    cell.set_alpha(alpha)
 
     if heatmap_rows_columns is not None:   # row[0]: row[1], column[0]:column[1]
         # set colors on all data
@@ -176,6 +178,7 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
             for k, cell in mpl_table._cells.items():
                 if k[0] == row_start + row_idx + 1 and k[1] >= col_start and k[1] < col_end:
                     cell.set_facecolor(colors[row_idx][col_idx])
+                    cell.set_alpha(alpha)
                     col_idx += 1
 
     if special_rows_colors is not None:
@@ -290,6 +293,7 @@ def set_cells_facecolor(table: Table,
     for k, cell in table._cells.items():
         if row is None and column is None:
             cell.set_facecolor(color)
+            cell.set_alpha(alpha)
             if bold_font:
                 txt = cell.get_text()
                 txt.set_fontweight("bold")
@@ -297,6 +301,7 @@ def set_cells_facecolor(table: Table,
         elif column is None:  # set solor to row
             if k[0] == row:
                 cell.set_facecolor(color)
+                cell.set_alpha(alpha)
                 if bold_font:
                     txt = cell.get_text()
                     txt.set_fontweight("bold")
@@ -312,25 +317,29 @@ def set_cells_facecolor(table: Table,
 
 def set_diag_cells_facecolor(table: Table,
                              color: str = 'slategray',
-                             bold_font: bool = False
+                             bold_font: bool = False,
+                             alpha: float = 1.0,
                              ) -> None:
     for k, cell in table._cells.items():
         if k[0] == k[1] and k[0] > 0:
             cell.set_facecolor(color)
+            cell.set_alpha(alpha)
             if bold_font:
                 txt = cell.get_text()
                 txt.set_fontweight("bold")
 
 
 def set_data_colors(table: Table,
-                    data_colors: np.ndarray,
+                    data_colors: List[Tuple[float, float, float]],
                     header_row_id: int = 0,
                     header_column_id = 0,
-                    bold_font: bool = False
+                    bold_font: bool = False,
+                    alpha: float = 1.0
                     ) -> None:
     for k, cell in table._cells.items():
         if k[1] > header_column_id and k[0] > header_row_id:
             cell.set_facecolor(data_colors[k[0]-1][k[1]-1])
+            cell.set_alpha(alpha)
             if bold_font:
                 txt = cell.get_text()
                 txt.set_fontweight("bold")
