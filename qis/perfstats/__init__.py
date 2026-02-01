@@ -66,7 +66,7 @@ from qis.perfstats.returns import (
     compute_total_return,
     estimate_vol,
     get_excess_returns_nav,
-    get_net_navs,
+    compute_net_navs_ex_perf_man_fees,
     log_returns_to_nav,
     portfolio_navs_to_additive,
     portfolio_returns_to_nav,
