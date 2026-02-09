@@ -120,7 +120,7 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
 
 
 def compute_asset_returns_dict(prices: pd.DataFrame,
-                               returns_freqs: pd.Series,
+                               returns_freqs: Union[str, pd.Series],
                                drop_first: bool = False,
                                is_first_zero: bool = True,
                                is_log_returns: bool = False
@@ -137,7 +137,13 @@ def compute_asset_returns_dict(prices: pd.DataFrame,
     Returns:
         Dictionary with frequency keys and return DataFrames as values
     """
-    group_freqs = get_group_dict(group_data=returns_freqs)
+    if isinstance(returns_freqs, str):
+        group_freqs = {returns_freqs: prices.columns.to_list()}
+    elif isinstance(returns_freqs, pd.Series):
+        group_freqs = get_group_dict(group_data=returns_freqs)
+    else:
+        raise NotImplementedError(f"returns_freqs={returns_freqs} with type {type(returns_freqs)}")
+
     asset_returns_dict = {}
     for freq, asset_tickers in group_freqs.items():
         asset_returns_dict[freq] = to_returns(prices=prices[asset_tickers],
