@@ -124,15 +124,31 @@ def run_report():
         'HFRXM Index': 'HFRX Macro/CTA'
     }
 
+    benchmark = 'AOR US Equity'
+    tickers = {
+        benchmark: benchmark,
+        'EHFI804 Index': 'ILS EHFI804 Index',
+        'FUCBIAU ID Equity': 'Fermat Cat ID Fund',
+        'FECABIA KY Equity': 'Fermat Cat KY Fund',
+    }
+
+    benchmark = 'AOR US Equity'
+    tickers = {
+        benchmark: benchmark,
+        'NMVVR1EL Index': 'IRVING1 EUR',
+        'NMVVR1UL Index': 'IRVING1 USD',
+        'NMVVR1L Index': 'IRVING1',
+    }
+
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2014', '31Oct2025')
+    time_period = qis.TimePeriod('07Nov2006', '31Dec2025')
     # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
     # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
-    kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD, add_rates_data=False)
+    kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD, add_rates_data=True)
 
     fig = qis.generate_multi_asset_factsheet(prices=prices,
                                              benchmark=benchmark,

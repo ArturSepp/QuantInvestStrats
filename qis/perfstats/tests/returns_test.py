@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from enum import Enum
 
 from qis.perfstats.returns import (to_zero_first_nonnan_returns, returns_to_nav, compute_sampled_vols,
-                                   adjust_navs_to_portfolio_pa, compute_net_navs_ex_perf_man_fees)
+                                   adjust_navs_to_portfolio_pa, compute_net_navs_ex_perf_man_fees,
+                                   compute_asset_returns_dict)
 
 
 class LocalTests(Enum):
@@ -13,6 +14,7 @@ class LocalTests(Enum):
     ADJUST_PORTFOLIO_PA_RETURNS = 3
     NET_RETURN = 4
     ROLLING_RETURNS = 5
+    ASSET_RETURNS_DICT = 6
 
 
 def run_local_test(local_test: LocalTests):
@@ -79,9 +81,52 @@ def run_local_test(local_test: LocalTests):
         net_navs = compute_net_navs_ex_perf_man_fees(navs=nav)
         print(net_navs)
 
+    elif local_test == LocalTests.ASSET_RETURNS_DICT:
+        # Create test data with different frequency requirements
+        # Some assets need daily returns, others weekly
+        test_prices = prices[['SPY', 'TLT', 'GLD']].copy()
+
+        # Define return frequencies for each asset
+        returns_freqs = pd.Series({
+            'SPY': 'B',  # Daily returns
+            'TLT': 'W-WED',  # Weekly returns
+            'GLD': 'ME'  # Monthly returns
+        })
+
+        print(f"\nReturns frequencies:\n{returns_freqs}")
+
+        # Compute asset returns grouped by frequency
+        asset_returns_dict = compute_asset_returns_dict(
+            prices=test_prices,
+            returns_freqs=returns_freqs,
+            drop_first=False,
+            is_first_zero=True,
+            is_log_returns=True
+        )
+
+        print(f"\nReturns dictionary: {asset_returns_dict}")
+
+        # Display returns for each frequency group
+        for freq, returns_df in asset_returns_dict.items():
+            print(f"\n{freq} frequency returns:")
+            print(f"Shape: {returns_df.shape}")
+            print(f"Columns: {returns_df.columns.tolist()}")
+            print(f"First 10 rows:\n{returns_df.head(10)}")
+            print(f"Last 5 rows:\n{returns_df.tail()}")
+
+            # Verify first non-NaN return is zero (is_first_zero=True)
+            first_nonnan = returns_df.apply(lambda x: x[x.notna()].iloc[0] if x.notna().any() else np.nan)
+            print(f"First non-NaN returns (should be ~0): {first_nonnan.to_dict()}")
+
+        # Reconstruct NAVs from returns to verify
+        print("\nReconstructed NAVs from returns:")
+        for freq, returns_df in asset_returns_dict.items():
+            navs = returns_to_nav(returns_df, init_period=1)
+            print(f"\n{freq} frequency NAVs tail:\n{navs.tail()}")
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.TO_ZERO_NONNAN)
+    run_local_test(local_test=LocalTests.ASSET_RETURNS_DICT)
