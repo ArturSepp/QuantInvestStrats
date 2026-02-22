@@ -232,7 +232,13 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
         if sheet_names is None:
             sheet_names = [f"Sheet {n+1}" for n, _ in enumerate(data)]
         for df, name in zip(data, sheet_names):
-            if df is not None and isinstance(df, pd.DataFrame):
+            if df is not None:
+                if isinstance(df, pd.DataFrame):
+                    pass
+                elif isinstance(df, pd.Series):
+                    df = df.to_frame()
+                else:
+                    continue
                 df = delocalize_df(df)
                 if transpose:
                     df = df.T
@@ -271,7 +277,8 @@ def load_df_from_excel(file_name: str,
                        key: str = None,
                        is_index: bool = True,
                        delocalize: bool = False,  # excel data may have local time which are unwanted
-                       header: int = 0
+                       header: int = 0,
+                       preserve_header0_columns: bool = True
                        ) -> pd.DataFrame:
     """
     one file, one sheet to pandas
@@ -288,6 +295,9 @@ def load_df_from_excel(file_name: str,
 
     index_col = 0 if is_index else None
     df = excel_reader.parse(sheet_name=sheet_name, index_col=index_col, header=header)
+    if preserve_header0_columns and header != 0:
+        header_names = excel_reader.parse(sheet_name=sheet_name, index_col=index_col, nrows=0).columns.tolist()
+        df.columns = header_names
 
     if is_index and delocalize:
         df = delocalize_df(df)

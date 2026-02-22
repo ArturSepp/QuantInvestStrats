@@ -252,8 +252,10 @@ class TimePeriod:
                 start, end = time_period.start, time_period.end
             else:
                 start, end = self.start, self.end
-            if start < df.index[0]:  # restrict
+            if start is not None and start < df.index[0]:  # restrict
                 start = df.index[0]
+            if end is not None and end > df.index[-1]:
+                end = df.index[-1]
             df = df.loc[start:end]
         else:
             pass
