@@ -115,10 +115,11 @@ def join_file_name_parts(parts: List[str]) -> str:
 
 def get_local_file_path(file_name: Optional[str],
                         file_type: Optional[FileTypes] = None,
-                        local_path: Optional[str] = None,
+                        local_path: Optional[str] = OUTPUT_PATH,
                         folder_name: str = None,
                         key: str = None,
-                        is_output_file: bool = False
+                        add_current_date: bool = False,
+                        date_format: str = '%Y%m%d_%H%M'
                         ) -> str:
     """
     file data management is organised as:
@@ -136,15 +137,12 @@ def get_local_file_path(file_name: Optional[str],
     if local_path in not None and file_name is None and key is not None and file_type is passed: file_path=local_path//key+file_type.value
     if local_path in not None and file_name and key and file_type is passed: file_path=local_path//file_name_key+file_type.value
     """
-    if local_path is None:
 
-        if is_output_file:
-            local_path = OUTPUT_PATH
-        else:
-            local_path = RESOURCE_PATH
+    if local_path is not None and folder_name is not None:
+        local_path = join(local_path, folder_name)
 
-        if folder_name is not None:
-            local_path = join(local_path, folder_name)
+    if add_current_date and file_name is not None:  # only for output files
+        file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(date_format)])
 
     if file_name is not None:
         if key is not None:
@@ -807,7 +805,7 @@ def get_pdf_path(file_name: str,
     if add_current_date:
         file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(DATE_FORMAT)])
 
-    file_path = get_local_file_path(file_name=file_name, file_type=FileTypes.PDF, local_path=local_path, is_output_file=True)
+    file_path = get_local_file_path(file_name=file_name, file_type=FileTypes.PDF, local_path=local_path)
 
     return file_path
 
@@ -838,8 +836,7 @@ def save_fig(fig: plt.Figure,
         file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(DATE_FORMAT)])
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=file_type,
-                                    local_path=local_path,
-                                    is_output_file=True)
+                                    local_path=local_path)
     if file_type == FileTypes.PNG:
         fig.savefig(file_path, dpi=dpi)
     elif file_type == FileTypes.EPS:
@@ -887,7 +884,7 @@ def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
     if add_current_date:
         file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(DATE_FORMAT)])
 
-    file_path = get_local_file_path(file_name=file_name, file_type=FileTypes.PDF, is_output_file=True, local_path=local_path)
+    file_path = get_local_file_path(file_name=file_name, file_type=FileTypes.PDF, local_path=local_path)
 
     with PdfPages(file_path) as pdf:
         if isinstance(figs, Dict):
@@ -920,47 +917,3 @@ def check_df_for_duplicated_columns_index(df: pd.DataFrame) -> bool:
             f"Found {len(duplicated_index)} duplicated index value(s): {unique_dupes}"
         )
     return True
-
-
-class LocalTests(Enum):
-    LOCAL_PATHS = 1
-    FOLDER_FILES = 2
-    NAMES = 3
-    DATA_FILE = 4
-    UNIVERSE = 5
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    if local_test == LocalTests.LOCAL_PATHS:
-        print(get_paths())
-        print(platform.system())
-        print(OUTPUT_PATH)
-
-    elif local_test == LocalTests.FOLDER_FILES:
-        get_all_folder_files(folder_path="C://")
-
-    elif local_test == LocalTests.NAMES:
-        file_name = join_file_name_parts(['head', 'tails'])
-        print(file_name)
-
-    elif local_test == LocalTests.DATA_FILE:
-        file_path = get_local_file_path(file_name='ETH', file_type=FileTypes.CSV)
-        print(file_path)
-
-    elif local_test == LocalTests.UNIVERSE:
-        file_path = get_local_file_path(file_name='ETH',
-                                        folder_name='bitmex',
-                                        key='1d',
-                                        file_type=FileTypes.CSV)
-        print(file_path)
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.UNIVERSE)

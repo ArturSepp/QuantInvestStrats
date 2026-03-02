@@ -11,7 +11,7 @@ from typing import Tuple, List
 import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
+from qis.portfolio.reports.config import PERF_PARAMS
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 
 
@@ -39,7 +39,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     else:
         is_grouped = False
 
-    if regime_benchmark is None:
+    if regime_benchmark is None and multi_portfolio_data.benchmark_prices is not None:
         regime_benchmark = multi_portfolio_data.benchmark_prices.columns[0]
 
     plot_kwargs = dict(fontsize=fontsize,
@@ -56,13 +56,18 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     if backtest_name is not None:
         fig.suptitle(backtest_name, fontweight="bold", fontsize=8, color='blue')
 
+    if regime_benchmark is not None:
+        title = f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
+    else:
+        title = f"Cumulative performance",
+
     multi_portfolio_data.plot_nav(ax=fig.add_subplot(gs[0, :2]),
                                   time_period=time_period,
                                   regime_benchmark=regime_benchmark,
                                   perf_params=perf_params,
                                   regime_classifier=regime_classifier,
                                   add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                  title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
+                                  title=title,
                                   **kwargs)
 
     multi_portfolio_data.plot_drawdowns(ax=fig.add_subplot(gs[1, :2]),

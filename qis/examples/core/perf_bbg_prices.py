@@ -88,21 +88,6 @@ def run_report():
         'DBBNU15Y Index': 'DBBNU15Y'
     }
 
-    benchmark = 'SPTR Index'
-    tickers = {
-        benchmark: benchmark,
-        'CICMCI5B Index': 'CDX IG Citi',
-        'UISYMI5S Index': 'CDX IG UBS shortable',
-        'DBCDIG5F Index': 'CDX IG DB long fixed',
-        'DBCDIG5L Index': 'CDX IG DB long variable',
-        'DBCDIG5S Index': 'CDX IG DB short',
-        'CICMCH5B Index': 'CDX HY Citi',
-        'UISYMH5S Index': 'CDX HY UBS shortable',
-        'DBCDHYLG Index': 'CDX HY DB long fixed',
-        'DBCDHY5A Index': 'CDX HY DB long variable',
-        # 'DBCDHY5S Index': 'CDX HY DB short'
-    }
-
     benchmark = 'AOR US Equity'
     tickers = {
         benchmark: benchmark,
@@ -140,12 +125,27 @@ def run_report():
         'NMVVR1L Index': 'IRVING1',
     }
 
+    benchmark = 'LGCPTRUH Index'
+    tickers = {
+        benchmark: benchmark,
+        'CICMCI5B Index': 'CDX IG Citi',
+        'UISYMI5S Index': 'CDX IG UBS shortable',
+        'DBCDIG5F Index': 'CDX IG DB long fixed',
+        'DBCDIG5L Index': 'CDX IG DB long variable',
+        'DBCDIG5S Index': 'CDX IG DB short',
+        'CICMCH5B Index': 'CDX HY Citi',
+        'UISYMH5S Index': 'CDX HY UBS shortable',
+        'DBCDHYLG Index': 'CDX HY DB long fixed',
+        'DBCDHY5A Index': 'CDX HY DB long variable',
+        # 'DBCDHY5S Index': 'CDX HY DB short'
+    }
+
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('07Nov2006', '31Dec2025')
+    time_period = qis.TimePeriod('31Dec2018', '31Jan2026')
     # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
     # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
     kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD, add_rates_data=True)

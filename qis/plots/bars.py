@@ -48,6 +48,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               reverse_columns: bool = False,
               is_sns: bool = True,
               alpha: float = 0.9,
+              x_loc_width_shift: float = 0.2,
               add_avg_line: bool = False,
               is_horizontal: bool = False,
               labels_frequency: Optional[int] = None,
@@ -120,8 +121,7 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         width, height = p.get_width(), p.get_height()
         y = p.get_y()
         x = p.get_x()
-
-        x_loc = x+.2*width
+        x_loc = x+x_loc_width_shift*width
         y_loc = y+.3*height if height > 0.0 else y+0.8*height
         if add_bar_values:
             if height != 0:

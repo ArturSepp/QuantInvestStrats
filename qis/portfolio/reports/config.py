@@ -180,9 +180,9 @@ def fetch_default_perf_params() -> Tuple[PerfParams, BenchmarkReturnsQuantilesRe
 
 
 def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
-                                reporting_frequency: ReportingFrequency = ReportingFrequency.DAILY,
+                                reporting_frequency: ReportingFrequency = ReportingFrequency.MONTHLY,
                                 long_threshold_years: float = 5.0,
-                                add_rates_data: bool = True,
+                                add_rates_data: bool = False,
                                 is_unit_based_traded_volume: bool = True,
                                 override: Dict[str, Any] = None
                                 ) -> Dict[str, Any]:
