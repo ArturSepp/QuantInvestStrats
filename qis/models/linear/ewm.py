@@ -1031,7 +1031,7 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
     """
     # adjust indices in case
     if not x_data.index.equals(y_data.index):
-        y_data = y_data.reindex(index=x_data, method='ffill')
+        y_data = y_data.reindex(index=x_data.index, method='ffill')
 
     # 1 - adjust by mean
     if mean_adj_type != MeanAdjType.NONE:
@@ -1051,9 +1051,12 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
 
     # 2  take gen arrays and convert to ndarray to use with numbdas
     if isinstance(x_data, pd.Series) and isinstance(y_data, pd.DataFrame):  # extend to df
+        x_data = x_data.to_frame()
         x = npo.np_array_to_n_column_array(a=npo.to_finite_np(data=x_data, fill_value=np.nan), ncols=len(y_data.columns))
         y = npo.to_finite_np(data=y_data, fill_value=np.nan)
     elif isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.DataFrame):
+        if not len(x_data.columns) == len(y_data.columns):
+            raise IndexError(f"x_data and y_data must have the same number of columns")
         # should be same dimensions
         x = npo.to_finite_np(data=x_data, fill_value=np.nan)
         y = npo.to_finite_np(data=y_data, fill_value=np.nan)

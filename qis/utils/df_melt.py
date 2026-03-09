@@ -19,6 +19,21 @@ def melt_scatter_data_with_xvar(df: pd.DataFrame,
     column with xvar_str will be repeated to melted y_column
     index is ignored
     """
+    # check xvar_str exists
+    if xvar_str not in df.columns:
+        raise ValueError(f"xvar_str='{xvar_str}' not found in df.columns={df.columns.tolist()}")
+
+    # check y_column does not conflict with existing columns
+    ex_xvar_columns = [c for c in df.columns if c != xvar_str]
+    if y_column in ex_xvar_columns:
+        raise ValueError(f"y_column='{y_column}' conflicts with existing df columns={ex_xvar_columns}. "
+                         f"Choose a different y_column name.")
+
+    # check hue_name does not conflict
+    if hue_name in df.columns:
+        raise ValueError(f"hue_name='{hue_name}' conflicts with existing df columns={df.columns.tolist()}. "
+                         f"Choose a different hue_name.")
+
     df = df.dropna()
     ex_benchmark_data = df.drop(xvar_str, axis=1)
     scatter_data = pd.melt(df,
@@ -29,7 +44,7 @@ def melt_scatter_data_with_xvar(df: pd.DataFrame,
     # move hue to last position
     columns_ex_hue = scatter_data.columns.to_list()
     columns_ex_hue.remove(hue_name)
-    scatter_data = scatter_data[columns_ex_hue+[hue_name]]
+    scatter_data = scatter_data[columns_ex_hue + [hue_name]]
     return scatter_data
 
 

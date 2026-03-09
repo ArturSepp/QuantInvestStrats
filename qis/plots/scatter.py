@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 from statsmodels import api as sm
-from typing import Union, List, Tuple, Optional
+from typing import Union, List, Tuple, Optional, Dict
 
 # qis
 import qis.plots as qp
@@ -44,6 +44,7 @@ def plot_scatter(df: pd.DataFrame,
                  fontsize: int = 10,
                  linewidth: int = 1,
                  markersize: int = 4,
+                 hue_linestyles: Dict[str, str] = None,
                  full_sample_label: str = 'Full sample: ',
                  add_45line: bool = False,
                  align_axis: bool = False,
@@ -92,8 +93,12 @@ def plot_scatter(df: pd.DataFrame,
     else:
         fig = None
 
-    def plot_regression_with_model(x_col, y_col, data, reg_model, x_vals, color, ax,
-                                   ci=None, order=1, markersize=20, linewidth=2):
+    def _plot_regression_with_model(x_col, y_col, data, reg_model, x_vals, color, ax,
+                                   ci=None,
+                                    order=1,
+                                    markersize=20,
+                                    linewidth=2,
+                                    linestyle: str = '-'):
         """Helper to plot scatter + regression line consistently"""
         # Plot scatter
         sns.scatterplot(x=x_col, y=y_col, data=data, color=color, s=markersize, ax=ax)
@@ -111,7 +116,7 @@ def plot_scatter(df: pd.DataFrame,
             # Plot custom regression line from our model
             x1_pred = qu.get_ols_x(x=x_vals, order=order, fit_intercept=reg_model.params.shape[0] > order)
             prediction = reg_model.predict(x1_pred)
-            ax.plot(x_vals, prediction, color=color, lw=linewidth, linestyle='-')
+            ax.plot(x_vals, prediction, color=color, lw=linewidth, linestyle=linestyle)
 
     estimated_reg_models = {}
     if hue is not None:
@@ -120,6 +125,8 @@ def plot_scatter(df: pd.DataFrame,
         palette = colors
 
         hue_ids = df[hue].unique()
+        if hue_linestyles is None:
+            hue_linestyles = {x: '-' for x in hue_ids}
         for idx, hue_id in enumerate(hue_ids):
             # Estimate model
             data_hue = df[df[hue] == hue_id].replace([np.inf, -np.inf], np.nan).dropna().sort_values(by=x)
@@ -130,8 +137,9 @@ def plot_scatter(df: pd.DataFrame,
             estimated_reg_models[hue_id] = reg_model
 
             # Plot
-            plot_regression_with_model(x, y, data_hue, reg_model, x_, palette[idx], ax,
-                                       ci=ci, order=order, markersize=markersize, linewidth=linewidth)
+            _plot_regression_with_model(x, y, data_hue, reg_model, x_, palette[idx], ax,
+                                       ci=ci, order=order, markersize=markersize, linewidth=linewidth,
+                                        linestyle=hue_linestyles[hue_id])
 
     else:
         if full_sample_order is None:
@@ -147,7 +155,7 @@ def plot_scatter(df: pd.DataFrame,
             reg_model = sm.OLS(y_, x1).fit()
 
             # Plot
-            plot_regression_with_model(x, y, data_clean, reg_model, x_, full_sample_color, ax,
+            _plot_regression_with_model(x, y, data_clean, reg_model, x_, full_sample_color, ax,
                                        ci=ci, order=full_sample_order, markersize=markersize, linewidth=linewidth)
 
     # add ml equations to labels
@@ -212,13 +220,13 @@ def plot_scatter(df: pd.DataFrame,
             annotation_markers = len(df.index) * ['o']
 
         for label, x_, y_, color, marker in zip(annotation_labels, df[x], df[y], colors, annotation_markers):
-            ax.annotate(label,
-                        xy=(x_, y_), xytext=(1, 1),
-                        textcoords='offset points', ha='left', va='bottom',
-                        color=color,
-                        fontsize=fontsize)
             if label != '':
-                ax.scatter(x=x_, y=y_, c=color, s=20, marker=marker)
+                ax.annotate(label,
+                            xy=(x_, y_), xytext=(1, 1),
+                            textcoords='offset points', ha='left', va='bottom',
+                            color=color,
+                            fontsize=fontsize)
+                ax.scatter(x=x_, y=y_, color=color, s=20, marker=marker)
 
     if align_axis or add_45line:
         ymin, ymax = ax.get_ylim()
