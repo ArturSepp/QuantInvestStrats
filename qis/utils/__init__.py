@@ -68,7 +68,6 @@ from qis.utils.df_cut import (
 from qis.utils.df_freq import (
     agg_remained_data_on_right,
     df_asfreq,
-    df_index_to_str,
     df_resample_at_freq,
     df_resample_at_int_index,
     df_resample_at_other_index

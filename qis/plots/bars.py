@@ -158,8 +158,9 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
                                 ha='left', va='top')
 
     if vline_columns is not None:
+        ylim = ax.get_ylim()
         for vline_column in vline_columns:
-            ax.vlines([vline_column-0.5], *ax.get_ylim(), lw=1)  # shift by 0.5 for visibility
+            ax.vlines([vline_column-0.5], *ylim, lw=1)  # shift by 0.5 for visibility
 
     if legend_labels is not None:
         labels = legend_labels

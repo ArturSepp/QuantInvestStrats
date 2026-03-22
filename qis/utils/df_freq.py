@@ -1,16 +1,29 @@
 """
 utilities to apply frequencies
 """
+import warnings
 import numpy as np
 import pandas as pd
-from enum import Enum
 from typing import Optional, Union, Callable, Literal
 
 import qis.utils.dates as da
-from qis.utils.df_str import df_index_to_str
 
 # Arguments for fillna()
 FillnaOptions = Literal["bfill", "ffill", "pad"]
+
+
+def _apply_fill(df: Union[pd.DataFrame, pd.Series],
+                fill_na_method: Optional[FillnaOptions]
+                ) -> Union[pd.DataFrame, pd.Series]:
+    """apply forward or backward fill to a dataframe or series"""
+    if fill_na_method is None:
+        return df
+    if fill_na_method in ('ffill', 'pad'):
+        return df.ffill()
+    elif fill_na_method == 'bfill':
+        return df.bfill()
+    else:
+        raise ValueError(f"unsupported fill_na_method={fill_na_method}")
 
 
 def df_asfreq(df: Union[pd.DataFrame, pd.Series],
@@ -20,59 +33,89 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
               inclusive: Optional[str] = None,
               include_start_date: bool = False,
               include_end_date: bool = False,
-              tz: str = None
+              tz: Optional[str] = None
               ) -> Union[pd.DataFrame, pd.Series]:
     """
-    wrapper to asfreq with closed period
-    closed{None, ‘left’, ‘right’}, optional : Make the interval closed with respect to the given frequency
-    to the ‘left’, ‘right’, or both sides (None, the default).
-    note that using include_start_date and include_end_date will disable given index freq
+    Wrapper to asfreq with closed period.
+
+    Reindexes df onto a date schedule generated at the given freq,
+    with optional inclusion of the original start/end dates.
+
+    Args:
+        df: input time series
+        freq: pandas frequency string; None returns df unchanged
+        method: fill method passed to pd.DataFrame.reindex()
+        fill_na_method: residual fill applied after reindex (handles leading/trailing NaNs)
+        inclusive: reserved, currently unused
+        include_start_date: if True, ensures df's first date is in the output index
+        include_end_date: if True, ensures df's last date is in the output index
+        tz: timezone string passed to date schedule generation
+
+    Note:
+        Using include_start_date / include_end_date may produce an irregular index.
     """
-    if freq is None:
-        return df
-    elif len(df.index) >=3 and freq == pd.infer_freq(df.index):
+    if freq is None or df.empty:
         return df
 
-    freq_index = da.generate_dates_schedule(time_period=da.get_time_period(df=df, tz=tz), freq=freq,
-                                            include_start_date=include_start_date,
-                                            include_end_date=include_end_date)
+    # pd.infer_freq requires >= 3 points and can raise on irregular indices
+    if len(df.index) >= 3:
+        try:
+            inferred = pd.infer_freq(df.index)
+        except (TypeError, ValueError):
+            inferred = None
+        if inferred is not None and inferred == freq:
+            return df
+
+    freq_index = da.generate_dates_schedule(
+        time_period=da.get_time_period(df=df, tz=tz),
+        freq=freq,
+        include_start_date=include_start_date,
+        include_end_date=include_end_date
+    )
+
     if freq_index.empty:
-        print(f"in df_asfreq: cannot resample with freq={freq} with start={df.index[0]}, end={df.index[-1]} - using start/end")
-        freq_index = freq_index.insert(0, df.index[0])
-        freq_index = freq_index.insert(1, df.index[-1])
-    if include_start_date:
-        if freq_index[0] != df.index[0]:
-            freq_index = freq_index.insert(0, df.index[0])
-    if include_end_date:  # close on last date
-        if freq_index[-1] != df.index[-1]:
-            freq_index = freq_index.append(df.index[-1:])
-    freq_data = df.reindex(index=freq_index, method=method)
+        warnings.warn(
+            f"df_asfreq: cannot resample with freq={freq} over "
+            f"[{df.index[0]}, {df.index[-1]}]; falling back to endpoints"
+        )
+        freq_index = pd.DatetimeIndex([df.index[0], df.index[-1]])
 
-    if fill_na_method is not None:
-        if fill_na_method == 'ffill':
-            freq_data = freq_data.ffill()
-        elif fill_na_method == 'bfill':
-            freq_data = freq_data.bfill()
-        else:
-            raise NotImplementedError(f"fill_na_method={fill_na_method}")
+    # ensure boundary dates are present when requested
+    if include_start_date and freq_index[0] != df.index[0]:
+        freq_index = freq_index.insert(0, df.index[0])
+    if include_end_date and freq_index[-1] != df.index[-1]:
+        freq_index = freq_index.insert(len(freq_index), df.index[-1])
+
+    freq_data = df.reindex(index=freq_index, method=method)
+    freq_data = _apply_fill(freq_data, fill_na_method)
     return freq_data
 
 
 def agg_remained_data_on_right(df: Union[pd.DataFrame, pd.Series],
                                data: Union[pd.DataFrame, pd.Series],
-                               agg_func: Optional[Callable[[pd.DataFrame], pd.Series]]  # for none use last
+                               agg_func: Optional[Callable[[pd.DataFrame], pd.Series]]  # for None use last
                                ) -> Union[pd.DataFrame, pd.Series]:
-    if df.index[-1] < data.index[-1]:  # some data left on right
-        remained_data_on_right = data.loc[df.index[-1]:]
-        if df.index[-1] in remained_data_on_right.index:  # data_f.index[-1] can be included in previous sample
-            remained_data_on_right = remained_data_on_right.drop(df.index[-1])
-        if agg_func is not None:
-            agg_remained_data_on_right = remained_data_on_right.apply(agg_func)
-        else:
-            agg_remained_data_on_right = remained_data_on_right.iloc[-1]
-        df = df.append(agg_remained_data_on_right)
+    """
+    If data extends beyond df's last date, aggregate the remaining tail
+    and append it to df.
+    """
+    if df.index[-1] >= data.index[-1]:
+        return df
+
+    remained_data_on_right = data.loc[df.index[-1]:]
+    # df.index[-1] may already be included in the previous resample bucket
+    if df.index[-1] in remained_data_on_right.index:
+        remained_data_on_right = remained_data_on_right.drop(df.index[-1])
+
+    if remained_data_on_right.empty:
+        return df
+
+    if agg_func is not None:
+        agg_row = remained_data_on_right.apply(agg_func)
     else:
-        df = df
+        agg_row = remained_data_on_right.iloc[-1]
+
+    df = pd.concat([df, agg_row.to_frame().T if isinstance(agg_row, pd.Series) and isinstance(df, pd.DataFrame) else pd.DataFrame([agg_row], index=[remained_data_on_right.index[-1]])])
     return df
 
 
@@ -83,10 +126,10 @@ def df_resample_at_other_index(df: Union[pd.DataFrame, pd.Series],
                                include_end_date: bool = False
                                ) -> Union[pd.DataFrame, pd.Series]:
     """
-    given the time index of another time series, aggregate data at frequency of the index
+    Given the time index of another time series, aggregate data at frequency of the index.
     """
     if not isinstance(other_index, pd.DatetimeIndex):
-        raise TypeError (f"other_index type = {type(other_index)} must be pd.DatetimeIndex")
+        raise TypeError(f"other_index type = {type(other_index)} must be pd.DatetimeIndex")
 
     freq = pd.infer_freq(other_index)
     if freq is None:
@@ -97,29 +140,34 @@ def df_resample_at_other_index(df: Union[pd.DataFrame, pd.Series],
     if include_end_date:
         data_f = agg_remained_data_on_right(df=data_f, data=df, agg_func=agg_func)
 
-    if fill_na_method is not None:
-        if fill_na_method == 'ffill':
-            data_f = data_f.reindex(index=other_index).ffill()
-        elif fill_na_method == 'bfill':
-            data_f = data_f.reindex(index=other_index).bfill()
-        else:
-            raise NotImplementedError(f"fill_na_method={fill_na_method}")
-
+    data_f = data_f.reindex(index=other_index)
+    data_f = _apply_fill(data_f, fill_na_method)
     return data_f
 
 
 def df_resample_at_freq(df: Union[pd.DataFrame, pd.Series],
                         freq: str = 'QE',
                         fill_na_method: FillnaOptions = 'ffill',
-                        agg_func: Optional[Callable[[pd.DataFrame], pd.Series]] = np.nanmean,  # if none use last
+                        agg_func: Optional[Callable[[pd.DataFrame], pd.Series]] = np.nanmean,  # if None use last
                         include_end_date: bool = False
                         ) -> Union[pd.DataFrame, pd.Series]:
     """
-    wrapper to asfreq with closed period
-    problem with resample it can put last date above last date in data
+    Wrapper to resample with closed period.
+
+    Problem with resample: it can generate dates beyond the last observation.
+    This clips to in-sample and optionally appends the tail.
     """
-    # other index date is strictly below the last date in data
+    if df.empty:
+        return df
+
     insample_index = pd.date_range(start=df.index[0], end=df.index[-1], freq=freq)
+    if insample_index.empty:
+        warnings.warn(
+            f"df_resample_at_freq: no periods for freq={freq} in "
+            f"[{df.index[0]}, {df.index[-1]}]"
+        )
+        return df
+
     in_sample_data = df.loc[:insample_index[-1]]
     if agg_func is not None:
         data_f = in_sample_data.resample(freq).apply(agg_func)
@@ -129,14 +177,7 @@ def df_resample_at_freq(df: Union[pd.DataFrame, pd.Series],
     if include_end_date:
         data_f = agg_remained_data_on_right(df=data_f, data=df, agg_func=agg_func)
 
-    if fill_na_method is not None:  # final check
-        if fill_na_method == 'ffill':
-            data_f = data_f.ffill()
-        elif fill_na_method == 'bfill':
-            data_f = data_f.bfill()
-        else:
-            raise NotImplementedError(f"fill_na_method={fill_na_method}")
-
+    data_f = _apply_fill(data_f, fill_na_method)
     return data_f
 
 
@@ -145,83 +186,33 @@ def df_resample_at_int_index(df: pd.DataFrame,
                              sample_size: int = 5
                              ) -> pd.DataFrame:
     """
-    resample dataframe at evenly spaced discrete index with intervals of sample_size
-    func is accumulating function which needs to have axis={0, 1} as arguments
+    Resample dataframe at evenly spaced discrete index with intervals of sample_size.
+
+    The grouping is reversed so the last group always has a full cycle.
+    func is the accumulating function; None takes the last row per group.
     """
-    assert isinstance(sample_size, int)
-    assert sample_size > 0
-    if sample_size == 1:  # no resampling is needed
+    if not isinstance(sample_size, int) or sample_size <= 0:
+        raise ValueError(f"sample_size must be a positive integer, got {sample_size}")
+    if sample_size == 1:
         return df
 
     original_index = df.index
-    df = df.reset_index(drop=True)  # need integer range index
+    df = df.reset_index(drop=True)
     int_index = df.index
-    sampler = (df.index.to_series() / sample_size).astype(int)
-    sampler = pd.Series(sampler.values[-1]-sampler.values[::-1], sampler.index)  # reverse so the last samples has full cycle
+
+    # reverse grouping so the last bucket is always complete
+    sampler = (int_index.to_series() / sample_size).astype(int)
+    sampler = pd.Series(sampler.values[-1] - sampler.values[::-1], index=sampler.index)
+
     if func is not None:
-        df = df.groupby(sampler, sort=False).agg(func, axis=0)
+        df = df.groupby(sampler, sort=False).agg(func)
     else:
-        # df = df.groupby(sampler, sort=False).apply(lambda x: len(x.index))
-        df = df.groupby(sampler).apply(lambda x: x.iloc[-1])
-    if isinstance(df, pd.Series):  # if input is one columns
+        df = df.groupby(sampler, sort=False).last()
+
+    if isinstance(df, pd.Series):
         df = df.to_frame()
 
-    # define sampled index
-    sampled_index = pd.Series(original_index, index=int_index).groupby(sampler).apply(lambda x: x.iloc[-1])
-    df = df.set_index(sampled_index)
+    # recover the original datetime index: take the last timestamp per group
+    sampled_index = pd.Series(original_index, index=int_index).groupby(sampler, sort=False).last()
+    df.index = sampled_index.values
     return df
-
-
-class LocalTests(Enum):
-    AS_FREQ = 1
-    RESAMPLE = 2
-    INT_INDEX = 3
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    time_period = da.TimePeriod('1Jan2020', '05Jan2021')
-    daily_index = time_period.to_pd_datetime_index(freq='B')
-    df = pd.DataFrame(data=np.tile(np.array([1.0, 2.0]), (len(daily_index), 1)), index=daily_index, columns=['1', '2'])
-    print(df)
-
-    if local_test == LocalTests.AS_FREQ:
-        freq_data = df_asfreq(df=df, freq='YE')
-        print(freq_data)
-        freq_data = df_asfreq(df=df, freq='YE', include_end_date=True)
-        print(freq_data)
-        print(type(freq_data.index))
-
-        freq_data_s = df_index_to_str(freq_data)
-        print(freq_data_s)
-        print(type(freq_data_s.index))
-
-    elif local_test == LocalTests.RESAMPLE:
-
-        time_period1 = da.TimePeriod('1Jan2020', '1Jan2021')
-        other_index = time_period1.to_pd_datetime_index(freq='QE')
-        print(other_index)
-        freq_data1 = df_resample_at_other_index(df=df, other_index=other_index, agg_func=np.nansum)
-        print(freq_data1)
-        print(freq_data1.index)
-
-        freq_data2 = df_resample_at_freq(df=df, freq='QE', agg_func=np.nansum, include_end_date=True)
-        print(freq_data2)
-        print(freq_data2.index)
-
-    elif local_test == LocalTests.INT_INDEX:
-        # df1 = df_resample_at_int_index(df=df, sample_size=21)
-        # print(df1)
-        df2 = df_resample_at_int_index(df=df.cumsum(0), func=None, sample_size=21)
-        print(f"func=None")
-        print(df2)
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.INT_INDEX)
