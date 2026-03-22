@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Verify core imports
+      run: |
+        python -c "
+        import qis
+        from qis import (
+            TimePeriod, PerfParams, PortfolioData,
+            compute_ewm, compute_ewm_covar,
+            to_returns, backtest_model_portfolio,
+            set_group_loadings, generate_rebalancing_indicators,
+        )
+        print('All imports OK')
+        "
+
+    - name: Run tests (no external data, no plots)
+      run: |
+        python qis/utils/tests/annualisation_test.py
+        python qis/utils/tests/dates_test.py
+        python qis/utils/tests/file_utils_tests.py
