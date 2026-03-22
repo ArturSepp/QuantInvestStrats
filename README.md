@@ -10,6 +10,8 @@ reporting, factsheets and analysis of quantitative strategies.
 | PyPI Version | ![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square) |
 | Python Versions | ![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square) |
 | License | ![License](https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square)|
+| CI Status | [![CI](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg)](https://github.com/ArturSepp/QuantInvestStrats/actions) |
+
 
 
 ### 📈 Package Statistics
