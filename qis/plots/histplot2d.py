@@ -2,6 +2,7 @@
 plot histogram 2d
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -28,13 +29,17 @@ def plot_histplot2d(df: pd.DataFrame,
                     **kwargs
                     ) -> plt.Figure:
 
-    if len(df.columns) != 2:
-        raise ValueError(f"should be 2 columns")
-
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     else:
         fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
+
+    if len(df.columns) != 2:
+        raise ValueError(f"should be 2 columns")
 
     if a_min is not None or a_max is not None:
         df = np.clip(df, a_min=a_min, a_max=a_max)

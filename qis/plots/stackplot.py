@@ -1,4 +1,5 @@
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
@@ -45,6 +46,10 @@ def plot_stack(df: pd.DataFrame,
         fig, ax = plt.subplots()
     else:
         fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
 
     if isinstance(df.index, pd.DatetimeIndex):
         re_indexed_data, datalables = put.map_dates_index_to_str(data=df,

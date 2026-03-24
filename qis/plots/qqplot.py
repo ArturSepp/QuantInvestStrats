@@ -2,6 +2,7 @@
 quantile-quantile plot
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -39,6 +40,10 @@ def plot_qq(df: Union[pd.DataFrame, pd.Series],
         fig, ax = plt.subplots()
     else:
         fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
 
     if isinstance(df, pd.Series):
         df = df.to_frame()

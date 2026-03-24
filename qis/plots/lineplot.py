@@ -2,6 +2,7 @@
 line plot
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -44,6 +45,16 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
     y: str = None: y column
     hue: str = None: hue
     """
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
+
     if isinstance(df, pd.DataFrame):
         pass
     elif isinstance(df, pd.Series):
@@ -59,11 +70,6 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
                 df = df[[x, y, hue]]
             else:
                 df = df[[x, y]]
-
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = None
 
     if colors is None:
         if hue is None:

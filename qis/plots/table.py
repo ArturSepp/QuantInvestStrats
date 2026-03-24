@@ -2,6 +2,7 @@
 plot df as table
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -61,6 +62,10 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
     """
     plot dataframe as maotplotlib table
     """
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return None
+
     df = df.copy()  # data object will be changed
     if isinstance(df, pd.Series):
         df = df.to_frame()
@@ -84,17 +89,17 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
     # allocate size
     size = (np.array(df.shape[::-1]) + np.array([0, 1])) * np.array([col_widths[0], row_height])
 
-    if first_column_width is None:
-        first_column_width = col_widths[0]
-    #else:
-    #    col_widths[0] = first_column_width # after this change
-
     if ax is None:  # create new axis
         fig, ax = plt.subplots(figsize=size)
         ax.axis('off')
     else:  # add table to existing axis
         fig = None
         ax.axis('off')
+
+    if first_column_width is None:
+        first_column_width = col_widths[0]
+    #else:
+    #    col_widths[0] = first_column_width # after this change
 
     if var_format is not None:
         df = dfs.df_to_str(df=df, var_format=var_format)

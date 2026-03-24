@@ -3,6 +3,7 @@ bar plots
 """
 
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -62,6 +63,10 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         fig, ax = plt.subplots()
     else:
         fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
 
     # convert to series to avoid melting
     # if isinstance(df, pd.DataFrame) and len(df.columns) == 1:
@@ -256,6 +261,16 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     """
     adopted for vertical bars
     """
+    if ax is None:
+        height = put.calc_table_height(num_rows=len(df.index), scale=0.30)
+        fig, ax = plt.subplots(figsize=(9.2, height))
+    else:
+        fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
+
     if isinstance(df, pd.Series):
         df = df.to_frame()
     category_names = df.columns.to_list()
@@ -286,11 +301,6 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
         else:  # colors are given for each index
             pass
 
-    if ax is None:
-        height = put.calc_table_height(num_rows=len(df.index), scale=0.30)
-        fig, ax = plt.subplots(figsize=(9.2, height))
-    else:
-        fig = None
 
     if add_bar_value_at_mid:
         bar_value_at_max = None

@@ -2,17 +2,18 @@
 pieplot
 """
 # packages
+import warnings
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import Optional, List
+from typing import Optional, List, Union
 from enum import Enum
 
 # qis
 import qis.plots.utils as put
 
 
-def plot_pie(df: [pd.Series, pd.DataFrame],
+def plot_pie(df: Union[pd.Series, pd.DataFrame],
              y_column: str = None,
              ylabel: str = '',
              title: str = None,
@@ -27,6 +28,10 @@ def plot_pie(df: [pd.Series, pd.DataFrame],
         fig, ax = plt.subplots()
     else:
         fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
 
     if y_column is None and isinstance(df, pd.DataFrame):
         y_column = df.columns[0]

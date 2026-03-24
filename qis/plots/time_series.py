@@ -43,6 +43,14 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      ax: plt.Subplot = None,
                      **kwargs
                      ) -> Optional[plt.Figure]:
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
 
     data1 = df.copy()
     if isinstance(data1, pd.DataFrame):
@@ -52,11 +60,6 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     else:
         raise TypeError(f"unsuported data type {type(data1)}")
     columns = data1.columns
-
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = None
 
     if colors is None:
         colors = put.get_n_colors(n=len(columns), **kwargs)
@@ -327,6 +330,10 @@ def plot_time_series_2ax(df1: Union[pd.Series, pd.DataFrame],
         fig, ax = plt.subplots()
     else:
         fig = None
+
+    if df1.empty or df2.empty:
+        warnings.warn('df1 or df2 is empty: no data to plot')
+        return fig
 
     if isinstance(df1, pd.Series):
         df1 = df1.to_frame()

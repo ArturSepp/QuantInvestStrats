@@ -2,6 +2,7 @@
 scatter plot core
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -55,6 +56,16 @@ def plot_scatter(df: pd.DataFrame,
     """
     x-y scatter of df
     """
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    else:
+        fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
+
     if x is None:
         if len(df.columns) == 2 or (len(df.columns) == 3 and hue is not None):
             x = df.columns[0]
@@ -87,11 +98,6 @@ def plot_scatter(df: pd.DataFrame,
 
     if hue is not None and add_hue_model_label is None:  # override to true unless false
         add_hue_model_label = True
-
-    if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-    else:
-        fig = None
 
     def _plot_regression_with_model(x_col, y_col, data, reg_model, x_vals, color, ax,
                                    ci=None,

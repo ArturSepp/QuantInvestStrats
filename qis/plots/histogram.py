@@ -2,6 +2,7 @@
 plot histogram
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -64,6 +65,10 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
         fig, ax = plt.subplots()
     else:
         fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
 
     df = df.copy()
     if isinstance(df, pd.DataFrame):

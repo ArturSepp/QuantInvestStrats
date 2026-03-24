@@ -59,17 +59,22 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
     plot boxplot of df[[x, y]]
     original_index use for melted df in term of original index
     """
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
+
     if x is None and y is None:
         if len(df.columns) == 2:
             x = df.columns[0]
             y = df.columns[1]
         else:
             raise ValueError(f"x and y must be defined for more than one columns")
-
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = None
 
     if colors is not None:
         palette = colors

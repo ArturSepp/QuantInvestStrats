@@ -3,6 +3,7 @@ errorbar plot
 """
 
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -34,6 +35,16 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   **kwargs
                   ) -> Optional[plt.Figure]:
 
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
+
     if isinstance(df, pd.DataFrame):
         pass
     elif isinstance(df, pd.Series):
@@ -42,11 +53,6 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
         raise TypeError(f"unsupported data type {type(df)}")
 
     columns = df.columns
-
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = None
 
     if colors is None:
         colors = put.get_n_colors(n=len(columns), **kwargs)

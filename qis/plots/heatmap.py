@@ -2,6 +2,7 @@
 heatmap plots
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -38,8 +39,12 @@ def plot_heatmap(df: pd.DataFrame,
 
     if ax is None:
         fig, ax = plt.subplots()
-    else:  # add table to existing axis
+    else:
         fig = None
+
+    if df.empty:
+        warnings.warn('df is empty: no data to plot')
+        return fig
 
     df = df.copy()
 
