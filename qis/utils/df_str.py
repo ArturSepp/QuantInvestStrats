@@ -2,13 +2,10 @@
 import numpy as np
 import pandas as pd
 from functools import partial
-from enum import Enum
 from pandas.core.dtypes.common import is_datetime64_any_dtype as is_datetime
 from pandas.api.types import is_string_dtype
-from tabulate import tabulate
 from typing import List, Optional, Union, Dict
-
-import qis
+from qis.utils.struct_ops import update_kwargs
 from qis.utils.dates import DATE_FORMAT
 
 EMPTY_NUM = ' '
@@ -142,7 +139,7 @@ def df_to_str(df: pd.DataFrame,
         elif isinstance(var_formats, dict):
             if var_format is not None:  # use var_format as pivot
                 var_formats_missing = {x: var_format for x in df.columns}
-                var_formats = qis.update_kwargs(var_formats_missing, var_formats)
+                var_formats = update_kwargs(var_formats_missing, var_formats)
 
             var_formats_ = []
             for column in df.columns:
@@ -227,7 +224,7 @@ def df_all_to_str(df: pd.DataFrame, index_name: str = '') -> str:
         fill = max(lab_len, c_len) + pad - 1
         fmts[idx] = partial(get_fmt_str, fill=fill)
     df_str = df.apply(fmts)
-    stats_str = tabulate(df_str, showindex=False, floatfmt='.2f', headers=df.columns)
+    stats_str = tabulate_df(df_str, showindex=False, floatfmt='.2f', headers=df.columns)
     return stats_str
 
 
@@ -260,32 +257,48 @@ def idx_to_alphabet(idx: int = 1, capitalise: bool = True) -> str:
         return chr(ord('`') + idx)
 
 
-class LocalTests(Enum):
-    DF_TO_STR = 1
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
+def tabulate_df(df: pd.DataFrame,
+                showindex: bool = False,
+                floatfmt: str = '.2f',
+                headers: Union[List[str], pd.Index] = None
+                ) -> str:
     """
+    Simple tabulate replacement for formatting DataFrame as aligned plain-text table.
+    """
+    if headers is None:
+        headers = list(df.columns)
 
-    if local_test == LocalTests.DF_TO_STR:
-        df = pd.DataFrame({
-            "c1": ("a", "bb", "ccc", "dddd", "eeeeee"),
-            "c2": (11, 22, 33, 44, 55),
-            "a3235235235": [1, 2, 3, 4, 5]
-        })
-        print(df)
+    # build rows as list of string lists
+    rows = []
+    for idx, row in df.iterrows():
+        row_strs = []
+        if showindex:
+            row_strs.append(str(idx))
+        for val in row:
+            if isinstance(val, float):
+                row_strs.append(format(val, floatfmt))
+            else:
+                row_strs.append(str(val))
+        rows.append(row_strs)
 
-        fmts = df_all_to_str(df)
-        print(fmts)
+    # prepend index header
+    if showindex:
+        headers = [str(df.index.name or '')] + list(headers)
 
-        stats_str = tabulate(df, showindex=True, floatfmt='.2f', headers=df.columns)
-        print(stats_str)
+    # compute column widths
+    n_cols = len(headers)
+    col_widths = [len(h) for h in headers]
+    for row in rows:
+        for j in range(n_cols):
+            col_widths[j] = max(col_widths[j], len(row[j]))
 
+    # format header and separator
+    header_line = '  '.join(h.rjust(col_widths[j]) for j, h in enumerate(headers))
+    sep_line = '  '.join('-' * col_widths[j] for j in range(n_cols))
 
-if __name__ == '__main__':
+    # format data rows
+    data_lines = []
+    for row in rows:
+        data_lines.append('  '.join(row[j].rjust(col_widths[j]) for j in range(n_cols)))
 
-    run_local_test(local_test=LocalTests.DF_TO_STR)
+    return '\n'.join([header_line, sep_line] + data_lines)

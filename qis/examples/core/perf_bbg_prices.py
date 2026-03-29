@@ -140,12 +140,18 @@ def run_report():
         # 'DBCDHY5S Index': 'CDX HY DB short'
     }
 
+    benchmark = 'LGCPTRUH Index'
+    tickers = {
+        benchmark: benchmark,
+        'DX1 Curncy': 'DXY'
+    }
+
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2018', '31Jan2026')
+    time_period = qis.TimePeriod('31Dec2018', '31Mar2026')
     # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
     # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
     kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD, add_rates_data=True)
