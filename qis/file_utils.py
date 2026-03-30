@@ -61,6 +61,7 @@ class FileTypes(FileData, Enum):
     TXT = FileData(extension='.txt', folder='txt')
     PARQUET = FileData(extension='.parquet', folder='parquet')
     ZIP = FileData(extension='.zip', folder=None)
+    HTML = FileData(extension='.html', folder=None)
 
 
 class PathData(NamedTuple):
