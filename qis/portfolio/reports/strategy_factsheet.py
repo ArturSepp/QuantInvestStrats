@@ -100,10 +100,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
         pivot_prices = joint_prices[regime_benchmark]
     else:
-        benchmark_prices_ = benchmark_prices[regime_benchmark]
-        joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
-        pivot_prices = joint_prices[regime_benchmark]
-        joint_prices = joint_prices[portfolio_nav.name]
+        if regime_benchmark != portfolio_nav.name:
+            benchmark_prices_ = benchmark_prices[regime_benchmark]
+            joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
+            pivot_prices = joint_prices[regime_benchmark]
+            joint_prices = joint_prices[portfolio_nav.name]
+        else:
+            pivot_prices = portfolio_nav.dropna()
+            joint_prices = portfolio_nav.dropna()
 
     ax = fig.add_subplot(gs[0:2, :2])
     qis.plot_prices(prices=joint_prices,
