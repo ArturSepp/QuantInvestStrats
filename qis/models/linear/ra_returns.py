@@ -98,10 +98,10 @@ def map_signal_to_weight(signals: pd.DataFrame,
                          loc: Union[float, pd.DataFrame] = 0.0,
                          scale: Union[float, np.ndarray] = 1.0,
                          tail_level: Union[float, np.ndarray] = 1.0,
-                         slope_right: Union[float, np.ndarray] = 0.5,
                          slope_left: Union[float, np.ndarray] = 0.5,
-                         tail_decay_right: Optional[Union[float, np.ndarray]] = None,
-                         tail_decay_left: Optional[Union[float, np.ndarray]] = None
+                         slope_right: Union[float, np.ndarray] = 0.5,
+                         tail_decay_left: Optional[Union[float, np.ndarray]] = None,
+                         tail_decay_right: Optional[Union[float, np.ndarray]] = None
                          ) -> pd.DataFrame:
     x = signals.to_numpy()
     if isinstance(loc, pd.DataFrame):
@@ -123,7 +123,8 @@ def map_signal_to_weight(signals: pd.DataFrame,
 
     elif signal_map_type == SignalMapType.ExpCDF:
         if np.any(np.less_equal(tail_level, slope_right)) or np.any(np.less_equal(tail_level, slope_left)):
-            raise ValueError(f"must be tail>slope_positive and tail > slope_negative")
+            raise ValueError(f"and tail_level={tail_level} > slope_left={slope_left}",
+                             f"must be tail_level={tail_level} > slope_right ={slope_right}")
         scale_negative = 1.5625 * scale / np.log(tail_level / (tail_level - slope_left))
         scale_positive = 1.5625 * scale / np.log(tail_level / (tail_level - slope_right))
         s_negative = - tail_level * (1.0 - np.exp(-np.square(x - loc) / scale_negative))

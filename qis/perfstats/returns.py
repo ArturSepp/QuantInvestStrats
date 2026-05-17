@@ -985,7 +985,7 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
     for idx, column in enumerate(prices.columns):
         good_price = prices.loc[first_date[idx]:last_date[idx], column]
         if method is not None:
-            good_price = good_price.infer_objects().ffill()
+            good_price = good_price.infer_objects(copy=False).ffill()
         good_parts.append(good_price)
 
     bfilled_data = pd.concat(good_parts, axis=1)

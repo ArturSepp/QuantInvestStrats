@@ -5,13 +5,13 @@ from qis.models.linear.ra_returns import map_signal_to_weight, SignalMapType
 import matplotlib.pyplot as plt
 
 
-def signal_mapping_illustration():
+def signal_mapping_illustration(x_range: float = 5.0):
     """
     Illustrate signal-to-weight mapping functions across different types.
     Shows how raw signals (x-axis) are transformed to portfolio weights (y-axis).
     """
     # Create signal range from -4 to 4
-    x_values = np.linspace(-4, 4, 201)
+    x_values = np.linspace(-x_range, x_range, 201)
     signals_df = pd.DataFrame({'signal': x_values})
 
     # Test different mapping types
@@ -22,33 +22,34 @@ def signal_mapping_illustration():
             'params': {'loc': 0.0, 'scale': 1.0}
         },
         {
-            'name': 'Normal CDF (σ=0.5)',
-            'signal_map_type': SignalMapType.NormalCDF,
-            'params': {'loc': 0.0, 'scale': 0.5}
-        },
-        {
             'name': 'Laplace CDF (σ=1.0)',
             'signal_map_type': SignalMapType.LaplaceCDF,
             'params': {'loc': 0.0, 'scale': 1.0}
         },
         {
-            'name': 'Exp CDF (symmetric)',
+            'name': 'Exp CDF (slope_left=slope_right=0.25)',
+            'signal_map_type': SignalMapType.ExpCDF,
+            'params': {'loc': 0.0, 'scale': 1.0, 'tail_level': 1.0,
+                       'slope_right': 0.25, 'slope_left': 0.25}
+        },
+        {
+            'name': 'Exp CDF (slope_left=slope_right=0.5)',
             'signal_map_type': SignalMapType.ExpCDF,
             'params': {'loc': 0.0, 'scale': 1.0, 'tail_level': 1.0,
                        'slope_right': 0.5, 'slope_left': 0.5}
         },
         {
-            'name': 'Exp CDF (asymmetric)',
+            'name': 'Exp CDF (slope_left=0.75, slope_right=0.75)',
             'signal_map_type': SignalMapType.ExpCDF,
             'params': {'loc': 0.0, 'scale': 1.0, 'tail_level': 1.0,
-                       'slope_right': 0.7, 'slope_left': 0.3}
+                       'slope_right': 0.75, 'slope_left': 0.75}
         },
         {
             'name': 'Exp CDF with tail decay',
             'signal_map_type': SignalMapType.ExpCDF,
-            'params': {'loc': 0.0, 'scale': 1.0, 'tail_level': 1.0,
-                       'slope_right': 0.5, 'slope_left': 0.5,
-                       'tail_decay_right': 1.0, 'tail_decay_left': 1.0}
+            'params': {'loc': 0.0, 'scale': 1.0, 'tail_level': 1.40,
+                       'slope_right': 0.75, 'slope_left': 0.75,
+                       'tail_decay_right': 3.0, 'tail_decay_left': 3.0}
         }
     ]
 
@@ -76,7 +77,7 @@ def signal_mapping_illustration():
         ax.set_xlabel('Signal (x)', fontsize=11)
         ax.set_ylabel('Weight', fontsize=11)
         ax.set_title(config['name'], fontsize=12, fontweight='bold')
-        ax.set_xlim(-4, 4)
+        ax.set_xlim(-x_range, x_range)
         ax.set_ylim(-1.1, 1.1)
 
         # Add reference lines at ±1
@@ -333,8 +334,8 @@ def signal_mapping_properties2():
 
 if __name__ == '__main__':
     # Run tests
-    #fig1 = signal_mapping_illustration()
+    fig1 = signal_mapping_illustration()
     #fig2 = signal_mapping_comparison()
     #fig3 = signal_mapping_properties()
-    fig4 = signal_mapping_properties2()
+    #fig4 = signal_mapping_properties2()
     plt.show()

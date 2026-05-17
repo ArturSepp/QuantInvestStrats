@@ -120,10 +120,10 @@ def run_local_test(local_test: LocalTests):
                                                          add_brinson_attribution=pnl_attribution,
                                                          add_exposures_pnl_attribution=pnl_attribution,
                                                          add_exposures_comp=pnl_attribution,
-                                                         add_strategy_factsheet=False,  # for strategy factsheet
+                                                         add_strategy_factsheet=True,  # for strategy factsheet
                                                          add_grouped_exposures=False,  # for strategy factsheet
                                                          add_grouped_cum_pnl=False,  # for strategy factsheet
-                                                         is_grouped=True,
+                                                         is_grouped=False,
                                                          add_joint_instrument_history_report=False,
                                                          **fetch_default_report_kwargs(time_period=time_period,
                                                                                        add_rates_data=True))

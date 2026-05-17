@@ -171,3 +171,9 @@ from qis.plots.reports.econ_data_single import econ_data_report
 
 from qis.plots.reports.price_history import (plot_price_history,
                                              generate_price_history_report)
+
+from qis.plots.derived.signal_diagnostics_plot import (
+    plot_signal_diagnostics,
+    plot_signal_diagnostics_bars,
+    plot_signal_diagnostics_scatter,
+)

@@ -103,3 +103,9 @@ from qis.perfstats.timeseries_bfill import (
 
 from qis.perfstats.fx_ops import (get_aligned_fx_spots,
                                   compute_futures_fx_adjusted_returns)
+
+from qis.perfstats.signal_diagnostics import (
+    SignalDiagnosticsColumns,
+    SignalDiagnosticsResult,
+    estimate_signal_diagnostics,
+)
