@@ -298,10 +298,8 @@ def plot_signal_diagnostics(
     n_cols = len(horizons)
     show_bars_row = bool(result.group_order)
     n_rows = 2 if show_bars_row else 1
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize, constrained_layout=True)
-    axes = np.atleast_2d(axes)
-    if n_rows == 1:
-        axes = axes.reshape(1, -1)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize,
+                             constrained_layout=True, squeeze=False)
 
     # Row 0: scatters
     for j, h in enumerate(horizons):

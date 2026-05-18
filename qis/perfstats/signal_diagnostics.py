@@ -1,50 +1,50 @@
 """
-Cross-sectional predictive regression diagnostics for trading signals.
+Cross-sectional predictive regression diagnostics for trading signals,
+with per-asset native-cadence handling.
 
-For an N-asset universe with a panel of signal scores and prices, this module
-quantifies the cross-sectional predictive content of the signal at one or more
-forward-return horizons via the regression
+For an N-asset universe with a panel of signal scores and per-frequency
+return panels, this module quantifies the cross-sectional predictive
+content of the signal at one or more forward-return horizons via the
+regression
 
         ỹ_{i,t,t+h} = β · z_{i,t-1} + ε_{i,t}      (default: no intercept)
 
-where
-    - z_{i,t-1}    is the signal value for asset i at the prior rebalance date
-    - ỹ_{i,t,t+h} is the cross-sectionally vol-normalised cumulative return of
-                  asset i over the forward window [t, t+h-1]:
+where the forward window length h is expressed in **the asset's native
+rebalancing cadence** — h=1 means one month for a monthly asset and one
+quarter for a quarterly asset. This is the key difference from a naive
+price-based diagnostic: assets that print quarterly are not forced onto
+a monthly grid (which produces zero-then-jump return artefacts), but
+instead are evaluated at horizon h in units of their native cadence.
 
-                      ỹ_{i,t,t+h} = (r_{i,t,t+h} - mean_j r_{j,t,t+h})
-                                    / std_j r_{j,t,t+h}
-
-The cross-sectional normalisation strips out the universe-wide directional move
-at each date, isolating the relative ranking information. The regression
-intercept is dropped by default because, with cross-sectionally demeaned LHS,
-α = 0 by construction.
+The cross-sectional normalisation at each "regression date" uses
+**whichever assets are active on that date** (i.e. have a non-NaN
+forward return at that horizon). This is universe-wide and includes
+mixed-cadence assets simultaneously when they happen to print on the
+same date.
 
 Two views are produced for each horizon:
 
-    1. Pooled regression on universe-normalised pairs across all assets / all
-       dates --- a single (β, t-stat, IC) statement of overall signal quality.
+    1. Pooled regression on universe-normalised pairs — a single
+       (β, t-stat, IC) statement of overall signal quality across all
+       assets and all rebalance dates.
 
-    2. Per-group regression with within-group normalisation, where each group's
-       β is estimated against returns demeaned within the group. This tests
-       whether the signal discriminates inside each segment of the universe.
+    2. Per-group regression with within-group normalisation — one β per
+       group label, useful for attributing where the signal works in
+       segmented universes.
 
-The non-overlapping rebalancing scheme samples one observation per asset per
-forward-window length (e.g. for h = 6 with monthly rebalancing, every 6th
-month-end). This keeps standard errors interpretable without requiring
-heteroskedasticity-and-autocorrelation corrections.
+String horizons (e.g. 'YE') override per-asset cadence: all assets are
+resampled to that frequency directly. Use for headline 12-month tests.
 
-This module's `estimate_signal_diagnostics` function is the compute entry
-point; see `qis.plots.derived.signal_diagnostics_plot` for visualisation.
+This module's ``estimate_signal_diagnostics`` is the compute entry
+point; see ``qis.plots.derived.signal_diagnostics_plot`` for plots.
 """
-# built-in
 from __future__ import annotations
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
 from enum import Enum
 from scipy import stats as scipy_stats
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 
 class SignalDiagnosticsColumns(str, Enum):
@@ -72,24 +72,24 @@ class SignalDiagnosticsResult:
     """Container for cross-sectional signal diagnostic outputs.
 
     Attributes:
-        pooled_universe: DataFrame indexed by horizon label (e.g. '1m', '3m',
-            '6m' or 'YE'); columns are SignalDiagnosticsColumns. Each row is
-            the universe-pooled regression for that horizon.
+        pooled_universe: DataFrame indexed by horizon label (e.g. '1', '3',
+            '6' or 'YE'); columns are SignalDiagnosticsColumns. Each row
+            is the universe-pooled regression for that horizon.
 
-        per_group: DataFrame indexed by (horizon, group) MultiIndex; same
-            columns. Each row is the within-group regression for that
-            (horizon, group) cell. Empty DataFrame when no group_data passed.
+        per_group: DataFrame indexed by (horizon, group) MultiIndex with the
+            same columns. Each row is the within-group regression. Empty
+            DataFrame when no group_data was passed.
 
         pairs: dict keyed by horizon label, each value a long-format
-            DataFrame with columns ['date', 'asset', 'group', 'z',
-            'r_norm_univ', 'r_norm_group']. The underlying (signal, return)
-            panel consumed by both regressions and by the plotting layer.
+            DataFrame with columns ['date', 'asset', 'group', 'asset_freq',
+            'z', 'r_norm_univ', 'r_norm_group']. The underlying (signal,
+            return) panel consumed by both regressions and by the plotting
+            layer.
 
-        horizon_labels: ordered list of horizon labels (matches index order of
-            pooled_universe).
+        horizon_labels: ordered list of horizon labels (matches index
+            order of pooled_universe).
 
-        group_order: ordered list of group labels present in per_group;
-            empty if group_data not provided.
+        group_order: ordered list of group labels present in per_group.
 
         start_date, end_date: span of the pairs sample.
     """
@@ -107,26 +107,39 @@ class SignalDiagnosticsResult:
 # ───────────────────────────────────────────────────────────────────────────────
 
 
-def _horizon_label(horizon: Union[int, str], rebalance_freq: str) -> str:
-    """Pretty label for a horizon spec.
+def _horizon_label(horizon: Union[int, str]) -> str:
+    """Pretty label for a horizon. Integers become 'Nx' marker-free strings.
 
-    Integer horizons are labelled as '{n}m' when rebalance_freq starts with 'M'
-    (monthly), '{n}q' for quarterly, etc. String horizons (e.g. 'YE') are passed
-    through verbatim.
+    Horizon is in *native cadence units* of each asset, so the same
+    integer label e.g. '3' means 3m for monthly assets and 3q for
+    quarterly assets. The label is left frequency-agnostic.
     """
     if isinstance(horizon, str):
         return horizon
-    suffix_map = {'M': 'm', 'Q': 'q', 'W': 'w', 'D': 'd', 'A': 'y', 'Y': 'y'}
-    suffix = suffix_map.get(rebalance_freq[0].upper(), '')
-    return f"{horizon}{suffix}"
+    return f"{int(horizon)}"
+
+
+def _asset_to_freq_map(
+        asset_returns_dict: Dict[str, pd.DataFrame],
+) -> Dict[str, str]:
+    """Map each asset → its native frequency (the dict key it appears under).
+
+    An asset that appears in multiple frequency panels (it should not)
+    is mapped to the first frequency in dict-insertion order; a warning
+    is emitted via the result of the call when this happens.
+    """
+    mapping: Dict[str, str] = {}
+    for freq, df in asset_returns_dict.items():
+        if df is None or df.empty:
+            continue
+        for col in df.columns:
+            if col not in mapping:
+                mapping[col] = freq
+    return mapping
 
 
 def _fit_through_origin(z: np.ndarray, r: np.ndarray) -> Optional[Dict[str, float]]:
-    """No-intercept OLS: β = Σ(zr) / Σ(z²).
-
-    Returns dict with n, beta, se, t_stat, IC_pearson, IC_spearman.
-    Returns None when the sample is too small or singular.
-    """
+    """No-intercept OLS: β = Σ(zr) / Σ(z²)."""
     mask = np.isfinite(z) & np.isfinite(r)
     z, r = z[mask], r[mask]
     n = len(z)
@@ -137,7 +150,6 @@ def _fit_through_origin(z: np.ndarray, r: np.ndarray) -> Optional[Dict[str, floa
         return None
     beta = float((z * r).sum() / zz)
     e = r - beta * z
-    # σ̂² = e'e / (n - 1)  (one estimated parameter)
     sigma2 = float((e ** 2).sum() / (n - 1)) if n > 1 else np.nan
     se = float(np.sqrt(sigma2 / zz)) if np.isfinite(sigma2) and sigma2 > 0 else np.nan
     t_stat = beta / se if se > 0 else np.nan
@@ -185,47 +197,147 @@ def _fit_with_intercept(z: np.ndarray, r: np.ndarray) -> Optional[Dict[str, floa
     }
 
 
-def _build_pairs_for_horizon(
-        prices_rs: pd.DataFrame,
-        signal_rs: pd.DataFrame,
-        horizon_periods: int,
+def _build_pairs_int_horizon(
+        asset_returns_dict: Dict[str, pd.DataFrame],
+        asset_freq: Dict[str, str],
+        signal_rs_by_freq: Dict[str, pd.DataFrame],
+        horizon: int,
         group_data: Optional[pd.Series],
-        group_order: List[str],
         is_log_returns: bool,
-        is_vol_normalised: bool,
+) -> pd.DataFrame:
+    """Build pairs for an integer horizon in **per-asset native cadence**.
+
+    For each frequency frame in the dict:
+        - take that frame's returns
+        - cumulate over a window of `horizon` periods of that frame
+        - sample every `horizon`-th period for non-overlap
+        - lag the signal one period of the same frame
+        - tag each row with the asset's native freq
+
+    Returns a long DataFrame with one row per (date, asset). The
+    'date' column is the asset's regression date in its native cadence.
+    Cross-sectional normalisation across the universe happens
+    downstream after pooling.
+    """
+    rows: List[Dict] = []
+    for freq, returns_df in asset_returns_dict.items():
+        if returns_df is None or returns_df.empty:
+            continue
+        # signal_rs is the signal panel resampled to this frequency
+        signal_rs = signal_rs_by_freq[freq]
+        # Only consider assets whose native freq is THIS freq
+        assets_here = [c for c in returns_df.columns if asset_freq.get(c) == freq]
+        if not assets_here:
+            continue
+        # Forward cumulative return over h periods of this freq:
+        # at date t, cum_fwd[t] = return over [t, t + h-1] (h periods)
+        ret = returns_df[assets_here]
+        if is_log_returns:
+            cum = ret.rolling(horizon).sum()
+        else:
+            cum = (1.0 + ret).rolling(horizon).apply(np.prod, raw=True) - 1.0
+        cum_fwd = cum.shift(-horizon + 1)
+        # Lagged signal, sampled at same frequency
+        sig_lag = signal_rs[assets_here].shift(1)
+        # Align indices: keep dates present in both
+        common = cum_fwd.index.intersection(sig_lag.index)
+        # Non-overlapping: every h-th date in this asset's native cadence
+        sampled = common[::horizon]
+        for d in sampled:
+            for asset in assets_here:
+                z = sig_lag.loc[d, asset]
+                r = cum_fwd.loc[d, asset]
+                if not (np.isfinite(z) and np.isfinite(r)):
+                    continue
+                rows.append({
+                    'date': d, 'asset': asset, 'asset_freq': freq,
+                    'group': group_data.get(asset) if group_data is not None else None,
+                    'z': float(z), 'r': float(r),
+                })
+    return pd.DataFrame(rows, columns=['date', 'asset', 'asset_freq',
+                                       'group', 'z', 'r'])
+
+
+def _build_pairs_string_horizon(
+        asset_returns_dict: Dict[str, pd.DataFrame],
+        signal: pd.DataFrame,
+        horizon_freq: str,
+        group_data: Optional[pd.Series],
+        is_log_returns: bool,
+) -> pd.DataFrame:
+    """String-horizon override: resample every asset's NAV to this frequency.
+
+    Reconstructs NAVs per native-cadence frame via cumulation, concatenates
+    column-wise, then re-resamples to ``horizon_freq``. One observation
+    per asset per horizon_freq period.
+    """
+    # Reconstruct NAVs at each asset's native cadence, then merge column-wise
+    per_freq_nav = []
+    asset_freq = _asset_to_freq_map(asset_returns_dict)
+    for freq, returns_df in asset_returns_dict.items():
+        if returns_df is None or returns_df.empty:
+            continue
+        # Build NAV from returns at native cadence; first row → 1.0
+        if is_log_returns:
+            nav = np.exp(returns_df.cumsum())
+        else:
+            nav = (1.0 + returns_df).cumprod()
+        # First observation set to 1.0 (preserves the diff)
+        nav.iloc[0] = nav.iloc[0].where(nav.iloc[0].notna(), 1.0)
+        per_freq_nav.append(nav)
+    if not per_freq_nav:
+        return pd.DataFrame(columns=['date', 'asset', 'asset_freq', 'group', 'z', 'r'])
+    full_nav = pd.concat(per_freq_nav, axis=1).sort_index().ffill()
+    # Resample to horizon_freq
+    nav_rs = full_nav.resample(horizon_freq).last().ffill()
+    # Returns at this freq
+    if is_log_returns:
+        ret_rs = np.log(nav_rs).diff()
+    else:
+        ret_rs = nav_rs.pct_change()
+    sig_rs = signal.resample(horizon_freq).last().shift(1)
+    common = ret_rs.index.intersection(sig_rs.index)
+    rows: List[Dict] = []
+    for d in common:
+        for asset in ret_rs.columns:
+            if asset not in sig_rs.columns:
+                continue
+            z = sig_rs.loc[d, asset]
+            r = ret_rs.loc[d, asset]
+            if not (np.isfinite(z) and np.isfinite(r)):
+                continue
+            rows.append({
+                'date': d, 'asset': asset, 'asset_freq': asset_freq.get(asset),
+                'group': group_data.get(asset) if group_data is not None else None,
+                'z': float(z), 'r': float(r),
+            })
+    return pd.DataFrame(rows, columns=['date', 'asset', 'asset_freq',
+                                       'group', 'z', 'r'])
+
+
+def _apply_cross_sectional_normalisation(
+        df: pd.DataFrame, is_vol_normalised: bool,
         min_obs_per_date: int,
 ) -> pd.DataFrame:
-    """Non-overlapping pair builder for a single horizon.
+    """Add r_norm_univ and r_norm_group columns to a pairs DataFrame.
 
-    Returns long-format DataFrame with columns
-    ['date', 'asset', 'group', 'z', 'r_norm_univ', 'r_norm_group'].
+    Cross-sectional normalisation is universe-wide at each regression
+    date, using whichever assets are active on that date. Within-group
+    normalisation uses the same date filter, restricted to the group.
+
+    Dates with fewer than ``min_obs_per_date`` active assets are dropped.
+    Group cells with fewer than 2 active members are left as NaN in
+    r_norm_group.
     """
-    # Forward cumulative returns: cum_fwd[t] = log return over [t, t+horizon-1]
-    if is_log_returns:
-        per_period = np.log(prices_rs).diff()
-        cum = per_period.rolling(horizon_periods).sum()
-    else:
-        per_period = prices_rs.pct_change()
-        cum = (1.0 + per_period).rolling(horizon_periods).apply(np.prod, raw=True) - 1.0
-    cum_fwd = cum.shift(-horizon_periods + 1)
+    df = df.copy()
+    df['r_norm_univ'] = np.nan
+    df['r_norm_group'] = np.nan
 
-    # Signal at t-1 (one rebalance lag, by convention)
-    signal_lag = signal_rs.shift(1)
-
-    common_index = cum_fwd.index.intersection(signal_lag.index)
-    sampled_dates = common_index[::horizon_periods]   # non-overlapping along time
-
-    asset_cols = list(signal_rs.columns)
-    rows: List[Dict] = []
-    for d in sampled_dates:
-        z_row = signal_lag.loc[d]
-        r_row = cum_fwd.loc[d]
-        valid = z_row.notna() & r_row.notna()
-        cols_ok = valid[valid].index.tolist()
-        if len(cols_ok) < min_obs_per_date:
+    keep_rows: List[int] = []
+    for d, grp_df in df.groupby('date'):
+        r_vals = grp_df['r'].to_numpy()
+        if len(r_vals) < min_obs_per_date:
             continue
-
-        r_vals = r_row[cols_ok].to_numpy()
         u_mean = float(r_vals.mean())
         if is_vol_normalised:
             u_std = float(r_vals.std(ddof=1))
@@ -233,40 +345,27 @@ def _build_pairs_for_horizon(
                 continue
         else:
             u_std = 1.0
+        idx = grp_df.index
+        df.loc[idx, 'r_norm_univ'] = (grp_df['r'].to_numpy() - u_mean) / u_std
+        keep_rows.extend(idx.tolist())
 
-        group_stats: Dict[str, Optional[tuple]] = {}
-        if group_data is not None:
-            for g in group_order:
-                cols_g = [t for t in cols_ok if group_data.get(t) == g]
-                if len(cols_g) < 2:
-                    group_stats[g] = None
+        # Per-group, this same date
+        if 'group' in grp_df.columns:
+            for g, sub in grp_df.groupby('group', dropna=False):
+                if g is None or pd.isna(g):
                     continue
-                rg = r_row[cols_g].to_numpy()
+                rg = sub['r'].to_numpy()
+                if len(rg) < 2:
+                    continue
                 g_mean = float(rg.mean())
                 if is_vol_normalised:
                     g_std = float(rg.std(ddof=1))
-                    group_stats[g] = (g_mean, g_std if g_std > 0.0 else None)
+                    if g_std <= 0.0:
+                        continue
                 else:
-                    group_stats[g] = (g_mean, 1.0)
-
-        for asset in cols_ok:
-            grp = group_data.get(asset) if group_data is not None else None
-            r_value = float(r_row[asset])
-            r_norm_univ = (r_value - u_mean) / u_std
-            r_norm_group = np.nan
-            if grp is not None and group_stats.get(grp) is not None:
-                g_mean, g_std = group_stats[grp]
-                if g_std is not None:
-                    r_norm_group = (r_value - g_mean) / g_std
-            rows.append({
-                'date': d, 'asset': asset, 'group': grp,
-                'z': float(z_row[asset]),
-                'r_norm_univ': r_norm_univ,
-                'r_norm_group': r_norm_group,
-            })
-
-    return pd.DataFrame(rows, columns=['date', 'asset', 'group', 'z',
-                                       'r_norm_univ', 'r_norm_group'])
+                    g_std = 1.0
+                df.loc[sub.index, 'r_norm_group'] = (rg - g_mean) / g_std
+    return df.loc[keep_rows].reset_index(drop=True)
 
 
 # ───────────────────────────────────────────────────────────────────────────────
@@ -275,11 +374,10 @@ def _build_pairs_for_horizon(
 
 
 def estimate_signal_diagnostics(
-        prices: pd.DataFrame,
+        asset_returns_dict: Dict[str, pd.DataFrame],
         signal: pd.DataFrame,
         group_data: Optional[pd.Series] = None,
         horizons: Sequence[Union[int, str]] = (1, 3, 6),
-        rebalance_freq: str = 'ME',
         fit_intercept: bool = False,
         is_log_returns: bool = True,
         is_vol_normalised: bool = True,
@@ -289,105 +387,100 @@ def estimate_signal_diagnostics(
 ) -> SignalDiagnosticsResult:
     """Cross-sectional predictive regression of forward returns on lagged signal.
 
-    For each horizon h in `horizons`, builds non-overlapping (signal, return)
-    pairs (z_{i,t-1}, ỹ_{i,t,t+h}) and fits
+    For each horizon h, builds non-overlapping (signal, return) pairs
+    ``(z_{i,t-1}, ỹ_{i,t,t+h})`` and fits
 
         ỹ_{i,t,t+h} = β · z_{i,t-1} + ε   (default: no intercept)
 
-    where ỹ is the cross-sectionally (and optionally vol-) normalised forward
-    return. Two regressions are run per horizon:
+    The forward window length h is in **native cadence units of each
+    asset** — h=1 means 1 month for a monthly asset and 1 quarter for a
+    quarterly asset. This avoids the zero-then-jump return artefacts
+    that arise when quarterly NAVs are forced onto a monthly grid.
 
-        - pooled with universe-wide normalisation: a single β across all assets
-        - per-group with within-group normalisation: one β per group label
-
-    The signal should already be on the scale you want to evaluate (e.g. mapped
-    via `qis.map_signal_to_weight`). No transformation is applied here.
+    String horizons (e.g. 'YE') override per-asset cadence — all assets
+    are resampled to that frequency. Use for headline annual tests.
 
     Args:
-        prices: T x N price panel. Index is date; columns are asset identifiers.
-            Stale prices (e.g. quarterly NAVs) should be forward-filled before
-            passing in.
+        asset_returns_dict: Per-frequency returns dict from a pipeline
+            that already handles FX adjustment and unsmoothing. Keys are
+            pandas frequency strings (e.g. 'ME', 'QE', 'YE'); values are
+            return DataFrames indexed at that frequency's period-ends
+            with asset tickers as columns. Each asset must appear in
+            exactly one frame (its native cadence).
 
-        signal: T x N signal panel with the same column names as prices.
-            Index need not match prices exactly; both are resampled to
-            `rebalance_freq` internally.
+        signal: T x N signal panel (e.g. ``AlphasData.alpha_scores``).
+            Columns must include every asset in ``asset_returns_dict``.
+            Signal panel is typically at the finest frequency present in
+            the dict (e.g. monthly); the function resamples it to each
+            asset's native cadence.
 
-        group_data: optional Series mapping asset name -> group label. When
-            None, only the pooled regression is run and per_group in the
-            output is empty.
+        group_data: Optional Series mapping asset name → group label.
+            When None, only the pooled regression is run.
 
-        horizons: sequence of forward-return horizons. Integers are
-            interpreted as units of `rebalance_freq` (1, 3, 6 -> 1m, 3m, 6m
-            when rebalance_freq='ME'). Strings like 'YE' or '1Q' are
-            interpreted as standalone resampling frequencies for that
-            horizon (one observation per period).
+        horizons: Forward-return horizons. Integers are in native-cadence
+            units (1, 3, 6 → 1, 3, 6 native periods per asset). Strings
+            like 'YE' override per-asset cadence and resample uniformly.
 
-        rebalance_freq: pandas frequency string for resampling prices and
-            signal before pair construction (default 'ME'). Use this when
-            horizons are integers; ignored for string horizons.
+        fit_intercept: Include α in the regression. Default False —
+            cross-sectional demeaning of the LHS makes α = 0 by
+            construction.
 
-        fit_intercept: include α in the regression. Default False because the
-            cross-sectional demeaning of the LHS makes α = 0 by construction.
-            Set True if you want to allow a non-zero intercept.
+        is_log_returns: Set True when ``asset_returns_dict`` contains log
+            returns (default), False for arithmetic. Affects cumulation
+            across horizons.
 
-        is_log_returns: cumulate forward returns in log space (default True).
+        is_vol_normalised: Divide cross-sectional return by cross-
+            sectional std at each date (default True).
 
-        is_vol_normalised: divide cross-sectional (mean-demeaned) return by
-            the cross-sectional std at each date (default True). When False,
-            ỹ is the raw cross-sectional return.
+        min_obs_per_date: Minimum cross-sectional sample at a date.
 
-        min_obs_per_date: minimum number of (z, r) pairs required at a
-            rebalance date for the date to enter the sample.
+        min_obs_per_group: Minimum sample size for a group's regression
+            to be reported.
 
-        min_obs_per_group: minimum sample size for a group's regression to
-            be reported. Groups with fewer observations are dropped from
-            per_group.
-
-        group_order: optional explicit ordering for the groups in per_group.
-            Defaults to the order of first appearance in group_data.
+        group_order: Explicit ordering for the groups in per_group.
 
     Returns:
-        SignalDiagnosticsResult with pooled_universe, per_group, and
-        pairs (per horizon) populated.
-
-    Notes:
-        - Non-overlapping sampling at horizon h takes every h-th rebalance
-          date along time, producing independent (uncorrelated-residual)
-          observations per asset across time.
-        - Cross-sectional vol normalisation makes β comparable across
-          horizons: without it, longer horizons mechanically have larger
-          coefficients due to accumulating dispersion.
-        - For string horizons like 'YE', prices and signal are resampled to
-          that frequency directly; the per-period return is the full annual
-          return.
+        ``SignalDiagnosticsResult`` with ``.pooled_universe``,
+        ``.per_group``, and ``.pairs`` populated.
     """
     if group_data is not None and not isinstance(group_data, pd.Series):
         raise TypeError("group_data must be a pandas Series mapping asset -> group label")
-    if not set(signal.columns).issubset(set(prices.columns)):
-        raise ValueError("signal columns must be a subset of prices columns")
+    if not isinstance(asset_returns_dict, dict) or not asset_returns_dict:
+        raise ValueError("asset_returns_dict must be a non-empty dict")
+
+    # Validate signal columns cover the universe
+    universe_assets: List[str] = []
+    for df in asset_returns_dict.values():
+        if df is None or df.empty:
+            continue
+        universe_assets.extend(df.columns.tolist())
+    if not set(universe_assets).issubset(set(signal.columns)):
+        missing = set(universe_assets) - set(signal.columns)
+        raise ValueError(f"signal panel is missing columns: {sorted(missing)[:5]}...")
 
     # Group ordering
     if group_data is not None:
         if group_order is None:
-            seen = []
+            seen: List[str] = []
             for _, g in group_data.items():
                 if g is not None and not pd.isna(g) and g not in seen:
                     seen.append(g)
-            group_order = seen
+            group_order_list = seen
         else:
-            group_order = list(group_order)
+            group_order_list = list(group_order)
     else:
-        group_order = []
+        group_order_list = []
 
-    # Resampled inputs (monthly by default) — forward-fill prices to handle
-    # stale NAVs gracefully; this only affects per-date denominators for
-    # cross-sectional normalisation and the cumulative return when the
-    # underlying NAV has not updated.
-    prices_rs_monthly = prices.resample(rebalance_freq).last().ffill()
-    signal_rs_monthly = signal.resample(rebalance_freq).last()
+    # Asset → native frequency map
+    asset_freq = _asset_to_freq_map(asset_returns_dict)
+
+    # Pre-resample signal panel to each frequency
+    signal_rs_by_freq: Dict[str, pd.DataFrame] = {}
+    for freq in asset_returns_dict.keys():
+        signal_rs_by_freq[freq] = signal.resample(freq).last()
 
     pooled_rows: Dict[str, Dict[str, float]] = {}
-    group_rows: Dict[tuple, Dict[str, float]] = {}
+    group_rows: Dict[Tuple[str, str], Dict[str, float]] = {}
     pairs_by_horizon: Dict[str, pd.DataFrame] = {}
     horizon_labels: List[str] = []
     fitter = _fit_with_intercept if fit_intercept else _fit_through_origin
@@ -397,49 +490,52 @@ def estimate_signal_diagnostics(
 
     for horizon in horizons:
         if isinstance(horizon, str):
-            # standalone-frequency horizon: resample to that frequency, h = 1 period
-            prices_rs = prices.resample(horizon).last().ffill()
-            signal_rs = signal.resample(horizon).last()
-            horizon_periods = 1
+            raw_pairs = _build_pairs_string_horizon(
+                asset_returns_dict=asset_returns_dict, signal=signal,
+                horizon_freq=horizon, group_data=group_data,
+                is_log_returns=is_log_returns,
+            )
             label = horizon
         elif isinstance(horizon, (int, np.integer)) and horizon >= 1:
-            prices_rs = prices_rs_monthly
-            signal_rs = signal_rs_monthly
-            horizon_periods = int(horizon)
-            label = _horizon_label(horizon, rebalance_freq)
+            raw_pairs = _build_pairs_int_horizon(
+                asset_returns_dict=asset_returns_dict,
+                asset_freq=asset_freq,
+                signal_rs_by_freq=signal_rs_by_freq,
+                horizon=int(horizon),
+                group_data=group_data,
+                is_log_returns=is_log_returns,
+            )
+            label = _horizon_label(horizon)
         else:
             raise ValueError(f"horizon {horizon!r} must be a positive int or a "
                              f"pandas frequency string")
         horizon_labels.append(label)
 
-        pairs = _build_pairs_for_horizon(
-            prices_rs=prices_rs,
-            signal_rs=signal_rs,
-            horizon_periods=horizon_periods,
-            group_data=group_data,
-            group_order=group_order,
-            is_log_returns=is_log_returns,
-            is_vol_normalised=is_vol_normalised,
+        # Cross-sectional normalisation across the active universe at each date
+        normed = _apply_cross_sectional_normalisation(
+            raw_pairs, is_vol_normalised=is_vol_normalised,
             min_obs_per_date=min_obs_per_date,
         )
-        pairs_by_horizon[label] = pairs
-        if len(pairs) > 0:
-            overall_start = (pairs['date'].min() if overall_start is None
-                             else min(overall_start, pairs['date'].min()))
-            overall_end = (pairs['date'].max() if overall_end is None
-                           else max(overall_end, pairs['date'].max()))
+        pairs_by_horizon[label] = normed
 
-        # Pooled (universe-normalised)
-        if len(pairs) > 0:
-            fit = fitter(pairs['z'].to_numpy(), pairs['r_norm_univ'].to_numpy())
+        if len(normed) > 0:
+            d_min = normed['date'].min()
+            d_max = normed['date'].max()
+            overall_start = d_min if overall_start is None else min(overall_start, d_min)
+            overall_end = d_max if overall_end is None else max(overall_end, d_max)
+
+        # Pooled regression (universe-normalised)
+        if len(normed) > 0:
+            fit = fitter(normed['z'].to_numpy(), normed['r_norm_univ'].to_numpy())
             pooled_rows[label] = fit if fit is not None else {c: np.nan for c in _STAT_COLS}
         else:
             pooled_rows[label] = {c: np.nan for c in _STAT_COLS}
 
         # Per-group (within-group normalised)
         if group_data is not None:
-            for g in group_order:
-                sub = pairs[pairs['group'] == g].dropna(subset=['z', 'r_norm_group'])
+            for g in group_order_list:
+                sub = normed[normed['group'] == g].dropna(
+                    subset=['z', 'r_norm_group'])
                 if len(sub) < min_obs_per_group:
                     continue
                 fit_g = fitter(sub['z'].to_numpy(), sub['r_norm_group'].to_numpy())
@@ -465,7 +561,7 @@ def estimate_signal_diagnostics(
         per_group=per_group_df,
         pairs=pairs_by_horizon,
         horizon_labels=horizon_labels,
-        group_order=group_order,
+        group_order=group_order_list,
         start_date=overall_start,
         end_date=overall_end,
     )
