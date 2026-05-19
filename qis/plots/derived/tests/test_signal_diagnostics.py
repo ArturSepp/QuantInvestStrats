@@ -232,12 +232,32 @@ class TestEdgeCases:
                                              horizons=[1, 3, 'YE'])
         assert list(result.pooled_universe.index) == ['1', '3', 'YE']
 
-    def test_rejects_signal_missing_columns(self):
+    def test_drops_assets_not_covered_by_signal(self):
+        """Partial signal coverage projects the returns dict to the
+        intersection — no error, smaller pooled sample."""
         ard, sig, _ = _make_synthetic_returns_dict()
-        bad_sig = sig.drop(columns=[sig.columns[0]])
-        with pytest.raises(ValueError, match='missing columns'):
+        dropped_col = sig.columns[0]
+        partial_sig = sig.drop(columns=[dropped_col])
+        result = estimate_signal_diagnostics(asset_returns_dict=ard,
+                                             signal=partial_sig, horizons=[1])
+        # The dropped asset should not appear in any pair frame
+        pairs = result.pairs['1']
+        assert dropped_col not in set(pairs['asset'].unique())
+        # Other assets should still be present
+        assert len(pairs) > 0
+
+    def test_rejects_signal_with_no_overlap(self):
+        """Signal panel with zero overlap raises."""
+        ard, _sig, _ = _make_synthetic_returns_dict()
+        # Build a signal panel on a totally different asset universe
+        first_returns = next(iter(ard.values()))
+        alien_sig = pd.DataFrame(
+            0.0, index=first_returns.index,
+            columns=['UNKNOWN_A', 'UNKNOWN_B'],
+        )
+        with pytest.raises(ValueError, match='No overlap'):
             estimate_signal_diagnostics(asset_returns_dict=ard,
-                                        signal=bad_sig, horizons=[1])
+                                        signal=alien_sig, horizons=[1])
 
     def test_rejects_empty_returns_dict(self):
         _, sig, _ = _make_synthetic_returns_dict()

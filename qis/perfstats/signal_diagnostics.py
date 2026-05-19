@@ -448,15 +448,30 @@ def estimate_signal_diagnostics(
     if not isinstance(asset_returns_dict, dict) or not asset_returns_dict:
         raise ValueError("asset_returns_dict must be a non-empty dict")
 
-    # Validate signal columns cover the universe
-    universe_assets: List[str] = []
-    for df in asset_returns_dict.values():
+    # Restrict each frequency frame to assets the signal panel actually
+    # covers. Per-component diagnostics (e.g. running against
+    # momentum_score on a universe that includes PE/HF funds) naturally
+    # produce a signal panel narrower than the full universe — the
+    # MANAGERS_ALPHA signal covers PE/HF, but MOMENTUM does not, so the
+    # MOMENTUM score panel has fewer columns. Project the returns dict
+    # accordingly rather than raising, but warn if every column drops.
+    signal_cols = set(signal.columns)
+    projected_returns: Dict[str, pd.DataFrame] = {}
+    dropped_assets: List[str] = []
+    for freq, df in asset_returns_dict.items():
         if df is None or df.empty:
             continue
-        universe_assets.extend(df.columns.tolist())
-    if not set(universe_assets).issubset(set(signal.columns)):
-        missing = set(universe_assets) - set(signal.columns)
-        raise ValueError(f"signal panel is missing columns: {sorted(missing)[:5]}...")
+        keep_cols = [c for c in df.columns if c in signal_cols]
+        if keep_cols:
+            projected_returns[freq] = df[keep_cols]
+        dropped_assets.extend([c for c in df.columns if c not in signal_cols])
+    if not projected_returns:
+        raise ValueError(
+            "No overlap between asset_returns_dict columns and signal "
+            "panel columns — signal does not cover any asset in the "
+            f"returns dict (first 5 dropped: {sorted(set(dropped_assets))[:5]})."
+        )
+    asset_returns_dict = projected_returns
 
     # Group ordering
     if group_data is not None:

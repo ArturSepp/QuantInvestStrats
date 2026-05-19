@@ -86,6 +86,26 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     if include_end_date and freq_index[-1] != df.index[-1]:
         freq_index = freq_index.insert(len(freq_index), df.index[-1])
 
+    # Pre-fill NaN values in df BEFORE the reindex.
+    #
+    # Rationale: pd.DataFrame.reindex(index=freq_index, method='ffill')
+    # looks back through the INPUT INDEX LABELS — not the values — and
+    # copies whatever value sits at the nearest preceding label. So when a
+    # target date (e.g. a holiday Friday at 'W-FRI' resample) is itself
+    # present in df.index with an explicit NaN value (as in yfinance data
+    # that returns NaN on US holidays), reindex returns NaN — it does not
+    # "skip past the NaN" to find the previous valid observation.
+    #
+    # Applying _apply_fill on df first carries the last known value
+    # forward through the explicit-NaN rows, so the reindex picks up the
+    # correct close-to-close anchor at each target date. This matches the
+    # convention of `df.resample(freq).last()` on a ffilled series.
+    #
+    # The post-reindex _apply_fill below stays in place: it handles
+    # leading/trailing NaNs introduced by reindex when target dates fall
+    # outside the observed range.
+    df = _apply_fill(df, fill_na_method)
+
     freq_data = df.reindex(index=freq_index, method=method)
     freq_data = _apply_fill(freq_data, fill_na_method)
     return freq_data

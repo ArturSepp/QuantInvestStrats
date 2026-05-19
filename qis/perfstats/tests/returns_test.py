@@ -6,6 +6,7 @@ from enum import Enum
 from qis.perfstats.returns import (to_zero_first_nonnan_returns, returns_to_nav, compute_sampled_vols,
                                    adjust_navs_to_portfolio_pa, compute_net_navs_ex_perf_man_fees,
                                    compute_asset_returns_dict,
+                                   to_returns,
                                    to_quarterly_returns)
 
 
@@ -17,6 +18,8 @@ class LocalTests(Enum):
     ROLLING_RETURNS = 5
     ASSET_RETURNS_DICT = 6
     QUARTERLY_RETURNS = 7
+    TO_RETURNS_HOLIDAY_NAN = 8
+    TO_RETURNS_MIXED_FREQUENCIES = 9
 
 
 def run_local_test(local_test: LocalTests):
@@ -152,9 +155,103 @@ def run_local_test(local_test: LocalTests):
         assert out2.notna().sum() >= 25, \
             f"expected ~30 valid quarters from W-FRI, got {out2.notna().sum()}"
 
+    elif local_test == LocalTests.TO_RETURNS_HOLIDAY_NAN:
+        # Regression test for to_returns when daily input contains an
+        # explicit NaN on a date that coincides with a resample target
+        # (the W-FRI bucket end). Root cause was in df_asfreq, not in
+        # to_returns itself, but the user-facing symptom surfaces here:
+        # before the fix, the weekly return for the holiday week was NaN.
+        # After the fix it matches df.resample('W-FRI').last().pct_change(),
+        # which is the canonical bucket-method ground truth.
+        #
+        # Reported by Ben Richards: SPY had a valid close on Thu 2025-07-03
+        # but an explicit NaN on Fri 2025-07-04 (US Independence Day).
+        bday_index = pd.bdate_range('2025-06-30', '2025-07-18', freq='B')
+        prices = pd.Series(
+            [100, 101, 102, 103, np.nan, 104, 105, 106, 107, 108,
+             109, 110, 111, 112, 113][:len(bday_index)],
+            index=bday_index,
+            name='SPY',
+        )
+        print("daily prices with NaN on Fri 2025-07-04 (US holiday):")
+        print(prices)
+
+        # Ground truth — resample bucket convention.
+        bucket = (prices.resample('W-FRI').last()
+                  .pct_change(fill_method=None).iloc[1:])
+        # qis convention via to_returns(freq='W-FRI').
+        qis_ret = to_returns(prices, freq='W-FRI', drop_first=True)
+        print(f"\nbucket method  2025-07-11: {bucket.loc['2025-07-11']:+.6f}")
+        print(f"qis.to_returns 2025-07-11: {qis_ret.loc['2025-07-11']:+.6f}")
+        print(f"bucket method  2025-07-18: {bucket.loc['2025-07-18']:+.6f}")
+        print(f"qis.to_returns 2025-07-18: {qis_ret.loc['2025-07-18']:+.6f}")
+
+        assert np.isclose(qis_ret.loc['2025-07-11'],
+                          bucket.loc['2025-07-11'], equal_nan=False), \
+            (f"holiday-week return mismatch: "
+             f"qis={qis_ret.loc['2025-07-11']}, "
+             f"bucket={bucket.loc['2025-07-11']}")
+        print("\n✓ qis.to_returns matches bucket method for holiday week")
+
+        # Also confirm the dense-input case is unchanged (no NaN, full
+        # business-day series) so we know the fix is scoped to NaN handling.
+        clean = pd.Series(np.linspace(100, 113, len(bday_index)),
+                          index=bday_index, name='clean')
+        clean_bucket = (clean.resample('W-FRI').last()
+                        .pct_change(fill_method=None).iloc[1:])
+        clean_qis = to_returns(clean, freq='W-FRI', drop_first=True)
+        assert np.allclose(clean_qis.values, clean_bucket.values), \
+            "dense input behaviour changed — fix should be NaN-scoped"
+        print("✓ dense-input behaviour unchanged (fix is NaN-scoped)")
+
+    elif local_test == LocalTests.TO_RETURNS_MIXED_FREQUENCIES:
+        # Cross-frequency regression test. The df_asfreq fix applies a
+        # pre-reindex ffill to the input before the resample picks bucket
+        # anchors. This branch exercises:
+        #   - daily → weekly (W-FRI) with NaN at the Friday bucket
+        #   - daily → monthly (ME) with NaN at month-end
+        #   - daily → quarterly (QE) with NaN at quarter-end
+        # In each case the qis output must equal the bucket method.
+        bday_index = pd.bdate_range('2024-01-02', '2025-12-31', freq='B')
+        np.random.seed(7)
+        np_prices = 100.0 * np.cumprod(1.0 + np.random.normal(0.0005, 0.012,
+                                                              len(bday_index)))
+        prices = pd.Series(np_prices, index=bday_index, name='SPY')
+
+        # Inject explicit NaNs on a set of holiday-like dates that
+        # coincide with common bucket ends.
+        holiday_dates = [
+            pd.Timestamp('2024-03-29'),  # Good Friday — last Fri of Q1
+            pd.Timestamp('2024-05-31'),  # Friday + month-end
+            pd.Timestamp('2024-07-05'),  # Friday after Independence Day
+            pd.Timestamp('2024-12-25'),  # Christmas (Wed) — month-end-ish
+            pd.Timestamp('2025-07-04'),  # Friday Independence Day
+            pd.Timestamp('2025-09-30'),  # Tue + quarter-end
+        ]
+        for d in holiday_dates:
+            if d in prices.index:
+                prices.loc[d] = np.nan
+        injected = [d for d in holiday_dates if d in prices.index]
+        print(f"injected NaN on: {[str(d.date()) for d in injected]}")
+
+        for freq in ['W-FRI', 'ME', 'QE']:
+            bucket = (prices.resample(freq).last()
+                      .pct_change(fill_method=None).iloc[1:])
+            qis_ret = to_returns(prices, freq=freq, drop_first=True)
+            # Align on the intersection of indices to make comparison robust
+            # to any boundary mismatch in the resampled outputs.
+            common = bucket.index.intersection(qis_ret.index)
+            assert len(common) > 0, f"empty intersection at freq={freq}"
+            diff = (qis_ret.loc[common] - bucket.loc[common]).abs()
+            max_diff = diff.max()
+            print(f"freq={freq}: {len(common)} buckets, max |qis - bucket| = {max_diff:.2e}")
+            assert max_diff < 1e-9, \
+                f"freq={freq}: qis diverges from bucket method, max diff {max_diff}"
+        print("\n✓ qis.to_returns matches bucket method across W-FRI / ME / QE")
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.QUARTERLY_RETURNS)
+    run_local_test(local_test=LocalTests.TO_RETURNS_MIXED_FREQUENCIES)
