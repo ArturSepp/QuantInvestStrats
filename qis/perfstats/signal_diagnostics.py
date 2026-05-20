@@ -580,3 +580,90 @@ def estimate_signal_diagnostics(
         start_date=overall_start,
         end_date=overall_end,
     )
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Per-asset β extraction (for cross-asset dispersion boxplots)
+# ───────────────────────────────────────────────────────────────────────────────
+
+
+def compute_per_asset_betas(
+        result: SignalDiagnosticsResult,
+        min_obs_per_asset: int = 12,
+        fit_intercept: bool = False,
+) -> pd.DataFrame:
+    """Estimate one β per (asset, horizon) from the diagnostic pairs.
+
+    For each asset and each horizon, runs the same no-intercept (default)
+    regression as the pooled diagnostic but restricted to that asset's
+    time-series of (z, r_norm_univ) pairs:
+
+        ỹ_{i,t,t+h} = β_i · z_{i,t-1} + ε
+
+    The LHS is the universe-normalised forward return (``r_norm_univ``)
+    — same convention as the pooled regression, so per-asset β values
+    are directly comparable to the pooled β.
+
+    Useful for cross-asset dispersion visualisations (e.g. boxplot of β
+    across assets at each horizon) — a complement to the pooled and
+    per-group regressions.
+
+    Args:
+        result: ``SignalDiagnosticsResult`` from
+            ``estimate_signal_diagnostics``.
+        min_obs_per_asset: Minimum (z, r) pair count per asset per
+            horizon required to report a β. Assets with fewer
+            observations are dropped from that horizon's row set.
+        fit_intercept: Match the corresponding flag in the pooled fit.
+            Default ``False`` for symmetry with the pooled regression.
+
+    Returns:
+        Long-format DataFrame with columns
+        ``[horizon, asset, asset_freq, group, beta, t_stat, n]``. One
+        row per (asset, horizon) cell that passed the
+        ``min_obs_per_asset`` filter.
+    """
+    fitter = _fit_with_intercept if fit_intercept else _fit_through_origin
+
+    rows: List[Dict] = []
+    for horizon_label in result.horizon_labels:
+        pairs = result.pairs.get(horizon_label)
+        if pairs is None or pairs.empty:
+            continue
+        for asset, sub in pairs.groupby('asset'):
+            if len(sub) < min_obs_per_asset:
+                continue
+            fit = fitter(sub['z'].to_numpy(),
+                         sub['r_norm_univ'].to_numpy())
+            if fit is None:
+                continue
+            # Use the asset's freq and group from the first row of this
+            # asset's pair frame — they're constant per asset.
+            asset_freq = sub['asset_freq'].iloc[0]
+            group = sub['group'].iloc[0]
+            rows.append({
+                'horizon': horizon_label,
+                'asset': asset,
+                'asset_freq': asset_freq,
+                'group': group,
+                SignalDiagnosticsColumns.BETA.value:
+                    fit[SignalDiagnosticsColumns.BETA.value],
+                SignalDiagnosticsColumns.T_STAT.value:
+                    fit[SignalDiagnosticsColumns.T_STAT.value],
+                SignalDiagnosticsColumns.N.value:
+                    fit[SignalDiagnosticsColumns.N.value],
+            })
+
+    if not rows:
+        return pd.DataFrame(columns=['horizon', 'asset', 'asset_freq',
+                                     'group',
+                                     SignalDiagnosticsColumns.BETA.value,
+                                     SignalDiagnosticsColumns.T_STAT.value,
+                                     SignalDiagnosticsColumns.N.value])
+    out = pd.DataFrame(rows)
+    # Preserve horizon ordering as in result.horizon_labels.
+    out['horizon'] = pd.Categorical(out['horizon'],
+                                    categories=result.horizon_labels,
+                                    ordered=True)
+    out = out.sort_values(['horizon', 'asset']).reset_index(drop=True)
+    return out

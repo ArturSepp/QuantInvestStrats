@@ -85,4 +85,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.DF_DICT)
+    run_local_test(local_test=LocalTests.RETURNS_BOXPLOT)

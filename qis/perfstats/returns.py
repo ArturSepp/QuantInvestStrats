@@ -198,7 +198,15 @@ def compute_total_return(prices: Union[pd.DataFrame, pd.Series]) -> Union[np.nda
             price_0 = dfo.get_first_nonnan_values(df=prices)
             warnings.warn(f"detected nan price for prices = {prices.iloc[0, np.isnan(price_0)]},"
                           f" using first non nan price = {price_0} for {prices.columns}")
+        # Symmetric: handle NaN at the END too. Common case: a fund that
+        # terminated mid-dataset, or an ETF that delisted, leaving trailing
+        # NaN. Without this fix, total return is NaN even though the data
+        # to compute it is right there in the series.
         price_end = prices.iloc[-1, :].to_numpy()
+        if np.any(np.isnan(price_end)):
+            price_end = dfo.get_last_nonnan_values(df=prices)
+            warnings.warn(f"detected nan price for prices = {prices.iloc[-1, np.isnan(price_end)]},"
+                          f" using last non nan price = {price_end} for {prices.columns}")
 
     elif isinstance(prices, pd.Series):
         price_0 = prices.iloc[0]
@@ -206,7 +214,12 @@ def compute_total_return(prices: Union[pd.DataFrame, pd.Series]) -> Union[np.nda
             price_0 = dfo.get_first_nonnan_values(df=prices)
             warnings.warn(f"detected nan price for prices at date = {prices.index[0]},"
                           f" using first non nan price = {price_0} for {prices.name}")
+        # Same symmetric fix for the Series branch.
         price_end = prices.iloc[-1]
+        if np.isnan(price_end):
+            price_end = dfo.get_last_nonnan_values(df=prices)
+            warnings.warn(f"detected nan price for prices at date = {prices.index[-1]},"
+                          f" using last non nan price = {price_end} for {prices.name}")
     else:
         raise TypeError(f"unsuported type={type(prices)}")
 
@@ -255,7 +268,10 @@ def compute_pa_return(prices: Union[pd.DataFrame, pd.Series],
                 compounded_return_pa = ratio - 1.0
     else:
         n = len(prices.columns) if isinstance(prices, pd.DataFrame) else 1
-        compounded_return_pa = np.zeros_like(n)
+        # Note: np.zeros_like(n) where n is an int returns a 0-d scalar 0,
+        # not a vector of zeros — that was the previous bug. Use np.zeros(n)
+        # so DataFrame callers get a column-aligned vector back.
+        compounded_return_pa = np.zeros(n)
 
     return compounded_return_pa
 
@@ -389,8 +405,13 @@ def compute_excess_returns(returns: Union[pd.Series, pd.DataFrame],
     Returns:
         Excess return time series (returns minus risk-free rate)
     """
-    # Convert annualized rates to period returns
-    rates_dt = dfo.multiply_df_by_dt(df=rates_data, dates=returns.index, lag=None)
+    # Use lag=1 on the rate series: funding cost at time t reflects the
+    # rate that was set at t-1 (the rate the manager could observe and
+    # plan around). Previously this used lag=None (contemporaneous rate),
+    # which introduces a small look-ahead bias relative to
+    # get_excess_returns_nav() that uses lag=1. The two functions now
+    # agree on convention.
+    rates_dt = dfo.multiply_df_by_dt(df=rates_data, dates=returns.index, lag=1)
     returns0 = returns.copy()
     if isinstance(returns, pd.Series):
         returns0 = returns0.to_frame(name=returns.name)
@@ -507,40 +528,63 @@ def portfolio_navs_to_additive(grouped_nav: pd.DataFrame,
         DataFrame with adjusted asset NAVs
     """
     portfolio_nav = grouped_nav[portfolio_name]
-    ac_nav_adj = adjust_navs_to_portfolio_pa(portfolio_nav=portfolio_nav,
-                                             asset_prices=grouped_nav.drop(columns=[portfolio_name]))
+    ac_nav_adj = adjust_component_navs_to_portfolio(portfolio_nav=portfolio_nav,
+                                                    component_navs=grouped_nav.drop(columns=[portfolio_name]))
     grouped_nav = pd.concat([portfolio_nav, ac_nav_adj], axis=1)
     return grouped_nav
 
 
-def adjust_navs_to_portfolio_pa(portfolio_nav: pd.Series,
-                                asset_prices: pd.DataFrame
-                                ) -> pd.DataFrame:
-    """Adjust asset NAVs so PA returns are additive to portfolio.
+def adjust_component_navs_to_portfolio(portfolio_nav: pd.Series,
+                                       component_navs: pd.DataFrame
+                                       ) -> pd.DataFrame:
+    """Rescale component NAVs so their PA returns sum to the portfolio PA return.
 
-    Uses time-weighted adjustment to match terminal value while
-    maintaining relative performance characteristics.
+    Used for portfolio NAV decomposition: when a portfolio's total return is
+    expressed as a sum of additive components (carry types, fundamental return
+    sources, gross vs net vs costs, etc.), the corresponding component NAVs
+    don't *automatically* sum back to the portfolio NAV — geometric compounding
+    introduces a small residual gap from the linear additivity of period
+    returns. This function rescales each component NAV by a common
+    time-weighted factor that closes the gap, so the visualised stacked NAVs
+    add up to the portfolio total.
+
+    Formula::
+
+        c_m(t) = ((portfolio_pa / n + 1) / (mean(component_pa) + 1)) ** t
+
+    where ``n`` is the number of components and ``t`` is years-from-start.
+    For truly additive components, ``mean(component_pa) ≈ portfolio_pa / n``
+    and ``c_m`` is close to 1 — only a small adjustment is applied.
+
+    Each component is rescaled by the same ``c_m(t)``, preserving the
+    *relative* contributions of components to the portfolio while making
+    them sum to the portfolio NAV exactly at the terminal point. Intended
+    use is display / stacked-area charting, not formal attribution.
 
     Args:
-        portfolio_nav: Portfolio NAV time series
-        asset_prices: Asset NAV DataFrame
+        portfolio_nav: Portfolio NAV time series.
+        component_navs: DataFrame of component NAVs (one column per
+            additive return component — e.g. total return, dividend
+            yield, funding cost).
 
     Returns:
-        Adjusted asset NAV DataFrame
+        DataFrame of rescaled component NAVs, same columns as input.
     """
     portfolio_pa = compute_pa_return(prices=portfolio_nav)
-    assets_pa = compute_pa_return(prices=asset_prices)
-    n = len(asset_prices.columns)
-    asset_prices_adj = asset_prices.copy()
+    components_pa = compute_pa_return(prices=component_navs)
+    n = len(component_navs.columns)
+    component_navs_adj = component_navs.copy()
 
-    # Compute time-weighted adjustment factor
+    # Time-weighted adjustment factor. For truly additive components,
+    # mean(component_pa) ≈ portfolio_pa / n, so c_m ≈ 1 and adjustment
+    # is small. The small deviation closes the compounding gap.
     t = (portfolio_nav.index - portfolio_nav.index[0]).days.to_numpy() / CALENDAR_DAYS_PER_YEAR_SHARPE
-    c_m = ((portfolio_pa / n + 1.0) / (np.nanmean(assets_pa) + 1.0)) ** t
+    c_m = ((portfolio_pa / n + 1.0) / (np.nanmean(components_pa) + 1.0)) ** t
     ratio = npo.np_array_to_df_columns(a=c_m, ncols=n)
 
-    asset_prices_adj = asset_prices_adj.multiply(ratio)
-    asset_prices_adj = asset_prices_adj[asset_prices.columns]
-    return asset_prices_adj
+    component_navs_adj = component_navs_adj.multiply(ratio)
+    component_navs_adj = component_navs_adj[component_navs.columns]
+    return component_navs_adj
 
 
 def compute_net_return_ex_perf_man_fees(gross_return: pd.Series,
@@ -591,7 +635,16 @@ def compute_net_return_ex_perf_man_fees(gross_return: pd.Series,
         nav_data.loc[date, 'NAV'] = nav_data.loc[date, 'GAV']-nav_data.loc[date, 'PF']
         nav_data.loc[date, 'HWM'] = nav_data.loc[last_date, 'HWM']
 
-        # Crystallize performance fee at period end
+        # Crystallize performance fee at period end.
+        # On crystallization day, CPF (crystallized perf fee) is recorded as
+        # the accrued PF, HWM is bumped up to max(NAV, prior HWM), and GAV is
+        # reduced by CPF so that GAV on the next iteration represents the
+        # capital actually carried forward (= NAV before the next period's
+        # gross return is applied). NAV is intentionally NOT recomputed here;
+        # the relevant invariant is `nav_data[last_date, 'GAV'] == NAV after
+        # crystallization` going into the next iteration. The displayed
+        # GAV column therefore has a discontinuity at crystallization dates,
+        # which is the audit-trail intent (fee paid out of GAV).
         if perf_cris_date:
             nav_data.loc[date, 'CPF'] = nav_data.loc[date, 'PF']
             nav_data.loc[date, 'HWM'] = np.maximum(nav_data.loc[date, 'NAV'], nav_data.loc[last_date, 'HWM'])
@@ -754,6 +807,14 @@ def prices_at_freq(prices: Union[pd.Series, pd.DataFrame],
                                include_end_date=include_end_date,
                                fill_na_method=fill_na_method)
     else:
+        # Previously this branch ignored `ffill_nans` entirely and gated
+        # only on `fill_na_method` (which defaults to 'ffill'). Result:
+        # callers passing ffill_nans=False without also overriding
+        # fill_na_method got ffilled prices anyway — opposite of what the
+        # parameter name promises. Mirror the freq-is-not-None branch:
+        # ffill_nans=False disables fill regardless of fill_na_method.
+        if not ffill_nans:
+            fill_na_method = None
         if fill_na_method is not None:
             if fill_na_method == 'ffill':
                 prices = prices.ffill()
@@ -817,8 +878,25 @@ def to_portfolio_returns(weights: pd.DataFrame,
                          ) -> pd.Series:
     """Compute portfolio returns from asset weights and returns.
 
-    Uses lagged weights (rebalanced at prior period close) and handles
-    NaN returns properly by excluding them from aggregation.
+    Uses lagged weights (rebalanced at prior period close).
+
+    NaN handling — IMPORTANT:
+        This function aggregates ``returns * lagged_weights`` via ``nansum``
+        across the asset axis. A NaN return contributes ``0`` to that day's
+        portfolio PnL — equivalent to "asset held its notional but earned 0%".
+        It does NOT renormalize remaining asset weights.
+
+        Example: weights = [0.5, 0.5], returns = [+0.02, NaN]. Output =
+        ``nansum([0.5*0.02, 0.5*NaN]) = 0.01``, not 0.02.
+
+        This is the right convention if NaN means "asset wasn't tradable
+        that day, position held in cash earning 0%". It is wrong if NaN
+        means "data missing, treat the position as fully invested in the
+        remaining assets". For the latter, drop NaN rows or renormalize
+        weights yourself before calling.
+
+        A date where ALL asset returns are NaN produces NaN portfolio
+        return (rather than 0), so fully-NaN periods propagate correctly.
 
     Args:
         weights: Portfolio weight DataFrame (columns = assets)
@@ -845,6 +923,11 @@ def portfolio_returns_to_nav(returns: pd.DataFrame,
                              freq: Optional[str] = None
                              ) -> Union[pd.Series, pd.DataFrame]:
     """Aggregate portfolio returns across assets to single NAV.
+
+    NaN handling: uses ``nansum`` across columns — a NaN contribution
+    on a given date is treated as 0 PnL, equivalent to "this asset held
+    its notional but earned 0% that period". See ``to_portfolio_returns``
+    docstring for the full discussion.
 
     Args:
         returns: Return DataFrame with assets as columns
@@ -902,16 +985,17 @@ def to_zero_first_nonnan_returns(returns: Union[pd.Series, pd.DataFrame],
                         returns.loc[prev_idx, column] = 0.0
 
     elif init_period == 1:
-        # Set first non-NaN value to zero
+        # Set first non-NaN value to zero. Previously there was a guard
+        # `if first_nonnan_index >= first_date` here, but since
+        # `first_date = returns.index[0]`, any non-NaN index is by
+        # definition >= the first index — the check was always True.
+        # Removed.
         first_nonnan_index = dfo.get_nonnan_index(df=returns, position='first')
-        first_date = returns.index[0]
         if isinstance(returns, pd.Series):
-            if first_nonnan_index >= first_date:
-                returns.loc[first_nonnan_index] = 0.0
+            returns.loc[first_nonnan_index] = 0.0
         else:
             for first_nonnan_index_, column in zip(first_nonnan_index, returns.columns):
-                if first_nonnan_index_ >= first_date:
-                    returns.loc[first_nonnan_index_, column] = 0.0
+                returns.loc[first_nonnan_index_, column] = 0.0
     else:
         warnings.warn(f"in to_zero_first_nonnan_returns init_period={init_period} is not supported")
 
@@ -984,8 +1068,17 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
     good_parts = []
     for idx, column in enumerate(prices.columns):
         good_price = prices.loc[first_date[idx]:last_date[idx], column]
-        if method is not None:
-            good_price = good_price.infer_objects(copy=False).ffill()
+        # Honour the `method` parameter — previously this branch
+        # hardcoded .ffill() regardless of method, so callers passing
+        # method='bfill' silently got ffill behaviour. Now method
+        # dispatches correctly. method=None still skips filling and
+        # returns gaps as NaN inside the valid date range.
+        if method == 'ffill':
+            good_price = good_price.infer_objects().ffill()
+        elif method == 'bfill':
+            good_price = good_price.infer_objects().bfill()
+        elif method is not None:
+            raise NotImplementedError(f"method={method} not supported")
         good_parts.append(good_price)
 
     bfilled_data = pd.concat(good_parts, axis=1)
@@ -1164,10 +1257,9 @@ def to_quarterly_returns(returns: Union[pd.Series, pd.DataFrame]) -> Union[pd.Se
 
     The completeness check uses calendar months, not exact QE timestamps, so
     weekly (W-FRI) and business-month-end series compound correctly even
-    though their stamps don't land on calendar quarter-end dates. (A previous
-    implementation used ``returns.reindex(QE).notna()``, which silently
-    masked the entire output for any input whose stamps did not align with
-    calendar QE.)
+    though their stamps don't land on calendar QE. (A previous implementation
+    used ``returns.reindex(QE).notna()``, which silently masked the entire
+    output for any input whose stamps did not align with calendar QE.)
 
     Used uniformly across all funds for schema consistency; for series that
     are already quarterly, this is effectively identity (single-obs quarters
@@ -1176,10 +1268,10 @@ def to_quarterly_returns(returns: Union[pd.Series, pd.DataFrame]) -> Union[pd.Se
     q_returns = to_returns(returns_to_nav(returns), freq='QE')
 
     # Per column, find the last observed month-end. A quarter ending at QE
-    # is complete iff the input has at least one non-NaN observation in that
-    # quarter's last calendar month — equivalently, QE <= (last_dt rounded
-    # forward to month-end).
-    def _last_complete_month_end(s: pd.Series):
+    # is complete iff the input has at least one non-NaN observation in
+    # that quarter's last calendar month — equivalently,
+    # QE <= (last_dt rounded forward to month-end).
+    def _last_complete_month_end(s):
         clean = s.dropna()
         if clean.empty:
             return None
@@ -1190,8 +1282,7 @@ def to_quarterly_returns(returns: Union[pd.Series, pd.DataFrame]) -> Union[pd.Se
         if last_me is None:
             q_returns[:] = float('nan')
         else:
-            q_returns = q_returns.where(q_returns.index <= last_me,
-                                        other=float('nan'))
+            q_returns = q_returns.where(q_returns.index <= last_me, other=float('nan'))
     else:  # DataFrame — compute per column to handle ragged end dates
         for col in returns.columns:
             last_me = _last_complete_month_end(returns[col])

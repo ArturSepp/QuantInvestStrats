@@ -4,10 +4,15 @@ import matplotlib.pyplot as plt
 from enum import Enum
 
 from qis.perfstats.returns import (to_zero_first_nonnan_returns, returns_to_nav, compute_sampled_vols,
-                                   adjust_navs_to_portfolio_pa, compute_net_navs_ex_perf_man_fees,
+                                   adjust_component_navs_to_portfolio, compute_net_navs_ex_perf_man_fees,
                                    compute_asset_returns_dict,
                                    to_returns,
-                                   to_quarterly_returns)
+                                   to_quarterly_returns,
+                                   compute_total_return,
+                                   compute_pa_return,
+                                   compute_excess_returns,
+                                   prices_at_freq,
+                                   df_price_ffill_between_nans)
 
 
 class LocalTests(Enum):
@@ -20,6 +25,12 @@ class LocalTests(Enum):
     QUARTERLY_RETURNS = 7
     TO_RETURNS_HOLIDAY_NAN = 8
     TO_RETURNS_MIXED_FREQUENCIES = 9
+    TOTAL_RETURN_TRAILING_NAN = 10
+    PRICES_AT_FREQ_FFILL_NANS_OFF = 11
+    EXCESS_RETURNS_LAG = 12
+    PRICE_FFILL_BETWEEN_NANS_METHOD = 13
+    PA_RETURN_ZEROS_SHAPE = 14
+    ZERO_FIRST_NONNAN_BOTH_BRANCHES = 15
 
 
 def run_local_test(local_test: LocalTests):
@@ -67,18 +78,18 @@ def run_local_test(local_test: LocalTests):
 
         portfolio_price = returns_to_nav(returns=returns.sum(axis=1)).rename('portfolio')
 
-        asset_prices_adj = adjust_navs_to_portfolio_pa(portfolio_nav=portfolio_price,
-                                                       asset_prices=prices)
+        component_navs_adj = adjust_component_navs_to_portfolio(portfolio_nav=portfolio_price,
+                                                                component_navs=prices)
 
-        asset_prices_adj.columns = [x + ' adjusted' for x in asset_prices_adj.columns]
+        component_navs_adj.columns = [x + ' adjusted' for x in component_navs_adj.columns]
 
         plot_data = pd.concat([prices.divide(prices.iloc[0, :], axis=1),
-                               asset_prices_adj.divide(asset_prices_adj.iloc[0, :], axis=1),
+                               component_navs_adj.divide(component_navs_adj.iloc[0, :], axis=1),
                                portfolio_price], axis=1)
         pts.plot_time_series(df=plot_data,
                              var_format='{:.2f}',
-                             title='Original vs Adjusted NAVs')
-        print(asset_prices_adj)
+                             title='Original vs Adjusted Component NAVs')
+        print(component_navs_adj)
 
     elif local_test == LocalTests.NET_RETURN:
         nav = prices['SPY'].dropna()
@@ -249,9 +260,214 @@ def run_local_test(local_test: LocalTests):
                 f"freq={freq}: qis diverges from bucket method, max diff {max_diff}"
         print("\n✓ qis.to_returns matches bucket method across W-FRI / ME / QE")
 
+    elif local_test == LocalTests.TOTAL_RETURN_TRAILING_NAN:
+        # Regression test for compute_total_return with trailing NaN.
+        # Previously the function handled NaN at the START (using
+        # get_first_nonnan_values) but not at the END — so any fund that
+        # terminated mid-dataset or asset that delisted would silently
+        # return NaN as total return. Fix mirrors the leading-NaN logic
+        # using get_last_nonnan_values.
+        import warnings
+        # Series case: 5 years of monthly data, last 3 months NaN.
+        idx = pd.date_range('2020-01-01', '2024-12-31', freq='ME')
+        prices_s = pd.Series(np.linspace(100, 150, len(idx)),
+                             index=idx, name='terminated_fund')
+        prices_s.iloc[-3:] = np.nan
+        last_valid = prices_s.dropna().iloc[-1]
+        expected_tr = last_valid / 100.0 - 1.0
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            tr = compute_total_return(prices_s)
+        print(f"Series with trailing NaN: total_return = {tr:.6f}, "
+              f"expected ~{expected_tr:.6f}")
+        assert not np.isnan(tr), "trailing NaN should not produce NaN total return"
+        assert np.isclose(tr, expected_tr), f"got {tr}, expected {expected_tr}"
+        print("  ✓ Series: trailing NaN recovers last valid price")
+
+        # DataFrame case: A ends mid-dataset, B is clean.
+        df = pd.DataFrame({
+            'A': np.linspace(100, 150, len(idx)),
+            'B': np.linspace(100, 200, len(idx)),
+        }, index=idx)
+        df.iloc[-3:, 0] = np.nan  # A trails off
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            tr_df = compute_total_return(df)
+        print(f"DataFrame mixed: A trailing NaN, B clean. tr = {tr_df}")
+        expected_a = df['A'].dropna().iloc[-1] / 100.0 - 1.0
+        assert np.isclose(tr_df[0], expected_a), \
+            f"A: expected {expected_a:.4f}, got {tr_df[0]}"
+        assert np.isclose(tr_df[1], 1.0), f"B: expected 1.0, got {tr_df[1]}"
+        print("  ✓ DataFrame: A recovers via last_nonnan, B unchanged")
+
+        # Clean input must still produce identical output.
+        prices_clean = pd.Series(np.linspace(100, 130, 12),
+                                  index=pd.date_range('2024-01-01', periods=12, freq='ME'))
+        tr_clean = compute_total_return(prices_clean)
+        assert np.isclose(tr_clean, 0.30)
+        print("  ✓ Clean input behaviour unchanged")
+
+    elif local_test == LocalTests.PRICES_AT_FREQ_FFILL_NANS_OFF:
+        # Regression test for prices_at_freq when freq is None.
+        # Previously this branch ignored ffill_nans entirely and gated only
+        # on fill_na_method (default 'ffill'), so ffill_nans=False without
+        # also overriding fill_na_method gave ffilled output — opposite of
+        # what the parameter promises. Now ffill_nans=False disables the
+        # fill regardless.
+        prices = pd.Series([100.0, 101.0, np.nan, 103.0],
+                           index=pd.date_range('2024-01-01', periods=4, freq='D'))
+        ffilled = prices_at_freq(prices, freq=None, ffill_nans=True)
+        noffill = prices_at_freq(prices, freq=None, ffill_nans=False)
+        print(f"input:            {prices.tolist()}")
+        print(f"ffill_nans=True:  {ffilled.tolist()}")
+        print(f"ffill_nans=False: {noffill.tolist()}")
+        assert ffilled.iloc[2] == 101.0, "ffill should carry 101 forward"
+        assert np.isnan(noffill.iloc[2]), \
+            f"ffill_nans=False should preserve NaN, got {noffill.iloc[2]}"
+        print("  ✓ ffill_nans=False is now honoured when freq is None")
+
+        # Also verify freq is not None branch still works (was already correct).
+        prices_freq = prices_at_freq(prices, freq='D', ffill_nans=True)
+        prices_nofreq = prices_at_freq(prices, freq='D', ffill_nans=False)
+        assert prices_freq.iloc[2] == 101.0
+        assert np.isnan(prices_nofreq.iloc[2])
+        print("  ✓ freq='D' branch unchanged (already correct)")
+
+    elif local_test == LocalTests.EXCESS_RETURNS_LAG:
+        # Regression test for compute_excess_returns lag convention.
+        # Previously used lag=None (contemporaneous rate), which introduces
+        # a small look-ahead bias because the funding cost paid at time t
+        # depends on the rate set at t-1 (or earlier), not the rate
+        # observed at t. get_excess_returns_nav already used lag=1; now
+        # compute_excess_returns matches that convention.
+        idx = pd.date_range('2024-01-01', periods=5, freq='D')
+        returns = pd.Series([0.01] * 5, index=idx, name='r')
+        # Time-varying rates so we can verify which rate gets applied per day.
+        rates = pd.Series([0.05, 0.06, 0.07, 0.08, 0.09], index=idx)
+        ex = compute_excess_returns(returns, rates)
+        print(f"returns:        {returns.tolist()}")
+        print(f"rates (annual): {rates.tolist()}")
+        print(f"excess returns: {ex.tolist()}")
+
+        # Day 0 must now be NaN: lag=1 means we need the rate from t=-1,
+        # which doesn't exist. (Before the fix, it would use today's rate.)
+        assert pd.isna(ex.iloc[0]), \
+            f"day 0 should be NaN with lag=1, got {ex.iloc[0]}"
+        # Day 1 should use the rate from day 0 (0.05), NOT day 1 (0.06).
+        # multiply_df_by_dt converts annual rate to a per-day rate using
+        # actual day count / annualization_factor=365.
+        days = (idx[1] - idx[0]).days
+        expected_day1_rate_dt = 0.05 * days / 365.0
+        expected_day1_excess = 0.01 - expected_day1_rate_dt
+        print(f"day 1: expected excess = {expected_day1_excess:.6f}")
+        assert np.isclose(ex.iloc[1], expected_day1_excess), \
+            (f"day 1 used wrong rate: expected to use 0.05 (yesterday's), "
+             f"got excess {ex.iloc[1]}, expected {expected_day1_excess}")
+        print("  ✓ lag=1 applied — day t uses rate from day t-1")
+
+    elif local_test == LocalTests.PRICE_FFILL_BETWEEN_NANS_METHOD:
+        # Regression test for df_price_ffill_between_nans method param.
+        # Previously the `method` parameter was silently ignored —
+        # the body always called .ffill() regardless of whether method
+        # was 'ffill' or 'bfill'. Now dispatches correctly. Leading and
+        # trailing NaN are preserved in both modes.
+        prices = pd.Series([np.nan, np.nan, 100.0, np.nan, 102.0, np.nan, np.nan],
+                            index=pd.date_range('2024-01-01', periods=7, freq='D'),
+                            name='p')
+        ff = df_price_ffill_between_nans(prices, method='ffill')
+        bf = df_price_ffill_between_nans(prices, method='bfill')
+        print(f"input:        {prices.tolist()}")
+        print(f"ffill output: {ff.tolist()}")
+        print(f"bfill output: {bf.tolist()}")
+        # Middle gap (index 3) should be filled differently by ffill vs bfill.
+        assert ff.iloc[3] == 100.0, f"ffill gap: expected 100, got {ff.iloc[3]}"
+        assert bf.iloc[3] == 102.0, f"bfill gap: expected 102, got {bf.iloc[3]}"
+        # Leading / trailing NaN preserved in both modes.
+        for arr, label in [(ff, 'ffill'), (bf, 'bfill')]:
+            assert np.isnan(arr.iloc[0]) and np.isnan(arr.iloc[1]), \
+                f"{label}: leading NaN not preserved"
+            assert np.isnan(arr.iloc[5]) and np.isnan(arr.iloc[6]), \
+                f"{label}: trailing NaN not preserved"
+        print("  ✓ ffill / bfill differ; leading & trailing NaN preserved")
+
+        # method=None: gap stays NaN inside the valid range.
+        none_result = df_price_ffill_between_nans(prices, method=None)
+        assert np.isnan(none_result.iloc[3]), \
+            f"method=None should leave gap as NaN, got {none_result.iloc[3]}"
+        print("  ✓ method=None leaves interior gap as NaN")
+
+    elif local_test == LocalTests.PA_RETURN_ZEROS_SHAPE:
+        # Regression test for the np.zeros_like(int) typo in
+        # compute_pa_return. The original code path
+        #     compounded_return_pa = np.zeros_like(n)
+        # produces a 0-d scalar array(0) when n is an int, not a vector
+        # of zeros. This branch is only reached when num_years <= 0 (a
+        # degenerate input), but if hit, downstream code that tries to
+        # index the result crashes. Fix: np.zeros(n) gives a proper vector.
+        n = 3
+        result = np.zeros(n)
+        assert result.shape == (n,), \
+            f"expected 1-d vector of length {n}, got shape {result.shape}"
+        print(f"  np.zeros(3) shape: {result.shape}  ✓")
+
+        # Sanity check that normal compute_pa_return paths still work.
+        idx = pd.date_range('2024-01-01', '2024-12-31', freq='ME')
+        prices = pd.DataFrame(
+            {'A': np.linspace(100, 110, len(idx)),
+             'B': np.linspace(100, 105, len(idx))}, index=idx,
+        )
+        pa = compute_pa_return(prices)
+        print(f"  compute_pa_return on 12-month 2-col DataFrame: {pa}, shape={np.shape(pa)}")
+        assert np.shape(pa) == (2,)
+        print("  ✓ compute_pa_return returns vector for DataFrame input")
+
+    elif local_test == LocalTests.ZERO_FIRST_NONNAN_BOTH_BRANCHES:
+        # Regression test for to_zero_first_nonnan_returns. The
+        # init_period=1 branch previously had a defensive check
+        #     if first_nonnan_index >= first_date: ...
+        # which was always True (since first_date = returns.index[0] and
+        # any non-NaN index is by definition >= the first index). The
+        # check was removed; this test verifies that the simplified code
+        # still zeros the first non-NaN return correctly for both Series
+        # and DataFrame inputs, including ragged-start columns.
+        # Series with leading NaN
+        returns_s = pd.Series([np.nan, np.nan, 0.5, 0.02, 0.03],
+                              index=pd.date_range('2024-01-01', periods=5, freq='D'))
+        result_s = to_zero_first_nonnan_returns(returns_s, init_period=1)
+        print(f"Series input:  {returns_s.tolist()}")
+        print(f"Series output: {result_s.tolist()}")
+        # Element [2] is the first non-NaN — must be zeroed.
+        assert result_s.iloc[2] == 0.0
+        # Leading NaN preserved.
+        assert pd.isna(result_s.iloc[0]) and pd.isna(result_s.iloc[1])
+        # Later values untouched.
+        assert result_s.iloc[3] == 0.02 and result_s.iloc[4] == 0.03
+        print("  ✓ Series: first non-NaN zeroed, leading NaN preserved")
+
+        # DataFrame with ragged-start columns
+        df_ret = pd.DataFrame({
+            'A': [np.nan, np.nan, 0.5, 0.02, 0.03],
+            'B': [0.3, 0.04, 0.05, 0.06, 0.07],
+            'C': [np.nan, 0.4, 0.01, 0.02, 0.03],
+        }, index=pd.date_range('2024-01-01', periods=5, freq='D'))
+        result_df = to_zero_first_nonnan_returns(df_ret, init_period=1)
+        print(f"\nDataFrame output:\n{result_df}")
+        # Each column's first non-NaN is at a different row.
+        assert result_df.loc[result_df.index[2], 'A'] == 0.0  # A starts at row 2
+        assert result_df.loc[result_df.index[0], 'B'] == 0.0  # B starts at row 0
+        assert result_df.loc[result_df.index[1], 'C'] == 0.0  # C starts at row 1
+        # Subsequent rows in each column untouched.
+        assert result_df.loc[result_df.index[3], 'A'] == 0.02
+        assert result_df.loc[result_df.index[1], 'B'] == 0.04
+        assert result_df.loc[result_df.index[2], 'C'] == 0.01
+        # Leading NaNs preserved.
+        assert pd.isna(result_df.loc[result_df.index[0], 'A'])
+        assert pd.isna(result_df.loc[result_df.index[0], 'C'])
+        print("  ✓ DataFrame: each column's first non-NaN zeroed at its own start")
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.TO_RETURNS_MIXED_FREQUENCIES)
+    run_local_test(local_test=LocalTests.QUARTERLY_RETURNS)

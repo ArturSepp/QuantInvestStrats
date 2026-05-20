@@ -59,7 +59,7 @@ from qis.perfstats.regime_classifier import (
 )
 
 from qis.perfstats.returns import (
-    adjust_navs_to_portfolio_pa,
+    adjust_component_navs_to_portfolio,
     compute_excess_returns,
     compute_excess_return_navs,
     compute_net_return_ex_perf_man_fees,
