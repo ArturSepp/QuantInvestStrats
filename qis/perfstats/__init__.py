@@ -107,5 +107,6 @@ from qis.perfstats.fx_ops import (get_aligned_fx_spots,
 from qis.perfstats.signal_diagnostics import (
     SignalDiagnosticsColumns,
     SignalDiagnosticsResult,
+    compute_per_asset_betas,
     estimate_signal_diagnostics,
 )
