@@ -11,12 +11,10 @@ Or with pytest:
 """
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from enum import Enum
 
-from qis.perfstats.unsmoothing import (unsmooth_returns_ar1_ewma,
-                                       unsmooth_returns_glm,
-                                       compute_ar1_unsmoothed_prices)
+from qis.models.unsmoothing import (unsmooth_returns_ar1_ewma,
+                                    unsmooth_returns_glm)
 
 
 class ComparisonTests(Enum):

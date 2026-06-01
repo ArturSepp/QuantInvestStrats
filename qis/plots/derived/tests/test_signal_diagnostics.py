@@ -1,8 +1,21 @@
 """
 Tests for qis.perfstats.signal_diagnostics — returns-dict API with
-per-asset native-cadence handling.
+per-asset native-cadence handling — plus integration tests for the
+two compute+plot convenience wrappers in
+qis.plots.derived.signal_diagnostics_plot:
+
+    plot_signal_diagnostics_for_returns      — composite figure
+    plot_signal_diagnostics_beta_boxplot     — per-asset β boxplot
+
+These two wrappers absorb what was previously in
+``optimalportfolios.alphas.signal_diagnostics``; the qis-side
+integration test makes sure the contract is stable when callers
+plug in raw DataFrame signals.
 """
 # built-in
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend for headless test runs
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -12,6 +25,13 @@ from qis.perfstats.signal_diagnostics import (
     SignalDiagnosticsColumns,
     SignalDiagnosticsResult,
     estimate_signal_diagnostics,
+)
+from qis.plots.derived.signal_diagnostics_plot import (
+    plot_signal_diagnostics,
+    plot_signal_diagnostics_boxplot,
+    plot_signal_diagnostics_group_boxplot,
+    plot_signal_diagnostics_for_returns,
+    plot_signal_diagnostics_beta_boxplot,
 )
 
 
@@ -272,6 +292,128 @@ class TestEdgeCases:
                                         signal=sig,
                                         horizons=[1],
                                         group_data={'M00': 'X'})
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Plot API — the two "compute+plot" convenience wrappers
+# ───────────────────────────────────────────────────────────────────────────────
+
+
+class TestPlotApi:
+    """Integration tests for the qis-side compute+plot wrappers.
+
+    These wrappers replace the previous
+    ``optimalportfolios.alphas.plot_signal_diagnostics`` and
+    ``plot_signal_diagnostics_beta_boxplot`` thin shims; the tests
+    cover the contract callers depend on: pass a returns dict + a
+    DataFrame signal, get a Figure back without side-effects.
+    """
+
+    def teardown_method(self):
+        plt.close('all')
+
+    def test_for_returns_default_args(self):
+        ard, sig, _ = _make_synthetic_returns_dict(n_years=8)
+        fig = plot_signal_diagnostics_for_returns(
+            asset_returns_dict=ard, signal=sig, horizons=[1, 3],
+        )
+        assert isinstance(fig, plt.Figure)
+        # 1 row × 2 horizons = 2 axes when no group data
+        assert len(fig.axes) >= 2
+
+    def test_for_returns_with_group_data(self):
+        ard, sig, gd = _make_synthetic_returns_dict(n_years=8)
+        fig = plot_signal_diagnostics_for_returns(
+            asset_returns_dict=ard, signal=sig,
+            horizons=[1, 3], group_data=gd,
+        )
+        # 2 rows × 2 horizons = 4 axes
+        assert len(fig.axes) == 4
+
+    def test_for_returns_custom_title(self):
+        ard, sig, _ = _make_synthetic_returns_dict(n_years=8)
+        fig = plot_signal_diagnostics_for_returns(
+            asset_returns_dict=ard, signal=sig, horizons=[1],
+            title='Custom title — APAC test',
+        )
+        assert fig._suptitle is not None
+        assert 'APAC test' in fig._suptitle.get_text()
+
+    def test_for_returns_string_horizons(self):
+        ard, sig, _ = _make_synthetic_returns_dict(n_years=15)
+        fig = plot_signal_diagnostics_for_returns(
+            asset_returns_dict=ard, signal=sig, horizons=['YE'],
+        )
+        assert isinstance(fig, plt.Figure)
+
+    def test_beta_boxplot_default_args(self):
+        ard, sig, gd = _make_synthetic_returns_dict(n_years=12)
+        fig = plot_signal_diagnostics_beta_boxplot(
+            asset_returns_dict=ard, signal=sig,
+            horizons=[1, 3, 6], group_data=gd,
+            min_obs_per_asset=10,
+        )
+        assert isinstance(fig, plt.Figure)
+        assert len(fig.axes) >= 1
+
+    def test_beta_boxplot_custom_hue_label(self):
+        """The user-facing hue label appears in the legend title rather
+        than the internal column name."""
+        ard, sig, gd = _make_synthetic_returns_dict(n_years=12)
+        fig = plot_signal_diagnostics_beta_boxplot(
+            asset_returns_dict=ard, signal=sig,
+            horizons=[1, 3], group_data=gd,
+            hue='asset_freq',
+            hue_display_label='Asset returns sampling',
+            min_obs_per_asset=10,
+        )
+        # qis.plot_box renders the legend if hue has >1 unique value.
+        # In _make_synthetic_returns_dict we have both ME and QE so the
+        # legend must be present and its title must use the display
+        # label, not the internal 'asset_freq'.
+        legends = [ax.get_legend() for ax in fig.axes
+                   if ax.get_legend() is not None]
+        assert legends, 'Expected legend on per-asset β boxplot'
+        title_txt = legends[0].get_title().get_text()
+        assert 'Asset returns sampling' in title_txt or \
+               'asset_freq' not in title_txt
+
+    def test_beta_boxplot_no_hue(self):
+        ard, sig, _ = _make_synthetic_returns_dict(n_years=12)
+        fig = plot_signal_diagnostics_beta_boxplot(
+            asset_returns_dict=ard, signal=sig,
+            horizons=[1, 3], hue=None,
+            min_obs_per_asset=10,
+        )
+        assert isinstance(fig, plt.Figure)
+
+    def test_beta_boxplot_handles_high_threshold(self):
+        """When the obs threshold is high enough that no asset
+        qualifies, the function still returns a Figure with a clear
+        message rather than crashing."""
+        ard, sig, _ = _make_synthetic_returns_dict(n_years=2)
+        fig = plot_signal_diagnostics_beta_boxplot(
+            asset_returns_dict=ard, signal=sig,
+            horizons=[1], min_obs_per_asset=10_000,
+        )
+        assert isinstance(fig, plt.Figure)
+
+    def test_boxplot_handles_degenerate_signal(self):
+        """Signals with mass at zero produce duplicate quantile edges;
+        the boxplot adapts the bucket count down (or falls back to a
+        single box) rather than raising ValueError from pd.qcut."""
+        ard, sig, _ = _make_synthetic_returns_dict(n_years=10)
+        # Zero out most of the signal — guarantees mass-at-zero
+        sparse = sig.copy()
+        sparse[:] = 0.0
+        # Sprinkle a few non-zero entries so we have *some* spread
+        sparse.iloc[::40, ::5] = 0.5
+        sparse.iloc[::43, ::7] = -0.5
+        fig = plot_signal_diagnostics_for_returns(
+            asset_returns_dict=ard, signal=sparse,
+            horizons=[1], num_buckets=10,
+        )
+        assert isinstance(fig, plt.Figure)
 
 
 if __name__ == '__main__':

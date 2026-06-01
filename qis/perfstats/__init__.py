@@ -42,11 +42,6 @@ from qis.perfstats.perf_stats import (
     compute_drawdowns_stats_table
 )
 
-from qis.perfstats.unsmoothing import (
-    unsmooth_returns_ar1_ewma,
-    compute_ar1_unsmoothed_prices,
-    unsmooth_returns_glm)
-
 from qis.perfstats.regime_classifier import (
     BenchmarkReturnsQuantilesRegime,
     BenchmarkVolsQuantilesRegime,

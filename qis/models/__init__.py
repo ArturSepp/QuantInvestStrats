@@ -112,3 +112,8 @@ from qis.models.linear.ewm_winsor_outliers import (
 
 from qis.models.stats.rolling_stats import (RollingPerfStat,
                                             compute_rolling_perf_stat)
+
+from qis.models.unsmoothing import (
+    adjust_returns_with_ar,
+    compute_ar_unsmoothed_prices,
+)
