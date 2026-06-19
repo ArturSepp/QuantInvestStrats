@@ -5,13 +5,15 @@ output is one-page figure with key numbers
 see example in qis.examples.multi_asset.py
 """
 # packages
+import math
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Union, List, Optional, Tuple
 import qis as qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData, RollingPerfStat, LegendStats, BenchmarkReturnsQuantilesRegime
-from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
+from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
+                                          validate_reporting_frequency, infer_data_frequency_label)
 
 
 PERF_COLUMNS = (
@@ -357,7 +359,7 @@ class MultiAssetsReport:
                          ax: plt.Subplot = None,
                          **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=benchmark)
-        title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {self.regime_classifier.freq}-freq regimes"
+        title = title or f"Sharpe in {str(benchmark)} Bear/Normal/Bull {self.regime_classifier.freq}-freq regimes"
         qis.plot_regime_data(regime_classifier=self.regime_classifier,
                              prices=prices,
                              benchmark=benchmark,
@@ -426,6 +428,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    factsheet_name: str = None,
                                    performance_bars: Tuple[PerfStat, PerfStat] = (PerfStat.SHARPE_RF0, PerfStat.MAX_DD),
                                    drop_1y_ra_perf_table: bool = True,
+                                   min_trailing_obs: int = 12,
                                    **kwargs
                                    ) -> plt.Figure:
     # use passed benchmark
@@ -443,6 +446,16 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
             benchmark_prices = prices[benchmark]
         else:
             raise ValueError(f"benchmark must be in prices")
+
+    # guard: the requested reporting frequency must not be finer than the data it is computed on -
+    # check the asset universe and the benchmark prices (used for regime / beta / scatter panels)
+    for data_series in (prices, benchmark_prices):
+        if data_series is not None:
+            validate_reporting_frequency(data_series, perf_params.freq)
+
+    # native grid of the price paths: drawdowns / under-water are on this grid (not resampled)
+    nav_freq = infer_data_frequency_label(prices)
+    nav_freq_label = f" ({nav_freq}-freq)" if nav_freq else ""
 
     # report data
     report = MultiAssetsReport(prices=prices,
@@ -464,27 +477,38 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     # 7 figures, *6 palce holders
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
 
+    # trailing comparison window (recent correlation table and, for small universes, the trailing
+    # RA table): widen the lookback so coarse reporting frequencies still yield enough observations -
+    # e.g. 1y of quarterly returns is only ~4 points, which makes the correlation matrix degenerate
+    corr_ppy = qis.get_annualization_factor(perf_params.freq)
+    trailing_n_years = max(1, math.ceil(min_trailing_obs / corr_ppy))
+
     if time_period is not None:
         report_period = time_period.to_str()
-        time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=time_period.locate(prices)))
+        time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=time_period.locate(prices)),
+                                                            n_years=trailing_n_years)
     else:
         report_period = qis.get_time_period(df=prices).to_str()
-        time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices))
+        time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices),
+                                                            n_years=trailing_n_years)
 
     factsheet_name = factsheet_name or f"Multi-asset report: {report_period}"
     qis.set_suptitle(fig=fig, title=factsheet_name, fontsize=8)
 
     report.plot_nav(regime_benchmark=benchmark,
                     add_benchmarks_to_navs=add_benchmarks_to_navs,
-                    title=f"Cumulative performance with background colors using bear/normal/bull regimes of {benchmark} {regime_classifier.freq}-returns",
+                    title=f"Cumulative performance ({perf_params.freq}-freq stats) with "
+                          f"bear/normal/bull regimes of {benchmark} {regime_classifier.freq}-returns",
                     ax=fig.add_subplot(gs[:2, :2]),
                     **kwargs)
 
     report.plot_drawdowns(regime_benchmark=benchmark,
+                          title=f'Running Drawdowns{nav_freq_label}',
                           ax=fig.add_subplot(gs[2:4, :2]),
                           **kwargs)
 
     report.plot_rolling_time_under_water(regime_benchmark=benchmark,
+                                         title=f'Rolling time under water{nav_freq_label}',
                                          ax=fig.add_subplot(gs[4:6, :2]),
                                          **kwargs)
 
@@ -556,11 +580,11 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     report.plot_regime_data(benchmark=benchmark,
                             ax=fig.add_subplot(gs[8:10, 2:]),
                             **kwargs)
-    
+
     report.plot_vol_regimes(benchmark=benchmark,
                             ax=fig.add_subplot(gs[10:12, 2:]),
                             **kwargs)
-    
+
     with sns.axes_style("whitegrid"):
         report.plot_returns_scatter(benchmark=benchmark,
                                     ax=fig.add_subplot(gs[12:14, 2:]),

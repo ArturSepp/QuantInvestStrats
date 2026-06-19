@@ -391,7 +391,7 @@ def load_df_dict_from_excel(file_name: str,
     for key in dataset_keys:
         try:
             df = excel_reader.parse(sheet_name=key, index_col=index_col)
-        except:
+        except Exception:
             raise TypeError(f"sheet_name data {key} nor found")
         if delocalize:
             df = delocalize_df(df)

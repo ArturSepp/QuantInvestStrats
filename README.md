@@ -44,6 +44,8 @@ dependency path increasing sequentially as follows.
 Function ```backtest_model_portfolio()```  in ```qis.portfolio.backtester.py``` takes instrument prices 
 and simulated weights from a generic strategy and compute the total return, performance attribution, and risk analysis
 
+```qis.market_data``` is an auxiliary module of market-data containers and FX analytics. ```FxRatesData``` holds FX spot and domestic short-rate panels and derives cross rates, covered-interest-parity forward premia, carry decomposition, and reference-currency / FX-hedged return translation of multi-asset panels, together with single- and multi-asset FX-hedging reports. ```FactorsData``` is a generic container for tradable-factor prices. Examples build the container from free Yahoo data or from Bloomberg via ```bbg-fetch```; see the module README at ```qis/market_data/README.md``` for the data contract and conventions.
+
 ```qis.examples``` contains runnable scripts showcasing the analytics, organised by sub-package:
 
 * ```qis.examples.perfstats``` — performance metrics on price series: quickstart usage, Sharpe vs Sortino across return frequencies, rolling performance, bond-ETF risk/return frontier, multi-figure performance reports, miss-best-worst-days impact, infrequent-returns interpolation, and an end-to-end de-levering / unsmoothing walkthrough on a bundled BDC vs private-credit dataset.

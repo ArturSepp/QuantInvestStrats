@@ -15,7 +15,8 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import AttributionMetric
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
-from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
+from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
+                                          validate_reporting_frequency, infer_data_frequency_label)
 
 
 def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfolioData,
@@ -64,6 +65,19 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     if time_period is None:
         time_period = qis.get_time_period(multi_portfolio_data.portfolio_datas[0].get_portfolio_nav())
 
+    # guard: the requested reporting frequency must not be finer than the data it is computed on -
+    # check both portfolio NAVs and the benchmark prices (used for regime / beta / scatter panels)
+    strategy_nav = multi_portfolio_data.portfolio_datas[strategy_idx].get_portfolio_nav()
+    for data_series in (strategy_nav,
+                        multi_portfolio_data.portfolio_datas[benchmark_idx].get_portfolio_nav(),
+                        multi_portfolio_data.benchmark_prices):
+        validate_reporting_frequency(data_series, perf_params.freq)
+
+    # native grid of the NAV path: drawdowns / under-water / cumulative are computed on this grid
+    # (not resampled to the reporting frequency), so their titles carry this frequency
+    nav_freq = infer_data_frequency_label(strategy_nav)
+    nav_freq_label = f" ({nav_freq}-freq)" if nav_freq else ""
+
     # set report specific kqargs
     plot_kwargs = dict(fontsize=fontsize,
                        linewidth=0.5,
@@ -90,21 +104,22 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                   regime_benchmark=regime_benchmark,
                                   perf_params=perf_params,
                                   regime_classifier=regime_classifier,
-                                  title=f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
+                                  title=f"Cumulative performance ({perf_params.freq}-freq stats) with "
+                                        f"bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
                                   **kwargs)
 
     multi_portfolio_data.plot_drawdowns(ax=fig.add_subplot(gs[2:4, :2]),
                                         add_benchmarks_to_navs=add_benchmarks_to_navs,
                                         regime_benchmark=regime_benchmark,
                                         regime_classifier=regime_classifier,
-                                        title='Running Drawdowns',
+                                        title=f'Running Drawdowns{nav_freq_label}',
                                         **kwargs)
 
     multi_portfolio_data.plot_rolling_time_under_water(ax=fig.add_subplot(gs[4:6, :2]),
                                                        add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                        regime_benchmark=regime_benchmark,
                                                        regime_classifier=regime_classifier,
-                                                       title='Rolling time under water',
+                                                       title=f'Rolling time under water{nav_freq_label}',
                                                        **kwargs)
 
     multi_portfolio_data.plot_rolling_perf(ax=fig.add_subplot(gs[6:8, :2]),
@@ -166,7 +181,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         benchmark_prices_ = {multi_portfolio_data.benchmark_prices.columns[0]: fig.add_subplot(gs[6:8, 2]),
                              multi_portfolio_data.benchmark_prices.columns[1]: fig.add_subplot(gs[6:8, 3])}
     for benchmark_, ax_ in benchmark_prices_.items():
-        post_title = f"Sharpe ratio in {benchmark_} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
+        post_title = f"Sharpe in {benchmark_} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
         multi_portfolio_data.plot_regime_data(benchmark=benchmark_,
                                               add_benchmarks_to_navs=add_benchmarks_to_navs,
                                               is_grouped=False,

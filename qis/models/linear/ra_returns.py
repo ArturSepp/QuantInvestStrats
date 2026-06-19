@@ -72,6 +72,25 @@ def compute_ewm_long_short_filtered_ra_returns(returns: pd.DataFrame,
                                                weight_lag: Optional[int] = 1,
                                                mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE
                                                ) -> pd.DataFrame:
+    """
+    Vol-normalise ``returns`` (EWM vol over ``vol_span``) then apply the long/short
+    EWM band-pass filter (ewm.compute_ewm_long_short_filter).
+
+    Every span drives an EWM decay ``lambda = 1 - 2/(span + 1)`` and must be ``>= 1``:
+    ``span = 1`` gives ``lambda = 0`` (an unsmoothed pass-through), while ``span < 1``
+    gives ``lambda < 0`` (a sign-alternating recursion, not a smoother) and for the
+    vol leg can yield a negative variance and hence NaN vol. When ``short_span`` is
+    given it must additionally be strictly less than ``long_span`` (equal spans
+    collapse the filter unit-variance normaliser to 0 -> division by zero).
+
+    long_span/short_span are checked with ewm._validate_long_short_spans, the same
+    routine compute_ewm_long_short_filter uses, so the contract is identical.
+    """
+    if vol_span is not None and np.any(np.asarray(vol_span, dtype=float) < 1.0):
+        raise ValueError(f"compute_ewm_long_short_filtered_ra_returns: vol_span must be >= 1 "
+                         f"(lambda = 1 - 2/(span+1) is negative below span 1); got vol_span={vol_span}")
+    ewm._validate_long_short_spans(long_span=long_span, short_span=short_span)
+
     if vol_span is not None:
         ra_returns, _, _ = compute_ra_returns(returns=returns,
                                               span=vol_span,
@@ -98,10 +117,10 @@ def map_signal_to_weight(signals: pd.DataFrame,
                          loc: Union[float, pd.DataFrame] = 0.0,
                          scale: Union[float, np.ndarray] = 1.0,
                          tail_level: Union[float, np.ndarray] = 1.0,
-                         slope_left: Union[float, np.ndarray] = 0.5,
                          slope_right: Union[float, np.ndarray] = 0.5,
-                         tail_decay_left: Optional[Union[float, np.ndarray]] = None,
-                         tail_decay_right: Optional[Union[float, np.ndarray]] = None
+                         slope_left: Union[float, np.ndarray] = 0.5,
+                         tail_decay_right: Optional[Union[float, np.ndarray]] = None,
+                         tail_decay_left: Optional[Union[float, np.ndarray]] = None
                          ) -> pd.DataFrame:
     x = signals.to_numpy()
     if isinstance(loc, pd.DataFrame):
@@ -123,14 +142,13 @@ def map_signal_to_weight(signals: pd.DataFrame,
 
     elif signal_map_type == SignalMapType.ExpCDF:
         if np.any(np.less_equal(tail_level, slope_right)) or np.any(np.less_equal(tail_level, slope_left)):
-            raise ValueError(f"and tail_level={tail_level} > slope_left={slope_left}",
-                             f"must be tail_level={tail_level} > slope_right ={slope_right}")
+            raise ValueError(f"must be tail>slope_positive and tail > slope_negative")
         scale_negative = 1.5625 * scale / np.log(tail_level / (tail_level - slope_left))
         scale_positive = 1.5625 * scale / np.log(tail_level / (tail_level - slope_right))
         s_negative = - tail_level * (1.0 - np.exp(-np.square(x - loc) / scale_negative))
         s_positive = tail_level * (1.0 - np.exp(-np.square(x - loc) / scale_positive))
-        # NumPy 2.x: comparison with `where=` needs `out=` so masked positions (non-finite x)
-        # are deterministic False, causing the outer np.where to select s_positive for them.
+        # NumPy 2.x: comparison with `where=` needs `out=` so masked positions are False,
+        # causing np.where to select s_positive (the safer default for non-finite x).
         finite_mask = np.isfinite(x)
         less_mask = np.less(x, loc, out=np.zeros_like(finite_mask, dtype=bool), where=finite_mask)
         weight = np.where(less_mask, s_negative, s_positive)

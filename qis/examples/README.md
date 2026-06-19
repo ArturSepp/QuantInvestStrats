@@ -18,7 +18,8 @@ examples/
 ├── factsheets/                   qis.generate_*_factsheet — full factsheets
 ├── plots/                        qis.plots — plotting primitives showcase
 ├── utils/                        qis.utils — date schedules
-└── case_studies/                 cross-cutting domain studies (VIX, credit)
+├── case_studies/                 cross-cutting domain studies (VIX, credit)
+└── market_data/                  qis.market_data — FX rates, CIP/carry, FX hedging
 ```
 
 ## perfstats — performance metrics
@@ -77,6 +78,10 @@ examples/
 | `strategy_benchmark.py` | `generate_strategy_benchmark_factsheet_plt` — strategy vs benchmark. |
 | `multi_assets.py` | `generate_multi_asset_factsheet` on an asset-class universe. |
 | `multi_strategy.py` | `generate_multi_portfolio_factsheet` over a span sweep. |
+| `strategy_reporting_frequencies.py` | `generate_strategy_factsheet` reproduced across the DAILY/WEEKLY/MONTHLY/QUARTERLY × {long, short} reporting-frequency grid via `fetch_default_report_kwargs`, on one volparity portfolio. |
+| `strategy_benchmark_reporting_frequencies.py` | `generate_strategy_benchmark_factsheet_plt` across the same reporting-frequency grid — volparity vs equal-weight. |
+| `multi_strategy_reporting_frequencies.py` | `generate_multi_portfolio_factsheet` across the same grid, on a vol-parity span sweep. |
+| `multi_assets_reporting_frequencies.py` | `generate_multi_asset_factsheet` across the same grid, on the asset-class universe (no backtest). |
 | `momentum_indices.py` | Multi-asset factsheet on momentum index family. **Bloomberg.** |
 | `europe_futures.py` | Strategy factsheet on volume-weighted European futures. **Bloomberg.** |
 | `hedge_funds.py` | Multi-asset factsheet on HFRX/HFRI/CTA index family. **Bloomberg.** |
@@ -105,6 +110,16 @@ examples/
 | `vix_conditional_returns.py` | Conditional returns on short-front-month VIX strategy. **Bloomberg.** |
 | `vix_spy_scatter_by_year.py` | VIX changes vs SPY returns scattered by year. |
 | `vix_term_structure.py` | VIX term-structure correlation with SPX returns. **Bloomberg.** |
+
+## market_data — FX rates & hedging
+
+| File | What it shows |
+|---|---|
+| `fx_rates_data_yahoo_example.py` | Build `FxRatesData` from free `yfinance` FX spots; cross rates, CIP forward premia, FX total-return NAVs, cash NAVs, reference-ccy translation. USD rate from `^IRX`, others stylised. |
+| `fx_rates_data_bloomberg_example.py` | The same, built from Bloomberg via `bbg_fetch` — real 3M rates, full currency set. **Bloomberg.** |
+| `fx_cip_identity_yahoo_example.py` | Covered-interest-parity check: USD excess vs CHF-hedged excess agree to within bp. |
+| `fx_hedging_yahoo_example.py` | Single/multi-asset FX hedging: optimal/carry/beta ratios, hedged NAVs, EWM FX vol/beta, hedge reports. |
+| `fx_hedging_example.py` | Hedging demo on the CSV-backed production universe (`load_fx_rates_data`, `load_usd_assets`). |
 
 ---
 

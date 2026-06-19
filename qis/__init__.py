@@ -44,4 +44,6 @@ from qis.models.__init__ import *
 
 from qis.portfolio.__init__ import *
 
+from qis.market_data.__init__ import *
+
 

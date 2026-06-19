@@ -49,7 +49,7 @@ def compute_rolling_perf_stat(prices: Union[pd.DataFrame, pd.Series],
         title = f"P.a. returns with roll_period={roll_periods}"
     elif rolling_perf_stat == RollingPerfStat.VOL:
         perf_stat = compute_rolling_vols(prices=prices, roll_freq=roll_freq, roll_periods=roll_periods)
-        title = f"Rolling vol with {roll_freq1}-freq and roll_period={roll_periods}"
+        title = f"Rolling Vol with {roll_freq1}-freq and roll_period={roll_periods}"
     elif rolling_perf_stat == RollingPerfStat.SHARPE:
         perf_stat = compute_rolling_sharpes(prices=prices, roll_freq=roll_freq, roll_periods=roll_periods)
         title = f"Rolling Sharpe with {roll_freq1}-freq and roll_period={roll_periods}"

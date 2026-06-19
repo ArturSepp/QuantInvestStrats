@@ -55,6 +55,8 @@ from qis.portfolio.reports.strategy_benchmark_tre_factsheet import (weights_trac
 
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 
+from qis.portfolio.reports.factsheet_facade import factsheet
+
 from qis.portfolio.reports.strategy_signal_factsheet import (generate_weight_change_report,
                                                              generate_current_signal_report,
                                                              generate_strategy_signal_factsheet_by_instrument)

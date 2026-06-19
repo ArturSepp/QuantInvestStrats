@@ -165,10 +165,49 @@ def ewm_recursion(a: np.ndarray,
         ewm[t] = last_ewm = current_ewm
 
     if is_unit_vol_scaling:
+        if ewm_lambda >= 1.0:
+            raise ValueError(f"ewm_lambda must be < 1, got {ewm_lambda}")
         vol_ratio = np.sqrt((1 + ewm_lambda) / (1 - ewm_lambda))
         ewm = vol_ratio * ewm
 
     return ewm
+
+
+def _validate_long_short_spans(long_span, short_span):
+    """Validate spans for the long/short EWM filter (compute_ewm_long_short).
+
+    The EWM decay is ``lambda = 1 - 2/(span + 1)``, so ``span = 1`` gives
+    ``lambda = 0`` (a VALID degenerate case: that leg passes the input through
+    unsmoothed) and ``span -> inf`` gives ``lambda -> 1``. Two hard limits follow:
+
+      1. every span must be ``>= 1``. Below 1 ``lambda < 0`` (a sign-alternating
+         recursion, not a smoother), and for ``span <= 0`` the unit-variance load
+         ``sqrt((1 + lambda)/(1 - lambda))`` takes the root of a non-positive number.
+      2. with two legs, ``short_span`` must be STRICTLY LESS than ``long_span``.
+         Equal spans make the legs identical, collapsing the unit-variance
+         normaliser ``covar = sqrt(1/(1-lL^2) + 1/(1-lS^2) - 2/(1-lL*lS))`` to
+         ``sqrt(0) = 0`` so the leg weights divide by zero; ``short_span`` above
+         ``long_span`` inverts the intended fast-minus-slow band-pass.
+
+    Scalars and per-asset ``np.ndarray`` spans are both accepted.
+    """
+    long_arr = np.asarray(long_span, dtype=float)
+    if np.any(long_arr < 1.0):
+        raise ValueError(f"compute_ewm_long_short: long_span must be >= 1 "
+                         f"(lambda = 1 - 2/(span+1) is negative below span 1); "
+                         f"got long_span={long_span}")
+    if short_span is not None:
+        short_arr = np.asarray(short_span, dtype=float)
+        if np.any(short_arr < 1.0):
+            raise ValueError(f"compute_ewm_long_short: short_span must be >= 1 "
+                             f"(lambda = 1 - 2/(span+1) is negative below span 1); "
+                             f"got short_span={short_span}")
+        if np.any(short_arr >= long_arr):
+            raise ValueError(f"compute_ewm_long_short: short_span must be strictly less "
+                             f"than long_span. Equal spans collapse the unit-variance "
+                             f"normaliser to 0 (division by zero); short_span > long_span "
+                             f"inverts the fast/slow bands. "
+                             f"got short_span={short_span}, long_span={long_span}")
 
 
 @njit
@@ -178,7 +217,25 @@ def compute_ewm_long_short(a: np.ndarray,
                            short_span: Optional[Union[float, np.ndarray]] = 5
                            ) -> np.ndarray:
     """
-    long short ewm filter with unit variance
+    Long/short EWM band-pass filter, unit-variance normalised.
+
+    Forms ``weight_long*load_long*EWM(long_lambda) - weight_short*load_short*
+    EWM(short_lambda)`` (or the long leg alone when ``short_span is None``), where
+    ``lambda = 1 - 2/(span + 1)`` and the weights/loads renormalise the output to
+    unit variance for unit-variance white-noise input.
+
+    Span limits (enforced by compute_ewm_long_short_filter via
+    _validate_long_short_spans):
+      * every span must be ``>= 1``. ``span = 1`` -> ``lambda = 0`` -> the EWM is a
+        pass-through (no smoothing): well defined. ``span < 1`` -> ``lambda < 0``:
+        rejected.
+      * two legs require ``short_span < long_span``: equal spans give ``covar = 0``
+        and the leg weights divide by zero.
+      * the unstable end is LARGE spans: ``span -> inf`` drives ``lambda -> 1`` and
+        the ``(1 - lambda)`` terms in the loads/weights toward zero.
+
+    @njit kernel: assumes pre-validated spans (no f-string raises inside njit), so
+    direct callers should validate first or use compute_ewm_long_short_filter.
     """
     long_lambda = 1.0 - 2.0 / (long_span+1.0)
     if short_span is not None:  # use short + long filter
@@ -206,8 +263,20 @@ def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series, np.ndarra
                                   warmup_period: Optional[Union[int, np.ndarray]] = 21
                                   ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
-    signal smoother for pd.Dataframe and pd.Series data
+    Signal smoother (long/short EWM band-pass) for DataFrame / Series / ndarray.
+
+    Validates the spans, applies compute_ewm_long_short, then masks the first
+    ``warmup_period`` observations.
+
+    Span limits (validated here, raising ValueError):
+      * ``long_span >= 1`` and, if given, ``short_span >= 1``. ``span = 1`` means
+        ``lambda = 1 - 2/(span+1) = 0`` -> that leg is an unsmoothed pass-through.
+      * if ``short_span`` is given, ``short_span < long_span``: equal spans collapse
+        the unit-variance normaliser to 0 (division by zero) and a larger
+        ``short_span`` inverts the band-pass.
     """
+
+    _validate_long_short_spans(long_span=long_span, short_span=short_span)
 
     if isinstance(data, pd.DataFrame):
         data_np = data.to_numpy()
@@ -549,7 +618,7 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
                 if is_x_correlated:  # use inversion
                     try:
                         inv_t = np.linalg.inv(covar_xx)
-                    except:  # "Singular matrix": #LinAlgError("Singular matrix")
+                    except np.linalg.LinAlgError:  # "Singular matrix": #LinAlgError("Singular matrix")
                         inv_t = np.diag(np.reciprocal(np.diag(covar_xx)))
                     inv_t = np.ascontiguousarray(inv_t)  # to remove numpy warning
                 else:

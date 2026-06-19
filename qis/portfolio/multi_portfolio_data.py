@@ -13,6 +13,7 @@ import qis as qis
 from qis import PerfParams, PerfStat, RegimeData, BenchmarkReturnsQuantilesRegime, TimePeriod, RollingPerfStat
 import qis.utils.struct_ops as sop
 import qis.utils.df_groups as dfg
+from qis.utils.annualisation import infer_data_frequency_label
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 # plots
@@ -420,7 +421,7 @@ class MultiPortfolioData:
             qis.plot_returns_corr_table(prices=prices,
                                         x_rotation=90,
                                         freq=freq,
-                                        title=f'Correlation of {freq} returns',
+                                        title=f'Correlation of {freq}-freq returns',
                                         ax=ax,
                                         **kwargs)
 
@@ -580,10 +581,11 @@ class MultiPortfolioData:
         for portfolio in self.portfolio_datas:
             exposures.append(portfolio.get_weights(time_period=time_period).sum(axis=1).rename(portfolio.nav.name))
         exposures = pd.concat(exposures, axis=1)
+        freq = infer_data_frequency_label(exposures)
         pts.plot_time_series(df=exposures,
                              var_format=var_format,
                              legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                             title='Portfolio net exposures',
+                             title=f"Portfolio net exposures ({freq}-freq)" if freq else 'Portfolio net exposures',
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:
@@ -678,7 +680,7 @@ class MultiPortfolioData:
                                      freq_turnover=freq_turnover,
                                      is_unit_based_traded_volume=is_unit_based_traded_volume,
                                      time_period=time_period)
-        freq = pd.infer_freq(turnover.index)
+        freq = freq_turnover or pd.infer_freq(turnover.index)
         turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
         pts.plot_time_series(df=turnover,
                              var_format=var_format,
@@ -708,7 +710,7 @@ class MultiPortfolioData:
         costs = pd.concat(costs, axis=1)
         if time_period is not None:
             costs = time_period.locate(costs)
-        freq = pd.infer_freq(costs.index)
+        freq = freq_cost or pd.infer_freq(costs.index)
         cost_title = cost_title or f"{cost_rolling_period}-period rolling {freq}-freq Costs %"
         pts.plot_time_series(df=costs,
                              var_format=var_format,
@@ -855,7 +857,7 @@ class MultiPortfolioData:
             else:
                 var_format = '{:.2%}'
 
-        title = title or f"Sharpe ratio split to {str(benchmark)} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
+        title = title or f"Sharpe in {str(benchmark)} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
         qis.plot_regime_data(regime_classifier=regime_classifier,
                              prices=prices,
                              benchmark=benchmark,

@@ -33,7 +33,7 @@ def fit_multivariate_ols(x: pd.DataFrame,
     params = pd.Series(fitted_model.params, index=xname)
     try:
         r2 = f", R\N{SUPERSCRIPT TWO}={fitted_model.rsquared:.0%}"
-    except:
+    except (AttributeError, ValueError):
         r2 = f", R\N{SUPERSCRIPT TWO}=0.0%"
     if fit_intercept:
         reg_label = "y=" + f"{alpha_format.format(params.iloc[0])}" + "".join([f"{beta_format.format(x)}*{key}" for key, x in params.iloc[1:].to_dict().items()]) + r2
@@ -74,7 +74,7 @@ def estimate_ols_alpha_beta(x: Union[np.ndarray, pd.Series, pd.DataFrame],
                             ) -> Tuple[float, float, float, float]:
     try:
         reg_model = fit_ols(x=x, y=y, order=order, fit_intercept=fit_intercept)
-    except:
+    except Exception:
         warnings.warn(f"problem with x={x}, y={y}")
         return 0.0, 0.0, 0.0, 0.0
     if fit_intercept:
@@ -157,7 +157,7 @@ def reg_model_params_to_str(reg_model: RegModel,
                             ) -> str:
     try:
         r2 = f", R\N{SUPERSCRIPT TWO}={reg_model.rsquared:.0%}"
-    except:
+    except (AttributeError, ValueError):
         r2 = f", R\N{SUPERSCRIPT TWO}=0.0%"
 
     if r2_only:
@@ -197,7 +197,7 @@ def reg_model_params_to_str(reg_model: RegModel,
                            + beta_format.format(reg_model.params[idx1]) + 'x' \
                            + alpha \
                            + f', R\N{SUPERSCRIPT TWO}=' + '{0:.0%}'.format(reg_model.rsquared)
-            except:
+            except (AttributeError, IndexError, ValueError):
                 text_str = 'model cannot be estimated'
         else:
             raise TypeError(f"order = {order} is not implemented")

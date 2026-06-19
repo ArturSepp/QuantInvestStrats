@@ -11,7 +11,7 @@ from typing import Tuple, List
 import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-from qis.portfolio.reports.config import PERF_PARAMS
+from qis.portfolio.reports.config import PERF_PARAMS, validate_reporting_frequency, infer_data_frequency_label
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 
 
@@ -42,6 +42,17 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     if regime_benchmark is None and multi_portfolio_data.benchmark_prices is not None:
         regime_benchmark = multi_portfolio_data.benchmark_prices.columns[0]
 
+    # guard: the requested reporting frequency must not be finer than the data it is computed on -
+    # check every portfolio NAV and the benchmark prices (used for regime / beta / scatter panels)
+    nav_datas = [portfolio.get_portfolio_nav() for portfolio in multi_portfolio_data.portfolio_datas]
+    for data_series in nav_datas + [multi_portfolio_data.benchmark_prices]:
+        if data_series is not None:
+            validate_reporting_frequency(data_series, perf_params.freq)
+
+    # native grid of the NAV paths: drawdowns / under-water / cumulative are on this grid (not resampled)
+    nav_freq = infer_data_frequency_label(nav_datas[0])
+    nav_freq_label = f" ({nav_freq}-freq)" if nav_freq else ""
+
     plot_kwargs = dict(fontsize=fontsize,
                        linewidth=0.5,
                        digits_to_show=1, sharpe_digits=2,
@@ -57,9 +68,10 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
         fig.suptitle(backtest_name, fontweight="bold", fontsize=8, color='blue')
 
     if regime_benchmark is not None:
-        title = f"Cumulative performance with background colors using bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
+        title = f"Cumulative performance ({perf_params.freq}-freq stats) with " \
+                f"bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns"
     else:
-        title = f"Cumulative performance",
+        title = f"Cumulative performance ({perf_params.freq}-freq stats)"
 
     multi_portfolio_data.plot_nav(ax=fig.add_subplot(gs[0, :2]),
                                   time_period=time_period,
@@ -76,7 +88,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                         regime_classifier=regime_classifier,
                                         dd_legend_type=qis.DdLegendType.SIMPLE,
                                         add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                        title='Running Drawdowns',
+                                        title=f'Running Drawdowns{nav_freq_label}',
                                         **kwargs)
 
     multi_portfolio_data.plot_rolling_time_under_water(ax=fig.add_subplot(gs[2, :2]),
@@ -84,7 +96,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                        regime_benchmark=regime_benchmark,
                                                        regime_classifier=regime_classifier,
                                                        add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                                       title='Rolling time under water',
+                                                       title=f'Rolling time under water{nav_freq_label}',
                                                        **kwargs)
 
     multi_portfolio_data.plot_rolling_perf(ax=fig.add_subplot(gs[3, :2]),

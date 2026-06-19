@@ -300,10 +300,10 @@ def compute_risk_table(prices: pd.DataFrame,
         dd_sampled_prices = ret.prices_at_freq(prices=prices, freq=perf_params.freq_drawdown)
 
     # skeweness computed at own frequency
-    if perf_params.freq_vol == perf_params.freq_skeweness:
+    if perf_params.freq_vol == perf_params.freq_skewness:
         sampled_prices_skew = sampled_prices_vol
     else:
-        sampled_prices_skew = ret.prices_at_freq(prices=prices, freq=perf_params.freq_skeweness)
+        sampled_prices_skew = ret.prices_at_freq(prices=prices, freq=perf_params.freq_skewness)
 
     vol_dt = np.sqrt(infer_annualisation_factor_from_df(data=sampled_prices_vol))
 

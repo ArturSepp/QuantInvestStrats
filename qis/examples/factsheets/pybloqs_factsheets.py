@@ -41,7 +41,7 @@ from qis.portfolio.reports.config import fetch_default_report_kwargs
 # pybloqs is optional — only required to run this file
 try:
     import pybloqs as p
-    from qis.portfolio.reports.multi_strategy_factseet_pybloqs import (
+    from qis.portfolio.reports.multi_strategy_factsheet_pybloqs import (
         generate_multi_portfolio_factsheet_with_pyblogs,
     )
     from qis.portfolio.reports.strategy_benchmark_factsheet_pybloqs import (
