@@ -7,6 +7,66 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-06-28
+
+### Added
+- `qis.estimate_dimson_beta` in `qis.models.unsmoothing.dimson_beta` —
+  Dimson (1979) aggregated-coefficient beta to detect return smoothing.
+  Regresses each asset on the contemporaneous and lagged market return and
+  reports `beta_dimson = sum_k b_k`; the `beta_dimson / b_0` ratio measures
+  the contemporaneous understatement and the t-stat on the summed lagged
+  slopes tests whether the lag effect is real. Pure numpy/pandas, importable
+  standalone.
+- `qis.adjust_returns_with_factor_lag` in `qis.models.unsmoothing.factor_lag`
+  — factor-lag (Dimson) unsmoothing for illiquid / appraisal-based series.
+  Companion to the own-lag AR(q) engine; removes smoothing that manifests as
+  a lagged response to a liquid factor, which the own-lag AR cannot see (a
+  fund-of-funds with near-zero own autocorrelation but a real lagged-equity
+  beta). The correction is mean-preserving and lifts the contemporaneous
+  loading to `beta_D`, so a plain contemporaneous regression recovers the
+  true loading and the existing HCGL / factor-covariance estimator picks it
+  up with no change.
+- `qis.adjust_returns_with_joint_unsmoothing` in
+  `qis.models.unsmoothing.joint_lag` — single-regression joint own-lag +
+  factor-lag unsmoothing, fitting the own-lag coefficient and the
+  lagged-factor beta jointly via the rolling EWMA cross-moment estimator.
+  Removes the omitted-variable bias and stage-order dependence of running the
+  AR engine and the factor-lag engine sequentially.
+- Week-of-month / last-week-of-month anchored frequencies (`WOM-*`, `LWOM-*`)
+  now resolve to a monthly (12.0) annualisation factor in
+  `qis.utils.annualisation`, handled explicitly because the generic frequency
+  regex cannot parse the week number in the anchor.
+
+### Changed
+- Reorganised unsmoothing into a `qis.models.unsmoothing` subpackage. The
+  former `qis/models/unsmoothing.py` (own-lag AR(q) engine,
+  `adjust_returns_with_ar`) is now `qis/models/unsmoothing/ar_lag.py`,
+  alongside `dimson_beta.py`, `factor_lag.py`, `joint_lag.py` and a `tests/`
+  directory. Package-level imports (`qis.adjust_returns_with_ar`, etc.) are
+  preserved; only code importing the old module by file path must update.
+- `multi_assets_factsheet` regime-Sharpe plotting accepts an optional
+  `regime_classifier` argument, falling back to the instance default for a
+  per-plot override.
+
+### Fixed
+- `RegimeClassifier` degenerate-benchmark guard. A constant / zero-return
+  block (e.g. an overlay nav with longer history than the principal,
+  back-padded over the union index) collapses interior quantiles, which
+  previously surfaced as a bare pandas `Bin edges must be unique`. The new
+  check mirrors `pd.qcut` exactly (unique edges <= number of labels), so it
+  fires iff qcut would have failed and never on healthy data, and raises a
+  descriptive error naming the benchmark, the number of non-empty bands, and
+  the remedy (clip inputs to their common live window).
+- `qis.plots.lineplot` marker indexing is now cyclic and None-safe
+  (`markers[idx % len(markers)] if markers else None`), fixing an IndexError
+  when the number of lines exceeds the number of supplied markers.
+
+### Removed
+- Internal `qis/market_data/MIGRATION_NOTES.md` scratch file; trimmed the
+  `fx_hedging_example.py` example.
+
+## [4.3.0] - 2026-06-19
+
 ### Added
 - Python 3.14 support.
 - `qis.delever_returns`, `qis.lever_returns`, `qis.implied_leverage` in
@@ -48,40 +108,6 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Moved `infrequent_returns_interpolation.py` from `examples/utils/` to
   `examples/perfstats/` (matches the API location:
   `qis.perfstats.timeseries_bfill`).
-
-### Fixed
-- `qis.compute_total_return` trailing-NaN handling. Previously the function
-  used `prices.iloc[-1]` for the end value, so any series with NaN at the
-  end (terminated fund, delisted ETF) silently returned NaN total return.
-  Now mirrors the existing leading-NaN treatment via
-  `get_last_nonnan_values`, with a matching warning. Fix propagates
-  through to `compute_pa_return`, `compute_returns_dict`, and Sharpe /
-  alpha computations downstream.
-- `qis.compute_excess_returns` look-ahead bias. The function used
-  `lag=None` for `multiply_df_by_dt`, applying today's risk-free rate to
-  today's funding cost — a small contemporaneous-rate look-ahead.
-  `get_excess_returns_nav` already used `lag=1`. Now both functions agree
-  on lag=1 (funding cost at t uses the rate set at t-1).
-- `qis.prices_at_freq` `ffill_nans=False` ignored when `freq is None`.
-  Previously the no-freq branch gated only on `fill_na_method` (default
-  `'ffill'`), so callers passing `ffill_nans=False` without also
-  overriding `fill_na_method` got ffilled prices anyway — opposite of
-  what the parameter name promised. Now `ffill_nans=False` disables fill
-  in both branches consistently.
-- `qis.df_price_ffill_between_nans` ignored its `method` parameter. The
-  body hardcoded `.ffill()` regardless of input, so callers passing
-  `method='bfill'` got silent ffill behaviour. Now `method` dispatches
-  correctly to ffill / bfill / None.
-- `qis.compute_pa_return` returned a 0-d scalar `array(0)` instead of a
-  vector of zeros for DataFrame input when `num_years <= 0` (degenerate
-  input). `np.zeros_like(n)` where `n` is an `int` returns a 0-d array;
-  replaced with `np.zeros(n)`.
-- `qis.to_zero_first_nonnan_returns` removed always-true defensive check
-  in the `init_period=1` branch. Since `first_date = returns.index[0]`
-  and any non-NaN index is by definition >= the first index, the guard
-  was dead code. Behaviour is unchanged; code is simpler.
-
-### Changed
 - `qis.adjust_navs_to_portfolio_pa` renamed to
   `qis.adjust_component_navs_to_portfolio`; the `asset_prices` parameter
   renamed to `component_navs`. The function decomposes a portfolio's
@@ -124,6 +150,38 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   a calendar-month coverage check per column: a quarter ending at QE is
   complete iff the input's last non-NaN observation falls in the same
   calendar month as QE.
+
+### Fixed
+- `qis.compute_total_return` trailing-NaN handling. Previously the function
+  used `prices.iloc[-1]` for the end value, so any series with NaN at the
+  end (terminated fund, delisted ETF) silently returned NaN total return.
+  Now mirrors the existing leading-NaN treatment via
+  `get_last_nonnan_values`, with a matching warning. Fix propagates
+  through to `compute_pa_return`, `compute_returns_dict`, and Sharpe /
+  alpha computations downstream.
+- `qis.compute_excess_returns` look-ahead bias. The function used
+  `lag=None` for `multiply_df_by_dt`, applying today's risk-free rate to
+  today's funding cost — a small contemporaneous-rate look-ahead.
+  `get_excess_returns_nav` already used `lag=1`. Now both functions agree
+  on lag=1 (funding cost at t uses the rate set at t-1).
+- `qis.prices_at_freq` `ffill_nans=False` ignored when `freq is None`.
+  Previously the no-freq branch gated only on `fill_na_method` (default
+  `'ffill'`), so callers passing `ffill_nans=False` without also
+  overriding `fill_na_method` got ffilled prices anyway — opposite of
+  what the parameter name promised. Now `ffill_nans=False` disables fill
+  in both branches consistently.
+- `qis.df_price_ffill_between_nans` ignored its `method` parameter. The
+  body hardcoded `.ffill()` regardless of input, so callers passing
+  `method='bfill'` got silent ffill behaviour. Now `method` dispatches
+  correctly to ffill / bfill / None.
+- `qis.compute_pa_return` returned a 0-d scalar `array(0)` instead of a
+  vector of zeros for DataFrame input when `num_years <= 0` (degenerate
+  input). `np.zeros_like(n)` where `n` is an `int` returns a 0-d array;
+  replaced with `np.zeros(n)`.
+- `qis.to_zero_first_nonnan_returns` removed always-true defensive check
+  in the `init_period=1` branch. Since `first_date = returns.index[0]`
+  and any non-NaN index is by definition >= the first index, the guard
+  was dead code. Behaviour is unchanged; code is simpler.
 
 ## [2.0.1] - 2023-07-08
 
