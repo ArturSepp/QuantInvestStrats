@@ -153,7 +153,7 @@ def plot_lines_list(xy_datas: Dict[str, pd.DataFrame],
         labels = data_labels[idx]
 
         if markers is not None:
-            marker = markers[idx]
+            marker = markers[idx % len(markers)] if markers else None
         else:
             marker = 'None'
         sns.lineplot(x=xy.columns[0], y=xy.columns[1], data=xy, marker=marker, color=color, ax=ax)

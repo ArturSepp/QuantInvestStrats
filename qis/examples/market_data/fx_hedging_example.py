@@ -35,9 +35,10 @@ def load_usd_assets(local_path: str,
     return data['usd_assets']
 
 class LocalTests(Enum):
+    # A live CHF-hedged-index demo using bbg_fetch lives in the rosaa example
+    # layer, not here: qis examples stay free of Bloomberg and tickers.
     LOAD_DATA = 2
     CHECK_HEDGED_RETURN = 3
-    CHECK_CHF = 4
     PLOT_HEDGE_REPORT = 5
     MULTI_ASSET_HEDGE = 6
     MULTI_ASSET_HEDGE_REPORT = 7
@@ -107,37 +108,6 @@ def run_local_test(local_test: LocalTests):
                                               span=3 * 12)
         qis.plot_time_series(fx_beta)
         qis.plot_time_series(fx_vol)
-
-    elif local_test == LocalTests.CHECK_CHF:
-
-        from bbg_fetch import fetch_field_timeseries_per_tickers
-
-        fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
-        fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
-
-        assets = {'LGCPTRUH Index': 'IG USD', 'LGCPTRCH Index': 'IG CHF Hedged'}
-        prices = fetch_field_timeseries_per_tickers(tickers=assets, freq='B', field='PX_LAST', start_date=pd.Timestamp('31Dec2001')).ffill()
-
-        nav_hedged, _ = fx_rates_data._compute_performance_of_local_ccy_asset_in_reference_ccy(
-            local_ccy='USD',
-            reference_ccy='CHF',
-            asset_price_local_ccy=prices.iloc[:, 0],
-            hedge_ratio=1.0)
-
-        prices: pd.DataFrame = pd.concat([prices, nav_hedged.rename('CHF-hedge replica')], axis=1)
-        prices = prices.asfreq('QE').ffill()
-        qis.plot_prices_with_dd(prices=prices, perf_params=qis.PerfParams(freq='ME'), title='Hedged')
-
-        assets = {'NDUEACWF Index': 'ACWI USD', 'MEWD Index': 'ACWI CHF'}
-        prices = fetch_field_timeseries_per_tickers(tickers=assets, freq='B', field='PX_LAST', start_date=pd.Timestamp('31Dec2013')).ffill()
-        nav_hedged, _ = fx_rates_data._compute_performance_of_local_ccy_asset_in_reference_ccy(
-            local_ccy='USD',
-            reference_ccy='CHF',
-            asset_price_local_ccy=prices.iloc[:, 0],
-            hedge_ratio=0.0)
-
-        prices = pd.concat([prices, nav_hedged.rename('CHF-local replica')], axis=1).asfreq('QE').ffill().loc['31Dec2013':, :]
-        qis.plot_prices_with_dd(prices=prices, perf_params=qis.PerfParams(freq='ME'), title='Unhedged')
 
     elif local_test == LocalTests.PLOT_HEDGE_REPORT:
         time_period = qis.TimePeriod('31Dec2004', '31Oct2025')

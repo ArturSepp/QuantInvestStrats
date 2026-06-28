@@ -113,7 +113,50 @@ from qis.models.linear.ewm_winsor_outliers import (
 from qis.models.stats.rolling_stats import (RollingPerfStat,
                                             compute_rolling_perf_stat)
 
-from qis.models.unsmoothing import (
+from qis.models.unsmoothing.ar_lag import (
     adjust_returns_with_ar,
     compute_ar_unsmoothed_prices,
 )
+
+from qis.models.unsmoothing.dimson_beta import estimate_dimson_beta
+
+from qis.models.unsmoothing.factor_lag import adjust_returns_with_factor_lag
+
+from qis.models.unsmoothing.joint_lag import adjust_returns_with_joint_unsmoothing
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 from enum import Enum
 
-from qis.models.unsmoothing import (unsmooth_returns_ar1_ewma,
-                                    unsmooth_returns_glm)
+from qis.models.unsmoothing.ar_lag import (unsmooth_returns_ar1_ewma,
+                                           unsmooth_returns_glm)
 
 
 class ComparisonTests(Enum):

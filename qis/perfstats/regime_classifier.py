@@ -373,7 +373,9 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
             DataFrame with returns and regime classification
 
         Raises:
-            ValueError: If insufficient data for classification
+            ValueError: If insufficient data for classification, or if the benchmark
+                returns are degenerate (constant / too many ties) so that quantile
+                bin edges are not unique.
         """
         if isinstance(prices, pd.Series):
             prices = prices.to_frame()
@@ -393,7 +395,29 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
             )
 
         x = sampled_returns_with_regime_id[benchmark]
-        quant0 = pd.qcut(x=x, q=self.q, labels=self.get_regime_ids())
+
+        # Guard against a degenerate regime benchmark: pd.qcut requires strictly
+        # increasing bin edges, but a constant / zero-return block (e.g. an overlay
+        # nav with longer history than the principal, back-padded over the union
+        # index) collapses interior quantiles onto the same value and raises a bare
+        # "Bin edges must be unique". The condition below mirrors qcut exactly
+        # (unique edges <= number of labels), so it fires iff qcut would have failed
+        # and never on healthy data. Surface the cause instead of the pandas trace.
+        labels = self.get_regime_ids()
+        x_valid = x.dropna().to_numpy(dtype=float)
+        probs = (np.linspace(0.0, 1.0, int(self.q) + 1) if np.isscalar(self.q)
+                 else np.asarray(self.q, dtype=float))
+        edges = np.nanquantile(x_valid, probs) if x_valid.size > 0 else np.array([])
+        if np.unique(edges).size <= len(labels):
+            raise ValueError(
+                f"Regime benchmark '{x.name}' is degenerate for q={self.q}: only "
+                f"{max(np.unique(edges).size - 1, 0)} of {len(labels)} quantile bands "
+                f"are non-empty (edges={np.unique(edges).tolist()}).\n"
+                f"This usually means a constant or zero-return block from misaligned "
+                f"navs — clip the inputs to their common live window before classifying."
+            )
+
+        quant0 = pd.qcut(x=x, q=self.q, labels=labels)
         sampled_returns_with_regime_id[self.REGIME_COLUMN] = quant0
 
         return sampled_returns_with_regime_id

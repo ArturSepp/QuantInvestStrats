@@ -356,13 +356,16 @@ class MultiAssetsReport:
                          title: str = None,
                          legend_loc: Optional[str] = 'upper center',
                          perf_params: PerfParams = None,
+                         regime_classifier: qis.RegimeClassifier = None,
                          ax: plt.Subplot = None,
                          **kwargs) -> None:
         prices = self.get_prices(time_period=time_period, benchmark=benchmark)
-        title = title or f"Sharpe in {str(benchmark)} Bear/Normal/Bull {self.regime_classifier.freq}-freq regimes"
-        qis.plot_regime_data(regime_classifier=self.regime_classifier,
-                             prices=prices,
+        if regime_classifier is None:
+            regime_classifier = self.regime_classifier
+        title = title or f"Sharpe in {str(benchmark)} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
+        qis.plot_regime_data(prices=prices,
                              benchmark=benchmark,
+                             regime_classifier=regime_classifier,
                              is_conditional_sharpe=is_conditional_sharpe,
                              regime_data_to_plot=regime_data_to_plot,
                              var_format=var_format or '{:.2f}',

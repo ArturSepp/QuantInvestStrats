@@ -69,6 +69,7 @@ class SmartDiversificationReport:
                                                         max_overlay_weight=max_overlay_weight,
                                                         rebalancing_freq=rebalancing_freq,
                                                         is_principal_weight_fixed=is_principal_weight_fixed)
+        portfolio_navs = portfolio_navs.dropna(how='any')  # drop union-index padding
         cvar_table, _ = self.regime_classifier.compute_regimes_pa_perf_table(prices=portfolio_navs,
                                                                              benchmark=portfolio_navs.columns[0],
                                                                              perf_params=self.perf_params)

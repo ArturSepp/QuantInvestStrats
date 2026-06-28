@@ -79,6 +79,11 @@ def get_annualization_factor(freq: str,
         return 12.0
     elif freq in ['2M', '2ME', '2BM', '2MS', '2BMS']:
         return 6.0
+    # Week-of-month / last-week-of-month anchored offsets (e.g. 'WOM-2WED' = 2nd Wednesday
+    # of each month, 'LWOM-FRI' = last Friday): monthly cadence. Handled explicitly because
+    # the generic regex below cannot parse the week-number in the anchor (the '2' in 'WOM-2WED').
+    elif freq.upper().startswith('WOM-') or freq.upper().startswith('LWOM-'):
+        return 12.0
 
     # Quarterly frequencies
     elif freq in ['QE', 'Q', 'DQ', 'BQ', 'QS', 'BQS', 'QE-DEC', 'QE-JAN', 'QE-FEB', 'Q-DEC']:
