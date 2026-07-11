@@ -53,7 +53,8 @@ from qis.utils.df_agg import (
     nansum_positive,
     sum_weighted,
     last_row,
-    compute_df_desc_data
+    compute_df_desc_data,
+    nanmean_weighted
 )
 
 from qis.utils.df_cut import (

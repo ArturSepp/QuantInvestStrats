@@ -31,6 +31,29 @@ that decays within ~span periods as the EWMA forgets its initial condition).
 The production-relevant parity gate is therefore the current-date max|delta-beta|,
 not the full-history unsmoothed vol.
 
+Guards (opt-in; defaults reproduce the previous behaviour exactly):
+
+    ``insufficient_data``  Controls what happens when a column comes out entirely
+        NaN. ``set_nans_for_warmup_period`` discards the first ``warmup_period``
+        FINITE beta values and blanks the whole column when fewer remain, and the
+        rolling tensor already masks its own first ``warmup_period`` rows, so the
+        returns frame needs ``2 * warmup_period + 2`` ROWS before any beta
+        survives (see ``min_obs_for_ar_unsmoothing``). Individual columns can also
+        degenerate when they are entirely NaN. The default ``NAN`` keeps the
+        historical silent all-NaN column. ``RAISE`` reports the offending columns.
+        ``PASSTHROUGH`` returns those columns unsmoothed.
+
+    ``check_denominator``  The inversion ``r_true = numerator / (1 - theta_sum)``
+        requires ``theta_sum < 1``. Above that the denominator is non-positive
+        and the unsmoothed series flips sign rather than inflating. The default
+        ``max_value_for_beta=0.75`` holds the denominator at or above 0.25, so
+        this check is inert under the default arguments. It fires only when the
+        cap is disabled, where the previous behaviour was to return sign-flipped
+        values with no error.
+
+    ``validate_inputs``  Type, shape, index and parameter-range checks that
+        raise ``ValueError`` carrying the offending value.
+
 Reference:
     Getmansky, M., Lo, A.W., and Makarov, I. (2004),
     "An Econometric Model of Serial Correlation and Illiquidity in Hedge Fund Returns,"
@@ -39,12 +62,134 @@ Reference:
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from enum import Enum
+from typing import List, Optional, Tuple, Union
 
 from qis.utils.np_ops import set_nans_for_warmup_period
 from qis.perfstats.returns import to_returns, returns_to_nav
 from qis.models.linear.ewm import (compute_ewm, compute_ewm_xy_beta_tensor, MeanAdjType,
                                     compute_rolling_mean_adj, InitType, NanBackfill)
+
+
+# compute_ewm_xy_beta_tensor's own default when warmup_period is None
+TENSOR_DEFAULT_WARMUP: int = 20
+# with warmup_period=None the outer warmup masking is skipped, so only the tensor warmup binds,
+# and the inversion consumes one further shift. verified for ar_order = 1, 2.
+WARMUP_NONE_MIN_OBS_OFFSET: int = 3
+# theta_sum >= 1 makes the inversion denominator non-positive: the unsmoothed series flips sign
+# rather than inflating. observed at theta_sum = 1.03 for AR(1) rho >= 0.9 with the beta smoother
+# off and max_value_for_beta=None. the default cap of 0.75 keeps the denominator at or above 0.25.
+DENOM_FLOOR: float = 1e-8
+
+
+class InsufficientData(str, Enum):
+    """Policy for columns with too few observations to identify the AR(q) beta.
+
+    NAN: return an all-NaN column with no error. This is the historical behaviour
+        and remains the default so that existing callers are unaffected.
+    RAISE: raise ValueError naming the columns and their observation counts.
+    PASSTHROUGH: return the observed returns unchanged for those columns.
+    """
+    NAN = 'nan'
+    RAISE = 'raise'
+    PASSTHROUGH = 'passthrough'
+
+
+def min_obs_for_ar_unsmoothing(ar_order: int,
+                               warmup_period: Optional[int],
+                               ) -> int:
+    """Minimum number of ROWS in the returns frame for which AR(q) unsmoothing yields output.
+
+    The rolling beta tensor masks its first ``warmup_period`` rows, and
+    ``set_nans_for_warmup_period`` then discards the first ``warmup_period`` finite betas,
+    blanking the column when fewer remain. The inversion consumes one further shift.
+    The bound does not depend on ``ar_order``.
+
+    This is a bound on the row count, not on a column's finite observation count. A column
+    with few finite returns inside a long frame still receives betas, because the tensor
+    backfills across the full index.
+
+    Args:
+        ar_order: Lag order q, must be >= 1.
+        warmup_period: Periods masked before the first valid beta. None defers to the
+            tensor default of ``TENSOR_DEFAULT_WARMUP``.
+
+    Returns:
+        Minimum number of rows in the returns frame.
+
+    Raises:
+        ValueError: If ``ar_order`` < 1 or ``warmup_period`` < 0.
+    """
+    if ar_order < 1:
+        raise ValueError(f"ar_order must be >= 1, got {ar_order!r}")
+    if warmup_period is None:
+        return TENSOR_DEFAULT_WARMUP + WARMUP_NONE_MIN_OBS_OFFSET
+    if warmup_period < 0:
+        raise ValueError(f"warmup_period must be >= 0 or None, got {warmup_period!r}")
+    return 2 * warmup_period + 2
+
+
+def _validate_ar_inputs(returns: pd.DataFrame,
+                        ar_order: int,
+                        span: int,
+                        warmup_period: Optional[int],
+                        max_value_for_beta: Optional[float],
+                        min_value_for_beta: Optional[float],
+                        non_negative_tol: float,
+                        ) -> None:
+    """Validate the arguments of ``adjust_returns_with_ar``, raising on the offending value."""
+    if not isinstance(returns, pd.DataFrame):
+        raise ValueError(f"returns must be a pd.DataFrame, got {type(returns).__name__}. "
+                         f"pass a Series as returns.to_frame()")
+    if returns.empty:
+        raise ValueError("returns is empty")
+    if returns.columns.has_duplicates:
+        dupes = returns.columns[returns.columns.duplicated()].tolist()
+        raise ValueError(f"returns has duplicate columns {dupes}")
+    if not returns.index.is_unique:
+        raise ValueError("returns index is not unique")
+    if not returns.index.is_monotonic_increasing:
+        raise ValueError("returns index must be sorted ascending")
+    if ar_order < 1:
+        raise ValueError(f"ar_order must be >= 1, got {ar_order!r}")
+    if span < 1:
+        raise ValueError(f"span must be >= 1, got {span!r}")
+    if warmup_period is not None and warmup_period < 0:
+        raise ValueError(f"warmup_period must be >= 0 or None, got {warmup_period!r}")
+    if (min_value_for_beta is not None and max_value_for_beta is not None
+            and min_value_for_beta > max_value_for_beta):
+        raise ValueError(f"min_value_for_beta {min_value_for_beta!r} exceeds "
+                         f"max_value_for_beta {max_value_for_beta!r}")
+    if non_negative_tol < 0.0:
+        raise ValueError(f"non_negative_tol must be >= 0, got {non_negative_tol!r}")
+
+
+def _degenerate_columns(unsmoothed: pd.DataFrame) -> List[str]:
+    """Return the columns of the unsmoothed frame that carry no finite observation."""
+    return [c for c in unsmoothed.columns if int(unsmoothed[c].notna().sum()) == 0]
+
+
+def _check_denominator(denom: pd.DataFrame) -> None:
+    """Raise when the inversion denominator 1 - theta_sum is non-positive.
+
+    The Getmansky-Lo-Makarov inversion r_true = numerator / (1 - theta_sum) requires
+    theta_sum < 1. At theta_sum >= 1 the denominator is non-positive and the unsmoothed
+    series flips sign instead of inflating, which is silent nonsense rather than a large number.
+    """
+    unsafe = denom <= DENOM_FLOOR
+    if not bool(unsafe.to_numpy().any()):
+        return
+    offenders = []
+    for col in denom.columns:
+        mask = unsafe[col].fillna(False)
+        if bool(mask.any()):
+            first = denom.index[mask][0]
+            theta_sum = 1.0 - float(denom.loc[first, col])
+            offenders.append(f"{col!r} at {first} (theta_sum={theta_sum:.4f})")
+    raise ValueError(f"inversion denominator 1 - theta_sum <= {DENOM_FLOOR} for "
+                     f"{'; '.join(offenders)}. the unsmoothed series would flip sign. "
+                     f"set max_value_for_beta below 1.0 to bound theta_sum, or pass "
+                     f"check_denominator=False to restore the previous behaviour")
 
 
 # =============================================================================
@@ -149,7 +294,10 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
                            apply_ewma_mean_smoother: bool = True,
                            non_negative: bool = False,
                            non_negative_tol: float = 0.0,
-                           return_diagnostics: bool = False
+                           return_diagnostics: bool = False,
+                           insufficient_data: InsufficientData = InsufficientData.NAN,
+                           check_denominator: bool = True,
+                           validate_inputs: bool = True,
                            ) -> Union[pd.DataFrame,
                                       Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     """Unsmooth observed returns with a rolling EWMA AR(q) beta vector.
@@ -176,6 +324,10 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
     bounding the vol-inflation factor 1 / (1 - theta_sum). For q = 1 this is
     identical to clipping the single beta, so the bounds carry the same meaning
     as in the legacy AR(1) path.
+
+    With the default arguments the output is identical to the pre-guard
+    implementation, including the all-NaN column returned for a series shorter
+    than ``min_obs_for_ar_unsmoothing(ar_order, warmup_period)``.
 
     Args:
         returns: Observed period returns (rows = dates, columns = assets).
@@ -216,25 +368,56 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
         return_diagnostics: If True, return (unsmoothed, betas, r2) where
             ``betas`` is the applied per-period theta_sum (sum of betas; equals
             the single beta for q = 1) and ``r2`` is the EWMA R^2 of the fit.
+        insufficient_data: Policy for columns that come out entirely NaN, which
+            happens when the frame has fewer than ``min_obs_for_ar_unsmoothing``
+            rows or when a column is itself all NaN. Default NAN preserves the
+            historical silent all-NaN column. RAISE reports the columns, their
+            finite input counts and the row count. PASSTHROUGH returns their
+            observed returns unchanged, with a theta_sum of 0.0 and an r2 of NaN
+            in the diagnostics.
+        check_denominator: If True, raise when the inversion denominator
+            1 - theta_sum is non-positive. Inert under the default
+            ``max_value_for_beta=0.75``, which keeps the denominator at or above
+            0.25. Pass False to restore the previous unchecked division.
+        validate_inputs: If True, validate types, index and parameter ranges.
 
     Returns:
         Unsmoothed returns (DataFrame, input shape). If ``return_diagnostics``,
         the tuple (unsmoothed, betas, r2).
+
+    Raises:
+        ValueError: If ``validate_inputs`` and an argument is invalid.
+        ValueError: If ``insufficient_data`` is RAISE and any column is too short.
+        ValueError: If ``check_denominator`` and 1 - theta_sum is non-positive.
     """
-    if ar_order < 1:
+    if validate_inputs:
+        _validate_ar_inputs(returns=returns, ar_order=ar_order, span=span,
+                            warmup_period=warmup_period, max_value_for_beta=max_value_for_beta,
+                            min_value_for_beta=min_value_for_beta,
+                            non_negative_tol=non_negative_tol)
+    elif ar_order < 1:
         raise ValueError(f"ar_order must be >= 1, got {ar_order}")
-    cols = returns.columns
-    lags_raw = [returns.shift(i + 1) for i in range(ar_order)]   # raw lags for the inversion
+
+    min_obs = min_obs_for_ar_unsmoothing(ar_order=ar_order, warmup_period=warmup_period)
+    if insufficient_data == InsufficientData.RAISE and len(returns) < min_obs:
+        raise ValueError(f"AR({ar_order}) unsmoothing needs {min_obs} rows with "
+                         f"warmup_period={warmup_period!r}, got {len(returns)}. every column "
+                         f"would come out all-NaN. pass insufficient_data="
+                         f"InsufficientData.PASSTHROUGH to leave them unsmoothed")
+
+    core = returns
+    cols = core.columns
+    lags_raw = [core.shift(i + 1) for i in range(ar_order)]   # raw lags for the inversion
 
     # Demean y and the lags consistently (single demean; the tensor does not demean).
     if mean_adj_type != MeanAdjType.NONE:
-        y_adj = compute_rolling_mean_adj(data=returns, mean_adj_type=mean_adj_type,
+        y_adj = compute_rolling_mean_adj(data=core, mean_adj_type=mean_adj_type,
                                          span=span, init_type=InitType.MEAN)
         x_lags = [compute_rolling_mean_adj(data=lag, mean_adj_type=mean_adj_type,
                                            span=span, init_type=InitType.MEAN)
                   for lag in lags_raw]
     else:
-        y_adj, x_lags = returns, lags_raw
+        y_adj, x_lags = core, lags_raw
 
     # Per-asset rolling q x q EWMA regression: x = [r_{t-1}, ..., r_{t-q}], y = r_t.
     if non_negative:
@@ -245,14 +428,14 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
                                       warmup_period=warmup_period,
                                       tol=non_negative_tol)
     else:
-        betas = [pd.DataFrame(index=returns.index, columns=cols, dtype=float)
+        betas = [pd.DataFrame(index=core.index, columns=cols, dtype=float)
                  for _ in range(ar_order)]
         for col in cols:
             x = np.column_stack([x_lags[i][col].to_numpy(float) for i in range(ar_order)])
             y = y_adj[col].to_numpy(float)
             betas_ts = compute_ewm_xy_beta_tensor(
                 x=x, y=y, span=span,
-                warmup_period=warmup_period if warmup_period is not None else 20,
+                warmup_period=warmup_period if warmup_period is not None else TENSOR_DEFAULT_WARMUP,
                 is_x_correlated=(ar_order > 1),     # q x q inverse for q >= 2; scalar for q = 1
                 nan_backfill=NanBackfill.FFILL,
             )                                       # shape [t, q, 1]
@@ -274,15 +457,29 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
 
     if warmup_period is not None:
         betas = [set_nans_for_warmup_period(a=b, warmup_period=warmup_period)
-                 .reindex(index=returns.index).bfill() for b in betas]
+                 .reindex(index=core.index).bfill() for b in betas]
 
     # Invert the AR(q) smoothing using lagged betas (align with lagged returns).
     betas_l = [b.shift(1) for b in betas]
-    numerator = returns.copy()
+    numerator = core.copy()
     for i in range(ar_order):
         numerator = numerator - lags_raw[i].multiply(betas_l[i])
     denom = 1.0 - sum(betas_l)
+    if check_denominator:
+        _check_denominator(denom)
     unsmoothed = numerator.divide(denom)
+
+    skipped: List[str] = []
+    if insufficient_data != InsufficientData.NAN:
+        skipped = _degenerate_columns(unsmoothed)
+        if skipped and insufficient_data == InsufficientData.RAISE:
+            counts = {c: int(returns[c].notna().sum()) for c in skipped}
+            raise ValueError(f"AR({ar_order}) unsmoothing produced no finite observation for "
+                             f"columns {skipped} (finite input returns {counts}, frame rows "
+                             f"{len(returns)}, floor {min_obs}). pass insufficient_data="
+                             f"InsufficientData.PASSTHROUGH to leave them unsmoothed")
+        for col in skipped:
+            unsmoothed[col] = returns[col]
 
     if return_diagnostics:
         betas_sum = sum(betas)
@@ -294,6 +491,9 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
         with np.errstate(divide='ignore', invalid='ignore'):
             r2 = (1.0 - resid_var.divide(y_var)).where(y_var > 0.0)
         r2 = r2.clip(lower=0.0, upper=1.0)
+        for col in skipped:
+            betas_sum[col] = 0.0
+            r2[col] = np.nan
         return unsmoothed, betas_sum, r2
 
     return unsmoothed
@@ -307,7 +507,8 @@ def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
                               min_value_for_beta: Optional[float] = -0.25,
                               apply_ewma_mean_smoother: bool = True,
                               non_negative: bool = False,
-                              non_negative_tol: float = 0.0
+                              non_negative_tol: float = 0.0,
+                              insufficient_data: InsufficientData = InsufficientData.NAN,
                               ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Backward-compatible rolling AR(1) unsmoother (shim over ``adjust_returns_with_ar``).
 
@@ -325,6 +526,7 @@ def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
         min_value_for_beta=min_value_for_beta,
         apply_ewma_mean_smoother=apply_ewma_mean_smoother, non_negative=non_negative,
         non_negative_tol=non_negative_tol, return_diagnostics=True,
+        insufficient_data=insufficient_data,
     )
 
 
@@ -339,7 +541,8 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
                                  apply_ewma_mean_smoother: bool = True,
                                  non_negative: bool = False,
                                  non_negative_tol: float = 0.0,
-                                 is_log_returns: bool = True
+                                 is_log_returns: bool = True,
+                                 insufficient_data: InsufficientData = InsufficientData.NAN,
                                  ) -> Tuple[pd.DataFrame, pd.DataFrame,
                                             pd.DataFrame, pd.DataFrame]:
     """Apply rolling EWMA AR(q) unsmoothing to a price panel, optionally mixed-frequency.
@@ -363,6 +566,7 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
             (forwarded to ``adjust_returns_with_ar``).
         is_log_returns: If True, use log returns for the regression and convert
             back with expm1 at the end. Generally recommended for unsmoothing.
+        insufficient_data: Forwarded to ``adjust_returns_with_ar``. Default NAN.
 
     Returns:
         Tuple (navs, unsmoothed_returns, betas, r2).
@@ -375,6 +579,7 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
             min_value_for_beta=min_value_for_beta,
             apply_ewma_mean_smoother=apply_ewma_mean_smoother, non_negative=non_negative,
             non_negative_tol=non_negative_tol, return_diagnostics=True,
+            insufficient_data=insufficient_data,
         )
     else:
         unsmoothed_dict, betas_dict, r2_dict = {}, {}, {}
@@ -390,6 +595,7 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
                 min_value_for_beta=min_value_for_beta,
                 apply_ewma_mean_smoother=apply_ewma_mean_smoother, non_negative=non_negative,
                 non_negative_tol=non_negative_tol, return_diagnostics=True,
+                insufficient_data=insufficient_data,
             )
             unsmoothed_dict[frequency] = u
             betas_dict[frequency] = b
@@ -413,7 +619,8 @@ def compute_ar1_unsmoothed_prices(prices: pd.DataFrame,
                                   min_value_for_beta: Optional[float] = -0.25,
                                   non_negative: bool = False,
                                   non_negative_tol: float = 0.0,
-                                  is_log_returns: bool = True
+                                  is_log_returns: bool = True,
+                                  insufficient_data: InsufficientData = InsufficientData.NAN,
                                   ) -> Tuple[pd.DataFrame, pd.DataFrame,
                                              pd.DataFrame, pd.DataFrame]:
     """Backward-compatible AR(1) price-level unsmoother (shim over ``compute_ar_unsmoothed_prices``).
@@ -426,6 +633,7 @@ def compute_ar1_unsmoothed_prices(prices: pd.DataFrame,
         warmup_period=warmup_period, max_value_for_beta=max_value_for_beta,
         min_value_for_beta=min_value_for_beta, non_negative=non_negative,
         non_negative_tol=non_negative_tol, is_log_returns=is_log_returns,
+        insufficient_data=insufficient_data,
     )
 
 
@@ -478,6 +686,10 @@ def unsmooth_returns_glm(returns: Union[pd.Series, pd.DataFrame],
     Note:
         Prefer ``adjust_returns_with_ar`` for most practical applications.
         Use this method for academic reproducibility or single-parameter summaries.
+
+        When ``theta_sum`` exceeds 1 the denominator turns negative and the
+        inversion flips the sign of the unsmoothed series. ``is_severe`` flags
+        ``|theta_sum| > 0.95``; check it before using the result.
     """
     if isinstance(returns, pd.Series):
         unsmoothed, diag = _unsmooth_glm_single(returns, ar_order=ar_order)

@@ -214,3 +214,30 @@ def compute_df_desc_data(df: pd.DataFrame,
     else:
         desc_data = pd.DataFrame.from_dict(desc_data, orient='columns')
     return desc_data
+
+
+def nanmean_weighted(df: pd.DataFrame,
+                     weights: pd.Series,
+                     axis: Literal[0, 1] = 1,
+                     ) -> pd.Series:
+    """
+    weighted average across `axis`, with weights RESCALED at each line to sum
+    to one over the non-nan entries only (nan/inf data are excluded and the
+    remaining weights renormalised). A line with no finite data — or whose
+    finite entries all carry zero weight — returns nan.
+    axis=1 -> weights indexed by df.columns, result indexed by df.index
+    axis=0 -> weights indexed by df.index,   result indexed by df.columns
+    """
+    data_np = npo.to_finite_np(data=df, fill_value=np.nan)
+    keys = df.columns if axis == 1 else df.index
+    out_index = df.index if axis == 1 else df.columns
+    w = weights.reindex(keys).to_numpy(dtype=np.float64)
+    w = np.where(np.isfinite(w), w, 0.0)
+    w = w[np.newaxis, :] if axis == 1 else w[:, np.newaxis]
+    mask = np.isfinite(data_np)
+    wmat = np.where(mask, w, 0.0)
+    wsum = np.nansum(wmat, axis=axis, keepdims=True)
+    num = np.nansum(np.where(mask, data_np, 0.0) * wmat, axis=axis, keepdims=True)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        avg = np.where(wsum > 0.0, num / wsum, np.nan)
+    return pd.Series(np.squeeze(avg, axis=axis), index=out_index, name='nanmean_weighted')

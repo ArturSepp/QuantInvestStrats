@@ -154,18 +154,34 @@ def run_report():
         'DX1 Curncy': 'DXY'
     }
 
+    benchmark = 'SPTGGUT Index'
+    tickers = {
+        benchmark: benchmark,
+        'LGTAXVH ID Equity': 'LGT Dynamic Protection',
+        'LGTAXND ID Equity': 'LGT Alpha Generix',
+    }
+
+    benchmark = 'MSDEWSCN Index'
+    tickers = {
+        benchmark: 'MSCI World Small Cap Eur',
+        'KESGLIA LX Equity': 'Kempen Global',
+        'LIWGSFE ID Equity': 'Lightrock Global',
+    }
+
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
     # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
 
-    time_period = qis.TimePeriod('31Dec2018', '31Mar2026')
+    # time_period = qis.TimePeriod('07Aug2014', '08Jul2026')
+    # time_period = qis.TimePeriod('18Apr2024', '08Jul2026')
+    time_period = qis.TimePeriod('07Aug2014', '01Apr2023')
     # kwargs = qis.fetch_default_report_kwargs(time_period=time_period, add_rates_data=False)
     # kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD, add_rates_data=False)
     kwargs = qis.fetch_factsheet_config_kwargs(factsheet_config=qis.FACTSHEET_CONFIG_MONTHLY_DATA_LONG_PERIOD, add_rates_data=True)
 
     fig = qis.generate_multi_asset_factsheet(prices=prices,
-                                             benchmark=benchmark,
+                                             benchmark=tickers[benchmark],
                                              time_period=time_period,
                                              **kwargs)
     qis.save_figs_to_pdf(figs=[fig],

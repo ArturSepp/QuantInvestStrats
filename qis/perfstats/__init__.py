@@ -104,4 +104,6 @@ from qis.perfstats.signal_diagnostics import (
     SignalDiagnosticsResult,
     compute_per_asset_betas,
     estimate_signal_diagnostics,
+    compute_ic_timeseries,
+    estimate_ic_ir,
 )

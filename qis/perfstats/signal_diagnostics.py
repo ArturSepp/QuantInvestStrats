@@ -67,6 +67,14 @@ _STAT_COLS = [
 ]
 
 
+# IC-IR table columns (the time-series IC summary in ``estimate_ic_ir``).
+# Kept separate from ``_STAT_COLS`` — those are the per-regression stats,
+# these summarise the per-date IC series.
+_IC_IR_COLS = [
+    'n_dates', 'mean_IC', 'std_IC', 'IC_IR', 'IC_IR_an', 't_stat', 'hit_rate',
+]
+
+
 @dataclass
 class SignalDiagnosticsResult:
     """Container for cross-sectional signal diagnostic outputs.
@@ -666,4 +674,175 @@ def compute_per_asset_betas(
                                     categories=result.horizon_labels,
                                     ordered=True)
     out = out.sort_values(['horizon', 'asset']).reset_index(drop=True)
+    return out
+# ───────────────────────────────────────────────────────────────────────────────
+# IC information ratio (IC-IR): time-series stability of the per-date IC
+# ───────────────────────────────────────────────────────────────────────────────
+
+
+def _per_date_ic(
+        pairs: pd.DataFrame,
+        method: str = 'spearman',
+        return_col: str = 'r_norm_univ',
+        min_obs_per_date: int = 5,
+) -> pd.DataFrame:
+    """Per-date cross-sectional IC of (z, forward return) from a pairs frame.
+
+    ``estimate_signal_diagnostics`` pools the whole panel into a single IC;
+    this instead computes ONE IC per rebalance date, giving the time
+    series whose mean/std define the IC-IR.
+
+    Args:
+        pairs: One horizon's normalised pairs frame (a value of
+            ``SignalDiagnosticsResult.pairs``). Needs ``date``, ``z`` and
+            ``return_col``.
+        method: 'spearman' (rank IC, default) or 'pearson'.
+        return_col: Forward-return column — ``r_norm_univ`` (universe
+            cross-section, default) or ``r_norm_group`` (within group),
+            matching the pooled vs per-group views.
+        min_obs_per_date: Dates with fewer active names are dropped; a
+            rank IC on 2-3 names is meaningless.
+
+    Returns:
+        DataFrame indexed by date with columns ``['n', 'IC']``, sorted by
+        date. Empty when no date clears ``min_obs_per_date``.
+    """
+    if pairs is None or len(pairs) == 0:
+        return pd.DataFrame(columns=['n', 'IC'])
+    corr = scipy_stats.spearmanr if method == 'spearman' else scipy_stats.pearsonr
+    recs: List[Tuple] = []
+    for d, sub in pairs.groupby('date'):
+        z = sub['z'].to_numpy()
+        r = sub[return_col].to_numpy()
+        mask = np.isfinite(z) & np.isfinite(r)
+        z, r = z[mask], r[mask]
+        if len(z) < min_obs_per_date:
+            continue
+        if np.std(z) == 0.0 or np.std(r) == 0.0:  # corr undefined on a constant
+            continue
+        try:
+            ic = float(corr(z, r)[0])
+        except Exception:
+            continue
+        if np.isfinite(ic):
+            recs.append((d, len(z), ic))
+    if not recs:
+        return pd.DataFrame(columns=['n', 'IC'])
+    return (pd.DataFrame(recs, columns=['date', 'n', 'IC'])
+            .set_index('date').sort_index())
+
+
+def _infer_periods_per_year(index: pd.Index) -> float:
+    """Annualisation factor from the median spacing of the IC-series dates.
+
+    Handles native-cadence / non-overlapping spacing automatically (a
+    horizon-3 monthly series is spaced ~3m → ~4/yr), so the caller need
+    not know the rebalance frequency.
+    """
+    if len(index) < 2:
+        return float('nan')
+    days = pd.Series(pd.to_datetime(index)).sort_values().diff().dropna().dt.days
+    med = float(days.median()) if len(days) else float('nan')
+    return 365.25 / med if (med and med > 0) else float('nan')
+
+
+def compute_ic_timeseries(
+        result: SignalDiagnosticsResult,
+        method: str = 'spearman',
+        return_col: str = 'r_norm_univ',
+        min_obs_per_date: int = 5,
+) -> Dict[str, pd.DataFrame]:
+    """Per-date IC series for every horizon in a diagnostic result.
+
+    Mirrors ``compute_per_asset_betas`` in shape — consumes a
+    ``SignalDiagnosticsResult`` and loops ``result.horizon_labels``.
+    Useful for plotting the IC time series / cumulative IC and inspecting
+    IC decay across horizons.
+
+    Args:
+        result: ``SignalDiagnosticsResult`` from
+            ``estimate_signal_diagnostics``.
+        method: 'spearman' (default) or 'pearson' for the per-date IC.
+        return_col: 'r_norm_univ' (default) or 'r_norm_group'.
+        min_obs_per_date: Minimum cross-section per date.
+
+    Returns:
+        ``{horizon_label: DataFrame[date -> (n, IC)]}`` in horizon order.
+    """
+    return {
+        label: _per_date_ic(
+            result.pairs.get(label), method=method,
+            return_col=return_col, min_obs_per_date=min_obs_per_date,
+        )
+        for label in result.horizon_labels
+    }
+
+
+def estimate_ic_ir(
+        result: SignalDiagnosticsResult,
+        method: str = 'spearman',
+        return_col: str = 'r_norm_univ',
+        periods_per_year: Optional[float] = None,
+        min_obs_per_date: int = 5,
+) -> pd.DataFrame:
+    """IC information ratio per horizon — the time-series counterpart to the
+    pooled IC in ``pooled_universe``.
+
+    For each horizon the per-date cross-sectional IC series is summarised::
+
+        IC_IR     = mean(IC) / std(IC)               (per period)
+        IC_IR_an  = IC_IR * sqrt(periods_per_year)   (annualised)
+        t_stat    = IC_IR * sqrt(n_dates)            (significance of mean IC)
+        hit_rate  = mean(IC > 0)
+
+    ``IC_IR`` is the breadth-adjusted quality of the signal: it rewards an
+    IC that is consistently the right sign, not merely large on average.
+    It is the honest stability number the pooled ``t_stat`` is not — the
+    pooled regression in ``estimate_signal_diagnostics`` treats every
+    (asset, date) pair as iid and so overstates significance when the
+    cross-section is correlated within a date; this collapses each date to
+    one observation.
+
+    Args:
+        result: ``SignalDiagnosticsResult`` from
+            ``estimate_signal_diagnostics``.
+        method: 'spearman' (default) or 'pearson' for the per-date IC.
+        return_col: 'r_norm_univ' (universe cross-section, default) or
+            'r_norm_group' (within-group — pass ``group_data`` to
+            ``estimate_signal_diagnostics`` to populate it).
+        periods_per_year: Annualisation factor for ``IC_IR_an``; inferred
+            from the median IC-date spacing when None.
+        min_obs_per_date: Minimum cross-section per date.
+
+    Returns:
+        DataFrame indexed by horizon label, columns ``_IC_IR_COLS``.
+    """
+    ts = compute_ic_timeseries(
+        result, method=method, return_col=return_col,
+        min_obs_per_date=min_obs_per_date,
+    )
+    rows: Dict[str, Dict[str, float]] = {}
+    for label in result.horizon_labels:
+        ic = ts.get(label)
+        if ic is None or ic.empty:
+            rows[label] = {c: np.nan for c in _IC_IR_COLS}
+            continue
+        s = ic['IC']
+        n_dates = int(s.shape[0])
+        mean_ic = float(s.mean())
+        std_ic = float(s.std(ddof=1)) if n_dates > 1 else np.nan
+        ppy = (periods_per_year if periods_per_year is not None
+               else _infer_periods_per_year(ic.index))
+        ic_ir = mean_ic / std_ic if (std_ic and std_ic > 0) else np.nan
+        rows[label] = {
+            'n_dates': n_dates,
+            'mean_IC': mean_ic,
+            'std_IC': std_ic,
+            'IC_IR': ic_ir,
+            'IC_IR_an': ic_ir * np.sqrt(ppy) if (np.isfinite(ic_ir) and np.isfinite(ppy)) else np.nan,
+            't_stat': ic_ir * np.sqrt(n_dates) if np.isfinite(ic_ir) else np.nan,
+            'hit_rate': float((s > 0).mean()),
+        }
+    out = pd.DataFrame.from_dict(rows, orient='index')[_IC_IR_COLS]
+    out.index.name = 'horizon'
     return out
