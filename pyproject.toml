@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qis"
-version = "5.0.2"
+version = "5.0.3"
 description = "Quantitative Investment Strategies (QIS) package implements Python analytics for visualisation of financial data, performance reporting, analysis of quantitative strategies"
 readme = "README.md"
 license = {text = "MIT"}
@@ -58,11 +58,14 @@ dependencies = [
     "seaborn>=0.13.0",
     "openpyxl>=3.1.0",
     "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+data = [
     "yfinance>=0.2.40",
     "pandas-datareader>=0.10.0",
 ]
 
-[project.optional-dependencies]
 reports = [
     "pybloqs>=1.2.13",
     "jinja2>=3.0.0",
@@ -95,10 +98,11 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "ruff>=0.4",
+    "qis[data]",
 ]
 
 all = [
-    "qis[reports,visualization,io,database,jupyter]",
+    "qis[data,reports,visualization,io,database,jupyter]",
 ]
 
 [project.urls]

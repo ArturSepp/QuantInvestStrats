@@ -30,7 +30,7 @@ from typing import Dict, Any, Tuple, NamedTuple, Optional, List, Union
 import pandas as pd
 from qis import PerfParams, BenchmarkReturnsQuantilesRegime, TimePeriod, PerfStat, update_kwargs
 from qis.utils.annualisation import (get_annualization_factor,
-                                     infer_data_periods_per_year, infer_data_frequency_label)
+                                     infer_data_periods_per_year)
 
 # default params have no risk-free rate
 PERF_PARAMS = PerfParams(freq='W-WED', freq_reg='W-WED', rates_data=None)
@@ -328,7 +328,14 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
     """
     if rates_data is None:
         if add_rates_data:
-            import yfinance as yf
+            try:
+                import yfinance as yf
+            except ImportError as exc:
+                raise ImportError(
+                    "add_rates_data=True downloads the 3M US T-bill ('^IRX') via the optional "
+                    "dependency yfinance: run `pip install qis[data]`, or pass rates_data directly, "
+                    "or set add_rates_data=False for zero-rate statistics"
+                ) from exc
             rates_data = yf.download('^IRX', start="1959-12-31", end=None, auto_adjust=True)['Close'].dropna() / 100.0
             if rates_data.empty:  # if online
                 rates_data = None
@@ -374,7 +381,14 @@ def fetch_default_perf_params(rates_data: pd.Series = None,
     """
     if rates_data is None:
         if add_rates_data:
-            import yfinance as yf
+            try:
+                import yfinance as yf
+            except ImportError as exc:
+                raise ImportError(
+                    "add_rates_data=True downloads the 3M US T-bill ('^IRX') via the optional "
+                    "dependency yfinance: run `pip install qis[data]`, or pass rates_data directly, "
+                    "or set add_rates_data=False for zero-rate statistics"
+                ) from exc
             rates_data = yf.download('^IRX', start="1959-12-31", end=None, auto_adjust=True)['Close'].dropna() / 100.0
             if rates_data.empty:  # if online
                 rates_data = None
