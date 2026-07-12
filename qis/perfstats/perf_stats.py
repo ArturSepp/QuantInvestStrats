@@ -15,7 +15,7 @@ from typing import Callable, Union, Dict, Tuple, Any, Optional, Literal
 # qis
 import qis.utils.regression as ols
 import qis.perfstats.returns as ret
-from qis.perfstats.config import PerfStat, PerfParams
+from qis.perfstats.config import PerfStat, PerfParams, ReturnTypes
 from qis.utils.annualisation import get_annualization_factor, infer_annualisation_factor_from_df
 
 # =============================================================================
@@ -278,7 +278,9 @@ def compute_risk_table(prices: pd.DataFrame,
 
     Returns:
         DataFrame indexed by asset with risk metric columns including:
-        VOL, DOWNSIDE_VOL, AVG_LOG_RETURN, START_DATE, END_DATE, NUM_OBS,
+        VOL, DOWNSIDE_VOL, AVG_LOG_RETURN, AVG_ARITH_RETURN, AN_ARITH_RETURN,
+        AVG_ARITH_EXCESS_RETURN, AN_ARITH_EXCESS_RETURN, SHARPE_ARITH,
+        SHARPE_ARITH_EXCESS, START_DATE, END_DATE, NUM_OBS,
         MAX_DD, CURRENT_DD, MAX_DD_VOL, WORST, BEST, SKEWNESS, KURTOSIS.
 
     Raises:
@@ -305,7 +307,8 @@ def compute_risk_table(prices: pd.DataFrame,
     else:
         sampled_prices_skew = ret.prices_at_freq(prices=prices, freq=perf_params.freq_skewness)
 
-    vol_dt = np.sqrt(infer_annualisation_factor_from_df(data=sampled_prices_vol))
+    an_factor = infer_annualisation_factor_from_df(data=sampled_prices_vol)
+    vol_dt = np.sqrt(an_factor)
 
     # ── Compute returns once at the vol and skewness frequencies ──
     # to_returns is bulk-vectorised; per-asset dropna is applied inside metric loops.
@@ -321,6 +324,28 @@ def compute_risk_table(prices: pd.DataFrame,
     # std uses ddof=1 to match the original per-asset numpy call.
     vol_series = returns_vol.std(ddof=1) * vol_dt
     avg_log_return = returns_vol.mean()  # nanmean equivalent for pandas
+
+    # ── Arithmetic Sharpe family ──
+    # SR_arith = sqrt(a) * mean(r_m) / std(r_m) on simple returns at freq_vol
+    # (Sharpe 1994 plug-in estimator). Numerator and denominator are paired on the
+    # same simple-return series and do not reuse the table vol, which follows
+    # perf_params.return_type (LOG by default); the std(r) vs std(l) wedge is third-order.
+    # Note SR_arith is an estimate at the sampling frequency freq_vol.
+    if perf_params.return_type == ReturnTypes.RELATIVE:
+        returns_arith = returns_vol
+    else:
+        returns_arith = ret.to_returns(prices=sampled_prices_vol, return_type=ReturnTypes.RELATIVE, drop_first=True)
+    avg_arith_return = returns_arith.mean()  # periodic mean of simple returns
+    sharpe_arith = vol_dt * avg_arith_return.divide(returns_arith.std(ddof=1))
+    if perf_params.rates_data is not None:
+        # periodic excess simple returns r_m - rf_{m-1}*dt_m, lag=1 rate convention
+        # consistent with the compounded excess-nav path in returns.py
+        excess_returns_arith = ret.compute_excess_returns(returns=returns_arith, rates_data=perf_params.rates_data)
+        avg_arith_excess_return = excess_returns_arith.mean()
+        sharpe_arith_excess = vol_dt * avg_arith_excess_return.divide(excess_returns_arith.std(ddof=1))
+    else:  # rf = 0: excess objects collapse to plain, mirroring the pa excess convention
+        avg_arith_excess_return = avg_arith_return
+        sharpe_arith_excess = sharpe_arith
     worst_series = pct_returns_dd.min()
     best_series = pct_returns_dd.max()
 
@@ -358,6 +383,12 @@ def compute_risk_table(prices: pd.DataFrame,
                 PerfStat.VOL.to_str(): vol,
                 PerfStat.DOWNSIDE_VOL.to_str(): float(downside_vol_series[asset]),
                 PerfStat.AVG_LOG_RETURN.to_str(): float(avg_log_return[asset]),
+                PerfStat.AVG_ARITH_RETURN.to_str(): float(avg_arith_return[asset]),
+                PerfStat.AN_ARITH_RETURN.to_str(): float(an_factor * avg_arith_return[asset]),
+                PerfStat.AVG_ARITH_EXCESS_RETURN.to_str(): float(avg_arith_excess_return[asset]),
+                PerfStat.AN_ARITH_EXCESS_RETURN.to_str(): float(an_factor * avg_arith_excess_return[asset]),
+                PerfStat.SHARPE_ARITH.to_str(): float(sharpe_arith[asset]),
+                PerfStat.SHARPE_ARITH_EXCESS.to_str(): float(sharpe_arith_excess[asset]),
                 PerfStat.START_DATE.to_str(): sampled_price.index[0],
                 PerfStat.END_DATE.to_str(): sampled_price.index[-1],
                 PerfStat.NUM_OBS.to_str(): n_obs,
@@ -394,8 +425,8 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
 
     Combines outputs from ``compute_performance_table`` (return metrics) and
     ``compute_risk_table`` (volatility, drawdowns, higher moments) and derives
-    the standard ratio family: Sharpe (rf=0, excess, log-annualised, average,
-    log-excess, APR), Sortino, Calmar.
+    the standard ratio family: Sharpe (rf=0, excess, log-annualised, log-excess,
+    arithmetic, arithmetic-excess), Sortino, Calmar.
 
     Args:
         prices: DataFrame or Series of asset price levels.
@@ -422,9 +453,9 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     perf_table[PerfStat.SHARPE_RF0.to_str()] = perf_table[PerfStat.PA_RETURN.to_str()] / vol
     perf_table[PerfStat.SHARPE_EXCESS.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / vol
     perf_table[PerfStat.SHARPE_LOG_AN.to_str()] = perf_table[PerfStat.AN_LOG_RETURN.to_str()] / vol
-    perf_table[PerfStat.SHARPE_AVG.to_str()] = perf_table[PerfStat.AVG_AN_RETURN.to_str()] / vol  # computed in risk
-    perf_table[PerfStat.SHARPE_LOG_EXCESS.to_str()] = perf_table[PerfStat.AN_LOG_RETURN_EXCESS.to_str()] / vol
-    perf_table[PerfStat.SHARPE_APR.to_str()] = perf_table[PerfStat.APR.to_str()] / vol
+    perf_table[PerfStat.SHARPE_LOG_EXCESS.to_str()] = perf_table[PerfStat.AN_LOG_EXCESS_RETURN.to_str()] / vol
+    # SHARPE_ARITH / SHARPE_ARITH_EXCESS arrive via risk_table: they are computed in
+    # compute_risk_table where numerator and denominator share the simple-return series
 
     if PerfStat.DOWNSIDE_VOL.to_str() in risk_table.columns:
         perf_table[PerfStat.SORTINO_RATIO.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.DOWNSIDE_VOL.to_str()]

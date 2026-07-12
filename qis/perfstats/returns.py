@@ -306,15 +306,13 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
             return_dict = {PerfStat.TOTAL_RETURN.to_str(): np.nan,
                            PerfStat.PA_RETURN.to_str(): np.nan,
                            PerfStat.AN_LOG_RETURN.to_str(): np.nan,
-                           PerfStat.AN_LOG_RETURN_EXCESS.to_str(): np.nan,
-                           PerfStat.APR.to_str(): np.nan,
+                           PerfStat.AN_LOG_EXCESS_RETURN.to_str(): np.nan,
                            PerfStat.NUM_YEARS.to_str(): np.nan}
         else:
             return_dict = {PerfStat.TOTAL_RETURN.to_str(): np.full(n, fill_value=np.nan),
                            PerfStat.PA_RETURN.to_str(): np.full(n, fill_value=np.nan),
                            PerfStat.AN_LOG_RETURN.to_str(): np.full(n, fill_value=np.nan),
-                           PerfStat.AN_LOG_RETURN_EXCESS.to_str(): np.full(n, fill_value=np.nan),
-                           PerfStat.APR.to_str(): np.full(n, fill_value=np.nan),
+                           PerfStat.AN_LOG_EXCESS_RETURN.to_str(): np.full(n, fill_value=np.nan),
                            PerfStat.NUM_YEARS.to_str(): np.full(n, fill_value=np.nan)}
         return return_dict
 
@@ -361,9 +359,7 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
                    PerfStat.PA_RETURN.to_str(): compounded_return_pa,
                    PerfStat.PA_EXCESS_RETURN.to_str(): excess_return_pa,
                    PerfStat.AN_LOG_RETURN.to_str(): _safe_log1p(compounded_return_pa),
-                   PerfStat.AN_LOG_RETURN_EXCESS.to_str(): _safe_log1p(excess_return_pa),
-                   PerfStat.AVG_AN_RETURN.to_str(): np.divide(total_return, num_years),
-                   PerfStat.APR.to_str(): CALENDAR_DAYS_PER_YEAR_SHARPE*total_return/num_days if num_days > 0 else CALENDAR_DAYS_PER_YEAR_SHARPE*total_return,
+                   PerfStat.AN_LOG_EXCESS_RETURN.to_str(): _safe_log1p(excess_return_pa),
                    PerfStat.NAV1.to_str(): (1.0+total_return),
                    PerfStat.NUM_YEARS.to_str(): num_years,
                    PerfStat.START_DATE.to_str(): prices.index[0],
