@@ -30,7 +30,7 @@ from typing import Dict, Any, Tuple, NamedTuple, Optional, List, Union
 import pandas as pd
 from qis import PerfParams, BenchmarkReturnsQuantilesRegime, TimePeriod, PerfStat, update_kwargs
 from qis.utils.annualisation import (get_annualization_factor,
-                                     infer_data_periods_per_year)
+                                     infer_data_periods_per_year, infer_data_frequency_label)
 
 # default params have no risk-free rate
 PERF_PARAMS = PerfParams(freq='W-WED', freq_reg='W-WED', rates_data=None)

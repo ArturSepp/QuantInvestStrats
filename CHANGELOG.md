@@ -7,6 +7,36 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.0.3] - 2026-07-12
+
+### Changed
+- `yfinance` and `pandas-datareader` moved out of the core dependencies into a
+  new `[data]` extra (`pip install qis[data]`). The analytics core no longer
+  installs a data-vendor client. The two function-local imports in
+  `qis/portfolio/reports/config.py` (the `^IRX` download behind
+  `add_rates_data=True`) raise an `ImportError` naming the extra when it is not
+  installed. The `[all]` extra includes `data`, so `pip install qis[all]` is
+  unchanged.
+
+## [5.0.2] - 2026-07-12
+
+### Added
+- Explicit arithmetic Sharpe convention alongside the p.a. (compound) default.
+  New `PerfStat` members `AN_ARITH_RETURN`, `AN_ARITH_EXCESS_RETURN`,
+  `AVG_ARITH_RETURN`, `AVG_ARITH_EXCESS_RETURN`, `SHARPE_ARITH` and
+  `SHARPE_ARITH_EXCESS` report `a * mean(r_m)` and `a * mean(r_m - rf_m)` on
+  simple returns at `freq_vol`, with the compounded and log Sharpe ratios
+  (`SHARPE_EXCESS`, `SHARPE_LOG_AN`, `SHARPE_LOG_EXCESS`) unchanged. Every
+  Sharpe object is now labeled in the output, so the convention is stated rather
+  than implied.
+- `qis/docs/sharpe_conventions.md` — decision record deriving the three Sharpe
+  objects (compound, log, arithmetic) and their reconciliation, and
+  `qis/perfstats/tests/sharpe_conventions_test.py` pinning the identities.
+
+### Changed
+- The p.a. (compound) Sharpe remains the qis default. No existing statistic
+  changes value; the arithmetic convention is additive and opt-in.
+
 ## [5.0.0] - 2026-07-12
 
 Breaking release. The public API is reduced from 568 to 373 symbols and the
@@ -213,6 +243,30 @@ For downstream code, the mechanical steps are:
    locates it; the module list is in `docs/REMOVED_5_0.md`.
 3. Do not import from `qis/examples/` — it is documentation and is
    restructured without notice.
+
+## [4.3.4] - 2026-07-11
+
+Never tagged; ships to users as part of 5.0.3.
+
+### Added
+- `qis.perfstats.signal_diagnostics` — cross-sectional predictive regression
+  diagnostics for trading signals with per-asset native-cadence handling. For an
+  N-asset panel of signal scores and per-frequency return panels,
+  `estimate_signal_diagnostics` quantifies cross-sectional predictive content at
+  one or more forward horizons via `y_{i,t,t+h} = beta * z_{i,t-1} + eps_{i,t}`
+  (through the origin by default), with the horizon expressed in each asset's
+  native periods. `compute_per_asset_betas`, `compute_ic_timeseries` and
+  `estimate_ic_ir` expose the per-asset betas, the per-date information
+  coefficient series and its IC-IR.
+- `qis.min_obs_for_ar_unsmoothing` — minimum observation count required for an
+  AR(q) unsmoothing fit given `ar_order` and `warmup_period`, validating both
+  (`ValueError` naming the offending value).
+
+### Changed
+- AR unsmoothing (`qis.models.unsmoothing.ar_lag`) gains opt-in guards for
+  short / degenerate columns, selected by enum. Defaults reproduce the previous
+  behaviour exactly; `RAISE` reports the offending columns and their observation
+  counts instead of silently returning an all-NaN column.
 
 ## [4.3.2] - 2026-06-28
 
