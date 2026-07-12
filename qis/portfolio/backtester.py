@@ -6,10 +6,12 @@ create total return blended portfolios based on weights
 import numpy as np
 import pandas as pd
 from numba import njit
-from enum import Enum
 from typing import Union, Dict, Tuple, List, Optional
 # qis
-import qis.utils as qu
+from qis.utils.dates import generate_rebalancing_indicators, set_rebalancing_timeindex_on_given_timeindex
+from qis.utils.df_ops import multiply_df_by_dt
+from qis.utils.np_ops import repeat_by_columns, repeat_by_rows
+from qis.utils.struct_ops import assert_list_subset
 from qis.portfolio.portfolio_data import PortfolioData
 
 
@@ -40,7 +42,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         weights = weights.to_dict()
 
     if isinstance(weights, Dict):  # map to np
-        qu.assert_list_subset(large_list=prices.columns.to_list(),
+        assert_list_subset(large_list=prices.columns.to_list(),
                               list_sample=list(weights.keys()),
                               message=f"weights columns must be aligned with price columns")
         weights = prices.columns.map(weights).to_numpy()
@@ -54,17 +56,17 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         if len(weights.shape) > 1:
             raise ValueError(f"only single aray is allowed")
 
-        is_rebalancing = qu.generate_rebalancing_indicators(df=prices,
+        is_rebalancing = generate_rebalancing_indicators(df=prices,
                                                             freq=rebalancing_freq,
                                                             include_start_date=is_rebalanced_at_first_date)
 
         portfolio_rebalance_dates = is_rebalancing[is_rebalancing == True]
-        portfolio_weights = pd.DataFrame(data=qu.repeat_by_rows(weights, n=len(portfolio_rebalance_dates)),
+        portfolio_weights = pd.DataFrame(data=repeat_by_rows(weights, n=len(portfolio_rebalance_dates)),
                                          index=portfolio_rebalance_dates,
                                          columns=prices.columns)
 
     elif isinstance(weights, pd.DataFrame):
-        qu.assert_list_subset(large_list=prices.columns.to_list(),
+        assert_list_subset(large_list=prices.columns.to_list(),
                               list_sample=weights.columns.to_list(),
                               message=f"weights columns must be aligned with price columns")
         if prices.index[0] > weights.index[0]:
@@ -76,24 +78,24 @@ def backtest_model_portfolio(prices: pd.DataFrame,
             rebalancing_index = portfolio_weights.index + pd.Timedelta(days=weight_implementation_lag)
         else:
             rebalancing_index = portfolio_weights.index
-        is_rebalancing = qu.set_rebalancing_timeindex_on_given_timeindex(given_index=prices.index,
+        is_rebalancing = set_rebalancing_timeindex_on_given_timeindex(given_index=prices.index,
                                                                          rebalancing_index=rebalancing_index)
     else:
         raise NotImplementedError(f"unsupported weights type = {type(weights)}")
 
     # adjust rates at rebealncing
     if funding_rate is not None:
-        funding_rate_dt = qu.multiply_df_by_dt(df=funding_rate, dates=prices.index, lag=0)
+        funding_rate_dt = multiply_df_by_dt(df=funding_rate, dates=prices.index, lag=0)
     else:
         funding_rate_dt = pd.Series(0.0, index=prices.index)
 
     if management_fee is not None:
-        management_fee_dt = qu.multiply_df_by_dt(df=pd.Series(management_fee, index=prices.index), dates=prices.index, lag=0)
+        management_fee_dt = multiply_df_by_dt(df=pd.Series(management_fee, index=prices.index), dates=prices.index, lag=0)
     else:
         management_fee_dt = pd.Series(0.0, index=prices.index)
 
     if instruments_carry is not None:
-        instruments_carry_dt = qu.multiply_df_by_dt(df=instruments_carry, dates=prices.index, lag=0)
+        instruments_carry_dt = multiply_df_by_dt(df=instruments_carry, dates=prices.index, lag=0)
     else:
         instruments_carry_dt = pd.Series(0.0, index=prices.index)
 
@@ -180,7 +182,7 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
         current_prices = prices[t, :]
         management_fee = management_fee_dt[t]*nav[t-1]
         current_cash_balance = cash_balances[t-1] * (1.0 + funding_rate_dt[t]) - management_fee
-        
+
         if instruments_carry_dt is not None:
             carry = np.nansum(current_units * current_prices * instruments_carry_dt[t])
             current_cash_balance += carry
@@ -206,63 +208,6 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
         nav[t] = np.nansum(current_units * current_prices) + current_cash_balance
         cash_balances[t] = current_cash_balance
 
-    effective_weights = np.divide(units * prices, qu.repeat_by_columns(a=nav, n=prices.shape[1]))
+    effective_weights = np.divide(units * prices, repeat_by_columns(a=nav, n=prices.shape[1]))
 
     return nav, units, effective_weights, realized_costs
-
-
-class LocalTests(Enum):
-    BLENDED = 1
-    COSTS = 2
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    import matplotlib.pyplot as plt
-    import qis.plots.derived.prices as ppd
-
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data().dropna()
-
-    prices = prices[['SPY', 'TLT']]
-    # prices.iloc[:200, :] = np.nan
-    print(prices)
-    
-    if local_test == LocalTests.BLENDED:
-
-        portfolio_nav_1_0 = backtest_model_portfolio(prices=prices,
-                                                     weights=np.array([1.0, 0.0]),
-                                                     rebalancing_freq='QE').get_portfolio_nav()
-
-        portfolio_nav_5_5 = backtest_model_portfolio(prices=prices,
-                                                     weights=np.array([1.0, 0.5]),
-                                                     rebalancing_freq='QE').get_portfolio_nav()
-
-        portfolio_nav_0_1 = backtest_model_portfolio(prices=prices,
-                                                     weights=np.array([1.0, 1.0]),
-                                                     rebalancing_freq='QE').get_portfolio_nav()
-
-        portfolio_nav = pd.concat([portfolio_nav_1_0, portfolio_nav_5_5, portfolio_nav_0_1], axis=1)
-        portfolio_nav.columns = ['x1=100, x2=0', 'x1=100, x2=50', 'x1=100, x2=100']
-        print(portfolio_nav)
-        fig, ax = plt.subplots(1, 1, figsize=(12, 10))
-        ppd.plot_prices(prices=portfolio_nav, ax=ax)
-
-    elif local_test == LocalTests.COSTS:
-        portfolio_nav = backtest_model_portfolio(prices=prices,
-                                                 weights=np.array([1.0, 1.0]),
-                                                 rebalancing_freq='QE')
-
-        portfolio_nav.plot_pnl()
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.BLENDED)

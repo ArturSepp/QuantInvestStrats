@@ -21,6 +21,7 @@ from typing import List
 
 import qis as qis
 from qis import PerfStat
+from qis.plots.utils import calc_table_height
 
 
 # Default column set for risk-adjusted performance vs benchmark.
@@ -76,7 +77,7 @@ def generate_performance_report(prices: pd.DataFrame,
     # 2. periodic returns table
     fig, ax = plt.subplots(
         1, 1,
-        figsize=(7, qis.calc_table_height(num_rows=len(prices.columns) + 5, scale=0.5)),
+        figsize=(7, calc_table_height(num_rows=len(prices.columns) + 5, scale=0.5)),
         tight_layout=True)
     qis.plot_periodic_returns_table(
         prices=prices,

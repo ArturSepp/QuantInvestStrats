@@ -15,6 +15,7 @@ import qis.utils.dates as da
 import qis.utils.df_freq as dff
 import qis.utils.np_ops as npo
 import qis.utils.df_ops as dfo
+from qis.utils.df_ops import df_price_ffill_between_nans
 from qis.utils.df_groups import get_group_dict
 from qis.perfstats.config import PerfStat, ReturnTypes, PerfParams
 from qis.utils.annualisation import infer_annualisation_factor_from_df, CALENDAR_DAYS_PER_YEAR_SHARPE
@@ -1039,55 +1040,6 @@ def get_excess_returns_nav(prices: Union[pd.DataFrame, pd.Series],
                                     terminal_value=terminal_value,
                                     init_period=1)
     return excess_nav
-
-
-def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
-                                method: Optional[str] = 'ffill'
-                                ) -> Union[pd.Series, pd.DataFrame]:
-    """Forward-fill prices only between first and last non-NaN dates.
-
-    Preserves leading and trailing NaN values while filling gaps.
-
-    Args:
-        prices: Price time series
-        method: Fill method ('ffill', 'bfill', or None)
-
-    Returns:
-        Price series with gaps filled between first and last valid observations
-    """
-    is_series_out = False
-    if isinstance(prices, pd.Series):
-        is_series_out = True
-        prices = prices.to_frame()
-
-    # Get first and last valid dates for each column
-    first_date = dfo.get_nonnan_index(df=prices, position='first')
-    last_date = dfo.get_nonnan_index(df=prices, position='last')
-
-    # Fill only between valid date ranges
-    good_parts = []
-    for idx, column in enumerate(prices.columns):
-        good_price = prices.loc[first_date[idx]:last_date[idx], column]
-        # Honour the `method` parameter — previously this branch
-        # hardcoded .ffill() regardless of method, so callers passing
-        # method='bfill' silently got ffill behaviour. Now method
-        # dispatches correctly. method=None still skips filling and
-        # returns gaps as NaN inside the valid date range.
-        if method == 'ffill':
-            good_price = good_price.infer_objects().ffill()
-        elif method == 'bfill':
-            good_price = good_price.infer_objects().bfill()
-        elif method is not None:
-            raise NotImplementedError(f"method={method} not supported")
-        good_parts.append(good_price)
-
-    bfilled_data = pd.concat(good_parts, axis=1)
-    if bfilled_data.index[0] > prices.index[0]:
-        bfilled_data = bfilled_data.reindex(index=prices.index)
-
-    if is_series_out:
-        bfilled_data = bfilled_data.iloc[:, 0]
-    return bfilled_data
 
 
 # =============================================================================

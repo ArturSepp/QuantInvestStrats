@@ -7,15 +7,10 @@ from qis.perfstats.config import (
     RA_TABLE_COLUMNS,
     RA_TABLE_COMPACT_COLUMNS,
     RegimeData,
-    RegimeType,
     ReturnTypes,
     SD_PERF_COLUMNS,
     TRE_TABLE_COLUMNS
 )
-
-from qis.perfstats.cond_regression import (ConditionalRegressionColumns,
-                                            estimate_cond_regression,
-                                            get_regime_regression_params)
 
 from qis.perfstats.desc_table import DescTableType, compute_desc_table
 
@@ -79,7 +74,6 @@ from qis.perfstats.returns import (
     prices_to_scaled_nav,
     to_total_returns,
     to_zero_first_nonnan_returns,
-    df_price_ffill_between_nans,
     delever_returns,
     lever_returns,
     implied_leverage,
@@ -89,15 +83,8 @@ from qis.perfstats.returns import (
 from qis.perfstats.timeseries_bfill import (
     interpolate_infrequent_returns,
     append_time_series,
-    bfill_timeseries,
-    df_fill_first_nan_by_cross_median,
-    df_price_fill_first_nan_by_cross_median,
-    replace_nan_by_median,
-    df_ffill_negatives
+    bfill_timeseries
 )
-
-from qis.perfstats.fx_ops import (get_aligned_fx_spots,
-                                  compute_futures_fx_adjusted_returns)
 
 from qis.perfstats.signal_diagnostics import (
     SignalDiagnosticsColumns,

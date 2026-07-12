@@ -102,14 +102,14 @@ def compute_brinson_attribution_table(
         df=strategy_pnl,
         group_data=asset_class_data,
         group_order=group_order,
-        agg_func=dfa.nansum
+        agg_func=dfa.df_nansum
     )
 
     grouped_benchmark_pnl = agg_df_by_groups(
         df=benchmark_pnl,
         group_data=asset_class_data,
         group_order=group_order,
-        agg_func=dfa.nansum
+        agg_func=dfa.df_nansum
     )
 
     # Aggregate weights by asset class (sum individual asset weights within class)
@@ -117,14 +117,14 @@ def compute_brinson_attribution_table(
         df=strategy_weights,
         group_data=asset_class_data,
         group_order=group_order,
-        agg_func=dfa.nansum
+        agg_func=dfa.df_nansum
     )
 
     grouped_benchmark_weights = agg_df_by_groups(
         df=benchmark_weights,
         group_data=asset_class_data,
         group_order=group_order,
-        agg_func=dfa.nansum
+        agg_func=dfa.df_nansum
     )
 
     # Core Brinson attribution calculations
@@ -140,7 +140,7 @@ def compute_brinson_attribution_table(
             df=active_return,
             group_data=asset_class_data,
             group_order=group_order,
-            agg_func=dfa.nansum
+            agg_func=dfa.df_nansum
         )
     else:
         # Approach 2: Calculate active return from grouped P&L (preferred)

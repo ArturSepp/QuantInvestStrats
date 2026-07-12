@@ -11,7 +11,9 @@ import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.risk.factor_model import LinearModel
-from qis.portfolio.reports.config import PERF_PARAMS, regime_classifier
+from qis.portfolio.reports.config import PERF_PARAMS
+from qis.plots.utils import get_n_sns_colors
+from qis.utils.df_str import idx_to_alphabet
 
 
 def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfolioData,
@@ -366,7 +368,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                    xvar_format='{:.0%}',
                                    add_bar_at_peak=True,
                                    desc_table_type=qis.DescTableType.NONE,
-                                   title=f"({qis.idx_to_alphabet(idx+1)}) {key} Returns",
+                                   title=f"({idx_to_alphabet(idx+1)}) {key} Returns",
                                    xlabel='return',
                                    ax=axs[idx])
             #if not add_titles:
@@ -528,7 +530,7 @@ def plot_exposures_long_short_groups(exposures_short: pd.DataFrame,
                    use_bar_plot=True,
                    legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                    var_format=var_format,
-                   colors=qis.get_n_sns_colors(n=len(exposures_short.columns)),
+                   colors=get_n_sns_colors(n=len(exposures_short.columns)),
                    ax=axs[0],
                    **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.01), ncols=1,
                                                     framealpha=0.9)))
@@ -541,7 +543,7 @@ def plot_exposures_long_short_groups(exposures_short: pd.DataFrame,
                               add_y_median_labels=False,
                               yvar_format=var_format,
                               x_rotation=90,
-                              colors=qis.get_n_sns_colors(n=len(exposures_long.columns)),
+                              colors=get_n_sns_colors(n=len(exposures_long.columns)),
                               y_limits=(0.0, None),
                               ax=axs[1],
                               **kwargs)
@@ -559,7 +561,7 @@ def plot_exposures_strategy_vs_benchmark_stack(strategy_exposures: pd.DataFrame,
                    use_bar_plot=True,
                    legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                    var_format=var_format,
-                   colors=qis.get_n_sns_colors(n=len(benchmark_exposures.columns)),
+                   colors=get_n_sns_colors(n=len(benchmark_exposures.columns)),
                    title=benchmark_ticker,
                    ax=axs[0],
                    **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.01), ncols=1,
@@ -568,7 +570,7 @@ def plot_exposures_strategy_vs_benchmark_stack(strategy_exposures: pd.DataFrame,
                    use_bar_plot=True,
                    legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
                    var_format=var_format,
-                   colors=qis.get_n_sns_colors(n=len(strategy_exposures.columns)),
+                   colors=get_n_sns_colors(n=len(strategy_exposures.columns)),
                    title=strategy_ticker,
                    ax=axs[1],
                    **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.01), ncols=1,
@@ -601,7 +603,7 @@ def plot_exposures_strategy_vs_benchmark_boxplot(strategy_exposures: pd.DataFram
                                    yvar_format=var_format,
                                    x_rotation=90,
                                    title=title,
-                                   # colors=qis.get_n_sns_colors(n=len(exposures_long.columns)),
+                                   # colors=get_n_sns_colors(n=len(exposures_long.columns)),
                                    y_limits=y_limits,
                                    ax=ax,
                                    **kwargs)

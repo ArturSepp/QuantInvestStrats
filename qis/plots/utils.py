@@ -25,6 +25,15 @@ import qis.utils.df_freq as dff
 import qis.utils.struct_ops as sop
 from qis.plots.table import ROW_HIGHT, COLUMN_WIDTH, FIRST_COLUMN_WIDTH
 
+# public API of this module: everything else is internal plotting machinery and is
+# imported by its full path, e.g. `from qis.plots.utils import set_spines`
+__all__ = ['TrendLine',        # enum, appears in plot_prices() / plot_prices_2ax() signatures
+           'LastLabel',        # enum, appears in plot_time_series() signature
+           'LegendStats',      # enum, appears in plot_bars() / plot_histogram() signatures
+           'set_suptitle'      # figure title helper, used across qis, optimalportfolios, rosaa
+           ]
+
+
 
 class FixedColors(Enum):
     NAVY = mcolors['navy']
@@ -1129,7 +1138,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             else:
                 total = np.nansum(column_data)
             legend_lines.append(f"{column}: total={var_format.format(total)}")
-    
+
     elif legend_stats == LegendStats.AVG_MIN_MAX_LAST:
         legend_lines = []
         for column in data.columns:
@@ -1167,7 +1176,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
             legend_lines.append(f"{column}: first={var_format.format(first)}, min={var_format.format(min)}, "
                                 f"max={var_format.format(max)}, last={var_format.format(last)}")
-        
+
     else:
         raise TypeError(f"{legend_stats} not implemented")
 

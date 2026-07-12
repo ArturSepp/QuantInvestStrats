@@ -255,7 +255,7 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
         ac_vars = dfg.agg_df_by_groups(df=instrument_vars,
                                        group_data=group_data,
                                        group_order=group_order,
-                                       agg_func=dfa.nansum,
+                                       agg_func=dfa.df_nansum,
                                        total_column=total_column)
     else:
         ac_vars = instrument_vars.sum(axis=1)

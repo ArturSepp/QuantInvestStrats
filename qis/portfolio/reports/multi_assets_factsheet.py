@@ -14,6 +14,8 @@ import qis as qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData, RollingPerfStat, LegendStats, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
                                           validate_reporting_frequency, infer_data_frequency_label)
+from qis.plots.utils import set_title
+from qis.utils.df_str import series_to_str
 
 
 PERF_COLUMNS = (
@@ -141,8 +143,8 @@ class MultiAssetsReport:
         table_data = pd.DataFrame(data=prices.columns, index=cvar_table.index, columns=[columns_title])
 
         for perf_column in perf_columns:
-            table_data[perf_column.to_str()] = qis.series_to_str(ds=cvar_table[perf_column.to_str()],
-                                                                 var_format=perf_column.to_format(**kwargs))
+            table_data[perf_column.to_str()] = series_to_str(ds=cvar_table[perf_column.to_str()],
+                                                             var_format=perf_column.to_format(**kwargs))
 
         special_columns_colors = [(0, 'steelblue')]
         special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
@@ -228,7 +230,7 @@ class MultiAssetsReport:
                                         date_format=date_format,
                                         **local_kwargs)
         title = title or f"{heatmap_freq} Returns"
-        qis.set_title(ax=ax, title=title, **kwargs)
+        set_title(ax=ax, title=title, **kwargs)
 
     def plot_corr_table(self,
                         corr_freq: str = 'W-WED',

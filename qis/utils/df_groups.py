@@ -113,7 +113,7 @@ def agg_df_by_groups_ax1(df: pd.DataFrame,
 def agg_df_by_groups(df: pd.DataFrame,
                      group_data: pd.Series,
                      group: str = None,
-                     agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.nansum,
+                     agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.df_nansum,
                      total_column: Union[str, None] = None,
                      is_total_first: bool = True,
                      group_order: List[str] = None,
@@ -162,7 +162,7 @@ def agg_df_by_groups(df: pd.DataFrame,
 def agg_df_by_group_with_avg(df: pd.DataFrame,
                              group_data: pd.Series,
                              group_order: List[str] = None,
-                             agg_func: Callable = dfa.nanmean,
+                             agg_func: Callable = dfa.df_nanmean,
                              agg_func_id: str = 'mean',
                              total_column: str = 'Universe mean'
                              ) -> Dict[str, pd.DataFrame]:
@@ -192,7 +192,7 @@ def agg_df_by_group_with_avg(df: pd.DataFrame,
 
 def fill_df_with_group_avg(df: pd.DataFrame,
                            group_data: pd.Series,
-                           agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.nanmean,
+                           agg_func: Callable[[pd.DataFrame], pd.Series] = dfa.df_nanmean,
                            group_order: List[str] = None
                            ) -> pd.DataFrame:
     """

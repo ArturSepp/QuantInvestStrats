@@ -10,6 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import qis as qis
+from qis.plots.utils import align_y_limits_axs, get_cmap_colors
 from pandas.tseries.holiday import AbstractHolidayCalendar, Holiday
 from dateutil.relativedelta import TU
 from bbg_fetch import fetch_field_timeseries_per_tickers
@@ -139,7 +140,7 @@ def plot_before_after_prices(joint_prices: pd.DataFrame,
     else:
         yvar_format='{:,.2f}',
     n = len(joint_prices.columns)
-    colors = qis.get_cmap_colors(n=n, cmap='tab20')
+    colors = get_cmap_colors(n=n, cmap='tab20')
     linestyles = ['dotted'] * n
     if add_average:
         colors[0] = 'blue'
@@ -202,7 +203,7 @@ def plot_conditional_performances(dfs: Dict[str, pd.DataFrame], title: str) -> p
         qis.set_suptitle(fig, title=title)
         for idx, (group, joint_prices) in enumerate(dfs.items()):
             plot_before_after_prices(joint_prices=joint_prices, title=group, ax=axs[idx])
-        qis.align_y_limits_axs(axs)
+        align_y_limits_axs(axs)
     return fig
 
 

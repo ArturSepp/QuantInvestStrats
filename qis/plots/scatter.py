@@ -12,8 +12,9 @@ from statsmodels import api as sm
 from typing import Union, List, Tuple, Optional, Dict
 
 # qis
-import qis.plots as qp
-import qis.utils as qu
+import qis.plots.utils as qp
+from qis.utils.df_cut import add_quantile_classification
+from qis.utils.regression import fit_multivariate_ols, get_ols_x, reg_model_params_to_str
 
 
 def plot_scatter(df: pd.DataFrame,
@@ -120,7 +121,7 @@ def plot_scatter(df: pd.DataFrame,
                             ax=ax)
 
             # Plot custom regression line from our model
-            x1_pred = qu.get_ols_x(x=x_vals, order=order, fit_intercept=reg_model.params.shape[0] > order)
+            x1_pred = get_ols_x(x=x_vals, order=order, fit_intercept=reg_model.params.shape[0] > order)
             prediction = reg_model.predict(x1_pred)
             ax.plot(x_vals, prediction, color=color, lw=linewidth, linestyle=linestyle)
 
@@ -138,7 +139,7 @@ def plot_scatter(df: pd.DataFrame,
             data_hue = df[df[hue] == hue_id].replace([np.inf, -np.inf], np.nan).dropna().sort_values(by=x)
             x_ = data_hue[x].to_numpy()
             y_ = data_hue[y].to_numpy()
-            x1 = qu.get_ols_x(x=x_, order=order, fit_intercept=fit_intercept)
+            x1 = get_ols_x(x=x_, order=order, fit_intercept=fit_intercept)
             reg_model = sm.OLS(y_, x1).fit()
             estimated_reg_models[hue_id] = reg_model
 
@@ -157,7 +158,7 @@ def plot_scatter(df: pd.DataFrame,
             data_clean = df[[x, y]].replace([np.inf, -np.inf], np.nan).dropna().sort_values(by=x)
             x_ = data_clean[x].to_numpy()
             y_ = data_clean[y].to_numpy()
-            x1 = qu.get_ols_x(x=x_, order=full_sample_order, fit_intercept=fit_intercept)
+            x1 = get_ols_x(x=x_, order=full_sample_order, fit_intercept=fit_intercept)
             reg_model = sm.OLS(y_, x1).fit()
 
             # Plot
@@ -172,7 +173,7 @@ def plot_scatter(df: pd.DataFrame,
             xy = df[[x, y]].sort_values(by=x)
             x_ = xy[x].to_numpy()
             y_ = xy[y].to_numpy()
-            x1 = qu.get_ols_x(x=x_, order=full_sample_order, fit_intercept=fit_intercept)
+            x1 = get_ols_x(x=x_, order=full_sample_order, fit_intercept=fit_intercept)
             reg_model = sm.OLS(y_, x1).fit()
 
             if add_universe_model_prediction:
@@ -188,7 +189,7 @@ def plot_scatter(df: pd.DataFrame,
 
             if add_universe_model_label:
                 text_str = f"{full_sample_label} " \
-                           f"{qu.reg_model_params_to_str(reg_model=reg_model, order=full_sample_order, fit_intercept=fit_intercept, **kwargs)}"
+                           f"{reg_model_params_to_str(reg_model=reg_model, order=full_sample_order, fit_intercept=fit_intercept, **kwargs)}"
                 legend_labels.append(text_str)
                 legend_colors.append(full_sample_color)
 
@@ -202,7 +203,7 @@ def plot_scatter(df: pd.DataFrame,
                 if add_hue_model_label:
                     reg_model = estimated_reg_models[hue_id]
                     text_str = (f"{hue_id}: " 
-                                f"{qu.reg_model_params_to_str(reg_model=reg_model, order=order, fit_intercept=fit_intercept, **kwargs)}")
+                                f"{reg_model_params_to_str(reg_model=reg_model, order=order, fit_intercept=fit_intercept, **kwargs)}")
                 else:
                     text_str = hue_id
                 legend_labels.append(text_str)
@@ -306,7 +307,7 @@ def plot_classification_scatter(df: pd.DataFrame,
         else:
             raise ValueError(f"y_column is not defined for more than on columns")
 
-    df, _ = qu.add_quantile_classification(df=df, x_column=x, hue_name=hue_name, num_buckets=num_buckets, bins=bins)
+    df, _ = add_quantile_classification(df=df, x_column=x, hue_name=hue_name, num_buckets=num_buckets, bins=bins)
 
     fig = plot_scatter(df=df,
                        x=x,
@@ -366,7 +367,7 @@ def estimate_classification_scatter(df: pd.DataFrame,
         else:
             raise ValueError(f"y_column is not defined for more than on columns")
 
-    df, _ = qu.add_quantile_classification(df=df, x_column=x, hue_name=hue_name, num_buckets=num_buckets, bins=bins)
+    df, _ = add_quantile_classification(df=df, x_column=x, hue_name=hue_name, num_buckets=num_buckets, bins=bins)
 
     x_np = df[x].to_numpy()
     x_range = np.linspace(np.min(x_np), np.max(x_np), 200)
@@ -378,7 +379,7 @@ def estimate_classification_scatter(df: pd.DataFrame,
         data_hue = df.sort_values(by=x)
         x_ = data_hue[x].to_numpy()
         y_ = data_hue[y].to_numpy()
-        x1 = qu.get_ols_x(x=x_, order=order, fit_intercept=fit_intercept)
+        x1 = get_ols_x(x=x_, order=order, fit_intercept=fit_intercept)
         reg_model = sm.OLS(y_, x1).fit()
         x_hue = np.extract(np.logical_and(x_range>=np.min(x_), x_range<np.max(x_)), x_range)
         y_hue = reg_model.predict(x_hue)
@@ -407,7 +408,7 @@ def plot_multivariate_scatter_with_prediction(df: pd.DataFrame,
                                               **kwargs
                                               ) -> Optional[plt.Figure]:
 
-    prediction, params, reg_label = qu.fit_multivariate_ols(x=df[x], y=df[y], fit_intercept=fit_intercept, verbose=verbose)
+    prediction, params, reg_label = fit_multivariate_ols(x=df[x], y=df[y], fit_intercept=fit_intercept, verbose=verbose)
 
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))

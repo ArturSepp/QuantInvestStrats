@@ -15,8 +15,9 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import AttributionMetric
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
-from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
+from qis.portfolio.reports.config import (PERF_PARAMS,
                                           validate_reporting_frequency, infer_data_frequency_label)
+from qis.plots.utils import get_df_table_size, set_spines, set_y_limits
 
 
 def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfolioData,
@@ -247,7 +248,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         tre_table = multi_portfolio_data.compute_tracking_error_table(strategy_idx=strategy_idx,
                                                                       benchmark_idx=benchmark_idx,
                                                                       **kwargs)
-        fig1, ax = plt.subplots(1, 1, figsize=qis.get_df_table_size(df=tre_table), constrained_layout=True)
+        fig1, ax = plt.subplots(1, 1, figsize=get_df_table_size(df=tre_table), constrained_layout=True)
         fig1.suptitle(f'{backtest_name} Tracking error table', fontweight="bold", fontsize=8, color='blue')
         figs.append(fig1)
         qis.plot_df_table(df=tre_table,
@@ -332,7 +333,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                      ax=ax,
                                      **local_kwargs)
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=df.index, regime_classifier=regime_classifier)
-                qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+                set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     if add_joint_instrument_history_report:
         perf_columns = (qis.PerfStat.START_DATE, qis.PerfStat.END_DATE, qis.PerfStat.PA_RETURN,
@@ -454,7 +455,7 @@ def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortf
                                               ax=ax,
                                               **local_kwargs)
     if is_long_only:
-        qis.set_y_limits(ax=ax, y_limits=(0, None))
+        set_y_limits(ax=ax, y_limits=(0, None))
     ax = fig.add_subplot(gs[2, 0])
     multi_portfolio_data.plot_weights_boxplot(strategy_idx=strategy_idx,
                                               benchmark_idx=benchmark_idx,
@@ -464,7 +465,7 @@ def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortf
                                               ax=ax,
                                               **local_kwargs)
     if is_long_only:
-        qis.set_y_limits(ax=ax, y_limits=(0, None))
+        set_y_limits(ax=ax, y_limits=(0, None))
 
     if add_strategy_factsheet:
         for portfolio_data in multi_portfolio_data.portfolio_datas:

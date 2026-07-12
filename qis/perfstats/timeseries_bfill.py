@@ -2,7 +2,6 @@
 Implement core for contacenation of time series
 """
 # packages
-import warnings
 import numpy as np
 import pandas as pd
 from typing import Optional, Union, List, Tuple
@@ -12,6 +11,7 @@ import qis.utils.np_ops as npo
 import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
 import qis.models.linear.ewm as ewm
+from qis.utils.df_ops import df_ffill_negatives
 
 
 def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataFrame],
@@ -219,70 +219,3 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
         new_df = new_df.iloc[:, 0]
 
     return new_df, diff
-
-
-def replace_nan_by_median(df: pd.DataFrame,
-                          is_replace_zeros: bool = True
-                          ) -> pd.DataFrame:
-    """
-    fill non nan using median of other columns
-    """
-    if is_replace_zeros:
-        df = df.replace(0.0, np.nan)
-    np_data = df.to_numpy()
-    data_med = npo.np_array_to_df_columns(a=np.nanmedian(np_data, axis=1), ncols=len(df.columns))
-    np_data_fill = np.where(np.isnan(np_data), data_med, np_data)
-    data_clean = pd.DataFrame(np_data_fill, index=df.index, columns=df.columns)
-    return data_clean
-
-
-def df_fill_first_nan_by_cross_median(df: pd.DataFrame,
-                                      is_replace_zeros: bool = True
-                                      ) -> pd.DataFrame:
-    """
-    before first non nan use median of other columns
-    after that use ffill
-    """
-    df = df.copy()
-    if is_replace_zeros:
-        df = df.replace(0.0, np.nan)
-
-    # for each column find first nonan
-    first_nonnan_index = dfo.get_nonnan_index(df)
-    merged_data = pd.DataFrame(index=df.index, columns=df.columns)
-    for idx, column in enumerate(df.columns):
-        its_first_nonnan_index = first_nonnan_index[idx]
-        with warnings.catch_warnings():  # silence All-NaN slice encountered
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            median_backfill = np.nanmedian(df.loc[:its_first_nonnan_index, :].to_numpy(), axis=1)
-        merged_data.loc[:its_first_nonnan_index, column] = median_backfill
-        merged_data.loc[its_first_nonnan_index:, column] = df.loc[its_first_nonnan_index:, column].to_numpy()
-
-    # fillnans with ffill in data after
-    merged_data = merged_data.infer_objects(copy=False).ffill()
-
-    return merged_data
-
-
-def df_price_fill_first_nan_by_cross_median(prices: pd.DataFrame) -> pd.DataFrame:
-    """
-    before first non nan use median of other columns
-    after that use ffill
-    """
-    prices = prices.ffill()
-    returns = ret.to_returns(prices=prices, is_first_zero=False)
-    returns_fill = df_fill_first_nan_by_cross_median(df=returns, is_replace_zeros=False)
-    returns_fill = returns_fill.fillna(0.0)
-    bfilled_data = ret.returns_to_nav(returns=returns_fill, terminal_value=prices.iloc[-1, :])
-    return bfilled_data
-
-
-def df_ffill_negatives(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
-    """
-    use ffill for filling negative prices
-    """
-    nans_mask = pd.isna(df)
-    df = df.where(df >= 0.0, other=0.0).replace({0.0: np.nan}).ffill()
-    # where will convert nans to zeros, replace zeros
-    df = df.where(nans_mask == False, other=np.nan)
-    return df

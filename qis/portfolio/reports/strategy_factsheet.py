@@ -15,6 +15,7 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
 from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
                                           validate_reporting_frequency, infer_data_frequency_label)
+from qis.plots.utils import TrendLine, align_y_limits_axs, set_spines
 
 
 def generate_strategy_factsheet(portfolio_data: PortfolioData,
@@ -124,7 +125,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                     ax=ax,
                     **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-    qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # dd
     ax = fig.add_subplot(gs[2:4, :2])
@@ -133,7 +134,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                dd_legend_type=dd_legend_type,
                                ax=ax, **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-    qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # under water
     ax = fig.add_subplot(gs[4:6, :2])
@@ -142,7 +143,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                       dd_legend_type=dd_legend_type,
                                       ax=ax, **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-    qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # rolling performance
     ax = fig.add_subplot(gs[6:8, :2])
@@ -152,9 +153,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      rolling_window=sharpe_rolling_window,
                                      time_period=time_period,
                                      ax=ax,
-                                     **qis.update_kwargs(kwargs, dict(trend_line=qis.TrendLine.ZERO_SHADOWS)))
+                                     **qis.update_kwargs(kwargs, dict(trend_line=TrendLine.ZERO_SHADOWS)))
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-    qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # exposures
     exposures = portfolio_data.get_weights(is_grouped=is_grouped, time_period=time_period, add_total=False)
@@ -168,7 +169,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                    var_format='{:.1%}',
                    ax=ax,
                    **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncols=2)))
-    qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # turnover
     ax = fig.add_subplot(gs[10:12, :2])
@@ -186,7 +187,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                          ax=ax,
                          **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-    qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # costs
     ax = fig.add_subplot(gs[12:14, :2])
@@ -204,7 +205,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                          ax=ax,
                          **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-    qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # ra perf table
     if add_benchmarks_to_navs:
@@ -289,7 +290,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                          ax=ax,
                          **kwargs)
     qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-    qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+    set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     figs = [fig]
 
@@ -320,7 +321,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                             is_grouped=True, is_correlated=True, time_period=time_period,
                                             freq=freq_var, vol_span=var_span,
                                             ax=axs[3], **kwargs)
-            qis.align_y_limits_axs(axs=axs)
+            align_y_limits_axs(axs=axs)
 
         # last / max var by instrument
         with sns.axes_style("whitegrid"):
@@ -333,7 +334,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                             is_grouped=False, is_correlated=False, time_period=time_period,
                                             freq=freq_var, vol_span=var_span,
                                             ax=axs[1], **kwargs)
-            qis.align_y_limits_axs(axs=axs)
+            align_y_limits_axs(axs=axs)
 
         # best worst returns
         with sns.axes_style("whitegrid"):
@@ -376,7 +377,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                   time_period=time_period,
                                                   **kwargs)
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+        set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # var time series - correlted
         ax = fig.add_subplot(gs[4, 2:])
@@ -385,7 +386,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                   time_period=time_period,
                                                   **kwargs)
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+        set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # vol time series
         ax = fig.add_subplot(gs[5, 2:])
@@ -395,7 +396,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                            ax=ax,
                                            **kwargs)
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+        set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # benchmark betas
         ax = fig.add_subplot(gs[5, :2])
@@ -411,7 +412,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                              ax=ax,
                              **kwargs)
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+        set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # beta attribution
         ax = fig.add_subplot(gs[6, :2])
@@ -428,7 +429,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                              ax=ax,
                              **kwargs)
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
-        qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+        set_spines(ax=ax, bottom_spine=False, left_spine=False)
         """
         # returns scatter
         with sns.axes_style("whitegrid"):
@@ -657,7 +658,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      **local_kwargs)
                 qis.add_bnb_regime_shadows(ax=ax, pivot_prices=time_period1.locate(pivot_prices),
                                            regime_classifier=regime_classifier1)
-                qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+                set_spines(ax=ax, bottom_spine=False, left_spine=False)
                 ax.axhline(0, color='black', linewidth=0.5)
 
     if add_grouped_cum_pnl:
@@ -683,7 +684,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                 qis.add_bnb_regime_shadows(ax=ax,
                                            pivot_prices=time_period1.locate(pivot_prices),
                                            regime_classifier=regime_classifier1)
-                qis.set_spines(ax=ax, bottom_spine=False, left_spine=False)
+                set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     if add_instrument_history_report:
         if df_to_add is None:

@@ -17,6 +17,7 @@ from enum import Enum
 # qis
 import yfinance as yf
 import qis
+from qis.plots.utils import add_scatter_points, set_legend
 
 SEED = 1
 
@@ -31,8 +32,8 @@ def plot_bootsrap_paths(prices: pd.Series,
     """
     figs = []
     bootstrap_prices = qis.bootstrap_price_data(prices=prices,
-                                                bootsrap_type=qis.BootsrapType.STATIONARY,
-                                                bootsrap_output=qis.BootsrapOutput.SERIES_TO_DF,
+                                                bootsrap_type=qis.BootstrapType.STATIONARY,
+                                                bootsrap_output=qis.BootstrapOutput.SERIES_TO_DF,
                                                 num_samples=num_samples,
                                                 block_size=block_size,
                                                 index_length=len(prices.index),
@@ -102,10 +103,10 @@ def plot_bootsrap_paths(prices: pd.Series,
                                 showmedians=True,
                                 ax=ax)
         # add reasized labels
-        qis.add_scatter_points(label_x_y=[(lag, v) for lag, v in acfs[prices.name].to_dict().items()],
+        add_scatter_points(label_x_y=[(lag, v) for lag, v in acfs[prices.name].to_dict().items()],
                                color='red',
                                ax=ax)
-        qis.set_legend(ax=ax,
+        set_legend(ax=ax,
                        labels=[prices.name],
                        markers=["*"],
                        colors=['red'],
@@ -125,8 +126,8 @@ def plot_autocorr_in_block_size(prices: pd.Series,
     figs = []
     for idx, block_size in enumerate(block_sizes):
         bootstrap_prices = qis.bootstrap_price_data(prices=prices,
-                                                    bootsrap_type=qis.BootsrapType.STATIONARY,
-                                                    bootsrap_output=qis.BootsrapOutput.SERIES_TO_DF,
+                                                    bootsrap_type=qis.BootstrapType.STATIONARY,
+                                                    bootsrap_output=qis.BootstrapOutput.SERIES_TO_DF,
                                                     num_samples=num_samples,
                                                     block_size=block_size,
                                                     index_length=len(prices.index),
@@ -151,10 +152,10 @@ def plot_autocorr_in_block_size(prices: pd.Series,
                                     showmedians=True,
                                     ax=ax)
             # add reasized labels
-            qis.add_scatter_points(label_x_y=[(lag, v) for lag, v in acfs[prices.name].to_dict().items()],
+            add_scatter_points(label_x_y=[(lag, v) for lag, v in acfs[prices.name].to_dict().items()],
                                    color='red',
                                    ax=ax)
-            qis.set_legend(ax=ax,
+            set_legend(ax=ax,
                            labels=[prices.name],
                            markers=["*"],
                            colors=['red'],

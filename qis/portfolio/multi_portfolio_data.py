@@ -24,6 +24,8 @@ import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.drawdowns as cdr
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
+from qis.utils.struct_ops import merge_lists_unique
+
 
 # default perf params
 PERF_PARAMS = PerfParams(freq='W-WED')
@@ -154,8 +156,8 @@ class MultiPortfolioData:
         benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq,
                                                                             is_input_weights=is_input_weights,
                                                                             is_grouped=is_grouped)
-        tickers_union = qis.merge_lists_unique(list1=strategy_weights.columns.to_list(),
-                                               list2=benchmark_weights.columns.to_list())
+        tickers_union = merge_lists_unique(list1=strategy_weights.columns.to_list(),
+                                           list2=benchmark_weights.columns.to_list())
         # replace with ac order of benchmark
         if is_grouped and self.portfolio_datas[benchmark_idx].group_order is not None:
             tickers_union = self.portfolio_datas[benchmark_idx].group_order
@@ -180,8 +182,8 @@ class MultiPortfolioData:
                                                                               freq=freq_turnover,
                                                                               roll_period=turnover_rolling_period,
                                                                               add_total=False, is_grouped=is_grouped)
-        tickers_union = qis.merge_lists_unique(list1=strategy_turnover.columns.to_list(),
-                                               list2=benchmark_turnover.columns.to_list())
+        tickers_union = merge_lists_unique(list1=strategy_turnover.columns.to_list(),
+                                           list2=benchmark_turnover.columns.to_list())
         # replace with ac order of benchmark
         if is_grouped and self.portfolio_datas[benchmark_idx].group_order is not None:
             tickers_union = self.portfolio_datas[benchmark_idx].group_order
@@ -257,8 +259,8 @@ class MultiPortfolioData:
         benchmark_pnl = self.portfolio_datas[benchmark_idx].get_attribution_table_by_instrument(time_period=time_period,
                                                                                                 freq=freq)
 
-        tickers_union = qis.merge_lists_unique(list1=strategy_pnl.columns.to_list(),
-                                               list2=benchmark_pnl.columns.to_list())
+        tickers_union = merge_lists_unique(list1=strategy_pnl.columns.to_list(),
+                                           list2=benchmark_pnl.columns.to_list())
         strategy_pnl = strategy_pnl.reindex(columns=tickers_union)
         benchmark_pnl = benchmark_pnl.reindex(columns=tickers_union).reindex(index=strategy_pnl.index)
         pnl_diff = strategy_pnl.subtract(benchmark_pnl)
@@ -364,7 +366,7 @@ class MultiPortfolioData:
                                          roll_periods=sharpe_rolling_window,
                                          legend_stats=legend_stats,
                                          title=sharpe_title,
-                                         trend_line=None,  # qis.TrendLine.ZERO_SHADOWS,
+                                         trend_line=None,
                                          ax=ax,
                                          **kwargs)
 

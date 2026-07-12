@@ -1,6 +1,6 @@
 
 from enum import Enum
-from qis.perfstats.cond_regression import get_regime_regression_params, BenchmarkReturnsQuantilesRegime
+from qis import get_regime_regression_params
 
 
 class LocalTests(Enum):

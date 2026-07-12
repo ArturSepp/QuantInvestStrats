@@ -9,18 +9,17 @@ from numba import njit
 from numba.typed import List
 from typing import Union, Tuple, Dict
 from statsmodels.tsa.ar_model import AutoReg
-
 # qis
 import qis.utils.np_ops as npo
 import qis.perfstats.returns as ret
 
 
-class BootsrapType(Enum):
+class BootstrapType(Enum):
     IID = 1
     STATIONARY = 2
 
 
-class BootsrapOutput(Enum):
+class BootstrapOutput(Enum):
     SERIES_TO_DF = 1
     DF_TO_LIST_ARRAYS = 2
 
@@ -84,7 +83,7 @@ def bootstrap_indices_stationary(num_data_index: int,
 
 
 @njit
-def get_bootsrtap_data_list(data_np: np.ndarray,
+def get_bootstrap_data_list(data_np: np.ndarray,
                             bootstrapped_indices: np.ndarray
                             ) -> List:
     """
@@ -98,7 +97,7 @@ def get_bootsrtap_data_list(data_np: np.ndarray,
 
 
 @njit
-def get_bootsrtap_ar_data_list(residuals: np.ndarray,
+def get_bootstrap_ar_data_list(residuals: np.ndarray,
                                intercept: np.ndarray,
                                beta: np.ndarray,
                                data0: np.ndarray,
@@ -139,7 +138,7 @@ def compute_ar_residuals(data: Union[pd.Series, pd.DataFrame]
 
 
 def generate_bootstrapped_indices(num_data_index: int,
-                                  bootsrap_type: BootsrapType = BootsrapType.IID,
+                                  bootsrap_type: BootstrapType = BootstrapType.IID,
                                   num_samples: int = 10,
                                   index_length: int = 1000,
                                   block_size: int = 30,
@@ -148,12 +147,12 @@ def generate_bootstrapped_indices(num_data_index: int,
     """
     wrapper for numba function
     """
-    if bootsrap_type == BootsrapType.IID:
+    if bootsrap_type == BootstrapType.IID:
         bootstrapped_indices = bootstrap_indices_iid(num_data_index=num_data_index,
                                                      num_samples=num_samples,
                                                      index_length=index_length,
                                                      seed=seed)
-    elif bootsrap_type == BootsrapType.STATIONARY:
+    elif bootsrap_type == BootstrapType.STATIONARY:
         bootstrapped_indices = bootstrap_indices_stationary(num_data_index=num_data_index,
                                                             num_samples=num_samples,
                                                             num_bootstrap_index=index_length,
@@ -166,8 +165,8 @@ def generate_bootstrapped_indices(num_data_index: int,
 
 
 def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
-                   bootsrap_type: BootsrapType = BootsrapType.STATIONARY,
-                   bootsrap_output: BootsrapOutput = BootsrapOutput.DF_TO_LIST_ARRAYS,
+                   bootsrap_type: BootstrapType = BootstrapType.STATIONARY,
+                   bootsrap_output: BootstrapOutput = BootstrapOutput.DF_TO_LIST_ARRAYS,
                    num_samples: int = 10,
                    index_length: int = 1000,
                    block_size: int = 30,
@@ -185,15 +184,15 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
                                                              block_size=block_size,
                                                              seed=seed)
 
-    if bootsrap_output == BootsrapOutput.DF_TO_LIST_ARRAYS:
-        bootstrap_sample = get_bootsrtap_data_list(data_np=data.to_numpy(),
+    if bootsrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
+        bootstrap_sample = get_bootstrap_data_list(data_np=data.to_numpy(),
                                                    bootstrapped_indices=bootstrapped_indices)
 
-    elif bootsrap_output == BootsrapOutput.SERIES_TO_DF:
+    elif bootsrap_output == BootstrapOutput.SERIES_TO_DF:
         if not isinstance(data, pd.Series):
             raise ValueError(f"data must be series")
 
-        bootstrap_sample = get_bootsrtap_data_list(data_np=npo.np_array_to_matrix(a=data.to_numpy(), ncols=1),
+        bootstrap_sample = get_bootstrap_data_list(data_np=npo.np_array_to_matrix(a=data.to_numpy(), ncols=1),
                                                    bootstrapped_indices=bootstrapped_indices)
         data = []
         for idx, sample in enumerate(bootstrap_sample):
@@ -207,8 +206,8 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
 
 
 def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
-                         bootsrap_type: BootsrapType = BootsrapType.STATIONARY,
-                         bootsrap_output: BootsrapOutput = BootsrapOutput.DF_TO_LIST_ARRAYS,
+                         bootsrap_type: BootstrapType = BootstrapType.STATIONARY,
+                         bootsrap_output: BootstrapOutput = BootstrapOutput.DF_TO_LIST_ARRAYS,
                          num_samples: int = 10,
                          index_length: int = 1000,
                          block_size: int = 30,
@@ -225,18 +224,18 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
                                                              block_size=block_size,
                                                              seed=seed)
 
-    if bootsrap_output == BootsrapOutput.DF_TO_LIST_ARRAYS:
-        bootstrap_sample = get_bootsrtap_ar_data_list(residuals=residuals,
+    if bootsrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
+        bootstrap_sample = get_bootstrap_ar_data_list(residuals=residuals,
                                                       intercept=intercept,
                                                       beta=beta,
                                                       data0=np.nanmean(data, axis=0),
                                                       bootstrapped_indices=bootstrapped_indices)
 
-    elif bootsrap_output == BootsrapOutput.SERIES_TO_DF:
+    elif bootsrap_output == BootstrapOutput.SERIES_TO_DF:
         if not isinstance(data, pd.Series):
             raise ValueError(f"data must be series")
 
-        bootstrap_sample = get_bootsrtap_ar_data_list(residuals=residuals,
+        bootstrap_sample = get_bootstrap_ar_data_list(residuals=residuals,
                                                       intercept=intercept,
                                                       beta=beta,
                                                       data0=np.array(np.nanmean(data)),
@@ -254,8 +253,8 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
 
 
 def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
-                         bootsrap_type: BootsrapType = BootsrapType.STATIONARY,
-                         bootsrap_output: BootsrapOutput = BootsrapOutput.DF_TO_LIST_ARRAYS,
+                         bootsrap_type: BootstrapType = BootstrapType.STATIONARY,
+                         bootsrap_output: BootstrapOutput = BootstrapOutput.DF_TO_LIST_ARRAYS,
                          num_samples: int = 10,
                          index_length: int = 1000,
                          block_size: int = 20,
@@ -266,7 +265,7 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                          ) -> Union[List[np.ndarray], pd.DataFrame]:
     """
     bootstrap price data
-    for pd.Dataframe use bootsrap_output = BootsrapOutput.DF_TO_LIST_ARRAYS to get list of nd.arrays
+    for pd.Dataframe use bootsrap_output = BootstrapOutput.DF_TO_LIST_ARRAYS to get list of nd.arrays
     block_size = 1 corresponds to iid sampling
     """
     returns = ret.to_returns(prices=prices, is_log_returns=is_log_returns, drop_first=True)
@@ -280,7 +279,7 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                                        seed=seed,
                                        bootstrapped_indices=bootstrapped_indices)
 
-    if bootsrap_output == BootsrapOutput.DF_TO_LIST_ARRAYS:
+    if bootsrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
         if init_to_end:
             init_value = prices.iloc[-1, :].to_numpy()
         else:
@@ -293,7 +292,7 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
             else:
                 bootstrap_sample.append(ret.returns_to_nav(returns=returns, init_value=init_value))
 
-    elif bootsrap_output == BootsrapOutput.SERIES_TO_DF:
+    elif bootsrap_output == BootstrapOutput.SERIES_TO_DF:
         if init_to_end:
             init_value = prices[-1]*np.ones(num_samples)
         else:
@@ -311,8 +310,8 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
 
 def bootstrap_price_fundamental_data(price_datas: Dict[str, Union[pd.Series, pd.DataFrame]],
                                      fundamental_datas: Dict[str, Union[pd.Series, pd.DataFrame]],
-                                     bootsrap_type: BootsrapType = BootsrapType.STATIONARY,
-                                     bootsrap_output: BootsrapOutput = BootsrapOutput.DF_TO_LIST_ARRAYS,
+                                     bootsrap_type: BootstrapType = BootstrapType.STATIONARY,
+                                     bootsrap_output: BootstrapOutput = BootstrapOutput.DF_TO_LIST_ARRAYS,
                                      num_samples: int = 10,
                                      index_length: int = 1000,
                                      block_size: int = 30,

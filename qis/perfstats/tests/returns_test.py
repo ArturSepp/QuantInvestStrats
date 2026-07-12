@@ -11,8 +11,8 @@ from qis.perfstats.returns import (to_zero_first_nonnan_returns, returns_to_nav,
                                    compute_total_return,
                                    compute_pa_return,
                                    compute_excess_returns,
-                                   prices_at_freq,
-                                   df_price_ffill_between_nans)
+                                   prices_at_freq)
+from qis.utils.df_ops import df_price_ffill_between_nans
 
 
 class LocalTests(Enum):

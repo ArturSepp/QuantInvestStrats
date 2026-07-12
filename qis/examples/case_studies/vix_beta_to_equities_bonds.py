@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import yfinance as yf
 import qis
 from qis import PortfolioData
+from qis.plots.utils import align_x_limits_axs
 
 # load VIX ETH
 vix = yf.download(tickers=['VXX'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].asfreq('B', method='ffill').rename('Long VIX ETF')
@@ -70,6 +71,6 @@ with sns.axes_style("darkgrid"):
     pivot_prices = benchmark_prices['SPY'].reindex(index=factor_attribution.index, method='ffill')
     qis.add_bnb_regime_shadows(ax=axs[2], pivot_prices=prices['SPY'], regime_classifier=regime_classifier)
 
-    qis.align_x_limits_axs(axs=axs, is_invisible_xs=True)
+    align_x_limits_axs(axs=axs, is_invisible_xs=True)
 
 plt.show()

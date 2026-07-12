@@ -37,6 +37,7 @@ import yfinance as yf
 import qis
 from qis import (PerfStat, TimePeriod, MultiPortfolioData, local_path)
 from qis.portfolio.reports.config import fetch_default_report_kwargs
+from qis.plots.utils import calc_table_height
 
 # pybloqs is optional — only required to run this file
 try:
@@ -94,7 +95,7 @@ def generate_ra_performance_pybloqs(prices: pd.DataFrame,
 
     fig2, ax = plt.subplots(
         1, 1,
-        figsize=(7, qis.calc_table_height(num_rows=len(prices.columns) + 5, scale=0.5)),
+        figsize=(7, calc_table_height(num_rows=len(prices.columns) + 5, scale=0.5)),
         tight_layout=True)
     qis.plot_periodic_returns_table(
         prices=prices, freq=heatmap_freq, ax=ax,

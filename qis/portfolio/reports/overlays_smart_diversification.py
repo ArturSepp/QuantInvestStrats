@@ -12,6 +12,8 @@ from enum import Enum
 from typing import Dict, Union, List, Optional, Tuple
 import qis as qis
 from qis import PerfStat, RegimeData, BenchmarkReturnsQuantilesRegime, PerfParams
+from qis.plots.utils import calc_table_height, get_n_markers
+from qis.utils.df_str import series_to_str
 
 regime_classifier = BenchmarkReturnsQuantilesRegime(freq='QE')
 PERF_PARAMS = PerfParams(freq='ME')
@@ -162,7 +164,7 @@ class SmartDiversificationReport:
             col_widths.append(15)
 
         for perf_column in perf_columns:
-            table_data[perf_column.to_str()] = qis.series_to_str(ds=cvar_table[perf_column.to_str()],
+            table_data[perf_column.to_str()] = series_to_str(ds=cvar_table[perf_column.to_str()],
                                                              var_format=perf_column.to_format(**kwargs))
             col_widths.append(7)
 
@@ -222,8 +224,8 @@ class SmartDiversificationReport:
                          **kwargs
                          ) -> plt.Figure:
         if ax is None:  # create new axis
-            height = qis.calc_table_height(num_rows=len(self.overlay_navs.columns),
-                                                       first_row_height=2.0)
+            height = calc_table_height(num_rows=len(self.overlay_navs.columns),
+                                       first_row_height=2.0)
             fig, ax = plt.subplots(1, 1, figsize=(height, height))
         else:
             fig = None
@@ -312,7 +314,7 @@ class SmartDiversificationReport:
             xy_datas[asset] = xy
             data_labels.append(portfolio_labels)
 
-        markers = qis.get_n_markers(n=len(xy_datas.keys()))
+        markers = get_n_markers(n=len(xy_datas.keys()))
         xlabel = xlabel or x_var.to_str()
         ylabel = ylabel or y_var.to_str()
 

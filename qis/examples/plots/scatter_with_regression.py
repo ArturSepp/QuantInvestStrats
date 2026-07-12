@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 import qis.plots as qp
+from qis.plots.utils import align_y_limits_ax12
 
 np.random.seed(2)
 
@@ -49,7 +50,7 @@ with sns.axes_style('darkgrid'):
                                    title='Localized sextile regression',
                                    ax=axs[1],
                                    **kwargs)
-    qp.align_y_limits_ax12(ax1=axs[0], ax2=axs[1])
+    align_y_limits_ax12(ax1=axs[0], ax2=axs[1])
     qp.set_suptitle(fig, 'Estimation of noisy regression: y=beta*abs(x)*x + noise, beta=Normal(1, 1), x=Normal(0, 1), noise=Normal(0, 1)')
 
 

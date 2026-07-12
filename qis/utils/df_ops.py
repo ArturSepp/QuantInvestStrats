@@ -574,3 +574,91 @@ def check_df_for_duplicated_columns_index(df: pd.DataFrame) -> bool:
             f"Found {len(duplicated_index)} duplicated index value(s): {unique_dupes}"
         )
     return True
+
+
+def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
+                                method: Optional[str] = 'ffill'
+                                ) -> Union[pd.Series, pd.DataFrame]:
+    """Forward-fill prices only between first and last non-NaN dates.
+
+    Preserves leading and trailing NaN values while filling gaps.
+
+    Args:
+        prices: Price time series
+        method: Fill method ('ffill', 'bfill', or None)
+
+    Returns:
+        Price series with gaps filled between first and last valid observations
+    """
+    is_series_out = False
+    if isinstance(prices, pd.Series):
+        is_series_out = True
+        prices = prices.to_frame()
+
+    # Get first and last valid dates for each column
+    first_date = get_nonnan_index(df=prices, position='first')
+    last_date = get_nonnan_index(df=prices, position='last')
+
+    # Fill only between valid date ranges
+    good_parts = []
+    for idx, column in enumerate(prices.columns):
+        good_price = prices.loc[first_date[idx]:last_date[idx], column]
+        # Honour the `method` parameter — previously this branch
+        # hardcoded .ffill() regardless of method, so callers passing
+        # method='bfill' silently got ffill behaviour. Now method
+        # dispatches correctly. method=None still skips filling and
+        # returns gaps as NaN inside the valid date range.
+        if method == 'ffill':
+            good_price = good_price.infer_objects().ffill()
+        elif method == 'bfill':
+            good_price = good_price.infer_objects().bfill()
+        elif method is not None:
+            raise NotImplementedError(f"method={method} not supported")
+        good_parts.append(good_price)
+
+    bfilled_data = pd.concat(good_parts, axis=1)
+    if bfilled_data.index[0] > prices.index[0]:
+        bfilled_data = bfilled_data.reindex(index=prices.index)
+
+    if is_series_out:
+        bfilled_data = bfilled_data.iloc[:, 0]
+    return bfilled_data
+
+
+def df_ffill_negatives(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
+    """
+    use ffill for filling negative prices
+    """
+    nans_mask = pd.isna(df)
+    df = df.where(df >= 0.0, other=0.0).replace({0.0: np.nan}).ffill()
+    # where will convert nans to zeros, replace zeros
+    df = df.where(nans_mask == False, other=np.nan)
+    return df
+
+
+def df_fill_first_nan_by_cross_median(df: pd.DataFrame,
+                                      is_replace_zeros: bool = True
+                                      ) -> pd.DataFrame:
+    """
+    before first non nan use median of other columns
+    after that use ffill
+    """
+    df = df.copy()
+    if is_replace_zeros:
+        df = df.replace(0.0, np.nan)
+
+    # for each column find first nonan
+    first_nonnan_index = get_nonnan_index(df)
+    merged_data = pd.DataFrame(index=df.index, columns=df.columns)
+    for idx, column in enumerate(df.columns):
+        its_first_nonnan_index = first_nonnan_index[idx]
+        with warnings.catch_warnings():  # silence All-NaN slice encountered
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            median_backfill = np.nanmedian(df.loc[:its_first_nonnan_index, :].to_numpy(), axis=1)
+        merged_data.loc[:its_first_nonnan_index, column] = median_backfill
+        merged_data.loc[its_first_nonnan_index:, column] = df.loc[its_first_nonnan_index:, column].to_numpy()
+
+    # fillnans with ffill in data after
+    merged_data = merged_data.infer_objects(copy=False).ffill()
+
+    return merged_data
