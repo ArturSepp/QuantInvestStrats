@@ -65,5 +65,5 @@ from qis.portfolio.reports.overlays_smart_diversification import (SmartDiversifi
                                                                   create_overlay_portfolio_curve)
 
 
-# disable requirements for pyblogs
-# from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pyblogs
+# disable requirements for pybloqs
+# from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pybloqs

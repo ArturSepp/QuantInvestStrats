@@ -104,7 +104,7 @@ def run_local_test(local_test: LocalTests):
         assets = {'LGCPTRUH Index': 'IG USD', 'LGCPTRCH Index': 'IG CHF Hedged'}
         prices = fetch_field_timeseries_per_tickers(tickers=assets, freq='B', field='PX_LAST', start_date=pd.Timestamp('31Dec2001')).ffill()
 
-        nav_hedged, _ = fx_rates_data._compute_performance_of_local_ccy_asset_in_reference_ccy(
+        nav_hedged, _ = fx_rates_data.compute_performance_of_local_ccy_asset_in_reference_ccy(
             local_ccy='USD',
             reference_ccy='CHF',
             asset_price_local_ccy=prices.iloc[:, 0],
@@ -116,7 +116,7 @@ def run_local_test(local_test: LocalTests):
 
         assets = {'NDUEACWF Index': 'ACWI USD', 'MEWD Index': 'ACWI CHF'}
         prices = fetch_field_timeseries_per_tickers(tickers=assets, freq='B', field='PX_LAST', start_date=pd.Timestamp('31Dec2013')).ffill()
-        nav_hedged, _ = fx_rates_data._compute_performance_of_local_ccy_asset_in_reference_ccy(
+        nav_hedged, _ = fx_rates_data.compute_performance_of_local_ccy_asset_in_reference_ccy(
             local_ccy='USD',
             reference_ccy='CHF',
             asset_price_local_ccy=prices.iloc[:, 0],

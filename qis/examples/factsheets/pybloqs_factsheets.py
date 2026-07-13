@@ -11,9 +11,9 @@ This file demonstrates three pybloqs report types:
                                   a pybloqs ``VStack``.
   ``Mode.MULTI_PORTFOLIO``      — multi-strategy factsheet (volparity sweep
                                   across spans) via
-                                  ``generate_multi_portfolio_factsheet_with_pyblogs``.
+                                  ``generate_multi_portfolio_factsheet_with_pybloqs``.
   ``Mode.STRATEGY_BENCHMARK``   — single strategy vs benchmark via
-                                  ``generate_strategy_benchmark_factsheet_with_pyblogs``.
+                                  ``generate_strategy_benchmark_factsheet_with_pybloqs``.
 
 ────────────────────────────────────────────────────────────────────────────
 pybloqs jinja patch (required for pandas >= 2.x)
@@ -43,10 +43,10 @@ from qis.plots.utils import calc_table_height
 try:
     import pybloqs as p
     from qis.portfolio.reports.multi_strategy_factsheet_pybloqs import (
-        generate_multi_portfolio_factsheet_with_pyblogs,
+        generate_multi_portfolio_factsheet_with_pybloqs,
     )
     from qis.portfolio.reports.strategy_benchmark_factsheet_pybloqs import (
-        generate_strategy_benchmark_factsheet_with_pyblogs,
+        generate_strategy_benchmark_factsheet_with_pybloqs,
     )
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
@@ -245,7 +245,7 @@ def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
     )
 
     if mode == Mode.MULTI_PORTFOLIO:
-        report = generate_multi_portfolio_factsheet_with_pyblogs(
+        report = generate_multi_portfolio_factsheet_with_pybloqs(
             multi_portfolio_data=multi,
             time_period=time_period,
             **fetch_default_report_kwargs(time_period=time_period))
@@ -254,7 +254,7 @@ def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
         print(f"saved multi-portfolio report to {out}")
 
     elif mode == Mode.STRATEGY_BENCHMARK:
-        report = generate_strategy_benchmark_factsheet_with_pyblogs(
+        report = generate_strategy_benchmark_factsheet_with_pybloqs(
             multi_portfolio_data=multi,
             strategy_idx=-1,
             benchmark_idx=0,

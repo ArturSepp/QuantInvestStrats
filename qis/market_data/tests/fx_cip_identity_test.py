@@ -169,7 +169,7 @@ def test_cip_identity() -> None:
     if abs(signed_gap - rate_diff_pa) < 30:
         hint = (
             "\n  Diagnosis: the CHF leg is subtracting r_USD instead of r_CHF. "
-            "The 'excess' adjustment in _compute_performance_of_local_ccy_asset_in_reference_ccy "
+            "The 'excess' adjustment in compute_performance_of_local_ccy_asset_in_reference_ccy "
             "must use the REFERENCE currency rate, not the fund's local-currency rate. "
             "Verify you are running the fixed fx_rates_data.py and clear stale __pycache__."
         )

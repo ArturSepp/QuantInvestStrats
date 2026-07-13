@@ -18,7 +18,7 @@ from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier, KWARGS
                                           KWARGS_TEXT, KWARGS_FOOTNOTE, KWARGS_FIG)
 
 
-def generate_multi_portfolio_factsheet_with_pyblogs(multi_portfolio_data: MultiPortfolioData,
+def generate_multi_portfolio_factsheet_with_pybloqs(multi_portfolio_data: MultiPortfolioData,
                                                     time_period: TimePeriod = None,
                                                     time_period_last: TimePeriod = None,
                                                     perf_params: PerfParams = PERF_PARAMS,

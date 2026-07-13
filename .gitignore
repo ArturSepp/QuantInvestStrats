@@ -1,4 +1,10 @@
 # created by virtualenv automatically
+
+/qis-*/
+/build/
+/dist/
+*.egg-info/
+
 Lib/
 Scripts/
 
@@ -163,3 +169,8 @@ output/
 */output/
 *.xlsx
 *.pdf
+
+/qis-*/
+/build/
+/dist/
+*.egg-info/

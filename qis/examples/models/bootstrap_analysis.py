@@ -22,7 +22,7 @@ from qis.plots.utils import add_scatter_points, set_legend
 SEED = 1
 
 
-def plot_bootsrap_paths(prices: pd.Series,
+def plot_bootstrap_paths(prices: pd.Series,
                         num_samples: int = 10,
                         block_size: int = 20,
                         nlags: int = 20,
@@ -32,8 +32,8 @@ def plot_bootsrap_paths(prices: pd.Series,
     """
     figs = []
     bootstrap_prices = qis.bootstrap_price_data(prices=prices,
-                                                bootsrap_type=qis.BootstrapType.STATIONARY,
-                                                bootsrap_output=qis.BootstrapOutput.SERIES_TO_DF,
+                                                bootstrap_type=qis.BootstrapType.STATIONARY,
+                                                bootstrap_output=qis.BootstrapOutput.SERIES_TO_DF,
                                                 num_samples=num_samples,
                                                 block_size=block_size,
                                                 index_length=len(prices.index),
@@ -47,7 +47,7 @@ def plot_bootsrap_paths(prices: pd.Series,
     kwargs = dict(x_date_freq='YE', legend_loc=None)
     with sns.axes_style("darkgrid"):
         fig, axs = plt.subplots(2, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title='Log-performance and drawdowns of realized (red) and bootsrapped paths (grey)')
+        qis.set_suptitle(fig, title='Log-performance and drawdowns of realized (red) and bootstrapped paths (grey)')
         figs.append(fig)
         qis.plot_prices_with_dd(prices=prices1,
                                 is_log=True,
@@ -63,7 +63,7 @@ def plot_bootsrap_paths(prices: pd.Series,
                                     annualization_factor=252)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title=f"EWMA-{span} span volatility of realized (red) and bootsrapped paths (gray)")
+        qis.set_suptitle(fig, title=f"EWMA-{span} span volatility of realized (red) and bootstrapped paths (gray)")
         figs.append(fig)
         qis.plot_time_series(df=ewma_vols,
                              colors=colors1,
@@ -74,7 +74,7 @@ def plot_bootsrap_paths(prices: pd.Series,
     acfs, m_acf, std_acf = qis.estimate_acf_from_paths(log_returns, is_pacf=True, nlags=nlags)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title=f"Auto-correlation of returns of realized (red) and bootsrapped paths (grey)")
+        qis.set_suptitle(fig, title=f"Auto-correlation of returns of realized (red) and bootstrapped paths (grey)")
         figs.append(fig)
         qis.plot_line(df=acfs,
                       colors=colors1,
@@ -84,7 +84,7 @@ def plot_bootsrap_paths(prices: pd.Series,
     acfs, m_acf, std_acf = qis.estimate_acf_from_paths(log_returns2, is_pacf=True, nlags=nlags)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title=f"Auto-correlation of squared returns of realized (red) and bootsrapped paths (grey)")
+        qis.set_suptitle(fig, title=f"Auto-correlation of squared returns of realized (red) and bootstrapped paths (grey)")
         figs.append(fig)
         qis.plot_line(df=acfs,
                       colors=colors1,
@@ -94,7 +94,7 @@ def plot_bootsrap_paths(prices: pd.Series,
 
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title=f"Realized auto-correlation of squared returns (red) and Boxplot of auto-correlation of bootsrapped paths (grey)")
+        qis.set_suptitle(fig, title=f"Realized auto-correlation of squared returns (red) and Boxplot of auto-correlation of bootstrapped paths (grey)")
         figs.append(fig)
         qis.df_boxplot_by_index(df=acfs.drop(prices.name, axis=1),
                                 legend_loc=None,
@@ -126,8 +126,8 @@ def plot_autocorr_in_block_size(prices: pd.Series,
     figs = []
     for idx, block_size in enumerate(block_sizes):
         bootstrap_prices = qis.bootstrap_price_data(prices=prices,
-                                                    bootsrap_type=qis.BootstrapType.STATIONARY,
-                                                    bootsrap_output=qis.BootstrapOutput.SERIES_TO_DF,
+                                                    bootstrap_type=qis.BootstrapType.STATIONARY,
+                                                    bootstrap_output=qis.BootstrapOutput.SERIES_TO_DF,
                                                     num_samples=num_samples,
                                                     block_size=block_size,
                                                     index_length=len(prices.index),
@@ -142,7 +142,7 @@ def plot_autocorr_in_block_size(prices: pd.Series,
         with sns.axes_style("darkgrid"):
             fig, ax = plt.subplots(1, 1, figsize=(14, 10))
             qis.set_suptitle(fig, title=f"Realized auto-correlation of squared returns (red) and Boxplot of "
-                                        f"auto-correlation of bootsrapped paths (grey) for block_size={block_size:0.0f}")
+                                        f"auto-correlation of bootstrapped paths (grey) for block_size={block_size:0.0f}")
             figs.append(fig)
             qis.df_boxplot_by_index(df=acfs.drop(prices.name, axis=1),
                                     legend_loc=None,
@@ -164,7 +164,7 @@ def plot_autocorr_in_block_size(prices: pd.Series,
 
 
 class LocalTests(Enum):
-    PLOT_BOOTSRAPPED_PRICES = 1
+    PLOT_bootstrapPED_PRICES = 1
     PLOT_AUTOCORR_BLOCKSIZES = 2
 
 
@@ -180,9 +180,9 @@ def run_local_test(local_test: LocalTests):
     # download spy prices
     prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename('Realised')
 
-    if local_test == LocalTests.PLOT_BOOTSRAPPED_PRICES:
+    if local_test == LocalTests.PLOT_bootstrapPED_PRICES:
         # use small number of num_samples for illustration
-        figs = plot_bootsrap_paths(prices=prices,
+        figs = plot_bootstrap_paths(prices=prices,
                                    block_size=30,
                                    num_samples=50)
         qis.save_figs_to_pdf(figs, file_name='bootstrap_illustrations', local_path=LOCAL_PATH)

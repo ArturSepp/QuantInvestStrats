@@ -317,7 +317,7 @@ class FxRatesData:
         # FX-translation machinery handles the spot-rate composition;
         # ``hedge_ratio=0.0`` means no forward-rate adjustment is
         # applied — the position carries full FX exposure.
-        nav_ref, _ = self._compute_performance_of_local_ccy_asset_in_reference_ccy(
+        nav_ref, _ = self.compute_performance_of_local_ccy_asset_in_reference_ccy(
             asset_price_local_ccy=cash_nav_local,
             hedge_ratio=0.0,
             local_ccy=local_ccy,
@@ -329,7 +329,7 @@ class FxRatesData:
         nav_ref.name = f'cash_{local_ccy}_in_{reference_ccy}'
         return nav_ref
 
-    def _compute_performance_of_local_ccy_asset_in_reference_ccy(self,
+    def compute_performance_of_local_ccy_asset_in_reference_ccy(self,
                                                                  asset_price_local_ccy: pd.Series,
                                                                  hedge_ratio: Union[float, pd.Series],
                                                                  local_ccy: str,
@@ -435,7 +435,7 @@ class FxRatesData:
         """Convert a multi-asset panel to a reference-currency NAV + returns.
 
         Dispatches each asset through
-        ``_compute_performance_of_local_ccy_asset_in_reference_ccy``
+        ``compute_performance_of_local_ccy_asset_in_reference_ccy``
         and assembles the results into a pair of DataFrames. Use this
         when a single ``freq`` applies to all assets; for per-asset
         frequencies, call ``compute_fx_adjusted_returns`` which wraps
@@ -477,7 +477,7 @@ class FxRatesData:
             else:
                 local_ccy = local_ccys
 
-            fx_adjusted_navs[asset], fx_adjusted_returns[asset] = self._compute_performance_of_local_ccy_asset_in_reference_ccy(
+            fx_adjusted_navs[asset], fx_adjusted_returns[asset] = self.compute_performance_of_local_ccy_asset_in_reference_ccy(
                 asset_price_local_ccy=asset_prices[asset],
                 hedge_ratio = hedge_ratio,
                 local_ccy=local_ccy,

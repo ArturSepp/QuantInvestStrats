@@ -31,8 +31,8 @@ def plot_price_bootrstrap(prices: pd.Series,
                           block_size: int = 20,
                           **kwargs):
     bt_data = bootstrap_price_data(prices=prices,
-                                   bootsrap_type=BootstrapType.STATIONARY,
-                                   bootsrap_output=BootstrapOutput.SERIES_TO_DF,
+                                   bootstrap_type=BootstrapType.STATIONARY,
+                                   bootstrap_output=BootstrapOutput.SERIES_TO_DF,
                                    index_length=len(prices),
                                    seed=seed,
                                    block_size=block_size)
@@ -44,8 +44,8 @@ def plot_price_bootrstrap(prices: pd.Series,
 def plot_ew_index_bootrstrap(prices: pd.DataFrame):
     log_returns = ret.to_returns(prices=prices, is_log_returns=True, drop_first=True)
     bt_data = bootstrap_data(data=log_returns,
-                             bootsrap_type=BootstrapType.STATIONARY,
-                             bootsrap_output=BootstrapOutput.DF_TO_LIST_ARRAYS,
+                             bootstrap_type=BootstrapType.STATIONARY,
+                             bootstrap_output=BootstrapOutput.DF_TO_LIST_ARRAYS,
                              index_length=len(prices))
     ew_data = []
     for idx, sample in enumerate(bt_data):
@@ -99,7 +99,7 @@ def plot_ar_bootstrap(data: pd.Series,
                       **kwargs
                       ):
     df_bts = bootstrap_ar_process(data=data,
-                                  bootsrap_output=BootstrapOutput.SERIES_TO_DF,
+                                  bootstrap_output=BootstrapOutput.SERIES_TO_DF,
                                   index_length=len(data.index),
                                   num_samples=num_samples,
                                   seed=seed)
@@ -122,7 +122,7 @@ def plot_joint_bootstrap():
     fundamental_datas = {'fundamental': fundamental_data}
     bootstrap_prices, bootstrap_fundamentals = bootstrap_price_fundamental_data(price_datas=price_datas,
                                                                                 fundamental_datas=fundamental_datas,
-                                                                                bootsrap_output=BootstrapOutput.SERIES_TO_DF,
+                                                                                bootstrap_output=BootstrapOutput.SERIES_TO_DF,
                                                                                 index_length=len(prices.index),
                                                                                 num_samples=10,
                                                                                 block_size=10)
@@ -192,15 +192,15 @@ def run_local_test(local_test: LocalTests):
 
     if local_test == LocalTests.DATA_LIST:
         bt_lists = bootstrap_data(data=data,
-                                  bootsrap_type=BootstrapType.STATIONARY,
-                                  bootsrap_output=BootstrapOutput.DF_TO_LIST_ARRAYS)
+                                  bootstrap_type=BootstrapType.STATIONARY,
+                                  bootstrap_output=BootstrapOutput.DF_TO_LIST_ARRAYS)
         for this in bt_lists:
             print(this)
 
     elif local_test == LocalTests.DATA_SERIES:
         bt_data = bootstrap_data(data=data.iloc[:, 0],
-                                 bootsrap_type=BootstrapType.STATIONARY,
-                                 bootsrap_output=BootstrapOutput.SERIES_TO_DF)
+                                 bootstrap_type=BootstrapType.STATIONARY,
+                                 bootstrap_output=BootstrapOutput.SERIES_TO_DF)
         print(bt_data)
 
 
