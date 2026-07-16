@@ -189,6 +189,20 @@ TRE_TABLE_COLUMNS = (PerfStat.TOTAL_RETURN,
                      PerfStat.BEST)
 
 
+class SharpeConvention(Enum):
+    """
+    convention for the Sharpe ratio numerator, see qis/docs/sharpe_conventions.md
+    PA = compound annual excess return / annualized vol (reporting default, BarclayHedge tradition)
+    ARITHMETIC = sqrt(af) * mean / std of periodic simple excess returns (Sharpe 1994 plug-in,
+                 the convention of the Sharpe-inference literature; regime decomposition is
+                 exactly additive in this convention)
+    LOG = sqrt(af) * mean / std of periodic log excess returns
+    """
+    PA = 1
+    ARITHMETIC = 2
+    LOG = 3
+
+
 @dataclass
 class PerfParams:
     """
@@ -201,6 +215,7 @@ class PerfParams:
     freq_reg: str = 'QE'  # for quadratic/linear regressions
     freq_excess_return: str = 'ME'
     return_type: ReturnTypes = ReturnTypes.LOG  # for vol computation
+    sharpe_convention: SharpeConvention = SharpeConvention.PA  # PA keeps all existing outputs byte-stable
     rates_data: Optional[pd.Series] = None  # to compute EXCESS returns
 
     def __post_init__(self):

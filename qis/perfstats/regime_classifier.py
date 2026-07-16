@@ -18,7 +18,7 @@ from enum import Enum
 import qis.utils.df_cut as dfc
 import qis.perfstats.perf_stats as pt
 import qis.perfstats.returns as ret
-from qis.perfstats.config import ReturnTypes, RegimeData, PerfParams, PerfStat
+from qis.perfstats.config import ReturnTypes, RegimeData, PerfParams, PerfStat, SharpeConvention
 from qis.utils.annualisation import get_annualization_factor
 
 # ============================================================================
@@ -163,9 +163,37 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
         regime_pa1.loc[benchmark, regime_pa_columns] = regime_avg.loc[benchmark]
 
     # Compute regime Sharpe ratios
-    vols_for_sharpe_pa = ra_perf_table[PerfStat.VOL.to_str()]
-    regime_sharpe = regime_pa1.divide(vols_for_sharpe_pa, axis=0)[regime_pa_columns]
-    regime_sharpe.columns = [f"{x}{RegimeData.REGIME_SHARPE.value}" for x in given_columns]
+    sharpe_convention = perf_params.sharpe_convention if perf_params is not None \
+        and hasattr(perf_params, 'sharpe_convention') else SharpeConvention.PA
+    if sharpe_convention in (SharpeConvention.ARITHMETIC, SharpeConvention.LOG):
+        # additive regime Sharpe (sharpe_conventions.md sections 1 and 4): under ARITHMETIC,
+        # sr_s = sqrt(af) * p_s * m_s / std(r) on the sampled simple returns; under LOG the same
+        # construction on log(1+r). In both, sum_s sr_s equals the total Sharpe of the convention
+        # exactly by linearity of the mean, so the pa additivity patch above does not apply, and
+        # numerator and denominator are paired on the identical periodic return series.
+        af_mult = get_annualization_factor(freq=freq)
+        sampled_returns = sampled_returns_with_regime_id.drop(columns=[RegimeClassifier.REGIME_COLUMN])
+        if sharpe_convention == SharpeConvention.LOG:
+            # log-space decomposition (Sepp 2020): sr_s = sqrt(af) * p_s * mean(log(1+r) | s) / std(log(1+r)),
+            # exactly additive to the log Sharpe, l = log(1+r) computed from the sampled simple returns
+            log_returns_with_id = sampled_returns_with_regime_id.copy()
+            log_returns_with_id[sampled_returns.columns] = np.log1p(sampled_returns)
+            conditional_means, _ = compute_mean_freq_regimes(sampled_returns_with_regime_id=log_returns_with_id)
+            conditional_means = conditional_means.T[given_columns]
+            an_vol = np.sqrt(af_mult) * np.log1p(sampled_returns).std(ddof=1)
+        else:
+            # arithmetic decomposition: sr_s = sqrt(af) * p_s * m_s / std(r), exactly additive
+            conditional_means = regime_avg.copy()
+            conditional_means.columns = given_columns
+            an_vol = np.sqrt(af_mult) * sampled_returns.std(ddof=1)
+        # linear annualized regime contributions af * p_s * m_s from the conditional means
+        regime_contrib = conditional_means.multiply(af_mult * norm_q[given_columns].to_numpy(), axis=1)
+        regime_sharpe = regime_contrib.divide(an_vol, axis=0)
+        regime_sharpe.columns = [f"{x}{RegimeData.REGIME_SHARPE.value}" for x in given_columns]
+    else:  # SharpeConvention.PA, the default: unchanged
+        vols_for_sharpe_pa = ra_perf_table[PerfStat.VOL.to_str()]
+        regime_sharpe = regime_pa1.divide(vols_for_sharpe_pa, axis=0)[regime_pa_columns]
+        regime_sharpe.columns = [f"{x}{RegimeData.REGIME_SHARPE.value}" for x in given_columns]
 
     # Combine into performance table
     if is_add_ra_perf_table:
@@ -342,13 +370,15 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
         Args:
             freq: Sampling frequency (default: 'QE' for quarter-end)
             return_type: Type of returns to compute
-            q: Quantile boundaries or number of quantiles (default: [0.0, 0.17, 0.83, 1.0])
+            q: Quantile boundaries or number of quantiles (default: [0.0, 0.16, 0.84, 1.0],
+                the one-sigma cut: P(Z < -1) = 15.87% rounds to 16%, central mass 68%
+                against the normal's 68.27%. Changed from [0.0, 0.17, 0.83, 1.0] in 5.0.7)
             regime_ids_colors: Mapping of regime names to colors
         """
         super().__init__()
         self.freq = freq
         self.return_type = return_type
-        self.q = q if q is not None else np.array([0.0, 0.17, 0.83, 1.0])
+        self.q = q if q is not None else np.array([0.0, 0.16, 0.84, 1.0])  # one-sigma default, see compute_regime_sharpe_decomposition
         self.regime_ids_colors = regime_ids_colors or {
             'Bear': mcolors['salmon'],
             'Normal': mcolors['yellowgreen'],
@@ -752,3 +782,77 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
     )
 
     return regimes_pa_perf_table
+
+def compute_regime_sharpe_decomposition(returns: Union[pd.Series, pd.DataFrame],
+                                        benchmark_returns: pd.Series,
+                                        af: float,
+                                        q: Union[np.ndarray, int] = None,
+                                        regime_ids: List[str] = None,
+                                        sharpe_convention: SharpeConvention = SharpeConvention.ARITHMETIC,
+                                        ddof: int = 1,
+                                        is_add_total: bool = True
+                                        ) -> Union[pd.Series, pd.DataFrame]:
+    """
+    returns-level additive regime Sharpe decomposition, sr_s = sqrt(af) * p_s * m_s / std
+    (sharpe_conventions.md sections 1 and 4)
+
+    the standalone counterpart of the regime-Sharpe branch of
+    compute_regimes_pa_perf_table_from_sampled_returns for callers that hold periodic
+    returns rather than prices: no resampling, no annualization inference (af is explicit),
+    and any index type is accepted (the index is never touched, so RangeIndex works)
+
+    classification uses pd.qcut on the benchmark returns with the same labels as the
+    regime classifier, so on an aligned panel without missing values the output equals the
+    table branch to machine precision. All moments are computed per asset over the rows
+    where both the asset and the benchmark are observed, which makes the decomposition
+    exactly additive per asset for any missing-value pattern:
+    sum_s sr_s = sqrt(af) * mean / std on that asset's sample
+
+    q defaults to the one-sigma boundaries np.array([0.0, 0.16, 0.84, 1.0])
+    (P(Z < -1) = 15.87% rounds to 16%, central mass 68% against the normal's 68.27%),
+    the single library-wide default shared with BenchmarkReturnsQuantilesRegime since 5.0.7
+
+    supported conventions: ARITHMETIC (on simple returns) and LOG (the same construction
+    on log(1 + r)), both exactly additive. PA does not decompose additively without the
+    c-adjustment: use compute_regimes_pa_perf_table_from_sampled_returns for the adjusted
+    p.a. regime bars
+    """
+    if not isinstance(benchmark_returns, pd.Series):
+        raise ValueError(f"benchmark_returns must be pd.Series, got {type(benchmark_returns)!r}")
+    if sharpe_convention == SharpeConvention.PA:
+        raise ValueError("PA regime Sharpe requires the c-adjusted table path: "
+                         "use compute_regimes_pa_perf_table_from_sampled_returns")
+    is_series = isinstance(returns, pd.Series)
+    returns_df = returns.to_frame() if is_series else returns
+    if not isinstance(returns_df, pd.DataFrame):
+        raise ValueError(f"returns must be pd.Series or pd.DataFrame, got {type(returns)!r}")
+    if q is None:
+        q = np.array([0.0, 0.16, 0.84, 1.0])
+
+    benchmark_valid = benchmark_returns.dropna()
+    if len(benchmark_valid) < 3:
+        raise ValueError(f"need at least 3 benchmark returns to classify, got {len(benchmark_valid)!r}")
+    n_buckets = int(q) if np.isscalar(q) else len(np.asarray(q)) - 1
+    if regime_ids is None:
+        regime_ids = ['Bear', 'Normal', 'Bull'] if n_buckets == 3 else [f"Q{n + 1}" for n in range(n_buckets)]
+    if len(regime_ids) != n_buckets:
+        raise ValueError(f"regime_ids must have {n_buckets} labels, got {regime_ids!r}")
+    regime_id = pd.qcut(x=benchmark_valid, q=q, labels=regime_ids)
+
+    if sharpe_convention == SharpeConvention.LOG:
+        returns_df = np.log1p(returns_df)
+
+    out = {}
+    for asset in returns_df.columns:
+        r = returns_df[asset].reindex(benchmark_valid.index).dropna()
+        regimes = regime_id.reindex(r.index)
+        sigma = r.std(ddof=ddof)
+        n = len(r)
+        row = {f"{regime}{RegimeData.REGIME_SHARPE.value}":
+               float(np.sqrt(af) * ((regimes == regime).sum() / n) * (r[regimes == regime].mean() if (regimes == regime).any() else 0.0) / sigma)
+               for regime in regime_ids}
+        if is_add_total:
+            row[f"Total{RegimeData.REGIME_SHARPE.value}"] = float(np.sqrt(af) * r.mean() / sigma)
+        out[asset] = row
+    table = pd.DataFrame.from_dict(out, orient='index')
+    return table.iloc[0] if is_series else table

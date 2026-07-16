@@ -842,3 +842,18 @@ def compute_drawdowns_stats_table(price: pd.Series,
     if max_num is not None:
         df = df.iloc[:max_num, :]
     return df
+
+def compute_sharpe_arithmetic(returns: Union[pd.Series, pd.DataFrame],
+                              af: Optional[float] = None,
+                              ddof: int = 1
+                              ) -> Union[float, pd.Series]:
+    """
+    canonical arithmetic Sharpe ratio, SR = sqrt(af) * E[r] / sqrt(Var[r]) on periodic
+    simple excess returns (Sharpe 1994 plug-in estimator, sharpe_conventions.md section 1A)
+    af defaults to the annualization factor inferred from the return index
+    """
+    if not isinstance(returns, (pd.Series, pd.DataFrame)):
+        raise ValueError(f"returns must be pd.Series or pd.DataFrame, got {type(returns)!r}")
+    if af is None:
+        af = infer_annualisation_factor_from_df(df=returns.to_frame() if isinstance(returns, pd.Series) else returns)
+    return np.sqrt(af) * returns.mean() / returns.std(ddof=ddof)
