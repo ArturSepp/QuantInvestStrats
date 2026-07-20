@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+title: "qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies"
+authors:
+  - family-names: Sepp
+    given-names: Artur
+repository-code: "https://github.com/ArturSepp/QuantInvestStrats"
+url: "https://pypi.org/project/qis/"
+license: MIT
+version: 5.0.8
+date-released: "2026-07-16"
+keywords:
+  - quantitative-finance
+  - performance-attribution
+  - portfolio-analytics
+  - factsheets
+  - data-visualization
+  - python
