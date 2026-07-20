@@ -1,32 +1,17 @@
-# 🚀 **Quantitative Investment Strategies: QIS**
+# QuantInvestStrats (`qis`)
 
-> qis package implements analytics for visualisation of financial data, performance
-reporting, factsheets and analysis of quantitative strategies.
+**qis package implements analytics for visualisation of financial data, performance reporting, factsheets and analysis of quantitative strategies.**
+
+[![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square)](https://pypi.org/project/qis/)
+[![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square)](https://pypi.org/project/qis/)
+[![License](https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square)](LICENSE.txt)
+[![CI](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg)](https://github.com/ArturSepp/QuantInvestStrats/actions)
+[![Downloads](https://static.pepy.tech/badge/qis)](https://pepy.tech/project/qis)
+[![Monthly](https://static.pepy.tech/badge/qis/month)](https://pepy.tech/project/qis)
 
 ---
 
-| 📊 Metric | 🔢 Value |
-|-----------|----------|
-| PyPI Version | ![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square) |
-| Python Versions | ![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square) |
-| License | ![License](https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square)|
-| CI Status | [![CI](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg)](https://github.com/ArturSepp/QuantInvestStrats/actions) |
-
-
-
-### 📈 Package Statistics
-
-| 📊 Metric | 🔢 Value |
-|-----------|----------|
-| Total Downloads | [![Total](https://pepy.tech/badge/qis)](https://pepy.tech/project/qis) |
-| Monthly | ![Monthly](https://pepy.tech/badge/qis/month) |
-| Weekly | ![Weekly](https://pepy.tech/badge/qis/week) |
-| GitHub Stars | ![GitHub stars](https://img.shields.io/github/stars/ArturSepp/QuantInvestStrats?style=flat-square&logo=github) |
-| GitHub Forks | ![GitHub forks](https://img.shields.io/github/forks/ArturSepp/QuantInvestStrats?style=flat-square&logo=github) |
-
-
-
-## **Quantitative Investment Strategies: QIS** <a name="analytics"></a>
+## Overview <a name="analytics"></a>
  
 
 The package is split into 5 main modules with the 
@@ -83,7 +68,7 @@ A README inside ```qis/examples/``` lists every script with a one-line descripti
 7. [Disclaimer](#disclaimer)
 
 
-## **Installation** <a name="installation"></a>
+## Installation <a name="installation"></a>
 Install using
 ```python 
 pip install qis
@@ -121,7 +106,7 @@ Optional dependencies:
 See `pyproject.toml` for the full list of optional extras (`reports`, `visualization`, `io`, `database`, `jupyter`, `dev`, `all`).
 
 
-## **Examples** <a name="examples"></a>
+## Examples <a name="examples"></a>
 
 ### 1. Visualization of price data <a name="price"></a>
 
@@ -247,7 +232,24 @@ Examples of using qis analytics jupyter notebooks are located here
 https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/notebooks
 
 
-## **Contributions** <a name="contributions"></a>
+## Ecosystem
+
+This package is part of an open-source Python stack for quantitative finance — full catalogue at [github.com/ArturSepp](https://github.com/ArturSepp):
+
+| Package | Purpose |
+|---|---|
+| [`qis`](https://github.com/ArturSepp/QuantInvestStrats) *(this package)* | Performance analytics, factsheets, and visualisation |
+| [`optimalportfolios`](https://github.com/ArturSepp/OptimalPortfolios) | Portfolio construction and backtesting |
+| [`factorlasso`](https://github.com/ArturSepp/factorlasso) | Sparse factor models and factor covariance estimation |
+| [`bbg-fetch`](https://github.com/ArturSepp/BloombergFetch) | Bloomberg data fetching |
+| [`trendfollowing`](https://github.com/ArturSepp/TrendFollowingSystems) | Trend-following systems: closed-form theory and replication |
+| [`goal-based-allocation`](https://github.com/ArturSepp/GoalBasedAllocation) | Dynamic MV allocation under regime-switching jump-diffusions |
+| [`stochvolmodels`](https://github.com/ArturSepp/StochVolModels) | Stochastic volatility pricing analytics |
+| [`vanilla-option-pricers`](https://github.com/ArturSepp/VanillaOptionPricers) | Vectorised vanilla option pricers and implied volatility fitters |
+
+Dependency links within the stack: `optimalportfolios` builds on `qis` and `factorlasso`; `trendfollowing` builds on `qis`.
+
+## Contributions <a name="contributions"></a>
 If you are interested in extending and improving QIS analytics, 
 please consider contributing to the library.
 
@@ -268,12 +270,12 @@ There are a number of requirements:
 
 
 
-## **Changelog** <a name="changelog"></a>
+## Changelog <a name="changelog"></a>
 
 Release history is maintained in [CHANGELOG.md](CHANGELOG.md).
 
 
-## **ToDos** <a name="todos"></a>
+## ToDos <a name="todos"></a>
 
 1. Enhanced documentation and readme examples.
 
@@ -283,30 +285,20 @@ Release history is maintained in [CHANGELOG.md](CHANGELOG.md).
 
 
 
-## **Disclaimer** <a name="disclaimer"></a>
+## License
 
-QIS package is distributed FREE & WITHOUT ANY WARRANTY under the GNU GENERAL PUBLIC LICENSE.
+MIT — see [LICENSE.txt](LICENSE.txt).
+
+## Disclaimer <a name="disclaimer"></a>
+
+QIS package is distributed FREE & WITHOUT ANY WARRANTY under the MIT License.
 
 See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/master/LICENSE.txt) in the release for details.
 
 Please report any bugs or suggestions by opening an [issue](https://github.com/ArturSepp/QuantInvestStrats/issues).
 
-.
-## BibTeX Citation
 
-If you use BloombergFetch in your research, please cite it as:
-
-```bibtex
-@software{sepp2024qis,
-  author={Sepp, Artur},
-  title={Qua: A Python Package for Bloomberg Terminal Data Access},
-  year={2024},
-  url={https://github.com/ArturSepp/BloombergFetch},
-  version={1.0.27}
-}
-```
-
-## BibTeX Citations for QIS (Quantitative Investment Strategies) Package
+## Citation
 
 If you use QIS in your research, please cite it as:
 
