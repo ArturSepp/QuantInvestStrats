@@ -1,0 +1,61 @@
+name: Bug report
+description: Report incorrect behaviour, an error, or a numerical problem
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The three things that make a bug fixable are the
+        version, a minimal reproducer, and the full traceback. Please fill those in.
+
+  - type: input
+    id: version
+    attributes:
+      label: "qis version"
+      description: "Output of `pip show qis` (the Version line)"
+      placeholder: "e.g. 5.0.8"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version and OS
+      description: "Output of `python --version`, plus your operating system"
+      placeholder: "e.g. 3.12.4 on Windows 11"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproducer
+      description: >-
+        The shortest self-contained snippet that shows the problem. Please avoid
+        proprietary data: use generated data or a public source where possible.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Full traceback or incorrect output
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: "I am on the latest released version of qis"
+          required: true
+        - label: I searched existing issues for a duplicate
+          required: true
