@@ -12,3 +12,34 @@ examples/* linguist-documentation
 # Exclude generated or data files
 *.json linguist-generated=true
 *.csv linguist-generated=true
+
+# Normalise line endings across platforms.
+#
+# Git stores text files with LF internally. Without this file, Windows
+# clients with ``core.autocrlf=true`` can check out CRLF-mangled copies
+# that trip editors and linters. Forcing ``text=auto eol=lf`` on every
+# text file keeps the working tree consistent everywhere.
+
+* text=auto eol=lf
+
+# Explicit overrides (redundant with the default above but clearer)
+*.py    text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.toml  text eol=lf
+*.json  text eol=lf
+*.cfg   text eol=lf
+
+# Binaries - never touch
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.pdf   binary
+*.xlsx  binary
+*.xls   binary
+*.docx  binary
+*.pkl   binary
+*.pickle binary
+*.parquet binary

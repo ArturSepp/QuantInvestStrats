@@ -110,7 +110,7 @@ See `pyproject.toml` for the full list of optional extras (`reports`, `visualiza
 
 ### 1. Visualization of price data <a name="price"></a>
 
-The script is located in ```qis.examples.performances``` (https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/performances.py)
+The script is located in ```qis.examples.performances``` (https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/performances.py)
 
 ```python 
 import matplotlib.pyplot as plt
@@ -179,7 +179,7 @@ This report is adopted for reporting the risk-adjusted performance
 of several assets with the goal
 of cross-sectional comparision
 
-Run example in ```qis.examples.factsheets.multi_assets.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/multi_assets.py
+Run example in ```qis.examples.factsheets.multi_assets.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/multi_assets.py
 
 ![image info](qis/examples/figures/multiassets.PNG)
 
@@ -189,7 +189,7 @@ This report is adopted for report performance, risk, and trading statistics
 for either backtested or actual strategy
     with strategy data passed as PortfolioData object
 
-Run example in ```qis.examples.factsheets.strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/strategy.py
+Run example in ```qis.examples.factsheets.strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/strategy.py
 
 ![image info](qis/examples/figures/strategy1.PNG)
 ![image info](qis/examples/figures/strategy2.PNG)
@@ -200,7 +200,7 @@ This report is adopted for report performance and marginal comparison
   of strategy vs a benchmark strategy 
 (data for both are passed using individual PortfolioData object)
 
-Run example in ```qis.examples.factsheets.strategy_benchmark.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/strategy_benchmark.py
+Run example in ```qis.examples.factsheets.strategy_benchmark.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/strategy_benchmark.py
 
 ![image info](qis/examples/figures/strategy_benchmark.PNG)
 
@@ -212,7 +212,7 @@ Brinson-Fachler performance attribution (https://en.wikipedia.org/wiki/Performan
 This report is adopted to examine the sensitivity of 
 backtested strategy to a parameter or set of parameters:
 
-Run example in ```qis.examples.factsheets.multi_strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/factsheets/multi_strategy.py
+Run example in ```qis.examples.factsheets.multi_strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/multi_strategy.py
 
 ![image info](qis/examples/figures/multi_strategy.PNG)
 
@@ -229,7 +229,7 @@ jupyter notebook
 ```
 
 Examples of using qis analytics jupyter notebooks are located here
-https://github.com/ArturSepp/QuantInvestStrats/blob/master/qis/examples/notebooks
+https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/notebooks
 
 
 ## Ecosystem
@@ -293,7 +293,7 @@ MIT — see [LICENSE.txt](LICENSE.txt).
 
 QIS package is distributed FREE & WITHOUT ANY WARRANTY under the MIT License.
 
-See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/master/LICENSE.txt) in the release for details.
+See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/main/LICENSE.txt) in the release for details.
 
 Please report any bugs or suggestions by opening an [issue](https://github.com/ArturSepp/QuantInvestStrats/issues).
 

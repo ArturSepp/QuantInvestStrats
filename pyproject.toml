@@ -107,7 +107,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/ArturSepp/QuantInvestStrats"
-Documentation = "https://github.com/ArturSepp/QuantInvestStrats/blob/master/README.md"
+Documentation = "https://github.com/ArturSepp/QuantInvestStrats/blob/main/README.md"
 Repository = "https://github.com/ArturSepp/QuantInvestStrats.git"
 Issues = "https://github.com/ArturSepp/QuantInvestStrats/issues"
 
