@@ -209,7 +209,30 @@ the meaning of existing outputs. Instead:
    `SR_arith - SR_pa ≈ sigma/2` within tolerance, so future edits cannot
    silently swap conventions.
 
-## 8. References
+## 8. Regime-conditional Sharpe ratios under each convention
+
+`PerfParams.sharpe_convention` selects how `compute_regimes_pa_perf_table` (and thus
+`plot_regime_data`) computes the regime-conditional Sharpe ratios, with regime
+probabilities p_s and conditional means m_s of the sampled periodic returns r:
+
+- **PA (default).** Compound per-annum regime returns, patched so the regime
+  p.a. returns sum to the total p.a. return, divided by the annualized vol. This
+  keeps all pre-existing outputs byte-stable and matches the reporting default of
+  Section 3.2.
+- **ARITHMETIC.** sr_s = sqrt(af) * p_s * m_s / std(r) on simple returns. By
+  linearity of the mean, sum_s sr_s equals the total arithmetic Sharpe ratio
+  exactly, with numerator and denominator paired on the identical periodic
+  series. This is the additive decomposition of the regime-attribution
+  literature (the exactness constraint of Section 4).
+- **LOG.** The same construction on log(1+r); exactly additive to the log Sharpe
+  ratio of Section 1.
+
+The additive conventions are the natural choice for regime attribution: the
+stacked regime bars of `plot_regime_data` then total to the headline Sharpe
+ratio. `PerfParams.copy()` carries `sharpe_convention` through, so a copied
+params object keeps the selected convention.
+
+## 9. References
 
 - Sharpe, W. F. (1966). Mutual Fund Performance. *Journal of Business* 39(1).
 - Sharpe, W. F. (1994). The Sharpe Ratio. *Journal of Portfolio Management*

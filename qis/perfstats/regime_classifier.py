@@ -296,7 +296,8 @@ class RegimeClassifier(ABC):
             prices: Asset price series
             benchmark: Benchmark asset name
             freq: Sampling frequency
-            perf_params: Performance parameters
+            perf_params: Performance parameters; perf_params.sharpe_convention selects the
+                regime-Sharpe convention (PA default, ARITHMETIC/LOG exactly additive)
             is_use_benchmark_means: Use benchmark means for normalization
             is_add_ra_perf_table: Include risk-adjusted performance
             drop_benchmark: Exclude benchmark from results
@@ -463,7 +464,8 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
         Args:
             prices: Asset prices
             benchmark: Benchmark asset name
-            perf_params: Performance parameters
+            perf_params: Performance parameters; perf_params.sharpe_convention selects the
+                regime-Sharpe convention (PA default, ARITHMETIC/LOG exactly additive)
             drop_benchmark: Exclude benchmark from results
 
         Returns:
@@ -576,7 +578,8 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
         Args:
             prices: Asset prices
             benchmark: Benchmark asset name
-            perf_params: Performance parameters
+            perf_params: Performance parameters; perf_params.sharpe_convention selects the
+                regime-Sharpe convention (PA default, ARITHMETIC/LOG exactly additive)
             drop_benchmark: Exclude benchmark from results
 
         Returns:
