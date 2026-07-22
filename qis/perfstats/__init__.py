@@ -9,6 +9,7 @@ from qis.perfstats.config import (
     RegimeData,
     ReturnTypes,
     SD_PERF_COLUMNS,
+    SharpeConvention,
     TRE_TABLE_COLUMNS
 )
 

@@ -28,7 +28,8 @@ import pandas as pd
 from enum import Enum
 # qis
 import qis.perfstats.returns as ret
-from qis.perfstats.config import PerfStat, PerfParams, ReturnTypes
+from qis.perfstats.config import PerfStat, PerfParams, RegimeData, ReturnTypes, SharpeConvention
+from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime, RegimeClassifier
 from qis.perfstats.perf_stats import compute_ra_perf_table
 
 AN_FACTOR = 12  # reference series is monthly
@@ -197,11 +198,62 @@ def test_excess_sharpe_conventions() -> None:
                      stat(perf_stat), float(table[perf_stat.to_str()].iloc[0]))
 
 
+def test_regime_sharpe_decomposition_conventions() -> None:
+    """regime sharpes are exactly additive under ARITHMETIC and LOG, PA sums to the pa sharpe,
+    and the PA default is pinned to a frozen fixture so the branch cannot move silently"""
+    np.random.seed(7)
+    n = 480  # monthly, forty years
+    dates = pd.date_range('1985-12-31', periods=n, freq='ME')
+    benchmark = pd.Series(0.005 + 0.04 * np.random.standard_normal(n), index=dates, name='benchmark')
+    asset = (pd.Series(0.003 + 0.03 * np.random.standard_normal(n), index=dates)
+             - 0.3 * benchmark).rename('asset')
+    returns = pd.concat([benchmark, asset], axis=1)
+    navs = ret.returns_to_nav(returns=returns, init_period=1, init_value=100.0)
+    classifier = BenchmarkReturnsQuantilesRegime(freq='ME', q=np.array([0.0, 0.16, 0.84, 1.0]))
+
+    for sharpe_convention in (SharpeConvention.ARITHMETIC, SharpeConvention.LOG, SharpeConvention.PA):
+        perf_params = PerfParams(freq='ME', sharpe_convention=sharpe_convention)
+        table, datas = classifier.compute_regimes_pa_perf_table(prices=navs,
+                                                                benchmark='benchmark',
+                                                                perf_params=perf_params)
+        regime_sharpes = datas[RegimeData.REGIME_SHARPE]
+        totals = regime_sharpes.sum(axis=1)
+        sampled = classifier.compute_sampled_returns_with_regime_id(prices=navs,
+                                                                    benchmark='benchmark',
+                                                                    include_start_date=True,
+                                                                    include_end_date=True)
+        sampled = sampled.drop(columns=[RegimeClassifier.REGIME_COLUMN])
+        if sharpe_convention == SharpeConvention.ARITHMETIC:
+            expected = np.sqrt(12.0) * sampled.mean() / sampled.std(ddof=1)
+            atol = 1e-10
+        elif sharpe_convention == SharpeConvention.LOG:
+            log_sampled = np.log1p(sampled)
+            expected = np.sqrt(12.0) * log_sampled.mean() / log_sampled.std(ddof=1)
+            atol = 1e-10
+        else:  # PA: the additivity patch makes the regime pa returns sum to the pa return
+            expected = table[PerfStat.SHARPE_RF0.to_str()]
+            atol = 1e-8
+        np.testing.assert_allclose(totals.to_numpy(), expected[totals.index].to_numpy(), atol=atol)
+
+    # frozen fixture on the PA default: hard-coded from the seeded panel, atol at display precision
+    perf_params = PerfParams(freq='ME')  # PA by default
+    _, datas = classifier.compute_regimes_pa_perf_table(prices=navs,
+                                                        benchmark='benchmark',
+                                                        perf_params=perf_params)
+    pa_sharpes = datas[RegimeData.REGIME_SHARPE]
+    np.testing.assert_allclose(pa_sharpes.loc['asset'].to_numpy(),
+                               np.array([0.458513, -0.001405, -0.296900]), atol=1e-6)
+    np.testing.assert_allclose(pa_sharpes.loc['benchmark'].to_numpy(),
+                               np.array([-0.820954, 0.052139, 0.885227]), atol=1e-6)
+
+
+
 class LocalTests(Enum):
     RETURN_CONVENTIONS = 1
     SHARPE_CONVENTIONS = 2
     EXCESS_SHARPE_CONVENTIONS = 3
-    ALL = 4
+    REGIME_SHARPE_CONVENTIONS = 4
+    ALL = 5
 
 
 def run_local_test(local_test: LocalTests):
@@ -215,6 +267,9 @@ def run_local_test(local_test: LocalTests):
     if local_test in (LocalTests.EXCESS_SHARPE_CONVENTIONS, LocalTests.ALL):
         test_excess_sharpe_conventions()
         print("excess sharpe conventions regression guard passed")
+    if local_test in (LocalTests.REGIME_SHARPE_CONVENTIONS, LocalTests.ALL):
+        test_regime_sharpe_decomposition_conventions()
+        print("regime sharpe decomposition regression guard passed")
 
 
 if __name__ == '__main__':

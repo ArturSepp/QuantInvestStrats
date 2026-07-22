@@ -34,7 +34,16 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                      ax: plt.Subplot = None,
                      **kwargs
                      ) -> plt.Figure:
+    """plot regime-conditional data of the classifier as stacked bars with regime colors.
 
+    for regime_data_to_plot=RegimeData.REGIME_SHARPE the values follow
+    perf_params.sharpe_convention (see qis/docs/sharpe_conventions.md):
+    PA (default) divides the additivity-patched compound per-annum regime returns
+    by the annualized vol. ARITHMETIC computes sr_s = sqrt(af) * p_s * m_s / std(r)
+    on the sampled simple returns, so the regime bars sum to the total arithmetic
+    Sharpe ratio exactly; LOG is the analog on log(1+r). The additive conventions
+    are the natural choice for regime attribution.
+    """
     regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(drop_benchmark=drop_benchmark,
                                                                                           **kwargs)
     data = regime_datas[regime_data_to_plot]

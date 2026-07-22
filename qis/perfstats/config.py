@@ -235,6 +235,7 @@ class PerfParams:
         print(f"freq_reg: {self.freq_reg}")
         print(f"freq_vol: {self.freq_vol}")
         print(f"return_type: {self.return_type.name}")
+        print(f"sharpe_convention: {self.sharpe_convention.name}")
         print(f"freq_drawdown: {self.freq_drawdown}")
         print(f"freq_excess_return: {self.freq_excess_return}")
         if self.rates_data is not None:
@@ -247,6 +248,7 @@ class PerfParams:
              freq_excess_return: str = None,
              return_type: ReturnTypes = None,
              rates_data: pd.Series = None,
+             sharpe_convention: SharpeConvention = None,
              **kwargs
              ) -> PerfParams:
         this_copy = PerfParams(freq_reg=freq_reg or self.freq_reg,
@@ -254,5 +256,6 @@ class PerfParams:
                                freq_drawdown=freq_drawdown or self.freq_drawdown,
                                freq_excess_return=freq_excess_return or self.freq_excess_return,
                                return_type=return_type or self.return_type,
-                               rates_data=rates_data if rates_data is not None else self.rates_data)
+                               rates_data=rates_data if rates_data is not None else self.rates_data,
+                               sharpe_convention=sharpe_convention or self.sharpe_convention)
         return this_copy
