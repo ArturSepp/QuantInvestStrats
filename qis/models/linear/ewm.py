@@ -669,9 +669,24 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                 nan_backfill: NanBackfill = NanBackfill.FFILL
                 ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
-    ewm for pandas or series
-    data dimension = t*n
-    use gen data of pandas and np and call ewm_np with numa
+    exponentially weighted moving average of a t-by-n panel.
+
+    Implements the recursion ``m_t = (1 - lambda) x_t + lambda m_{t-1}``, evaluated column-wise
+    by the numba kernel :func:`ewm_recursion`. The container type of ``data`` is preserved.
+
+    Args:
+        data: observations, time along the first axis
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``, the same
+            correspondence pandas uses
+        ewm_lambda: decay in [0, 1); higher is smoother. Ignored when ``span`` is given
+        init_value: explicit seed m_0; overrides ``init_type``
+        init_type: how m_0 is seeded when ``init_value`` is None — the first observation,
+            zero, or the sample mean
+        is_unit_vol_scaling: rescale the output to unit unconditional variance
+        nan_backfill: how the recursion carries over missing observations
+
+    Returns:
+        smoothed data, same container and shape as ``data``
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 

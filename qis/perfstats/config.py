@@ -206,7 +206,32 @@ class SharpeConvention(Enum):
 @dataclass
 class PerfParams:
     """
-    contain key parameters for computing risk adjusted performance
+    sampling frequencies and conventions for risk-adjusted performance statistics.
+
+    Every statistic is frequency-relative: volatility computed on monthly returns is not the
+    same number as volatility computed on daily returns, and the ratio is not a rescaling. The
+    frequencies are therefore explicit here rather than assumed, and each factsheet panel
+    states the frequency it was computed at. See ``qis/docs/reporting_frequencies.md``.
+
+    Passing ``freq`` sets ``freq_vol``, ``freq_reg``, ``freq_excess_return`` and, where it is
+    not already set, ``freq_drawdown`` to the same value; the per-statistic fields are for the
+    cases where one statistic needs a different grid from the rest.
+
+    Attributes:
+        freq: single frequency applied to the fields listed above; None keeps them independent
+            and defaults ``freq`` itself to 'ME'
+        freq_vol: sampling for volatility, and therefore the Sharpe denominator
+        freq_skewness: sampling for skewness
+        freq_drawdown: sampling for drawdowns and time under water; 'D' keeps the peak-to-
+            trough path at native resolution rather than on the reporting grid
+        freq_reg: sampling for linear and quadratic regressions against a benchmark
+        freq_excess_return: sampling for excess returns over ``rates_data``
+        return_type: log or arithmetic returns for the volatility computation
+        sharpe_convention: which Sharpe object the numerator reports — compound p.a.,
+            arithmetic, or log. PA is the default and leaves every existing output unchanged.
+            See ``qis/docs/sharpe_conventions.md``
+        rates_data: risk-free rate series; required for the excess-return statistics and for
+            any Sharpe ratio that is not the rf=0 variant
     """
     freq: str = None  # if pass this will be default for all
     freq_vol: str = 'ME'  # volatility of Sharpe

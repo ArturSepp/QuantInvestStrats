@@ -434,7 +434,37 @@ def generate_dates_schedule(time_period: TimePeriod,
                             is_business_dates: bool = True
                             ) -> pd.DatetimeIndex:
     """
-    tz-aware rebalancing dates
+    tz-aware schedule of dates spanning a time period at a given frequency.
+
+    The returned index carries the tz of ``time_period``. Beyond the pandas offset aliases,
+    four bespoke frequencies are recognised:
+
+    - ``'SE'``: the start and end dates only
+    - ``'M-FRI'`` / ``'Q-FRI'``: the last Friday of each month / quarter
+    - ``'Q-3FRI'``: the third Friday of the last month of each quarter, the listed-derivative
+      expiry convention
+    - ``'<freq>_<n>H'``, for example ``'D_8H'``: ``freq`` shifted by ``n`` hours, for schedules
+      anchored to an intraday fixing
+
+    Args:
+        time_period: window to span; ``time_period.end`` is required
+        freq: pandas offset alias ('ME', 'QE', 'W-WED', 'B', 'h') or one of the bespoke
+            frequencies above
+        hour_offset: hours added to every date after the schedule is built; ignored for the
+            ``'<freq>_<n>H'`` form, which sets its own offset
+        include_start_date: prepend ``time_period.start`` when the first scheduled date is
+            later than it
+        include_end_date: append ``time_period.end`` when the last scheduled date is earlier
+            than it. The Friday and underscore frequencies drop their final date when this is
+            False, so that the schedule does not run past the period
+        is_business_dates: build on ``pd.bdate_range`` rather than ``pd.date_range``
+
+    Returns:
+        schedule of dates; empty only if the period admits no date and neither
+        ``include_start_date`` nor ``include_end_date`` is set
+
+    Raises:
+        ValueError: if ``time_period.end`` is None
     """
     if freq == 'SE':  # simple start end
         dates_schedule = pd.DatetimeIndex(data=[time_period.start, time_period.end], tz=time_period.tz)
@@ -554,8 +584,31 @@ def generate_rebalancing_indicators(df: Union[pd.DataFrame, pd.Series] = None,
                                     return_true_only: bool = False
                                     ) -> pd.Series:
     """
-    tz awre rebalancing date indicators for rebalancing at data index
-    optional num_warmup_periods in number of periods at freq-schedule
+    boolean rebalancing flags aligned to an observation index.
+
+    Builds a schedule at ``freq`` over the span of the index, then marks each observation date
+    on or after a scheduled date. The result is the ``is_rebalancing`` input the backtester
+    expects, so rebalancing happens on dates the data actually has rather than on calendar
+    dates that may fall on a holiday.
+
+    Args:
+        df: frame or series whose index defines the observation dates; ignored if ``index``
+            is given
+        index: observation dates, as an alternative to ``df``
+        freq: rebalancing frequency, passed to :func:`generate_dates_schedule`
+        include_start_date: mark the first observation as a rebalancing date
+        include_end_date: mark the last observation as a rebalancing date
+        num_warmup_periods: number of leading observations forced to False, so an estimator
+            has data before the first rebalancing
+        return_true_only: return only the True entries rather than a flag per observation
+
+    Returns:
+        boolean series indexed as the observations, or only its True entries when
+        ``return_true_only``
+
+    Raises:
+        ValueError: if neither ``df`` nor ``index`` is given
+        NotImplementedError: if ``df`` is neither pd.Series nor pd.DataFrame
     """
     if df is not None:
         if not (isinstance(df, pd.Series) or isinstance(df, pd.DataFrame)):

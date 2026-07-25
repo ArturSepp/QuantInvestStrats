@@ -228,6 +228,24 @@ def sort_df_by_index_group(df: pd.DataFrame,
 
 
 def set_group_loadings(group_data: pd.Series, group_order: List[str] = None) -> pd.DataFrame:
+    """
+    one-hot loadings of instruments on groups.
+
+    Column g holds 1.0 where ``group_data`` equals g and 0.0 elsewhere, so
+    ``loadings.T @ x`` aggregates an instrument-indexed vector to group level.
+
+    Args:
+        group_data: group label per instrument, indexed by ticker
+        group_order: groups to emit, in column order; defaults to the order of first
+            appearance in ``group_data``. Groups outside the list are dropped, and a group in
+            the list that never occurs yields an all-zero column
+
+    Returns:
+        loadings indexed as ``group_data``, one column per group, values 1.0 or 0.0
+
+    Raises:
+        ValueError: if ``group_data`` is not a pd.Series
+    """
     if not isinstance(group_data, pd.Series):
         raise ValueError(f"{type(group_data)} must be pd.Series")
     if group_order is None:

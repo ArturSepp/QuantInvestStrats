@@ -46,6 +46,9 @@ extensions = [
 napoleon_google_docstring = True
 napoleon_numpy_docstring = False
 napoleon_use_admonition_for_notes = True
+# render an Attributes: block as :ivar: fields on the class rather than as separate attribute
+# directives, which would otherwise duplicate the members autodoc already emits for a dataclass
+napoleon_use_ivar = True
 
 autosummary_generate = True
 autodoc_typehints = 'description'  # signatures stay readable; types render in the body

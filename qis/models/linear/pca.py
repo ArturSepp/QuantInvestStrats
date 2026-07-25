@@ -25,7 +25,25 @@ def apply_pca(cmatrix: np.ndarray,
               is_max_sign_positive: bool = True,
               eigen_signs: np.ndarray = None
               ) -> (np.ndarray, np.ndarray):
+    """
+    eigen decomposition of a symmetric matrix, ordered from the largest eigenvalue down.
 
+    Uses ``np.linalg.eigh``, so ``cmatrix`` must be symmetric; only the lower triangle is read.
+    Eigenvectors are columns: ``cmatrix @ vectors[:, i] == values[i] * vectors[:, i]``.
+
+    The sign of an eigenvector is arbitrary, which makes loadings flip between refits. Two
+    conventions are offered to pin it down.
+
+    Args:
+        cmatrix: symmetric covariance or correlation matrix, shape (n, n)
+        is_max_sign_positive: flip each eigenvector so its largest-magnitude element is
+            positive. Ignored when ``eigen_signs`` is given
+        eigen_signs: explicit sign per eigenvector, shape (n,); use to carry the sign
+            convention of a previous fit forward so loadings stay comparable across dates
+
+    Returns:
+        (eigenvalues, eigenvectors), descending by eigenvalue, eigenvectors as columns
+    """
     # from sample covar_model
     eig_vals, eig_vecs = np.linalg.eigh(cmatrix)
 
