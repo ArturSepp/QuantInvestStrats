@@ -4,11 +4,16 @@ pytest unit tests for qis.file_utils save functions.
 Uses tmp_path so tests never touch the configured RESOURCE_PATH / OUTPUT_PATH.
 """
 
+import importlib.util
+
 import numpy as np
 import pandas as pd
 import pytest
 
 import qis.file_utils as fu
+
+requires_pyarrow = pytest.mark.skipif(importlib.util.find_spec('pyarrow') is None,
+                                      reason='parquet and feather io need pip install qis[io]')
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +305,7 @@ class TestCsv:
 # ---------------------------------------------------------------------------
 
 
+@requires_pyarrow
 class TestFeather:
 
     def test_roundtrip_preserves_index(self, tmp_path, df):
@@ -349,6 +355,7 @@ class TestFeather:
 # ---------------------------------------------------------------------------
 
 
+@requires_pyarrow
 class TestParquet:
 
     def test_roundtrip(self, tmp_path, df):

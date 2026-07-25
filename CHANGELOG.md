@@ -7,6 +7,31 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- `qis/tests/synthetic_data.py` — seeded synthetic multi-asset panel generator for tests,
+  CI and documented examples. `generate_synthetic_prices` and `generate_synthetic_universe`
+  draw a 10-instrument panel carrying ragged starts, missing observations, stale prices,
+  a delisted tail, fat tails, appraisal smoothing and a monthly-reported sleeve, with no
+  network and no data file. Internal: not exported from `qis/__init__.py`.
+
+### Fixed
+- `[tool.pytest.ini_options] testpaths` pointed at a non-existent top-level `tests/`, so a
+  bare `pytest` fell back to recursive collection and stopped on three collection errors.
+  `testpaths` is now `qis`, collection uses `--import-mode=importlib` so the two
+  `test_signal_diagnostics.py` modules no longer collide, and `mpl_image_compare` is a
+  registered marker.
+- `qis/tests/price_data_test.py` imported `yfinance` at module level, so collecting it failed
+  on a core install. The import moved inside the branch that needs it and raises an
+  `ImportError` naming the `[data]` extra. `load_etf_data` now raises `FileNotFoundError`
+  rather than returning an empty frame when the local cache is absent.
+- `qis/perfstats/tests/cond_regression_test.py` imported `get_regime_regression_params` from
+  `qis`, where it is not exported, and used `BenchmarkReturnsQuantilesRegime` without
+  importing it.
+- The parquet and feather tests in `qis/tests/file_utils_test.py` are skipped rather than
+  failed when the `[io]` extra is absent.
+- `qis/market_data/tests/factors_data_test.py::test_csv_round_trip` asserted an index `freq`
+  that csv does not carry.
+
 ## [5.0.3] - 2026-07-12
 
 ### Changed

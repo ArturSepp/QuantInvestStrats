@@ -119,8 +119,15 @@ exclude = ["tests*", "docs*"]
 qis = ["*.yaml"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-ra -q --tb=short"
+# tests live inside the package, in qis/<subpackage>/tests/, not in a top-level tests/
+testpaths = ["qis"]
+norecursedirs = [".*", "examples", "notebooks", "build", "dist", "*.egg-info", "__pycache__"]
+# importlib import mode: test modules are resolved by full path, so the two
+# test_signal_diagnostics.py files in different subpackages do not collide
+addopts = "-ra -q --tb=short --import-mode=importlib"
+markers = [
+    "mpl_image_compare: figure regression test; inert unless the pytest-mpl plugin is installed",
+]
 
 [tool.ruff]
 line-length = 100

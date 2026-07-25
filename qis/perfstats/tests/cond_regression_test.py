@@ -1,6 +1,7 @@
 
 from enum import Enum
-from qis import get_regime_regression_params
+from qis import BenchmarkReturnsQuantilesRegime
+from qis.plots.derived.regime_scatter import get_regime_regression_params
 
 
 class LocalTests(Enum):

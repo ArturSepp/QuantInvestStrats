@@ -45,7 +45,8 @@ def test_csv_round_trip(tmp_path) -> None:
     prices = _sample_prices()
     qis.save_df_to_csv(df=prices, file_name='futures_risk_factors', local_path=f"{tmp_path}/")
     fd = FactorsData.load(local_path=f"{tmp_path}/", factors=_Factors)
-    pd.testing.assert_frame_equal(fd.factors_prices, prices)
+    # csv does not carry the index freq, so it is not part of the round-trip contract
+    pd.testing.assert_frame_equal(fd.factors_prices, prices, check_freq=False)
 
 
 if __name__ == '__main__':
