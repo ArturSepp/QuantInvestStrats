@@ -11,6 +11,8 @@ Scripts/
 # YAML
 *.yaml
 !/qis/settings.yaml
+# read the docs build config; the blanket rule above would otherwise hide it
+!/.readthedocs.yaml
 
 # Byte-compiled / optimized / DLL files
 docs/figures/
