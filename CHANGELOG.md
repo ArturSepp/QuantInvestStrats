@@ -8,6 +8,21 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [Unreleased]
 
 ### Added
+- `qis/plots/tests/plot_smoke_test.py` — smoke test over every `plot_*` exported from `qis`.
+  Each of the 62 runs on the frozen synthetic panel and must draw a figure; the
+  parametrisation is read from `dir(qis)` at collection time, so exporting a new `plot_*`
+  without a fixture fails the suite rather than going uncovered. Three exported functions are
+  marked `xfail(strict=True)` against defects it found: `plot_prices_2ax`, `plot_regime_pdf`
+  and `plot_vbars`.
+- CI runs `pytest` on the 3.10–3.14 matrix against a core install, repeats it with the
+  `[data,io]` extras, and lints the files a push or pull request changes with a pinned `ruff`.
+
+### Changed
+- `[tool.ruff.lint] select` drops `"I"`. The isort rule contradicts the documented import
+  convention, which groups stdlib imports under `# packages` after numpy/pandas, so it failed
+  every file written to the house style.
+
+### Added
 - `qis/tests/synthetic_data.py` — seeded synthetic multi-asset panel generator for tests,
   CI and documented examples. `generate_synthetic_prices` and `generate_synthetic_universe`
   draw a 10-instrument panel carrying ragged starts, missing observations, stale prices,

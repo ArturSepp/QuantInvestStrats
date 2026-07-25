@@ -6,12 +6,20 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  MPLBACKEND: Agg  # no display on the runner
 
 jobs:
+  # the path a reviewer follows: pip install qis, then pytest. Nothing optional installed.
   test:
+    name: pytest (core install, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -24,11 +32,13 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+        cache: pip
 
-    - name: Install dependencies
+    - name: Install
       run: |
         python -m pip install --upgrade pip
         pip install -e .
+        pip install pytest
 
     - name: Verify core imports
       run: |
@@ -43,8 +53,77 @@ jobs:
         print('All imports OK')
         "
 
-    - name: Run tests (no external data, no plots)
+    - name: Run tests
+      run: pytest
+
+  # the same suite with the optional extras present, so the tests skipped above actually run
+  test-extras:
+    name: pytest (data + io extras)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: pip
+
+    - name: Install
       run: |
-        python qis/utils/tests/annualisation_test.py
-        python qis/utils/tests/dates_test.py
-        python qis/utils/tests/file_utils_tests.py
+        python -m pip install --upgrade pip
+        pip install -e ".[data,io]"
+        pip install pytest pytest-cov
+
+    - name: Run tests with coverage
+      # the coverage number is reported, not gated: raising it is tracked work, not a merge
+      # condition
+      run: pytest --cov=qis --cov-report=term:skip-covered
+
+  lint:
+    name: ruff (changed files)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: pip
+
+    - name: Install ruff
+      # pinned exactly: an unpinned linter turns someone else's release into a red build
+      run: pip install ruff==0.14.2
+
+    - name: Lint files changed by this push or pull request
+      # the package carries a large pre-existing violation count, so a repo-wide gate would be
+      # red on arrival and would teach everyone to route around it. Gating the diff keeps the
+      # check green today and stops new debt. See AGENTS.md, Known issues.
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          BASE="${{ github.event.pull_request.base.sha }}"
+        else
+          BASE="${{ github.event.before }}"
+        fi
+        if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+          echo "no usable base commit for a diff; skipping the gate"
+          exit 0
+        fi
+        CHANGED=$(git diff --name-only --diff-filter=ACM "$BASE" "${{ github.sha }}" -- '*.py')
+        if [ -z "$CHANGED" ]; then
+          echo "no python files changed"
+          exit 0
+        fi
+        echo "$CHANGED"
+        ruff check $CHANGED
+
+    - name: Repo-wide violation count (report only, never fails)
+      if: always()
+      run: ruff check qis/ --statistics || true

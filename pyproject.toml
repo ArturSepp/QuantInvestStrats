@@ -97,7 +97,7 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
-    "ruff>=0.4",
+    "ruff>=0.14,<0.15",  # CI pins the exact patch; see .github/workflows/ci.yml
     "qis[data]",
 ]
 
@@ -133,7 +133,10 @@ markers = [
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"]
+# "I" (isort) is deliberately absent: the house convention groups stdlib imports under the
+# "# packages" marker after numpy/pandas, which isort will always want to reorder. Keeping the
+# rule would fail every file written to the documented convention. See AGENTS.md, Conventions.
+select = ["E", "F", "W"]
 
 [tool.coverage.run]
 source = ["qis"]
