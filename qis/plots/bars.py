@@ -281,7 +281,9 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     # plot results = {index, column data as list}
     results = {rdata[0]: rdata[1].to_list() for rdata in df.iterrows()}
 
-    labels = list(results.keys())
+    # bars must be categorical: the value labels (ax.text) and the total markers (ax.vlines)
+    # below address rows by integer position, which barh only honours for non-numeric labels
+    labels = [str(x) for x in results.keys()]
     np_data = np.array(list(results.values()))
     if totals is None:
         totals = np.sum(np_data, axis=1)
@@ -313,10 +315,8 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     last_starts = None
     initial_starts = np.sum(np.where(np_data < 0.0, np_data, 0.0), axis=1)
     for i, colname in enumerate(category_names):
-        if is_category_names_colors:
-            col_colors = colors[i]
-        else:
-            col_colors = colors
+        # colors are indexed by row (one per bar), not by column: pass the whole array
+        col_colors = colors
         widths = np.where(np_data[:, i] < 0.0, np_data[:, i], 0.0)
         if last_starts is None:
             starts = initial_starts
@@ -345,10 +345,8 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     # positive
     last_starts = 0*last_starts
     for i, colname in enumerate(category_names):
-        if is_category_names_colors:
-            col_colors = colors[i]
-        else:
-            col_colors = colors
+        # colors are indexed by row (one per bar), not by column: pass the whole array
+        col_colors = colors
 
         widths = np.where(np_data[:, i] > 0.0, np_data[:, i], 0.0)
         if last_starts is None:
@@ -435,6 +433,9 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     if axvline_color is not None:
         ax.axvline(x=0, linewidth=2, color=axvline_color)
 
+    # barh places categorical bars at 0..n-1; pin the y locator to those positions so the
+    # label count matches, whatever the auto locator picked
+    ax.set_yticks(np.arange(len(labels)))
     x_labels = [var_format.format(x) for x in ax.get_xticks()]
     put.set_ax_tick_labels(ax=ax,
                            x_labels=x_labels,

@@ -32,10 +32,8 @@ def plot_regime_pdf(prices: pd.DataFrame,
     else:
         fig = None
 
-    regime_classifier = BenchmarkReturnsQuantilesRegime()
     sampled_returns_with_regime_id = regime_classifier.compute_sampled_returns_with_regime_id(prices=prices,
-                                                                                              benchmark=benchmark,
-                                                                                              **regime_classifier._asdict())
+                                                                                              benchmark=benchmark)
 
     if is_histogram:
         sns.histplot(data=sampled_returns_with_regime_id,

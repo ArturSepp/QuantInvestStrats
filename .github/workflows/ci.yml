@@ -102,10 +102,10 @@ jobs:
       # pinned exactly: an unpinned linter turns someone else's release into a red build
       run: pip install ruff==0.14.2
 
-    - name: Lint files changed by this push or pull request
-      # the package carries a large pre-existing violation count, so a repo-wide gate would be
-      # red on arrival and would teach everyone to route around it. Gating the diff keeps the
-      # check green today and stops new debt. See AGENTS.md, Known issues.
+    - name: Lint lines changed by this push or pull request
+      # the package carries ~2,250 pre-existing violations, so gating whole files would fail on
+      # any edit to a legacy file and the check would be routed around. Gating the added lines
+      # keeps it green today and still stops new debt. See AGENTS.md, Known issues.
       run: |
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           BASE="${{ github.event.pull_request.base.sha }}"
@@ -116,13 +116,7 @@ jobs:
           echo "no usable base commit for a diff; skipping the gate"
           exit 0
         fi
-        CHANGED=$(git diff --name-only --diff-filter=ACM "$BASE" "${{ github.sha }}" -- '*.py')
-        if [ -z "$CHANGED" ]; then
-          echo "no python files changed"
-          exit 0
-        fi
-        echo "$CHANGED"
-        ruff check $CHANGED
+        python .github/lint_changed_lines.py "$BASE" "${{ github.sha }}"
 
     - name: Repo-wide violation count (report only, never fails)
       if: always()

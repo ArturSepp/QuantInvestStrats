@@ -7,6 +7,22 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+- Three exported plot functions could not be called on their documented signature.
+  `plot_prices_2ax` passed `trend_line` into `plot_time_series_2ax`, which takes
+  `trend_line1` / `trend_line2` and forwarded the stray keyword into `plot_time_series`
+  alongside `trend_line1` (`TypeError`). `plot_regime_pdf` called `_asdict()` on
+  `BenchmarkReturnsQuantilesRegime`, which is a class and not a NamedTuple
+  (`AttributeError`), and overwrote the caller's `regime_classifier` argument on the
+  preceding line, so that parameter was ignored. `plot_vbars` indexed a per-row colour
+  array by column (`IndexError` above four columns) and left the y locator to matplotlib,
+  so the label count matched only on a frame with exactly eight rows (`ValueError`).
+- `plot_vbars` now coerces the index to strings before `barh`. The value labels and the
+  total markers address rows by integer position, which `barh` honours only for
+  non-numeric labels, so a `DatetimeIndex` silently drew every bar in the wrong place.
+- `plot_multivariate_scatter_with_prediction` dereferenced `ax.get_legend()` unguarded and
+  raised whenever `hue` was left at its default, since seaborn draws no legend in that case.
+
 ### Added
 - `qis/plots/tests/plot_smoke_test.py` — smoke test over every `plot_*` exported from `qis`.
   Each of the 62 runs on the frozen synthetic panel and must draw a figure; the
@@ -46,6 +62,42 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   failed when the `[io]` extra is absent.
 - `qis/market_data/tests/factors_data_test.py::test_csv_round_trip` asserted an index `freq`
   that csv does not carry.
+
+## [5.0.9] - 2026-07-22
+
+### Added
+- `SharpeConvention` is exported from `qis`. `compute_regimes_pa_perf_table` and
+  `plot_regime_data` accept the convention, so regime tables state which Sharpe object they
+  report. `qis/docs/sharpe_conventions.md` extended with the regime decomposition.
+
+## [5.0.8] - 2026-07-16
+
+### Added
+- `SharpeConvention` (`PA`, `ARITHMETIC`, `LOG`) on `PerfParams`, defaulting to `PA` so no
+  existing statistic changes value, and `compute_regime_sharpe_decomposition`, which is
+  exactly additive in the arithmetic convention.
+
+## [5.0.7] - unreleased tag
+
+[TODO: 5.0.7 is on PyPI but no commit in this repository sets that version. Reconstruct from
+the uploaded sdist or yank it.]
+
+## [5.0.6] - unreleased tag
+
+[TODO: 5.0.6 is on PyPI but no commit in this repository sets that version. Reconstruct from
+the uploaded sdist or yank it.]
+
+## [5.0.5] - 2026-07-13
+
+### Fixed
+- Typo fixes and method visibility corrections across `market_data.fx_rates_data`,
+  `models.bootstrap.bootstrap_numba`, `portfolio` and the pybloqs factsheet examples.
+
+## [5.0.4] - 2026-07-12
+
+### Fixed
+- `qis/portfolio/reports/config.py` did not import `infer_data_frequency_label`, so
+  `import qis` failed in 5.0.3. Hotfix release.
 
 ## [5.0.3] - 2026-07-12
 

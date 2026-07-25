@@ -25,16 +25,8 @@ import qis  # noqa: E402
 from qis.tests.synthetic_data import generate_synthetic_universe  # noqa: E402
 
 # exported plot functions that cannot be called on their documented minimal signature.
-# strict=True: when the defect is fixed the test fails until the entry is removed.
-KNOWN_BROKEN = {
-    'plot_prices_2ax': "passes trend_line into plot_time_series_2ax, which forwards it to "
-                       "plot_time_series alongside trend_line1: TypeError",
-    'plot_regime_pdf': "calls regime_classifier._asdict() on BenchmarkReturnsQuantilesRegime, "
-                       "which is a class and not a NamedTuple: AttributeError",
-    'plot_vbars': "the x tick locator is fixed at 8 positions regardless of len(df.index), so "
-                  "the call succeeds only on a frame with exactly 8 rows: ValueError. With 5 or "
-                  "more columns it raises IndexError first, indexing a shorter colors list",
-}
+# strict=True: when a defect is fixed the test fails until the entry is removed.
+KNOWN_BROKEN = {}
 
 
 def _exported_plot_functions() -> list:
@@ -146,9 +138,7 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
                                 data_labels=['a', 'b']),
         'plot_multivariate_scatter_with_prediction': dict(
             df=fx.returns, x=list(fx.returns.columns[1:3]), y=fx.returns.columns[0],
-            # hue is not optional in practice: without it seaborn draws no legend and the
-            # function dereferences ax.get_legend() unguarded
-            x_axis_column=fx.returns.columns[1], hue=fx.returns.columns[3]),
+            x_axis_column=fx.returns.columns[1]),  # no hue: exercises the no-legend path
         'plot_pie': dict(df=fx.positive_table),
         'plot_prices_2ax': dict(prices_ax1=fx.prices.iloc[:, [0]],
                                 prices_ax2=fx.prices.iloc[:, [1]]),

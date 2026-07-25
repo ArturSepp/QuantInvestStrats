@@ -303,10 +303,11 @@ Please report any bugs or suggestions by opening an [issue](https://github.com/A
 If you use QIS in your research, please cite it as:
 
 ```bibtex
-@software{sepp2024qis,
+@software{sepp2026qis,
   title={qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies},
   author={Sepp, Artur},
-  year={2024},
+  year={2026},
+  version={5.0.9},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

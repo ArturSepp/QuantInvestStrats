@@ -438,9 +438,10 @@ def plot_multivariate_scatter_with_prediction(df: pd.DataFrame,
     labels = [f"prediction {reg_label}"]
     colors = [full_sample_color]
     leg = ax.get_legend()
-    for label, line in zip(leg.get_texts(), leg.get_lines()):
-        labels.append(label.get_text())
-        colors.append(line.get_color())
+    if leg is not None:  # seaborn draws no legend when hue is not given
+        for label, line in zip(leg.get_texts(), leg.get_lines()):
+            labels.append(label.get_text())
+            colors.append(line.get_color())
 
     qp.set_legend(ax=ax,
                   labels=labels,
