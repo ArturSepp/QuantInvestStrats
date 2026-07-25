@@ -307,7 +307,7 @@ If you use QIS in your research, please cite it as:
   title={qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies},
   author={Sepp, Artur},
   year={2026},
-  version={5.0.9},
+  version={5.0.10},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

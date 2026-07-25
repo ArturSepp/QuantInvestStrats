@@ -7,61 +7,44 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-### Fixed
-- Three exported plot functions could not be called on their documented signature.
-  `plot_prices_2ax` passed `trend_line` into `plot_time_series_2ax`, which takes
-  `trend_line1` / `trend_line2` and forwarded the stray keyword into `plot_time_series`
-  alongside `trend_line1` (`TypeError`). `plot_regime_pdf` called `_asdict()` on
-  `BenchmarkReturnsQuantilesRegime`, which is a class and not a NamedTuple
-  (`AttributeError`), and overwrote the caller's `regime_classifier` argument on the
-  preceding line, so that parameter was ignored. `plot_vbars` indexed a per-row colour
-  array by column (`IndexError` above four columns) and left the y locator to matplotlib,
-  so the label count matched only on a frame with exactly eight rows (`ValueError`).
-- `plot_vbars` now coerces the index to strings before `barh`. The value labels and the
-  total markers address rows by integer position, which `barh` honours only for
-  non-numeric labels, so a `DatetimeIndex` silently drew every bar in the wrong place.
-- `plot_multivariate_scatter_with_prediction` dereferenced `ax.get_legend()` unguarded and
-  raised whenever `hue` was left at its default, since seaborn draws no legend in that case.
+## [5.0.10] - 2026-07-25
 
 ### Added
-- `qis/plots/tests/plot_smoke_test.py` — smoke test over every `plot_*` exported from `qis`.
-  Each of the 62 runs on the frozen synthetic panel and must draw a figure; the
-  parametrisation is read from `dir(qis)` at collection time, so exporting a new `plot_*`
-  without a fixture fails the suite rather than going uncovered. Three exported functions are
-  marked `xfail(strict=True)` against defects it found: `plot_prices_2ax`, `plot_regime_pdf`
-  and `plot_vbars`.
+- `qis/tests/synthetic_data.py` — seeded synthetic multi-asset panel for tests, CI and
+  documented examples. `generate_synthetic_prices` and `generate_synthetic_universe` draw a
+  10-instrument panel carrying ragged starts, missing observations, stale prices, a delisted
+  tail, fat tails, appraisal smoothing and a monthly-reported sleeve, with no network and no
+  data file. Internal: not exported from `qis/__init__.py`.
+- `qis/plots/tests/plot_smoke_test.py` — every `plot_*` exported from `qis` runs on that panel
+  and must draw a figure. The parametrisation is read from `dir(qis)` at collection time, so a
+  newly exported `plot_*` without a fixture fails the suite rather than going uncovered.
 - CI runs `pytest` on the 3.10–3.14 matrix against a core install, repeats it with the
-  `[data,io]` extras, and lints the files a push or pull request changes with a pinned `ruff`.
+  `[data,io]` extras, and lints the lines a push or pull request changes with a pinned `ruff`.
 
 ### Changed
 - `[tool.ruff.lint] select` drops `"I"`. The isort rule contradicts the documented import
   convention, which groups stdlib imports under `# packages` after numpy/pandas, so it failed
   every file written to the house style.
 
-### Added
-- `qis/tests/synthetic_data.py` — seeded synthetic multi-asset panel generator for tests,
-  CI and documented examples. `generate_synthetic_prices` and `generate_synthetic_universe`
-  draw a 10-instrument panel carrying ragged starts, missing observations, stale prices,
-  a delisted tail, fat tails, appraisal smoothing and a monthly-reported sleeve, with no
-  network and no data file. Internal: not exported from `qis/__init__.py`.
-
 ### Fixed
-- `[tool.pytest.ini_options] testpaths` pointed at a non-existent top-level `tests/`, so a
-  bare `pytest` fell back to recursive collection and stopped on three collection errors.
-  `testpaths` is now `qis`, collection uses `--import-mode=importlib` so the two
-  `test_signal_diagnostics.py` modules no longer collide, and `mpl_image_compare` is a
-  registered marker.
-- `qis/tests/price_data_test.py` imported `yfinance` at module level, so collecting it failed
-  on a core install. The import moved inside the branch that needs it and raises an
-  `ImportError` naming the `[data]` extra. `load_etf_data` now raises `FileNotFoundError`
-  rather than returning an empty frame when the local cache is absent.
-- `qis/perfstats/tests/cond_regression_test.py` imported `get_regime_regression_params` from
-  `qis`, where it is not exported, and used `BenchmarkReturnsQuantilesRegime` without
-  importing it.
-- The parquet and feather tests in `qis/tests/file_utils_test.py` are skipped rather than
-  failed when the `[io]` extra is absent.
-- `qis/market_data/tests/factors_data_test.py::test_csv_round_trip` asserted an index `freq`
-  that csv does not carry.
+- `plot_prices_2ax` passed `trend_line` into `plot_time_series_2ax`, which takes `trend_line1` /
+  `trend_line2`, and the stray keyword reached `plot_time_series` alongside `trend_line1`
+  (`TypeError`).
+- `plot_regime_pdf` called `_asdict()` on `BenchmarkReturnsQuantilesRegime`, which is a class
+  and not a NamedTuple (`AttributeError`), and overwrote the caller's `regime_classifier` on the
+  preceding line, so that argument was ignored.
+- `plot_vbars` indexed a per-row colour array by column (`IndexError` above four columns) and
+  left the y locator to matplotlib, so the label count matched only on a frame with exactly
+  eight rows (`ValueError`). It also drew every bar in the wrong place on a `DatetimeIndex`: the
+  value labels and total markers address rows by integer position, which `barh` honours only for
+  non-numeric labels, so the index is now coerced to strings.
+- `plot_multivariate_scatter_with_prediction` dereferenced `ax.get_legend()` unguarded and raised
+  whenever `hue` was left at its default, since seaborn draws no legend in that case.
+- `pytest` at the repository root collected nothing useful: `testpaths` pointed at a top-level
+  `tests/` that does not exist, and three modules failed to import. `testpaths` is now `qis`,
+  collection uses `--import-mode=importlib`, the `yfinance` import in
+  `qis/tests/price_data_test.py` moved inside the branch that needs it, and the parquet and
+  feather tests skip rather than fail without the `[io]` extra.
 
 ## [5.0.9] - 2026-07-22
 
