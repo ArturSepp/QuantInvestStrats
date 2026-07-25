@@ -6,6 +6,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square)](https://pypi.org/project/qis/)
 [![License](https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square)](LICENSE.txt)
 [![CI](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg)](https://github.com/ArturSepp/QuantInvestStrats/actions)
+[![Docs](https://readthedocs.org/projects/quantinveststrats/badge/?version=latest)](https://quantinveststrats.readthedocs.io/en/latest/)
 [![Downloads](https://static.pepy.tech/badge/qis)](https://pepy.tech/project/qis)
 [![Monthly](https://static.pepy.tech/badge/qis/month)](https://pepy.tech/project/qis)
 
