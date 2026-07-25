@@ -19,7 +19,13 @@ qis being fully initialised (keeps the top-level `qis.factsheet` export circular
 """
 import matplotlib.pyplot as plt
 import pandas as pd
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING, List, Optional, Union
+
+if TYPE_CHECKING:  # resolved by typing.get_type_hints and by sphinx autodoc, never at runtime
+    from qis.portfolio.reports.config import ReportingFrequency
+    from qis.portfolio.multi_portfolio_data import MultiPortfolioData
+    from qis.portfolio.portfolio_data import PortfolioData
+    from qis.utils.dates import TimePeriod
 
 # report-archetype identifiers (also accepted via the `kind=` override)
 KIND_STRATEGY = 'strategy'

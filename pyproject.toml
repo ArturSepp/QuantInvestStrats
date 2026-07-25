@@ -93,6 +93,12 @@ jupyter = [
     "ipywidgets>=8.0.0",
 ]
 
+docs = [
+    "sphinx>=8.0",
+    "myst-parser>=4.0",
+    "furo>=2024.8.6",
+]
+
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -102,7 +108,7 @@ dev = [
 ]
 
 all = [
-    "qis[data,reports,visualization,io,database,jupyter]",
+    "qis[data,reports,visualization,io,database,jupyter,docs]",
 ]
 
 [project.urls]
