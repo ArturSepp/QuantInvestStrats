@@ -51,16 +51,27 @@ from the stated frequency. Three Sharpe conventions are named and selected expli
 reporting frequency appears on every rendered panel. The simulation holds units between
 rebalancings, so the realised weights drift with prices, which is what a portfolio does.
 
+The cost of leaving a convention unstated is measurable rather than notional. The stationary
+bootstrap resamples a series in blocks, and a block drawn near the end of the sample either wraps
+around to the start or stops there. Both forms run, and neither reports which it used. Under the
+truncating form the first observation of a 250-period sample is drawn at 0.11 times its uniform
+weight and the first decile at 0.53 times, because a block can only run forwards. Applied to a
+series whose drift rises through the sample, that uneven draw reports a mean return 2.15% per
+year above the source series, while the wrapping form reports it within 0.32%. Two researchers
+running a stationary bootstrap on the same data would publish annual returns differing by more
+than two percentage points, and nothing in either output would explain the gap. The example that
+produces these numbers ships with the package and runs in the test suite.
+
 [TODO: Artur to write the economic-mechanism paragraph here, per the house rule that this passage
-is drafted without AI assistance. The argument to make is why convention drift matters in
-practice rather than in principle, anchored in a concrete case where two correct implementations
-disagree.]
+is drafted without AI assistance. The demonstration above supplies the measurement, so this
+paragraph carries the argument for why convention drift matters in practice, and what it costs a
+reader of a published result who cannot tell which convention produced it.]
 
 The second need is compositional, because a research group accumulates analytics faster than it
-consolidates them, and the same method is then written repeatedly across projects. We found four
-independent block bootstrap implementations and two return unsmoothers across four of our own
-repositories, all of them reimplementing code that `qis` already exported, and one carrying a
-comment that recorded the intention to move it into `qis`. Those implementations had diverged, so
+consolidates them, and the same method is then written repeatedly across projects. In our own repositories we found
+four independent block bootstrap implementations and two return unsmoothers, all of them
+reimplementing code that `qis` already exported, and one carrying a comment that recorded the
+intention to move it into `qis`. Those implementations had diverged, so
 the same nominal method produced different numbers in different papers. A general-purpose
 analytics layer is worth maintaining because the alternative is not an absence of code, but
 several copies of it that no longer agree.
@@ -113,24 +124,33 @@ documented surface cannot drift away from the published one.
 We enforce four properties through the test suite rather than through convention. Every exported
 plotting function must run on a synthetic panel and produce a figure, and every example must
 reference symbols and keyword arguments that exist. Every symbol in the documented core must
-document its arguments, and every documented argument must exist in the signature. The suite
-contains 928 tests and runs without network access on a core installation, because its data comes
+document its arguments, and every documented argument must exist in the signature. The suite also executes the
+examples that need no data vendor, including the one that produces the convention measurement
+quoted above, so those numbers cannot drift away from the code that generates them. The suite
+contains 929 tests and runs without network access on a core installation, because its data comes
 from a frozen seeded simulator that reproduces the defects of real panels, including ragged start
 dates, missing observations, stale prices, and appraisal smoothing.
 
 # Research impact statement
 
-`qis` is the base layer of a stack of packages. `optimalportfolios`, which implements portfolio
-optimisation solvers and rolling backtests, declares `qis` as a mandatory dependency and calls 73
-of its symbols at 541 call sites. `TrendFollowingSystems`, which carries the code for a paper in
-submission on diversification of systematic strategies, calls 96 symbols at 538 sites. Both
-packages are public, so a reader can reproduce both counts from a clone.
+`qis` is the base layer of a stack of packages, and we state plainly that the stack is the
+author's. Two consumers carry this section, because both are public and both use the package
+deeply.
+`optimalportfolios`, which implements portfolio optimisation solvers and rolling backtests,
+declares `qis` as a mandatory dependency and calls 73 of its symbols at 541 call sites.
+`TrendFollowingSystems`, which carries the code for a paper in submission on diversification of
+systematic strategies, calls 96 symbols at 538 sites. A reader can reproduce both counts from a
+clone with a short script.
 
-Four further repositories depend on the package, among them a production asset allocation system
-and four paper-specific repositories. Across six consumers we measure 2,738 call sites covering
-240 distinct symbols. The capabilities carry named results: regime-conditional reporting supports
-published work on diversification, the bootstrap layer supports work on achievable Sharpe ratios,
-and the portfolio layer supports work on mandate architecture.
+A third public package, `privateassets`, applies the unsmoothing layer to private-asset returns.
+It is recent and its dependency is small, so we cite it for the range of asset classes the
+package serves rather than as evidence of adoption. Three private repositories account for the
+remainder, among them a production asset allocation system. Across six consumers we measure 2,738
+call sites covering 240 distinct symbols.
+
+The capabilities carry named results. Regime-conditional reporting supports published work on
+diversification, the bootstrap layer supports work on achievable Sharpe ratios, and the portfolio
+layer supports work on mandate architecture.
 
 [TODO: list the four to six papers with venue, year, volume and pages, each verified. Do not
 include any citation that has not been checked.]

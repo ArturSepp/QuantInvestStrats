@@ -25,6 +25,7 @@ prices, a delisted tail and a monthly-reported illiquid sleeve.
 
 install
 quickstart
+reproducibility
 _included/gallery
 ```
 

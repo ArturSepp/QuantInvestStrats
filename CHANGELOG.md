@@ -7,6 +7,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- `qis/examples/models/bootstrap_convention.py` — measures what the block-resampling convention
+  costs. The superseded truncating sampler draws the first observation of a 250-period sample at
+  0.11x its uniform weight and the first decile at 0.53x; applied to a series with rising drift
+  it reports a mean return 2.15% per year above the source, against 0.32% for the circular
+  sampler now used. No network, and the test suite executes it, so the numbers cannot drift from
+  the code.
+- `docs/reproducibility.md` — the same measurement as a documentation page, with what follows
+  from it for the return convention, the Sharpe conventions and the reported frequency.
+
 ## [5.1.0] - 2026-07-26
 
 **`BootstrapType.STATIONARY` produces different draws in this release.** Blocks now wrap around
