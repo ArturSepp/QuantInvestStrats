@@ -20,10 +20,15 @@ from qis.market_data.fx_hedging import compute_performance_of_local_ccy_asset_in
 @dataclass
 class FxRatesData:
     """
-    Container for FX spot rates and domestic interest rates.
+    FX spot rates and domestic short rates, aligned on a common index.
 
-    Supports conversion between currencies and forward rate calculations.
-    FX spots are quoted as local_ccy/USD (units of USD per 1 local currency).
+    Spots are quoted as USD per one unit of the local currency, so a cross rate is a ratio of two
+    columns and the quote currency's own column is identically one. Rates are reindexed onto the
+    spot dates and forward-filled on construction, so the two are always aligned.
+
+    Attributes:
+        fx_spots: USD per 1 unit of each currency, one column per currency
+        domestic_rates: annualised short rate per currency, on the same columns
     """
     fx_spots: pd.DataFrame
     domestic_rates: pd.DataFrame
@@ -639,17 +644,20 @@ class FxRatesData:
 def load_fx_rates_data(local_path: str,
                        file_name: str = 'fx_hedging_data'
                        ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Load FX spot rates and domestic short rates from saved CSV files.
+    """
+    read FX spots and domestic short rates from the saved CSV pair.
 
-    ``usd_assets`` is not loaded here — it is only needed for examples and
-    reporting; use ``qis.examples.market_data.load_usd_assets`` for that.
+    Applies one in-memory correction: historical files stored ``GBp`` as a copy of ``GBP``, where
+    the correct relationship is ``GBp = 0.01 * GBP``. A file carrying the stale mapping is healed on
+    load, so callers always see the corrected series; rerunning ``create_fx_rates_data`` persists
+    the fix.
 
-    Applies a one-time correction for historical CSVs that stored
-    ``GBp`` as a 1:1 copy of ``GBP``. The correct relationship is
-    ``GBp = 0.01 * GBP`` (1 GBP = 100 pence). If the loaded data is
-    detected to carry the stale mapping, it is healed in-memory so
-    callers always see the corrected series. Re-running
-    ``create_fx_rates_data`` will persist the fix to disk.
+    Args:
+        local_path: directory holding the CSV files
+        file_name: base file name; the spots and rates are stored under keys of it
+
+    Returns:
+        the spots and the domestic rates, in that order
     """
     data = qis.load_df_dict_from_csv(dataset_keys=['fx_spots', 'domestic_rates'],
                                      file_name=file_name, local_path=local_path)

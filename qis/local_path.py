@@ -34,7 +34,18 @@ def get_paths() -> Dict[str, str]:
 
 def get_resource_path() -> str:
     """
-    resource path from settings.yaml
+    directory for bundled data resources, read from ``settings.yaml``.
+
+    Note:
+        ``settings.yaml`` ships with a placeholder path, so this returns a directory that does not
+        exist until the file is edited for the machine. Pass an explicit ``local_path`` to the
+        file_utils readers and writers rather than relying on it.
+
+    Returns:
+        the configured resource path
+
+    Raises:
+        KeyError: if ``settings.yaml`` has no ``RESOURCE_PATH`` entry
     """
     return get_paths()['RESOURCE_PATH']
 

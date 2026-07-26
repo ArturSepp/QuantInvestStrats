@@ -61,9 +61,23 @@ def estimate_hf_ohlc_vol(ohlc_data: pd.DataFrame,
                          agg_freq: Optional[str] = 'B'
                          ) -> pd.Series:
     """
+    annualised volatility from open-high-low-close bars using a range estimator.
 
-    group hf data into daily or higher frequency bins
-    for each sample compute vol at data freq and annualize at an
+    A range estimator uses the high and low as well as the close, so it extracts several times more
+    information per bar than a close-to-close estimate at the same sample size. Bars are aggregated
+    to ``agg_freq`` and the per-bar variance is averaged before annualising.
+
+    Args:
+        ohlc_data: bars with open, high, low and close columns
+        ohlc_estimator_type: which range estimator to apply; see :class:`OhlcEstimatorType`
+        annualization_factor: periods per year. None infers it from the aggregated index, which is
+            a guess worth overriding - it rescales every reported number
+        is_exclude_weekends: drop Saturdays and Sundays from the output. Off by default because a
+            24/7 market trades through them
+        agg_freq: frequency the per-bar variances are averaged to. None leaves them per bar
+
+    Returns:
+        annualised volatility, indexed at ``agg_freq``
     """
     sample_var = estimate_ohlc_var(ohlc_data=ohlc_data, ohlc_estimator_type=ohlc_estimator_type)
     if agg_freq is not None:

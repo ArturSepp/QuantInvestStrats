@@ -550,9 +550,28 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
                                               nan_backfill: NanBackfill = NanBackfill.FFILL
                                               ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    compute ewm covariance matrix time series as 3-d tensor [t, x, x]
-    returns vector a is normalised by vol
-    compute normalised covar, covar for natural vars and vols
+    EWM covariance tensor computed on vol-normalised returns, with the vols returned alongside.
+
+    Two-step estimator: each series is divided by its own EWM volatility, the correlation is
+    estimated on the normalised series, and the covariance is rebuilt as ``D C D`` with ``D`` the
+    diagonal of vols. Normalising first stops a single volatile asset dominating the correlation
+    estimate, which the direct covariance recursion does not avoid.
+
+    Args:
+        a: returns, rows are dates and columns are assets. 2-d only
+        span: EWM span. Takes precedence over ``ewm_lambda``. An array applies a span per asset
+        ewm_lambda: decay used when ``span`` is None
+        covar0: initial covariance. None starts from zero
+        is_corr: return the correlation tensor rather than the covariance in the first output
+        nan_backfill: how a missing observation is handled in the recursion; see
+            :class:`NanBackfill`
+
+    Returns:
+        the covariance (or correlation) tensor of shape ``(t, n, n)``, the normalised-return
+        covariance tensor, and the EWM vols of shape ``(t, n)``
+
+    Raises:
+        ValueError: if ``a`` is not 2-d
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)

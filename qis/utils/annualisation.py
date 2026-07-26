@@ -155,7 +155,19 @@ def get_annualization_factor(freq: str,
 
 def infer_annualisation_factor_from_df(data: Union[pd.DataFrame, pd.Series]) -> float:
     """
-    infer annualization factor for vol
+    the number of periods per year implied by a frame's index frequency.
+
+    The factor volatility is scaled by: 260 for business days, 12 for month-ends, and so on. It is
+    inferred rather than assumed, because getting it wrong rescales every reported volatility and
+    Sharpe ratio silently.
+
+    Args:
+        data: frame or series with a date index. Fewer than three observations cannot support an
+            inference
+
+    Returns:
+        periods per year. Falls back to the business-day count with a UserWarning when the index
+        frequency cannot be inferred - an irregular index, or one with gaps
     """
     if len(data.index) < 3:
         freq = None

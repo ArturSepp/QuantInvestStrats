@@ -419,33 +419,29 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
                                 override: Dict[str, Any] = None
                                 ) -> Dict[str, Any]:
     """
-    Top-level helper returning the report kwargs for a given reporting frequency and time span.
+    the report keyword arguments for a given reporting frequency and reported span.
 
-    The reported-span axis is selected automatically: the long-period presets are used when no
-    time_period is given or its length exceeds long_threshold_years, otherwise the short-period
-    presets. reporting_frequency selects the matching preset (unknown frequencies fall back to
-    MONTHLY), which is then expanded by fetch_factsheet_config_kwargs.
+    The reported-span axis is selected automatically: the long-period presets apply when no
+    ``time_period`` is given or its length exceeds ``long_threshold_years``, otherwise the
+    short-period presets. ``reporting_frequency`` then selects the matching preset, which
+    ``fetch_factsheet_config_kwargs`` expands. An unknown frequency falls back to MONTHLY.
 
-    Parameters
-    ----------
-    time_period : TimePeriod, optional
-        reporting window; its length drives the long/short preset choice. None -> long period.
-    reporting_frequency : ReportingFrequency
-        data sampling frequency / report base grid (default MONTHLY).
-    long_threshold_years : float
-        span (in years) above which the long-period presets are used.
-    add_rates_data : bool
-        forwarded to fetch_factsheet_config_kwargs: download the default 3M US rate and show
-        excess-return columns when True.
-    is_unit_based_traded_volume : bool
-        use unit-based (normalised) turnover/cost rather than notional.
-    override : dict, optional
-        final overrides merged into the returned kwargs (override wins).
+    Spread the result into a factsheet generator: it carries the window lengths, grid spacing and
+    regime presets that make a report's panels agree with one another and with the data frequency.
 
-    Returns
-    -------
-    dict
-        kwargs ready to spread into generate_*_factsheet(...).
+    Args:
+        time_period: reporting window; its length drives the long / short preset choice. None
+            selects the long-period presets
+        reporting_frequency: data sampling frequency and the report's base grid
+        long_threshold_years: span in years above which the long-period presets are used
+        add_rates_data: download the default 3M US rate and show excess-return columns. Needs the
+            ``[data]`` extra, since the download goes through yfinance
+        is_unit_based_traded_volume: report turnover and cost on normalised units rather than
+            notional
+        override: final overrides merged into the result, which win over every preset
+
+    Returns:
+        keyword arguments ready to spread into ``generate_*_factsheet(...)``
     """
     # long span when no time_period is given or its length exceeds the threshold (number of years > 5)
     is_long_period = time_period is None or time_period.get_time_period_an() > long_threshold_years

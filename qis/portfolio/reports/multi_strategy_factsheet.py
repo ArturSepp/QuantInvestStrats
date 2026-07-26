@@ -31,8 +31,32 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        **kwargs
                                        ) -> List[plt.Figure]:
     """
-    for portfolio data with structurally different strategies
-    for portfolios with large universe use is_grouped = True to report turnover and exposures by groups
+    factsheet comparing several structurally different strategies, as a list of A4 figures.
+
+    For portfolios that are not variants of one another - different universes, different
+    mandates - so the report compares outcomes rather than attributing differences to weights.
+    Pass ``group_data`` when the universe is large: turnover and exposures are then reported by
+    group instead of per instrument, which is the difference between a readable page and a
+    hundred-line legend.
+
+    Args:
+        multi_portfolio_data: the portfolios to compare
+        time_period: reporting window. None uses the full common history
+        perf_params: annualisation, frequency and rate conventions for the statistics
+        regime_classifier: how benchmark returns are mapped to regimes for the conditional panels
+        regime_benchmark: column driving the regime classification. None uses the first benchmark
+        backtest_name: title of the report
+        heatmap_freq: frequency of the periodic-returns heatmap
+        add_benchmarks_to_navs: include the benchmarks as additional lines in the performance panels
+        figsize: page size in inches; the default is A4 portrait
+        group_data: asset-class label per instrument, indexed by instrument. Given, exposures and
+            turnover are reported by group
+        add_group_exposures_and_pnl: add the per-group exposure and P&L pages
+        add_strategy_factsheets: append a full single-strategy factsheet for each portfolio
+        fontsize: base font size, small by default because a factsheet page is dense
+
+    Returns:
+        the pages, in order, ready for :func:`save_figs_to_pdf`
     """
     if group_data is not None:
         is_grouped = True

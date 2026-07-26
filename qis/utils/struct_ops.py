@@ -186,7 +186,18 @@ def update_kwargs(kwargs: Dict[Any, Any],
                   new_kwargs: Optional[Dict[Any, Any]]
                   ) -> Dict[Any, Any]:
     """
-    update kwargs with optional kwargs dicts
+    merge two keyword dictionaries, with the second winning on collisions.
+
+    Neither argument is mutated: the copy is the point. This is how the factsheet layer passes one
+    defaults dict down to every panel while letting each panel override a few entries, without a
+    panel's override leaking into its siblings.
+
+    Args:
+        kwargs: base keyword dictionary
+        new_kwargs: overrides. None or empty leaves the base unchanged
+
+    Returns:
+        a new dictionary; neither input is modified
     """
     local_kwargs = kwargs.copy()
     if new_kwargs is not None and not len(new_kwargs) == 0:

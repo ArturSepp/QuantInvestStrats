@@ -22,7 +22,30 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
                                    vol_adjustment: float = 1.15  # adjust vol of the bridge
                                    ) -> Union[pd.Series, pd.DataFrame]:
     """
-    backfill infrequent value using Brownian bridge with normals obtained using path of pivot_returns
+    backfill an infrequently reported series onto a frequent grid with a Brownian bridge.
+
+    A quarterly private-market series cannot be risk-analysed against daily public markets, and
+    forward-filling it makes it look riskless between reports. This interpolates instead: the
+    increments between two reported values are drawn from a Brownian bridge whose innovations come
+    from the path of ``pivot_returns``, so the interpolated series carries the timing of a real
+    market rather than a smooth line, while still hitting each reported value exactly.
+
+    The interpolated path is a plausible history, not the true one. Statistics computed on it
+    inherit the bridge's assumptions, so it belongs in a risk model and not in a performance report.
+
+    Args:
+        infrequent_returns: the reported series, with gaps between reports. A DataFrame is handled
+            column by column
+        pivot_returns: a frequent series whose path supplies the innovations; the grid it is
+            observed on is the grid the result is returned on
+        span: EWM span used to estimate the volatility of the infrequent series
+        annualization_factor: periods per year of ``pivot_returns``
+        is_to_log_returns: treat the inputs as log returns
+        vol_adjustment: multiplier on the bridge volatility. Above one compensates for the bridge
+            understating the volatility of the unobserved path
+
+    Returns:
+        the interpolated returns on the index of ``pivot_returns``, in the shape of the input
     """
     # call recursion here
     if isinstance(infrequent_returns, pd.DataFrame):

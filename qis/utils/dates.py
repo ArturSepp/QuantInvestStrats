@@ -353,7 +353,23 @@ def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],
                             start: pd.Timestamp
                             ) -> Union[pd.DataFrame, pd.Series]:
     """
-    truncate timeseries data from start with a data point including or prior to the star
+    slice from ``start``, keeping the last observation before it when ``start`` is not an index
+    entry.
+
+    A plain ``df.loc[start:]`` drops the observation before ``start``, and for a price series that
+    loses the level the first return is computed against - the truncated series then has one fewer
+    return than it should. This keeps that anchor row.
+
+    Args:
+        df: frame or series with a sorted date index
+        start: first date to keep. When it is not in the index, the last entry before it is
+            prepended
+
+    Returns:
+        the truncated data, in the same type as the input
+
+    Raises:
+        NotImplementedError: if ``df`` is neither a DataFrame nor a Series
     """
     if isinstance(df, pd.DataFrame):
         df_ = df.loc[start:, :]
@@ -379,7 +395,22 @@ def get_time_period(df: Union[pd.Series, pd.DataFrame] = None,
                     tz: str = None
                     ) -> TimePeriod:
     """
-    get tz-aware start end dates
+    the TimePeriod spanned by a frame's index, or by an index directly.
+
+    ``TimePeriod`` is the house type for a date range, so this is the entry point that turns data
+    into one. The timezone is inherited from the index unless ``tz`` overrides it, which keeps a
+    localised panel from silently losing its zone downstream.
+
+    Args:
+        df: frame or series whose index defines the period. Takes precedence over ``index``
+        index: index to read instead, when there is no frame to hand
+        tz: timezone for the result. None inherits the index timezone
+
+    Returns:
+        the period from the first to the last index entry, or an empty TimePeriod on an empty index
+
+    Raises:
+        ValueError: if neither ``df`` nor ``index`` is given
     """
     if df is not None:
         index = df.index
@@ -410,6 +441,19 @@ def get_time_period_label(data: pd.DataFrame,
                           is_increase_by_one_day: bool = False,
                           date_format: str = DATE_FORMAT
                           ) -> str:
+    """
+    the date range of a frame's index, formatted for a chart title or a table header.
+
+    Args:
+        data: frame whose first and last index entries bound the label
+        date_separator: string between the two dates
+        is_increase_by_one_day: add a day to the end date. Use it where the period is quoted with
+            an exclusive end, so that a month-end panel reads to the first of the next month
+        date_format: strftime format for both dates
+
+    Returns:
+        the formatted range, e.g. ``31Dec2019:31Dec2024``
+    """
     time_period = TimePeriod(start=data.index[0], end=data.index[-1])
     time_period_label = time_period.to_str(date_format=date_format,
                                            date_separator=date_separator,
@@ -891,8 +935,24 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
                                   future_days_offset: int = 360
                                   ) -> pd.Series:
     """
-    for given time_period generate fixed maturity rolls
-    rolls occur when (current_roll - value_time).days < min_days_to_next_roll
+    the roll schedule of a fixed-maturity instrument: for each observation time, the expiry held.
+
+    A constant-maturity series is a sequence of contracts, and this says which one is held when.
+    The roll happens once the current expiry is closer than ``min_days_to_next_roll``, so the
+    position is never carried into the last days before expiry where liquidity thins.
+
+    Args:
+        time_period: period over which to generate the schedule
+        freq: frequency of the observation times, as a pandas offset alias
+        roll_freq: frequency of the candidate expiries, e.g. ``'W-FRI'`` for weekly Friday expiries
+        roll_hour: hour of day of the expiry. None leaves it at midnight
+        min_days_to_next_roll: roll once the held expiry is fewer than this many days away
+        include_end_date: include the end of ``time_period`` in the observation times
+        future_days_offset: how far past the end of the period to generate candidate expiries, so
+            that the observations near the end still have a next contract to roll into
+
+    Returns:
+        the expiry held at each observation time, indexed by observation time
     """
     observation_times = generate_dates_schedule(time_period,
                                                 freq=freq,

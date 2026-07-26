@@ -73,18 +73,33 @@ def compute_ewm_long_short_filtered_ra_returns(returns: pd.DataFrame,
                                                mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE
                                                ) -> pd.DataFrame:
     """
-    Vol-normalise ``returns`` (EWM vol over ``vol_span``) then apply the long/short
-    EWM band-pass filter (ewm.compute_ewm_long_short_filter).
+    vol-normalise returns, then band-pass them with a long/short EWM filter.
 
-    Every span drives an EWM decay ``lambda = 1 - 2/(span + 1)`` and must be ``>= 1``:
-    ``span = 1`` gives ``lambda = 0`` (an unsmoothed pass-through), while ``span < 1``
-    gives ``lambda < 0`` (a sign-alternating recursion, not a smoother) and for the
-    vol leg can yield a negative variance and hence NaN vol. When ``short_span`` is
-    given it must additionally be strictly less than ``long_span`` (equal spans
-    collapse the filter unit-variance normaliser to 0 -> division by zero).
+    The trend-following signal primitive: dividing by EWM vol puts every asset on comparable risk,
+    and the difference of a short and a long EWM isolates the medium-frequency component that a
+    trend signal is built from. The result is in units of risk, so it can be summed across assets.
 
-    long_span/short_span are checked with ewm._validate_long_short_spans, the same
-    routine compute_ewm_long_short_filter uses, so the contract is identical.
+    Every span drives a decay ``lambda = 1 - 2/(span + 1)`` and so must be at least 1: ``span = 1``
+    passes the data through unsmoothed, and below 1 the recursion alternates sign rather than
+    smoothing, which on the vol leg can produce a negative variance and hence NaN.
+
+    Args:
+        returns: returns panel, one column per asset
+        vol_span: EWM span of the volatility used to normalise. None skips the normalisation
+        long_span: EWM span of the slow leg
+        short_span: EWM span of the fast leg, strictly less than ``long_span``. None applies the
+            long leg alone
+        warmup_period: leading periods blanked, before which the EWM state is still converging
+        weight_lag: periods to lag the filter output, so a signal formed at t is applied at t+1 and
+            the construction is free of look-ahead
+        mean_adj_type: mean subtracted before the vol estimate; see :class:`MeanAdjType`
+
+    Returns:
+        the filtered risk-adjusted returns, in the shape of ``returns``
+
+    Raises:
+        ValueError: if any span is below 1, or if ``short_span`` is not strictly less than
+            ``long_span``
     """
     if vol_span is not None and np.any(np.asarray(vol_span, dtype=float) < 1.0):
         raise ValueError(f"compute_ewm_long_short_filtered_ra_returns: vol_span must be >= 1 "

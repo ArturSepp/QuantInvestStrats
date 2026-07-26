@@ -226,9 +226,21 @@ def get_aligned_fx_spots(prices: pd.DataFrame,
                          quote_currency: str = 'USD'
                          ) -> pd.DataFrame:
     """
-    get fx currency for price_data columns = instrument ticker
-    universe_local_ccy is map {instrument ticker: fx_rate_ccy}
-    fx_prices is fx prices columns = fx_rate_ccy
+    the FX spot series belonging to each instrument, on the index of its prices.
+
+    An instrument panel is quoted in mixed currencies, and converting it needs a spot series per
+    instrument rather than per currency. This maps each column of ``prices`` through its currency to
+    the matching spot column, reindexes onto the price dates and masks where the price is missing,
+    so the spots are NaN exactly where the prices are.
+
+    Args:
+        prices: instrument prices, one column per instrument
+        asset_ccy_map: instrument to currency, as a Series indexed by instrument or a dict
+        fx_prices: FX spots, one column per currency
+        quote_currency: the numeraire, whose spot column is set to one
+
+    Returns:
+        spots in the shape of ``prices``, one column per instrument
     """
     # first backfill and the bbfill so prices will have corresponding fx spots data
     fx_prices = fx_prices.reindex(index=prices.index, method='ffill').ffill().bfill()
@@ -248,8 +260,20 @@ def compute_futures_fx_adjusted_returns(prices: pd.DataFrame,
                                         is_log_returns: bool = False
                                         ) -> pd.DataFrame:
     """
-    futures returns adjusted for fx rate change
-    fx_return affects only the future return
+    returns of a futures position in a foreign currency, converted to the quote currency.
+
+    For a future, only the margin flow is in the foreign currency, so the FX move applies to the
+    return and not to the notional: ``r = r_local + r_local * r_fx``. Contrast
+    :func:`compute_cash_fx_adjusted_returns`, where the notional is exposed as well.
+
+    Args:
+        prices: instrument prices in local currency
+        fx_spots: spot per instrument, aligned with ``prices``; see :func:`get_aligned_fx_spots`
+        periods: return horizon in index steps
+        is_log_returns: return log returns rather than arithmetic ones
+
+    Returns:
+        quote-currency returns in the shape of ``prices``
     """
     price_return = prices / prices.shift(periods=periods) - 1.0
     fx_return = fx_spots / fx_spots.shift(periods=periods) - 1.0
@@ -265,8 +289,21 @@ def compute_cash_fx_adjusted_returns(prices: pd.DataFrame,
                                      is_log_returns: bool = False
                                      ) -> pd.DataFrame:
     """
-    cash returns adjusted for fx rate change
-    fx_return affects notional + return
+    returns of a cash position in a foreign currency, converted to the quote currency.
+
+    For a cash instrument the whole notional sits in the foreign currency, so the FX move applies to
+    the notional as well as to the return: ``r = r_fx + r_local + r_local * r_fx``. The extra
+    ``r_fx`` term is the difference from :func:`compute_futures_fx_adjusted_returns`, and it is the
+    whole of the unhedged currency exposure.
+
+    Args:
+        prices: instrument prices in local currency
+        fx_spots: spot per instrument, aligned with ``prices``; see :func:`get_aligned_fx_spots`
+        periods: return horizon in index steps
+        is_log_returns: return log returns rather than arithmetic ones
+
+    Returns:
+        quote-currency returns in the shape of ``prices``
     """
     price_return = prices / prices.shift(periods=periods) - 1.0
     fx_return = fx_spots / fx_spots.shift(periods=periods) - 1.0

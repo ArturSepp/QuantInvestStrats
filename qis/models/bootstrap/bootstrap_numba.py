@@ -271,7 +271,27 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
                    bootstrapped_indices: np.ndarray = None
                    ) -> Union[List, pd.DataFrame]:
     """
-    core data bootstrap
+    resample a series or panel with replacement, preserving the cross-section within each draw.
+
+    The whole row is resampled, not each column independently, so the contemporaneous correlation
+    structure survives. To resample two aligned panels jointly - factor returns and residuals, say -
+    draw the indices once with :func:`generate_bootstrapped_indices` and pass them here as
+    ``bootstrapped_indices`` for each panel.
+
+    Args:
+        data: observations to resample, rows are dates
+        bootstrap_type: resampling scheme; see :class:`BootstrapType`
+        bootstrap_output: shape of the result; see :class:`BootstrapOutput`
+        num_samples: number of independent draws
+        index_length: length of each draw, which need not equal the length of ``data``
+        block_size: mean block length for STATIONARY, exact length for FIXED_BLOCK
+        min_block_size: floor on the drawn block length under STATIONARY
+        seed: seed for the numba random state
+        bootstrapped_indices: precomputed indices. Given, every sampling argument above is ignored
+            and this is the array used, which is how paired resampling is done
+
+    Returns:
+        a DataFrame of draws for SERIES_TO_DF, or a list of arrays for DF_TO_LIST_ARRAYS
     """
     if bootstrapped_indices is None:
         bootstrapped_indices = generate_bootstrapped_indices(num_data_index=len(data.index),
@@ -365,9 +385,28 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                          init_to_end: bool = True
                          ) -> Union[List[np.ndarray], pd.DataFrame]:
     """
-    bootstrap price data
-    for pd.Dataframe use bootstrap_output = BootstrapOutput.DF_TO_LIST_ARRAYS to get list of nd.arrays
-    block_size = 1 corresponds to iid sampling
+    resample price levels by resampling their returns and recompounding.
+
+    Prices are not resampled directly - a block of prices lifted from one part of the sample would
+    jump at the joins. Returns are resampled and then compounded back into a path, so each draw is a
+    continuous price series with the return distribution of the original.
+
+    Args:
+        prices: price levels, one column per asset
+        bootstrap_type: resampling scheme; see :class:`BootstrapType`
+        bootstrap_output: shape of the result; see :class:`BootstrapOutput`
+        num_samples: number of independent draws
+        index_length: length of each draw
+        block_size: mean block length for STATIONARY, exact length for FIXED_BLOCK. 1 is IID
+        min_block_size: floor on the drawn block length under STATIONARY
+        is_log_returns: resample log returns rather than arithmetic ones
+        seed: seed for the numba random state
+        bootstrapped_indices: precomputed indices, which override the sampling arguments
+        init_to_end: start every path from the last observed price, so the draws continue from
+            today. False starts them from the first price, so the draws are alternative histories
+
+    Returns:
+        a DataFrame of paths for SERIES_TO_DF, or a list of arrays for DF_TO_LIST_ARRAYS
     """
     returns = ret.to_returns(prices=prices, is_log_returns=is_log_returns, drop_first=True)
 

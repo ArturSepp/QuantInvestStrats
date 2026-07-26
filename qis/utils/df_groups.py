@@ -17,8 +17,26 @@ def get_group_dict(group_data: pd.Series,
                    total_column: Union[str, None] = None
                    ) -> Dict[str, List[str]]:
     """
-    take group_data and return dictionary of index tickers mapped to group_data
-    with index_data can do double mappings group_data to key, then key:index_data
+    map each group label to the tickers belonging to it.
+
+    ``group_data`` is the house convention for asset-class metadata: a Series indexed by ticker
+    whose values are the group labels. This inverts it into group to tickers, which is the shape
+    the grouped reporting layer consumes.
+
+    Args:
+        group_data: group label per ticker, indexed by ticker
+        index_data: restrict the result to these tickers, and order them accordingly. None uses
+            every ticker in ``group_data``
+        group_order: order of the groups in the result. None orders by first appearance
+        total_column: name of an extra group holding every ticker, for a total row alongside the
+            groups. None adds none
+
+    Returns:
+        group label to the tickers in it, in ``group_order``
+
+    Raises:
+        ValueError: if ``group_data`` is not a Series, or if it or ``index_data`` contains nulls
+        TypeError: if ``index_data`` is not an Index, list or array
     """
     if not isinstance(group_data, pd.Series):
         raise ValueError(f"group_data type={type(group_data)} must be series")
@@ -67,9 +85,20 @@ def split_df_by_groups(df: pd.DataFrame,
                        group_order: List[str] = None
                        ) -> Dict[str, pd.DataFrame]:
     """
-    take pandas data which are index=time series, data = assets
-    slit data according to grouping by rows in group_data[asset_group_column] in group_data
-    the match of columns in data to rows in group_data is done using group_data.index or group_data[ticker_column_to_match]
+    split a panel's columns into one frame per group.
+
+    The frame is time by asset and ``group_data`` maps asset to group, so this returns one
+    time-by-asset frame per group. Groups with no columns present in ``df`` are omitted rather than
+    returned empty.
+
+    Args:
+        df: panel indexed by date with one column per asset
+        group_data: group label per asset, indexed by asset
+        total_column: name of an extra group holding every column. None adds none
+        group_order: order of the groups. None orders by first appearance
+
+    Returns:
+        group label to the sub-panel of ``df``, each a copy rather than a view
     """
     # group by descriptive data
     group_dict = get_group_dict(group_data=group_data,

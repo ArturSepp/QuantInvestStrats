@@ -510,15 +510,32 @@ def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
                               non_negative_tol: float = 0.0,
                               insufficient_data: InsufficientData = InsufficientData.NAN,
                               ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Backward-compatible rolling AR(1) unsmoother (shim over ``adjust_returns_with_ar``).
+    """
+    rolling AR(1) unsmoother; a shim over ``adjust_returns_with_ar`` with ``ar_order=1``.
 
-    Equivalent to ``adjust_returns_with_ar(returns, ar_order=1, ...)``. Retained
-    for existing callers and for the AR(1) defaults (span=20, warmup=10). See
-    the module docstring for the ~1e-4 current-date parity note vs the previous
-    panel-vectorised implementation.
+    Retained for existing callers and for its AR(1) defaults, which differ from the general engine:
+    ``span=20`` and ``warmup_period=10``. New code should call ``adjust_returns_with_ar`` directly
+    and state the order.
+
+    Args:
+        returns: observed returns of the appraisal-based series, one column per fund
+        span: EWM span of the rolling AR(1) beta estimate
+        mean_adj_type: mean subtracted before estimating the beta; see :class:`MeanAdjType`
+        warmup_period: leading periods blanked while the EWM state converges
+        max_value_for_beta: cap on the estimated beta. The inversion divides by ``1 - beta``, so
+            the cap is what keeps the denominator away from zero; the default 0.75 holds it at or
+            above 0.25
+        min_value_for_beta: floor on the estimated beta, below which negative autocorrelation is
+            treated as noise rather than smoothing
+        apply_ewma_mean_smoother: smooth the estimated beta itself before inverting
+        non_negative: clip the unsmoothed returns at ``non_negative_tol``
+        non_negative_tol: the clipping level used when ``non_negative``
+        insufficient_data: what to do with a column that cannot be identified; see
+            :class:`InsufficientData`
 
     Returns:
-        Tuple (unsmoothed_returns, betas, r2), each matching the input shape.
+        the unsmoothed returns, the estimated betas and the regression R-squared, each in the shape
+        of ``returns``
     """
     return adjust_returns_with_ar(
         returns=returns, ar_order=1, span=span, mean_adj_type=mean_adj_type,

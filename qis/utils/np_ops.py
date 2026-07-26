@@ -288,7 +288,16 @@ def to_finite_ratio(x: Union[pd.Series, pd.DataFrame, np.ndarray],
 
 def covar_to_corr(covar: Union[np.ndarray, pd.DataFrame]) -> Union[np.ndarray, pd.DataFrame]:
     """
-    compute correlation out of covariance
+    convert a covariance matrix to the corresponding correlation matrix.
+
+    Computes ``D^-1 Σ D^-1`` with ``D = diag(sqrt(diag(Σ)))``, so the diagonal becomes one and the
+    off-diagonal entries become correlations.
+
+    Args:
+        covar: covariance matrix, square and with a positive diagonal
+
+    Returns:
+        the correlation matrix, in the same type as the input
     """
     inv_vol = np.reciprocal(np.sqrt(np.diag(covar)))
     norm = np.outer(inv_vol, inv_vol)
@@ -306,9 +315,18 @@ def np_get_sorted_idx(a: np.ndarray) -> np.ndarray:
 
 def np_array_to_df_columns(a: np.ndarray, ncols: int) -> np.ndarray:
     """
-    in case operation of np array is needed to apply to pandas column wise,
-    the numpy array is broadcast to pandas columns
-    the lenth = pandas.index
+    broadcast a 1-d array down the columns of a frame-shaped array.
+
+    For applying a per-date vector across every asset: the array of length ``len(df.index)`` is
+    tiled into shape ``(len(a), ncols)``, so it can multiply or divide a panel elementwise without
+    relying on pandas alignment.
+
+    Args:
+        a: values, one per row of the target frame
+        ncols: number of columns to broadcast across
+
+    Returns:
+        an array of shape ``(len(a), ncols)`` with ``a`` repeated in every column
     """
     return np.tile(a, (ncols, 1)).T
 

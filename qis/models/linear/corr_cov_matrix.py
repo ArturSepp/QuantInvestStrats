@@ -27,9 +27,28 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
                                 apply_an_factor: bool = True
                                 ) -> Dict[pd.Timestamp, pd.DataFrame]:
     """
-    compute ewma covar matrix: supporting for nans in prices
-    covar data frequency is rebalancing_freq for period time_period
-    output is dict[estimation timestamp, pd.Dataframe(estimated_covar)
+    EWM covariance matrix sampled on a rebalancing schedule, ready for a rolling backtest.
+
+    Returns one matrix per rebalancing date rather than a single matrix, so a backtest can look up
+    the covariance it would have had at each rebalancing without recomputing. Returns are estimated
+    at ``returns_freq`` and the matrices are taken at ``rebalancing_freq``: the two are separate
+    because the estimation frequency sets the sampling error and the rebalancing frequency sets the
+    turnover.
+
+    Args:
+        prices: price levels, one column per asset. NaN is tolerated
+        time_period: restrict the output dates. None uses the full sample
+        returns_freq: frequency the returns are computed at
+        rebalancing_freq: frequency the covariance is sampled at
+        span: EWM span in units of ``returns_freq``
+        is_apply_vol_normalised_returns: estimate the correlation on vol-normalised returns and
+            rebuild the covariance from it, which stops a single volatile asset dominating
+        demean: subtract the EWM mean before estimating. False takes the second moment about zero
+        apply_an_factor: annualise, so the matrix is in annual units
+
+    Returns:
+        rebalancing date to the covariance matrix estimated at that date, indexed and labelled by
+        the columns of ``prices``
     """
     returns = ret.to_returns(prices=prices, is_log_returns=True, drop_first=True, freq=returns_freq)
     returns_np = returns.to_numpy()
@@ -87,8 +106,24 @@ def compute_masked_covar_corr(data: Union[np.ndarray, pd.DataFrame],
                               bias: bool = False
                               ) -> Union[np.ndarray, pd.DataFrame]:
     """
-    given returns: time * assets
-    compute covar by masking nans
+    covariance or correlation of a returns panel, computed pairwise over the observed entries.
+
+    A ragged panel has no common sample: dropping rows with any missing value can discard most of
+    the history, and filling with zero biases the estimate towards zero. Masked arrays compute each
+    pair on the observations both series have, which uses all the data at the cost of a matrix that
+    is not guaranteed positive semi-definite. Check before feeding it to an optimiser.
+
+    Args:
+        data: returns, rows are dates and columns are assets
+        is_covar: return the covariance. False returns the correlation
+        bias: normalise by ``n`` rather than ``n - 1``. Ignored for the correlation, where the two
+            normalisations cancel
+
+    Returns:
+        the matrix, in the same type as the input
+
+    Raises:
+        ValueError: if ``data`` is neither a DataFrame nor an ndarray
     """
     if isinstance(data, pd.DataFrame):
         data_np = data.to_numpy()

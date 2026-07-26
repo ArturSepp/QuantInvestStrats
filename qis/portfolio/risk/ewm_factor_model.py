@@ -20,7 +20,19 @@ from qis.portfolio.risk.factor_model import LinearModel, compute_benchmarks_beta
 
 
 class EwmLinearModel(LinearModel):
-    """Exponentially weighted moving average implementation of LinearModel."""
+    """
+    linear factor model with exponentially weighted time-varying loadings.
+
+    Implements :class:`LinearModel` with EWM estimation: the betas are re-estimated at every date
+    from an exponentially weighted covariance, so an exposure that changes is tracked rather than
+    averaged away over the sample. Construct with the factor and asset panels, call ``fit``, then
+    read the loadings through the LinearModel interface.
+
+    Attributes:
+        x: factor returns, shape (T, N), one column per factor
+        y: asset returns, shape (T, M), one column per asset
+        loadings: factor name to a (T, M) frame of time-varying betas, populated by ``fit``
+    """
 
     def fit(self,
             span: Optional[int] = 31,

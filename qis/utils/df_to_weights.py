@@ -38,7 +38,19 @@ def df_to_equal_weight_allocation(df: Union[pd.Series, pd.DataFrame],
                                   index: pd.DatetimeIndex = None
                                   ) -> Union[pd.Series, pd.DataFrame]:
     """
-    equal weight accounting for nans in df
+    equal weights across the assets observed on each date.
+
+    Equal-weight over the live universe rather than over the column count: an asset that has not
+    started or has been delisted carries a NaN and is excluded from that date's denominator, so the
+    weights still sum to one as the universe changes.
+
+    Args:
+        df: panel whose non-NaN entries define which assets are live on each date
+        freq: resample the weights to this frequency, forward-filling. None keeps the input dates
+        index: reindex the weights onto this index, forward-filling. Ignored when ``freq`` is given
+
+    Returns:
+        weights in the same shape, each row summing to one over the live assets
     """
     equal_weight_allocation = df_to_weight_allocation_sum1(df=df_nans_to_one_zero(df=df))
     if freq is not None:
@@ -50,7 +62,18 @@ def df_to_equal_weight_allocation(df: Union[pd.Series, pd.DataFrame],
 
 def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
     """
-    normalized rows by cross-sectional sum
+    normalise each row to sum to one.
+
+    Signed values are kept, so a row with short positions produces weights summing to one that
+    include negatives - this is the general normaliser. Use
+    :func:`df_to_long_only_allocation_sum1` when negatives should be dropped instead.
+
+    Args:
+        df: scores or notionals, one column per asset. NaN is treated as zero in the row sum and
+            the resulting weight is zero
+
+    Returns:
+        weights in the same shape, each row summing to one
     """
     if isinstance(df, pd.Series):
         weights = df.divide(np.nansum(df.to_numpy(dtype=float), axis=0)).fillna(0.0)
@@ -62,7 +85,17 @@ def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd
 
 def df_to_long_only_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
     """
-    normalized rows by cross-sectional sum
+    normalise each row to sum to one after setting negative values to zero.
+
+    The long-only counterpart of :func:`df_to_weight_allocation_sum1`: negatives are dropped before
+    normalising rather than after, so the surviving positives carry the full weight. A row with no
+    positive value returns all zeros rather than dividing by zero.
+
+    Args:
+        df: scores, one column per asset. Non-positive entries and NaN become zero weight
+
+    Returns:
+        non-negative weights in the same shape, each row summing to one or to zero
     """
     weighted_score = np.where(df.to_numpy() > 0.0, df, 0.0)
     if isinstance(df, pd.Series):

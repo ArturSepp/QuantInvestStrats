@@ -21,17 +21,19 @@ FILE_NAME = 'futures_risk_factors'
 
 @dataclass
 class FactorsData:
-    """Container for tradable factor prices.
+    """
+    tradable factor price levels, optionally validated against a factor-set descriptor.
 
-    Parameters
-    ----------
-    factors_prices : pd.DataFrame
-        Factor price levels, columns are factor names, index is datetime.
-    factors : Optional[Type[Enum]]
-        Optional factor-set descriptor (a str-valued Enum whose values are the
-        expected column names, e.g. a MATF ``RiskFactors``). When supplied, it
-        enables typed access and column validation; when ``None`` the container
-        falls back to raw column names and stays fully generic.
+    Passing ``factors`` turns the column names into a checked contract: construction fails if an
+    expected factor is missing, which catches a renamed or dropped column at load time rather than
+    in the middle of an estimation. Leaving it None keeps the container generic.
+
+    Attributes:
+        factors_prices: factor price levels, one column per factor, indexed by date
+        factors: str-valued Enum whose values are the expected column names. None skips validation
+
+    Raises:
+        ValueError: if ``factors`` is given and a factor it names is absent from the columns
     """
     factors_prices: pd.DataFrame
     factors: Optional[Type[Enum]] = None

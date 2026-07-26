@@ -66,42 +66,120 @@ def _get_signed_np_data(df: pd.DataFrame,
 
 
 def df_nanmean(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """mean of finite entries along axis"""
+    """
+    mean of finite entries along axis
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'nanmean'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     data_np = npo.to_finite_np(data=df, fill_value=np.nan)
     return _to_agg_series(agg_data=_nanmean(data_np, axis=axis), df=df, axis=axis, name='nanmean')
 
 
 def df_nanmedian(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """median of finite entries along axis"""
+    """
+    median of finite entries along axis
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'nanmedian'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     data_np = npo.to_finite_np(data=df, fill_value=np.nan)
     return _to_agg_series(agg_data=_nanmedian(data_np, axis=axis), df=df, axis=axis, name='nanmedian')
 
 
 def df_nansum(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """sum of finite entries along axis"""
+    """
+    sum of finite entries along axis
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'nansum'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     data_np = npo.to_finite_np(data=df, fill_value=np.nan)
     return _to_agg_series(agg_data=np.nansum(data_np, axis=axis), df=df, axis=axis, name='nansum')
 
 
 def df_nansum_positive(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """sum of strictly positive finite entries along axis"""
+    """
+    sum of strictly positive finite entries along axis
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'nansum_positive'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     signed_np_data = _get_signed_np_data(df=df, is_positive=True)
     return _to_agg_series(agg_data=np.nansum(signed_np_data, axis=axis), df=df, axis=axis, name='nansum_positive')
 
 
 def df_nansum_negative(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """sum of strictly negative finite entries along axis"""
+    """
+    sum of strictly negative finite entries along axis
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'nansum_negative'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     signed_np_data = _get_signed_np_data(df=df, is_positive=False)
     return _to_agg_series(agg_data=np.nansum(signed_np_data, axis=axis), df=df, axis=axis, name='nansum_negative')
 
 
 def df_nanmean_positive(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """mean of strictly positive finite entries along axis"""
+    """
+    mean of strictly positive finite entries along axis
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'nanmean_positive'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     signed_np_data = _get_signed_np_data(df=df, is_positive=True)
     return _to_agg_series(agg_data=_nanmean(signed_np_data, axis=axis), df=df, axis=axis, name='nanmean_positive')
@@ -120,7 +198,24 @@ def df_nansum_clip(df: pd.DataFrame,
                    is_min_max_clip_fill: bool = True,  # entries outside [a_min, a_max] are filled at the bound
                    axis: Literal[0, 1] = 1
                    ) -> pd.Series:
-    """sum of finite entries along axis, after clipping the data to [a_min, a_max]"""
+    """
+    sum of finite entries along axis, after clipping the data to [a_min, a_max]
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        a_min: lower bound. None applies no lower bound
+        a_max: upper bound. None applies no upper bound
+        is_min_max_clip_fill: True replaces an entry outside the bounds with the bound it
+            breached; False drops it, so it does not enter the aggregate at all
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate of the clipped values along ``axis``, named ``'nansum_clip'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1
+    """
     _validate_axis(axis)
     data_np = npo.to_finite_np(data=df,
                                fill_value=np.nan,
@@ -136,7 +231,24 @@ def df_nanmean_clip(df: pd.DataFrame,
                     is_min_max_clip_fill: bool = True,  # entries outside [a_min, a_max] are filled at the bound
                     axis: Literal[0, 1] = 1
                     ) -> pd.Series:
-    """mean of finite entries along axis, after clipping the data to [a_min, a_max]"""
+    """
+    mean of finite entries along axis, after clipping the data to [a_min, a_max]
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        a_min: lower bound. None applies no lower bound
+        a_max: upper bound. None applies no upper bound
+        is_min_max_clip_fill: True replaces an entry outside the bounds with the bound it
+            breached; False drops it, so it does not enter the aggregate at all
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate of the clipped values along ``axis``, named ``'nanmean_clip'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1
+    """
     _validate_axis(axis)
     data_np = npo.to_finite_np(data=df,
                                fill_value=np.nan,
@@ -147,14 +259,40 @@ def df_nanmean_clip(df: pd.DataFrame,
 
 
 def df_abssum(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """sum of absolute values of finite entries along axis: ``sum |x_i|``"""
+    """
+    sum of absolute values of finite entries along axis: ``sum |x_i|``
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'abssum'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     data_np = npo.to_finite_np(data=df, fill_value=np.nan)
     return _to_agg_series(agg_data=np.nansum(np.abs(data_np), axis=axis), df=df, axis=axis, name='abssum')
 
 
 def df_abssum_positive(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """sum of absolute values of strictly positive finite entries along axis"""
+    """
+    sum of absolute values of strictly positive finite entries along axis
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'abssum_positive'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     signed_np_data = _get_signed_np_data(df=df, is_positive=True)
     return _to_agg_series(agg_data=np.nansum(np.abs(signed_np_data), axis=axis), df=df, axis=axis,
@@ -162,7 +300,20 @@ def df_abssum_positive(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
 
 
 def df_abssum_negative(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """sum of absolute values of strictly negative finite entries along axis"""
+    """
+    sum of absolute values of strictly negative finite entries along axis
+
+    Args:
+        df: values to aggregate. Non-finite entries are skipped, not treated as zero
+        axis: 0 collapses the rows and returns a Series indexed by ``df.columns``; 1 collapses
+            the columns and returns a Series indexed by ``df.index``
+
+    Returns:
+        the aggregate along ``axis``, named ``'abssum_negative'``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1. numpy would silently accept -1 or None
+    """
     _validate_axis(axis)
     signed_np_data = _get_signed_np_data(df=df, is_positive=False)
     return _to_agg_series(agg_data=np.nansum(np.abs(signed_np_data), axis=axis), df=df, axis=axis,
@@ -196,7 +347,24 @@ def df_nanmean_weighted(df: pd.DataFrame,
 
 
 def series_nansum_weighted(data: pd.Series, weights: pd.Series) -> float:
-    """weighted sum of finite entries: sum_i w_i x_i, with non-finite terms skipped"""
+    """
+    weighted sum of finite entries: ``sum_i w_i x_i``, with non-finite terms skipped.
+
+    Weights are not renormalised, so this is a weighted sum and not a weighted mean; pass
+    weights summing to one when a mean is wanted. A term is skipped when either its value or
+    its weight is non-finite, so a missing observation contributes nothing rather than
+    propagating NaN into the total.
+
+    Args:
+        data: values, indexed to align with ``weights``
+        weights: weights, in the same order as ``data``
+
+    Returns:
+        the weighted sum
+
+    Raises:
+        ValueError: if either argument is not a pd.Series
+    """
     if not isinstance(data, pd.Series):
         raise ValueError(f"data must be pd.Series, got {type(data)!r}")
     if not isinstance(weights, pd.Series):
@@ -208,7 +376,25 @@ def df_last_row(df: pd.DataFrame,
                 axis: Literal[0, 1] = 0,
                 is_nonan: bool = True
                 ) -> np.ndarray:
-    """last row (axis=0) or last column (axis=1); is_nonan takes the last finite value per key"""
+    """
+    last row (axis=0) or last column (axis=1); is_nonan takes the last finite value per key.
+
+    On a ragged panel the last row is not the last observation of every column: a series that
+    stopped reporting earlier carries a NaN there. ``is_nonan=True`` takes each column's own
+    last finite value instead, which is what a current-holdings or latest-level read wants.
+
+    Args:
+        df: values to read from
+        axis: 0 takes the last row, giving one value per column; 1 takes the last column
+        is_nonan: with ``axis=0``, take each column's last finite value rather than the value
+            at the final index entry. Ignored when ``axis=1``
+
+    Returns:
+        the values as an array, in column order for ``axis=0`` and row order for ``axis=1``
+
+    Raises:
+        ValueError: if ``axis`` is not 0 or 1
+    """
     _validate_axis(axis)
     if axis == 0:
         if is_nonan:

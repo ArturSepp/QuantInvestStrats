@@ -43,11 +43,39 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               **kwargs
                                               ) -> List[plt.Figure]:
     """
-    report designed for 1 strategy and 1 benchmark report using matplotlib figure
-    multi_portfolio_data = [stragegy portfolio, benchmark strategy portfolio]
-    is_grouped sets report of annual returns by asset classes or portfolio instruments if their number is less than 10
-    1 page: generate the stragegy portfolio factsheet
-    2 page: generate the comparision to benchmark
+    factsheet comparing one strategy against one benchmark, as a list of A4 figures.
+
+    The two-portfolio case, where the difference between them is the subject: the first page is the
+    strategy on its own and the second is the comparison, with Brinson attribution decomposing the
+    active return into allocation, selection and interaction. That decomposition is why this is a
+    separate report from :func:`generate_multi_portfolio_factsheet`, which compares strategies that
+    share no common weights.
+
+    Args:
+        multi_portfolio_data: the portfolios, strategy and benchmark among them
+        strategy_idx: position of the strategy within ``multi_portfolio_data``
+        benchmark_idx: position of the benchmark within ``multi_portfolio_data``
+        time_period: reporting window. None uses the full common history
+        perf_params: annualisation, frequency and rate conventions for the statistics
+        regime_classifier: how benchmark returns are mapped to regimes
+        backtest_name: title of the report
+        add_benchmarks_to_navs: include the benchmarks as additional lines in the performance panels
+        add_brinson_attribution: add the allocation / selection / interaction decomposition
+        add_exposures_pnl_attribution: add the exposure and P&L attribution pages
+        add_strategy_factsheet: append the full single-strategy factsheet
+        add_grouped_exposures: report exposures by group in that appended factsheet
+        add_grouped_cum_pnl: report cumulative P&L by group in that appended factsheet
+        add_tracking_error_table: add the tracking-error table
+        add_exposures_comp: add the strategy-versus-benchmark exposure comparison
+        is_grouped: report annual returns by asset class rather than by instrument. None decides by
+            the universe size, grouping once there are more than ten instruments
+        figsize: page size in inches; the default is A4 portrait
+        fontsize: base font size
+        heatmap_fontsize: font size inside the heatmap panels, smaller because the cells are dense
+        add_joint_instrument_history_report: add the per-instrument history page
+
+    Returns:
+        the pages, in order, ready for :func:`save_figs_to_pdf`
     """
     if len(multi_portfolio_data.portfolio_datas) == 1:
         raise ValueError(f"must be at least two strategies")

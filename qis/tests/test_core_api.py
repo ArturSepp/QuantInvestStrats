@@ -23,26 +23,9 @@ import pytest
 import qis
 from qis.api import CORE_API, core_api_names
 
-# core symbols still awaiting an Args/Attributes block. This list only shrinks.
-PENDING_DOCSTRINGS: FrozenSet[str] = frozenset({
-    'EwmLinearModel', 'FactorsData', 'FxRatesData', 'bootstrap_data', 'bootstrap_price_data',
-    'compute_cash_fx_adjusted_returns', 'compute_ewm_covar_tensor_vol_norm_returns',
-    'compute_ewm_long_short_filtered_ra_returns', 'compute_futures_fx_adjusted_returns',
-    'compute_masked_covar_corr', 'covar_to_corr', 'df_abssum', 'df_abssum_negative',
-    'df_abssum_positive', 'df_last_row', 'df_nanmean', 'df_nanmean_clip',
-    'df_nanmean_positive', 'df_nanmedian', 'df_nansum', 'df_nansum_clip', 'df_nansum_negative',
-    'df_nansum_positive', 'df_to_equal_weight_allocation', 'df_to_long_only_allocation_sum1',
-    'df_to_weight_allocation_sum1', 'estimate_hf_ohlc_vol', 'estimate_rolling_ewma_covar',
-    'fetch_default_report_kwargs', 'fit_multivariate_ols', 'generate_fixed_maturity_rolls',
-    'generate_multi_portfolio_factsheet', 'generate_strategy_benchmark_factsheet_plt',
-    'get_aligned_fx_spots', 'get_group_dict', 'get_ra_perf_columns', 'get_resource_path',
-    'get_time_period', 'get_time_period_label', 'infer_annualisation_factor_from_df',
-    'interpolate_infrequent_returns', 'load_df_dict_from_csv', 'load_df_from_csv',
-    'load_df_from_excel', 'load_fx_rates_data', 'np_array_to_df_columns',
-    'save_df_dict_to_csv', 'save_df_to_csv', 'save_fig', 'save_figs_to_pdf',
-    'series_nansum_weighted', 'split_df_by_groups', 'timer', 'truncate_prior_to_start',
-    'unsmooth_returns_ar1_ewma', 'update_kwargs',
-})
+# core symbols still awaiting an Args/Attributes block. Empty: the documented core is complete,
+# and it stays complete because a new core export without a docstring fails the suite below.
+PENDING_DOCSTRINGS: FrozenSet[str] = frozenset()
 
 
 # core symbols where an Args/Attributes block is the wrong form, with the reason. These are
@@ -65,7 +48,15 @@ def _is_documented(obj: Any) -> bool:
     docs = [inspect.getdoc(obj) or '']
     if inspect.isclass(obj):
         docs.append(inspect.getdoc(getattr(obj, '__init__', None)) or '')
-    return any(('Args:' in doc) or ('Attributes:' in doc) for doc in docs)
+    if any(('Args:' in doc) or ('Attributes:' in doc) for doc in docs):
+        return True
+    # a callable taking no arguments has nothing to put in an Args block; what it returns is
+    # the whole of its contract, so a Returns block is the documentation
+    try:
+        takes_arguments = len(inspect.signature(getattr(obj, 'py_func', obj)).parameters) > 0
+    except (ValueError, TypeError):
+        takes_arguments = True
+    return not takes_arguments and any('Returns:' in doc for doc in docs)
 
 
 def _documentable(name: str) -> bool:

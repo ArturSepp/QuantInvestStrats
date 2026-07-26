@@ -66,6 +66,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   refers to `qis/docs/plotting_kwargs.md` for the shared ones. Prose docstrings on `PerfStat`
   and `LegendStats`, whose members are compositional and where a per-member block would restate
   the names.
+- **Every symbol in `CORE_API` now carries an `Args:`/`Attributes:` block.** The remaining 56
+  in this release: the `df_*` aggregation family, the `file_utils` readers and writers, the
+  date and annualisation helpers, `get_group_dict` / `split_df_by_groups`, the three
+  `df_to_*_allocation` normalisers, `covar_to_corr`, `np_array_to_df_columns`,
+  `fit_multivariate_ols`, `compute_masked_covar_corr`, `estimate_rolling_ewma_covar`,
+  `compute_ewm_covar_tensor_vol_norm_returns`, `compute_ewm_long_short_filtered_ra_returns`,
+  `estimate_hf_ohlc_vol`, `interpolate_infrequent_returns`, `get_ra_perf_columns`,
+  `unsmooth_returns_ar1_ewma`, `bootstrap_data`, `bootstrap_price_data`, `EwmLinearModel`,
+  `FxRatesData`, `FactorsData`, the FX conversion functions, `fetch_default_report_kwargs`
+  and the two factsheet generators. `fetch_default_report_kwargs` moves from numpydoc to the
+  house Google style.
 
 ### Fixed
 - `unsmooth_returns_ar1_ewma`, `unsmooth_returns_glm` and `compute_ar1_unsmoothed_prices` are

@@ -17,6 +17,24 @@ def fit_multivariate_ols(x: pd.DataFrame,
                          beta_format: str = '{0:+0.2f}',
                          alpha_format: str = '{0:+0.2f}',
                          ) -> Tuple[pd.Series, pd.Series, str]:
+    """
+    ordinary least squares of y on the columns of x, with a formatted summary of the fit.
+
+    Rows where any variable is missing are dropped before fitting, so the prediction is indexed on
+    the rows that survived rather than on the full input.
+
+    Args:
+        x: explanatory variables, one column per regressor
+        y: dependent variable, aligned with ``x``
+        fit_intercept: include an intercept, reported under the name ``'intercept'``
+        verbose: print the statsmodels summary
+        beta_format: format for the slope coefficients in the returned label
+        alpha_format: format for the intercept in the returned label
+
+    Returns:
+        the fitted parameters indexed by regressor name, the prediction indexed by the retained
+        dates, and a formatted label of the fitted equation for a chart legend
+    """
 
     x_, y_, cond = filter_x_y(x=x.to_numpy(), y=y.to_numpy())
 

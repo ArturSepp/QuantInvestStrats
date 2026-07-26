@@ -132,7 +132,17 @@ def get_local_file_path(file_name: Optional[str],
 
 def timer(func):
     """
-    Print the runtime of the decorated function
+    decorator printing the wall-clock runtime of the decorated function.
+
+    Runtimes under a minute print in seconds, longer ones in minutes and seconds. Intended for the
+    long-running research entry points - a rolling backtest, a covariance sweep - where the cost of
+    a change is worth seeing without reaching for a profiler.
+
+    Args:
+        func: the function to wrap
+
+    Returns:
+        the wrapped function, which returns whatever ``func`` returns
     """
     @functools.wraps(func)
     def wrapper_timer(*args, **kwargs):
@@ -295,7 +305,26 @@ def load_df_from_excel(file_name: str,
                        preserve_header0_columns: bool = True
                        ) -> pd.DataFrame:
     """
-    one file, one sheet to pandas
+    read one sheet of an Excel workbook into a DataFrame.
+
+    Args:
+        file_name: base file name without extension
+        sheet_name: sheet to read
+        local_path: directory to read from
+        folder_name: subdirectory under ``local_path``
+        key: suffix appended to ``file_name``
+        is_index: read the first column as the index
+        delocalize: drop the timezone from a datetime index. Excel often carries a local timezone
+            that is an artefact of the machine that wrote the file, not of the data
+        header: row number of the header, zero-based
+        preserve_header0_columns: when ``header`` is not 0, keep the names from row 0 as the column
+            labels, so a two-row header does not lose the names in favour of the units
+
+    Returns:
+        the sheet as a frame
+
+    Raises:
+        FileNotFoundError: if the workbook does not exist
     """
     file_path = get_local_file_path(file_name=file_name,
                                     file_type=FileTypes.EXCEL,
@@ -416,7 +445,27 @@ def save_df_to_csv(df: pd.DataFrame,
                    file_type: FileTypes = FileTypes.CSV
                    ) -> None:
     """
-    pandas to csv
+    write one DataFrame to a CSV under the managed path layout.
+
+    The path is assembled rather than passed: ``local_path/folder_name/file_name_key.csv``. That
+    keeps a dataset's location in one place, so a caller names the dataset instead of building a
+    path.
+
+    Args:
+        df: frame to write. A Series is promoted to a one-column frame
+        file_name: base file name without extension
+        folder_name: subdirectory under ``local_path``
+        key: suffix appended to ``file_name``, for one file per key
+        add_current_date: append the current date to the file name, so successive runs do not
+            overwrite each other
+        local_path: directory to write to. None writes to the working directory
+        file_type: CSV or CSV_GZ
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: if ``file_type`` is neither CSV nor CSV_GZ, or if ``df`` is empty
     """
     if file_type not in (FileTypes.CSV, FileTypes.CSV_GZ):
         raise ValueError(f"file_type must be CSV or CSV_GZ, got {file_type}")
@@ -447,7 +496,26 @@ def load_df_from_csv(file_name: Optional[str] = None,
                      file_type: FileTypes = FileTypes.CSV
                      ) -> pd.DataFrame:
     """
-    pandas from csv
+    read one DataFrame from a CSV under the managed path layout.
+
+    Args:
+        file_name: base file name without extension
+        local_path: directory to read from. None resolves to the working directory
+        folder_name: subdirectory under ``local_path``
+        key: suffix appended to ``file_name``, for one file per key
+        is_index: read the first column as the index. False leaves a RangeIndex
+        parse_dates: parse the index as dates. Applies only when ``is_index``
+        dayfirst: interpret ambiguous dates as day-first. None leaves it to pandas, which is
+            month-first, so set it True for European-formatted files
+        tz: timezone to localise the index to. None leaves it naive
+        drop_duplicated: drop duplicated index entries, keeping the first
+        file_type: CSV or CSV_GZ
+
+    Returns:
+        the frame, with a DatetimeIndex when ``is_index`` and ``parse_dates``
+
+    Raises:
+        ValueError: if ``file_type`` is neither CSV nor CSV_GZ
     """
     if file_type not in (FileTypes.CSV, FileTypes.CSV_GZ):
         raise ValueError(f"file_type must be CSV or CSV_GZ, got {file_type}")
@@ -539,7 +607,21 @@ def save_df_dict_to_csv(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFram
                         file_type: FileTypes = FileTypes.CSV
                         ) -> None:
     """
-    pandas dict to csv files
+    write a dict of DataFrames, one CSV per key.
+
+    Args:
+        datasets: key to frame. An Enum key is used by its value
+        file_name: base file name shared by every key
+        local_path: directory to write to
+        folder_name: subdirectory under ``local_path``
+        add_current_date: append the current date to the file name
+        file_type: CSV or CSV_GZ
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: if ``file_type`` is neither CSV nor CSV_GZ
     """
     if file_type not in (FileTypes.CSV, FileTypes.CSV_GZ):
         raise ValueError(f"file_type must be CSV or CSV_GZ, got {file_type}")
@@ -568,7 +650,30 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
                           file_type: FileTypes = FileTypes.CSV
                           ) -> Dict[str, pd.DataFrame]:
     """
-    pandas dict from csv files
+    read a dict of DataFrames, one CSV per key.
+
+    The inverse of :func:`save_df_dict_to_csv`. One file per key rather than one file with a key
+    column, so each dataset can be read without loading the rest.
+
+    Args:
+        dataset_keys: keys to read. An Enum member is used by its value, so an Enum can name the
+            datasets instead of string literals
+        file_name: base file name shared by every key
+        local_path: directory to read from
+        folder_name: subdirectory under ``local_path``
+        is_index: read the first column of each file as a parsed date index
+        dayfirst: interpret ambiguous dates as day-first
+        force_not_found_error: raise when a key's file is absent. False skips it, so the returned
+            dict may be smaller than ``dataset_keys``
+        file_type: CSV or CSV_GZ
+
+    Returns:
+        key to frame, containing only the keys whose files were found unless
+        ``force_not_found_error``
+
+    Raises:
+        ValueError: if ``file_type`` is neither CSV nor CSV_GZ
+        FileNotFoundError: if a key's file is absent and ``force_not_found_error``
     """
     if file_type not in (FileTypes.CSV, FileTypes.CSV_GZ):
         raise ValueError(f"file_type must be CSV or CSV_GZ, got {file_type}")
@@ -898,7 +1003,21 @@ def save_fig(fig: plt.Figure,
              **kwargs
              ) -> str:
     """
-    save matplotlib figure
+    write a matplotlib figure to an image or vector file.
+
+    Args:
+        fig: figure to write
+        file_name: base file name without extension
+        local_path: directory to write to. None writes to the working directory
+        dpi: resolution. Relevant to PNG; the vector formats use it only for rasterised elements
+        file_type: PNG, EPS, SVG or PDF
+        add_current_date: append the current date to the file name
+
+    Returns:
+        the path written
+
+    Raises:
+        NotImplementedError: if ``file_type`` is not one of the four supported formats
     """
     if add_current_date:
         file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(DATE_FORMAT)])
@@ -947,7 +1066,23 @@ def save_figs_to_pdf(figs: Union[List[plt.Figure], Dict[str, plt.Figure]],
                      add_current_date: bool = True
                      ) -> str:
     """
-    create PDF of list of plf figures
+    write several matplotlib figures to one multi-page PDF, one figure per page.
+
+    This is how a factsheet is assembled: each panel is drawn as its own figure and they are
+    collected here, so a report is a list of figures rather than a layout engine. A None entry is
+    skipped, which lets a caller build the list conditionally without filtering it.
+
+    Args:
+        figs: figures to write, in page order. A dict is written in insertion order and its keys
+            are ignored
+        file_name: base file name without extension
+        orientation: page orientation
+        local_path: directory to write to. None writes to the working directory
+        add_current_date: append the current date to the file name. True by default here, since a
+            report is usually dated
+
+    Returns:
+        the path written
     """
     if add_current_date:
         file_name = join_file_name_parts([file_name, pd.Timestamp.now().strftime(DATE_FORMAT)])

@@ -27,7 +27,23 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                         **kwargs
                         ) -> pd.DataFrame:
     """
-    compute ra perf table and get ra performance columns with data as string for tables
+    risk-adjusted performance statistics as a table of formatted strings, ready to render.
+
+    The bridge between :func:`compute_ra_perf_table`, which computes numbers, and
+    :func:`plot_df_table`, which renders text: each statistic is formatted with the format its
+    :class:`PerfStat` member carries, so percent, ratio and date columns display correctly without
+    the caller restating the convention.
+
+    Args:
+        prices: price levels, one column per asset. A Series is promoted to a one-column frame
+        perf_params: annualisation, frequency and rate conventions. None uses the defaults
+        perf_columns: statistics to include, in column order
+        column_header: header of the leading column, which holds the asset names
+        df_to_add: extra columns inserted before the statistics, for group labels or weights
+        is_to_str: format the values as strings. False returns the numbers, for further computation
+
+    Returns:
+        one row per asset, columns named by the display names of ``perf_columns``
     """
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
