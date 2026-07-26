@@ -289,26 +289,17 @@ class FxRatesData:
         Rates loadings — without contaminating the main asset-universe
         factor model.
 
-        Parameters
-        ----------
-        local_ccy : str
-            Foreign-leg currency (e.g. 'EUR').
-        reference_ccy : str
-            Reference / reporting currency (e.g. 'USD').
-        freq : str, default 'B'
-            Construction frequency for the underlying cash NAV. Daily
-            ('B') is the safe default; the cash NAV is rebuilt at this
-            cadence and downsampled to ``output_freq`` at the end.
-        output_freq : str, default 'ME'
-            Reporting frequency for the returned NAV series.
+        Args:
+            local_ccy: foreign-leg currency, e.g. ``'EUR'``
+            reference_ccy: reference / reporting currency, e.g. ``'USD'``
+            freq: construction frequency of the underlying cash NAV. Daily is the safe
+                default: the NAV is compounded at this cadence and downsampled at the end
+            output_freq: reporting frequency of the returned NAV
 
-        Returns
-        -------
-        pd.Series
-            NAV levels in reference currency, indexed at ``output_freq``.
-            Returns an empty series if ``local_ccy == reference_ccy``
-            (the cross-FX construction is meaningful only for non-native
-            reference frames).
+        Returns:
+            NAV levels in the reference currency, indexed at ``output_freq``. Empty when
+            ``local_ccy == reference_ccy``, since the cross-FX construction is meaningful only
+            for a non-native reference frame
         """
         if local_ccy == reference_ccy:
             # Native frame: no cross-FX series needed. Caller should

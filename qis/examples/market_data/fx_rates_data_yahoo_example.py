@@ -69,15 +69,13 @@ def fetch_fx_rates_data_from_yahoo(start_date: str = '2005-12-31',
     Domestic 3M rates use the real USD rate ('^IRX' / 100) and stylised per-ccy differentials for
     the rest (see module docstring) — illustrative only.
 
-    Parameters
-    ----------
-    start_date, end_date : str
-        Yahoo download window (end_date=None fetches up to today).
+    Args:
+        start_date: first date of the Yahoo download window
+        end_date: last date of the window. None fetches up to today
 
-    Returns
-    -------
-    FxRatesData
-        ready to use; __post_init__ forward-fills spots and aligns rates to the spot calendar.
+    Returns:
+        the container, ready to use: ``__post_init__`` forward-fills the spots and aligns the
+        rates to the spot calendar
     """
     fx_tickers = list(_DIRECT_USD_PER_LOCAL.values()) + list(_INVERTED_LOCAL_PER_USD.values())
     raw = yf.download(fx_tickers, start=start_date, end=end_date, auto_adjust=True, progress=False)['Close']

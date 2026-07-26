@@ -128,13 +128,14 @@ def get_nonnan_index(df: Union[pd.Series, pd.DataFrame],
     """
     Get the first or last non-NaN index for each column/series.
 
-    Parameters
-    ----------
-    df : pd.Series or pd.DataFrame
-    position : str
-        'first' or 'last' - which non-NaN index to find
-    return_index_for_all_nans : int
-        Index position to return if all NaN (-1 for last, 0 for first)
+    Args:
+        df: series or frame to scan
+        position: which end to look from, ``'first'`` or ``'last'``
+        return_index_for_all_nans: positional index returned for an all-NaN column, so an empty
+            column yields a date rather than raising. -1 gives the last index entry, 0 the first
+
+    Returns:
+        the timestamp for a Series, or one timestamp per column for a DataFrame
     """
 
     def get_index(series: pd.Series) -> pd.Timestamp:

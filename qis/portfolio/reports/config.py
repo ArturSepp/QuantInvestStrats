@@ -322,22 +322,17 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
       - add_rates_data also selects the displayed performance columns: the excess-return set and
         labels when True, the rf=0 set when False.
 
-    Parameters
-    ----------
-    factsheet_config : FactsheetConfig
-        the (frequency, span) preset whose fields become the report kwargs.
-    rates_data : pd.Series, optional
-        external risk-free rate series; when supplied it is used as-is and no download occurs.
-    add_rates_data : bool
-        when rates_data is None, download the default 3M US rate, and show excess-return columns.
-    override : dict, optional
-        final overrides merged into the returned kwargs (override wins).
+    Args:
+        factsheet_config: the (frequency, span) preset whose fields become the report kwargs
+        rates_data: external risk-free rate series as a decimal. Supplied, it is used as-is and
+            no download occurs
+        add_rates_data: when ``rates_data`` is None, download the default 3M US rate and show
+            the excess-return columns. Needs the ``[data]`` extra
+        override: final overrides merged into the result, which win over the preset
 
-    Returns
-    -------
-    dict
-        kwargs ready to spread into generate_*_factsheet(...), including perf_params and
-        regime_classifier.
+    Returns:
+        keyword arguments ready to spread into ``generate_*_factsheet(...)``, including the
+        constructed ``perf_params`` and ``regime_classifier``
     """
     if rates_data is None:
         if add_rates_data:
@@ -388,9 +383,14 @@ def fetch_default_perf_params(rates_data: pd.Series = None,
     PerfParams use weekly ('W-WED') return and regression frequencies; the regime classifier uses a
     quarterly ('QE') grid.
 
-    Returns
-    -------
-    Tuple[PerfParams, BenchmarkReturnsQuantilesRegime]
+    Args:
+        rates_data: external risk-free rate series as a decimal. Supplied, it is used as-is and
+            no download occurs
+        add_rates_data: when ``rates_data`` is None, download the default 3M US rate. Needs the
+            ``[data]`` extra; an empty download falls back to zero-rate statistics
+
+    Returns:
+        the performance parameters and the regime classifier, in that order
     """
     if rates_data is None:
         if add_rates_data:

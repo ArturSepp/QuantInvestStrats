@@ -90,6 +90,15 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
 - Line length 100 (`ruff`, rules `E`, `F`, `W`). Run `ruff check` on the files you touched
   before finishing; CI gates the diff, not the repository. The isort rule `I` is deliberately
   not selected — it contradicts the import convention above.
+- **Docstrings are Google-style** (`Args:` / `Returns:` / `Raises:`, `Attributes:` on a class
+  or enum), rendered through `napoleon`. `qis/tests/test_docstring_convention.py` fails the
+  suite on a numpydoc section heading. `factorlasso` is the one package in the stack that keeps
+  numpydoc — it is sklearn-compatible and its readers arrive from a numpydoc ecosystem. That
+  exception is per-package and stays per-package; do not mix the two inside `qis`.
+- **Everything in `qis/api.py`'s `CORE_API` must carry an `Args:`/`Attributes:` block.**
+  `qis/tests/test_core_api.py` enforces it, and also that a documented argument exists in the
+  signature. Arguments shared across the `plot_*` functions are documented once in
+  `qis/docs/plotting_kwargs.md`; a plot docstring covers only what is specific to it.
 - Enums are used heavily (100+ modules) for options and switches; prefer an enum
   member over a string literal when one already exists.
 - Dataclasses are used for configuration and result containers.

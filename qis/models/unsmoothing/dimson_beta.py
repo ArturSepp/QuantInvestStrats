@@ -33,38 +33,23 @@ def estimate_dimson_beta(asset_returns: Union[pd.Series, pd.DataFrame],
     convention is used for asset and market, so total returns are the natural
     input when the goal is to detect smoothing in the raw reported series.
 
-    Parameters
-    ----------
-    asset_returns : pd.Series or pd.DataFrame
-        Asset return panel, one column per asset, at the same frequency as
-        ``market_returns`` (monthly for a quarter-smoothing test with L=3).
-    market_returns : pd.Series
-        Market / factor return series, the timing reference. Use a liquid,
-        frequently-priced index (e.g. a broad equity benchmark).
-    num_lags : int, default 3
-        Number of lagged market terms L. L=3 on monthly data tests whether
-        aggregating to quarterly recovers exposure the monthly regression misses.
-    min_obs : int, default 36
-        Minimum overlapping observations required to fit an asset.
+    Args:
+        asset_returns: asset return panel, one column per asset, at the same frequency as
+            ``market_returns``. Monthly for a quarter-smoothing test with L=3
+        market_returns: market or factor return series, the timing reference. Use a liquid,
+            frequently priced index
+        num_lags: number of lagged market terms L. L=3 on monthly data tests whether
+            aggregating to quarterly recovers exposure the monthly regression misses
+        min_obs: minimum overlapping observations required to fit an asset
 
-    Returns
-    -------
-    pd.DataFrame
-        Indexed by asset column, with columns:
-            beta_0          contemporaneous slope b_0
-            beta_dimson     aggregated slope sum_k b_k
-            smoothing_ratio beta_dimson / b_0 (NaN when |b_0| ~ 0)
-            t_beta_0        t-stat of b_0
-            sum_lag_beta    sum of lagged slopes sum_{k>=1} b_k
-            t_sum_lag       t-stat of the summed lagged slopes
-            ar1             first-order autocorrelation of r_i (smoothing signature)
-            r2              regression R^2
-            n_obs           overlapping observations used
+    Returns:
+        one row per asset, with columns ``beta_0`` the contemporaneous slope, ``beta_dimson``
+        the aggregated slope, ``smoothing_ratio`` their ratio (NaN when ``b_0`` is near zero),
+        ``t_beta_0``, ``sum_lag_beta`` the sum of the lagged slopes, ``t_sum_lag`` its t-stat,
+        ``ar1`` the first-order autocorrelation of the asset return, ``r2``, and ``n_obs``
 
-    Raises
-    ------
-    ValueError
-        If ``market_returns`` is not a pd.Series, or ``num_lags`` < 0.
+    Raises:
+        ValueError: if ``market_returns`` is not a pd.Series, or ``num_lags`` is negative
     """
     if not isinstance(market_returns, pd.Series):
         raise ValueError(f"market_returns must be a pd.Series, got {type(market_returns)!r}")

@@ -77,6 +77,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `FxRatesData`, `FactorsData`, the FX conversion functions, `fetch_default_report_kwargs`
   and the two factsheet generators. `fetch_default_report_kwargs` moves from numpydoc to the
   house Google style.
+- The six remaining numpydoc docstrings in `qis` are converted to Google style:
+  `get_nonnan_index`, `FxRatesData.build_cross_fx_cash_nav`, `estimate_dimson_beta`,
+  `fetch_factsheet_config_kwargs`, `fetch_default_perf_params` and the FX rates example.
+  `qis/tests/test_docstring_convention.py` fails the suite on a numpydoc section heading
+  anywhere in the package. `factorlasso` keeps numpydoc; the exception is per-package.
 
 ### Fixed
 - `unsmooth_returns_ar1_ewma`, `unsmooth_returns_glm` and `compute_ar1_unsmoothed_prices` are
