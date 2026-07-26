@@ -92,6 +92,17 @@ class Fixtures:
 
         self.exposures = weights.resample('YE').last()
 
+        # fx rates: spots quoted as USD per 1 unit of the local currency, so a level series
+        # rebased to 1.0 is the right shape. Domestic rates are annualised and constant, which
+        # is enough for the carry term to be non-zero and differ across currencies.
+        spot_columns = list(self.prices.columns[:3])
+        fx_spots = self.prices[spot_columns].div(self.prices[spot_columns].iloc[0])
+        fx_spots.columns = ['USD', 'CHF', 'EUR']
+        fx_spots['USD'] = 1.0  # the quote currency is its own numeraire
+        domestic_rates = pd.DataFrame({'USD': 0.04, 'CHF': 0.01, 'EUR': 0.02},
+                                      index=fx_spots.index)
+        self.fx_rates_data = qis.FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
+
 
 @pytest.fixture(scope='module')
 def fx() -> Fixtures:
@@ -136,6 +147,9 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
         'plot_lines_list': dict(xy_datas={'a': fx.returns.iloc[:, :2].reset_index(drop=True),
                                           'b': fx.returns.iloc[:, 2:4].reset_index(drop=True)},
                                 data_labels=['a', 'b']),
+        'plot_multi_asset_fx_hedging_report': dict(asset_prices=fx.prices.iloc[:, :2],
+                                                   fx_rates_data=fx.fx_rates_data,
+                                                   local_ccy='EUR', reference_ccy='CHF'),
         'plot_multivariate_scatter_with_prediction': dict(
             df=fx.returns, x=list(fx.returns.columns[1:3]), y=fx.returns.columns[0],
             x_axis_column=fx.returns.columns[1]),  # no hue: exercises the no-legend path

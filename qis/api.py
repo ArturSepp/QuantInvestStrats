@@ -54,6 +54,16 @@ CORE_API: Dict[str, Tuple[str, ...]] = {
         'compute_ewm_long_short_filtered_ra_returns', 'compute_masked_covar_corr',
         'estimate_rolling_ewma_covar', 'estimate_hf_ohlc_vol', 'plot_corr_matrix_from_covar',
     ),
+    # rosaa is the consumer, and it reached eleven symbols through six deep imports because only
+    # five were exported. The six are exported now, and the capability is core: a private
+    # production consumer is still a consumer, and the cookbook has a page for it.
+    'Market data and FX': (
+        'FxRatesData', 'FactorsData', 'load_fx_rates_data', 'get_aligned_fx_spots',
+        'compute_local_and_fx_return', 'compute_performance_of_local_ccy_asset_in_reference_ccy',
+        'compute_fx_vol_beta', 'compute_fx_optimal_hedge', 'compute_futures_fx_adjusted_returns',
+        'compute_cash_fx_adjusted_returns', 'compute_multi_asset_fx_hedging',
+        'run_asset_fx_hedging_report', 'plot_multi_asset_fx_hedging_report',
+    ),
     'Regime reporting': (
         'BenchmarkReturnsQuantilesRegime',
     ),

@@ -53,7 +53,7 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
                                                             ) -> Tuple[pd.Series, pd.Series]:
     """Reference-currency NAV and return of a local-currency asset at a given hedge ratio.
 
-    The per-period hedged return is
+    The per-period hedged return is::
 
         hedged_return = local_return * (1 + fx_return)
                         + (1 - h) * fx_return

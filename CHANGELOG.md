@@ -36,6 +36,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `qis/docs/plotting_kwargs.md` — the keyword arguments every `plot_*` function shares (`ax`,
   `title`, `var_format`, `x_date_freq`, `fontsize`, `colors`, `legend_loc`, `y_limits`),
   documented once so individual plot docstrings cover only what is specific to them.
+- Six FX analytics exported from `qis`: `compute_fx_optimal_hedge`, `compute_fx_vol_beta`,
+  `compute_performance_of_local_ccy_asset_in_reference_ccy`, `compute_multi_asset_fx_hedging`,
+  `run_asset_fx_hedging_report` and `plot_multi_asset_fx_hedging_report`, plus
+  `compute_local_and_fx_return` and `compute_cash_fx_adjusted_returns`. `market_data` published
+  5 of the 11 symbols its consumers use, and the rest were reached by deep import into
+  `qis.market_data.fx_hedging` and `qis.market_data.reports.fx_hedging_report`. Market data is
+  now a capability group in `CORE_API`. Roadmap item T5.
 
 ### Changed
 - **`BootstrapType.STATIONARY` blocks now wrap around the end of the sample**, as in
