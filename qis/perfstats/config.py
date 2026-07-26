@@ -60,7 +60,18 @@ class RegimeData(Enum):
 
 class PerfStat(ColVar, Enum):
     """
-    performance data outputs are computed as df(index=assets, columns=PerfStat)
+    the column set of every performance table in qis.
+
+    Performance output is a frame indexed by asset with PerfStat members as columns, so a
+    statistic is selected by enum member rather than by a string literal that can drift.
+
+    Each member is a :class:`ColVar` carrying its display name, its short and wrapped labels
+    for table headers, and its :class:`ValueType`, which fixes how the number is formatted —
+    percent, ratio, date or count. Formatting therefore travels with the statistic instead of
+    being reapplied at each call site.
+
+    Members whose name ends in ``_RF0`` use a zero risk-free rate; the excess variants need
+    ``PerfParams.rates_data``. Sharpe members follow ``PerfParams.sharpe_convention``.
     """
     START_DATE = ColVar(name='Start date', short_n='Start\ndate', value_type=ValueType.DATE)
     END_DATE = ColVar(name='End date', short_n='End\ndate', value_type=ValueType.DATE)
@@ -218,12 +229,19 @@ TRE_TABLE_COLUMNS = (PerfStat.TOTAL_RETURN,
 
 class SharpeConvention(Enum):
     """
-    convention for the Sharpe ratio numerator, see qis/docs/sharpe_conventions.md
-    PA = compound annual excess return / annualized vol (reporting default, BarclayHedge tradition)
-    ARITHMETIC = sqrt(af) * mean / std of periodic simple excess returns (Sharpe 1994 plug-in,
-                 the convention of the Sharpe-inference literature; regime decomposition is
-                 exactly additive in this convention)
-    LOG = sqrt(af) * mean / std of periodic log excess returns
+    which Sharpe ratio numerator a statistic reports.
+
+    The three are different numbers on the same data, not roundings of each other, so every
+    Sharpe object in qis is labelled with the convention it used. Full derivation and
+    reconciliation in ``qis/docs/sharpe_conventions.md``.
+
+    Attributes:
+        PA: compound annual excess return over annualised volatility. The reporting default
+            and the BarclayHedge tradition; leaves every pre-5.0.2 output unchanged
+        ARITHMETIC: ``sqrt(af) * mean / std`` of periodic simple excess returns — the Sharpe
+            (1994) plug-in estimator and the convention of the Sharpe-inference literature.
+            The regime decomposition is exactly additive only in this convention
+        LOG: ``sqrt(af) * mean / std`` of periodic log excess returns
     """
     PA = 1
     ARITHMETIC = 2

@@ -60,6 +60,71 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 factsheet_name: str = None,
                                 **kwargs
                                 ) -> List[plt.Figure]:
+    """
+    multi-page factsheet for one strategy against a benchmark.
+
+    The strategy archetype behind :func:`qis.factsheet`. Page one always renders: cumulative
+    performance with regime shading, risk-adjusted performance tables, rolling volatility,
+    Sharpe and beta, drawdowns, exposures, turnover and costs. The ``add_*`` flags each append
+    a further page, all off by default, so the report stays one page unless more is asked for.
+
+    The parameters group as: data; reporting windows; statistics configuration; per-panel
+    frequencies and rolling windows; optional extra sheets; layout; naming. The per-panel
+    frequencies exist because the panels do not share a grid — drawdowns are read on the native
+    business-day path while betas are read weekly — and each panel states the frequency it was
+    computed at.
+
+    Args:
+        portfolio_data: the strategy; must carry weights and instrument pnl for the attribution
+            panels, and ``covar_dict`` for the risk panels
+        benchmark_prices: benchmark panel for the regressions and regime classification
+        time_period: reporting span; defaults to the full nav history
+        ytd_attribution_time_period: span of the year-to-date attribution panel
+        weight_report_time_period: span of the weights panel, when it should differ from the
+            report span
+        perf_params: sampling frequencies and Sharpe convention for the performance tables
+        regime_classifier: how the benchmark history is cut into regimes
+        regime_benchmark: which benchmark column drives the regimes; defaults to the first
+        weights_freq: sampling of the exposures panel
+        turnover_rolling_period: window of the rolling turnover panel, in periods of
+            ``freq_turnover``
+        freq_turnover: grid the turnover panel is computed on
+        freq_cost: grid the realised-cost panel is computed on
+        cost_rolling_period: window of the rolling cost panel
+        factor_beta_span: EWM span of the rolling beta, in periods of ``freq_beta``
+        freq_beta: grid the rolling beta is computed on
+        vol_rolling_window: window of the rolling volatility panel
+        freq_sharpe: grid the rolling Sharpe is computed on
+        freq_var: grid the value-at-risk panel is computed on
+        var_span: EWM span for the value-at-risk estimate
+        sharpe_rolling_window: window of the rolling Sharpe panel
+        add_benchmarks_to_navs: show the benchmarks alongside the strategy in the performance
+            panels rather than only as the regression reference
+        figsize: page size in inches; the default is A4 portrait
+        fontsize: base font size
+        heatmap_fontsize: font size for the heatmap panels, which carry more cells
+        weights_change_lag: lookback for the weight-change report, in periods
+        add_current_position_var_risk_sheet: append current positions with their value-at-risk
+        add_grouped_weights_sheet: append weights aggregated by ``group_data``
+        add_current_signal_report: append the current signal state; needs
+            ``strategy_signal_data``
+        add_weight_change_report: append weight changes over ``weights_change_lag``
+        add_performance_risk_attribution_sheet: append performance and risk attribution
+        add_grouped_exposures: append exposures aggregated by group
+        add_grouped_cum_pnl: append cumulative pnl aggregated by group
+        add_instrument_history_report: append per-instrument history
+        y_limits_signal: y limits of the signal panel
+        is_1y_exposures: restrict the exposures panel to the trailing year
+        is_grouped: aggregate the panels by ``group_data`` where the panel supports it
+        dd_legend_type: how much detail the drawdown legend carries
+        is_unit_based_traded_volume: measure traded volume in units rather than in notional
+        df_to_add: extra frame appended as a table
+        factsheet_name: report title
+        **kwargs: forwarded to the underlying plot functions
+
+    Returns:
+        one figure per page, in page order
+    """
     # align
     if isinstance(benchmark_prices, pd.Series):
         benchmark_prices = benchmark_prices.to_frame()

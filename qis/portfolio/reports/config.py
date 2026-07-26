@@ -65,8 +65,21 @@ PERF_COLUMNS = (PerfStat.TOTAL_RETURN,
 
 class ReportingFrequency(Enum):
     """
-    sampling frequency of the *input data* a factsheet is built on.
-    the value is the pandas resampling rule used as the report base grid.
+    the grid a factsheet is computed on.
+
+    Selecting this recalibrates the whole report, not just the x axis: rolling windows, EWM
+    spans, regression frequency, regime classification and annualisation are all derived from
+    it, so the same portfolio reported daily and monthly yields different volatilities and
+    Sharpe ratios by construction rather than by error. Each panel states the frequency it was
+    computed at. See ``qis/docs/reporting_frequencies.md``.
+
+    The value of each member is the pandas resampling rule.
+
+    Attributes:
+        DAILY: business days, 'B', 260 periods per year
+        WEEKLY: Wednesdays, 'W-WED', 52 per year
+        MONTHLY: month ends, 'ME', 12 per year
+        QUARTERLY: quarter ends, 'QE', 4 per year
     """
     DAILY = 'B'
     WEEKLY = 'W-WED'

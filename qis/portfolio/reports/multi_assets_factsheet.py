@@ -436,6 +436,37 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    min_trailing_obs: int = 12,
                                    **kwargs
                                    ) -> plt.Figure:
+    """
+    one-page cross-sectional factsheet comparing instruments against a benchmark.
+
+    The multi-asset archetype behind :func:`qis.factsheet`: cumulative performance with regime
+    shading, a risk-adjusted performance table, rolling statistics, drawdowns, periodic returns
+    and correlations, laid out on a single A4 page.
+
+    Args:
+        prices: price panel, one column per instrument
+        benchmark_prices: benchmark panel; when given, its columns are the regression and
+            regime reference
+        benchmark: column name to use as the reference; defaults to the first benchmark column
+        add_benchmarks_to_navs: include the benchmarks as rows in the performance panels rather
+            than only as the regression reference
+        perf_params: sampling frequencies and Sharpe convention for every statistic
+        regime_classifier: how the benchmark history is cut into regimes for the conditional
+            panels
+        heatmap_freq: aggregation of the periodic-returns heatmap, 'YE' for calendar years
+        time_period: reporting span; defaults to the full history
+        figsize: figure size in inches; the default is A4 portrait
+        fontsize: base font size for the tables
+        factsheet_name: report title
+        performance_bars: the two statistics drawn as bar panels
+        drop_1y_ra_perf_table: omit the trailing one-year table, which is noise on a long
+            history
+        min_trailing_obs: minimum observations before a trailing statistic is reported
+        **kwargs: forwarded to the underlying plot functions
+
+    Returns:
+        the assembled figure
+    """
     # use passed benchmark
     if benchmark is None and benchmark_prices is not None:
         if benchmark_prices is None:
