@@ -151,9 +151,9 @@ author's. Two consumers carry this section, because both are public and both use
 deeply.
 `optimalportfolios`, which implements portfolio optimisation solvers and rolling backtests,
 declares `qis` as a mandatory dependency and calls 73 of its symbols at 541 call sites.
-`TrendFollowingSystems`, which carries the code for a paper in submission on diversification of
-systematic strategies, calls 96 symbols at 538 sites. A reader can reproduce both counts from a
-clone with a short script.
+`TrendFollowingSystems`, which carries the code behind the trend-following work cited below,
+calls 96 symbols at 538 sites. A reader can reproduce both counts from a clone with a short
+script.
 
 A third public package, `privateassets`, applies the unsmoothing layer to private-asset returns.
 It is recent and its dependency is small, so we cite it for the range of asset classes served
@@ -164,11 +164,8 @@ sites covering 240 distinct symbols.
 The capabilities carry named results. The portfolio and optimisation layers support work on
 robust strategic and tactical allocation [@sepp2026robust], the backtester and performance layer
 support work on cryptocurrency allocation [@sepp2023crypto], and the regime-conditional layer
-supports work on trend-following systems [@sepp2025trend].
-
-[TODO: the roadmap also names a JOIM paper on smart diversification, a SIFIN paper, and an FAJ
-paper on achievable Sharpe ratios. None was found on the research page under those titles.
-Supply the citations, or drop the sentence that rests on them.]
+supports work on trend-following systems [@sepp2025trend]. The trend-following paper is under
+submission at the SIAM Journal on Financial Mathematics.
 
 Development has been continuous rather than concentrated. The repository holds 278 commits made
 between December 2022 and July 2026, with activity in 37 of the 44 calendar months in that span.
