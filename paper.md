@@ -32,9 +32,10 @@ everything downstream of those weights is reconstruction rather than research. `
 that reconstruction, so a researcher writes the rule and the package supplies the simulation, the
 statistics, the conventions, and the exhibits.
 
-`qis` serves as the base layer of a stack of quantitative finance packages, two of which are
+`qis` serves as the base layer of a stack of quantitative finance packages, three of which are
 public, and as the computational layer beneath published research in portfolio construction and
-systematic strategies. It requires only the scientific Python stack, runs on Python 3.10 to 3.14,
+systematic strategies. Each capability is written once and reused across that stack, so a method
+carries the same implementation wherever it appears. It requires only the scientific Python stack, runs on Python 3.10 to 3.14,
 and is released under the MIT licence.
 
 # Statement of need
@@ -62,16 +63,28 @@ running a stationary bootstrap on the same data would publish annual returns dif
 than two percentage points, and nothing in either output would explain the gap. The example that
 produces these numbers ships with the package and runs in the test suite.
 
-[TODO: Artur to write the economic-mechanism paragraph here, per the house rule that this passage
-is drafted without AI assistance. The demonstration above supplies the measurement, so this
-paragraph carries the argument for why convention drift matters in practice, and what it costs a
-reader of a published result who cannot tell which convention produced it.]
+A backtest needs two inputs. A strategy generator produces weights, and a price panel aligned to
+those weights supplies everything else. Returns, turnover, realised trading costs and attribution
+are reconstruction rather than research, and we reconstruct them once inside the library. The
+common alternative makes the profit and loss depend on state held inside the strategy generator.
+That design obliges every consumer of the result to rebuild the same quantities from whatever the
+generator chose to emit, and the rebuilt versions stop agreeing with one another. The consequence
+appears in a place every practitioner recognises. The Sharpe ratio of one strategy, read from a
+chart, from a summary table and from a factsheet, comes out as three numbers. We build all three
+from one `PortfolioData` object constructed from weights and prices, so they cannot disagree.
+The same reasoning applies to every method the package holds, which is why we treat them as
+building blocks: one implementation of unsmoothing, of resampling, of covariance estimation, used
+the same way everywhere it is needed.
 
-The second need is compositional, because a research group accumulates analytics faster than it
-consolidates them, and the same method is then written repeatedly across projects. In our own repositories we found
-four independent block bootstrap implementations and two return unsmoothers, all of them
-reimplementing code that `qis` already exported, and one carrying a comment that recorded the
-intention to move it into `qis`. Those implementations had diverged, so
+[TODO: Artur to confirm this paragraph is in his voice and reflects his argument, or replace it.
+Drafted on request from the QIS strategic layout, against the house rule that reserves the
+economic-mechanism passage for the author.]
+
+The building-block discipline is the second need, because a research group accumulates analytics
+faster than it consolidates them, and the same method is then written again in each project. In
+our own repositories we found four independent block bootstrap implementations and two return
+unsmoothers, all of them reimplementing code that `qis` already exported, and one carrying a
+comment that recorded the intention to move it into `qis`. Those implementations had diverged, so
 the same nominal method produced different numbers in different papers. A general-purpose
 analytics layer is worth maintaining because the alternative is not an absence of code, but
 several copies of it that no longer agree.
