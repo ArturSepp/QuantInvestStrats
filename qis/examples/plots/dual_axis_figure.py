@@ -43,4 +43,6 @@ def generate_figure_2x(num_assets: int = 5, n_days: int = 1000) -> List[plt.Figu
 
 
 figs = generate_figure_2x(num_assets=5, n_days=1000)
-qis.save_figs_to_pdf(figs=figs, file_name='test_price_report', local_path=qis.get_output_path())
+# local_path=None writes to the working directory; qis.get_output_path() reads settings.yaml,
+# which ships with a placeholder path that does not exist on any machine
+qis.save_figs_to_pdf(figs=figs, file_name='test_price_report', local_path=None)

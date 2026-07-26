@@ -21,6 +21,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   which estimates as before.
 - `qis/models/bootstrap/tests/test_bootstrap_numba.py` and
   `qis/models/unsmoothing/tests/test_ar_lag_glm.py`.
+- `qis/tests/test_examples.py` — every file in `qis/examples/` must parse, every `qis.<name>`
+  it references must resolve, every qis module it imports from must exist with the symbol it
+  names, and every keyword it passes to a qis callable must be in that callable's signature.
+  The nine examples that reach no data vendor are executed in a temporary directory. An
+  optional dependency is a skip, never a failure.
 
 ### Changed
 - **`BootstrapType.STATIONARY` blocks now wrap around the end of the sample**, as in
@@ -39,6 +44,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   exported from `qis`. They were documented and referenced as `qis.<name>` by
   `qis/examples/perfstats/unsmoothing_and_delevering.py`, which raised `AttributeError`.
 - `bootstrap_price_data` ignored `min_block_size` instead of forwarding it to the sampler.
+- `qis/examples/plots/dual_axis_figure.py` wrote its PDF to `qis.get_output_path()`, which
+  reads `settings.yaml` and ships as the placeholder `C:\Users\...\`. The example raised
+  `FileNotFoundError` on every machine. It now writes to the working directory, as the other
+  examples do.
 
 ## [5.0.10] - 2026-07-25
 
