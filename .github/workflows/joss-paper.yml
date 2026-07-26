@@ -1,0 +1,27 @@
+name: JOSS paper
+
+# Renders paper.md to PDF with the JOSS template on every change to the paper, so the
+# submission is never blocked on a rendering surprise. The artifact is the paper as the
+# reviewer will see it.
+on:
+  push:
+    branches: [main]
+    paths: ['paper.md', 'paper.bib', '.github/workflows/joss-paper.yml']
+  pull_request:
+    paths: ['paper.md', 'paper.bib']
+  workflow_dispatch:
+
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the draft PDF
+        uses: openjournals/openjournals-draft-action@master
+        with:
+          journal: joss
+          paper-path: paper.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paper
+          path: paper.pdf
