@@ -7,6 +7,39 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- `BootstrapType.FIXED_BLOCK` — circular block resampling with a block of exactly `block_size`,
+  for a block length chosen to match a known cycle rather than drawn.
+- `min_block_size` on `generate_bootstrapped_indices`, `bootstrap_data`, `bootstrap_ar_process`,
+  `bootstrap_price_data` and `bootstrap_price_fundamental_data`. Floors the drawn block length
+  under `BootstrapType.STATIONARY`; set it to the number of periods in the slowest-reporting
+  series when the panel mixes frequencies. Default `1`, which is the previous behaviour.
+- `theta` on `unsmooth_returns_glm` — supply the Getmansky-Lo-Makarov smoothing weights instead
+  of estimating them, for a coefficient that comes from outside the series (a panel estimate
+  pooled across vintages, or a value fixed for a production run). A scalar or an array of
+  length q; the sample-length guard does not apply, since nothing is fitted. Default `None`,
+  which estimates as before.
+- `qis/models/bootstrap/tests/test_bootstrap_numba.py` and
+  `qis/models/unsmoothing/tests/test_ar_lag_glm.py`.
+
+### Changed
+- **`BootstrapType.STATIONARY` blocks now wrap around the end of the sample**, as in
+  Politis-Romano (1994). Previously a block was cut short at the last observation, so the
+  realised block length was not geometric there and the first observations were drawn far less
+  often than the rest: on a 250-period sample with `block_size=20` the first observation
+  appeared at 0.11x the uniform rate and the first decile at 0.53x. **This changes every
+  `STATIONARY` draw**, including `rosaa/research/analysis/crypto_publication.py`. The effect on
+  a long daily sample is confined to the first `block_size` observations; on quarterly or
+  monthly panels it is material.
+- `generate_bootstrapped_indices` raises with the offending value on an unhandled
+  `bootstrap_type`, rather than a bare `not implemented`.
+
+### Fixed
+- `unsmooth_returns_ar1_ewma`, `unsmooth_returns_glm` and `compute_ar1_unsmoothed_prices` are
+  exported from `qis`. They were documented and referenced as `qis.<name>` by
+  `qis/examples/perfstats/unsmoothing_and_delevering.py`, which raised `AttributeError`.
+- `bootstrap_price_data` ignored `min_block_size` instead of forwarding it to the sampler.
+
 ## [5.0.10] - 2026-07-25
 
 ### Added

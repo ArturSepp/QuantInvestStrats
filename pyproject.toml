@@ -144,6 +144,11 @@ line-length = 100
 # rule would fail every file written to the documented convention. See AGENTS.md, Conventions.
 select = ["E", "F", "W"]
 
+[tool.ruff.lint.per-file-ignores]
+# an __init__.py re-exports: the public API is defined as what these files import, so every
+# one of the 398 imports across them is "unused" by F401's definition and none is a defect
+"**/__init__.py" = ["F401"]
+
 [tool.coverage.run]
 source = ["qis"]
 omit = ["*/tests/*", "*/examples/*"]

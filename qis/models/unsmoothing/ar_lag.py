@@ -661,6 +661,7 @@ class GLMUnsmoothingDiagnostics:
 
 def unsmooth_returns_glm(returns: Union[pd.Series, pd.DataFrame],
                          ar_order: int = 3,
+                         theta: Optional[Union[float, np.ndarray]] = None,  # None estimates them
                          return_diagnostics: bool = False
                          ) -> Union[pd.Series, pd.DataFrame,
                                     Tuple[pd.Series, GLMUnsmoothingDiagnostics],
@@ -668,12 +669,22 @@ def unsmooth_returns_glm(returns: Union[pd.Series, pd.DataFrame],
     """Apply static AR(q) unsmoothing following Getmansky-Lo-Makarov (2004).
 
     Fits a single AR(q) model over the entire sample to extract constant
-    smoothing weights, then inverts period-by-period. Less adaptive than the
-    rolling EWMA method but useful for academic reproducibility.
+    smoothing weights, then inverts period-by-period:
+    ``r*_t = (r_t - Σ_i θ_i r_{t-i}) / (1 - Σ_i θ_i)``.
+    Less adaptive than the rolling EWMA method but useful for academic reproducibility.
+
+    Pass ``theta`` to supply the smoothing weights instead of estimating them. Use that when
+    the coefficient comes from outside the series - a panel estimate pooled across vintages, or
+    a value fixed for a production run so the unsmoothing does not move with the aggregation
+    choice. No model is fitted in that case, so the length guard does not apply and the same
+    weights apply to every column of a DataFrame.
 
     Args:
         returns: Observed return Series or DataFrame.
         ar_order: Lag order q. Standard values: 2 for monthly, 3 for higher frequency.
+            Ignored when ``theta`` is given, where the order is the length of ``theta``.
+        theta: Fixed smoothing weights, a scalar for AR(1) or an array of length q. When None
+            the weights are estimated from the sample.
         return_diagnostics: If True, return tuple of (unsmoothed, diagnostics).
 
     Returns:
@@ -681,7 +692,8 @@ def unsmooth_returns_glm(returns: Union[pd.Series, pd.DataFrame],
         a tuple with ``GLMUnsmoothingDiagnostics`` (single) or dict (per column).
 
     Raises:
-        ValueError: If returns has fewer than 4*ar_order observations.
+        ValueError: If returns has fewer than 4*ar_order observations and ``theta`` is None,
+            or if a supplied ``theta`` sums to within 1e-10 of 1.
 
     Note:
         Prefer ``adjust_returns_with_ar`` for most practical applications.
@@ -690,9 +702,16 @@ def unsmooth_returns_glm(returns: Union[pd.Series, pd.DataFrame],
         When ``theta_sum`` exceeds 1 the denominator turns negative and the
         inversion flips the sign of the unsmoothed series. ``is_severe`` flags
         ``|theta_sum| > 0.95``; check it before using the result.
+
+        An observation whose lags are not all observed cannot be inverted and is returned as
+        NaN, not as the raw value: an uncorrectable observation is missing, not unsmoothed.
     """
+    theta_fixed = _validate_fixed_theta(theta=theta) if theta is not None else None
+    if theta_fixed is not None:
+        ar_order = len(theta_fixed)
+
     if isinstance(returns, pd.Series):
-        unsmoothed, diag = _unsmooth_glm_single(returns, ar_order=ar_order)
+        unsmoothed, diag = _unsmooth_glm_single(returns, ar_order=ar_order, theta_fixed=theta_fixed)
         if return_diagnostics:
             return unsmoothed, diag
         return unsmoothed
@@ -701,7 +720,8 @@ def unsmooth_returns_glm(returns: Union[pd.Series, pd.DataFrame],
         unsmoothed_cols = {}
         diagnostics_dict = {}
         for col in returns.columns:
-            us, diag = _unsmooth_glm_single(returns[col], ar_order=ar_order)
+            us, diag = _unsmooth_glm_single(returns[col], ar_order=ar_order,
+                                            theta_fixed=theta_fixed)
             unsmoothed_cols[col] = us
             diagnostics_dict[col] = diag
         unsmoothed_df = pd.DataFrame(unsmoothed_cols)
@@ -712,21 +732,36 @@ def unsmooth_returns_glm(returns: Union[pd.Series, pd.DataFrame],
     raise ValueError(f"returns must be Series or DataFrame, got {type(returns)}")
 
 
+def _validate_fixed_theta(theta: Union[float, np.ndarray]) -> np.ndarray:
+    """Coerce a supplied smoothing weight to a 1-d array and reject a singular inversion."""
+    theta_fixed = np.atleast_1d(np.asarray(theta, dtype=float))
+    if theta_fixed.ndim != 1 or len(theta_fixed) == 0:
+        raise ValueError(f"theta must be a scalar or a 1-d array of weights, got {theta!r}")
+    if not np.all(np.isfinite(theta_fixed)):
+        raise ValueError(f"theta must be finite, got {theta!r}")
+    if abs(1.0 - float(theta_fixed.sum())) < 1e-10:
+        raise ValueError(f"theta sums to 1, the inversion is singular, got {theta!r}")
+    return theta_fixed
+
+
 def _unsmooth_glm_single(returns: pd.Series,
-                         ar_order: int
+                         ar_order: int,
+                         theta_fixed: Optional[np.ndarray] = None
                          ) -> Tuple[pd.Series, GLMUnsmoothingDiagnostics]:
     """Internal single-series worker for ``unsmooth_returns_glm``."""
     from statsmodels.tsa.ar_model import AutoReg
 
-    clean = returns.dropna()
-    if len(clean) < 4 * ar_order:
-        raise ValueError(
-            f"insufficient observations: {len(clean)} returns for AR({ar_order}) "
-            f"(need at least {4 * ar_order})"
-        )
-
-    model = AutoReg(clean.values, lags=ar_order, old_names=False).fit()
-    theta = np.asarray(model.params[1:])
+    if theta_fixed is not None:
+        theta = theta_fixed
+    else:
+        clean = returns.dropna()
+        if len(clean) < 4 * ar_order:
+            raise ValueError(
+                f"insufficient observations: {len(clean)} returns for AR({ar_order}) "
+                f"(need at least {4 * ar_order})"
+            )
+        model = AutoReg(clean.values, lags=ar_order, old_names=False).fit()
+        theta = np.asarray(model.params[1:])
     theta_sum = float(theta.sum())
     vol_inflation = 1.0 / (1.0 - theta_sum) if theta_sum < 1.0 else np.inf
     is_severe = abs(theta_sum) > 0.95

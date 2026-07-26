@@ -147,7 +147,7 @@ def df_nanmean_clip(df: pd.DataFrame,
 
 
 def df_abssum(df: pd.DataFrame, axis: Literal[0, 1] = 1) -> pd.Series:
-    """sum of absolute values of finite entries along axis: sum |x_i|"""
+    """sum of absolute values of finite entries along axis: ``sum |x_i|``"""
     _validate_axis(axis)
     data_np = npo.to_finite_np(data=df, fill_value=np.nan)
     return _to_agg_series(agg_data=np.nansum(np.abs(data_np), axis=axis), df=df, axis=axis, name='abssum')

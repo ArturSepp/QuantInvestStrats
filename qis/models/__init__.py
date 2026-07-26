@@ -112,7 +112,10 @@ from qis.models.stats.rolling_stats import (RollingPerfStat,
 
 from qis.models.unsmoothing.ar_lag import (
     adjust_returns_with_ar,
+    compute_ar1_unsmoothed_prices,
     compute_ar_unsmoothed_prices,
+    unsmooth_returns_ar1_ewma,
+    unsmooth_returns_glm,
 )
 
 from qis.models.unsmoothing.dimson_beta import estimate_dimson_beta

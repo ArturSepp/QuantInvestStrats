@@ -15,8 +15,20 @@ import qis.perfstats.returns as ret
 
 
 class BootstrapType(Enum):
+    """
+    how observations are resampled.
+
+    Attributes:
+        IID: independent draws with replacement; destroys autocorrelation, so use it only when
+            the series is genuinely serially independent
+        STATIONARY: Politis-Romano circular blocks of geometric length, mean ``block_size``.
+            The default for financial returns, since it preserves short-range dependence
+        FIXED_BLOCK: circular blocks of exactly ``block_size``. Use when the block length is
+            chosen to match a known cycle rather than drawn
+    """
     IID = 1
     STATIONARY = 2
+    FIXED_BLOCK = 3
 
 
 class BootstrapOutput(Enum):
@@ -60,25 +72,67 @@ def bootstrap_indices_stationary(num_data_index: int,
                                  num_samples: int = 10,
                                  num_bootstrap_index: int = 1000,
                                  block_size: int = 30,
+                                 min_block_size: int = 1,
                                  seed: int = 1
                                  ) -> np.ndarray:
     """
-    generate stationary bootstrap indices
+    generate stationary bootstrap indices, Politis-Romano (1994)
+
+    Blocks start at a uniformly drawn observation and run for a geometric number of periods
+    with mean ``block_size``, wrapping around the end of the sample. The wrap is what makes the
+    resample stationary: without it a block drawn near the end is cut short, the realised block
+    length is no longer geometric there, and the last observations can only ever appear in short
+    blocks.
+
+    ``min_block_size`` floors the block length, which matters when the panel mixes reporting
+    frequencies — a quarterly series needs at least three monthly periods to carry its own
+    autocorrelation into the resample.
     """
     np.random.seed(seed)
     set_seed(seed)
     bootstrapped_indices = np.zeros((num_bootstrap_index, num_samples), dtype=np.int64)
     for idx in np.arange(num_samples):
-        previous_index, next_index = 0, 0
-        while next_index < num_bootstrap_index-1:
-            start_index = np.random.randint(low=0, high=num_data_index) # random start of a block
-            random_block_size = np.random.geometric(1.0/block_size)  # random block size, default size is 1
-            end_index_in_data = np.minimum(start_index+random_block_size, num_data_index)  # end of sample
-            proposed_fill = end_index_in_data-start_index  # how much we can increase based on index in data
-            next_index = np.minimum(previous_index + proposed_fill, num_bootstrap_index)  # index for backfill indices
-            implemented_fill = next_index-previous_index  # how much we will increase based on index in bootstrap indices
-            bootstrapped_indices[previous_index:next_index, idx] = np.arange(start_index, start_index+implemented_fill)
-            previous_index = next_index
+        next_index = 0
+        while next_index < num_bootstrap_index:
+            start_index = np.random.randint(low=0, high=num_data_index)  # random start of a block
+            # geometric length, mean block_size
+            random_block_size = np.random.geometric(1.0/block_size)
+            if random_block_size < min_block_size:
+                random_block_size = min_block_size
+            # never overrun the output
+            fill = np.minimum(random_block_size, num_bootstrap_index-next_index)
+            for k in range(fill):
+                # the modulo is the circular wrap: a block runs past the end into the start
+                bootstrapped_indices[next_index+k, idx] = (start_index+k) % num_data_index
+            next_index = next_index + fill
+    return bootstrapped_indices
+
+
+@njit
+def bootstrap_indices_fixed_block(num_data_index: int,
+                                  num_samples: int = 10,
+                                  num_bootstrap_index: int = 1000,
+                                  block_size: int = 30,
+                                  seed: int = 1
+                                  ) -> np.ndarray:
+    """
+    generate circular block bootstrap indices with a fixed block length
+
+    Every block is exactly ``block_size`` periods, wrapping at the end of the sample. Use this
+    when the block length is chosen to match a known cycle — a calendar year of quarterly
+    observations, say — rather than drawn.
+    """
+    np.random.seed(seed)
+    set_seed(seed)
+    bootstrapped_indices = np.zeros((num_bootstrap_index, num_samples), dtype=np.int64)
+    for idx in np.arange(num_samples):
+        next_index = 0
+        while next_index < num_bootstrap_index:
+            start_index = np.random.randint(low=0, high=num_data_index)
+            fill = np.minimum(block_size, num_bootstrap_index-next_index)
+            for k in range(fill):
+                bootstrapped_indices[next_index+k, idx] = (start_index+k) % num_data_index
+            next_index = next_index + fill
     return bootstrapped_indices
 
 
@@ -142,10 +196,35 @@ def generate_bootstrapped_indices(num_data_index: int,
                                   num_samples: int = 10,
                                   index_length: int = 1000,
                                   block_size: int = 30,
+                                  min_block_size: int = 1,
                                   seed: int = 1
                                   ) -> np.ndarray:
     """
-    wrapper for numba function
+    draw resampling indices, without touching any data.
+
+    This is the primitive behind every ``bootstrap_*`` function, and it is public because the
+    indices are what makes *paired* resampling possible: draw once, then apply the same index
+    array to several aligned panels so their joint structure survives the resample. Pass the
+    result as ``bootstrapped_indices`` to :func:`bootstrap_data` and friends.
+
+    Args:
+        num_data_index: number of observations in the source data
+        bootstrap_type: resampling scheme; see :class:`BootstrapType`
+        num_samples: number of independent bootstrap draws, the columns of the result
+        index_length: length of each draw, the rows of the result. May differ from
+            ``num_data_index``
+        block_size: mean block length for STATIONARY, exact block length for FIXED_BLOCK,
+            ignored for IID
+        min_block_size: floor on the drawn block length under STATIONARY. Set it to the number
+            of periods in the slowest-reporting series when the panel mixes frequencies
+        seed: seed for the numba random state
+
+    Returns:
+        integer indices, shape ``(index_length, num_samples)``, every value in
+        ``[0, num_data_index)``
+
+    Raises:
+        ValueError: if ``bootstrap_type`` is not one of the implemented schemes
     """
     if bootstrap_type == BootstrapType.IID:
         bootstrapped_indices = bootstrap_indices_iid(num_data_index=num_data_index,
@@ -157,9 +236,16 @@ def generate_bootstrapped_indices(num_data_index: int,
                                                             num_samples=num_samples,
                                                             num_bootstrap_index=index_length,
                                                             block_size=block_size,
+                                                            min_block_size=min_block_size,
                                                             seed=seed)
+    elif bootstrap_type == BootstrapType.FIXED_BLOCK:
+        bootstrapped_indices = bootstrap_indices_fixed_block(num_data_index=num_data_index,
+                                                             num_samples=num_samples,
+                                                             num_bootstrap_index=index_length,
+                                                             block_size=block_size,
+                                                             seed=seed)
     else:
-        raise ValueError(f"not implemented")
+        raise ValueError(f"bootstrap_type not implemented, got {bootstrap_type!r}")
 
     return bootstrapped_indices
 
@@ -170,6 +256,7 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
                    num_samples: int = 10,
                    index_length: int = 1000,
                    block_size: int = 30,
+                   min_block_size: int = 1,
                    seed: int = 1,
                    bootstrapped_indices: np.ndarray = None
                    ) -> Union[List, pd.DataFrame]:
@@ -182,6 +269,7 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
                                                              num_samples=num_samples,
                                                              index_length=index_length,
                                                              block_size=block_size,
+                                                             min_block_size=min_block_size,
                                                              seed=seed)
 
     if bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
@@ -211,6 +299,7 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
                          num_samples: int = 10,
                          index_length: int = 1000,
                          block_size: int = 30,
+                         min_block_size: int = 1,
                          seed: int = 1,
                          bootstrapped_indices: np.ndarray = None
                          ) -> Union[List, pd.DataFrame]:
@@ -222,6 +311,7 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
                                                              num_samples=num_samples,
                                                              index_length=index_length,
                                                              block_size=block_size,
+                                                             min_block_size=min_block_size,
                                                              seed=seed)
 
     if bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
@@ -258,6 +348,7 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                          num_samples: int = 10,
                          index_length: int = 1000,
                          block_size: int = 20,
+                         min_block_size: int = 1,
                          is_log_returns: bool = False,
                          seed: int = 1,
                          bootstrapped_indices: np.ndarray = None,
@@ -276,6 +367,7 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                                        num_samples=num_samples,
                                        index_length=index_length,
                                        block_size=block_size,
+                                       min_block_size=min_block_size,
                                        seed=seed,
                                        bootstrapped_indices=bootstrapped_indices)
 
@@ -315,6 +407,7 @@ def bootstrap_price_fundamental_data(price_datas: Dict[str, Union[pd.Series, pd.
                                      num_samples: int = 10,
                                      index_length: int = 1000,
                                      block_size: int = 30,
+                                     min_block_size: int = 1,
                                      is_log_returns: bool = False,
                                      seed: int = 1,
                                      is_price_weighted_fundamentals: bool = False  # multiply by price_datas[0] price bootstrap
@@ -339,6 +432,7 @@ def bootstrap_price_fundamental_data(price_datas: Dict[str, Union[pd.Series, pd.
                                                          num_samples=num_samples,
                                                          index_length=index_length,
                                                          block_size=block_size,
+                                                         min_block_size=min_block_size,
                                                          seed=seed)
 
     bootstrap_prices = {}
