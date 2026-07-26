@@ -7,6 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-07-26
+
+**`BootstrapType.STATIONARY` produces different draws in this release.** Blocks now wrap around
+the end of the sample, which is the correct Politis-Romano construction; see *Changed* below.
+Any result produced with `bootstrap_data`, `bootstrap_price_data`, `bootstrap_ar_process` or
+`bootstrap_price_fundamental_data` under `STATIONARY` will move. Nothing else changes an
+existing number.
+
 ### Added
 - `BootstrapType.FIXED_BLOCK` — circular block resampling with a block of exactly `block_size`,
   for a block length chosen to match a known cycle rather than drawn.
