@@ -34,11 +34,21 @@ PERF_PARAMS = PerfParams(freq='W-WED')
 @dataclass
 class MultiPortfolioData:
     """
-    data structure to unify multi portfolio reporting
-    portfolio_datas: List[PortfolioData]
-    benchmark_prices: Union[pd.DataFrame, pd.Series] = None  # Optional
-    covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None  # annualised covariance matrix
-                                                        for investable universe for computing tracking error
+    several portfolios reported together, against a common benchmark.
+
+    The input to the multi-strategy and strategy-versus-benchmark factsheets. Each member
+    keeps its own weights, costs and grouping; what this adds is the shared benchmark and the
+    shared covariance, so cross-portfolio statistics are computed on one risk model rather
+    than on each portfolio's own.
+
+    Attributes:
+        portfolio_datas: the portfolios, in report order
+        benchmark_prices: benchmark panel shared by all members
+        covar_dict: annualised covariance matrix per date for the investable universe.
+            Required for tracking error, which is a property of the pair rather than of either
+            portfolio alone
+        navs: navs of the members collected into one frame; computed in ``__post_init__``,
+            not supplied
     """
     portfolio_datas: List[PortfolioData]
     benchmark_prices: Union[pd.DataFrame, pd.Series] = None

@@ -137,13 +137,28 @@ class FreqMap(FreqData, Enum):
 
 class TimePeriod:
     """
-    TimePeriod for storing start and end dates of a schedule
-    Initialized with (start_date, end_date)
-    start_date, end_date with SUPPORTED_TYPES
-    Allowed Strings:
-    start  = '12/31/2019'  # m/d/yyyy
-    start  = 31Dec2019
-    start  = 20191231  # y/m/d
+    a start and end date, with the conversions and slicing every qis function expects.
+
+    The canonical way to express a window in this stack. Pass a TimePeriod rather than masking
+    an index by hand: ``time_period.locate(df)`` applies the same inclusive convention
+    everywhere, and the tz is carried with the period so a tz-aware frame is not silently
+    compared against naive timestamps.
+
+    Either bound may be None, meaning open-ended on that side. ``start`` and ``end`` accept
+    pd.Timestamp, datetime, str, int, or an Enum whose value is one of those:
+
+    - ``'12/31/2019'`` — month/day/year
+    - ``'31Dec2019'``
+    - ``20191231`` as a string — year/month/day
+    - ``2019`` as an int — 1 January of that year
+
+    Args:
+        start: start of the window, or None for open-ended
+        end: end of the window, or None for open-ended
+        tz: timezone applied to both bounds
+
+    Raises:
+        TypeError: if a bound is of a type not listed above
     """
 
     SUPPORTED_TYPES = Union[pd.Timestamp, str, dt.datetime, Enum, int]
