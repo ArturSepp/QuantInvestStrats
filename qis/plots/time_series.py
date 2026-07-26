@@ -41,6 +41,42 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      ax: plt.Subplot = None,
                      **kwargs
                      ) -> Optional[plt.Figure]:
+    """
+    plot columns of a DataFrame against its index, with summary statistics in the legend.
+
+    The general time-series plot the rest of the package builds on. Its distinguishing argument
+    is ``legend_stats``: the legend carries statistics computed on the plotted window, so the
+    numbers beside a series always describe the data actually drawn.
+
+    Arguments shared with every ``plot_*`` function — ``ax``, ``title``, ``var_format``,
+    ``x_date_freq``, ``fontsize``, ``colors``, ``xlabel``, ``ylabel``, ``legend_loc``,
+    ``markersize``, ``y_limits`` — are documented in ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: values indexed by date, one line per column. A Series is plotted as one line
+        linestyles: matplotlib line styles, one per column
+        linewidth: line width in points
+        x_date_freq: tick frequency on the date axis
+        date_format: strftime format for the tick labels
+        legend_title: heading above the legend entries
+        last_label: whether to annotate the last point of each line, and with what
+        sort_by_value_stretch_factor: vertical spread applied when last labels are sorted by
+            value, to keep them from overlapping
+        trend_line: trend line drawn through each series
+        trend_line_colors: colours for those trend lines, defaulting to the series colours
+        legend_stats: which statistics each legend entry reports; see :class:`LegendStats`
+        desc_table_type: descriptive statistics table drawn beside the plot
+        legend_labels: replace the column names in the legend. Statistics from
+            ``legend_stats`` are appended to these
+        indices_for_shaded_areas: name to (start, end) positional index pairs, shaded to mark
+            episodes. Positional, not dates, so it survives an irregular index
+        markers: marker style per column, or False for lines only
+        is_log: log scale on the vertical axis
+        x_limits: (low, high) on the date axis, either end may be None
+
+    Returns:
+        the figure drawn on, or None when ``ax`` was supplied or ``df`` is empty
+    """
     if ax is None:
         fig, ax = plt.subplots()
     else:

@@ -16,9 +16,22 @@ import qis.utils.np_ops as npo
 
 class NanBackfill(Enum):
     """
-    when you sung ewm recursion we need to treat nans
-    base case: when we assume conitnuous time series with occasional gaps we use FFILL method
-    case where outputs needs a flag that given data are nans we need to use nan fill
+    how the EWM recursion treats a missing observation.
+
+    The recursion ``s_t = (1-λ) x_t + λ s_{t-1}`` has no value to carry forward at a NaN, so a
+    policy is required. Which one is right depends on whether the gap means "no observation
+    arrived" or "the series is genuinely absent here".
+
+    Attributes:
+        FFILL: carry the last non-NaN state forward unchanged. The base case: a continuous
+            series with occasional gaps, where a missing print does not mean the level moved
+        DEFLATED_FFILL: carry the last non-NaN state forward scaled by λ, so a long gap decays
+            towards zero rather than holding a stale level indefinitely
+        ZERO_FILL: substitute zero. Needed where the recursion cannot start otherwise, and the
+            usual choice for return series, where a missing return is economically zero
+        NAN_FILL: run the recursion with ZERO_FILL, then put NaN back at the gaps, so the output
+            flags where the input was missing. Equivalent to DEFLATED_FFILL for the non-NaN
+            values that follow
     """
     FFILL = 1   # use last nonnan value
     DEFLATED_FFILL = 2  #  use last nonnan value * lambda
@@ -35,6 +48,22 @@ class InitType(Enum):
 
 
 class MeanAdjType(Enum):
+    """
+    which mean is subtracted before an EWM second moment is computed.
+
+    The choice sets whether the estimate is a variance or a second moment about zero, and
+    whether it uses information the estimation date did not have. ``INSAMPLE`` subtracts the
+    full-sample mean and is therefore forward-looking: correct for a descriptive exhibit,
+    wrong inside a backtest.
+
+    Attributes:
+        NONE: subtract nothing. The second moment about zero, which is the convention for
+            return volatility where the mean is small relative to the standard deviation
+        INSAMPLE: subtract the full-sample mean. Uses the whole sample at every date, so it is
+            forward-looking and belongs only in descriptive output
+        EXPANDING: subtract the expanding mean up to each date. Point-in-time
+        EWMA: subtract the EWM mean at the same span. Point-in-time, and tracks a drifting mean
+    """
     NONE = 1
     INSAMPLE = 2
     EXPANDING = 3

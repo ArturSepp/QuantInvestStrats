@@ -83,7 +83,48 @@ def plot_prices(prices: Union[pd.DataFrame, pd.Series],
                 ax: plt.Subplot = None,
                 **kwargs
                 ) -> plt.Figure:
+    """
+    plot price or NAV series with performance statistics in the legend.
 
+    The legend is the point of this plot: each series is labelled with the statistics in
+    ``perf_stats_labels`` computed over the plotted window, so the chart and the numbers cannot
+    disagree. Series are rebased so that levels are comparable across instruments.
+
+    Arguments shared with every ``plot_*`` function — ``ax``, ``title``, ``var_format``,
+    ``x_date_freq``, ``fontsize``, ``colors`` and the rest — are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        prices: price or NAV levels indexed by date, one column per instrument. A Series is
+            promoted to a one-column frame
+        perf_stats_labels: statistics to append to each legend entry, computed on the plotted
+            window. None labels with the column name alone
+        perf_params: annualisation, frequency and rate conventions for those statistics.
+            None uses the defaults of :class:`PerfParams`
+        regime_benchmark: column name whose returns classify the regime shading. None draws
+            no shading
+        pivot_prices: benchmark levels for the regime classification when the benchmark is not
+            one of the plotted columns
+        regime_classifier: how the benchmark return is mapped to a regime
+        var_format: format for the price levels in the legend
+        digits_to_show: significant digits for the performance statistics
+        sharpe_format: format for Sharpe ratios, which conventionally carry more digits than
+            the other statistics
+        x_date_freq: tick frequency on the date axis
+        trend_line: trend line drawn through each series
+        is_log: plot the vertical axis on a log scale, so that equal vertical distances are
+            equal relative moves
+        resample_freq: resample the prices before plotting, forward-filling. None plots at the
+            input frequency
+        start_to_one: rebase every series to 1.0 at its first observation
+        end_to_one: rebase every series to 1.0 at its last observation instead, which compares
+            the paths that led to the same endpoint. Takes precedence over ``start_to_one``
+        title: axis title
+        ax: axis to draw on; None creates a figure
+
+    Returns:
+        the figure drawn on, whether or not ``ax`` was supplied
+    """
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
 
@@ -146,7 +187,42 @@ def plot_prices_with_dd(prices: Union[pd.DataFrame, pd.Series],
                         axs: List[plt.Subplot] = None,
                         **kwargs
                         ) -> plt.Figure:
+    """
+    plot price series above their running drawdown, on a shared date axis.
 
+    Two stacked panels: :func:`plot_prices` on top, the running drawdown from the prior peak
+    below. The pairing is the point — a performance line alone hides the path, and the drawdown
+    panel puts the worst of it directly under the level that produced it.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``. Arguments in common with :func:`plot_prices` mean the same
+    thing here and are passed straight through.
+
+    Args:
+        prices: price or NAV levels indexed by date, one column per instrument
+        perf_stats_labels: statistics appended to each legend entry of the upper panel
+        perf_params: annualisation, frequency and rate conventions for those statistics
+        regime_benchmark: column name whose returns classify the regime shading on both panels
+        pivot_prices: benchmark levels when the benchmark is not one of the plotted columns
+        regime_classifier: how the benchmark return is mapped to a regime
+        var_format: format for the price levels in the upper legend
+        dd_format: format for the drawdown, conventionally a percentage
+        digits_to_show: significant digits for the performance statistics
+        start_to_one: rebase every series to 1.0 at its first observation
+        sharpe_format: format for Sharpe ratios
+        x_date_freq: tick frequency on the shared date axis
+        is_log: log scale on the price panel only; the drawdown panel is always linear
+        remove_xticklabels_ax1: drop the date labels from the upper panel, since the two panels
+            share an axis and one set of labels is enough
+        title: title of the price panel
+        dd_title: title of the drawdown panel
+        dd_legend_type: what the drawdown legend reports - the maximum alone, or the full
+            drawdown statistics
+        axs: the two axes to draw on, price first. None creates a two-panel figure
+
+    Returns:
+        the figure drawn on, or None when ``axs`` was supplied
+    """
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
 

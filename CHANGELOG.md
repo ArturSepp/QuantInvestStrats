@@ -26,6 +26,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   names, and every keyword it passes to a qis callable must be in that callable's signature.
   The nine examples that reach no data vendor are executed in a temporary directory. An
   optional dependency is a skip, never a failure.
+- `qis/api.py` — `CORE_API`, the documented core of the public API: 103 symbols grouped by
+  capability. Nothing is un-exported; the module records which exports the documentation
+  promises to describe. The boundary is measured — a symbol is core when a package that depends
+  on qis, or qis's own examples, README or docs, calls it — plus five bootstrap symbols
+  promoted by intent. `qis/tests/test_core_api.py` enforces it: a core symbol without an
+  `Args:`/`Attributes:` block fails the suite, and the `PENDING_DOCSTRINGS` backlog is a ratchet
+  that cannot silently hide finished work.
+- `qis/docs/plotting_kwargs.md` — the keyword arguments every `plot_*` function shares (`ax`,
+  `title`, `var_format`, `x_date_freq`, `fontsize`, `colors`, `legend_loc`, `y_limits`),
+  documented once so individual plot docstrings cover only what is specific to them.
 
 ### Changed
 - **`BootstrapType.STATIONARY` blocks now wrap around the end of the sample**, as in
@@ -38,6 +48,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   monthly panels it is material.
 - `generate_bootstrapped_indices` raises with the offending value on an unhandled
   `bootstrap_type`, rather than a bare `not implemented`.
+- The API reference is split into **Core API**, grouped by capability, and **Also exported**.
+  It is still generated from `dir(qis)` at build time, so it cannot drift from the exports.
+- Docstrings with `Args:`/`Attributes:` blocks on `MeanAdjType`, `NanBackfill`,
+  `BootstrapOutput`, `plot_prices`, `plot_prices_with_dd` and `plot_time_series`; prose
+  docstrings on `PerfStat` and `LegendStats`, whose members are compositional and where a
+  per-member block would restate the names.
 
 ### Fixed
 - `unsmooth_returns_ar1_ewma`, `unsmooth_returns_glm` and `compute_ar1_unsmoothed_prices` are

@@ -32,6 +32,16 @@ class BootstrapType(Enum):
 
 
 class BootstrapOutput(Enum):
+    """
+    the shape a bootstrap function returns, which follows from the shape of its input.
+
+    Attributes:
+        SERIES_TO_DF: one input series becomes a DataFrame whose columns are the draws. Use for
+            a single series, where the samples are directly comparable side by side
+        DF_TO_LIST_ARRAYS: an input panel becomes a numba list of arrays, one per draw, each the
+            shape of the input. Use for a multi-asset panel, where a draw is itself a panel and
+            the cross-section must stay aligned within it
+    """
     SERIES_TO_DF = 1
     DF_TO_LIST_ARRAYS = 2
 

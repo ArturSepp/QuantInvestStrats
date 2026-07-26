@@ -743,6 +743,32 @@ def set_linestyles(ax: plt.Subplot,
 
 
 class LegendStats(Enum):
+    """
+    which summary statistics the legend prints beside each series name.
+
+    The members are compositional and the name reads left to right in the order the statistics
+    appear in the legend, so ``AVG_STD_LAST`` prints the mean, the standard deviation and the
+    final value in that order. Rather than restate twenty-nine names, the vocabulary:
+
+    ``AVG`` mean, ``STD`` standard deviation with ``ddof=1``, ``MEDIAN`` median, ``MAD`` median
+    absolute deviation scaled to be comparable with a standard deviation, ``SKEW`` and ``KURT``
+    the third and fourth moments, ``TSTAT`` mean over standard error, ``TOTAL`` the sum,
+    ``FIRST`` and ``LAST`` the endpoints, ``MIN`` and ``MAX`` the extremes.
+
+    Three modifiers change what the statistics are computed on:
+
+    ``NONNAN`` takes the last observed value rather than the value at the last index, which
+    differs when a series ends with gaps. ``NONZERO`` excludes zeros, for a series where zero
+    means "no position" rather than "a return of zero". ``MISSING`` prefixes the count of NaN
+    observations, which is how a ragged panel shows its own coverage in the legend. ``SCORE``
+    appends the percentile rank of the last value within its own history.
+
+    ``NONE`` prints the column name alone. Formatting of every value follows the ``var_format``
+    argument of the plotting function, so the enum chooses the statistics and not their display.
+
+    A member documented here is computed in ``get_legend_lines``, which is the single place the
+    legend text is built for every plot in the package.
+    """
     NONE = 1
     LAST = 2
     AVG = 3
