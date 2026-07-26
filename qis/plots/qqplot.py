@@ -33,6 +33,29 @@ def plot_qq(df: Union[pd.DataFrame, pd.Series],
             ax: plt.Subplot = None,
             **kwargs
             ) -> plt.Figure:
+    """
+    quantile-quantile plot of each column against the normal distribution.
+
+    The diagnostic for whether a return series is normal, and where it is not: points bending
+    away from the reference line in the lower left are the left tail being fatter than normal,
+    which is the usual finding and the reason the package reports skew and kurtosis alongside
+    volatility.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: returns, one column per series. A Series is plotted alone
+        markers: matplotlib marker style per column
+        is_drop_na: drop missing observations before ranking. False leaves them in and shifts
+            the empirical quantiles, so leave this True unless the gaps are meaningful
+        desc_table_type: descriptive statistics table drawn beside the plot; see
+            :class:`DescTableType`
+        legend_stats: summary statistics appended to each legend entry
+
+    Returns:
+        the figure drawn on
+    """
 
     if ax is None:
         fig, ax = plt.subplots()

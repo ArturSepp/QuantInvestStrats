@@ -557,6 +557,24 @@ def plot_exposures_strategy_vs_benchmark_stack(strategy_exposures: pd.DataFrame,
                                                benchmark_ticker: str = 'SAA',
                                                **kwargs
                                                ) -> None:
+    """
+    draw strategy and benchmark exposures as two stacked-area panels on a shared scale.
+
+    Side by side rather than as a difference, because the active bet is easier to read against
+    the allocation it departs from than as a signed residual. The tracking-error factsheet uses
+    this as its allocation page.
+
+    Args:
+        strategy_exposures: strategy weights over time, one column per asset or group
+        benchmark_exposures: benchmark weights on the same index and columns
+        axs: the two axes to draw on, benchmark first
+        var_format: format for the weights, a percentage by convention
+        strategy_ticker: label for the strategy panel
+        benchmark_ticker: label for the benchmark panel
+
+    Returns:
+        None; the supplied axes are drawn on
+    """
     qis.plot_stack(df=benchmark_exposures,
                    use_bar_plot=True,
                    legend_stats=qis.LegendStats.AVG_NONNAN_LAST,

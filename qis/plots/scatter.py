@@ -55,7 +55,46 @@ def plot_scatter(df: pd.DataFrame,
                  **kwargs
                  ) -> plt.Figure:
     """
-    x-y scatter of df
+    x-y scatter with a fitted relationship, optionally split by a grouping variable.
+
+    The fit is the point: a polynomial of degree ``order`` is drawn through the full sample and,
+    when ``hue`` is given, through each group separately, so the question "does the relationship
+    hold within groups" is answered by the same chart that shows the scatter.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: data to plot; ``x`` and ``y`` name its columns
+        x: column for the horizontal axis. None takes the first column
+        y: column for the vertical axis. None takes the second column
+        hue: column whose values split the sample into separately fitted groups
+        annotation_labels: text to place beside each point, in row order
+        annotation_colors: colour per annotated point
+        annotation_markers: marker per annotated point
+        annotation_color: colour used when ``annotation_colors`` is None
+        add_universe_model_label: report the full-sample fit in the legend
+        add_universe_model_prediction: draw the full-sample fitted line
+        add_universe_model_ci: shade the confidence band of the full-sample fit
+        add_hue_model_label: report each group fit in the legend. None follows whether
+            ``hue`` was given
+        ci: confidence level for the bands, as a percentage. None draws none
+        order: polynomial degree of the per-group fit. 1 is a straight line, 2 a quadratic
+        full_sample_order: polynomial degree of the full-sample fit, which need not match the
+            per-group order. None fits nothing on the full sample
+        fit_intercept: fit an intercept. False forces the line through the origin, which is
+            what a beta regression on excess returns wants
+        full_sample_color: colour of the full-sample fitted line
+        xticks: explicit tick positions on the horizontal axis
+        linewidth: width of the fitted lines
+        hue_linestyles: line style per group value, for distinguishing fits in monochrome
+        full_sample_label: legend prefix for the full-sample fit
+        add_45line: draw the y = x diagonal, for comparing two estimates of the same quantity
+        align_axis: force the two axes onto the same limits, which the 45-degree line needs
+            to be meaningful
+
+    Returns:
+        the figure drawn on, or None when ``ax`` was supplied
     """
 
     if ax is None:
@@ -294,7 +333,31 @@ def plot_classification_scatter(df: pd.DataFrame,
                                 **kwargs
                                 ) -> Optional[plt.Figure]:
     """
-    add bin classification using x_column
+    x-y scatter with the sample split into buckets of x, and a fit within each bucket.
+
+    A specialisation of :func:`plot_scatter` where the grouping variable is not a separate
+    column but ``x`` itself, bucketed. Use it to see whether the y-on-x relationship changes
+    with the level of x — a conditional beta, in other words — without having to construct the
+    classification column by hand.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: data to plot; ``x`` and ``y`` name its columns
+        x: column bucketed and used for the horizontal axis. None takes the first column
+        y: column for the vertical axis. None takes the second column
+        hue_name: name given to the generated bucket column, which appears as the legend title
+        num_buckets: split x into this many equally populated quantile buckets. None uses
+            ``bins`` instead
+        bins: explicit bucket edges in units of x, used when ``num_buckets`` is None. The
+            default cuts at -3, -1.5, 0, 1.5, 3, which suits a standardised variable
+        order: polynomial degree of the fit within each bucket
+        full_sample_order: polynomial degree of the fit across the whole sample. None fits none
+        fit_intercept: fit an intercept in each regression
+
+    Returns:
+        the figure drawn on, or None when ``ax`` was supplied
     """
     if x is None:
         if len(df.columns) == 2:

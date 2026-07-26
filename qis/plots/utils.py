@@ -95,6 +95,21 @@ def set_suptitle(fig: plt.Figure,
                  color: str = 'dodgerblue',
                  **kwargs
                  ) -> None:
+    """
+    set the figure-level title above all its axes.
+
+    Distinct from an axis title: a multi-panel factsheet page carries one suptitle naming the
+    strategy and a title on each panel naming what the panel shows.
+
+    Args:
+        fig: figure to title
+        title: the text
+        fontsize: point size, larger than the axis titles by convention
+        color: text colour
+
+    Returns:
+        None; the figure is modified in place
+    """
     fig.suptitle(title, color=color, fontsize=fontsize)
 
 

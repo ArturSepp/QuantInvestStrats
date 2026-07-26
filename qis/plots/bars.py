@@ -57,7 +57,45 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
               **kwargs
               ) -> Optional[plt.Figure]:
     """
-    plot bars
+    plot columns of a DataFrame as bars, grouped or stacked, one group per index entry.
+
+    Stacked is the default because the usual subject is a decomposition — exposures by asset
+    class, attribution by group — where the total is as interesting as the parts. Set
+    ``stacked=False`` for side-by-side comparison of series that do not sum to anything.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: values to draw, one bar group per index entry and one bar per column
+        stacked: stack the columns within each group rather than placing them side by side
+        date_format: strftime format for a DatetimeIndex on the category axis
+        add_bar_values: annotate each bar segment with its own value
+        add_top_bar_values: annotate only the topmost segment of a stacked group
+        is_top_totals: place the group total above the bar rather than inside it
+        totals: group totals to annotate. None computes the row sum, which is the total only
+            when the columns are additive; pass it explicitly when they are not
+        legend_stats: summary statistics appended to each legend entry
+        x_rotation: rotation in degrees of the category labels
+        total_rotation: rotation in degrees of the total annotations
+        skip_y_axis: draw no vertical axis, for a bar row read entirely from its labels
+        bbox_to_anchor: legend anchor passed to matplotlib, for placing the legend outside
+        annotate_totals: draw the totals at all
+        totals_offset: (x, y) offset in points of the total annotation from the bar
+        series_color: colour used when the frame has a single column and ``colors`` is None
+        legend_labels: replace the column names in the legend
+        legend_colors: legend swatch colours, when they should differ from the bar colours
+        vline_columns: positions after which to draw a vertical separator, to group categories
+        reverse_columns: reverse the column order, which reverses the stacking order
+        is_sns: draw through seaborn rather than matplotlib directly
+        alpha: bar opacity
+        x_loc_width_shift: horizontal offset of grouped bars within a category
+        add_avg_line: draw a horizontal line at the mean of the plotted values
+        is_horizontal: draw horizontal bars, which reads better with long category names
+        labels_frequency: label every nth category. None labels all of them
+
+    Returns:
+        the figure drawn on, or None when ``ax`` was supplied
     """
     if ax is None:
         fig, ax = plt.subplots()

@@ -16,7 +16,8 @@ enforced invariant rather than a convention nobody runs.
 """
 # packages
 import inspect
-from typing import Any, Dict, FrozenSet
+import re
+from typing import Any, Dict, FrozenSet, List
 import pytest
 # qis / project
 import qis
@@ -28,22 +29,19 @@ PENDING_DOCSTRINGS: FrozenSet[str] = frozenset({
     'compute_cash_fx_adjusted_returns', 'compute_ewm_covar_tensor_vol_norm_returns',
     'compute_ewm_long_short_filtered_ra_returns', 'compute_futures_fx_adjusted_returns',
     'compute_masked_covar_corr', 'covar_to_corr', 'df_abssum', 'df_abssum_negative',
-    'df_abssum_positive', 'df_boxplot_by_classification_var', 'df_boxplot_by_hue_var',
-    'df_last_row', 'df_nanmean', 'df_nanmean_clip', 'df_nanmean_positive', 'df_nanmedian',
-    'df_nansum', 'df_nansum_clip', 'df_nansum_negative', 'df_nansum_positive',
-    'df_to_equal_weight_allocation', 'df_to_long_only_allocation_sum1',
+    'df_abssum_positive', 'df_last_row', 'df_nanmean', 'df_nanmean_clip',
+    'df_nanmean_positive', 'df_nanmedian', 'df_nansum', 'df_nansum_clip', 'df_nansum_negative',
+    'df_nansum_positive', 'df_to_equal_weight_allocation', 'df_to_long_only_allocation_sum1',
     'df_to_weight_allocation_sum1', 'estimate_hf_ohlc_vol', 'estimate_rolling_ewma_covar',
     'fetch_default_report_kwargs', 'fit_multivariate_ols', 'generate_fixed_maturity_rolls',
     'generate_multi_portfolio_factsheet', 'generate_strategy_benchmark_factsheet_plt',
     'get_aligned_fx_spots', 'get_group_dict', 'get_ra_perf_columns', 'get_resource_path',
     'get_time_period', 'get_time_period_label', 'infer_annualisation_factor_from_df',
     'interpolate_infrequent_returns', 'load_df_dict_from_csv', 'load_df_from_csv',
-    'load_df_from_excel', 'load_fx_rates_data', 'np_array_to_df_columns', 'plot_bars',
-    'plot_classification_scatter', 'plot_df_table',
-    'plot_exposures_strategy_vs_benchmark_stack', 'plot_heatmap', 'plot_qq', 'plot_scatter',
+    'load_df_from_excel', 'load_fx_rates_data', 'np_array_to_df_columns',
     'save_df_dict_to_csv', 'save_df_to_csv', 'save_fig', 'save_figs_to_pdf',
-    'series_nansum_weighted', 'set_suptitle', 'split_df_by_groups', 'timer',
-    'truncate_prior_to_start', 'unsmooth_returns_ar1_ewma', 'update_kwargs',
+    'series_nansum_weighted', 'split_df_by_groups', 'timer', 'truncate_prior_to_start',
+    'unsmooth_returns_ar1_ewma', 'update_kwargs',
 })
 
 
@@ -149,3 +147,35 @@ def test_prose_documented_symbol_has_a_substantive_docstring(name: str) -> None:
     assert len(doc.splitlines()) >= 6, (
         f"qis.{name} is exempted from the Args/Attributes rule because "
         f"{PROSE_DOCUMENTED[name]}, so its prose has to carry the description")
+
+
+def _documented_argument_names(obj: Any) -> List[str]:
+    """the argument names an Args: block declares, in order."""
+    doc = inspect.getdoc(getattr(obj, 'py_func', obj)) or ''
+    block = re.search(r'^Args:\n(.*?)(?=\n[A-Z][a-z]+:\n|\Z)', doc, flags=re.S | re.M)
+    if block is None:
+        return []
+    return re.findall(r'^    (\w+):', block.group(1), flags=re.M)
+
+
+@pytest.mark.parametrize('name', sorted(set(core_api_names()) - set(PROSE_DOCUMENTED)))
+def test_documented_arguments_exist(name: str) -> None:
+    """
+    an Args: block cannot name an argument the function does not take.
+
+    The mirror of the keyword check in test_examples.py. There it is a call site naming an
+    argument that does not exist; here it is a docstring doing the same, which is worse,
+    because a reader has no way to find out except by trying it.
+    """
+    if not _documentable(name):
+        pytest.skip(f"{name} is a constant, not a callable")
+    obj = getattr(qis, name)
+    documented = _documented_argument_names(obj)
+    if len(documented) == 0:
+        pytest.skip(f"{name} has no Args: block")
+    try:
+        parameters = set(inspect.signature(getattr(obj, 'py_func', obj)).parameters)
+    except (ValueError, TypeError):
+        pytest.skip(f"{name} has no introspectable signature")
+    stray = [argument for argument in documented if argument not in parameters]
+    assert not stray, f"qis.{name} documents arguments it does not take: {stray}"

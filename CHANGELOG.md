@@ -58,9 +58,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The API reference is split into **Core API**, grouped by capability, and **Also exported**.
   It is still generated from `dir(qis)` at build time, so it cannot drift from the exports.
 - Docstrings with `Args:`/`Attributes:` blocks on `MeanAdjType`, `NanBackfill`,
-  `BootstrapOutput`, `plot_prices`, `plot_prices_with_dd` and `plot_time_series`; prose
-  docstrings on `PerfStat` and `LegendStats`, whose members are compositional and where a
-  per-member block would restate the names.
+  `BootstrapOutput` and on every plot function in the documented core: `plot_time_series`,
+  `plot_prices`, `plot_prices_with_dd`, `plot_bars`, `plot_scatter`,
+  `plot_classification_scatter`, `plot_heatmap`, `plot_qq`, `plot_df_table`,
+  `df_boxplot_by_classification_var`, `df_boxplot_by_hue_var`, `set_suptitle` and
+  `plot_exposures_strategy_vs_benchmark_stack`. Each documents only its own arguments and
+  refers to `qis/docs/plotting_kwargs.md` for the shared ones. Prose docstrings on `PerfStat`
+  and `LegendStats`, whose members are compositional and where a per-member block would restate
+  the names.
 
 ### Fixed
 - `unsmooth_returns_ar1_ewma`, `unsmooth_returns_glm` and `compute_ar1_unsmoothed_prices` are

@@ -35,7 +35,39 @@ def plot_heatmap(df: pd.DataFrame,
                  ax: plt.Subplot = None,
                  **kwargs
                  ) -> Optional[plt.Figure]:
+    """
+    draw a DataFrame as a colour-coded table.
 
+    The colour carries the magnitude and the annotation carries the number, so the panel is
+    readable both at a glance and exactly. ``vmin`` and ``vmax`` are what make several heatmaps
+    comparable: without them each panel scales its colours to its own range and two charts side
+    by side mislead.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: values to colour, drawn in the orientation of the frame
+        transpose: swap rows and columns before drawing
+        inverse: reverse the colour map, for a quantity where low is good
+        date_format: strftime format for a DatetimeIndex on either axis
+        cmap: matplotlib colour map name, or an explicit map. The default is diverging, which
+            suits a signed quantity centred near zero
+        alpha: cell opacity
+        top_x_label: place the column labels above the table rather than below
+        square: force square cells, which a correlation matrix wants
+        vline_columns: positions after which to draw a vertical separator
+        hline_rows: positions after which to draw a horizontal separator
+        vmin: value mapped to the low end of the colour scale. None takes the data minimum,
+            so panels drawn separately are not comparable unless this is set
+        vmax: value mapped to the high end of the colour scale
+        labelpad: padding in points between the axis and its label
+        annot: write the value in each cell. An array of the same shape writes those strings
+            instead, which is how a table of formatted values is drawn over unformatted colours
+
+    Returns:
+        the figure drawn on, or None when ``ax`` was supplied
+    """
     if ax is None:
         fig, ax = plt.subplots()
     else:

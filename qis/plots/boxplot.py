@@ -351,8 +351,27 @@ def df_boxplot_by_hue_var(df: Union[pd.Series, pd.DataFrame],
                           **kwargs
                           ) -> Optional[plt.Figure]:
     """
-    plot time series of data frame by melting columns
-    hue_var_name is hue index
+    box plots of a wide DataFrame melted into long form, one box per hue value.
+
+    The frame is melted so that the index becomes one variable and the columns another, and the
+    boxes then show the distribution across whichever of the two is not on the axis. The usual
+    use is a panel of asset returns melted by date, giving one box per period across assets —
+    the cross-sectional dispersion over time.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: wide frame, typically dates by instruments
+        hue_var_name: name of the melted variable that separates the boxes
+        x_index_var_name: name given to the index once melted. None uses the index name
+        y_var_name: name given to the values once melted, used as the axis label
+        is_heatmap_colors: colour the boxes along a sequential map in hue order, so that a
+            time-ordered hue reads as a gradient rather than as unrelated categories
+        hue_order: explicit order of the hue values
+
+    Returns:
+        the figure drawn on, or None when ``ax`` was supplied
     """
     box_data = dfm.melt_df_by_columns(df=df,
                                       x_index_var_name=x_index_var_name,
@@ -402,7 +421,36 @@ def df_boxplot_by_classification_var(df: pd.DataFrame,
                                      **kwargs
                                      ) -> None:
     """
-    use x as classification var and plod box plot relative to quatiles of x
+    box plots of y within quantile buckets of x.
+
+    The non-parametric counterpart to :func:`plot_classification_scatter`: instead of fitting a
+    line within each bucket of x, it shows the whole conditional distribution of y. Use it where
+    the relationship is not expected to be linear, or where the tails of the conditional
+    distribution are the subject — conditional drawdown, say, rather than conditional mean.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: data to plot
+        x: column bucketed into quantiles, and the horizontal axis
+        y: column whose conditional distribution each box describes
+        num_buckets: number of equally populated quantile buckets of x
+        x_hue_name: name given to the generated bucket column
+        hue: further column splitting each bucket into side-by-side boxes
+        hue_order: order of the hue values, left to right within a bucket
+        is_add_xlabel: label the horizontal axis with the bucket ranges
+        showfliers: draw outliers beyond the whiskers as points. Off by default, since on a
+            return panel the fliers dominate the ink
+        showmeans: mark the mean of each box
+        meanline: draw the mean as a line rather than a marker
+        medianline: draw the median as a line
+        add_xy_mean_labels: annotate each box with the mean of x and of y in that bucket
+        add_xy_med_labels: annotate each box with the medians instead
+        is_value_labels: label the buckets with their x ranges rather than their ordinals
+
+    Returns:
+        None; the supplied or created axis is drawn on
     """
     df = df.dropna()
     scatter_data, _ = dfc.add_quantile_classification(df=df, x_column=x,

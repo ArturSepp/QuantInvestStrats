@@ -59,7 +59,59 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
                   **kwargs
                   ) -> Optional[plt.Figure]:
     """
-    plot dataframe as maotplotlib table
+    render a DataFrame as a matplotlib table, with optional per-cell colouring.
+
+    A table drawn as a figure rather than as text, so it composes into a multi-panel factsheet
+    page beside the charts it summarises and exports into the same PDF. Values are formatted
+    before they arrive, so this function lays out and colours; it does not compute.
+
+    The colouring arguments are what make it more than a grid. ``heatmap_columns`` shades down a
+    column so ranks are visible without reading the numbers; ``special_rows_colors`` picks out a
+    total or a benchmark row; ``rows_edge_lines`` separates groups.
+
+    Arguments shared with every ``plot_*`` function are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        df: values to render, already formatted as strings where display matters
+        add_index_as_column: draw the index as the leading column
+        column_width: width of a data column, in the table's own units
+        row_height: height of a data row
+        first_column_width: width of the leading column, usually wider because it holds names
+        first_row_height: height of the header row. None follows ``row_height``
+        col_widths: explicit width per column, overriding ``column_width``
+        rotation_for_columns_headers: rotation in degrees of the header text
+        rotation_for_text: rotation in degrees of the cell text
+        transpose: swap rows and columns before rendering
+        index_column_name: header of the index column. The default is a space, which leaves
+            the corner cell visually empty without collapsing it
+        header_color: fill colour of the header row
+        header_text_color: text colour of the header row
+        row_colors: colours cycled down the data rows, giving the banded look
+        edge_color: colour of the cell borders
+        bbox: (x0, y0, width, height) of the table within the axis, in axis coordinates
+        header_column_id: index of the column treated as a header
+        header_row_id: index of the row treated as a header
+        left_aligned_first_col: left-align the leading column, which reads better for names
+        heatmap_columns: positions of columns to colour by value down the column
+        heatmap_rows: positions of rows to colour by value across the row
+        heatmap_rows_columns: (rows, columns) block coloured on its own joint scale
+        cmap: colour map for the heatmap regions
+        special_rows_colors: (position, colour) pairs overriding the banding for a row
+        special_columns_colors: (position, colour) pairs overriding the banding for a column
+        data_colors: explicit colour per cell, same shape as the data
+        diagonal_color: fill for the leading diagonal, for a correlation or transition matrix
+        rows_edge_lines: positions after which to draw a horizontal separator
+        rows_edge_color: colour of those separators
+        columns_edge_lines: positions after which to draw a vertical separator
+        bold_font: render all text bold
+        linewidth: width of the cell borders
+        alpha: cell opacity
+        emply_column_names: blank the header text while keeping the header row, for a table
+            whose columns are labelled by an adjacent panel
+
+    Returns:
+        the figure drawn on, or None when ``ax`` was supplied or ``df`` is empty
     """
     if df.empty:
         warnings.warn('df is empty: no data to plot')
