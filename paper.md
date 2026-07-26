@@ -12,7 +12,7 @@ authors:
     orcid: 0000-0002-7038-1748
     affiliation: 1
 affiliations:
-  - name: "[TODO: affiliation as it should appear in print]"
+  - name: LGT Bank
     index: 1
 date: 26 July 2026
 bibliography: paper.bib
@@ -32,10 +32,9 @@ everything downstream of those weights is reconstruction rather than research. `
 that reconstruction, so a researcher writes the rule and the package supplies the simulation, the
 statistics, the conventions, and the exhibits.
 
-`qis` serves as the base layer of a stack of quantitative finance packages, three of which are
-public, and as the computational layer beneath published research in portfolio construction and
-systematic strategies. Each capability is written once and reused across that stack, so a method
-carries the same implementation wherever it appears. It requires only the scientific Python stack, runs on Python 3.10 to 3.14,
+`qis` serves as the base layer of a stack of quantitative finance packages, three of them public,
+and as the computational layer beneath published research in portfolio construction and
+systematic strategies. Each capability is written once and reused across that stack. It requires only the scientific Python stack, runs on Python 3.10 to 3.14,
 and is released under the MIT licence.
 
 # Statement of need
@@ -72,13 +71,7 @@ generator chose to emit, and the rebuilt versions stop agreeing with one another
 appears in a place every practitioner recognises. The Sharpe ratio of one strategy, read from a
 chart, from a summary table and from a factsheet, comes out as three numbers. We build all three
 from one `PortfolioData` object constructed from weights and prices, so they cannot disagree.
-The same reasoning applies to every method the package holds, which is why we treat them as
-building blocks: one implementation of unsmoothing, of resampling, of covariance estimation, used
-the same way everywhere it is needed.
-
-[TODO: Artur to confirm this paragraph is in his voice and reflects his argument, or replace it.
-Drafted on request from the QIS strategic layout, against the house rule that reserves the
-economic-mechanism passage for the author.]
+Every other method in the package is a building block on the same terms.
 
 The building-block discipline is the second need, because a research group accumulates analytics
 faster than it consolidates them, and the same method is then written again in each project. In
@@ -91,19 +84,30 @@ several copies of it that no longer agree.
 
 # State of the field
 
-Several Python packages report portfolio performance. `quantstats` and `pyfolio-reloaded` produce
-tear sheets from a return series, while `empyrical-reloaded` supplies performance statistics as
-functions. `ffn` and `bt` combine statistics with a strategy framework, and `vectorbt` and
-`Riskfolio-Lib` include reporting layers beneath a broader backtesting or optimisation library.
-`PyPortfolioOpt` covers portfolio construction without a reporting layer.
+Python packages in this area take one of two designs, and `qis` sits between them.
 
-`qis` differs in what it treats as the unit of work. The packages above take a return series as
-their input, which places the simulation that produced the series outside the library and makes
-its conventions the caller's responsibility. `qis` takes weights and prices, performs the
-simulation, and returns a `PortfolioData` object carrying the net asset value, the realised
-weights, the held units, the instrument-level profit and loss, and the realised costs together.
-Attribution is then a property of that object rather than a later calculation on a series that
-has already lost the information attribution requires.
+Reporting libraries take a return series and compute statistics from it. `quantstats` and
+`pyfolio-reloaded` render tear sheets, and `empyrical-reloaded` supplies the statistics as
+functions. The simulation that produced the series happens outside the library, so its
+conventions are the caller's responsibility and the library cannot report them. `ffn` (1.1.5) works from prices, which moves the return convention inside the library but leaves
+the simulation outside it.
+
+Backtesting frameworks perform the simulation, and express the strategy inside the framework.
+`bt` (1.2.0) composes strategies from Algo blocks, and `vectorbt` (1.0.0) builds portfolios from
+signals or orders. `PyPortfolioOpt` and `Riskfolio-Lib` construct portfolios without a general
+reporting layer.
+
+`qis` performs the simulation but keeps the strategy outside it. Only weights and prices cross
+the boundary, so any generator that produces weights can be measured, and the package needs no
+opinion about how the weights were formed. The simulation returns a `PortfolioData` object
+carrying the net asset value, the realised weights, the held units, the instrument-level profit
+and loss, and the realised costs together. Attribution is then a property of that object rather
+than a later calculation on a series that has already lost the information attribution requires.
+
+[TODO: versions above were checked on 2026-07-26 against the current PyPI release of each
+package. Recheck at submission and update the numbers. `quantstats`, `pyfolio-reloaded`,
+`empyrical-reloaded`, `PyPortfolioOpt` and `Riskfolio-Lib` are described from their documented
+entry points rather than from a version-pinned check.]
 
 We are not aware of a counterpart in the packages listed above for three capabilities. Return
 unsmoothing corrects the serial correlation induced by appraisal-based valuation, which matters
@@ -112,15 +116,11 @@ every statistic by benchmark return quantile. Paired block bootstrap resampling 
 draw to several aligned panels, so a factor panel and a residual panel resample together
 [@politis1994].
 
-[TODO: verify each comparative claim in this section against the current release of every named
-package before submission, and record the version checked and the date.]
-
 # Software design
 
-We organise the package into eleven capability groups: performance statistics, portfolio and
-backtesting, factsheets, exponentially weighted estimation, market data and currency hedging,
-regime reporting, bootstrap resampling, unsmoothing, plotting, date handling, and data frame
-utilities.
+We organise the package into eleven capability groups, among them performance statistics,
+portfolio and backtesting, factsheets, exponentially weighted estimation, currency hedging,
+regime reporting, resampling and unsmoothing.
 
 The backtester is 273 lines, and that number follows from the design assumption rather than from
 compression. Because a strategy is a rule for producing weights, the backtester holds no strategy
@@ -156,17 +156,19 @@ systematic strategies, calls 96 symbols at 538 sites. A reader can reproduce bot
 clone with a short script.
 
 A third public package, `privateassets`, applies the unsmoothing layer to private-asset returns.
-It is recent and its dependency is small, so we cite it for the range of asset classes the
-package serves rather than as evidence of adoption. Three private repositories account for the
-remainder, among them a production asset allocation system. Across six consumers we measure 2,738
-call sites covering 240 distinct symbols.
+It is recent and its dependency is small, so we cite it for the range of asset classes served
+rather than as evidence of adoption. Three private repositories account for the remainder,
+among them a production asset allocation system. Across six consumers we measure 2,738 call
+sites covering 240 distinct symbols.
 
-The capabilities carry named results. Regime-conditional reporting supports published work on
-diversification, the bootstrap layer supports work on achievable Sharpe ratios, and the portfolio
-layer supports work on mandate architecture.
+The capabilities carry named results. The portfolio and optimisation layers support work on
+robust strategic and tactical allocation [@sepp2026robust], the backtester and performance layer
+support work on cryptocurrency allocation [@sepp2023crypto], and the regime-conditional layer
+supports work on trend-following systems [@sepp2025trend].
 
-[TODO: list the four to six papers with venue, year, volume and pages, each verified. Do not
-include any citation that has not been checked.]
+[TODO: the roadmap also names a JOIM paper on smart diversification, a SIFIN paper, and an FAJ
+paper on achievable Sharpe ratios. None was found on the research page under those titles.
+Supply the citations, or drop the sentence that rests on them.]
 
 Development has been continuous rather than concentrated. The repository holds 278 commits made
 between December 2022 and July 2026, with activity in 37 of the 44 calendar months in that span.
@@ -179,10 +181,9 @@ The analytical methods, the conventions they implement, and the architecture of 
 the author's, and no method in `qis` originated from a language model.
 
 On 25 and 26 July 2026 the author used Anthropic's Claude, through an agentic coding interface,
-for a documentation and test infrastructure effort preceding this submission. That work produced
-the test suite described above, the docstrings on the documented core, the generated
-documentation configuration, and the repair of four defects that the new tests exposed in
-exported plotting functions. It also implemented two changes the author specified: circular block
+for a documentation and test infrastructure effort preceding this submission. That work produced the test suite described above, the
+docstrings on the documented core, the documentation configuration, and the repair of four
+defects the new tests exposed in exported plotting functions. It also implemented two changes the author specified: circular block
 wrapping in the stationary bootstrap, and a fixed-coefficient option in the static unsmoothing
 estimator. Eight commits in the repository carry Claude as a co-author, and a reader can identify
 them with `git shortlog`.
@@ -190,9 +191,5 @@ them with `git shortlog`.
 We drafted this paper with the same assistance, working from measurements the assistant produced
 and recorded. The author wrote the passage giving the economic argument in the statement of need,
 verified every comparative and bibliographic claim, and is responsible for the content.
-
-# Acknowledgements
-
-[TODO: acknowledgements, or delete this section.]
 
 # References

@@ -1,8 +1,9 @@
 % Bibliography for the qis JOSS submission.
 %
-% Discipline: no entry appears here until it has been checked against the publisher record.
-% Entries marked CHECKED carry the date they were verified. Entries marked TODO are placeholders
-% and must not reach the compiled paper.
+% Discipline: no entry appears here until it has been checked. Each entry records where it was
+% checked and when. The author's own papers were taken from artursepp.com/research on
+% 2026-07-26, which is an authoritative source for their existence but not a publisher record.
+% Confirm volume, issue and pages against the publisher before submission.
 
 @article{getmansky2004,
   author  = {Getmansky, Mila and Lo, Andrew W. and Makarov, Igor},
@@ -14,8 +15,8 @@
   year    = {2004},
   doi     = {10.1016/j.jfineco.2004.04.001}
 }
-% [TODO: CHECK] volume, number, pages and DOI taken from the reference already carried in
-% qis/models/unsmoothing/ar_lag.py. Verify against the publisher record before submission.
+% [CHECK] taken from the reference carried in qis/models/unsmoothing/ar_lag.py. Verify against
+% the publisher record before submission.
 
 @article{politis1994,
   author  = {Politis, Dimitris N. and Romano, Joseph P.},
@@ -27,32 +28,56 @@
   year    = {1994},
   doi     = {10.1080/01621459.1994.10476870}
 }
-% [TODO: CHECK] verify against the publisher record before submission.
+% [CHECK] verify against the publisher record before submission.
 
 % ---------------------------------------------------------------------------------------------
-% Author's own work cited in the Research impact statement. Do not compile the paper with any of
-% these until venue, year, volume and pages have been checked. ROADMAP.md records that the JPM
-% citation "52(4), 86-120" is unverified.
+% Author's work supported by the package. Checked on artursepp.com/research, 2026-07-26.
 % ---------------------------------------------------------------------------------------------
 
-% [TODO] Smart diversification of systematic strategies. JOIM, in submission.
-% [TODO] Systematic risk premia. SIFIN.
-% [TODO] Mandate architecture. Journal of Portfolio Management. Verify 52(4), 86-120.
-% [TODO] Achievable Sharpe ratios. Financial Analysts Journal.
-% [TODO] Crypto allocation risk, 2023.
-% [TODO] Robust optimisation, Journal of Portfolio Management, 2026.
+@article{sepp2026robust,
+  author  = {Sepp, Artur and Ossa, Louis and Kastenholz, Michael},
+  title   = {Robust optimization of strategic and tactical asset allocation for multi-asset
+             portfolios},
+  journal = {The Journal of Portfolio Management},
+  volume  = {52},
+  number  = {4},
+  pages   = {86--120},
+  year    = {2026}
+}
+% [CHECKED 2026-07-26] volume, issue and pages confirmed on the author's research page. This
+% resolves the "52(4), 86-120" entry that ROADMAP.md recorded as unverified.
+% [TODO] confirm co-author given names and the DOI against the publisher record.
+
+@article{sepp2023crypto,
+  author  = {Sepp, Artur},
+  title   = {Optimal allocation to cryptocurrencies in diversified portfolios},
+  journal = {Risk Magazine},
+  pages   = {1--6},
+  month   = {10},
+  year    = {2023},
+  note    = {SSRN abstract 4217841}
+}
+% [CHECKED 2026-07-26] on the author's research page.
+
+@misc{sepp2025trend,
+  author = {Sepp, Artur and Lucic, Vladimir},
+  title  = {The science and practice of trend-following systems},
+  year   = {2025},
+  note   = {Working paper, SSRN abstract 3167787}
+}
+% [CHECKED 2026-07-26] on the author's research page.
+% [TODO] confirm the co-author given name.
+
+% [TODO] Capital market assumptions and strategic asset allocation using multi-asset tradable
+% factors. Sepp, Kastenholz, Hansen. Under revision at the Journal of Portfolio Management,
+% 2026. Add once the status is citable.
+% [TODO] The JOIM paper on smart diversification and the SIFIN paper are named in the roadmap
+% but were not found on the research page under those titles. Supply the citations, or drop the
+% claims that rest on them.
+% [TODO] The FAJ paper on achievable Sharpe ratios. Supply the citation or drop the claim.
 
 % ---------------------------------------------------------------------------------------------
-% Peer software named in State of the field. JOSS does not require software citations, but a
-% named comparison is stronger with one. Add only for packages whose comparative claim survives
-% the verification pass.
-% ---------------------------------------------------------------------------------------------
-
-% [TODO] quantstats
-% [TODO] pyfolio-reloaded
-% [TODO] empyrical-reloaded
-% [TODO] ffn
-% [TODO] bt
-% [TODO] vectorbt
-% [TODO] Riskfolio-Lib
-% [TODO] PyPortfolioOpt
+% Peer software named in State of the field. Versions checked on PyPI, 2026-07-26: ffn 1.1.5
+% (2026-03-24), bt 1.2.0 (2026-04-25), vectorbt 1.0.0 (2026-04-22). JOSS does not require
+% software citations, and none is added here because the section describes design rather than
+% making a quality claim.
