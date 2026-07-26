@@ -29,12 +29,45 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              ticker: str = 'Portfolio'  # default ticker
                              ) -> PortfolioData:
     """
-    simulate portfolio given prices and weights
-    include_start_date if index rebalanced at start date
-    the safest weight is to pass weights as Dict or pd.Dataframe - this enforces the alignment with prices
-    does not rebalancing_freq when dates are pd.DataFrame
-    funding_rate is funding rate on cash annualised
-    management_fee is man fee on strategy nav annualised
+    simulate a rebalanced portfolio from prices and target weights.
+
+    The simulation holds units, not weights: target weights are converted to units at each
+    rebalancing and held until the next one, so the realised weights drift with prices in
+    between and reported turnover is the turnover actually traded. ``PortfolioData.weights``
+    returns those realised weights, not the targets.
+
+    Args:
+        prices: instrument prices, columns are tickers. Costs, carry and fees are applied on
+            this grid
+        weights: target weights. A Dict or pd.DataFrame is safest, since both are aligned to
+            ``prices.columns`` by name; a list or array is positional and must match the
+            column count. A fixed weight vector is applied at every date in
+            ``rebalancing_freq``; a pd.DataFrame supplies its own rebalancing dates and
+            ``rebalancing_freq`` is then ignored
+        rebalancing_freq: calendar anchor for rebalancing when ``weights`` is a fixed vector,
+            passed to :func:`generate_rebalancing_indicators`
+        initial_nav: starting nav
+        funding_rate: annualised rate applied to positive and negative cash balances
+        management_fee: annualised fee accrued on nav
+        instruments_carry: per-instrument carry, expressed on nav
+        rebalancing_costs: annualised proportional cost in bp, one figure for all instruments
+            or a series per instrument
+        weight_implementation_lag: days between a weight being observed and traded. Applies
+            only when ``weights`` is a pd.DataFrame, since a fixed vector has no signal date
+        constant_trade_level: size each rebalancing off this notional rather than off current
+            nav, so trade size does not compound with performance
+        is_rebalanced_at_first_date: rebalance on the first price date as well as on the
+            schedule
+        ticker: name carried on the resulting portfolio
+
+    Returns:
+        PortfolioData holding the nav, realised weights, units, instrument pnl and realised
+        costs
+
+    Raises:
+        ValueError: if ``prices`` is not a pd.DataFrame, if a weight vector does not match the
+            number of price columns, or if the price history starts after the weights do
+        NotImplementedError: if ``weights`` is of an unsupported type
     """
     if not isinstance(prices, pd.DataFrame):
         raise ValueError(f"prices type={type(prices)} must be pd.Dataframe")
@@ -140,6 +173,34 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
                                   constant_trade_level: float = None,
                                   rebalancing_costs: Union[float, np.ndarray] = None  # proportional rebalancing costs
                                   ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    path-dependent portfolio simulation kernel.
+
+    The numba layer under :func:`backtest_model_portfolio`. Between rebalancings it holds
+    units fixed and lets nav follow prices, so the effective weights it returns are those
+    implied by the held units rather than the targets. This is a genuine recursion — each
+    step depends on the previous nav and cash balance — which is why it is not vectorized.
+
+    Args:
+        prices: price panel, shape (t, n), time along the first axis
+        weights: target weights, shape (num_rebalancings, n), one row consumed per True in
+            ``is_rebalancing``
+        is_rebalancing: boolean flag per date, shape (t,)
+        funding_rate_dt: per-period funding rate on the cash balance, shape (t,); zeros when
+            None
+        management_fee_dt: per-period fee on nav, shape (t,); zeros when None
+        instruments_carry_dt: per-period carry per instrument, shape (t, n)
+        initial_nav: starting nav
+        constant_trade_level: size trades off this notional instead of current nav
+        rebalancing_costs: proportional cost, one figure or one per instrument
+
+    Returns:
+        (nav, units, effective_weights, realized_costs)
+
+    Raises:
+        ValueError: if ``prices`` and ``is_rebalancing`` disagree on length, or if ``weights``
+            and ``prices`` disagree on the number of instruments
+    """
     if prices.shape[0] != is_rebalancing.shape[0]:
         raise ValueError(f"prices.shape[0] != is_rebalancing.shape[0]")
     if weights.shape[1] != prices.shape[1]:

@@ -314,8 +314,25 @@ def compute_ewm_covar(a: np.ndarray,
                       nan_backfill: NanBackfill = NanBackfill.FFILL
                       ) -> np.ndarray:
     """
-    compute ewm covariance matrix
-    b is optional, when given the covar is cross product a and b
+    exponentially weighted covariance matrix at the final observation.
+
+    Runs ``S_t = (1 - lambda) x_t x_t' + lambda S_{t-1}`` over the sample and returns the last
+    state, not the path; use :func:`compute_ewm_covar_tensor` for the time series of matrices.
+
+    Args:
+        a: observations, shape (t, n) or (n,) for a single cross-section
+        b: second panel of the same shape. When given, the result is the cross-covariance of
+            ``a`` with ``b`` and is not symmetric
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        ewm_lambda: decay in [0, 1); ignored when ``span`` is given
+        covar0: seed matrix, shape (n, n); non-finite entries are treated as zero. Zeros when
+            None
+        is_corr: normalise the result to a correlation matrix
+        nan_backfill: how a missing observation is carried — hold the previous matrix, or
+            hold it decayed by ``ewm_lambda``
+
+    Returns:
+        covariance matrix, shape (n, n)
     """
     if b is None:
         b = a
@@ -733,8 +750,34 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     nan_backfill: NanBackfill = NanBackfill.FFILL
                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
-    implementation of ewm recursion for variance/volatility computation
-    vol_floor_quantile_roll_period will replace ewma estimate with quantile vol if vol < quantile vol
+    exponentially weighted volatility, or variance when ``apply_sqrt`` is False.
+
+    Runs the EWM recursion on squared observations: ``v_t = (1 - lambda) x_t^2 + lambda
+    v_{t-1}``. Whether the result is a volatility per period or per annum depends on
+    ``annualize``, and the annualisation factor is inferred from the index frequency for
+    pandas input.
+
+    Args:
+        data: observations, time along the first axis
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        ewm_lambda: decay in [0, 1); ignored when ``span`` is given
+        mean_adj_type: how the mean is removed before squaring. NONE treats the data as
+            already centred, which is the usual choice for returns
+        init_type: how the recursion is seeded when ``init_value`` is None
+        init_value: explicit seed for the variance recursion
+        apply_sqrt: return volatility rather than variance
+        annualize: scale to annual terms
+        annualization_factor: periods per year; inferred from the index for pandas input,
+            and defaults to 1 with a warning for a bare ndarray
+        vol_floor_quantile: floor the estimate at this rolling quantile of itself, so a quiet
+            sample does not produce a vol that collapses toward zero. 0.16 is a usual choice
+        vol_floor_quantile_roll_period: lookback for that quantile, in periods
+        warmup_period: number of leading observations set to nan, so an estimate is not
+            reported before the recursion has data
+        nan_backfill: how the recursion carries over missing observations
+
+    Returns:
+        volatility or variance, same container and shape as ``data``
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 
