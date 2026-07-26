@@ -444,7 +444,25 @@ def compute_ewm_covar_tensor(a: np.ndarray,
                              nan_backfill: NanBackfill = NanBackfill.FFILL
                              ) -> np.ndarray:
     """
-    compute ewm covariance matrix time series as 3-d tensor [t, x, x]
+    exponentially weighted covariance matrix at every date, as a 3-d tensor.
+
+    The path version of :func:`compute_ewm_covar`: same recursion, but every intermediate
+    state is kept rather than only the last. Memory is t * n * n floats, so this is for
+    rolling risk attribution over a modest universe, not for a wide panel.
+
+    Args:
+        a: observations, shape (t, n); 1-d input is rejected
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        ewm_lambda: decay in [0, 1); ignored when ``span`` is given
+        covar0: seed matrix, shape (n, n); zeros when None
+        is_corr: normalise each matrix to a correlation matrix
+        nan_backfill: how a missing observation is carried
+
+    Returns:
+        covariance tensor, shape (t, n, n), one matrix per observation date
+
+    Raises:
+        ValueError: if ``a`` is not 2-d
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)

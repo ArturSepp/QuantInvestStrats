@@ -35,10 +35,27 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
                        **kwargs
                        ) -> pd.DataFrame:
     """
-    data corresponds to matrix of returns with index = time and columns = tickers
-    data can contain nan in columns
-    output is index = tickers, columns = descriptive data
-    data converted to str
+    descriptive statistics per column, formatted for display.
+
+    Transposes the panel: the input is time by ticker, the output is ticker by statistic.
+    Values are returned as formatted strings, not numbers, because this feeds the table
+    renderer directly — use the underlying statistic functions if the numbers are wanted.
+    Columns may contain nans; statistics are computed on the available observations.
+
+    Args:
+        df: returns panel, index is time and columns are tickers; a Series is treated as one
+            column named after it
+        desc_table_type: which set of statistics to report
+        var_format: format applied to the statistics
+        annualize_vol: report volatility per annum rather than per period
+        is_add_tstat: add the t-statistic of the mean
+        norm_variable_display_type: format applied to the t-statistic
+
+    Returns:
+        table indexed by ticker, one column per statistic, values as strings
+
+    Raises:
+        TypeError: if ``df`` is neither pd.DataFrame nor pd.Series
     """
     if isinstance(df, pd.DataFrame):
         descriptive_table = pd.DataFrame(index=df.columns)

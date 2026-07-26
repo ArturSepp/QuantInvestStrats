@@ -12,6 +12,21 @@ from qis.utils.generic import ColVar, ValueType
 
 
 class ReturnTypes(Enum):
+    """
+    how a price series is converted to a return.
+
+    The choice is stated rather than assumed: log and arithmetic returns aggregate differently
+    across time and across assets, and the difference is not a rescaling. Functions taking
+    ``is_log_returns`` map onto LOG and RELATIVE.
+
+    Attributes:
+        RELATIVE: arithmetic return, S1 / S0 - 1; additive across assets within a period
+        LOG: log return, ln(S1 / S0); additive across periods for one asset
+        DIFFERENCE: absolute change, S1 - S0; for series already in rate or spread space,
+            where a ratio is meaningless
+        LEVEL: the end-of-period level itself, S1
+        LEVEL0: the start-of-period level, S0
+    """
     RELATIVE = 'Relative'  # =S1/S0-1
     LOG = 'Log'  # =ln(S1/S0)
     DIFFERENCE = 'Diff'  # =S1-S0
@@ -26,6 +41,18 @@ class RegimeType(Enum):
 
 
 class RegimeData(Enum):
+    """
+    which statistic a regime-conditional table reports.
+
+    Selects the panel produced by :func:`compute_regimes_pa_perf_table` and rendered by
+    :func:`plot_regime_data`.
+
+    Attributes:
+        REGIME_AVG: average return within each regime, on the sampling frequency
+        REGIME_PA: return annualised within each regime
+        REGIME_SHARPE: Sharpe ratio within each regime; the convention is the one carried on
+            PerfParams, see ``qis/docs/sharpe_conventions.md``
+    """
     REGIME_AVG = 'Average'
     REGIME_PA = 'P.a.'
     REGIME_SHARPE = '-Sharpe'

@@ -107,29 +107,32 @@ def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfo
     annualisation consistently, via fetch_default_report_kwargs; long vs short horizon is selected
     automatically from the reporting span against long_threshold_years.
 
-    Parameters
-    ----------
-    data : prices/returns, PortfolioData, or MultiPortfolioData (drives archetype selection)
-    benchmark_prices : reference price(s); required for the strategy (PortfolioData) report
-    benchmark : reference column name (multi-asset path); defaults to the first column of `data`
-    reporting_frequency : 'daily'/'weekly'/'monthly'/'quarterly' or a ReportingFrequency
-    time_period : reporting span; defaults to the full history of `data`
-    kind : force an archetype identifier (see above); None auto-detects
-    data_is_returns : if True, `data` (and benchmark_prices) are returns and are compounded to NAVs
-    long_threshold_years : span >= this uses the long-horizon preset, else short
-    file_name, local_path : if file_name is given, the report is written to a PDF and its path
-        is returned; otherwise the list of figures is returned
-    factsheet_name : optional report title (mapped to backtest_name for the multi-portfolio reports)
-    **kwargs : forwarded to the underlying generator (caller values override the preset)
+    This is additive: the underlying ``generate_*_factsheet`` functions are unchanged and remain
+    the full-control API.
 
-    Returns
-    -------
-    str (PDF path) if file_name is given, else List[matplotlib.figure.Figure]
+    Args:
+        data: prices or returns, PortfolioData, or MultiPortfolioData; drives archetype
+            selection
+        benchmark_prices: reference prices; required for the strategy (PortfolioData) report
+        benchmark: reference column name on the multi-asset path; defaults to the first column
+            of ``data``
+        reporting_frequency: 'daily', 'weekly', 'monthly', 'quarterly', or a ReportingFrequency
+        time_period: reporting span; defaults to the full history of ``data``
+        kind: force an archetype identifier; None auto-detects from the type of ``data``
+        data_is_returns: treat ``data`` and ``benchmark_prices`` as returns and compound them
+            to navs
+        long_threshold_years: spans of at least this length use the long-horizon preset
+        add_rates_data: download the risk-free rate for the excess-return statistics; needs the
+            [data] extra
+        file_name: write the report to a PDF of this name and return its path; without it the
+            figures are returned
+        local_path: directory for the PDF; ignored when ``file_name`` is None
+        factsheet_name: report title, mapped to ``backtest_name`` for the multi-portfolio
+            reports
+        **kwargs: forwarded to the underlying generator; caller values override the preset
 
-    Notes
-    -----
-    Additive wrapper - the underlying generate_*_factsheet functions are unchanged and remain the
-    full-control API.
+    Returns:
+        the PDF path when ``file_name`` is given, otherwise the list of figures
     """
     import qis as qis
     from qis import PortfolioData, MultiPortfolioData
