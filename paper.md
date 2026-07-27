@@ -112,7 +112,7 @@ entry points rather than from a version-pinned check.]
 We are not aware of a counterpart in the packages listed above for three capabilities. Return
 unsmoothing corrects the serial correlation induced by appraisal-based valuation, which matters
 for private assets and hedge funds [@getmansky2004]. Regime-conditional reporting partitions
-every statistic by benchmark return quantile. Paired block bootstrap resampling applies one index
+every statistic by benchmark return quantile [@Sepp2019]. Paired block bootstrap resampling applies one index
 draw to several aligned panels, so a factor panel and a residual panel resample together
 [@politis1994].
 
@@ -164,8 +164,10 @@ sites covering 240 distinct symbols.
 The capabilities carry named results. The portfolio and optimisation layers support work on
 robust strategic and tactical allocation [@sepp2026robust], the backtester and performance layer
 support work on cryptocurrency allocation [@sepp2023crypto], and the regime-conditional layer
-supports work on trend-following systems [@sepp2025trend]. The trend-following paper is under
-submission at the SIAM Journal on Financial Mathematics.
+supports work on trend-following systems [@sepp2025trend]. The resampling layer supports work on
+capital market assumptions built from multi-asset tradable factors [@sepp2026matf]. The two
+working papers are under submission at the SIAM Journal on Financial Mathematics and at The
+Journal of Portfolio Management.
 
 Development has been continuous rather than concentrated. The repository holds 278 commits made
 between December 2022 and July 2026, with activity in 37 of the 44 calendar months in that span.
