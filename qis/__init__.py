@@ -47,3 +47,15 @@ from qis.portfolio.__init__ import *
 from qis.market_data.__init__ import *
 
 
+# the public surface, computed once here rather than inferred from ``dir(qis)`` later.
+#
+# ``dir(qis)`` is not stable: importing a submodule binds its name on the package, so
+# ``import qis.api`` makes ``dir(qis)`` one name longer than it was. Anything that counts or
+# checks the public surface has to be counting the same set every time, so the set is fixed at
+# the end of this module, where the wildcard re-exports above have finished and nothing else has
+# been imported yet. The nine subpackage names bound by those imports are included, because
+# ``from qis import *`` has always bound them and removing them would be a silent break.
+#
+# ``qis.api.PUBLIC_API`` records the same names in a diffable literal, and
+# ``qis/tests/test_core_api.py`` fails when the two disagree.
+__all__ = [_name for _name in dir() if not _name.startswith('_')]

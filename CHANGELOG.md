@@ -5,7 +5,66 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.3.0] - 2026-07-27
+
+**`qis.__all__` now exists and fixes the public surface at 403 names.** Nothing is added to or
+removed from the namespace, but `from qis import *` is now defined by an explicit list rather
+than by whatever `dir()` returned at the time, and `dir(qis)` no longer answers the question of
+what is public: importing a submodule binds its name on the package, so `dir(qis)` grew by one
+whenever a process imported `qis.api`. Anything counting the public surface should read
+`qis.__all__`.
+
+The seeded data generator moved from `qis.tests.synthetic_data` to `qis.datasets.synthetic`.
+The old path still imports the same module, so nothing breaks, but the quickstart no longer tells
+a reader to import from a `tests` namespace. Seeds, draw order and every golden pinned to the
+generator are unchanged.
+
+### Added
+- `qis.datasets`, re-exporting `generate_synthetic_universe`, `generate_synthetic_prices`,
+  `SyntheticUniverseData`, `SyntheticInstrument`, `DataQuirk`, `SYNTHETIC_UNIVERSE`,
+  `GROUP_ORDER`, `BENCHMARK_TICKER` and `BENCHMARK_WEIGHTS`. The module ships in the wheel; the
+  `qis.tests.synthetic_data` path is kept as a compatibility shim.
+- `qis.api.PUBLIC_API`, the export list as a literal, so a change to the public surface appears
+  in a diff. `tools/sync_public_api.py` regenerates it and `qis/tests/test_core_api.py` fails
+  when it disagrees with the namespace.
+- `tools/paper_audit.py` and `docs/audit/paper_numbers.json`: every number `paper.md` quotes,
+  generated rather than hand-measured. `qis/tests/test_paper_audit.py` fails when the record, the
+  repository and the manuscript disagree, and when the manuscript quotes a large number the
+  record does not know about.
+- `tools/audit_consumers.py` and `docs/audit/consumers.json`: qis usage in its public consumers
+  at pinned commits, with the counting rule stated in the script's docstring.
+- `qis/models/bootstrap/tests/test_bootstrap_convention.py`, pinning the published values of the
+  bootstrap convention example (0.110, 0.526, +2.15%, -0.32% and the rest) rather than only
+  asserting that the example exits zero, and checking that `docs/reproducibility.md` still states
+  them.
+- `qis/tests/test_documentation.py`, asserting that every repository-internal documentation link
+  resolves to a file that exists, and that the README's core dependency list is the `dependencies`
+  table of `pyproject.toml`.
+
+### Fixed
+- `qis/api.py`'s module docstring stated 386 exports, 98 core symbols, 288 non-core, 109
+  private-use and 179 uncalled, and said `market_data` had no core symbol, against a `CORE_API`
+  holding 116 symbols in 12 groups including 13 market-data and FX names. Every count is removed
+  from the prose; the generated record carries them.
+- `README.md` listed `yfinance` and `pandas-datareader` as core dependencies; both are in the
+  `[data]` extra.
+- `README.md`'s ecosystem table omitted `privateassets`, which `paper.md` names as one of the
+  three public consumers.
+- `README.md` linked to `qis/examples/performances.py` and `qis/examples/notebooks`, neither of
+  which has existed since the examples were reorganised, and embedded `perf1`, `perf2` and
+  `perf3`, which `.gitignore` excludes by name, so the front page rendered three broken images.
+  The links now point at `qis/examples/perfstats/quickstart.py` and `notebooks/`; the three
+  embeds are removed and the runner that produces them is named instead.
+- `qis/portfolio/backtester.py` had no final newline, which is why it measured 273 lines by
+  `wc -l` and 274 by every other count.
+
+### Changed
+- `paper.md`: the state-of-the-field section is a capability comparison at checked versions
+  rather than a two-class taxonomy, and adds `skfolio`. All ten rows were read from each
+  package's current documentation on 2026-07-27. The impact section quotes consumer counts at
+  pinned commits and gives no figure for private repositories; every count is taken from the
+  generated record; "cannot drift" is replaced by the invariant the tests enforce; the body is
+  1,749 words.
 
 ### Removed
 - `qis/perfstats/ra_returns.py`, an unreferenced duplicate of `qis/models/linear/ra_returns.py`.

@@ -1,12 +1,12 @@
 # Quickstart
 
-Everything on this page runs offline. `qis.tests.synthetic_data` draws a seeded ten-instrument
+Everything on this page runs offline. `qis.datasets.synthetic` draws a seeded ten-instrument
 panel, so no network, data file or vendor licence is needed to reproduce any of it.
 
 ## A panel to work with
 
 ```python
-from qis.tests.synthetic_data import generate_synthetic_universe
+from qis.datasets import generate_synthetic_universe
 
 universe = generate_synthetic_universe()
 prices = universe.prices                      # business-day panel, 10 instruments

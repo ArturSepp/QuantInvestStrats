@@ -4,7 +4,7 @@ generate and load the local etf price file used by the run_local_test entry poin
 `load_etf_data` reads a csv from RESOURCE_PATH that is not distributed with the package: it is
 produced locally by running LocalTest.FETCH_ETF_PRICES, which needs the [data] extra. Code that
 has to run for anyone — the test suite, CI, documented examples — uses
-`qis.tests.synthetic_data` instead, which needs no file, no network and no vendor licence.
+`qis.datasets.synthetic` instead, which needs no file, no network and no vendor licence.
 """
 
 # packages
@@ -34,7 +34,7 @@ def load_etf_data() -> pd.DataFrame:
     if prices is None or len(prices.index) == 0:
         raise FileNotFoundError(f"no cached etf prices under {resource_path!r}; produce them with "
                                 f"run_local_test(LocalTest.FETCH_ETF_PRICES), which needs "
-                                f"pip install qis[data], or use qis.tests.synthetic_data instead")
+                                f"pip install qis[data], or use qis.datasets.synthetic instead")
     return prices
 
 

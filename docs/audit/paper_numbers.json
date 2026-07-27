@@ -1,0 +1,139 @@
+{
+  "generated_by": "tools/paper_audit.py",
+  "measured_at_commit": "b6927dc844a20e55228cb2c7aafe1e29ce1595e7",
+  "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
+  "metrics": {
+    "active_months": {
+      "value": 37,
+      "how": "distinct YYYY-MM with at least one commit",
+      "live": false,
+      "paper_phrase": null
+    },
+    "ai_coauthored_commits": {
+      "value": 18,
+      "how": "commits carrying a Co-authored-by trailer naming Claude",
+      "live": false,
+      "paper_phrase": null
+    },
+    "ai_coauthored_first_day": {
+      "value": "2026-07-25",
+      "how": "earliest AI co-authored commit",
+      "live": false,
+      "paper_phrase": null
+    },
+    "ai_coauthored_last_day": {
+      "value": "2026-07-27",
+      "how": "latest AI co-authored commit",
+      "live": false,
+      "paper_phrase": null
+    },
+    "backtester_nonblank_lines": {
+      "value": 236,
+      "how": "nonblank lines of qis/portfolio/backtester.py",
+      "live": true,
+      "paper_phrase": null
+    },
+    "backtester_physical_lines": {
+      "value": 274,
+      "how": "physical lines of qis/portfolio/backtester.py",
+      "live": true,
+      "paper_phrase": "backtester is 274 lines"
+    },
+    "capability_groups": {
+      "value": 12,
+      "how": "len(qis.api.CORE_API)",
+      "live": true,
+      "paper_phrase": "12 capability groups"
+    },
+    "collected_tests": {
+      "value": 1069,
+      "how": "pytest --collect-only -q, summed over files, core install",
+      "live": false,
+      "paper_phrase": null
+    },
+    "commits": {
+      "value": 289,
+      "how": "git rev-list --count HEAD",
+      "live": false,
+      "paper_phrase": null
+    },
+    "consumer_optimalportfolios_call_sites": {
+      "value": 683,
+      "how": "tools/audit_consumers.py at 832a2baf4b4c",
+      "live": false,
+      "paper_phrase": "683"
+    },
+    "consumer_optimalportfolios_symbols": {
+      "value": 94,
+      "how": "tools/audit_consumers.py at 832a2baf4b4c",
+      "live": false,
+      "paper_phrase": "94"
+    },
+    "consumer_privateassets_call_sites": {
+      "value": 9,
+      "how": "tools/audit_consumers.py at f82de8fdcbda",
+      "live": false,
+      "paper_phrase": "9"
+    },
+    "consumer_privateassets_symbols": {
+      "value": 5,
+      "how": "tools/audit_consumers.py at f82de8fdcbda",
+      "live": false,
+      "paper_phrase": "5"
+    },
+    "consumer_trendfollowing_call_sites": {
+      "value": 443,
+      "how": "tools/audit_consumers.py at 107da7d49b24",
+      "live": false,
+      "paper_phrase": "443"
+    },
+    "consumer_trendfollowing_symbols": {
+      "value": 87,
+      "how": "tools/audit_consumers.py at 107da7d49b24",
+      "live": false,
+      "paper_phrase": "87"
+    },
+    "core_symbols": {
+      "value": 116,
+      "how": "len(qis.api.core_api_names())",
+      "live": true,
+      "paper_phrase": "116 symbols"
+    },
+    "exported_module_bindings": {
+      "value": 9,
+      "how": "the subpackage names the wildcard re-exports leave in the namespace",
+      "live": true,
+      "paper_phrase": null
+    },
+    "exported_symbols": {
+      "value": 403,
+      "how": "len(qis.__all__)",
+      "live": true,
+      "paper_phrase": "403"
+    },
+    "first_commit_month": {
+      "value": "2022-12",
+      "how": "git log --reverse --format=%ad --date=format:%Y-%m",
+      "live": false,
+      "paper_phrase": null
+    },
+    "last_commit_month": {
+      "value": "2026-07",
+      "how": "git log -1 --format=%ad --date=format:%Y-%m",
+      "live": false,
+      "paper_phrase": null
+    },
+    "paper_body_words": {
+      "value": 1749,
+      "how": "whitespace-separated tokens in paper.md after the YAML front matter",
+      "live": true,
+      "paper_phrase": null
+    },
+    "span_months": {
+      "value": 44,
+      "how": "calendar months from the first commit to the last, inclusive",
+      "live": false,
+      "paper_phrase": null
+    }
+  }
+}

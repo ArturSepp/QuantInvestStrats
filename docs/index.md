@@ -7,7 +7,7 @@ Install with `pip install qis`, then build a factsheet from a price panel:
 
 ```python
 import qis
-from qis.tests.synthetic_data import generate_synthetic_universe
+from qis.datasets import generate_synthetic_universe
 
 universe = generate_synthetic_universe()
 qis.factsheet(universe.prices,

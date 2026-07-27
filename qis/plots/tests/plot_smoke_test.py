@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 # qis
 import qis  # noqa: E402
-from qis.tests.synthetic_data import generate_synthetic_universe  # noqa: E402
+from qis.datasets import generate_synthetic_universe  # noqa: E402
 
 # exported plot functions that cannot be called on their documented minimal signature.
 # strict=True: when a defect is fixed the test fails until the entry is removed.

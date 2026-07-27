@@ -94,13 +94,16 @@ Core dependencies:
     matplotlib = ">=3.8.0",
     seaborn = ">=0.13.0",
     openpyxl = ">=3.1.0",
-    PyYAML = ">=6.0",
-    yfinance = ">=0.2.40",
-    pandas-datareader = ">=0.10.0"
+    PyYAML = ">=6.0"
+
+`qis/tests/test_documentation.py` asserts that this list is the `dependencies` table of
+`pyproject.toml`, so it cannot drift from what `pip install qis` actually pulls.
 
 Python 3.14 is supported (numba 0.63+ ships cp314 wheels).
 
 Optional dependencies:
+    yfinance = ">=0.2.40" and pandas-datareader = ">=0.10.0" (examples and tests that pull free
+        price data — install with `pip install qis[data]`; never imported by library code),
     pybloqs ">=1.2.13" (for producing html and pdf factsheets — install with `pip install qis[reports]`),
     bbg-fetch ">=2.0.0" (third-party; for examples that pull data from a Bloomberg terminal)
 
@@ -111,7 +114,7 @@ See `pyproject.toml` for the full list of optional extras (`reports`, `visualiza
 
 ### 1. Visualization of price data <a name="price"></a>
 
-The script is located in ```qis.examples.performances``` (https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/performances.py)
+The script is located in ```qis.examples.perfstats.quickstart``` (https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/perfstats/quickstart.py). Run it to produce the figures below; `perf1` to `perf3` are excluded from the repository by `.gitignore` on size, so only the last is embedded here.
 
 ```python 
 import matplotlib.pyplot as plt
@@ -128,14 +131,12 @@ with sns.axes_style("darkgrid"):
     fig, ax = plt.subplots(1, 1, figsize=(10, 7))
     qis.plot_prices(prices=prices, x_date_freq='YE', ax=ax)
 ```
-![image info](qis/examples/figures/perf1.PNG)
 ```python 
 # 2-axis plot with drawdowns using sns styles
 with sns.axes_style("darkgrid"):
     fig, axs = plt.subplots(2, 1, figsize=(10, 7), tight_layout=True)
     qis.plot_prices_with_dd(prices=prices, x_date_freq='YE', axs=axs)
 ```
-![image info](qis/examples/figures/perf2.PNG)
 
 ```python 
 # plot risk-adjusted performance table with excess Sharpe ratio
@@ -152,7 +153,6 @@ fig = qis.plot_ra_perf_table(prices=prices,
                              title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')}",
                              perf_params=perf_params)
 ```
-![image info](qis/examples/figures/perf3.PNG)
 
 
 
@@ -230,7 +230,7 @@ jupyter notebook
 ```
 
 Examples of using qis analytics jupyter notebooks are located here
-https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/notebooks
+https://github.com/ArturSepp/QuantInvestStrats/tree/main/notebooks
 
 
 ## Ecosystem
@@ -244,11 +244,12 @@ This package is part of an open-source Python stack for quantitative finance —
 | [`factorlasso`](https://github.com/ArturSepp/factorlasso) | Sparse factor models and factor covariance estimation |
 | [`bbg-fetch`](https://github.com/ArturSepp/BloombergFetch) | Bloomberg data fetching |
 | [`trendfollowing`](https://github.com/ArturSepp/TrendFollowingSystems) | Trend-following systems: closed-form theory and replication |
+| [`privateassets`](https://github.com/ArturSepp/privateassets) | Private-asset return unsmoothing and capital market assumptions |
 | [`goal-based-allocation`](https://github.com/ArturSepp/GoalBasedAllocation) | Dynamic MV allocation under regime-switching jump-diffusions |
 | [`stochvolmodels`](https://github.com/ArturSepp/StochVolModels) | Stochastic volatility pricing analytics |
 | [`vanilla-option-pricers`](https://github.com/ArturSepp/VanillaOptionPricers) | Vectorised vanilla option pricers and implied volatility fitters |
 
-Dependency links within the stack: `optimalportfolios` builds on `qis` and `factorlasso`; `trendfollowing` builds on `qis`.
+Dependency links within the stack: `optimalportfolios` builds on `qis` and `factorlasso`; `trendfollowing` and `privateassets` build on `qis`.
 
 ## Contributions <a name="contributions"></a>
 If you are interested in extending and improving QIS analytics, 
@@ -308,7 +309,7 @@ If you use QIS in your research, please cite it as:
   title={qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies},
   author={Sepp, Artur},
   year={2026},
-  version={5.2.1},
+  version={5.3.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

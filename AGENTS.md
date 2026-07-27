@@ -56,7 +56,8 @@ Tests live **inside** the package next to the code they cover, as
 
 ## Test data
 
-`qis/tests/synthetic_data.py` is the data source for tests, CI and any documented example.
+`qis/datasets/synthetic.py` is the data source for tests, CI and any documented example.
+`qis/tests/synthetic_data.py` is a compatibility shim for the path the 5.2 quickstart documented.
 It draws a 10-instrument multi-asset panel from a fixed seed with the defects real panels carry
 (ragged starts, missing observations, stale prices, a delisted tail, fat tails, appraisal
 smoothing, a monthly-reported sleeve). No network, no data file, no vendor licence. The module
@@ -95,6 +96,11 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
   suite on a numpydoc section heading. `factorlasso` is the one package in the stack that keeps
   numpydoc — it is sklearn-compatible and its readers arrive from a numpydoc ecosystem. That
   exception is per-package and stays per-package; do not mix the two inside `qis`.
+- **`qis.__all__` is the public surface**, fixed at the end of `qis/__init__.py`. Do not use
+  `dir(qis)` to decide what is public: importing a submodule binds its name on the package, so
+  `dir(qis)` is one name longer after `import qis.api`. `qis/api.py`'s `PUBLIC_API` records the
+  same list as a literal; regenerate it with `python tools/sync_public_api.py` when an export is
+  added or removed, or `qis/tests/test_core_api.py` fails.
 - **Everything in `qis/api.py`'s `CORE_API` must carry an `Args:`/`Attributes:` block.**
   `qis/tests/test_core_api.py` enforces it, and also that a documented argument exists in the
   signature. Arguments shared across the `plot_*` functions are documented once in
@@ -116,6 +122,22 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
 - Do not commit generated factsheets, PDFs, or figure output.
 - Do not modify `settings.yaml` or `local_path.py` to hardcode a machine-specific path.
 - Examples must run on free data (yfinance) — do not make an example require Bloomberg.
+
+## Generated records
+
+`docs/audit/` holds measurements rather than prose, and three scripts under `tools/` write them.
+Regenerate before cutting a tag, never by hand:
+
+```bash
+python tools/sync_public_api.py     # qis/api.py PUBLIC_API from the namespace
+python tools/paper_audit.py         # docs/audit/paper_numbers.json, every number paper.md quotes
+python tools/audit_consumers.py     # docs/audit/consumers.json, qis usage in public consumers
+```
+
+`tools/paper_audit.py --check` and `tools/sync_public_api.py --check` report drift without
+writing. Neither runs in CI: the consumer audit needs the network, and the git metrics move on
+every commit, so a CI check on them would fail on every push. `qis/tests/test_paper_audit.py`
+enforces the part that can be enforced offline.
 
 ## Release checklist
 

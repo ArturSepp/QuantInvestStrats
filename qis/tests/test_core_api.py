@@ -21,7 +21,7 @@ from typing import Any, Dict, FrozenSet, List
 import pytest
 # qis / project
 import qis
-from qis.api import CORE_API, core_api_names
+from qis.api import CORE_API, PUBLIC_API, core_api_names
 
 # core symbols still awaiting an Args/Attributes block. Empty: the documented core is complete,
 # and it stays complete because a new core export without a docstring fails the suite below.
@@ -170,3 +170,40 @@ def test_documented_arguments_exist(name: str) -> None:
         pytest.skip(f"{name} has no introspectable signature")
     stray = [argument for argument in documented if argument not in parameters]
     assert not stray, f"qis.{name} documents arguments it does not take: {stray}"
+
+
+def test_public_api_matches_the_namespace() -> None:
+    """
+    the recorded public surface is the surface the package actually exports.
+
+    ``PUBLIC_API`` is a literal so that adding or losing an export is a visible line in a diff
+    rather than a count that moves. It is checked against ``qis.__all__`` and not against
+    ``dir(qis)``: importing a submodule binds its name on the package, so ``dir(qis)`` is one
+    name longer inside this file than it is in a fresh process, and a check against it would
+    depend on which tests ran first.
+    """
+    recorded = set(PUBLIC_API)
+    exported = set(qis.__all__)
+    missing = sorted(exported - recorded)
+    stale = sorted(recorded - exported)
+    assert not missing and not stale, (
+        f"qis exports {missing} which PUBLIC_API does not record, and PUBLIC_API records "
+        f"{stale} which qis does not export. Run python tools/sync_public_api.py")
+
+
+def test_public_api_has_no_duplicates() -> None:
+    """the record is a set written as a tuple, so a name cannot appear twice."""
+    duplicates = sorted({name for name in PUBLIC_API if PUBLIC_API.count(name) > 1})
+    assert not duplicates, f"PUBLIC_API lists twice: {duplicates}"
+
+
+def test_core_is_a_subset_of_public() -> None:
+    """
+    the documented core is part of the public surface, not beside it.
+
+    A core symbol that is not exported would be documented and unreachable, which is the failure
+    ``test_core_api_is_exported`` catches from the other direction; this states the containment
+    between the two records rather than between a record and the namespace.
+    """
+    outside = sorted(set(core_api_names()) - set(PUBLIC_API))
+    assert not outside, f"CORE_API names symbols outside PUBLIC_API: {outside}"

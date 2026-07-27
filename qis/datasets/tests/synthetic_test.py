@@ -1,5 +1,5 @@
 """
-pytest unit tests for qis.tests.synthetic_data
+pytest unit tests for qis.datasets.synthetic
 
 These pin the properties that other tests rely on: reproducibility, the shape of the panel, and
 the presence of each declared data defect. They deliberately do not pin exact prices — the
@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 # qis
-from qis.tests.synthetic_data import (BENCHMARK_TICKER, GROUP_ORDER, SMOOTHING_AR1,
+from qis.datasets.synthetic import (BENCHMARK_TICKER, GROUP_ORDER, SMOOTHING_AR1,
                                       SYNTHETIC_UNIVERSE, DataQuirk, SyntheticInstrument,
                                       generate_synthetic_prices, generate_synthetic_universe)
 
