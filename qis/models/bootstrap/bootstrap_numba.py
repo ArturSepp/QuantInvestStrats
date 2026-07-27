@@ -8,7 +8,6 @@ from enum import Enum
 from numba import njit
 from numba.typed import List
 from typing import Union, Tuple, Dict
-from statsmodels.tsa.ar_model import AutoReg
 # qis
 import qis.utils.np_ops as npo
 import qis.perfstats.returns as ret
@@ -188,16 +187,60 @@ def get_bootstrap_ar_data_list(residuals: np.ndarray,
 
 def compute_ar_residuals(data: Union[pd.Series, pd.DataFrame]
                          ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    fit an AR(1) per column and return the residuals on complete lag pairs.
+
+    A lag pair at t is usable when every column is observed at both t and t-1. Estimating and
+    residualising on that same set is what keeps the returned arrays aligned, and what stops a
+    gap being read as a one-period step. Rows must be complete across all columns because
+    ``bootstrap_ar_process`` resamples rows jointly to preserve the cross-section.
+
+    The coefficient is the conditional maximum likelihood estimate, which for an AR(1) is
+    ordinary least squares of the series on its own lag.
+
+    Args:
+        data: observations, one column per series
+
+    Returns:
+        Tuple of (residuals, intercept, beta). ``residuals`` has one row per usable lag pair and
+        one column per series, and contains no NaN. ``intercept`` and ``beta`` have one entry
+        per series
+
+    Raises:
+        ValueError: if no column is present, or if fewer than three usable lag pairs survive,
+            below which an AR(1) is not identified
+    """
     if isinstance(data, pd.Series):
         data = data.to_frame()
-    intercept, beta = np.zeros(len(data.columns)), np.zeros(len(data.columns))
-    residuals = np.zeros((len(data.index)-1, len(data.columns)))
-    for idx, column in enumerate(data.columns):
-        ar_model = AutoReg(data[column].dropna(), lags=1).fit()
-        intercept[idx], beta[idx] = ar_model.params[0], ar_model.params[1]
-        data_np = data[column].to_numpy()
-        y, y_1 = data_np[1:], data_np[:-1]
-        residuals[:, idx] = y - (ar_model.params[1] * y_1 + ar_model.params[0])
+    if data.shape[1] == 0:
+        raise ValueError(f"data has no columns, got {data.shape}")
+
+    values = data.to_numpy(dtype=float)
+    observed = np.isfinite(values).all(axis=1)
+    # both ends of the step must be observed, so a gap removes the pair rather than joining the
+    # observations either side of it
+    usable = observed[1:] & observed[:-1]
+    num_pairs = int(usable.sum())
+    if num_pairs < 3:
+        raise ValueError(f"need at least 3 complete lag pairs to identify an AR(1), "
+                         f"got {num_pairs} from {len(data.index)} rows")
+
+    y, y_1 = values[1:][usable], values[:-1][usable]
+    num_columns = values.shape[1]
+    intercept, beta = np.zeros(num_columns), np.zeros(num_columns)
+    residuals = np.zeros((num_pairs, num_columns))
+    for idx in range(num_columns):
+        target, regressor = y[:, idx], y_1[:, idx]
+        variance = float(np.var(regressor, ddof=1))
+        if np.isclose(variance, 0.0):
+            # a constant series has no autoregression to estimate: zero beta and a mean
+            # intercept reproduce it exactly
+            beta[idx] = 0.0
+            intercept[idx] = float(np.mean(target))
+        else:
+            beta[idx] = float(np.cov(target, regressor, ddof=1)[0, 1] / variance)
+            intercept[idx] = float(np.mean(target) - beta[idx] * np.mean(regressor))
+        residuals[:, idx] = target - (intercept[idx] + beta[idx] * regressor)
     return residuals, intercept, beta
 
 
@@ -336,13 +379,24 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
 
     residuals, intercept, beta = compute_ar_residuals(data=data)
     if bootstrapped_indices is None:
-        bootstrapped_indices = generate_bootstrapped_indices(num_data_index=len(data.index),
+        # an AR(1) on n observations has n-1 residuals, and the consumer is @njit with bounds
+        # checking off, so drawing over len(data.index) reads one row past the end
+        bootstrapped_indices = generate_bootstrapped_indices(num_data_index=len(residuals),
                                                              bootstrap_type=bootstrap_type,
                                                              num_samples=num_samples,
                                                              index_length=index_length,
                                                              block_size=block_size,
                                                              min_block_size=min_block_size,
                                                              seed=seed)
+    else:
+        # supplied indices were drawn over some other array. get_bootstrap_ar_data_list is
+        # njit with bounds checking off, so an index past the end reads adjacent memory
+        # and returns a plausible number instead of raising
+        largest = int(np.max(bootstrapped_indices))
+        if largest >= len(residuals):
+            raise ValueError(f"bootstrapped_indices reach {largest} but residuals has "
+                             f"{len(residuals)} rows: draw them over the residual rows, "
+                             f"which gaps in the data can shorten below len(data.index)-1")
 
     if bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
         bootstrap_sample = get_bootstrap_ar_data_list(residuals=residuals,

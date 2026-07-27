@@ -7,15 +7,63 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.2.1] - 2026-07-27
+
+**`compute_ar_residuals` and `bootstrap_ar_process` change their results on data with gaps, and
+raise where they previously returned a number.** Any AR bootstrap run on a series with a missing
+observation moves in this release, and a panel with a row incomplete across columns now raises
+instead of returning NaN. On gap-free data nothing moves: the AR(1) is still ordinary least
+squares on the lag pairs, agreeing with the previous `statsmodels AutoReg` fit to 6.7e-16 across
+persistences from -0.6 to 0.95 and lengths 60 to 2000.
+
+**5.2.0 is yanked and this release replaces it.** It was published from an uncommitted working
+tree, so no commit set that version and the release could not be reproduced from source. It also
+shipped without the second bounds check below.
+
+### Fixed
+- `compute_ar_residuals` raised `KeyError: 0` under pandas 3.0. `AutoReg(...).fit().params` is
+  indexed by name, so `params[0]` was a label lookup. `bootstrap_ar_process` went down with it.
+- `compute_ar_residuals` returned NaN residuals for data with gaps. The fit used `dropna()` while
+  the residuals were computed on the original array, so every missing observation left NaN in two
+  residual rows, and those entered every draw that sampled them.
+- `compute_ar_residuals` fitted steps that spanned a gap as if they were one period apart,
+  because `dropna()` makes the observations either side of a gap adjacent. An AR(1) at spacing k
+  has persistence theta^k, so the estimate was pulled towards zero.
+- `bootstrap_ar_process` drew indices over `len(data.index)` while the residual array has one row
+  fewer, so the largest index was one row past the end. `get_bootstrap_ar_data_list` is `@njit`
+  with bounds checking off, so the read did not raise: on a 50-point series it returned 5.6e-321
+  from adjacent memory and used it as a residual. The draw is now taken over `len(residuals)`.
+- `bootstrap_ar_process` rejects a supplied `bootstrapped_indices` that reaches past the residual
+  rows. `bootstrap_price_fundamental_data` draws one index set over `len(prices.index)-1` and
+  passes it to both the price path and the AR path, which is what keeps the two resampled
+  together. Gaps in the fundamental panel shorten the residuals below that length, so the same
+  out-of-bounds read returned through that path. Quarterly fundamental panels are where this
+  bites.
+
 ### Added
+- `qis/models/bootstrap/tests/test_bootstrap_ar.py` — 14 tests over the AR residual path. Each of
+  the five defects above has a test that fails on it alone.
+- `qis/examples/models/ar_bootstrap_gaps.py` — measures what a gap costs an AR(1) fit. Over 20
+  gap patterns blanking 30% of a 3000-point series at persistence 0.7, dropping the lag pairs
+  that straddle a gap deviates from the gap-free estimate by 0.001 to 0.026, while collapsing the
+  gaps first deviates by 0.064 to 0.095. The ranges do not overlap. No network, and the test
+  suite executes it.
 - `qis/examples/models/bootstrap_convention.py` — measures what the block-resampling convention
   costs. The superseded truncating sampler draws the first observation of a 250-period sample at
   0.11x its uniform weight and the first decile at 0.53x; applied to a series with rising drift
   it reports a mean return 2.15% per year above the source, against 0.32% for the circular
-  sampler now used. No network, and the test suite executes it, so the numbers cannot drift from
-  the code.
+  sampler now used.
 - `docs/reproducibility.md` — the same measurement as a documentation page, with what follows
   from it for the return convention, the Sharpe conventions and the reported frequency.
+
+### Changed
+- `compute_ar_residuals` requires each row to be complete across all columns, and raises
+  `ValueError` below three usable lag pairs. Rows are resampled jointly to preserve the
+  cross-section, so a row missing one column cannot be resampled coherently; previously such a
+  row produced NaN silently. A constant series now returns a beta of exactly 0.0 and an intercept
+  at the level, where `AutoReg` returned 9.999e-05.
+- `qis/models/bootstrap/bootstrap_numba.py` no longer imports `statsmodels`. The AR(1) is
+  estimated directly; `statsmodels` remains a dependency, used in eight other modules.
 
 ## [5.1.0] - 2026-07-26
 
