@@ -48,7 +48,10 @@ def generate_ar1(theta: float,
     values = np.zeros(n)
     for t in range(1, n):
         values[t] = theta * values[t - 1] + rng.normal(0.0, sigma)
-    return pd.Series(values, index=pd.date_range('1950-03-31', periods=n, freq='QE'), name='a')
+    # unit='s' because NUM_OBSERVATIONS is 3000 quarters, which is 750 years: a nanosecond
+    # DatetimeIndex tops out at 2262 and pandas 2.x raises OutOfBoundsDatetime there
+    return pd.Series(values, name='a',
+                     index=pd.date_range('1950-03-31', periods=n, freq='QE', unit='s'))
 
 
 def estimate_by_collapsing_gaps(series: pd.Series) -> float:

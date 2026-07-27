@@ -39,7 +39,10 @@ def _ar1(theta: float, n: int = 300, sigma: float = 0.02, seed: int = 3) -> pd.S
     values = np.zeros(n)
     for t in range(1, n):
         values[t] = theta * values[t - 1] + rng.normal(0.0, sigma)
-    return pd.Series(values, index=pd.date_range('1950-03-31', periods=n, freq='QE'), name='a')
+    # unit='s' because n reaches 3000 quarters, which is 750 years: a nanosecond
+    # DatetimeIndex tops out at 2262 and pandas 2.x raises OutOfBoundsDatetime there
+    return pd.Series(values, name='a',
+                     index=pd.date_range('1950-03-31', periods=n, freq='QE', unit='s'))
 
 
 def test_no_key_error_on_a_labelled_params_series():
@@ -149,6 +152,25 @@ def test_the_draw_is_over_the_residual_rows_not_the_data_rows(monkeypatch):
     qis.bootstrap_ar_process(series, num_samples=4, index_length=49, block_size=10, seed=1)
     residuals, _, _ = compute_ar_residuals(series)
     assert drawn['num_data_index'] == len(residuals)
+
+
+def test_supplied_indices_are_checked_against_the_residual_rows():
+    """Indices drawn elsewhere must fit the residual array of this data.
+
+    ``bootstrap_price_fundamental_data`` draws one index set over ``len(prices.index)-1``
+    and passes it to both the price path and the AR path, which is what keeps the two
+    resampled together. A gap in the fundamental data shortens the residuals below that
+    length, and ``get_bootstrap_ar_data_list`` is ``@njit`` with bounds checking off, so
+    the overshoot reads adjacent memory instead of raising. The call site has to refuse
+    it. Shipped in 5.2.1; 5.2.0 went out without it.
+    """
+    series = _ar1(0.5, n=120)
+    holed = series.copy()
+    holed.iloc[[10, 50, 90]] = np.nan
+    # in bounds for a gap-free series of this length, past the end once gaps remove pairs
+    indices = np.full((5, 2), len(series) - 2, dtype=int)
+    with pytest.raises(ValueError, match='draw them over the residual rows'):
+        qis.bootstrap_ar_process(holed, bootstrapped_indices=indices)
 
 
 def test_bootstrap_ar_process_runs_and_returns_finite_paths():
