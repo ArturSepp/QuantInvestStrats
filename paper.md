@@ -164,7 +164,7 @@ sites covering 240 distinct symbols.
 The capabilities carry named results. The portfolio and optimisation layers support work on
 robust strategic and tactical allocation [@sepp2026robust], the backtester and performance layer
 support work on cryptocurrency allocation [@sepp2023crypto], and the regime-conditional layer
-supports work on trend-following systems [@sepp2025trend]. The resampling layer supports work on
+supports work on trend-following systems [@sepp2026trend]. The resampling layer supports work on
 capital market assumptions built from multi-asset tradable factors [@sepp2026matf]. The two
 working papers are under submission at the SIAM Journal on Financial Mathematics and at The
 Journal of Portfolio Management.
