@@ -7,6 +7,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Removed
+- `qis/perfstats/ra_returns.py`, an unreferenced duplicate of `qis/models/linear/ra_returns.py`.
+  It was added on 2026-04-19 and never imported: not by `qis/perfstats/__init__.py`, not by any
+  module or test, and `qis.perfstats.ra_returns` was absent from `sys.modules` after
+  `import qis`. Every `qis.<symbol>` in the pair already resolved to the `models.linear` copy, so
+  nothing exported changes and the export count stays at 403. The copies had begun to diverge:
+  `compute_ewm_long_short_filtered_ra_returns` gained its docstring and its span validation in
+  the live module and not in the duplicate, so a deep import of `qis.perfstats.ra_returns`
+  returned a version that accepted `vol_span` below 1 and produced NaN through a negative
+  variance. Only a direct import of that module path is affected.
+
 ## [5.2.1] - 2026-07-27
 
 **`compute_ar_residuals` and `bootstrap_ar_process` change their results on data with gaps, and
