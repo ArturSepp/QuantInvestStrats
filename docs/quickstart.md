@@ -57,9 +57,9 @@ qis.factsheet(prices,
 One call picks the report archetype from the input type and calibrates every window, regression,
 regime and annualisation to the requested reporting frequency. See
 [reporting frequencies](_included/reporting_frequencies.md) for what that recalibrates, and the
-[gallery](_included/gallery.md) for what each report looks like.
+[gallery](gallery.md) for what each report looks like.
 
 ## Where to go next
 
-- [Gallery](_included/gallery.md) — the four factsheet archetypes, each from one call
+- [Gallery](gallery.md) — the four factsheet archetypes, each from one call
 - [API reference](api/index.rst) — every exported symbol

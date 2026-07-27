@@ -5,6 +5,26 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- `notebooks/`, six Jupyter notebooks last touched on 2025-07-19. They were the only documented
+  surface with no test covering it: `qis/tests/test_examples.py` checks all 58 example scripts,
+  and nothing checked a notebook, so drift in one was invisible - the stored outputs kept
+  rendering last year's numbers as embedded images. Every notebook duplicated ground already
+  covered by a tested script: `multi_assets.py`, `strategy.py`, `strategy_benchmark.py` and
+  `multi_strategy.py` under `qis/examples/factsheets/`, `us_election_regimes.py` under
+  `qis/examples/regimes/`, and `quickstart.py` under `qis/examples/perfstats/`. Nothing shipped in
+  the wheel changes; the notebooks were never in it.
+
+### Changed
+- `qis/docs/gallery.md` and its four screenshots moved to `docs/`. `MANIFEST.in` excludes `*.png`,
+  so the gallery shipped inside the wheel with four image links that resolved to nothing for every
+  installed user. It is a documentation page rather than a package note, and shipping the images
+  instead would have added 1.3 MB to a 730 KB wheel for four screenshots. `AGENTS.md` now states
+  the rule that decides which tree a document belongs in.
+- `README.md`'s notebooks section points at `qis/examples/` and names the four factsheet scripts.
+
 ## [5.3.0] - 2026-07-27
 
 **`qis.__all__` now exists and fixes the public surface at 403 names.** Nothing is added to or

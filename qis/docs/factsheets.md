@@ -5,7 +5,8 @@ universes. There are four report archetypes, a single configuration layer that c
 statistic to a chosen reporting frequency, and a one-call entry point (`qis.factsheet`) for the
 common case. The verbose `generate_*_factsheet` functions remain the full-control API.
 
-For rendered examples of all four report types, see the [gallery](gallery.md).
+For rendered examples of all four report types, see the
+[gallery](https://github.com/ArturSepp/QuantInvestStrats/blob/main/docs/gallery.md). It is a documentation page rather than a package note, so it is not shipped in the wheel: its four screenshots would be 1.3 MB that a reader of this file does not need.
 
 ## Quick start
 

@@ -218,19 +218,19 @@ Run example in ```qis.examples.factsheets.multi_strategy.py``` https://github.co
 ![image info](qis/examples/figures/multi_strategy.PNG)
 
 
-### 6. Notebooks <a name="notebooks"></a>
+### 6. Runnable examples <a name="notebooks"></a>
 
-Recommended package to work with notebooks:  
-```python 
-pip install notebook
-```
-Starting local server
-```python 
-jupyter notebook
-```
+All 58 examples are plain scripts under
+[`qis/examples/`](https://github.com/ArturSepp/QuantInvestStrats/tree/main/qis/examples), each
+runnable top to bottom. `qis/tests/test_examples.py` checks every one of them for symbols and
+keyword arguments that exist, and runs the nine that need no data vendor.
 
-Examples of using qis analytics jupyter notebooks are located here
-https://github.com/ArturSepp/QuantInvestStrats/tree/main/notebooks
+The four factsheet archetypes shown above are
+[`multi_assets.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/multi_assets.py),
+[`strategy.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/strategy.py),
+[`strategy_benchmark.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/strategy_benchmark.py)
+and
+[`multi_strategy.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/multi_strategy.py).
 
 
 ## Ecosystem

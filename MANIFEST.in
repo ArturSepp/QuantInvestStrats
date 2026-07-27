@@ -18,7 +18,6 @@ recursive-include qis *.yml *.yaml *.json *.txt *.md
 
 # Explicitly exclude figures, notebooks, and image files
 recursive-exclude qis/examples/figures *
-recursive-exclude qis/notebooks *
 recursive-exclude qis *figures*
 global-exclude *.png
 global-exclude *.jpg

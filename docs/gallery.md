@@ -5,7 +5,7 @@ from one synthetic correlated-GBM price panel (no live data needed). All four ar
 **monthly** frequency — and note that every panel states the frequency at which it was computed:
 cumulative and rolling statistics on the monthly (`ME`) grid, drawdowns and time-under-water on the
 native business-day (`B`) grid, regimes on the quarterly (`QE`) grid. Changing `reporting_frequency`
-recalibrates all of it; see [reporting_frequencies.md](reporting_frequencies.md).
+recalibrates all of it; see [reporting_frequencies.md](_included/reporting_frequencies.md).
 
 ## Multi-asset universe
 
@@ -59,5 +59,5 @@ qis.factsheet(multi_portfolio, reporting_frequency='monthly', file_name='strateg
 
 All four pages were produced with the defaults; pass `time_period=...` to restrict the window, or
 swap `reporting_frequency` to `'daily'`, `'weekly'` or `'quarterly'` to re-render the same book at a
-different cadence with every statistic recalibrated. See [factsheets.md](factsheets.md) for the
-full-control API and [reporting_frequencies.md](reporting_frequencies.md) for the convention.
+different cadence with every statistic recalibrated. See [factsheets.md](_included/factsheets.md) for the
+full-control API and [reporting_frequencies.md](_included/reporting_frequencies.md) for the convention.

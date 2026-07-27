@@ -139,6 +139,25 @@ writing. Neither runs in CI: the consumer audit needs the network, and the git m
 every commit, so a CI check on them would fail on every push. `qis/tests/test_paper_audit.py`
 enforces the part that can be enforced offline.
 
+**Those records live in `docs/`, which is not shipped, so `test_paper_audit.py` and the
+`reproducibility.md` check in `test_bootstrap_convention.py` skip when the suite is run against an
+installed wheel rather than a checkout.** That is deliberate - they are repository-integrity
+tests, and a test that fails for a user who pip-installed the package would be worse than one that
+skips. It does mean the suite a wheel user runs is smaller than the one CI runs.
+
+## Two documentation trees, and which is which
+
+`qis/docs/` ships inside the wheel; `docs/` does not. The rule is whether a reader who ran only
+`pip install qis` needs the file:
+
+- **`qis/docs/*.md` ships.** Twenty docstrings reference these notes by path, so
+  `help(qis.plot_bars)` names `qis/docs/plotting_kwargs.md` and that file is in the reader's
+  site-packages. Keep them text-only; images do not ship, and a relative image link here is a dead
+  link for every installed user.
+- **`docs/` is the Sphinx site and the generated records.** `conf.py` mirrors `qis/docs/` into
+  `docs/_included/` at build time so the site reads as one tree while the package keeps one source
+  of truth. Do not move package notes up, and do not move site pages down.
+
 ## Release checklist
 
 A release touches three version locations. All three must agree:
