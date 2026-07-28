@@ -22,7 +22,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              funding_rate: pd.Series = None,  # annualised on positive / negative cash balances
                              management_fee: float = None,  # annualised
                              instruments_carry: pd.DataFrame = None,  # on nav
-                             rebalancing_costs: Union[float, pd.Series] = None,  # 0.0010 = 10 bp
+                             rebalancing_costs: Union[float, pd.Series, pd.DataFrame] = None,
                              weight_implementation_lag: Optional[int] = None,  # applies for weight is pd.Dataframe
                              constant_trade_level: float = None,
                              is_rebalanced_at_first_date: bool = False,
@@ -51,7 +51,12 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         management_fee: annualised fee accrued on nav
         instruments_carry: per-instrument carry, expressed on nav
         rebalancing_costs: proportional cost on traded notional, fractional units (0.0010 is
-            10 bp); one figure for all instruments or a series per instrument
+            10 bp). A float applies to every instrument and date; a Series indexed by ticker
+            is per-instrument and constant in time; a DataFrame of dates x tickers is
+            reindexed to ``prices`` dates taking the last schedule row at or before each
+            date, so a cost schedule stated on era boundaries applies from each boundary
+            onward. Costs are read at the trade date; dates before the first schedule row
+            are costless
         weight_implementation_lag: days between a weight being observed and traded. Applies
             only when ``weights`` is a pd.DataFrame, since a fixed vector has no signal date
         constant_trade_level: size each rebalancing off this notional rather than off current
@@ -66,7 +71,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
 
     Raises:
         ValueError: if ``prices`` is not a pd.DataFrame, if a weight vector does not match the
-            number of price columns, or if the price history starts after the weights do
+            number of price columns, if the price history starts after the weights do, if a
+            ``rebalancing_costs`` DataFrame is missing a price column, or if a
+            ``rebalancing_costs`` Series is indexed by dates rather than tickers
         NotImplementedError: if ``weights`` is of an unsupported type
     """
     if not isinstance(prices, pd.DataFrame):
@@ -133,8 +140,23 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         instruments_carry_dt = pd.Series(0.0, index=prices.index)
 
     if rebalancing_costs is not None:
-        if isinstance(rebalancing_costs, pd.Series):
-            rebalancing_costs = rebalancing_costs[prices.columns].to_numpy()
+        if isinstance(rebalancing_costs, pd.DataFrame):
+            missing_columns = prices.columns.difference(rebalancing_costs.columns)
+            if len(missing_columns) > 0:
+                raise ValueError(f"rebalancing_costs is missing price columns "
+                                 f"{list(missing_columns)}")
+            rebalancing_costs = rebalancing_costs.sort_index().reindex(index=prices.index,
+                                                                       method='ffill')
+            rebalancing_costs = rebalancing_costs[prices.columns].fillna(0.0).to_numpy()
+        elif isinstance(rebalancing_costs, pd.Series):
+            if isinstance(rebalancing_costs.index, pd.DatetimeIndex):
+                raise ValueError("a date-indexed rebalancing_costs Series is ambiguous: "
+                                 "pass a DataFrame of dates x tickers")
+            costs_vector = rebalancing_costs[prices.columns].to_numpy()
+            rebalancing_costs = np.tile(costs_vector, (len(prices.index), 1))
+        else:
+            rebalancing_costs = np.full((len(prices.index), len(prices.columns)),
+                                        float(rebalancing_costs))
 
     nav, units, effective_weights, realized_costs = backtest_rebalanced_portfolio(prices=prices.to_numpy(),
                                                                                   weights=portfolio_weights.to_numpy(),
@@ -171,7 +193,7 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
                                   instruments_carry_dt: np.ndarray = None,
                                   initial_nav: float = 100.0,
                                   constant_trade_level: float = None,
-                                  rebalancing_costs: Union[float, np.ndarray] = None  # proportional rebalancing costs
+                                  rebalancing_costs: np.ndarray = None  # (t, n) proportional costs
                                   ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     path-dependent portfolio simulation kernel.
@@ -192,7 +214,8 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
         instruments_carry_dt: per-period carry per instrument, shape (t, n)
         initial_nav: starting nav
         constant_trade_level: size trades off this notional instead of current nav
-        rebalancing_costs: proportional cost, one figure or one per instrument
+        rebalancing_costs: proportional costs on traded notional, shape (t, n); the wrapper
+            broadcasts the scalar and per-instrument forms to this shape. None trades costless
 
     Returns:
         (nav, units, effective_weights, realized_costs)
@@ -258,7 +281,7 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
             units_change = current_units - units[t-1]
             change_in_cash = -np.nansum(units_change*current_prices)
             if rebalancing_costs is not None:
-                realized_costs_t = rebalancing_costs*current_prices*np.abs(units_change)
+                realized_costs_t = rebalancing_costs[t, :]*current_prices*np.abs(units_change)
                 realized_costs[t, :] = realized_costs_t
                 change_in_cash -= np.nansum(realized_costs_t)
             current_cash_balance = current_cash_balance + change_in_cash

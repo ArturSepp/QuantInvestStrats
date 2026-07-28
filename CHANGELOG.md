@@ -8,6 +8,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [Unreleased]
 
 ### Added
+- `backtest_model_portfolio` accepts `rebalancing_costs` as a `pd.DataFrame` of dates x
+  tickers: each price date takes the last schedule row at or before it, so a cost schedule
+  stated on era boundaries (the `trendfollowing` volume-cost panel is the motivating case)
+  applies from each boundary onward. A float or per-instrument `pd.Series` behaves exactly as
+  before; a date-indexed Series now raises rather than being misread as per-instrument.
+  Covered by `qis/portfolio/tests/test_backtester_costs.py`.
+
 - `qis/tests/test_version_metadata.py`: `pyproject.toml`, `CITATION.cff` and the `@software`
   BibTeX entry in `README.md` must carry the same version, and `date-released` must be an ISO
   date. The three agree at 5.3.0 today; nothing had held them together, and in the sibling
@@ -18,6 +25,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   nothing failing.
 
 ### Changed
+- `backtest_rebalanced_portfolio` (the numba kernel under `backtest_model_portfolio`) takes
+  `rebalancing_costs` as a `(t, n)` array; the wrapper broadcasts the scalar and
+  per-instrument forms. Breaking only for direct callers of the kernel, of which the public
+  consumers have none.
 - `paper.md`: the statement of need names the two comparisons a research pipeline runs and
   extends the shared-convention argument to agentic AI tooling.
   `docs/audit/paper_numbers.json` regenerated at `0e4c7e5`; body words 1,749 → 1,851.
