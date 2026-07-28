@@ -14,7 +14,7 @@ authors:
 affiliations:
   - name: LGT Bank
     index: 1
-date: 26 July 2026
+date: 28 July 2026
 bibliography: paper.bib
 ---
 
@@ -24,11 +24,12 @@ bibliography: paper.bib
 weights and a panel of prices into a simulated portfolio, measures that portfolio against a
 benchmark, and renders the result as a factsheet. Around those three steps it provides the
 supporting analytics reporting depends on: exponentially weighted covariance estimation, block
-bootstrap resampling, regime-conditional statistics, currency hedging, and return unsmoothing for
-assets that report infrequently.
+bootstrap resampling, risk measures, regime-conditional statistics, currency hedging, and return
+unsmoothing for assets that report infrequently.
 
 We designed it around one assumption: a strategy is a rule for producing weights, and everything
-downstream of those weights is reconstruction rather than research.
+downstream of those weights is reconstruction rather than research. The researcher keeps the
+signal and the portfolio construction; the rest belongs to the library.
 
 `qis` is the base layer of a stack of quantitative finance packages — `optimalportfolios`,
 `trendfollowing` and `privateassets`, all three public — and the computational layer beneath
@@ -66,13 +67,20 @@ those weights supplies everything else. The common alternative makes the profit 
 on state held inside the generator, so every consumer of the result rebuilds those quantities
 from whatever the generator emitted. The Sharpe ratio of one strategy, read from a chart, a
 summary table and a factsheet, then comes out as three numbers. We build all three from one
-`PortfolioData` object constructed from weights and prices.
+`PortfolioData` object constructed from weights and prices, and from the same object the
+comparisons a pipeline actually runs — a variant against its base, several strategies side by
+side — are rendered by one reporting layer rather than a figure written per comparison.
 
 The same discipline answers a second need. A research group accumulates analytics faster than it
 consolidates them, and the same method is written again in each project. In our own repositories
 we found four independent block bootstrap implementations and two return unsmoothers, all
 reimplementing code `qis` already exported. They had diverged, so the same nominal method
 produced different numbers in different papers.
+
+The argument now extends to agentic AI tools. A researcher who directs such a tool at `qis` for
+simulation and reporting, rather than letting it write those steps, holds the conventions fixed
+across sessions; otherwise each session reimplements them and the divergence above reappears one
+conversation at a time.
 
 # State of the field
 

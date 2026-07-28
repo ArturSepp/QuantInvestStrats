@@ -1,9 +1,9 @@
 """
 the documentation agrees with the repository it documents.
 
-Two checks of the same shape, each asserting something a reader is told against the thing it
-describes: a link points at a file that exists, and the README's core dependency list is the
-list ``pip install qis`` actually resolves.
+Three checks of the same shape, each asserting something a reader is told against the thing it
+describes: a link points at a file that exists, an in-page anchor points at a section that
+exists, and the README's core dependency list is the list ``pip install qis`` actually resolves.
 
 **Links.** The README told a reader to run ``qis/examples/performances.py`` and to look in
 ``qis/examples/notebooks``. Neither path had existed since the examples were reorganised into
@@ -17,10 +17,16 @@ Two kinds of link are checked, both resolvable without a network:
   * a ``github.com/<owner>/<repo>/blob/<ref>/<path>`` url pointing back into this repository,
     which is how the README refers to its own example scripts.
 
-Everything else - an external url, an anchor, a mailto - is skipped. A test may not reach the
-network, so an external link is not this file's business. ``docs/_included/`` and ``docs/api/``
-are skipped too: ``docs/conf.py`` writes both at build time, so they are absent from a checkout
-by design rather than by accident.
+Everything else - an external url, a mailto - is skipped. A test may not reach the network, so an
+external link is not this file's business. ``docs/_included/`` and ``docs/api/`` are skipped too:
+``docs/conf.py`` writes both at build time, so they are absent from a checkout by design rather
+than by accident.
+
+**Anchors.** The README's table of contents is thirteen ``#anchor`` links into its own body. A
+section can be renamed, merged or deleted without the entry above it moving, and the result is a
+contents line that scrolls nowhere - the same invisibility as a dead path link, on the part of the
+document a reader meets first. An anchor resolves when the document defines ``<a name="...">`` or
+``id="..."`` with that value, or when a heading slugifies to it the way GitHub renders one.
 
 **Dependencies.** The README listed ``yfinance`` and ``pandas-datareader`` under "Core
 dependencies" while ``pyproject.toml`` had both in the ``[data]`` extra. A reader planning an
@@ -152,6 +158,81 @@ def test_internal_link_resolves(link: Link) -> None:
     assert resolved.exists(), (
         f"{link.document} links to {link.target}, which does not exist. "
         f"Written as {link.raw!r}")
+
+
+EXPLICIT_ANCHOR_PATTERN = re.compile(r'(?:name|id)\s*=\s*"([^"]+)"')
+HEADING_PATTERN = re.compile(r'^#{1,6}\s+(.+?)\s*$', flags=re.M)
+# GitHub's heading slug: drop the markup and everything that is not a word character, a space or a
+# hyphen, lower-case the rest, then join on hyphens
+SLUG_STRIP = re.compile(r'[^\w\s-]')
+
+
+class Anchor(NamedTuple):
+    """
+    Attributes:
+        document: the markdown file the link was found in, relative to the repository root
+        target: the anchor name, without the leading '#'
+        raw: the link as written, for the failure message
+    """
+    document: str
+    target: str
+    raw: str
+
+
+def _slugify(heading: str) -> str:
+    """the anchor GitHub generates for a heading."""
+    text = re.sub(r'<[^>]+>', '', heading)          # an inline <a name="..."></a> is not title text
+    text = SLUG_STRIP.sub('', text).strip().lower()
+    return re.sub(r'[\s_]+', '-', text)
+
+
+def _anchor_targets_in(text: str) -> set:
+    """every anchor a document defines: explicit name/id attributes, and heading slugs."""
+    targets = set(EXPLICIT_ANCHOR_PATTERN.findall(text))
+    targets.update(_slugify(heading) for heading in HEADING_PATTERN.findall(text))
+    return targets
+
+
+def _anchors_in(path: Path) -> List[Anchor]:
+    """
+    the in-page anchor links one document contains.
+
+    Args:
+        path: the markdown file
+
+    Returns:
+        one entry per '#...' link, which should name a section of the same document
+    """
+    text = path.read_text(encoding='utf-8', errors='replace')
+    document = path.relative_to(REPO_ROOT).as_posix()
+    anchors: List[Anchor] = []
+    for match in MARKDOWN_LINK_PATTERN.finditer(text):
+        target = match.group(1)
+        if not target.startswith('#') or len(target) == 1:
+            continue
+        anchors.append(Anchor(document=document, target=target[1:], raw=match.group(0)))
+    return anchors
+
+
+ALL_ANCHORS: List[Anchor] = [anchor for path in _documents() for anchor in _anchors_in(path)]
+ANCHOR_IDS: List[str] = [f'{anchor.document}:#{anchor.target}' for anchor in ALL_ANCHORS]
+
+
+def test_anchors_are_found() -> None:
+    """the anchor pattern still matches something, so a green run is not an empty run."""
+    assert len(ALL_ANCHORS) >= 10, (
+        f"only {len(ALL_ANCHORS)} in-page anchor links found; the README table of contents alone "
+        f"carries thirteen, so the pattern broke")
+
+
+@pytest.mark.parametrize('anchor', ALL_ANCHORS, ids=ANCHOR_IDS)
+def test_in_page_anchor_resolves(anchor: Anchor) -> None:
+    """an anchor link names a section of the document it is written in."""
+    text = REPO_ROOT.joinpath(anchor.document).read_text(encoding='utf-8', errors='replace')
+    targets = _anchor_targets_in(text)
+    assert anchor.target in targets, (
+        f"{anchor.document} links to #{anchor.target}, which no heading or anchor in that "
+        f"document defines. Written as {anchor.raw!r}")
 
 
 README_PATH: Path = REPO_ROOT.joinpath('README.md')

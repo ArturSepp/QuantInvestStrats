@@ -62,7 +62,7 @@ A README inside ```qis/examples/``` lists every script with a one-line descripti
    3. [Strategy factsheet](#strategy)
    4. [Strategy benchmark factsheet](#strategybenchmark)
    5. [Multi strategy factsheet](#multistrategy)
-   6. [Notebooks](#notebooks)
+   6. [Runnable examples](#runnable-examples)
 4. [Contributions](#contributions)
 5. [Changelog](#changelog)
 6. [ToDos](#todos)
@@ -218,7 +218,7 @@ Run example in ```qis.examples.factsheets.multi_strategy.py``` https://github.co
 ![image info](qis/examples/figures/multi_strategy.PNG)
 
 
-### 6. Runnable examples <a name="notebooks"></a>
+### 6. Runnable examples <a name="runnable-examples"></a>
 
 All 58 examples are plain scripts under
 [`qis/examples/`](https://github.com/ArturSepp/QuantInvestStrats/tree/main/qis/examples), each

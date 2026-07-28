@@ -7,6 +7,23 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- `qis/tests/test_version_metadata.py`: `pyproject.toml`, `CITATION.cff` and the `@software`
+  BibTeX entry in `README.md` must carry the same version, and `date-released` must be an ISO
+  date. The three agree at 5.3.0 today; nothing had held them together, and in the sibling
+  `optimalportfolios` repository the same three read 6.3.0, 6.2.0 and versionless at one commit.
+- `qis/tests/test_documentation.py` gains an in-page anchor check: every `#anchor` link resolves
+  to a heading or an explicit `<a name>` in the same document. The README table of contents is
+  thirteen such links, and a renamed section leaves the entry above it pointing nowhere with
+  nothing failing.
+
+### Changed
+- `paper.md`: the statement of need names the two comparisons a research pipeline runs and
+  extends the shared-convention argument to agentic AI tooling.
+  `docs/audit/paper_numbers.json` regenerated at `0e4c7e5`; body words 1,749 → 1,851.
+- `README.md`: the table-of-contents entry `Notebooks` is now `Runnable examples`, matching the
+  section it has pointed at since the notebooks were removed, and its anchor is renamed with it.
+
 ### Removed
 - `notebooks/`, six Jupyter notebooks last touched on 2025-07-19. They were the only documented
   surface with no test covering it: `qis/tests/test_examples.py` checks all 58 example scripts,
