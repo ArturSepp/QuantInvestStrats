@@ -39,8 +39,8 @@ weights = {ticker: 0.1 for ticker in prices.columns}
 portfolio_data = qis.backtest_model_portfolio(prices=prices,
                                               weights=weights,
                                               rebalancing_freq='QE',
-                                              rebalancing_costs=10)  # annualised, in bp
-print(portfolio_data.get_navs().tail())
+                                              rebalancing_costs=0.0010)  # fractional units: 10 bp on traded notional
+print(portfolio_data.get_portfolio_nav().tail())
 ```
 
 Rebalancing weights are drift-adjusted, so reported turnover is the turnover actually traded.
@@ -51,7 +51,8 @@ Rebalancing weights are drift-adjusted, so reported turnover is the turnover act
 qis.factsheet(prices,
               benchmark_prices=benchmark_prices,
               reporting_frequency='monthly',
-              file_name='universe')
+              file_name='universe',
+              local_path='.')  # write universe.pdf to the working directory
 ```
 
 One call picks the report archetype from the input type and calibrates every window, regression,

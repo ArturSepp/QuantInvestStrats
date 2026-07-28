@@ -176,7 +176,7 @@ Generative AI assisted this project, and we state where.
 The analytical methods, the conventions they implement, and the architecture of the package are
 the author's, and no method in `qis` originated from a language model.
 
-Between 25 and 27 July 2026 the author used Anthropic's Claude, through an agentic coding
+Between 25 and 28 July 2026 the author used Anthropic's Claude, through an agentic coding
 interface, for a documentation and test infrastructure effort preceding this submission. That work
 produced the test suite described above, the docstrings on the documented core, the documentation
 configuration, the audit scripts under `tools/`, and the repair of four defects the new tests

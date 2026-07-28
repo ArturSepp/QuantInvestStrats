@@ -22,7 +22,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              funding_rate: pd.Series = None,  # annualised on positive / negative cash balances
                              management_fee: float = None,  # annualised
                              instruments_carry: pd.DataFrame = None,  # on nav
-                             rebalancing_costs: Union[float, pd.Series] = None,  # annualised rebalancing costs in bp
+                             rebalancing_costs: Union[float, pd.Series] = None,  # 0.0010 = 10 bp
                              weight_implementation_lag: Optional[int] = None,  # applies for weight is pd.Dataframe
                              constant_trade_level: float = None,
                              is_rebalanced_at_first_date: bool = False,
@@ -50,8 +50,8 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         funding_rate: annualised rate applied to positive and negative cash balances
         management_fee: annualised fee accrued on nav
         instruments_carry: per-instrument carry, expressed on nav
-        rebalancing_costs: annualised proportional cost in bp, one figure for all instruments
-            or a series per instrument
+        rebalancing_costs: proportional cost on traded notional, fractional units (0.0010 is
+            10 bp); one figure for all instruments or a series per instrument
         weight_implementation_lag: days between a weight being observed and traded. Applies
             only when ``weights`` is a pd.DataFrame, since a fixed vector has no signal date
         constant_trade_level: size each rebalancing off this notional rather than off current
