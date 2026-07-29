@@ -91,8 +91,8 @@ below is capability by capability, at the versions current on 27 July 2026.
 | package | its documented interface takes | and returns |
 |---|---|---|
 | `pyfolio-reloaded` 0.9.9 | returns, and optionally positions, transactions, market data, factor returns and loadings | tear sheets, including round-trip analysis rebuilt from positions and transactions |
-| `bt` 1.2.0 | `WeighTarget` takes a target-weight `DataFrame` from the caller | a backtest result; the strategy need not be written as Algo blocks |
-| `vectorbt` 1.1.0 | `Portfolio.from_orders` takes arrays of size, price, fees and direction produced elsewhere | order and trade records, statistics and plots |
+| `bt` 1.2.0 | `WeighTarget` takes a target-weight `DataFrame` from the caller, as part of an Algo-stack strategy | a result exposing statistics, weights, positions and turnover |
+| `vectorbt` 1.1.0 | `Portfolio.from_orders`, `from_signals` and `from_order_func` take orders, signals, or an order-generating callback produced elsewhere | order and trade records, statistics and plots |
 | `Riskfolio-Lib` 7.3.0 | returns and optimisation constraints | weights, with documented `Reports` and `PlotFunctions` modules |
 | `skfolio` 0.20.1 | a scikit-learn estimator fitted to returns | weights, walk-forward and combinatorial purged cross-validation, risk measures and plots |
 | `quantstats` 0.0.81 | a return series, not trade data | metrics, plots and an HTML tear sheet |
@@ -100,17 +100,22 @@ below is capability by capability, at the versions current on 27 July 2026.
 | `ffn` 1.1.5 | prices | analytics; its documentation refers simulation to `bt` |
 | `PyPortfolioOpt` 1.6.0 | prices, or expected returns and a risk model | weights and a discrete allocation, `portfolio_performance()`, a `plotting` module |
 
+`arch` has no row, being a resampling and econometrics library rather than a portfolio stack, but
+it documents the closest primitive: `StationaryBootstrap` takes several aligned arrays, Series or
+DataFrames in one object, so one index draw propagates across them.
+
 `qis` differs in where the boundary sits. Only weights and prices cross it, so any generator
 producing weights can be measured. The simulation returns a `PortfolioData` object carrying the net asset value, the realised weights, the held units, the
 instrument-level profit and loss and the realised costs together, so attribution is a property of
 that object rather than a later calculation on a series that has already lost what it needs.
 
-We found no counterpart in the documented interfaces above for three capabilities. Return
-unsmoothing corrects the serial correlation induced by appraisal-based valuation, which matters
-for private assets and hedge funds [@getmansky2004]. Regime-conditional reporting partitions every
-statistic by benchmark return quantile [@Sepp2019]. Paired block bootstrap resampling applies one
-index draw to several aligned panels, so a factor and a residual panel resample together
-[@politis1994].
+Two capabilities have no counterpart in the documented interfaces above. Return unsmoothing
+corrects the serial correlation induced by appraisal-based valuation, which matters for private
+assets and hedge funds [@getmansky2004]. Regime-conditional reporting partitions every statistic
+by benchmark return quantile [@Sepp2019]. A third, paired block bootstrap resampling — one index
+draw across several aligned panels, so a factor and a residual panel resample together
+[@politis1994] — has the primitive noted above; what has no counterpart is its coupling to
+portfolio reconstruction and reporting inside one object model.
 
 # Software design
 
@@ -183,7 +188,7 @@ unsmoothing estimator. The co-authored commits can be listed with
 
 We drafted this paper with the same assistance, working from measurements the assistant recorded
 under `docs/audit/`. Every row of the comparison above, and every bibliographic claim, was
-verified against primary documentation on 27 July 2026. The author wrote the economic argument in
+verified against primary documentation on 29 July 2026. The author wrote the economic argument in
 the statement of need and is responsible for the content.
 
 # References
