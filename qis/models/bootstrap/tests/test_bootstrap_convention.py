@@ -12,8 +12,13 @@ This file pins them. Every value below is deterministic given the seeds in the e
 tolerances are half a unit in the last published digit rather than a statistical allowance: a
 change large enough to alter the printed table fails here.
 
-It also checks that ``docs/reproducibility.md`` still states the values that the code produces,
-so the page cannot drift away from its own script.
+It also checks that ``docs/reproducibility.md`` and ``paper.md`` still state the values the code
+produces, so neither document can drift away from the script behind it. The paper was the gap:
+the failure messages below have always claimed it quotes these numbers, and until now nothing
+read it. It rounds to two decimals where this file pins three, so the check formats the
+measurement the way the manuscript prints it and requires that fragment. A recomputation that
+moves a value therefore changes the fragment the paper must carry, rather than passing on a
+sentence that has quietly become wrong.
 
 To confirm the check can fail, replace ``qis.generate_bootstrapped_indices`` in the example with
 ``draw_truncating_indices``: the circular rows move to the truncating values and four assertions
@@ -24,7 +29,7 @@ import importlib.util
 import re
 from pathlib import Path
 from types import ModuleType
-from typing import Tuple
+from typing import Dict, Tuple
 import numpy as np
 import pytest
 # qis / project
@@ -34,6 +39,7 @@ EXAMPLE_PATH: Path = Path(qis.__file__).parent.joinpath('examples', 'models',
                                                         'bootstrap_convention.py')
 REPRODUCIBILITY_PATH: Path = Path(qis.__file__).parent.parent.joinpath('docs',
                                                                        'reproducibility.md')
+PAPER_PATH: Path = Path(qis.__file__).parent.parent.joinpath('paper.md')
 
 # half a unit in the last digit each quantity is published to
 FREQUENCY_TOLERANCE: float = 0.0005     # published to three decimals
@@ -215,3 +221,62 @@ def test_reproducibility_page_states_the_measured_values(published: str) -> None
     assert published in normalised, (
         f"docs/reproducibility.md no longer states {published!r}. Regenerate the page from "
         f"python -m qis.examples.models.bootstrap_convention")
+
+
+@pytest.fixture(scope='module')
+def paper_fragments(example: ModuleType,
+                    indices: Tuple[np.ndarray, np.ndarray],
+                    ) -> Dict[str, str]:
+    """
+    the four quantities the statement of need quotes, formatted as the manuscript prints them.
+
+    The manuscript rounds to two decimals where this file pins three - 0.110 is printed 0.11,
+    0.526 is printed 0.53 - so the fragment is built from the measurement rather than written
+    out. A value that moves changes the fragment the paper is required to carry, which fails
+    here instead of leaving a sentence that has quietly stopped being true.
+
+    Args:
+        example: the imported example module
+        indices: the truncating and circular draws
+
+    Returns:
+        the fragment paper.md must contain, by quantity
+    """
+    truncating, circular = indices
+    first_observation, first_decile, _ = _frequency_triple(example=example, draw=truncating)
+    returns = example.make_trending_returns()
+    source_mean = float(returns.mean())
+    annual = {name: (float(returns[draw].mean(axis=0).mean()) - source_mean)
+                    * example.PERIODS_PER_YEAR * 100.0
+              for name, draw in (('truncating', truncating), ('circular', circular))}
+    return {'first_observation': f'{first_observation:.2f} times',
+            'first_decile': f'{first_decile:.2f} times',
+            'truncating_annual_bias': f'{annual["truncating"]:.2f}% per year',
+            'circular_annual_bias': f'within {abs(annual["circular"]):.2f}%'}
+
+
+@pytest.mark.parametrize('quantity, published',
+                         [('first_observation', '0.11 times'),
+                          ('first_decile', '0.53 times'),
+                          ('truncating_annual_bias', '2.15% per year'),
+                          ('circular_annual_bias', 'within 0.32%')])
+def test_paper_states_the_measured_values(paper_fragments: Dict[str, str],
+                                          quantity: str,
+                                          published: str,
+                                          ) -> None:
+    """
+    paper.md quotes what the example computes, at the manuscript's own precision.
+
+    Two assertions, and they fail for different reasons. The first says the measurement still
+    rounds to the figure the manuscript and this row agree on; the second says the manuscript
+    still carries it. The paper is the document a reviewer reads, and it was the one document
+    nothing held to these numbers.
+    """
+    if not PAPER_PATH.is_file():
+        pytest.skip(f"{PAPER_PATH} is not in this checkout")
+    measured = paper_fragments[quantity]
+    assert measured == published, (
+        f"{quantity} now prints as {measured!r} where this row and paper.md say {published!r}; "
+        f"correct the manuscript and this row together")
+    assert published in PAPER_PATH.read_text(encoding='utf-8'), (
+        f"paper.md no longer states {published!r}, which the example computes")

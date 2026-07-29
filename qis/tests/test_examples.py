@@ -3,7 +3,7 @@ The examples are documentation, so they are tested like documentation.
 
 ``qis/examples/`` had three calls to symbols that were implemented, documented and not exported,
 and every one of them raised ``AttributeError`` the moment anybody ran the file. Nothing caught
-it, because nothing executes the examples: 49 of the 58 pull prices from ``yfinance``, so they
+it, because nothing executes the examples: most of them pull prices from ``yfinance``, so they
 cannot run on a core install or in CI.
 
 This file closes that gap without needing the network. Four checks are static and run against
@@ -25,7 +25,7 @@ An optional dependency is a skip, never a failure - the suite must pass on a cor
 
 What this does not cover, stated so the green tick is not read as more than it is:
 
-  * 49 of the 58 examples are never executed, only read. A runtime error past the import and
+  * most examples are never executed, only read. A runtime error past the import and
     signature layer - a shape mismatch, a bad column name - is not caught.
   * 88 of the 368 exported callables take ``**kwargs`` and accept any keyword, so check 4 skips
     them. ``plot_time_series_2ax`` is one of them, which is why the ``trend_line`` typo was
