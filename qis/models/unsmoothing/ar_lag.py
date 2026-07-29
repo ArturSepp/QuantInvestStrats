@@ -31,7 +31,9 @@ that decays within ~span periods as the EWMA forgets its initial condition).
 The production-relevant parity gate is therefore the current-date max|delta-beta|,
 not the full-history unsmoothed vol.
 
-Guards (opt-in; defaults reproduce the previous behaviour exactly):
+Guards (defaults reproduce the previous behaviour exactly; ``check_denominator`` and
+``validate_inputs`` are on and inert under the default arguments, ``insufficient_data``
+is the opt-in one):
 
     ``insufficient_data``  Controls what happens when a column comes out entirely
         NaN. ``set_nans_for_warmup_period`` discards the first ``warmup_period``

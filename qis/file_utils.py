@@ -9,8 +9,8 @@ UNIVERSE_PATH:
   'C:\\your_folder\\'
 OUTPUT_PATH:
   'C:\\your_folder\\'
-# optional
-POSTGRES:
+# optional; the key qis.sql_engine.get_engine reads by default
+AWS_POSTGRES:
   "postgresql://user:password@database:port"
 """
 import os

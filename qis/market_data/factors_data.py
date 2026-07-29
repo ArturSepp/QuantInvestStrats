@@ -5,8 +5,9 @@ Holds a panel of tradable risk-factor prices and exposes typed, time-sliced
 access. The container is factor-set agnostic: the concrete factor universe
 (its enum and any vols) is injected by the caller via ``factors``, so a
 specific model such as MATF defines ``RiskFactors`` in its own layer while this
-container stays generic. Instances load from CSV (or a SQL/Ramen source via
-``from_sql``); the factor prices are built upstream in the production layer.
+container stays generic. Instances load from CSV; ``from_sql`` is a stub that raises, kept as
+the place a project wires its own connection. The factor prices are built upstream in the
+production layer.
 """
 from __future__ import annotations
 

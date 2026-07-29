@@ -1,7 +1,7 @@
 """
 local_path uses setting.yaml to return absolute path for file/folder paths
 use:
-git update-index --skip-worktree optimalportfolios/settings.yaml
+git update-index --skip-worktree qis/settings.yaml
 
 example usage:
 import local_path as lp

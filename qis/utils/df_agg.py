@@ -1,7 +1,8 @@
 """
 analytics for dataframe aggregation
 
-all df_* aggregators consume a pd.DataFrame and return a pd.Series.
+the df_* aggregators consume a pd.DataFrame and return a pd.Series; df_last_row is the
+exception, selecting rather than aggregating, and returns an np.ndarray.
 non-finite entries (nan and +-inf) are excluded from the aggregation: the data are passed
 through npo.to_finite_np() first, so +-inf is mapped to nan and then skipped.
 

@@ -3,7 +3,7 @@ Visualisation of cross-sectional signal predictive diagnostics.
 
 Renders the output of ``qis.perfstats.signal_diagnostics.estimate_signal_diagnostics``.
 
-Three plotting functions:
+The two boxplot primitives, and the composite figure built from them:
 
     plot_signal_diagnostics_boxplot — per-horizon quantile-bucket boxplot of
         the cross-sectional return distribution conditional on the signal
@@ -20,9 +20,12 @@ Three plotting functions:
         factsheet: per-horizon return-conditional boxplots on top,
         per-group β boxplots on the bottom.
 
-Follows the qis convention: each plotting function accepts an optional
-``ax`` so it can be embedded in a larger factsheet layout, and returns
-the Figure (or None when plotting into a supplied axis).
+The two primitives follow the qis convention: an optional ``ax`` so the
+panel can be embedded in a larger layout, returning the Figure or None
+when drawing into a supplied axis. The composite functions —
+``plot_signal_diagnostics``, ``plot_signal_diagnostics_for_returns`` and
+``plot_signal_diagnostics_beta_boxplot`` — lay out their own grid, take
+no ``ax`` and always return a Figure.
 """
 # built-in
 from __future__ import annotations
