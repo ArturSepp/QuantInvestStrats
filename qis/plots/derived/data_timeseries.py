@@ -1,5 +1,9 @@
 """
-useful as interface when data can be either price or level time series
+one interface for plotting a series that may be either a price or a level.
+``plot_data_timeseries`` takes ``is_price_data`` and routes to the price plot, whose legend
+carries risk-adjusted performance statistics computed with ``perf_params``, or to the plain
+time-series plot for a level, whose legend carries the descriptive ``legend_stats`` instead.
+Rebasing is off here: ``start_to_one`` defaults to False, overriding the price plot's own default.
 """
 import pandas as pd
 from typing import Optional, Union

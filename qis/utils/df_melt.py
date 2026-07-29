@@ -1,5 +1,9 @@
 """
-analytic for melting of pandas
+reshaping a wide panel into the long form seaborn's scatter and box functions expect: one row per
+observation, carrying a ``hue`` column. ``melt_scatter_data_with_xvar`` repeats a named column of
+the frame as x, ``melt_scatter_data_with_xdata`` takes x from outside it, and
+``melt_signed_paired_df`` returns a dict keyed by ``SignCondition``: TREND and REVERSION for the
+same-sign and opposite-sign pairs, NONE for their union rather than for a third bucket.
 """
 # packages
 import pandas as pd

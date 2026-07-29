@@ -1,5 +1,7 @@
 """
-compute descriptive data table
+a duplicate of ``qis/perfstats/desc_table.py``: the same ``DescTableType`` and
+``compute_desc_table``, plus a ``run_local_test`` block. Nothing imports this copy - the exported
+symbols come from the ``perfstats`` module, which is the one to change.
 """
 # packages
 import numpy as np

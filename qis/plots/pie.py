@@ -1,5 +1,7 @@
 """
-pieplot
+a pie chart of one column of a frame, wedges labelled by the index and sized by value.
+``plot_pie`` is the only entry point: ``y_column`` picks the column and defaults to the first,
+and ``autopct`` formats the percentage written on each wedge.
 """
 # packages
 import warnings

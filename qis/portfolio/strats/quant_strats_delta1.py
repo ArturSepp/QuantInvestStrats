@@ -1,3 +1,12 @@
+"""
+two delta-one strategy simulations, used as examples and as reference implementations:
+``simulate_vol_target_strats`` scales each asset by ``vol_target`` over its EWM volatility and
+returns weights and navs; ``simulate_trend_strats`` multiplies that by a unit-variance EWM trend
+signal and returns weights, navs and the signal. Weights are applied lagged one period. The
+``*_range`` variants sweep one span each - ``vol_spans``, and ``tf_spans`` with ``vol_span`` held
+fixed - and prepend the underlying prices to the navs frame unless ``add_asset`` is off. Neither
+returns a portfolio object, so a report over them goes through ``qis.backtest_model_portfolio``.
+"""
 
 # packages
 import numpy as np

@@ -1,3 +1,8 @@
+"""
+how much history each instrument in a panel has: a horizontal bar per ticker from its first to
+its last non-nan price. ``plot_price_history`` draws the bars, ``generate_price_history_report``
+puts them beside a risk-adjusted performance table on one page.
+"""
 import matplotlib.pyplot as plt
 import pandas as pd
 import qis as qis

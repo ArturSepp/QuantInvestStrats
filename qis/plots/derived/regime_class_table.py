@@ -1,5 +1,9 @@
 """
-plot tables for regime classification
+a table of ``y_column`` summarised within quantile buckets of ``x_column`` - bucket frequency,
+count, mean and standard deviation - for reading how one variable behaves conditional on another.
+``get_quantile_class_table`` computes it and ``plot_quantile_class_table`` draws it.
+``y_data_lag`` shifts y after the frame has been sorted by x, so it pairs neighbours in x rather
+than lagging in time.
 """
 # packages
 import numpy as np

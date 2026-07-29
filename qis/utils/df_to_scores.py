@@ -1,11 +1,10 @@
 """
-DataFrame Scoring and Normalization Functions
-
-This module provides various functions for computing normalized scores and rankings
-from pandas DataFrame and Series data. The functions support cross-sectional scoring,
-max normalization, score aggregation, and top quantile selection operations commonly
-used in financial analysis, research rankings, and data science workflows.
-
+turning raw values into comparable scores: cross-sectional z-scores, max normalisation and their
+aggregation. ``df_to_cross_sectional_score`` standardises each row, applying
+``lower_clip``/``upper_clip`` to the raw values first, so the clip bounds the input rather than
+the score. ``compute_aggregate_scores`` combines several score series as a nan-sum scaled by
+1/sqrt(n) when ``penalise_nan_values``, which is not a mean, and ``select_top_integrated_scores``
+keeps only rows above ``top_quantile`` on every score at once. Scores are signals, not weights.
 """
 import warnings
 import numpy as np

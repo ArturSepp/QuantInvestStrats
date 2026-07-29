@@ -1,6 +1,7 @@
 """
-file utils to work with sql_engine
-requires SQLAlchemy>=2.0.0
+read and write a dict of DataFrames through a SQLAlchemy engine, one table per dict key.
+``get_engine`` builds the engine from a connection string in ``settings.yaml``;
+``save_df_dict_to_sql`` writes the dict and ``load_df_dict_from_sql`` reads it back.
 """
 
 

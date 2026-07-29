@@ -1,5 +1,7 @@
 """
-line plot
+line plots drawn with seaborn, of every column of a frame against its index or of named ``x``
+and ``y`` columns split by an optional ``hue``. ``plot_line`` is the entry point;
+``plot_lines_list`` draws several x-y frames on one axis and annotates individual points.
 """
 # packages
 import warnings

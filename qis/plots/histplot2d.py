@@ -1,5 +1,7 @@
 """
-plot histogram 2d
+a two-dimensional histogram of the two columns of a frame, binned by ``sns.histplot`` and shaded
+by probability. ``plot_histplot2d`` is the only entry point: ``add_corr_legend`` puts the
+Spearman rank correlation and its p-value in the legend, and ``a_min``/``a_max`` clip first.
 """
 # packages
 import warnings

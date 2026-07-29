@@ -1,3 +1,9 @@
+"""
+returns of one or more assets scattered against a benchmark's, with a fitted relationship.
+``plot_returns_scatter`` is the only entry point: prices are converted to returns at ``freq``,
+optionally divided by their own standard deviation under ``is_vol_norm``, melted into long form
+and drawn by ``plot_scatter`` with a degree-``order`` fit and a ``ci`` confidence band.
+"""
 # packages
 import numpy as np
 import pandas as pd

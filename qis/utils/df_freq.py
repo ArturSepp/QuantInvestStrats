@@ -1,5 +1,9 @@
 """
-utilities to apply frequencies
+resampling a panel onto another frequency or onto another series' index, with the closed-period
+convention made explicit. ``df_asfreq`` samples the last observation at or before each scheduled
+date, while ``df_resample_at_freq`` and ``df_resample_at_other_index`` aggregate within the period
+by ``agg_func`` and, under ``include_end_date``, carry a final partial period through
+``agg_remained_data_on_right`` rather than discarding it.
 """
 import warnings
 import numpy as np

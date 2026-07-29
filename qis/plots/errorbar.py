@@ -1,5 +1,8 @@
 """
-errorbar plot
+point estimates with error bars, one series per column of a frame, drawn through ``ax.errorbar``.
+``plot_errorbar`` is the only entry point: ``y_std_errors`` sets the bar half-widths as a scalar,
+as a Series applied to every column, or as a frame read column by column, and ``exact`` overlays
+a reference series as scatter points.
 """
 
 # packages

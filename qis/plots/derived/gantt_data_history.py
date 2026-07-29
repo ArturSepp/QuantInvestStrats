@@ -1,6 +1,8 @@
 """
-plot gantt figure showing price data history
-requires plotly package
+data-availability gantt charts, drawn with plotly rather than matplotlib and returning a
+``go.Figure``. ``plot_price_history`` shows one bar per instrument over its live history and
+``plot_backfill_history`` shows where a series is vendor data and where it is backfilled.
+Requires the optional ``plotly`` dependency.
 """
 
 import numpy as np

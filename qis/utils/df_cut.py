@@ -1,6 +1,10 @@
 """
-implementation for infinite lower and upper bounds for pd.cut with wrapper
-https://stackoverflow.com/questions/30127427/pandas-cut-with-infinite-upper-lower-bounds
+bucketing a variable into labelled bins on top of ``pd.cut``. ``x_bins_cut`` is the primitive:
+``lower_infinite`` and ``upper_infinite`` extend the outer bins to +-inf, so values outside the
+supplied edges are captured rather than dropped to nan, and on that path it returns the
+categorical with its labels - with both flags off it passes ``pd.cut`` straight through and
+returns the categorical alone. ``add_classification`` and ``add_quantile_classification`` attach
+the result to a frame as a hue column, the latter taking its edges from ``np.nanquantile``.
 """
 import numpy as np
 import pandas as pd

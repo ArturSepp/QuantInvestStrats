@@ -1,3 +1,8 @@
+"""
+stacked area or stacked bar charts of the columns of a frame. ``plot_stack`` is the only entry
+point: ``use_bar_plot`` switches from ``ax.stackplot`` to a stacked bar chart, and
+``add_mean_levels`` or ``add_cum_levels`` annotate per-column horizontal levels.
+"""
 # packages
 import warnings
 import numpy as np

@@ -1,5 +1,8 @@
 """
-plot returns heatmap table by monthly and annual
+the distribution of the benchmark's own returns, split by the regimes its quantiles define, drawn
+as overlaid densities in the classifier's colours. ``plot_regime_pdf`` is the only entry point:
+``is_histogram`` switches from the kernel density to bars, and ``is_multiple_stack`` stacks the
+regimes rather than overlaying them - it applies to the histogram branch only.
 """
 # packages
 import pandas as pd

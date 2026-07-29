@@ -1,5 +1,9 @@
 """
-utiliti
+splitting a date range into training and live windows for out-of-sample work.
+``split_to_train_live_samples`` builds update dates by calendar at ``model_update_freq`` between
+the first and last index dates - they need not be members of the index - and pairs each with the
+``roll_period`` window before it and the period after, as ``TrainLiveSamples`` of
+``TrainLivePeriod``. ``split_to_samples`` cuts the data itself into per-period frames.
 """
 # packages
 import pandas as pd

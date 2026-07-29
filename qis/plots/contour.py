@@ -1,5 +1,8 @@
 """
-2-d countrur plot
+filled contour plots of a value ``z`` sampled on an ``x`` by ``y`` grid, with a formatted colour
+bar. ``plot_contour`` draws a single panel and ``contour_multi`` a row of panels sharing axes,
+one per entry of ``zs``. ``plot_contour`` takes a ``fig`` rather than an ``ax``, since the colour
+bar is a figure-level artist; ``contour_multi`` builds its own figure at ``figsize``.
 """
 
 # packages

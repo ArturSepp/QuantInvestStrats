@@ -1,5 +1,9 @@
 """
-compute seasonal strategy using monthly returns
+a monthly seasonality signal: +1 for a calendar month whose 40th percentile of historical returns
+is positive, -1 where its 60th percentile is negative, 0 otherwise - a ternary position by month,
+not a distribution. ``compute_seasonal_signal`` fits it on the whole sample;
+``compute_rolling_seasonal_signals`` refits on a trailing ``num_sample_years`` window, but walks a
+hard-coded 2000 to 2024, so it does not follow the span of the prices passed to it.
 """
 
 import numpy as np
