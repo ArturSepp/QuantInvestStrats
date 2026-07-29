@@ -15,11 +15,18 @@ the record carries a value and the commit it was measured at.
 Run it from the repository root::
 
     python tools/paper_audit.py            # rewrite docs/audit/paper_numbers.json
-    python tools/paper_audit.py --check    # exit 1 if the file is out of date, write nothing
+    python tools/paper_audit.py --check    # exit 1 unless the record is the truth, write nothing
 
-``--check`` prints the metrics that moved and writes nothing. It is not wired into CI: the git
-metrics move on every commit, so a CI gate on them would fail on every push.
-``qis/tests/test_paper_audit.py`` enforces the part that holds still.
+``--check`` writes nothing and fails closed. It exits 1 on three conditions: a recorded value
+that moved, a measurement that could not be taken at all, and a record whose metric names are not
+the names measured here. The second and third matter more than the first. The comparison iterates
+over the metrics this run measured, so losing a whole measurement class - an absent
+``consumers.json``, a collection that will not run - used to drop those metrics out of the
+comparison and return 0, and an incomplete check that reports success is worse than no check.
+Plain write mode is unaffected: it prints the same warnings and writes the record anyway, because
+a partial record is still the best measurement available and its gaps are visible in the file.
+``--check`` is not wired into CI: the git metrics move on every commit, so a CI gate on them would
+fail on every push. ``qis/tests/test_paper_audit.py`` enforces the part that holds still.
 
 ``measured_at_commit`` is the commit that was checked out when the record was written, which is
 the parent of the commit that carries the record. It cannot be otherwise: writing the value would
@@ -307,7 +314,8 @@ def main() -> int:
     """write or check the record; returns the process exit code."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true',
-                        help='exit 1 when the record is out of date instead of rewriting it')
+                        help='exit 1 when the record is out of date, incomplete, or carries a '
+                             'different set of metrics, instead of rewriting it')
     arguments = parser.parse_args()
 
     result = measure()
@@ -321,7 +329,19 @@ def main() -> int:
             print(f'{RECORD_PATH} does not exist; run python tools/paper_audit.py',
                   file=sys.stderr)
             return 1
+        if len(result.warnings) > 0:
+            print(f'{len(result.warnings)} measurement(s) above could not be taken, so this '
+                  f'comparison would cover less than the record does', file=sys.stderr)
+            return 1
         current = json.loads(RECORD_PATH.read_text(encoding='utf-8'))
+        measured_names = set(record['metrics'])
+        recorded_names = set(current.get('metrics', {}))
+        if measured_names != recorded_names:
+            for name in sorted(recorded_names - measured_names):
+                print(f'{name}: in {RECORD_PATH.name}, not measured here', file=sys.stderr)
+            for name in sorted(measured_names - recorded_names):
+                print(f'{name}: measured here, not in {RECORD_PATH.name}', file=sys.stderr)
+            return 1
         moved = [name for name, metric in record['metrics'].items()
                  if current['metrics'].get(name, {}).get('value') != metric['value']]
         if len(moved) > 0:
