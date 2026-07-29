@@ -54,6 +54,19 @@ TODO_BLOCK = re.compile(r'\[TODO:.*?\]', flags=re.S)
 
 AI_COAUTHOR: str = 'Claude'  # the trailer identity disclosed in the paper's AI usage section
 
+# the sentence each consumer count is quoted inside, as a template over the measured value. A
+# bare number cannot be used: '94' is satisfied by the citation key politis1994, so that check
+# would have stayed green on a manuscript that had stopped quoting the count altogether.
+# privateassets is None in both positions because the paper cites it for the range of asset
+# classes it serves and quotes no figure for it - a phrase that binds nothing is a check that
+# cannot fail. A consumer absent from this table gets no phrase, which is the right default: it
+# means the manuscript does not quote it yet.
+CONSUMER_PHRASES: Dict[str, Dict[str, Optional[str]]] = {
+    'optimalportfolios': dict(symbols='references {value} of its', call_sites='at {value} sites'),
+    'trendfollowing': dict(symbols='references {value} symbols', call_sites='at {value} sites'),
+    'privateassets': dict(symbols=None, call_sites=None),
+}
+
 
 @dataclass
 class Metric:
@@ -64,8 +77,9 @@ class Metric:
         value: the measured value
         how: the command or rule that produced it, short enough to read in the json
         live: True when a test can recompute it without git, a network or a subprocess
-        paper_phrase: the exact substring paper.md must contain, or None when the paper states
-            the quantity without a figure
+        paper_phrase: the exact fragment paper.md must contain - enough of the sentence that it
+            can match nowhere else - or None when the paper does not quote the figure at all.
+            A fragment may not span a line break, because the manuscript is matched as written
     """
     value: Any
     how: str
@@ -196,7 +210,7 @@ def measure() -> AuditResult:
         value=exports['exported_symbols'],
         how='len(qis.__all__)',
         live=True,
-        paper_phrase=str(exports['exported_symbols']))
+        paper_phrase=f"holds {exports['exported_symbols']} names")
     result.metrics['exported_module_bindings'] = Metric(
         value=exports['exported_module_bindings'],
         how='the subpackage names the wildcard re-exports leave in the namespace',
@@ -207,7 +221,7 @@ def measure() -> AuditResult:
         value=len(core_api_names()),
         how='len(qis.api.core_api_names())',
         live=True,
-        paper_phrase=f'{len(core_api_names())} symbols')
+        paper_phrase=f'documented core of {len(core_api_names())} symbols')
     result.metrics['capability_groups'] = Metric(
         value=len(CORE_API),
         how='len(qis.api.CORE_API)',
@@ -245,16 +259,20 @@ def measure() -> AuditResult:
         how='git rev-list --count HEAD',
         live=False)
     dates = _git('log', '--format=%ad', '--date=format:%Y-%m').splitlines()
-    result.metrics['active_months'] = Metric(
-        value=len(set(dates)),
-        how='distinct YYYY-MM with at least one commit',
-        live=False)
     first_date = _git('log', '--reverse', '--format=%ad', '--date=format:%Y-%m').splitlines()[0]
     last_date = dates[0]
     first_year, first_month = (int(part) for part in first_date.split('-'))
     last_year, last_month = (int(part) for part in last_date.split('-'))
+    span_months = (last_year - first_year) * 12 + (last_month - first_month) + 1
+    active_months = len(set(dates))
+    # the phrase carries both numbers, so span_months is bound to the manuscript through it
+    result.metrics['active_months'] = Metric(
+        value=active_months,
+        how='distinct YYYY-MM with at least one commit',
+        live=False,
+        paper_phrase=f'in {active_months} of the {span_months} calendar months')
     result.metrics['span_months'] = Metric(
-        value=(last_year - first_year) * 12 + (last_month - first_month) + 1,
+        value=span_months,
         how='calendar months from the first commit to the last, inclusive',
         live=False)
     result.metrics['first_commit_month'] = Metric(
@@ -284,16 +302,16 @@ def measure() -> AuditResult:
     if CONSUMERS_PATH.is_file():
         consumers = json.loads(CONSUMERS_PATH.read_text(encoding='utf-8'))
         for name, entry in consumers.get('consumers', {}).items():
-            result.metrics[f'consumer_{name}_symbols'] = Metric(
-                value=entry['distinct_symbols'],
-                how=f"tools/audit_consumers.py at {entry['commit'][:12]}",
-                live=False,
-                paper_phrase=str(entry['distinct_symbols']))
-            result.metrics[f'consumer_{name}_call_sites'] = Metric(
-                value=entry['call_sites'],
-                how=f"tools/audit_consumers.py at {entry['commit'][:12]}",
-                live=False,
-                paper_phrase=str(entry['call_sites']))
+            templates = CONSUMER_PHRASES.get(name, dict(symbols=None, call_sites=None))
+            for key, value in (('symbols', entry['distinct_symbols']),
+                               ('call_sites', entry['call_sites'])):
+                template = templates.get(key)
+                result.metrics[f'consumer_{name}_{key}'] = Metric(
+                    value=value,
+                    how=f"tools/audit_consumers.py at {entry['commit'][:12]}",
+                    live=False,
+                    paper_phrase=(None if template is None
+                                  else template.format(value=value)))
     else:
         result.warnings.append(f'{CONSUMERS_PATH.name} absent; consumer counts left unmeasured')
 
