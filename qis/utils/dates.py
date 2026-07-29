@@ -1,7 +1,33 @@
 """
-implementation of dates analytics and frequency with TimePeriod method
-construction of daate schedules and rebalancing
-support for bespoke frequencies: M-FRI, Q-FRI
+time windows, date schedules and rebalancing calendars: the date layer the rest of qis calls.
+
+``TimePeriod`` is the canonical window - a start, an end and a tz - and ``time_period.locate(df)``
+is how a frame is sliced anywhere in the stack. Masking an index by hand instead is the thing
+this class exists to prevent: ``locate`` applies one inclusive convention everywhere, and the tz
+travels with the period so a tz-aware frame is never silently compared against naive timestamps.
+Either bound may be None for an open-ended side, and both accept pd.Timestamp, datetime, str,
+int or an Enum wrapping one of those.
+
+``generate_dates_schedule`` turns a window and a frequency into a tz-aware index. Beyond the
+pandas offset aliases ('B', 'W-WED', 'ME', 'QE') it recognises four bespoke frequencies:
+``'SE'`` for the endpoints only, ``'M-FRI'`` and ``'Q-FRI'`` for the last Friday of a month or
+quarter, ``'Q-3FRI'`` for the third Friday of the quarter's last month - the listed-derivative
+expiry - and the ``'<freq>_<n>H'`` form for a schedule anchored to an intraday fixing.
+
+``generate_rebalancing_indicators`` is the step that matters for a backtest. It builds the
+schedule, then marks each *observation* date on or after a scheduled date, so rebalancing lands
+on dates the data actually has rather than on a calendar date that fell on a holiday. Its
+boolean series is the ``is_rebalancing`` input the backtester consumes;
+``create_rebalancing_indicators_from_freqs`` does the same per ticker when instruments rebalance
+on different calendars, and ``num_warmup_periods`` holds the first rebalancing back until an
+estimator has data.
+
+``FreqMap`` maps a frequency alias to a caption and to business- and calendar-day counts. Those
+counts are period lengths, not annualisation factors: periods per year come from
+``qis/utils/annualisation.py``, which reads the frequency string or infers it from an index.
+
+Also here: ``generate_sample_dates`` and ``split_df_by_freq`` for overlapping windows, and
+``generate_fixed_maturity_rolls`` for the roll schedule of a fixed-maturity instrument.
 """
 
 from __future__ import annotations  # to allow class method annotations

@@ -1,5 +1,35 @@
 """
-define transform for ra returns
+risk-adjusted returns: divide by an EWM volatility, then build signals on the result.
+
+The primitive is ``compute_ra_returns``:
+
+    w_t = vol_target / sigma_t,   ra_t = w_t r_t
+
+with sigma an EWM volatility at ``span`` or ``ewm_lambda``. Two conventions hold throughout.
+The weight is lagged by ``weight_lag``, 1 by default, so the scaling applied over [t, t+1] uses
+the volatility known at t and the construction carries no look-ahead. And ``vol_target=None``
+means a non-dimensional unit target rather than no scaling: the output is then in units of risk,
+comparable across assets and summable across a panel, but not a tradeable return stream. Pass an
+explicit target to size a position. The function returns the triple (ra_returns, weights,
+ewm_vol), since the weights and the vol are usually wanted alongside.
+
+``vol_floor_quantile`` floors sigma at a rolling quantile of itself, so a quiet sample does not
+produce an unbounded weight; ``is_log_returns_to_arithmetic`` converts back with expm1 before
+scaling, for the common case where the vol was estimated on log returns.
+
+``compute_ewm_long_short_filtered_ra_returns`` is the trend primitive built on top: normalise by
+vol, then take the difference of a fast and a slow EWM to isolate the medium-frequency
+component. Every span drives λ = 1 - 2/(span + 1) and must be at least 1; below that the
+recursion alternates sign instead of smoothing, which on the vol leg yields a negative variance
+and NaN, so the spans are validated rather than trusted.
+
+``map_signal_to_weight`` turns a signal into a weight through a CDF - ``SignalMapType`` selects
+normal, Laplace or exponential - with separate tail levels and slopes for the two sides.
+``compute_returns_transform`` dispatches over ``ReturnsTransform`` for the rolling and momentum
+variants.
+
+Turning weights into a portfolio is ``qis.backtest_model_portfolio``; the EWM estimators
+themselves are ``qis/models/linear/ewm.py``.
 """
 # packages
 import numpy as np

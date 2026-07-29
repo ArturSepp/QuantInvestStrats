@@ -1,10 +1,34 @@
 """
-Compute risk-adjusted performance tables.
+the risk-adjusted performance table: one price panel in, one row of statistics per asset out.
 
-This module provides the core performance and risk analytics for the QIS framework,
-including return statistics, drawdown analysis, factor regressions, and information
-ratios. All public function signatures are preserved for backward compatibility with
-downstream modules.
+``compute_ra_perf_table`` is the entry point and assembles two halves -
+``compute_performance_table`` for the return metrics and ``compute_risk_table`` for volatility,
+drawdowns and higher moments - then derives the ratio family from them. Every column is a
+``PerfStat`` member, and the ``*_TABLE_COLUMNS`` tuples at the top of the module are the
+presets that reporting functions select from; downstream code depends on their order.
+
+Nothing here is frequency-free. ``PerfParams`` carries the sampling grid for each statistic
+separately - ``freq_vol`` for the Sharpe denominator, ``freq_reg`` for the regressions,
+``freq_drawdown`` at 'D' so the peak-to-trough path is not smoothed onto the reporting grid -
+and volatility computed on monthly returns is a different number from volatility computed on
+daily returns, not a rescaling of it. State the frequency wherever a number is quoted.
+
+Sharpe is not one statistic. The table emits the conventions side by side as distinct columns,
+so the choice is made by picking a column rather than by a flag: ``SHARPE_RF0`` over p.a.
+return, ``SHARPE_EXCESS`` over p.a. excess return, ``SHARPE_LOG_AN`` and ``SHARPE_LOG_EXCESS``
+on annualised log returns, and the arithmetic pair from ``compute_sharpe_arithmetic``,
+
+    SR = sqrt(af) E[r] / sqrt(Var[r])
+
+computed inside ``compute_risk_table`` so numerator and denominator share one return series.
+Every excess variant needs ``PerfParams.rates_data``; without it those columns are undefined.
+``PerfParams.sharpe_convention`` labels which object a *regime* Sharpe reports and is read in
+``qis/perfstats/regime_classifier.py``, not here. Full reconciliation in
+``qis/docs/sharpe_conventions.md``.
+
+Drawdowns live here too - ``compute_rolling_drawdowns``, ``compute_max_current_drawdown``,
+``compute_drawdowns_stats_table`` for the episode table. Regime-conditional versions of these
+statistics belong in ``qis/perfstats/regime_classifier.py``.
 """
 # packages
 import numpy as np

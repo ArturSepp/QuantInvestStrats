@@ -1,5 +1,34 @@
 """
-import qis.plots.derived as put
+the shared plotting layer: what every ``plot_*`` function in qis does to its axis.
+
+Nothing here draws a chart. These are the operations a chart function performs around its own
+marks - titles, tick formats, spines, limit alignment across paired axes, date axes, legends,
+colour sequences, table sizing - factored out so that a title, a percentage format or a legend
+means the same thing on every panel of a factsheet.
+
+Four things are public, and they are the ones that appear in a caller's signature:
+
+    ``TrendLine``   the overlay drawn on a series - none, mean, zero line, fitted trend, each
+                    with or without a shaded band
+    ``LastLabel``   whether and how the final point of a line is annotated
+    ``LegendStats`` which summary statistics the legend prints beside each series name
+    ``set_suptitle``  the figure-level title above a grid of axes
+
+Everything else is internal machinery, imported by full path
+(``from qis.plots.utils import set_spines``) rather than through the package namespace, and may
+change without a deprecation.
+
+The kwargs contract is what to know before calling anything here. Styling arguments travel
+through ``**kwargs`` from the caller down to these helpers, and an argument a helper does not
+recognise is ignored rather than rejected: that is what lets one
+``**qis.fetch_default_report_kwargs()`` configure a whole factsheet whose panels take different
+options. The cost is that a misspelled keyword fails silently. The shared arguments and their
+exact spelling are documented once in ``qis/docs/plotting_kwargs.md``; check there rather than
+guessing, and a helper that reads a shared keyword differently from the others is a defect to
+report, not a local convention.
+
+Colour selection also lives here - ``get_n_colors`` and the fixed, matplotlib, cmap and seaborn
+variants behind it - so that series colours are stable across the panels of one report.
 """
 
 # packages

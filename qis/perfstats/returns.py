@@ -1,8 +1,34 @@
 """
-Core performance attribution and return calculations.
+the return conventions of the stack: prices to returns, returns to nav, and back.
 
-This module provides fundamental functions for computing returns, volatilities,
-and performance metrics from price data.
+Everything downstream - performance statistics, factsheets, backtest attribution - reads its
+numbers through this module, so a convention set here is a convention everywhere.
+
+The conversion is stated, never implied. ``to_returns`` takes ``is_log_returns`` or the fuller
+``return_type``, and the two are not a rescaling of each other:
+
+    RELATIVE   r = S1 / S0 - 1     additive across assets within a period
+    LOG        r = ln(S1 / S0)     additive across periods for one asset
+
+``returns_to_nav`` and ``log_returns_to_nav`` invert them on the matching convention; passing
+log returns to the arithmetic inverse compounds the wrong quantity and raises nothing. Prices
+are resampled by ``prices_at_freq`` before differencing, so ``freq`` selects the return
+frequency rather than resampling returns after the fact, and non-positive prices are masked to
+NaN rather than producing a spurious return.
+
+Annualisation is geometric and driven by elapsed calendar time, not by observation count:
+``compute_pa_return`` raises the total return to 1/num_years, where num_years counts calendar
+days over 365.25. Samples shorter than a year are returned untouched unless
+``annualize_less_1y`` asks for linear scaling, which is the safer default for a young track
+record. Volatility is annualised by the periods-per-year implied by the index frequency,
+inferred in ``qis/utils/annualisation.py`` rather than assumed here.
+
+Main entry points: ``to_returns``, ``returns_to_nav``, ``compute_total_return``,
+``compute_pa_return``, ``compute_sampled_vols``, and ``compute_excess_returns``, which subtracts
+an annualised ``rates_data`` series lagged one period, so the funding cost charged at t is the
+rate observable at t-1. Leverage and fee arithmetic - ``lever_returns``, ``delever_returns``,
+``compute_net_navs_ex_perf_man_fees`` - is here because it is a return transform; ratio
+statistics such as Sharpe are assembled in ``qis/perfstats/perf_stats.py``.
 """
 # packages
 import warnings

@@ -1,10 +1,34 @@
 """
-FX rates data container.
+``FxRatesData``: spot rates and domestic short rates, and everything currency conversion needs.
 
-Holds FX spot rates and domestic short rates and derives cross rates, CIP
-forward premia, carry decomposition, and reference-currency conversions. The
-container loads from CSV (or a SQL/Ramen source via ``from_sql``); the data is
-built upstream — see the Bloomberg builder in the production layer, not here.
+Two panels on one index: ``fx_spots``, quoted as USD per one unit of each currency, and
+``domestic_rates``, the annualised short rate per currency. Rates are reindexed onto the spot
+dates and forward filled on construction, so the two never drift apart.
+
+The quote convention is the thing to get right, because it is what makes every downstream sign
+correct. Each spot column is USD per 1 unit of that currency, so USD is identically one and a
+cross rate is a ratio of two columns: ``get_local_to_reference_fx_rate('EUR', 'CHF')`` returns
+CHF per EUR - units of the *reference* currency per one unit of the *local* one.
+
+Carry follows from covered interest parity rather than from a forward panel. Over one period of
+length dt = 1 / annualisation_factor(freq) the premium earned on the local currency is
+
+    simple:  (1 + dt r_loc) / (1 + dt r_ref) - 1
+    log:     log( (1 + dt r_loc) / (1 + dt r_ref) )
+
+and the total return of holding a currency pair splits into the spot return of the cross and
+this premium, lagged one period so that the rate earned over [t, t+1] is the one set at t.
+``is_log_returns`` selects the convention and both legs honour it.
+
+Main entry points: ``get_local_to_reference_fx_rate`` and ``get_local_rate`` for the raw
+quantities, ``get_fx_total_return_nav`` and ``get_carry_fx_return_nav`` for a tradeable pair,
+``build_local_cash_nav`` and ``build_cross_fx_cash_nav`` for money-market legs, and
+``compute_returns_in_reference_ccy`` / ``compute_fx_adjusted_returns`` to move a whole asset
+panel into a reference currency at supplied ``hedge_ratios``.
+
+Loading is from the CSV pair written by the data layer, through ``FxRatesData.load`` or
+``load_fx_rates_data``; building that data from a vendor is ``bbg-fetch``, not this module.
+Choosing the hedge ratio rather than applying it is ``qis/market_data/fx_hedging.py``.
 """
 from __future__ import annotations
 

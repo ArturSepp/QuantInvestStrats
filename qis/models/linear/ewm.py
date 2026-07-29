@@ -1,5 +1,39 @@
 """
-implementation of exponentially weighted mean (ewm) filter using numpy and lambda
+the exponentially weighted moving-average engine: one recursion, and everything built on it.
+
+Every estimator here is the same recursion,
+
+    s_t = (1 - λ) x_t + λ s_{t-1}
+
+applied to the observations for a mean, to their squares for a variance, and to outer products
+for a covariance or a beta. Decay is given as ``ewm_lambda`` or as ``span``, which overrides it
+through λ = 1 - 2/(span + 1). That is the pandas span-to-decay mapping, but the recursion is
+run unadjusted, so it matches ``.ewm(span=..., adjust=False)`` and not the ``.ewm()`` default.
+The column-wise path takes a vector decay, one per column; the covariance kernels take a scalar.
+
+Four enums carry the conventions, and they are the arguments worth getting right:
+
+    ``NanBackfill`` what the recursion carries across a missing observation: ``FFILL`` holds the
+        last state, ``DEFLATED_FFILL`` decays it by λ, ``ZERO_FILL`` resets it to zero.
+        ``NAN_FILL`` is honoured only by the covariance tensors and is zero fill elsewhere
+    ``MeanAdjType`` which mean is removed before a second moment is taken. ``NONE`` is the
+        second moment about zero, the usual choice for returns; ``INSAMPLE`` subtracts the
+        full-sample mean and is forward-looking, so descriptive exhibits only, never inside a
+        backtest; ``EXPANDING`` and ``EWMA`` are point-in-time given a point-in-time seed
+    ``InitType`` how the recursion is seeded - and ``MEAN`` and ``VAR`` seed it with full-sample
+        statistics, so they carry the same look-ahead near the start of the sample as
+        ``INSAMPLE`` does throughout. ``CrossXyType`` selects covariance, beta or correlation
+
+Two layers, and the difference matters at the call site. ``compute_ewm`` and ``compute_ewm_vol``
+are wrappers: they take pandas or ndarray, preserve the container, and handle the NaN policy,
+the warmup mask and annualisation. ``compute_ewm_covar`` for the covariance at the last date,
+``compute_ewm_covar_tensor`` for the (t, n, n) tensor at every date and
+``compute_ewm_xy_beta_tensor`` for rolling multivariate betas are ndarray-only - pass
+``.to_numpy()`` and rebuild the frame yourself. Second moments are per period unless
+annualisation is asked for; the factor is inferred from the index frequency of pandas input,
+and a bare ndarray, having no frequency, falls back to 1 with a warning.
+
+Factor-structured covariance belongs in ``factorlasso``, not here.
 """
 # packages
 import warnings

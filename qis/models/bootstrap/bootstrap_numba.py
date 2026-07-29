@@ -1,5 +1,33 @@
 """
-implementation of bootstrap methods in numba
+resampling with replacement: iid, stationary and fixed-block bootstraps, in numba.
+
+The module is organised around one separation. ``generate_bootstrapped_indices`` draws integer
+indices and touches no data; the ``bootstrap_*`` functions map those indices onto data. Drawing
+once and applying the same index array to several aligned panels is how a *paired* resample
+keeps the joint structure across panels, and it is why the index primitive is public.
+
+``BootstrapType`` selects the scheme. IID draws single observations and destroys
+autocorrelation. STATIONARY is Politis-Romano (1994): blocks start uniformly and run for a
+geometric number of periods with mean ``block_size``, so short-range dependence survives.
+FIXED_BLOCK uses blocks of exactly ``block_size``, for a length matched to a known cycle rather
+than drawn. ``min_block_size`` floors the drawn length, which matters when the panel mixes
+reporting frequencies.
+
+Blocks wrap circularly, ``(start + k) mod n``. Without the wrap a block drawn near the end of
+the sample is cut short, the realised block length is no longer geometric there, and the last
+observations can only ever appear in short blocks. STATIONARY gained the wrap in 5.1.0, so any
+result resampled under an earlier version does not reproduce.
+
+Draws are reproducible through ``seed``, which sets both the numpy and the numba random state -
+setting ``np.random.seed`` alone does not reach the ``@njit`` kernels.
+
+Entry points: ``generate_bootstrapped_indices`` for indices, ``bootstrap_data`` for a series or
+panel, ``bootstrap_price_data`` which resamples returns and recompounds them into prices rather
+than resampling price levels, ``bootstrap_ar_process`` for a fitted AR(1) with resampled
+residuals, and ``bootstrap_price_fundamental_data`` for prices carrying aligned fundamentals.
+``BootstrapOutput`` sets whether a draw set comes back as a DataFrame of columns or a list of
+arrays. Confidence intervals and the statistics computed on the draws are the caller's; this
+module only resamples.
 """
 
 import numpy as np

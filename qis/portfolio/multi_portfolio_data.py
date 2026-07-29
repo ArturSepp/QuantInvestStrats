@@ -1,5 +1,33 @@
 """
-core implementation of baktest report focus on strategy and comparison vs benchmark stategy
+``MultiPortfolioData``: a family of related portfolios reported together against one benchmark.
+
+Each member is a ``PortfolioData`` that keeps its own weights, costs and grouping. What this
+layer adds is what only exists across members: a shared ``benchmark_prices`` panel, a shared
+``covar_dict``, and the pairwise statistics that follow from them. The members' navs are
+collected into ``navs`` in ``__post_init__`` and every accessor works off that frame; the
+benchmark panel is reindexed onto it and forward filled, so members at different frequencies
+still align.
+
+Two portfolios are compared by index rather than by name, ``strategy_idx`` against
+``benchmark_idx``, defaulting to the first two:
+
+    ex-ante tracking error is the quadratic form on the shared covariance,
+    TE_t = sqrt(Δw_t' Σ_t Δw_t) with Δw the difference of *input* weights reindexed onto the
+        covariance dates. It needs ``covar_dict`` and raises without it. Grouped, the same form
+        is evaluated on each group's block of Σ.
+
+    realised tracking error, in ``compute_tracking_error_table``, is per-instrument
+        mean(Δpnl) / std(Δpnl) on the attribution tables, with turnover and costs annualised by
+        ``annualization_factor``, 260 by default.
+
+    Brinson attribution splits active return into allocation, selection and interaction on
+        *realised* weights; ``is_exclude_interaction_term=True`` by default folds interaction
+        into selection.
+
+Entry points are ``get_navs``, ``get_ra_perf_table``, ``compute_tracking_error_implied_by_covar``
+and ``compute_brinson_attribution``, plus a ``plot_*`` family drawing one panel onto a supplied
+axis. The factsheets that consume this object - the multi-strategy, strategy-versus-benchmark
+and tracking-error reports - live in ``qis/portfolio/reports/``, not here.
 """
 
 # packages

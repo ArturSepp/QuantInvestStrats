@@ -1,10 +1,37 @@
 """
-Pure FX hedging computations.
+how much of a foreign-currency exposure to hedge, and what the hedge costs.
 
-CIP-based forward/spot decomposition, FX vol/beta, and mean-variance optimal
-hedge ratios. All functions operate on plain price/return Series and hold no
-state; the stateful container lives in ``fx_rates_data.FxRatesData`` and the
-reporting pipeline in ``reports.fx_hedging_report``.
+Stateless: plain pandas objects in, plain pandas objects out, no container to construct. The
+single-pair functions work on Series and the panel functions on frames. The container that holds
+the spot and rate panels is ``FxRatesData`` in ``qis/market_data/fx_rates_data.py``, and the
+report built on these numbers is ``qis/market_data/reports/fx_hedging_report.py``.
+
+A holding in a foreign asset earns three things - the local return, the FX return on the cross,
+and the forward premium given up on whatever fraction is hedged:
+
+    r_hedged = r_local (1 + r_fx) + (1 - h) r_fx - h f
+
+with h the hedge ratio in [0, 1] and f the per-period CIP forward premium. Both h and f enter
+lagged one period, so the return realised over [t-1, t] uses the hedge decided and the forward
+contracted at t-1 - the construction carries no look-ahead. The first period is set to zero so
+the nav starts at 1.0 rather than inheriting the lag's NaN. The cross-product term
+r_local * r_fx is kept rather than dropped, so the decomposition is exact in simple returns.
+
+``compute_fx_optimal_hedge`` is the mean-variance choice of h. From an EWMA FX variance and the
+beta of the local return on the FX return it builds
+
+    carry ratio = (annualised f / var_fx) / (2 λ),  Optimal h = 1 - carry ratio + β_fx
+
+alongside the two reference ratios it is read against: ``Max Carry`` = 1 - carry ratio, the pure
+carry tilt, and ``Beta Hedge`` = 1 + β_fx, which removes only the exposure the beta implies. All
+three are clipped to ``min_max_hedge``, (0, 1) by default; λ is ``risk_aversion_lambda``, and a
+larger λ tilts less on carry.
+
+Also here: ``compute_local_and_fx_return`` for the two-leg decomposition,
+``compute_fx_vol_beta`` for the EWMA inputs, ``get_aligned_fx_spots`` to attach the right spot
+series to each instrument in a panel, and ``compute_futures_fx_adjusted_returns`` /
+``compute_cash_fx_adjusted_returns`` - which differ because a futures position converts only its
+pnl while a cash position converts its whole notional.
 """
 from __future__ import annotations
 

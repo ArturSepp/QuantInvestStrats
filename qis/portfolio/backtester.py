@@ -1,5 +1,31 @@
 """
-create total return blended portfolios based on weights
+weights and prices in, a ``PortfolioData`` out: the total-return simulation of a rebalanced
+portfolio.
+
+``backtest_model_portfolio`` is the entry point and the only one most callers need. It accepts
+target weights as a Dict, Series or DataFrame - aligned to ``prices.columns`` by name - or as a
+list or array, which is positional. A fixed weight vector is applied on the calendar anchor in
+``rebalancing_freq``; a DataFrame of weights supplies its own dates and the anchor is ignored.
+
+The simulation holds units between rebalancings, not weights. Units are set at a rebalancing as
+u_t = nav_t w_t / p_t and held until the next one, so realised weights drift with prices and the
+reported turnover is what was actually traded. A weighted average of instrument returns is a
+different number, and the difference is exactly this drift.
+
+Costs are proportional to traded notional, in fractional units:
+
+    cost_t = c_t p_t |Δu_t|,   c in fractional units: c = 0.0010 is 10 bp
+
+``rebalancing_costs`` takes a float applying everywhere, a Series indexed by ticker for a
+per-instrument cost constant in time, or a (t, n) DataFrame of dates x tickers, forward filled
+onto the price dates so a schedule stated on era boundaries applies from each boundary onward.
+Dates before the first schedule row are costless. A date-indexed Series is rejected as
+ambiguous. ``funding_rate`` accrues on the cash balance, ``management_fee`` on nav and
+``instruments_carry`` per instrument, all annualised and converted to the price grid.
+
+``backtest_rebalanced_portfolio`` is the numba kernel underneath: a genuine recursion in nav and
+cash balance, which is why it is not vectorized. Rolling an optimisation through time is
+``optimalportfolios``; the reporting of what comes out is ``qis/portfolio/reports/``.
 """
 
 # packages

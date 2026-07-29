@@ -1,3 +1,40 @@
+"""
+the ``PortfolioData`` contract: what a backtest result carries, and what may be asked of it.
+
+``PortfolioData`` is what every portfolio in the stack hands to the reporting layer. It is a
+dataclass of aligned panels - ``nav``, ``prices``, ``units``, ``weights``, ``instrument_pnl``,
+``realized_costs`` - of which only ``nav`` is required; the rest are filled in ``__post_init__``
+as a delta-one holding of the nav itself, which reports correctly but has nothing to attribute.
+
+Units, not weights, are the state carried between rebalancings. ``weights`` therefore holds the
+realised weights implied by the units held, w_t = u_t p_t / nav_t, which drift with prices away
+from the targets that were requested; ``input_weights`` keeps those targets for comparison.
+Reading ``weights`` as the target is the most common misuse of this class.
+
+Conventions that hold module-wide:
+
+    ``is_unit_based_traded_volume``, True by default, is the unit-based branch of turnover and
+        costs: turnover is traded notional over gross exposure, |Δu_t| p_t / Σ_i |u_t p_t|, and
+        costs are ``realized_costs`` divided by nav. Set it False for a backtest that produced
+        weights rather than units, and turnover becomes |Δw_t| on ``input_weights`` while costs
+        stay in currency, unnormalised. Both are summed over a rolling ``roll_period``, 260
+        observations by default.
+
+    ``instrument_pnl`` is arithmetic and additive across instruments. When not supplied it is
+        reconstructed as prices.pct_change() * weights.shift(1) with missing values filled to
+        zero, so a backtester computing pnl on another convention should pass it explicitly.
+
+    ``covar_dict``, annualised covariance by date, is read by
+        ``compute_ex_anti_portfolio_vol_implied_by_covar`` and
+        ``compute_risk_contributions_implied_by_covar`` and by nothing else here. The VaR
+        accessors do not use it; they estimate from prices and weights at ``vol_span``.
+
+Three accessor families: ``get_*`` return the stored panels sliced and aggregated, ``compute_*``
+derive risk and attribution quantities, and ``plot_*`` draw one panel, onto a supplied ``ax``
+wherever the panel is a single axis. ``AttributionMetric`` selects what is attributed and
+``SnapshotPeriod`` which summary of a risk series a snapshot panel shows. The factsheets that
+assemble these panels into a document live in ``qis/portfolio/reports/``.
+"""
 from __future__ import annotations
 
 # packages

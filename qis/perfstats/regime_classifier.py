@@ -1,9 +1,34 @@
 """
-Regime classification for performance attribution analysis.
+regime-conditional performance: partition time by what a benchmark did, then report per bucket.
 
-This module provides abstract and concrete implementations of regime classifiers
-that partition time periods based on market conditions (e.g., bull/bear markets,
-high/low volatility) for conditional performance analysis.
+A classifier resamples prices to its own ``freq``, computes benchmark returns, and labels each
+period with a regime id; ``compute_regimes_pa_perf_table`` then reports every asset conditional
+on those labels. The regime is a property of the *benchmark*, so all assets in a panel share one
+partition and their conditional statistics are comparable.
+
+``BenchmarkReturnsQuantilesRegime`` is the default and the one the factsheets use. Bucketing is
+``pd.qcut`` on benchmark returns at q = [0.0, 0.16, 0.84, 1.0] - the one-sigma cut, since
+P(Z < -1) = 15.87% rounds to 16% and the central mass is 68% against the normal's 68.27% -
+giving Bear / Normal / Bull. That default is shared with ``compute_regime_sharpe_decomposition``
+so the two agree. ``BenchmarkReturnsPositiveNegativeRegime`` splits on sign;
+``BenchmarkVolsQuantilesRegime`` buckets on realised volatility instead of return. Quantile
+edges must be unique: a constant or back-padded zero-return block raises here rather than
+surfacing as a bare pandas "Bin edges must be unique".
+
+``RegimeData`` selects which statistic the table reports - average, p.a., or Sharpe. The Sharpe
+branch is the one that needs care, and ``PerfParams.sharpe_convention`` selects it:
+
+    sr_s = sqrt(af) p_s m_s / std,   sum over regimes s of sr_s = the full-sample Sharpe
+
+is exactly additive under ARITHMETIC and LOG. PA does not decompose additively without a
+c-adjustment, which the table path applies and ``compute_regime_sharpe_decomposition`` refuses -
+that function is the returns-level counterpart for callers holding periodic returns rather than
+prices, with ``af`` explicit and no resampling.
+
+Main entry points: the three classifiers, ``compute_regimes_pa_perf_table`` on each,
+``compute_bnb_regimes_pa_perf_table`` for the benchmark case in one call, and
+``compute_regime_sharpe_decomposition``. Drawing regime shading and the regime panels is
+``qis/plots/derived/regime_data.py``; this module returns tables and colours only.
 """
 from __future__ import annotations
 
