@@ -7,6 +7,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-07-29
+
+**`backtest_model_portfolio` accepts `rebalancing_costs` as a panel of dates x tickers, and the
+numba kernel beneath it, `backtest_rebalanced_portfolio`, takes a `(t, n)` array.** A float or a
+per-instrument `pd.Series` behaves exactly as before, so a caller of the public wrapper sees
+nothing change; a date-indexed `Series` now raises rather than being read as per-instrument, and a
+direct caller of the kernel has to pass the broadcast array. Everything else in this release is
+documentation, tests and packaging metadata, most of it hardening the JOSS submission after an
+external review.
+
 ### Added
 - `backtest_model_portfolio` accepts `rebalancing_costs` as a `pd.DataFrame` of dates x
   tickers: each price date takes the last schedule row at or before it, so a cost schedule
@@ -17,23 +27,57 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - `qis/tests/test_version_metadata.py`: `pyproject.toml`, `CITATION.cff` and the `@software`
   BibTeX entry in `README.md` must carry the same version, and `date-released` must be an ISO
-  date. The three agree at 5.3.0 today; nothing had held them together, and in the sibling
-  `optimalportfolios` repository the same three read 6.3.0, 6.2.0 and versionless at one commit.
+  date. Nothing had held them together, and in the sibling `optimalportfolios` repository the
+  same three read 6.3.0, 6.2.0 and versionless at one commit.
 - `qis/tests/test_documentation.py` gains an in-page anchor check: every `#anchor` link resolves
   to a heading or an explicit `<a name>` in the same document. The README table of contents is
   thirteen such links, and a renamed section leaves the entry above it pointing nowhere with
   nothing failing.
+- `qis/tests/test_documentation.py` also reads the README's `python` blocks as one script, in
+  document order, and requires every bare name a block loads to be a builtin or a name bound in
+  a block above it. Static rather than executed: the blocks call `yfinance`, and no test here
+  may reach the network.
+- `qis/models/bootstrap/tests/test_bootstrap_convention.py` requires `paper.md` to state the
+  four values the convention example computes, at the two decimals the manuscript prints. The
+  file's failure messages had always claimed the paper quoted them; nothing read it.
 
 ### Changed
 - `backtest_rebalanced_portfolio` (the numba kernel under `backtest_model_portfolio`) takes
   `rebalancing_costs` as a `(t, n)` array; the wrapper broadcasts the scalar and
   per-instrument forms. Breaking only for direct callers of the kernel, of which the public
   consumers have none.
-- `paper.md`: the statement of need names the two comparisons a research pipeline runs and
-  extends the shared-convention argument to agentic AI tooling.
-  `docs/audit/paper_numbers.json` regenerated at `0e4c7e5`; body words 1,749 → 1,851.
+- Packaging metadata migrated to PEP 639: `license = "MIT"` with `license-files`, and the
+  deprecated `License :: OSI Approved :: MIT License` classifier removed. `build-system`
+  requires `setuptools>=77.0`, which is where that spelling is supported; this is a
+  build-from-source floor and does not affect installing the wheel.
+- Every `paper_phrase` in `docs/audit/paper_numbers.json` is a sentence-level fragment rather
+  than a bare number. `94` was satisfied by the citation key `politis1994`, so that check would
+  have passed on a manuscript that had stopped quoting the count. The two `privateassets`
+  counts carry no phrase: the paper cites the package without a figure, so those two checks
+  could not fail. `active_months` gains one.
+- `paper.md` revised after an external review: the capability table states `vectorbt` and `bt`
+  at documented-interface strength, `arch` is credited under it for the paired-resampling
+  primitive and the no-counterpart claim is scoped to the integration, the API and example
+  inventories give way to the audit record, and the body is 1,745 words against JOSS's 1,750.
+  The statement of need also names the two comparisons a research pipeline runs and extends the
+  shared-convention argument to agentic AI tooling.
 - `README.md`: the table-of-contents entry `Notebooks` is now `Runnable examples`, matching the
   section it has pointed at since the notebooks were removed, and its anchor is renamed with it.
+- `qis/docs/gallery.md` and its four screenshots moved to `docs/`. `MANIFEST.in` excludes `*.png`,
+  so the gallery shipped inside the wheel with four image links that resolved to nothing for every
+  installed user. It is a documentation page rather than a package note, and shipping the images
+  instead would have added 1.3 MB to a 730 KB wheel for four screenshots. `AGENTS.md` now states
+  the rule that decides which tree a document belongs in.
+- `README.md`'s notebooks section points at `qis/examples/` and names the four factsheet scripts.
+
+### Fixed
+- The README's example blocks used `PerfStat` twelve times without importing it, so a reader
+  pasting them in order got `NameError` at the performance table. The import is added, and the
+  new namespace check above fails if it is removed again. Three fences carrying `pip` and `git`
+  commands were labelled `python`; they are labelled `bash`.
+- `tools/paper_audit.py --check` exits nonzero on any measurement warning and on any difference
+  between the generated and the stored metric key sets. It compared only the metrics it had
+  measured, so with `docs/audit/consumers.json` absent it compared 16 of 22 and returned 0.
 
 ### Removed
 - `notebooks/`, six Jupyter notebooks last touched on 2025-07-19. They were the only documented
@@ -44,14 +88,6 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `multi_strategy.py` under `qis/examples/factsheets/`, `us_election_regimes.py` under
   `qis/examples/regimes/`, and `quickstart.py` under `qis/examples/perfstats/`. Nothing shipped in
   the wheel changes; the notebooks were never in it.
-
-### Changed
-- `qis/docs/gallery.md` and its four screenshots moved to `docs/`. `MANIFEST.in` excludes `*.png`,
-  so the gallery shipped inside the wheel with four image links that resolved to nothing for every
-  installed user. It is a documentation page rather than a package note, and shipping the images
-  instead would have added 1.3 MB to a 730 KB wheel for four screenshots. `AGENTS.md` now states
-  the rule that decides which tree a document belongs in.
-- `README.md`'s notebooks section points at `qis/examples/` and names the four factsheet scripts.
 
 ## [5.3.0] - 2026-07-27
 
