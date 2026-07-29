@@ -71,16 +71,16 @@ A README inside ```qis/examples/``` lists every script with a one-line descripti
 
 ## Installation <a name="installation"></a>
 Install using
-```python 
+```bash
 pip install qis
 ```
 Upgrade using
-```python 
+```bash
 pip install --upgrade qis
 ```
 
 Close using
-```python 
+```bash
 git clone https://github.com/ArturSepp/QuantInvestStrats.git
 ```
 
@@ -121,6 +121,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import yfinance as yf
 import qis
+from qis import PerfStat
 
 # define tickers and fetch price data
 tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'SHY', 'LQD', 'HYG', 'GLD']

@@ -1,9 +1,10 @@
 """
 the documentation agrees with the repository it documents.
 
-Three checks of the same shape, each asserting something a reader is told against the thing it
+Four checks of the same shape, each asserting something a reader is told against the thing it
 describes: a link points at a file that exists, an in-page anchor points at a section that
-exists, and the README's core dependency list is the list ``pip install qis`` actually resolves.
+exists, the README's core dependency list is the list ``pip install qis`` actually resolves, and
+every name a README code block uses is a name the blocks above it bound.
 
 **Links.** The README told a reader to run ``qis/examples/performances.py`` and to look in
 ``qis/examples/notebooks``. Neither path had existed since the examples were reorganised into
@@ -33,11 +34,27 @@ dependencies" while ``pyproject.toml`` had both in the ``[data]`` extra. A reade
 install therefore saw two packages that a core install does not pull, and the project's own rule
 is that library code never imports either. The list is hand-written prose next to a machine-read
 table, which is the same drift shape as a stale count, so it is checked rather than trusted.
+
+**Code blocks.** The README's first example imported ``matplotlib``, ``seaborn``, ``yfinance`` and
+``qis``, and then used ``PerfStat`` twice without importing it. A reader pasting the blocks in the
+order they are written got ``NameError`` at the performance table, and the example script the
+block was copied from carries the import the README lacked. The blocks are therefore read as one
+script: every bare name loaded in a block must be a builtin, a name bound in a block above it, or
+a name bound somewhere in the same block.
+
+The resolution is static, and that is a deliberate departure from executing the blocks. They call
+``yfinance``, so running them needs the network, which no test in this repository may reach.
+Resolving names against an accumulated namespace catches the whole undefined-name class - the
+defect above included - without leaving the process. It catches nothing past the name layer: a
+keyword argument that does not exist or a shape mismatch is invisible to it, exactly as it is to
+the static checks in ``test_examples.py``.
 """
 # packages
+import ast
+import builtins
 import re
 from pathlib import Path
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Set
 import pytest
 # qis / project
 import qis
@@ -301,3 +318,118 @@ def test_readme_core_dependencies_match_pyproject() -> None:
     assert not only_in_readme and not only_in_pyproject, (
         f"README.md lists {only_in_readme} as core and pyproject.toml does not; "
         f"pyproject.toml requires {only_in_pyproject} and the README does not list them")
+
+
+README_PYTHON_BLOCK = re.compile(r'^```[ \t]*python[ \t]*\n(.*?)^```', flags=re.M | re.S)
+
+
+class CodeBlock(NamedTuple):
+    """
+    Attributes:
+        index: the block's position in the document, counting from zero
+        line: the line the opening fence is written on, for the failure message
+        source: the block's contents, without the fences
+    """
+    index: int
+    line: int
+    source: str
+
+
+def _readme_python_blocks() -> List[CodeBlock]:
+    """every ```python block in the README, in document order."""
+    text = README_PATH.read_text(encoding='utf-8')
+    blocks: List[CodeBlock] = []
+    for index, match in enumerate(README_PYTHON_BLOCK.finditer(text)):
+        blocks.append(CodeBlock(index=index,
+                                line=text.count('\n', 0, match.start()) + 1,
+                                source=match.group(1)))
+    return blocks
+
+
+def _bound_names(tree: ast.AST) -> Set[str]:
+    """
+    every name a block binds, wherever in the block it binds it.
+
+    Scope is deliberately flattened: a name bound inside a function body counts as bound for the
+    whole block. A README block is read rather than executed, and the alternative is a scope
+    analyser catching a class of defect that has never appeared in this file.
+
+    Args:
+        tree: the parsed block
+
+    Returns:
+        assignment, loop, with, comprehension, except, import, def, class and argument names
+    """
+    names: Set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            names.add(node.id)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                names.add(alias.asname if alias.asname is not None
+                          else alias.name.split('.')[0])
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.arg):
+            names.add(node.arg)
+        elif isinstance(node, ast.ExceptHandler) and node.name is not None:
+            names.add(node.name)
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            names.update(node.names)
+    return names
+
+
+def _loaded_names(tree: ast.AST) -> Set[str]:
+    """
+    every bare name a block reads.
+
+    An attribute is not one: ``qis.plot_prices`` loads ``qis`` and nothing else, which is what
+    keeps this from asserting that the whole public surface exists - ``test_examples.py`` does
+    that, against the installed package rather than against a namespace built from prose.
+
+    Args:
+        tree: the parsed block
+
+    Returns:
+        the names in load context
+    """
+    return {node.id for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)}
+
+
+README_BLOCKS: List[CodeBlock] = _readme_python_blocks()
+BLOCK_IDS: List[str] = [f'README.md:{block.line}' for block in README_BLOCKS]
+
+
+def test_readme_python_blocks_are_found() -> None:
+    """the fence pattern still matches something, so a green run is not an empty run."""
+    assert len(README_BLOCKS) >= 4, (
+        f"only {len(README_BLOCKS)} ```python blocks found in README.md; the first example "
+        f"section alone carries four, so the fence pattern broke")
+
+
+@pytest.mark.parametrize('block', README_BLOCKS, ids=BLOCK_IDS)
+def test_readme_block_resolves_its_names(block: CodeBlock) -> None:
+    """
+    a reader pasting the README's blocks in order never meets a name that is not there.
+
+    The namespace a block is checked against is the builtins plus everything the blocks above it
+    bind, which is the namespace that reader has. Names bound later in the same block count, so
+    the check is about the document's order rather than the statement order inside one block.
+    """
+    available = set(dir(builtins))
+    for earlier in README_BLOCKS[:block.index]:
+        try:
+            available |= _bound_names(ast.parse(earlier.source))
+        except SyntaxError:
+            continue  # that block fails its own case; it is not reported twice
+    try:
+        tree = ast.parse(block.source)
+    except SyntaxError as error:
+        raise AssertionError(
+            f"README.md line {block.line} is fenced as python and does not parse: {error}. "
+            f"Fence it as the language it is written in, or correct it") from error
+    unresolved = sorted(_loaded_names(tree) - _bound_names(tree) - available)
+    assert not unresolved, (
+        f"README.md line {block.line} uses {unresolved}, which nothing above it binds and which "
+        f"is not a builtin. A reader pasting the blocks in order gets NameError here")
