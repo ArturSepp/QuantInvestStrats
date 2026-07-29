@@ -20,16 +20,18 @@ bibliography: paper.bib
 
 # Summary
 
-`qis` computes the quantities a quantitative investor reports. It turns a series of portfolio
-weights and a panel of prices into a simulated portfolio, measures it against a benchmark, and
-renders the result as a factsheet. Around those three steps it provides the analytics reporting
-depends on: exponentially weighted covariance, block bootstrap resampling, risk measures,
+`qis` computes the quantities a quantitative portfolio manager or investor reports. It turns a
+series of portfolio weights, generated externally, and a panel of underlying asset prices into a
+simulated portfolio, measures it against a benchmark, and renders the result as a factsheet. In
+addition to the backtesting engine, `qis` provides strategy and reporting building blocks:
+exponentially weighted covariance, block bootstrap resampling, risk measures,
 regime-conditional statistics, currency hedging, and return unsmoothing.
 
-We designed it around one assumption: a strategy is a rule for producing weights, and, for the
+We designed `qis` around one assumption: a strategy is a rule for producing weights, and, for the
 simulation and reporting workflows `qis` targets, everything downstream of those weights is
 reconstruction rather than research. The researcher keeps the signal and the portfolio
-construction; the rest belongs to the library.
+construction — the things that actually matter for a successful research and investment process;
+the rest belongs to the library.
 
 `qis` is the base layer of a stack of quantitative finance packages — `optimalportfolios`,
 `trendfollowing` and `privateassets`, all three public. Each capability is written once and reused
@@ -65,9 +67,11 @@ A backtest needs two inputs: a strategy generator produces weights, and a price 
 those weights supplies everything else. When each consumer of a result rebuilds the reported
 quantities for itself, the Sharpe ratio of one strategy, read from a chart, a summary table and a
 factsheet, comes out as three numbers. We build all three from one
-`PortfolioData` object constructed from weights and prices, and from the same object the
-comparisons a pipeline actually runs — a variant against its base, several strategies side by
-side — are rendered by one reporting layer rather than a figure written per comparison.
+`PortfolioData` object constructed from weights and prices, and from the same object come the
+comparisons a pipeline actually runs. In addition, we implement two other base pipelines for
+strategy profiling: a bumped strategy against its base, and several building blocks of the same
+strategy side by side. All three reports are rendered by one reporting layer rather than a figure
+written per comparison.
 
 The same discipline answers a second need. A research group accumulates analytics faster than it
 consolidates them, and the same method is written again in each project. In our own repositories
@@ -141,17 +145,13 @@ smoothing.
 
 # Research impact statement
 
-We state plainly that the stack is the author's. Two public consumers carry this section, both
-using the package deeply. `optimalportfolios`, which implements portfolio optimisation solvers
-and rolling backtests, declares `qis` a mandatory dependency and references 94 of its symbols
-at 683 sites. `trendfollowing`, which carries the code behind the trend-following work cited
-below, references 87 symbols at 443 sites. Both counts are taken at the commits recorded in
-`docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`, whose
-docstring defines a symbol and a site.
+We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 94 of its symbols
+at 683 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
+at 443 sites. Both counts are taken at the commits recorded in
+`docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
 
-A third public package, `privateassets`, applies the unsmoothing layer to private-asset returns; it
-is recent and its dependency small, so we cite it for the range of asset classes served, not as
-adoption evidence.
+A third public package, `privateassets`, applies the unsmoothing layer to private-asset
+returns; we cite it for the range of asset classes served, not as adoption evidence.
 
 The capabilities carry named results. The portfolio and optimisation layers support work on robust
 strategic and tactical allocation [@sepp2026robust], the backtester and performance layer work on
@@ -159,12 +159,9 @@ cryptocurrency allocation [@sepp2023crypto], the regime-conditional layer work o
 systems [@sepp2026trend], and the resampling layer work on capital market assumptions built from
 multi-asset tradable factors [@sepp2026matf]. The last two are working papers.
 
-Commits run from December 2022 to July 2026, with activity in 37 of the 44 calendar months in that
-span.
+Commits run from December 2022 to July 2026, with activity in 37 of the 44 calendar months.
 
 # AI usage disclosure
-
-Generative AI assisted this project, and we state where.
 
 The analytical methods, the conventions they implement, and the architecture of the package are
 the author's, and no method in `qis` originated from a language model.

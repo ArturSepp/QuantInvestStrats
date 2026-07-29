@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "4d09b6208f552eedeaab8c27eef0604efef4ab3e",
+  "measured_at_commit": "93b53a84faf21368a9cc53578ed9b711665d736c",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": "in 37 of the 44 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 35,
+      "value": 37,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -52,7 +52,7 @@
       "paper_phrase": null
     },
     "commits": {
-      "value": 306,
+      "value": 308,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -124,7 +124,7 @@
       "paper_phrase": null
     },
     "paper_body_words": {
-      "value": 1745,
+      "value": 1743,
       "how": "whitespace-separated tokens in paper.md after the YAML front matter",
       "live": true,
       "paper_phrase": null
