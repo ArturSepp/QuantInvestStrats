@@ -1,5 +1,16 @@
 """
-implementation of multi factor ewm model
+the EWM estimator for ``LinearModel``: factor betas re-estimated at every date, not once.
+
+``EwmLinearModel.fit`` runs ``compute_ewm_xy_beta_tensor`` over the factor panel ``x`` and the
+asset panel ``y``, producing a (t, factors, assets) tensor unpacked into one loadings frame per
+factor. Decay is set by ``span`` through λ = 1 - 2/(span + 1), overriding ``ewm_lambda``, and
+``warmup_period`` blanks the opening observations, where a covariance built from a handful of
+points gives betas that are large and meaningless.
+
+``estimate_ewm_factor_model`` is the price-level entry point and works on log returns at
+``freq``. ``compute_portfolio_ewm_benchmark_betas`` aggregates asset betas by weights, and
+``compute_portfolio_benchmark_ewm_beta_alpha_attribution`` decomposes the nav into benchmark
+betas and a residual. The base class is in ``qis/portfolio/risk/factor_model.py``.
 """
 # packages
 import numpy as np

@@ -1,3 +1,17 @@
+"""
+the display metadata a table column carries: its labels, its number format, and its aggregator.
+
+``ColVar`` is a NamedTuple holding a column's full name, its short and wrapped variants, a
+``ValueType`` and an optional ``agg_func``. ``ColVar.to_format`` maps the ``ValueType`` onto a
+python format string - percent, price, date, integer, Sharpe - so a statistic's formatting
+travels with its definition instead of being restated at every call site.
+
+``ColumnData`` pairs a ``ColVar`` with a data Series and ``column_datas_to_df`` assembles a dict
+of them into a table, optionally grouped by ``agg_column`` with group rows and a total appended.
+``DfOutDict`` accumulates named frames for one Excel workbook. ``DATE_FORMAT`` here is
+``'%d%b%y'``, the two-digit-year form for table metadata, and is not the four-digit
+``DATE_FORMAT`` of ``dates.py``.
+"""
 
 # packages
 import numpy as np

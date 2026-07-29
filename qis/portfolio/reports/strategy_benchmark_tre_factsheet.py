@@ -1,5 +1,18 @@
 """
-report for strategy benchmark with tre
+strategy against benchmark by asset class: named landscape figures keyed by panel, not pages.
+
+``weights_tracking_error_report_by_ac_subac`` takes a ``MultiPortfolioData``, the pair
+``strategy_idx`` and ``benchmark_idx``, and three independent groupings - ``ac_group_data``,
+``sub_ac_group_data`` and ``turnover_groups``, the last driving the turnover panels alone. It
+returns a dict of figures and a dict of frames, keyed by panel name; the two key sets overlap
+but are not the same, so read each on its own keys rather than assuming a figure has a frame.
+
+Weights are read as input weights and risk contributions are normalised. Tracking error needs
+``multi_portfolio_data.covar_dict`` and raises without it; the ex-ante volatility and
+risk-contribution panels fall back to the covariance each member portfolio carries itself.
+``risk_model`` adds the factor exposure, attribution and risk-contribution figures.
+
+The same pair as a paginated A4 factsheet is ``strategy_benchmark_factsheet.py``.
 """
 import pandas as pd
 import numpy as np

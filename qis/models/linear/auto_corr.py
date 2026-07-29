@@ -1,5 +1,18 @@
 """
-analytics for computing auto-correlations
+autocorrelation of a path, at fixed lags over the whole sample and as an EWM state through time.
+
+``estimate_acf_from_path`` and ``estimate_acf_from_paths`` wrap the ``statsmodels`` ``acf`` and
+``pacf``, returning NaN for a column with no more than ``2 * nlags`` finite observations.
+``compute_path_autocorr`` is the njit full-sample version, correlating a column with itself at
+lags 0 to ``num_lags`` - 1, entry 0 being a hardcoded 1.0. ``compute_ewm_vector_autocorr`` runs
+the EWM recursion on the lagged product column by column; ``compute_ewm_matrix_autocorr`` does
+the same for the matrix, aggregating diagonal and off-diagonal under ``aggregation_type='mean'``;
+under ``'median'`` the second output is the median over the whole matrix, diagonal included.
+
+``lag`` counts rows of the index, so it inherits the frequency of the input rather than setting
+one. The EWM path is normalised by the contemporaneous second moment when ``is_normalize``; the
+vector version seeds its variance state with the full-sample ``np.nanvar``, the matrix version at
+zero unless ``covar0`` is passed.
 """
 # packages
 import numpy as np

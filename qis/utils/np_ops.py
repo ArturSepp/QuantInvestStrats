@@ -1,5 +1,18 @@
 """
-common numpy operations
+numpy helpers for panels that carry nans: nan-safe reductions, finite mapping and broadcasting.
+
+``np_nanmean``, ``np_nanstd``, ``np_nanvar`` and ``np_nansum`` are numba kernels over a 2-d
+array. The first three return nan on an all-nan slice rather than raising a RuntimeWarning;
+``np_nansum`` returns 0.0 there, as numpy does. The ``ddof=1`` correction is applied explicitly,
+since numba does not accept ddof - and it is on by default in ``np_nanstd`` but not in
+``np_nanvar``, so the two disagree unless ddof is passed.
+
+``to_finite_np``, ``to_finite_reciprocal`` and ``to_finite_ratio`` map +-inf and nan onto a fill
+value or a clip range before dividing, since pandas treats +-inf differently from nan.
+``set_nans_for_warmup_period`` blanks the first ``warmup_period`` finite observations of a
+column, counted from its first finite value, and blanks the column entirely when fewer remain.
+
+Frame-level equivalents that keep the index and columns are in ``df_ops.py``.
 """
 import numpy as np
 import pandas as pd

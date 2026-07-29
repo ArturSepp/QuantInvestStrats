@@ -1,3 +1,17 @@
+"""
+regime-conditional exhibits: bars of performance by regime, and the regime shading on any axis.
+
+``plot_regime_data`` takes a ``RegimeClassifier`` and draws one bar per asset split into the
+regimes, in the classifier's own colours, with ``RegimeData`` selecting whether the bars are
+conditional Sharpe ratios, average or annualised returns. The classifier carries no data, so
+``prices``, ``benchmark`` and ``perf_params`` travel through ``**kwargs`` to its table method
+and are not optional. ``plot_regime_boxplot`` shows the dispersion behind the point estimates.
+
+``add_bnb_regime_shadows`` is the odd one out: it draws ``axvspan`` bands onto an existing
+``ax`` and returns None, so it is called after the panel it annotates and needs either
+``pivot_prices`` or a ``benchmark`` present in ``data_df``. The classification, the conditional
+tables and the Sharpe convention behind the bars are in ``qis/perfstats/regime_classifier.py``.
+"""
 from __future__ import annotations
 
 import numpy as np

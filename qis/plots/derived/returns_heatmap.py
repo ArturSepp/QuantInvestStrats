@@ -1,5 +1,17 @@
 """
-plot returns heatmap table by monthly and annual
+periodic returns laid out as a table of coloured cells rather than a chart.
+
+``plot_returns_heatmap`` is the calendar grid - years down, months or quarters across, built by
+``compute_periodic_returns_table`` from one ``pd.Series`` at a time and rejecting a frame. The
+many-asset forms put assets on one axis and periods on the other, and which way round is
+``transpose``: ``plot_periodic_returns_table`` defaults it to True, ``plot_returns_table``
+leaves it False. The latter gives the total return over each window of a ``TimePeriod`` dict, and
+``plot_sorted_periodic_returns`` ranks assets within each period, one colour held per name.
+
+Cells are simple period returns from ``to_returns``; the trailing column named by ``ytd_name``
+is the return over the whole row period, which compounds the cells rather than summing them.
+The colour scale and cell drawing are ``qis/plots/heatmap.py``; the statistics table, with its
+Sharpe and drawdown columns, is ``qis/plots/derived/perf_table.py``.
 """
 # packages
 import numpy as np

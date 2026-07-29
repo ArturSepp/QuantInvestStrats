@@ -1,5 +1,17 @@
 """
-different methods to generate portfolio weights from df
+weights from a score panel: row normalisations, equal weighting and long-short indicators.
+
+``df_to_weight_allocation_sum1`` is the general normaliser - each row divided by its nansum, so
+signs survive and a row holding shorts still sums to one. ``df_to_long_only_allocation_sum1``
+zeroes negatives first and returns an all-zero row when nothing is positive.
+``df_to_equal_weight_allocation`` weights over the assets live on each date: a nan excludes an
+asset from that date's denominator rather than counting it as a zero weight.
+
+``df_to_top_bottom_n_indicators`` returns +1 for the ``num_top_assets`` largest values in a row,
+-1 for the smallest and 0 between - indicators, not weights summing to one, so they need
+normalising before use as an allocation. ``compute_long_short_ind_by_row`` also lives here.
+
+Turning a weight frame into a portfolio is ``qis.backtest_model_portfolio``, not this module.
 """
 import numpy as np
 import pandas as pd

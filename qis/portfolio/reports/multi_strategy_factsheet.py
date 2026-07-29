@@ -1,7 +1,18 @@
 """
-factsheet for multi strategy report for cross sectional comparison of strategies
-and generating sensitivities to parameters
-see example in qis.examples.factheets.multi_strategy.py
+several strategies compared side by side: a ``MultiPortfolioData`` in, a list of A4 pages out.
+
+``generate_multi_portfolio_factsheet`` compares the members against the shared benchmark, and
+reports outcomes rather than attributing differences to weights. One page always renders: navs,
+drawdowns, rolling performance, turnover, costs and the first portfolio's exposures, beside the
+performance bars, the risk-adjusted table, the periodic-returns heatmap, correlations, regime
+Sharpes and betas. ``group_data`` only sets ``is_grouped``, which switches the regime panels to
+group navs and groups the exposures of an appended strategy factsheet; the exposure and turnover
+panels have no group mode. ``add_group_exposures_and_pnl`` and ``add_strategy_factsheets`` each
+append further pages, both off by default. Frequencies arrive spread in from
+``qis.fetch_default_report_kwargs``.
+
+Attributing the difference between a pair to their weights is ``strategy_benchmark_factsheet.py``;
+the same page rendered as HTML is ``multi_strategy_factsheet_pybloqs.py``.
 """
 # packages
 import pandas as pd

@@ -1,5 +1,16 @@
 """
-common python structures operations
+list, dict and kwargs helpers used across qis: membership, ordering and merging.
+
+Order is why these exist rather than ``set`` operations: ``list_intersection`` and ``list_diff``
+return the elements of ``list_sample`` in the order they appear there, and
+``merge_lists_unique`` puts the intersection first, then what is unique to ``list1``, then what
+is unique to ``list2``. That ordering is what fixes group and column order downstream.
+
+``assert_list_subset`` raises ``ValueError`` naming the missing elements when ``list_sample`` is
+not contained in ``large_list``, or prints them and returns False when ``is_stop=False``.
+``update_kwargs`` merges two keyword dictionaries with the second winning and neither input
+mutated - the copy is the point, since it is how one defaults dict is passed down to several
+panels without one panel's override leaking into the next.
 """
 import itertools
 import pandas as pd

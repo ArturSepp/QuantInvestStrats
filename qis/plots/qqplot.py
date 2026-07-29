@@ -1,5 +1,17 @@
 """
-quantile-quantile plot
+quantile-quantile plots for reading how far a sample departs from a reference distribution.
+
+``plot_qq`` draws each column of a frame against the normal distribution, with location and
+scale estimated from the sample (``fit=True``): a single series gets the quantile line
+statsmodels fits, several columns share a 45-degree line so they can be read against one
+another. ``plot_xy_qq`` compares two empirical samples instead, evaluating both on a common
+grid of quantiles.
+
+Points bending away from the line in the lower left are a left tail fatter than normal, the
+usual finding on returns. ``desc_table_type`` replaces the legend with a descriptive table; the
+default ``DescTableType.SHORT`` reports mean and volatility only, and skew and kurtosis need
+``DescTableType.WITH_KURTOSIS``, ``DescTableType.SKEW_KURTOSIS`` or ``DescTableType.EXTENSIVE``.
+Shared arguments are in ``qis/docs/plotting_kwargs.md``; the density is ``qis.plots.histogram``.
 """
 # packages
 import warnings

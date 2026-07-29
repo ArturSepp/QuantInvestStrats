@@ -1,5 +1,16 @@
 """
-boxplot
+box plots of a distribution split by a categorical variable, one box per category.
+
+``plot_box`` is the primitive: a long-form frame with ``x`` naming the category column and
+``y`` the values, optionally split further by ``hue``. ``df_boxplot_by_index`` and
+``df_boxplot_by_columns`` melt the wide dates-by-instruments frame the rest of the package
+works in and pick which axis becomes the category; ``df_boxplot_by_classification_var``
+buckets a continuous column into quantiles and boxes the distribution of y within each bucket.
+
+Without ``hue``, box colours default to a diverging RdYlGn map over the per-category mean
+(``get_data_group_colors``), so an ordered category reads as a gradient; when ``hue`` is given
+the palette is categorical instead (``get_n_colors``). Shared arguments are in
+``qis/docs/plotting_kwargs.md``; regime-conditional box panels live in ``qis.plots.derived``.
 """
 # packages
 import warnings

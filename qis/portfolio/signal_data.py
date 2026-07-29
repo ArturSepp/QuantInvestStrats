@@ -1,5 +1,17 @@
 """
-signal data outpout for portfolio data reporting
+the signal panels behind a set of weights, and an OLS attribution of how the weights moved.
+
+``StrategySignalData`` is a dataclass of aligned frames indexed by date and ticker - ``signal``,
+``momentum``, ``ra_carry``, ``instrument_target_vols``, ``instrument_portfolio_leverages`` and
+the final ``weights``. All default to None, but only ``ra_carry`` is guarded: the attribution
+path dereferences the others and raises when one of them is absent.
+``locate_period`` and ``rename_data`` return a new instance rather than mutating in place.
+
+The attribution works on differences: ``asdiff`` resamples every panel and takes a diff, and
+``estimate_signal_changes_joint`` regresses the weight change on the carry, momentum, target-vol
+and leverage changes through ``fit_ols`` with no intercept, holding the last observation back to
+predict it. ``estimate_signal_changes_by_groups`` and ``estimate_signal_changes_individual`` run
+that fit per group and per ticker. Realised backtest panels live in ``portfolio_data.py``.
 """
 from __future__ import annotations
 import numpy as np

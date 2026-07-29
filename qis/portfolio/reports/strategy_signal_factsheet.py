@@ -1,5 +1,17 @@
 """
-report for PortfolioData.strategy_signal_data
+the signal side of a strategy: what moved the weights, rather than what the weights earned.
+
+``generate_weight_change_report`` and ``generate_current_signal_report`` read
+``PortfolioData.strategy_signal_data``, a ``StrategySignalData`` populated by the backtester, and
+raise ``ValueError`` when it is absent; ``generate_strategy_signal_factsheet_by_instrument`` takes
+a ``StrategySignalData`` directly and returns one page per instrument, a column of signal, vol,
+leverage and weight series against their histograms. The weight-change report attributes the
+change in weights by group into momentum, carry, target-vol and portfolio-leverage terms over the
+last ``sample_size`` periods, with ``is_add_residual_to_momentum`` on by default folding the
+regression residual into momentum and a separate residual term shown only when it is off. The
+current-signal report bars the signal by group against its value 20 observations earlier.
+
+Performance, exposures and costs of the same portfolio are ``strategy_factsheet.py``.
 """
 import numpy as np
 # packages

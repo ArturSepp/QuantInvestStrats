@@ -1,6 +1,18 @@
 """
-generate strategy factsheet report with comparision to benchmark strategy using MultiPortfolioData object
-for test implementation see qis.examples.portfolio_factsheet
+one strategy against one benchmark: a ``MultiPortfolioData`` in, a list of A4 pages out.
+
+``generate_strategy_benchmark_factsheet_plt`` picks the pair by position, ``strategy_idx``
+against ``benchmark_idx``, and returns one ``plt.Figure`` per page. Page one always renders the
+joint performance, exposure and cost panels beside the risk-adjusted tables, regime Sharpes and
+the per-instrument P&L difference. ``add_brinson_attribution`` is the one flag on by default,
+appending the allocation / selection page - the call excludes the interaction term, folding it
+into selection. The other page flags are off; ``add_benchmarks_to_navs`` adds benchmark lines to
+the page-one panels rather than a page, and ``add_grouped_exposures`` / ``add_grouped_cum_pnl``
+apply only to the factsheet appended by ``add_strategy_factsheet``. Frequencies are per panel and
+are meant to arrive spread in from ``qis.fetch_default_report_kwargs``.
+
+Several structurally different strategies is ``multi_strategy_factsheet.py``; tracking error and
+risk contributions on the same pair is ``strategy_benchmark_tre_factsheet.py``.
 """
 import numpy as np
 # packages

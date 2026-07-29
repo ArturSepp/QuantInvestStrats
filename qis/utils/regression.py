@@ -1,5 +1,17 @@
 """
-statsmodels wrappers for ols and regression analysis
+statsmodels OLS wrappers: fit, extract alpha and beta, and render the fitted equation.
+
+``fit_multivariate_ols`` regresses a Series on the columns of a frame and returns, in that order,
+the prediction, the parameters and a formatted label of the fitted equation; ``fit_ols`` is the
+array form; ``estimate_ols_alpha_beta`` reduces a fit to alpha, beta, R² and the alpha p-value,
+returning zeros with a warning rather than raising when the fit fails. ``reg_model_params_to_str``
+formats the fitted equation for a chart legend, and annualises the intercept as expm1(a α) when
+``alpha_an_factor`` is passed.
+
+Every fit runs through ``filter_x_y`` first: rows where any of x or y is non-finite are dropped,
+so a prediction is indexed on the surviving rows, not on the full input. ``order`` is a
+polynomial degree in a single x, not a second regressor - ``get_ols_x`` stacks x, x², x³ and x⁴
+up to order 4. These are static, full-sample fits; time-varying betas are in ``ewm.py``.
 """
 # packages
 import warnings

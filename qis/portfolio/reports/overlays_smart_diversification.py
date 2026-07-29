@@ -1,5 +1,18 @@
 """
-reporting anatytics for smart diversification frontier of futures_strats and portfolios
+the smart-diversification frontier: what adding an overlay to a principal portfolio buys.
+
+``SmartDiversificationReport`` holds ``principal_nav`` and a panel of ``overlay_navs`` and draws
+each panel onto a supplied axis or into a new ``plt.Figure``. ``create_overlay_portfolio_curve``
+mixes the principal with one overlay at eleven weights from zero to ``max_overlay_weight``,
+backtests each mix with ``qis.backtest_model_portfolio`` at ``rebalancing_freq`` and returns the
+navs; ``compute_smart_diversification_curve`` reads two statistics off them, the regime-conditional
+``PerfStat.BEAR_SHARPE`` against the full-sample ``PerfStat.SHARPE_RF0`` by default.
+``plot_smart_diversification_curve`` draws one curve per overlay,
+``plot_smart_diversification_scatter`` one point per overlay and, unless ``is_drop_principal``,
+the principal too, with a cross-sectional fit.
+
+A candidate-overlay exhibit, not a track record: unlike ``strategy_factsheet.py`` it carries no
+realised weights, turnover or costs.
 """
 # packages
 import warnings

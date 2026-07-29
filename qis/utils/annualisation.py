@@ -1,3 +1,17 @@
+"""
+annualisation factors: periods per year for a pandas frequency string or a data index.
+
+``get_annualization_factor`` maps a frequency to periods per year, handling multipliers and
+anchors ('2W' -> 26, 'QE-DEC' -> 4) and falling back to a regex parse, with a UserWarning and a
+factor of 1.0 for a string it cannot read. 'D' is 365 always, 'B' is ``default_trading_days``
+(252 by default), and ``is_calendar=True`` moves the business-day family to 365.
+``get_annualisation_conversion_factor`` is the ratio of two such factors.
+
+Two inference paths differ on an irregular index. ``infer_annualisation_factor_from_df`` reads
+``pd.infer_freq``, and warns then returns ``BUS_DAYS_PER_YEAR`` when the index has gaps.
+``infer_data_periods_per_year`` instead classifies the median spacing into the tiers
+260 / 52 / 12 / 4 / 1, so holidays and weekends do not push monthly data into the daily tier.
+"""
 from __future__ import annotations
 
 import warnings

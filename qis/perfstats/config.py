@@ -1,5 +1,17 @@
 """
-configuration of performance stats and regime params
+the configuration objects of the performance layer: what a statistic is called, how it is
+formatted, and on what grid it is computed.
+
+``PerfStat`` is the column set of every performance table, each member a ``ColVar`` carrying its
+display names and its ``ValueType``, so formatting travels with the statistic. ``PerfParams``
+holds the sampling frequencies and the return convention, ``SharpeConvention`` selects which of
+the three Sharpe numerators a number reports, and ``ReturnTypes`` fixes log against arithmetic.
+
+Frequencies are explicit, not inferred: the defaults are ``freq_vol='ME'``, ``freq_reg='QE'`` and
+``freq_drawdown='D'``, the last daily so the peak-to-trough path is not smoothed onto the
+reporting grid. Passing ``freq`` sets ``freq_vol``, ``freq_reg`` and ``freq_excess_return`` only;
+``freq_drawdown`` keeps its own value unless that is unset, and ``freq_skewness`` is never touched.
+Column-preset tuples are what reporting selects from; the numbers themselves are ``perf_stats.py``.
 """
 from __future__ import annotations
 

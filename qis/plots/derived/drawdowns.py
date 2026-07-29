@@ -1,5 +1,16 @@
 """
-analytics for drawdowns
+drawdown panels: the running loss from the prior peak, and how long it lasted.
+
+``plot_rolling_drawdowns`` draws p_t / max_{s<=t} p_s - 1 through time, a series that is
+non-positive and whose axis is therefore capped at zero by default.
+``plot_rolling_time_under_water`` draws the consecutive periods spent below the prior peak on
+the same grid, and ``plot_top_drawdowns_paths`` overlays the deepest episodes re-indexed to days
+since their own peak, so episodes of different dates are compared on one horizontal axis.
+
+``DdLegendType`` selects what the legend reports - nothing, the extreme and the last value, or
+the mean and the 10% quantile as well - all from ``compute_avg_max_dd``. The drawdown series
+themselves are computed by ``compute_rolling_drawdowns`` in ``qis/perfstats/perf_stats.py``,
+which is where a number quoted in a table comes from; arguments in ``qis/docs/plotting_kwargs.md``.
 """
 # packages
 import pandas as pd

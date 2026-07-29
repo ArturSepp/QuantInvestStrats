@@ -1,5 +1,16 @@
 """
-analytics for computing portfolio risk with ewm filter
+portfolio volatility and 99% value-at-risk from an EWM covariance of the instrument returns.
+
+Two names sit close together. ``compute_portfolio_var_np`` returns *variance*, w' Σ_t w rolled
+forward date by date from a full-sample ``compute_ewm_covar`` seed;
+``compute_portfolio_correlated_var_by_groups`` and ``compute_portfolio_independent_var_by_ac``
+return *value-at-risk*, the volatility scaled by ``VAR99`` = 2.3263, the normal 99% quantile -
+the first keeping correlations, the second summing |w| σ across instruments for the
+undiversified figure. ``limit_weights_to_max_var_limit`` caps a weight at a VaR budget in bp.
+
+``compute_portfolio_vol`` lags the weights one period before contracting them with the
+covariance, and leaves the result per period unless ``annualize`` is set. Decomposing a
+covariance already in hand is ``contributions.py``; the recursion is in ``qis/models/linear/``.
 """
 
 import warnings

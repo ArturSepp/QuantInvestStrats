@@ -1,3 +1,19 @@
+"""
+the plotting layer over the correlation estimators: matrices as heatmaps, and pairs through time.
+
+``plot_returns_corr_table`` draws the masked pairwise correlation of returns computed from
+prices, and ``plot_returns_ewm_corr_table`` its EWM counterpart, either at the last date or
+averaged over the tensor. ``plot_returns_corr_matrix_time_series`` plots one line per pair
+through time, shading regimes only when both ``regime_benchmark`` and a
+``BenchmarkReturnsQuantilesRegime`` classifier are passed. ``plot_corr_matrix_from_covar`` is the
+one function here that starts from an estimate made elsewhere: it draws the lower triangle of a
+covariance matrix as correlations with the volatilities on the diagonal.
+
+The others start from prices and compute their own returns, so ``return_type`` and ``freq`` are
+arguments rather than assumptions. The estimators live in ``corr_cov_matrix.py`` and ``ewm.py``;
+``plot_returns_corr_table`` draws nothing and returns the matrix itself when ``is_fig_out`` is
+False.
+"""
 # packages
 import numpy as np
 import pandas as pd

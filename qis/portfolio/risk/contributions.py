@@ -1,5 +1,18 @@
 """
-computation of risk contributions
+Euler risk decompositions: who owns which part of a portfolio's risk, given a covariance matrix.
+
+``compute_portfolio_risk_contributions`` is the identity itself. With σ = sqrt(w' Σ w), asset i
+contributes rc_i = w_i (Σ w)_i / σ, and Σ_i rc_i = w' Σ w / σ = σ exactly, so the parts add to
+the whole and not to an approximation of it. ``compute_benchmark_portfolio_risk_contributions``
+runs the same product on active weights Δw = w_p - w_b but divides by the *benchmark*
+volatility sqrt(w_b' Σ w_b), so its parts sum to Δw' Σ Δw / σ_b and not to tracking error.
+``is_independent_risk`` switches it to standalone position volatilities |Δw_i| σ_i, which are
+not an Euler decomposition of anything and sum to more than the active volatility.
+
+``calculate_marginal_active_risk`` and ``calculate_active_risk_squared`` are the factor-model
+pair and decompose active *variance*, not volatility: their marginal terms carry the factor 2
+from ∂(w' Σ w)/∂w. Nothing here estimates Σ - units and annualisation are whatever the caller's
+covariance carries. The factor-structured version through time is ``factor_model.py``.
 """
 import numpy as np
 import pandas as pd

@@ -1,5 +1,18 @@
 """
-imlementation of basic linear factor model
+the linear factor model container: y = B' x + α, with loadings supplied rather than estimated.
+
+``LinearModel`` is a dataclass of a factor panel ``x``, an asset panel ``y`` and a ``loadings``
+dict whose keys ``__post_init__`` asserts against the columns of ``x``; estimation belongs to a
+subclass, and ``ewm_factor_model.py`` supplies the EWM one. ``get_factor_alpha`` shifts the
+loadings by ``lag``, so lag 1 is the point-in-time reading and lag 0 is in-sample and
+forward-looking, while ``get_asset_factor_attribution`` always shifts by one period.
+
+Given ``x_covars`` and ``residual_vars``, ``compute_factor_risk_contribution`` splits portfolio
+variance as (B w)' F (B w) + w' D w, under both the systematic-only and the total-variance
+normalisation. ``compute_active_factor_risk`` is factor-only and does not carry the idiosyncratic
+term: it returns exposures B Δw per date, marginal risks 2 F B Δw and their products, normalised
+to sum to one across factors. The nav-level version of the same question is
+``compute_benchmarks_beta_attribution_from_prices``.
 """
 
 import numpy as np

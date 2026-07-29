@@ -1,8 +1,16 @@
 """
-performance report for a universe of several assets
-with comparison to 1-2 benchmarks
-output is one-page figure with key numbers
-see example in qis.examples.multi_asset.py
+a universe of assets against a benchmark: prices in, one A4 figure out.
+
+``generate_multi_asset_factsheet`` takes a price panel directly - no portfolio object, so no
+weights, turnover or costs anywhere in it - and returns a single ``plt.Figure`` carrying
+cumulative performance with regime shading, drawdowns, rolling Sharpe and volatility, beta and
+alpha attribution, the risk-adjusted tables, the periodic-returns heatmap, correlations and the
+return scatter. ``MultiAssetsReport`` holds the aligned prices and benchmarks and draws each
+panel onto a supplied axis. The trailing comparison window is widened from ``min_trailing_obs``
+so a coarse reporting frequency still leaves enough observations for a correlation matrix.
+
+A backtested portfolio with weights and costs is ``strategy_factsheet.py``; several such
+portfolios are ``multi_strategy_factsheet.py``.
 """
 # packages
 import math

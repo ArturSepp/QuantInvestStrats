@@ -1,5 +1,17 @@
 """
-ewm convolution
+EWM convolution of returns with their own lag or with a signal, at a horizon set by ``freq``.
+
+``ewm_xy_convolution`` is the single entry point. ``ConvolutionType`` selects what x is: the
+rolling return lagged by the horizon (``AUTO_CORR``), or the signal (``SIGNAL_CORR``,
+``SIGNAL_BETA``), y always being the rolling return. ``SignalAggType`` says whether a signal
+enters at its last value or as its mean over the horizon, and ``estimates_smoothing_lambda``
+smooths the resulting series of estimates.
+
+The horizon is ``get_annualization_factor`` of ``freq`` - 252 for ``'B'``, 12 for ``'ME'`` - and
+that one number is used three ways: rows summed into the rolling return, lag applied to x, and span
+behind the EWM decay. It counts rows of the input, which is assumed daily, not periods of ``freq``;
+where the factor is one the decay falls back to 0.2 and the returns are left unsummed.
+``is_ra_returns`` divides returns by the EWM volatility lagged one period first.
 """
 # packages
 import numpy as np

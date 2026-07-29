@@ -1,5 +1,17 @@
 """
-compute descriptive data table
+descriptive statistics per column of a panel, formatted for display.
+
+``compute_desc_table`` transposes the panel - time by ticker in, ticker by statistic out - and
+``DescTableType`` selects what is reported: mean and standard deviation first, though
+``AVG_WITH_POSITIVE_PROB`` and ``SKEW_KURTOSIS`` drop both again, then skewness, kurtosis, a
+normality p-value, quantiles, the median, the positive share, or the percentile rank of the last
+value. Values come back as formatted strings because the table renderer takes them directly.
+
+``annualize_vol`` scales the standard deviation by the square root of the factor inferred from
+the index via ``infer_annualisation_factor_from_df``, reporting ``STD_AN`` rather than ``STD``.
+``is_add_tstat`` divides the mean by that volatility, nan where the mean is not positive; with
+``annualize_vol`` off ``an_factor`` is 1.0, so neither side is annualised. Risk-adjusted
+statistics are ``perf_stats.py``.
 """
 # packages
 import numpy as np

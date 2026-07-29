@@ -1,9 +1,17 @@
 """
-FX hedging research reports.
+FX hedging of a foreign-currency asset: prices and an ``FxRatesData`` in, figures and frames out.
 
-Single-asset and multi-asset hedging tearsheets built on ``qis.plots``. These
-are research/reporting helpers, not part of the data container. No seaborn
-dependency: the prior ``sns.axes_style`` styling wrapper has been removed.
+``run_asset_fx_hedging_report`` is the single-asset entry point: it converts one
+``asset_price_local_ccy`` into ``reference_ccy`` at fixed hedge ratios of 0, 0.5 and 1 and at the
+beta-, carry- and optimal-hedged ratios, all three from ``compute_fx_optimal_hedge``, returning
+one ``plt.Figure`` with the performance table, navs and drawdowns, the hedge ratios and the EWMA
+FX beta and vol from ``compute_fx_vol_beta``. ``compute_multi_asset_fx_hedging`` runs the same
+construction across a panel and returns five statistic frames rather than figures, skipping
+assets already in ``reference_ccy``; ``plot_multi_asset_fx_hedging_report`` renders three of them
+- p.a. returns, vols and Sharpes - as heatmap tables. ``span``, ``risk_aversion_lambda`` and
+``min_max_hedge`` are passed explicitly.
+
+A market-data exhibit: no ``qis.PortfolioData``, weights or costs enter it.
 """
 from __future__ import annotations
 

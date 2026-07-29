@@ -1,5 +1,18 @@
 """
-module for computing rolling performance stats
+performance statistics computed on a rolling window of a price series.
+
+``compute_rolling_perf_stat`` is the dispatcher: given a ``RollingPerfStat`` it returns the
+statistic and the title describing the window, which is what the plotting layer draws. Behind it
+sit ``compute_rolling_returns`` and ``compute_rolling_pa_returns``, ``compute_rolling_vols`` and
+``compute_ewma_vols``, ``compute_rolling_sharpes`` and ``compute_rolling_skew``.
+
+``roll_periods`` counts rows after the series is resampled to ``roll_freq``, so 260 with
+``roll_freq='B'`` is one year and a five-year monthly window is ``roll_freq='ME'`` with 60; the
+exceptions are ``RollingPerfStat.PA_RETURNS``, which never resamples, and ``EWMA_VOL``, where
+``roll_periods`` is the EWM ``span``. Volatility and Sharpe are taken on log returns and
+annualised by the factor inferred from the index, the skew on log returns without any
+annualisation, while the two return statistics work on the prices directly. ``compute_sharpe``
+subtracts no financing rate; the excess-return conventions live in ``qis.perfstats``.
 """
 # packages
 import numpy as np

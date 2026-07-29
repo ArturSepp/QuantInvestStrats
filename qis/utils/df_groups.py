@@ -1,5 +1,17 @@
 """
-implement group by operations on df
+group-by operations driven by ``group_data``: a pd.Series indexed by ticker whose values are the
+group labels.
+
+``get_group_dict`` inverts that Series into group to tickers and the splitting and aggregating
+functions route through it: groups alphabetical by default, ``group_order`` fixing their order
+and appending any group outside the list, ``total_column`` adding a group holding every ticker,
+and a group with no column present in the frame dropped rather than returned empty.
+
+``split_df_by_groups`` returns one time-by-asset sub-panel per group, ``agg_df_by_groups``
+collapses each group to a single column with ``agg_func`` (``df_nansum`` by default), and
+``set_group_loadings`` gives the one-hot matrix for which loadings.T @ x aggregates an
+instrument-indexed vector to group level - it bypasses ``get_group_dict``, ordering groups by
+first appearance and dropping any outside ``group_order``.
 """
 # packages
 import numpy as np

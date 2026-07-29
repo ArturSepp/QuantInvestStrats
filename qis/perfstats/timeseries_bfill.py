@@ -1,5 +1,16 @@
 """
-Implement core for contacenation of time series
+splicing time series together: a Brownian-bridge interpolation and two backfill joins.
+
+``interpolate_infrequent_returns`` fills the gaps of an infrequently reported series onto the
+grid of a frequent pivot series, drawing increments from a Brownian bridge whose innovations
+come from the pivot path, so the result hits every reported value exactly while carrying the
+timing of a real market. The interpolated path is a plausible history, not the true one.
+
+``bfill_timeseries`` extends a newer panel backwards with an older one column by column. Output
+columns are always the newer panel's, and with ``is_prices=True`` the join is made in return
+space and rebuilt into a nav anchored on the newer panel's last non-nan level, so the recent
+level is preserved rather than the old one. ``append_time_series`` is the plain concatenation
+over a shared overlap and requires the older columns to be a subset of the newer ones.
 """
 # packages
 import numpy as np

@@ -1,3 +1,18 @@
+"""
+formatting a frame for display: numbers to strings, and the parse back.
+
+``df_to_str`` and ``series_to_str`` are the entry points; ``var_formats`` overrides the default
+format per column, positionally when a list is passed and by column name when a dict is.
+``timeseries_df_to_str`` resamples first, for a table of returns by period.
+
+nan becomes ``EMPTY_NUM``, a single space, so a fixed-width column stays aligned.
+``str_to_float`` and ``df_to_numeric`` strip thousands separators and percent signs and return
+nan on what they cannot parse; '%' goes without a divide by 100, so '50%' parses back to 50.0
+and the round trip is not an inverse for percent formats. ``tabulate_df`` renders aligned plain
+text and is a local stand-in for the tabulate library, which qis does not depend on.
+
+Which format a statistic gets is decided alongside its column definition in ``generic.py``.
+"""
 # packages
 import numpy as np
 import pandas as pd

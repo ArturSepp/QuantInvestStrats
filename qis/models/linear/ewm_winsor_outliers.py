@@ -1,8 +1,17 @@
 """
-implement winsorizing of time series data using ewm
-1. compute mean_t and vol_t
-2. select x% of outliers defined by normalized score (x_t-mean_t) / vol_t
-3. replace or trim outliers as specified
+outlier filtering and winsorising of a time series driven by the score (x_t - m_t) / v_t.
+
+``filter_outliers`` applies an ``OutlierPolicy`` in a fixed order: absolute ceiling and floor, the
+optional log transform, a cut on the full-sample standard deviation, then a cut on the EWM score;
+``OutlierPolicyTypes`` holds the ready-made policies. ``ewm_insample_winsorising`` cuts that score
+at ``quantile_cut`` from each tail instead, with ``ReplacementType`` deciding what a rejected point
+becomes - the EWM mean, NaN, or the corresponding quantile. ``compute_ewm_score`` is the shared
+scoring step, clipping ``ewm_vol`` from below at its own ``clip_quantile``.
+
+Those three read the whole sample - the mean and volatility are contemporaneous and the quantiles
+full-sample - so they clean a descriptive exhibit, not a backtest path.
+``ewm_winsdor_markovian_score`` is the non-anticipating alternative: it scores x_t against the EWM
+state at t-1 and returns the cleaned series alongside that state and the score.
 """
 # packages
 import numpy as np

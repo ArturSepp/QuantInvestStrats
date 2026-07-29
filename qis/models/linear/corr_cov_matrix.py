@@ -1,5 +1,17 @@
 """
-correlation related core
+correlation and covariance estimation on the EWM engine, in the shapes a caller needs them in.
+
+``estimate_rolling_ewma_covar`` is the backtest-facing entry point: the EWM covariance of log
+returns taken at ``returns_freq``, sampled on a ``rebalancing_freq`` schedule, one matrix per
+rebalancing date and annualised unless ``apply_an_factor`` is False. ``compute_masked_covar_corr``
+is the single-matrix path for a ragged panel - each pair is computed on the observations both
+series have, which uses all the data and is not guaranteed positive semi-definite.
+``compute_ewm_corr_df`` unstacks the correlation tensor into one column per pair, with
+``CorrMatrixOutput`` choosing which pairs come back.
+
+``span`` is in units of ``returns_freq``, not days, and the estimation and rebalancing frequencies
+are separate arguments because one sets the sampling error and the other the turnover. The
+recursion lives in ``ewm.py``, the heatmaps and time-series exhibits in ``plot_correlations.py``.
 """
 # packages
 import numpy as np

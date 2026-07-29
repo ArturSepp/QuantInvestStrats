@@ -1,5 +1,17 @@
 """
-plot df as table
+a DataFrame rendered as a matplotlib table, so it composes into a page beside the charts.
+
+``plot_df_table`` lays out and colours; it does not compute. Values arrive already formatted as
+strings unless ``var_format`` is given. The figure size is built from ``row_height`` and the
+first entry of ``col_widths`` (``column_width`` by default), then passed to ``plt.subplots`` as
+a figsize, so the units are inches; ``first_column_width`` sets the leading cell, not the figure.
+``plot_df_table_with_ci`` merges a frame of estimates with a frame of confidence intervals into
+one cell string and colours the cells by the estimate.
+
+Colouring is what makes the grid readable: ``heatmap_columns`` shades down a column,
+``special_rows_colors`` picks out a total row, ``rows_edge_lines`` separates groups, and the
+``set_cells_facecolor`` family applies the same to an already-built table. Shared arguments are
+in ``qis/docs/plotting_kwargs.md``. A numeric frame coloured wholesale is ``qis.plots.heatmap``.
 """
 # packages
 import warnings

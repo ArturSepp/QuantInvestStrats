@@ -1,3 +1,19 @@
+"""
+the performance table as a drawn object: statistics computed elsewhere, formatted and rendered.
+
+Nothing is computed here. ``get_ra_perf_columns`` calls ``compute_ra_perf_table`` and formats
+each column with the format its own ``PerfStat`` member carries, so percent, ratio and date
+columns display correctly without the caller restating the convention; ``plot_ra_perf_table``
+renders that frame through ``plot_df_table``. ``plot_ra_perf_table_benchmark`` builds its own
+frame from ``compute_ra_perf_table_with_benchmark`` and returns it beside the figure. The same
+numbers reach a bar chart in ``plot_ra_perf_bars`` and an x-y plane in ``plot_ra_perf_scatter``,
+which switches to ``compute_bnb_regimes_pa_perf_table`` when an axis is regime-conditional.
+
+Which statistics appear is a choice of preset - ``STANDARD_TABLE_COLUMNS``,
+``BENCHMARK_TABLE_COLUMNS`` - defined in ``qis/perfstats/perf_stats.py`` as orderings of
+``PerfStat``; frequency and Sharpe convention come from ``PerfParams``. Shared arguments are in
+``qis/docs/plotting_kwargs.md``.
+"""
 # packages
 import numpy as np
 import pandas as pd

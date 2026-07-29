@@ -1,5 +1,18 @@
 """
-common pandas operations
+pandas operations on a time-by-asset panel: nan boundaries, alignment and fills.
+
+``get_nonnan_index`` gives the first or last non-nan date per column and the nan-boundary helpers
+build on it, ``df_price_ffill_between_nans`` among them: it fills gaps only between a column's
+first and last observation, so a column that starts late is not back-filled into a flat price.
+The input index is restored only on the leading side, so trailing dates past every column's last
+observation are dropped rather than returned as nan.
+
+``align_df1_to_df2`` and ``align_dfs_dict_with_df`` are the alignment entry points.
+``multiply_df_by_dt`` converts an annualised rate into a per-period accrual by multiplying by the
+actual calendar days between index dates over ``annualization_factor`` (365 by default), with the
+first date carrying dt = 0, and ``lag`` shifting the rate before the reindex.
+
+Numpy work without an index is ``np_ops.py``; aggregation across columns is ``df_agg.py``.
 """
 # packages
 import warnings

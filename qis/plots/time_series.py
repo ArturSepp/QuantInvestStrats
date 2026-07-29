@@ -1,3 +1,17 @@
+"""
+line plots of a frame against its date index, with summary statistics in the legend.
+
+``plot_time_series`` is the base panel most of the package draws through: one line per column,
+the index on the horizontal axis, ``x_date_freq`` and ``date_format`` setting tick frequency
+and label format. ``plot_time_series_2ax`` puts one frame on the left axis and another on the
+right, tagging the legend entries "(left)" and "(right)" so the two scales cannot be confused.
+
+What separates these from a plain matplotlib line plot is the legend: ``legend_stats`` appends
+statistics computed on the plotted window and ``desc_table_type`` replaces the legend with a
+descriptive table, so the numbers describe the data drawn rather than a wider sample. Shared
+arguments are in ``qis/docs/plotting_kwargs.md``. Long-form data with an explicit grouping
+column is drawn by ``qis.plots.lineplot``, not here.
+"""
 # packages
 import warnings
 import numpy as np

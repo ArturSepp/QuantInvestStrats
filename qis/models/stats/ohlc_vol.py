@@ -1,4 +1,16 @@
+"""
+volatility estimated from open-high-low-close bars, using the range as well as the close.
 
+``estimate_ohlc_var`` returns the per-bar variance in log-price units for the estimator named by
+``OhlcEstimatorType``: Parkinson (h-l)^2 / (4 ln 2), Garman-Klass 0.5 (h-l)^2 - (2 ln2 - 1)(c-o)^2,
+Rogers-Satchell (h-c)(h-o) + (l-c)(l-o), and close-to-close (c_t - c_{t-1})^2, which is NaN on the
+first bar since it needs a previous close. ``estimate_hf_ohlc_vol`` averages those variances to
+``agg_freq`` and returns the annualised volatility.
+
+Variances are per bar until the annualisation step, and ``annualization_factor`` is worth passing
+explicitly: inferred from the aggregated index it is a guess, and it rescales every number
+reported. No mean is subtracted by any of the estimators.
+"""
 # packages
 import numpy as np
 import pandas as pd

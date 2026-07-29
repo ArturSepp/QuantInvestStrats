@@ -1,5 +1,18 @@
 """
-analytics for plotting price data
+price and NAV panels, each labelled with the performance statistics of the window it draws.
+
+``plot_prices`` is the base panel: series are rebased - to 1.0 at the first observation under
+``start_to_one``, at the last under ``end_to_one`` - and every legend entry carries the
+``PerfStat`` members listed in ``perf_stats_labels``, computed by ``compute_ra_perf_table`` over
+the plotted window, so the chart and its numbers cannot disagree. ``plot_prices_with_dd`` stacks
+that panel above the running drawdown, ``plot_prices_2ax`` splits two groups across a left and a
+right axis, and ``plot_rolling_perf_stat`` draws a ``RollingPerfStat`` through time.
+
+Passing ``regime_benchmark`` shades the axis by benchmark regime; ``plot_prices_with_dd`` also
+accepts ``pivot_prices`` in its place, the other panels do not. The statistics are computed in
+``qis/perfstats/``, apart from the rolling panel's ``compute_rolling_perf_stat``, taken from
+``qis/models/stats/rolling_stats.py``; the unlabelled line primitive is
+``qis/plots/time_series.py`` and the shared arguments are in ``qis/docs/plotting_kwargs.md``.
 """
 # packages
 import pandas as pd

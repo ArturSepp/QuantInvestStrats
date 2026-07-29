@@ -1,3 +1,18 @@
+"""
+principal component analysis of a covariance or correlation matrix, and what is built on it.
+
+``apply_pca`` is the primitive: ``np.linalg.eigh`` on a symmetric matrix, reordered from the
+largest eigenvalue down, with a sign convention so that loadings do not flip between refits.
+``compute_pca_r2`` turns the eigenvalues into variance shares, raw or cumulative, and
+``compute_data_pca_r2`` runs that through time over an EWM tensor of the input, correlation unless
+``is_corr`` is False, sampled at ``freq``, one row per date and one column per component.
+``compute_eigen_portfolio_weights`` returns the principal portfolios of a covariance matrix, one
+per row, each scaled to unit variance.
+
+``compute_eigen_portfolio_weights`` decomposes the correlation matrix rather than the covariance,
+so the ranking is by explained correlation, and the volatilities re-enter in the scaling step
+w_ij = v_ij / (σ_i sqrt(λ_j)).
+"""
 import numpy as np
 import pandas as pd
 import qis.utils.dates as da

@@ -1,5 +1,16 @@
 """
-plot histogram
+the distribution of each column of a frame, drawn as a density or as a histogram.
+
+``plot_histogram`` is the entry point and ``PdfType`` selects what it draws: a seaborn kernel
+density, a binned histogram, the two together, the statsmodels density of ``kde_dens``, or the
+zero-truncated density of ``trunc_dens`` for a quantity that cannot change sign.
+
+Columns share one axis so they can be compared, and ``add_total_sample_pdf`` pools all of them
+into an extra series named by ``total_sample_name`` - the universe against which one column is
+read. ``desc_table_type`` replaces the legend with a descriptive table, ``add_norm_std_pdf``
+overlays a normal density, and ``add_last_value`` marks the latest observation with its
+percentile rank. Shared arguments are in ``qis/docs/plotting_kwargs.md``. Regime-conditional
+densities live in ``qis.plots.derived``.
 """
 # packages
 import warnings

@@ -1,5 +1,17 @@
 """
-bar plots
+bar charts of the columns of a frame, one bar group per index entry.
+
+``plot_bars`` is the general one: columns are stacked within each group by default, since the
+usual subject is a decomposition whose total matters, and ``stacked=False`` places them side by
+side. For a ``pd.Series`` with a DatetimeIndex the index is converted to string labels before
+drawing, with ``x_date_freq`` and ``date_format`` choosing which entries carry a label; a
+DataFrame keeps its raw timestamps as labels. Either way the axis is categorical rather than a
+date axis. ``plot_vbars`` instead draws one horizontal bar per row, segments laid end to end,
+with the row total marked by a vertical rule.
+
+Bar values, group totals and legend statistics are annotations layered on top, set by
+``add_bar_values``, ``totals`` and ``legend_stats``; shared arguments are in
+``qis/docs/plotting_kwargs.md``. The same decomposition as filled areas is ``qis.plots.stackplot``.
 """
 
 # packages

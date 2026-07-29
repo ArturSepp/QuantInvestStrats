@@ -1,5 +1,17 @@
 """
-heatmap plots
+a DataFrame drawn as a colour-coded grid, one cell per value.
+
+``plot_heatmap`` is the only entry point. Colour carries the magnitude and the cell annotation
+carries the number, so a panel is readable both at a glance and exactly; no colour bar is
+drawn, since ``annot`` makes one redundant. Passing an array of strings to ``annot`` lays a grid
+of formatted values over unformatted data, and requires ``var_format=None``: otherwise
+``var_format`` reaches seaborn as ``fmt`` and raises on the string cells.
+
+The scale is centred on zero and diverging by default, which suits a signed quantity. ``vmin``
+and ``vmax`` are what make two heatmaps comparable: without them each panel scales to its own
+range and a pair drawn side by side misleads. Shared arguments are in
+``qis/docs/plotting_kwargs.md``. Text cells with per-cell control over fill and edges are
+``qis.plots.table``; the monthly and annual returns grid is in ``qis.plots.derived``.
 """
 # packages
 import warnings

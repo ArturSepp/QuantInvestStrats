@@ -1,5 +1,17 @@
 """
-scatter plot core
+x-y scatter plots with a fitted relationship drawn through the points.
+
+``plot_scatter`` is the primitive: it names ``x`` and ``y`` columns of a frame and prints the
+fitted equation in the legend. Without ``hue`` it fits a polynomial of degree
+``full_sample_order`` through the full sample; with ``hue`` it fits degree ``order`` within each
+group separately and the full-sample line is not drawn.
+``plot_classification_scatter`` makes the grouping variable ``x`` itself, cut into quantile
+buckets or explicit ``bins``; ``plot_multivariate_scatter_with_prediction`` regresses y on
+several columns and draws the prediction against one chosen ``x_axis_column``.
+
+The fit is the subject rather than the cloud: ``estimate_classification_scatter`` returns the
+per-bucket prediction without drawing. Shared arguments are in ``qis/docs/plotting_kwargs.md``;
+the returns- and regime-specific scatters built on these live in ``qis.plots.derived``.
 """
 # packages
 import warnings
