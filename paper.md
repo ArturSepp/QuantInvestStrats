@@ -27,9 +27,10 @@ supporting analytics reporting depends on: exponentially weighted covariance est
 bootstrap resampling, risk measures, regime-conditional statistics, currency hedging, and return
 unsmoothing for assets that report infrequently.
 
-We designed it around one assumption: a strategy is a rule for producing weights, and everything
-downstream of those weights is reconstruction rather than research. The researcher keeps the
-signal and the portfolio construction; the rest belongs to the library.
+We designed it around one assumption: a strategy is a rule for producing weights, and, for the
+simulation and reporting workflows `qis` targets, everything downstream of those weights is
+reconstruction rather than research. The researcher keeps the signal and the portfolio
+construction; the rest belongs to the library.
 
 `qis` is the base layer of a stack of quantitative finance packages — `optimalportfolios`,
 `trendfollowing` and `privateassets`, all three public — and the computational layer beneath
@@ -63,10 +64,9 @@ and nothing in either output would explain the gap. The example producing these 
 with the package, and its values are pinned by the test suite.
 
 A backtest needs two inputs: a strategy generator produces weights, and a price panel aligned to
-those weights supplies everything else. The common alternative makes the profit and loss depend
-on state held inside the generator, so every consumer of the result rebuilds those quantities
-from whatever the generator emitted. The Sharpe ratio of one strategy, read from a chart, a
-summary table and a factsheet, then comes out as three numbers. We build all three from one
+those weights supplies everything else. When each consumer of a result rebuilds the reported
+quantities for itself, the Sharpe ratio of one strategy, read from a chart, a summary table and a
+factsheet, comes out as three numbers. We build all three from one
 `PortfolioData` object constructed from weights and prices, and from the same object the
 comparisons a pipeline actually runs — a variant against its base, several strategies side by
 side — are rendered by one reporting layer rather than a figure written per comparison.
@@ -124,19 +124,17 @@ logic: it converts target weights to units at each rebalancing, holds those unit
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
 one of the few paths here where a loop cannot be vectorised.
 
-The public interface is `qis.__all__`, fixed when the package is imported so that it does not
-depend on which submodules a process has loaded. It holds 403 names, nine of them subpackage
-bindings. `qis/api.py` records that list as a literal, so a change to the surface appears in a
-diff rather than as a count that moves, and records a documented core of 116 symbols grouped by
-capability. The suite fails when either record disagrees with the namespace.
+The public interface is `qis.__all__`, which holds 403 names; `qis/api.py` records that list as a
+literal together with a documented core of 116 symbols grouped by capability, and the suite fails
+when either record disagrees with the namespace.
 
 Properties are enforced by tests rather than by convention: every exported plotting function
 draws a figure on a synthetic panel; every example references symbols and keyword arguments that
 exist; every core symbol documents its arguments and documents none it does not take; the
 recorded export list matches the namespace; documentation links resolve; and the measurements
 this paper quotes match a generated record. The convention measurement above is pinned to its
-published values rather than only executed. Nine of the 58 examples need no data vendor and are
-run; the other 49 are checked statically.
+published values rather than only executed. Every example that needs no data vendor runs in the
+suite; the rest are checked statically.
 
 The suite runs without network access on a core installation: its data comes from a frozen
 seeded simulator reproducing the defects of real panels: ragged starts, missing observations,
@@ -154,9 +152,7 @@ defines a symbol and a site.
 
 A third public package, `privateassets`, applies the unsmoothing layer to private-asset returns;
 it is recent and its dependency small, so we cite it for the range of asset classes served rather
-than as evidence of adoption. Private repositories account for further use, among them a
-production allocation system; we give no figure for them, because a count a reader cannot
-reproduce is not evidence.
+than as evidence of adoption.
 
 The capabilities carry named results. The portfolio and optimisation layers support work on
 robust strategic and tactical allocation [@sepp2026robust], the backtester and performance layer
@@ -176,7 +172,7 @@ Generative AI assisted this project, and we state where.
 The analytical methods, the conventions they implement, and the architecture of the package are
 the author's, and no method in `qis` originated from a language model.
 
-Between 25 and 28 July 2026 the author used Anthropic's Claude, through an agentic coding
+In July 2026 the author used Anthropic's Claude, through an agentic coding
 interface, for a documentation and test infrastructure effort preceding this submission. That work
 produced the test suite described above, the docstrings on the documented core, the documentation
 configuration, the audit scripts under `tools/`, and the repair of four defects the new tests
