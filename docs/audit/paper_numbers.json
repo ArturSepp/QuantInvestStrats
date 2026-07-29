@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "0e4c7e52849a8cf07689de9fc78ed1f112791c7c",
+  "measured_at_commit": "8cb509cefd2ce724c51f729ea6e3f2838e24d5e7",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": null
     },
     "ai_coauthored_commits": {
-      "value": 18,
+      "value": 27,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -22,22 +22,22 @@
       "paper_phrase": null
     },
     "ai_coauthored_last_day": {
-      "value": "2026-07-27",
+      "value": "2026-07-28",
       "how": "latest AI co-authored commit",
       "live": false,
       "paper_phrase": null
     },
     "backtester_nonblank_lines": {
-      "value": 236,
+      "value": 279,
       "how": "nonblank lines of qis/portfolio/backtester.py",
       "live": true,
       "paper_phrase": null
     },
     "backtester_physical_lines": {
-      "value": 274,
+      "value": 323,
       "how": "physical lines of qis/portfolio/backtester.py",
       "live": true,
-      "paper_phrase": "backtester is 274 lines"
+      "paper_phrase": "backtester is 323 lines"
     },
     "capability_groups": {
       "value": 12,
@@ -46,13 +46,13 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 1091,
+      "value": 1099,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 291,
+      "value": 298,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null

@@ -118,7 +118,7 @@ We organise the package into 12 capability groups: among them performance statis
 and backtesting, factsheets, exponentially weighted estimation, currency hedging, regime
 reporting, resampling and unsmoothing.
 
-The backtester is 274 lines, and that follows from the design assumption rather than from
+The backtester is 323 lines, and that follows from the design assumption rather than from
 compression. Because a strategy is a rule for producing weights, the backtester holds no strategy
 logic: it converts target weights to units at each rebalancing, holds those units until the next
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
