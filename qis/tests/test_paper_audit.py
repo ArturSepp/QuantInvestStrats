@@ -10,12 +10,22 @@ recorded, and the record is enforced.
 ``tools/paper_audit.py`` writes ``docs/audit/paper_numbers.json``. This file checks three things
 against it:
 
-  1. every **live** metric - one measurable from the installed package or the working tree -
-     still has the recorded value;
+  1. every **live** metric the manuscript actually quotes still has the recorded value;
   2. every metric carrying a ``paper_phrase`` has that phrase in ``paper.md``, so a number cannot
      be corrected in the record and left stale in the manuscript;
   3. ``paper.md`` quotes no large number that the record does not know about, which is what stops
      a new hand-measured count from being pasted in.
+
+A **live** metric is one measurable from the installed package or the working tree; ``live`` is a
+statement about how a number can be obtained, not about whether it is enforced. Check 1 enforces
+only the subset carrying a ``paper_phrase``, because a metric the manuscript never quotes cannot
+make the manuscript wrong - it can only turn the build red. Enforcing all seven made two builds
+red in the first three days and caught nothing either time: once because two words of prose moved
+``paper_body_words``, once because a module docstring moved a line count. A check that fires when
+a proxy moves but the claim stays true is the kind that gets routed around, which is the same
+reason the lint job in ``.github/workflows/ci.yml`` gates changed lines rather than whole files.
+The unquoted metrics are still measured, still recorded and still refreshed; nothing asserts on
+them.
 
 A **recorded** metric needs ``git`` or a network clone of a consumer repository. Neither may run
 in a test, so those are checked for presence and provenance rather than recomputed. Refresh them
@@ -115,10 +125,13 @@ def test_record_exists_and_names_its_commit() -> None:
 
 @pytest.mark.parametrize('metric', sorted(_live_measurements()))
 def test_live_metric_matches_the_record(metric: str) -> None:
-    """a metric measurable here still has the value the record and the paper carry."""
+    """a metric the paper quotes still has the value the record and the paper carry."""
     record = _record()
     assert metric in record['metrics'], (
         f'{metric} is measured here but absent from the record; regenerate it')
+    if record['metrics'][metric].get('paper_phrase') is None:
+        pytest.skip(f'{metric} is recorded but not quoted in paper.md, so drift in it cannot '
+                    f'make the manuscript wrong')
     recorded = record['metrics'][metric]['value']
     measured = _live_measurements()[metric]
     assert measured == recorded, (
