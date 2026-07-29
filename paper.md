@@ -166,18 +166,18 @@ Commits run from December 2022 to July 2026, with activity in 37 of the 44 calen
 The analytical methods, the conventions they implement, and the architecture of the package are
 the author's, and no method in `qis` originated from a language model.
 
-In July 2026 the author used Anthropic's Claude, through an agentic coding
+In July 2026 the author used Anthropic's Claude (2026 models), through an agentic coding
 interface, for a documentation and test infrastructure effort preceding this submission. That work
 produced the test suite described above, the docstrings on the documented core, the documentation
-configuration, the audit scripts under `tools/`, and the repair of four defects the new tests
-exposed in exported plotting functions. It also implemented two changes the author specified:
+configuration, the audit scripts under `tools/`, and repairs of defects the new tests exposed. It also implemented two changes the author specified:
 circular block wrapping in the stationary bootstrap, and a fixed-coefficient option in the static
 unsmoothing estimator. The co-authored commits can be listed with
 `git log --grep='Co-authored-by: Claude'`; their number is not quoted here because it moves.
 
 We drafted this paper with the same assistance, working from measurements the assistant recorded
 under `docs/audit/`. Every row of the comparison above, and every bibliographic claim, was
-verified against primary documentation on 29 July 2026. The author wrote the economic argument in
-the statement of need and is responsible for the content.
+verified against primary documentation on 29 July 2026. The author reviewed, edited and validated all
+assisted output, wrote the economic argument in the statement of need, made the design
+decisions, and is responsible for the content.
 
 # References

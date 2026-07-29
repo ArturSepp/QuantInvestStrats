@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "93b53a84faf21368a9cc53578ed9b711665d736c",
+  "measured_at_commit": "40ecfbe181e2c89dba11ff1276aedc5cb6b8de23",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -52,7 +52,7 @@
       "paper_phrase": null
     },
     "commits": {
-      "value": 308,
+      "value": 310,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -124,7 +124,7 @@
       "paper_phrase": null
     },
     "paper_body_words": {
-      "value": 1743,
+      "value": 1750,
       "how": "whitespace-separated tokens in paper.md after the YAML front matter",
       "live": true,
       "paper_phrase": null
