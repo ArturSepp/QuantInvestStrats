@@ -62,7 +62,8 @@ AI_COAUTHOR: str = 'Claude'  # the trailer identity disclosed in the paper's AI 
 # cannot fail. A consumer absent from this table gets no phrase, which is the right default: it
 # means the manuscript does not quote it yet.
 CONSUMER_PHRASES: Dict[str, Dict[str, Optional[str]]] = {
-    'optimalportfolios': dict(symbols='references {value} of its', call_sites='at {value} sites'),
+    'optimalportfolios': dict(symbols='references {value} of its symbols',
+                              call_sites='at {value} sites'),
     'trendfollowing': dict(symbols='references {value} symbols', call_sites='at {value} sites'),
     'privateassets': dict(symbols=None, call_sites=None),
 }

@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "80311ad9f424c8ba383fe000d4eb7a69233ecd62",
+  "measured_at_commit": "4d09b6208f552eedeaab8c27eef0604efef4ab3e",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": "in 37 of the 44 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 32,
+      "value": 35,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -46,13 +46,13 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 1103,
+      "value": 1107,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 303,
+      "value": 306,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -67,7 +67,7 @@
       "value": 94,
       "how": "tools/audit_consumers.py at 832a2baf4b4c",
       "live": false,
-      "paper_phrase": "references 94 of its"
+      "paper_phrase": "references 94 of its symbols"
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
@@ -124,7 +124,7 @@
       "paper_phrase": null
     },
     "paper_body_words": {
-      "value": 1768,
+      "value": 1745,
       "how": "whitespace-separated tokens in paper.md after the YAML front matter",
       "live": true,
       "paper_phrase": null

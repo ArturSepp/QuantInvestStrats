@@ -21,11 +21,10 @@ bibliography: paper.bib
 # Summary
 
 `qis` computes the quantities a quantitative investor reports. It turns a series of portfolio
-weights and a panel of prices into a simulated portfolio, measures that portfolio against a
-benchmark, and renders the result as a factsheet. Around those three steps it provides the
-supporting analytics reporting depends on: exponentially weighted covariance estimation, block
-bootstrap resampling, risk measures, regime-conditional statistics, currency hedging, and return
-unsmoothing for assets that report infrequently.
+weights and a panel of prices into a simulated portfolio, measures it against a benchmark, and
+renders the result as a factsheet. Around those three steps it provides the analytics reporting
+depends on: exponentially weighted covariance, block bootstrap resampling, risk measures,
+regime-conditional statistics, currency hedging, and return unsmoothing.
 
 We designed it around one assumption: a strategy is a rule for producing weights, and, for the
 simulation and reporting workflows `qis` targets, everything downstream of those weights is
@@ -33,18 +32,17 @@ reconstruction rather than research. The researcher keeps the signal and the por
 construction; the rest belongs to the library.
 
 `qis` is the base layer of a stack of quantitative finance packages — `optimalportfolios`,
-`trendfollowing` and `privateassets`, all three public — and the computational layer beneath
-published research in portfolio construction and systematic strategies. Each capability is
-written once and reused across that stack. It requires only the scientific Python stack, runs on
-Python 3.10 to 3.14, and is released under the MIT licence.
+`trendfollowing` and `privateassets`, all three public. Each capability is written once and reused
+across that stack. It requires only the scientific Python stack, runs on Python 3.10 to 3.14, and is
+released under the MIT licence.
 
 # Statement of need
 
-Reported performance numbers depend on conventions that are rarely stated. Annualisation depends
-on the return frequency, and a Sharpe ratio depends on whether a risk-free rate is subtracted and
-on which rate. A backtested return depends on whether holdings drift between rebalancings or are
-reset every period. Two implementations of the same strategy can therefore report different
-numbers without either containing an error, and the difference is invisible in the output.
+Reported performance numbers depend on conventions that are rarely stated. Annualisation depends on
+the return frequency, a Sharpe ratio on whether a risk-free rate is subtracted and on which rate,
+and a backtested return on whether holdings drift between rebalancings or are reset every period.
+Two implementations of the same strategy can therefore report different numbers without either
+containing an error, and the difference is invisible in the output.
 
 We answer each of these questions once, inside the library, and report the answer beside the
 number. The return convention is an argument rather than an assumption, annualisation follows
@@ -77,16 +75,15 @@ we found four independent block bootstrap implementations and two return unsmoot
 reimplementing code `qis` already exported. They had diverged, so the same nominal method
 produced different numbers in different papers.
 
-The argument now extends to agentic AI tools. A researcher who directs such a tool at `qis` for
-simulation and reporting, rather than letting it write those steps, holds the conventions fixed
-across sessions; otherwise each session reimplements them and the divergence above reappears one
-conversation at a time.
+The argument extends to agentic AI tools: a researcher who directs one at `qis` for simulation and
+reporting, rather than letting it write those steps, holds the conventions fixed across sessions
+instead of having each session reimplement them and reproduce the divergence above.
 
 # State of the field
 
-Python packages in this area are often described as splitting into reporting libraries and
-backtesting frameworks. Their documented interfaces do not split that way, so the comparison
-below is capability by capability, at the versions current on 27 July 2026.
+Packages in this area are usually described as splitting into reporting libraries and backtesting
+frameworks; their documented interfaces do not, so the comparison below is capability by capability,
+at the versions current on 27 July 2026.
 
 | package | its documented interface takes | and returns |
 |---|---|---|
@@ -119,56 +116,51 @@ portfolio reconstruction and reporting inside one object model.
 
 # Software design
 
-We organise the package into 12 capability groups: among them performance statistics, portfolio
-and backtesting, factsheets, exponentially weighted estimation, currency hedging, regime
-reporting, resampling and unsmoothing.
+We organise the package into 12 capability groups, which `qis/api.py` names.
 
 The backtester is 323 lines, and that follows from the design assumption rather than from
 compression. Because a strategy is a rule for producing weights, the backtester holds no strategy
 logic: it converts target weights to units at each rebalancing, holds those units until the next
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
-one of the few paths here where a loop cannot be vectorised.
+one of the few loops here that cannot be vectorised.
 
 The public interface is `qis.__all__`, which holds 403 names; `qis/api.py` records that list as a
 literal together with a documented core of 116 symbols grouped by capability, and the suite fails
 when either record disagrees with the namespace.
 
-Properties are enforced by tests rather than by convention: every exported plotting function
-draws a figure on a synthetic panel; every example references symbols and keyword arguments that
-exist; every core symbol documents its arguments and documents none it does not take; the
-recorded export list matches the namespace; documentation links resolve; and the measurements
-this paper quotes match a generated record. The convention measurement above is pinned to its
-published values rather than only executed. Every example that needs no data vendor runs in the
-suite; the rest are checked statically.
+Properties are enforced by tests rather than by convention: every exported plotting function draws a
+figure on a synthetic panel; every example references symbols and keyword arguments that exist;
+every core symbol documents its arguments and documents none it does not take; documentation links
+resolve; and the measurements this paper quotes match a generated record. The convention measurement
+above is pinned to its published values rather than only executed. Every example that needs no data
+vendor runs in the suite; the rest are checked statically.
 
-The suite runs without network access on a core installation: its data comes from a frozen
-seeded simulator reproducing the defects of real panels: ragged starts, missing observations,
-stale prices, appraisal smoothing.
+The suite runs without network access on a core installation, from a frozen seeded simulator
+reproducing the defects of real panels: ragged starts, missing observations, stale prices, appraisal
+smoothing.
 
 # Research impact statement
 
-We state plainly that the stack is the author's. Two consumers carry this section, both public
-and both using the package deeply. `optimalportfolios`, which implements portfolio optimisation
-solvers and rolling backtests, declares `qis` a mandatory dependency and references 94 of its
-symbols at 683 sites. `trendfollowing`, which carries the code behind the trend-following work
-cited below, references 87 symbols at 443 sites. Both counts are taken at the commits recorded in
-`docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`, whose docstring
-defines a symbol and a site.
+We state plainly that the stack is the author's. Two public consumers carry this section, both
+using the package deeply. `optimalportfolios`, which implements portfolio optimisation solvers
+and rolling backtests, declares `qis` a mandatory dependency and references 94 of its symbols
+at 683 sites. `trendfollowing`, which carries the code behind the trend-following work cited
+below, references 87 symbols at 443 sites. Both counts are taken at the commits recorded in
+`docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`, whose
+docstring defines a symbol and a site.
 
-A third public package, `privateassets`, applies the unsmoothing layer to private-asset returns;
-it is recent and its dependency small, so we cite it for the range of asset classes served rather
-than as evidence of adoption.
+A third public package, `privateassets`, applies the unsmoothing layer to private-asset returns; it
+is recent and its dependency small, so we cite it for the range of asset classes served, not as
+adoption evidence.
 
-The capabilities carry named results. The portfolio and optimisation layers support work on
-robust strategic and tactical allocation [@sepp2026robust], the backtester and performance layer
-work on cryptocurrency allocation [@sepp2023crypto], the regime-conditional layer work on
-trend-following systems [@sepp2026trend], and the resampling layer work on capital market
-assumptions built from multi-asset tradable factors [@sepp2026matf]. The last two are working
-papers, under submission at the SIAM Journal on Financial Mathematics and at The Journal of
-Portfolio Management.
+The capabilities carry named results. The portfolio and optimisation layers support work on robust
+strategic and tactical allocation [@sepp2026robust], the backtester and performance layer work on
+cryptocurrency allocation [@sepp2023crypto], the regime-conditional layer work on trend-following
+systems [@sepp2026trend], and the resampling layer work on capital market assumptions built from
+multi-asset tradable factors [@sepp2026matf]. The last two are working papers.
 
-Development has been continuous rather than concentrated: commits run from December 2022 to
-July 2026, with activity in 37 of the 44 calendar months in that span.
+Commits run from December 2022 to July 2026, with activity in 37 of the 44 calendar months in that
+span.
 
 # AI usage disclosure
 
