@@ -91,6 +91,18 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
 - Line length 100 (`ruff`, rules `E`, `F`, `W`). Run `ruff check` on the files you touched
   before finishing; CI gates the diff, not the repository. The isort rule `I` is deliberately
   not selected — it contradicts the import convention above.
+- **Three stack invariants are enforced by ruff rather than written down.** Unlike `E`/`F`/`W`
+  they are green on the whole repository, so a violation is always yours:
+  - `TID251` fails any import of `optimalportfolios`, `factorlasso` or a subject package. `qis`
+    is the base layer and imports flow one way only. If a change appears to need one, the code
+    belongs in the lower package — say so rather than adding the import.
+  - `TID253` fails a **module-level** import of an optional extra (`yfinance`,
+    `pandas_datareader`, `pybloqs`, `plotly`, `pyarrow`, `psycopg2`, `sqlalchemy`); the same
+    import inside a function passes, which is the documented pattern. `qis/examples/**` and the
+    four modules dedicated to a single optional backend are named in `per-file-ignores` — add to
+    that list only for a module `qis/__init__.py` cannot reach.
+  - `ICN` pins `import numpy as np` and `import pandas as pd`. Ruff's default alias map is
+    replaced rather than extended, so `matplotlib` stays free to be both `mpl` and `plt`.
 - **Docstrings are Google-style** (`Args:` / `Returns:` / `Raises:`, `Attributes:` on a class
   or enum), rendered through `napoleon`. `qis/tests/test_docstring_convention.py` fails the
   suite on a numpydoc section heading. `factorlasso` is the one package in the stack that keeps

@@ -144,10 +144,50 @@ line-length = 100
 # rule would fail every file written to the documented convention. See AGENTS.md, Conventions.
 select = ["E", "F", "W"]
 
+# --- stack invariants as lint, not prose ---------------------------------------------------
+# TID251 bans an import outright, TID253 bans it only at module level, ICN pins the numpy and
+# pandas aliases. None belongs to the "I" (isort) family, so the import-grouping convention is
+# untouched. Verified green on the repository as it stands.
+extend-select = ["TID251", "TID253", "ICN"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# A1: qis is the base layer. Imports flow one way only; it never imports a dependent or a
+# subject package. If a change appears to need one of these, the code belongs in the lower
+# package -- say so rather than adding the import.
+"optimalportfolios".msg = "A1: qis is the base layer and must never import optimalportfolios."
+"factorlasso".msg = "A1: qis must never import factorlasso."
+"trendfollowing".msg = "A1: the core never imports a subject package."
+"privateassets".msg = "A1: the core never imports a subject package."
+"stochvolmodels".msg = "A1: the core never imports a subject package."
+"goal_based_allocation".msg = "A1: the core never imports a subject package."
+"vanilla_option_pricers".msg = "A1: the core never imports a subject package."
+
+[tool.ruff.lint.flake8-tidy-imports]
+# A3: an optional extra is imported inside a function and guarded, never at module level, so a
+# core install keeps working. A module dedicated to a single optional backend is the documented
+# exception and is named in per-file-ignores below.
+banned-module-level-imports = ["yfinance", "pandas_datareader", "pybloqs", "plotly", "pyarrow",
+                               "psycopg2", "sqlalchemy"]
+
+[tool.ruff.lint.flake8-import-conventions.aliases]
+# replaces ruff's default alias map, which also demands `matplotlib as mpl` everywhere. Only
+# numpy and pandas are house convention; matplotlib is legitimately both `mpl` and `plt` here.
+numpy = "np"
+pandas = "pd"
+
 [tool.ruff.lint.per-file-ignores]
 # an __init__.py re-exports: the public API is defined as what these files import, so every
 # one of the 398 imports across them is "unused" by F401's definition and none is a defect
 "**/__init__.py" = ["F401"]
+# examples are documentation and run top to bottom: a module-level yfinance import is correct
+"qis/examples/**" = ["TID253"]
+# modules dedicated to one optional backend. None is reachable from qis/__init__.py, so
+# `import qis` on a core install never touches them (checked: pybloqs, plotly and sqlalchemy are
+# absent from sys.modules after `import qis`).
+"qis/plots/derived/gantt_data_history.py" = ["TID253"]
+"qis/portfolio/reports/multi_strategy_factsheet_pybloqs.py" = ["TID253"]
+"qis/portfolio/reports/strategy_benchmark_factsheet_pybloqs.py" = ["TID253"]
+"qis/sql_engine.py" = ["TID253"]
 
 [tool.coverage.run]
 source = ["qis"]
