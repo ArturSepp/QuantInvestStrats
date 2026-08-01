@@ -176,3 +176,6 @@ output/
 /build/
 /dist/
 *.egg-info/
+
+# Claude Code: shared project settings are committed, per-machine overrides are not
+.claude/settings.local.json
