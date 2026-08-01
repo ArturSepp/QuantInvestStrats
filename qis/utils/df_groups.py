@@ -178,7 +178,7 @@ def agg_df_by_groups(df: pd.DataFrame,
             if len(group_columns) > 0:
                 agg_grouped_datas.append(agg_func(df[group_columns], axis=axis).rename(key))
         if len(agg_grouped_datas) > 0:
-            agg_grouped_data = pd.concat(agg_grouped_datas, axis=1)
+            agg_grouped_data = pd.concat(agg_grouped_datas, axis=1, sort=True)
         else:
             agg_grouped_data = pd.DataFrame()
 
@@ -225,7 +225,7 @@ def agg_df_by_group_with_avg(df: pd.DataFrame,
     grouped_data_avg[total_column] = group_avg
     for ac_id, ac_data in grouped_data.items():
         data_avg = group_avg[ac_id].rename(f"{ac_id} {agg_func_id}")
-        ac_data = pd.concat([data_avg, ac_data], axis=1)
+        ac_data = pd.concat([data_avg, ac_data], axis=1, sort=True)
         grouped_data_avg[ac_id] = ac_data
 
     return grouped_data_avg

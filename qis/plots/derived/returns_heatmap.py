@@ -116,7 +116,8 @@ def compute_periodic_returns_table(prices: pd.Series,
                 row_periodic_returns = row_periodic_returns.rename(ytd_name)
             else:
                 row_periodic_returns.columns = [ytd_name]
-            periodic_returns_table = pd.concat([periodic_returns_table, row_periodic_returns], axis=1, join='inner')
+            periodic_returns_table = pd.concat([periodic_returns_table, row_periodic_returns],
+                                               axis=1, sort=False, join='inner')
 
     if is_inverse_order:
         periodic_returns_table = periodic_returns_table.reindex(index=periodic_returns_table.index[::-1])
@@ -201,7 +202,7 @@ def plot_returns_table(prices: pd.DataFrame,
         if len(period_data.index) > 1:
             period_return = period_data.iloc[-1, :] / period_data.iloc[0, :] - 1
             period_returns.append(period_return.rename(period))
-    data = pd.concat(period_returns, axis=1)
+    data = pd.concat(period_returns, axis=1, sort=False)
     fig = plot_heatmap(df=data,
                        vline_columns=vline_columns,
                        hline_rows=hline_rows,
@@ -228,6 +229,13 @@ def compute_periodic_returns(prices: pd.DataFrame,
         raise ValueError(f"prices must be dataframe")
     if time_period is not None:
         prices = time_period.locate(prices)
+
+    # the fill below and to_total_returns() further down both read the panel in row order, so
+    # the panel has to be chronological first. pd.concat(axis=1, sort=False) leaves the union
+    # of two DatetimeIndexes in appearance order from pandas 3.0 - see df_asfreq - and filling
+    # such a panel carries the terminal price backwards onto the dates a column does not carry
+    if not prices.index.is_monotonic_increasing:
+        prices = prices.sort_index()
 
     # make sure there are no gaps for heterogeneous price data
     prices = prices.ffill().bfill()
@@ -349,8 +357,8 @@ def plot_sorted_periodic_returns(prices: pd.DataFrame,
         entries_colors = pd.Series([fixed_colors[key] for key, v in current_period.to_dict().items()], name=date)
         sorted_colors.append(entries_colors)
 
-    sorted_returns = pd.concat(sorted_returns, axis=1)
-    sorted_colors = pd.concat(sorted_colors, axis=1)
+    sorted_returns = pd.concat(sorted_returns, axis=1, sort=False)
+    sorted_colors = pd.concat(sorted_colors, axis=1, sort=False)
 
     fig = ptb.plot_df_table(df=sorted_returns,
                             first_column_width=None,

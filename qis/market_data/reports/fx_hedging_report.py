@@ -77,7 +77,7 @@ def run_asset_fx_hedging_report(asset_price_local_ccy: pd.Series,
     optimal_hedge, max_carry, beta_hedged = compute_fx_optimal_hedge(**kwargs, span=span,
                                                                      risk_aversion_lambda=risk_aversion_lambda,
                                                                      min_max_hedge=min_max_hedge)
-    hedges = pd.concat([optimal_hedge, max_carry, beta_hedged], axis=1)
+    hedges = pd.concat([optimal_hedge, max_carry, beta_hedged], axis=1, sort=True)
 
     # Generate NAVs for different hedge ratios
     nav0, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(hedge_ratio=0.0, **kwargs)
@@ -93,7 +93,7 @@ def run_asset_fx_hedging_report(asset_price_local_ccy: pd.Series,
                       nav0.rename('h=0.0'), nav05.rename('h=0.5'), nav1.rename('h=1.0'),
                       nav_beta.rename('Beta-Hedged'),
                       nav_carry.rename('Carry-Hedged'),
-                      nav_optimal.rename('Optimal-Hedged')], axis=1)
+                      nav_optimal.rename('Optimal-Hedged')], axis=1, sort=True)
 
     fx_vol, fx_beta = compute_fx_vol_beta(asset_price_local_ccy=asset_price_local_ccy,
                                           local_to_reference_fx_rate=local_to_reference_fx_rate, freq=freq,
@@ -213,7 +213,7 @@ def compute_multi_asset_fx_hedging(asset_prices: pd.DataFrame,
             optimal_hedge, max_carry, beta_hedged = compute_fx_optimal_hedge(**kwargs, span=span,
                                                                              risk_aversion_lambda=risk_aversion_lambda,
                                                                              min_max_hedge=min_max_hedge)
-            hedges = pd.concat([optimal_hedge, max_carry, beta_hedged], axis=1)
+            hedges = pd.concat([optimal_hedge, max_carry, beta_hedged], axis=1, sort=True)
 
             # Generate NAVs for comparison
             nav0, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(hedge_ratio=0.0, **kwargs)
@@ -227,7 +227,7 @@ def compute_multi_asset_fx_hedging(asset_prices: pd.DataFrame,
                               nav0.rename('h=0.0'), nav05.rename('h=0.5'), nav1.rename('h=1.0'),
                               nav_beta.rename('Beta-Hedged'),
                               nav_carry.rename('Carry-Hedged'),
-                              nav_optimal.rename('Optimal-Hedged')], axis=1)
+                              nav_optimal.rename('Optimal-Hedged')], axis=1, sort=True)
 
             if time_period is not None:
                 navs = time_period.locate(navs)

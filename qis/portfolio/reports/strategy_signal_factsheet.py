@@ -54,9 +54,13 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
             if is_add_residual_to_momentum:
                 df_mom = df['momentum_change'].add(df['residual']).rename('momentum_change')
                 if 'carry_change' in df.columns:
-                    df_ac = pd.concat([df_mom, df[['carry_change', 'target_vol_change', 'port_leverage_change']]], axis=1)
+                    df_ac = pd.concat([df_mom,
+                                       df[['carry_change', 'target_vol_change',
+                                           'port_leverage_change']]],
+                                      axis=1, sort=False)
                 else:
-                    df_ac = pd.concat([df_mom, df[['target_vol_change', 'port_leverage_change']]], axis=1)
+                    df_ac = pd.concat([df_mom, df[['target_vol_change', 'port_leverage_change']]],
+                                      axis=1, sort=False)
             else:
                 df_ac = df[['momentum_change', 'carry_change', 'target_vol_change', 'port_leverage_change', 'residual']]
             group_preds[group] = df_ac.copy()

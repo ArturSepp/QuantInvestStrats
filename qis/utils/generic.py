@@ -162,7 +162,7 @@ def column_datas_to_df(column_datas: Dict[str, ColumnData],
     datas = []
     for _, column_data in column_datas.items():
         datas.append(column_data.data.rename(column_data.column.to_str()))
-    table_data = pd.concat(datas, axis=1)
+    table_data = pd.concat(datas, axis=1, sort=False)
 
     if weight is None:
         weight = pd.Series(1.0, index=table_data.index)

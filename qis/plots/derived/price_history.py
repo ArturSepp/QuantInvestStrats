@@ -47,7 +47,7 @@ def plot_price_history(prices: pd.DataFrame,
     start_dates = pd.Series(start_dates).rename('Start')
     end_dates = pd.Series(end_dates).rename('End')
     durations = pd.Series(durations).rename('Period')
-    df = pd.concat([start_dates, end_dates, durations], axis=1)
+    df = pd.concat([start_dates, end_dates, durations], axis=1, sort=False)
     df = df.iloc[::-1]  # reverse index
     if ax is None:
         width, height, _, _ = put.calc_df_table_size(df=df, min_rows=len(df.index), min_cols=len(df.index)//2)

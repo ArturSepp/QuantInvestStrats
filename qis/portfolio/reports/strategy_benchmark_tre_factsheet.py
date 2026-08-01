@@ -155,7 +155,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         benchmark_ex_anti_vol = benchmark_data.compute_ex_anti_portfolio_vol_implied_by_covar(
             covar_dict=multi_portfolio_data.covar_dict)
 
-        ex_anti_vols = pd.concat([strategy_ex_anti_vol, benchmark_ex_anti_vol], axis=1)
+        ex_anti_vols = pd.concat([strategy_ex_anti_vol, benchmark_ex_anti_vol], axis=1, sort=True)
         dfs['ex_anti_vols'] = ex_anti_vols
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         if add_titles:

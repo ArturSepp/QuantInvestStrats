@@ -64,7 +64,8 @@ def compute_local_and_fx_return(asset_price_local_ccy: pd.Series,
     Returns:
         Tuple ``(local_return, fx_return)`` of period-return Series sampled at ``freq``.
     """
-    price_data = pd.concat([asset_price_local_ccy, local_to_reference_fx_rate], axis=1).ffill()
+    price_data = pd.concat([asset_price_local_ccy, local_to_reference_fx_rate],
+                           axis=1, sort=True).ffill()
     price_returns = qis.to_returns(prices=price_data, freq=freq, is_log_returns=is_log_returns)
     local_return = price_returns.iloc[:, 0]
     fx_return = price_returns.iloc[:, 1]
@@ -225,8 +226,10 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
     fx_vol, fx_beta = compute_fx_vol_beta(asset_price_local_ccy=asset_price_local_ccy,
                                           local_to_reference_fx_rate=local_to_reference_fx_rate,
                                           freq=freq, span=span)
-    aligned_data = pd.concat(
-        [fx_vol.rename('vol'), fx_beta.rename('beta'), forward_rate_for_local_ccy.rename('forward')], axis=1)
+    aligned_data = pd.concat([fx_vol.rename('vol'),
+                              fx_beta.rename('beta'),
+                              forward_rate_for_local_ccy.rename('forward')],
+                             axis=1, sort=True)
     aligned_data = aligned_data.asfreq(freq).ffill()
     fx_var = aligned_data['vol'] ** 2
 

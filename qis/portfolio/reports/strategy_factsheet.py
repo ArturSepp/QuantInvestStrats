@@ -188,12 +188,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     if add_benchmarks_to_navs:
         benchmark_prices_ = benchmark_prices
-        joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
+        joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1, sort=True).dropna()
         pivot_prices = joint_prices[regime_benchmark]
     else:
         if regime_benchmark != portfolio_nav.name:
             benchmark_prices_ = benchmark_prices[regime_benchmark]
-            joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1).dropna()
+            joint_prices = pd.concat([portfolio_nav, benchmark_prices_], axis=1, sort=True).dropna()
             pivot_prices = joint_prices[regime_benchmark]
             joint_prices = joint_prices[portfolio_nav.name]
         else:
@@ -603,7 +603,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                 idx -= 1  # account for dropping total_column
                 df = pd.concat([weights.loc[past_date, :].rename(past_date.strftime('%d%b%Y')),
                                                                  weights.loc[current_date, :].rename(current_date.strftime('%d%b%Y')),
-                                ], axis=1)
+                                ], axis=1, sort=True)
                 ax = fig1.add_subplot(gs[1+idx//2, idx%2])  # shift row by one
                 qis.plot_bars(df=df,
                               title=f"{key} by instrument",
@@ -780,7 +780,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             ac_data = portfolio_data.group_data.to_frame(name='AC')
             if portfolio_data.instrument_names is not None:
                 df_to_add = pd.concat([portfolio_data.instrument_names.rename('Name'),
-                                       ac_data], axis=1)
+                                       ac_data], axis=1, sort=True)
             else:
                 df_to_add = ac_data
 

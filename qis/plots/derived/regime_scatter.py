@@ -354,7 +354,7 @@ def estimate_cond_regression(prices: pd.DataFrame,
         regression_datas.append(benchmark_data)
 
     # Concatenate regime columns and fill missing values with zeros (non-regime periods)
-    regression_matrix = pd.concat(regression_datas, axis=1).fillna(0)
+    regression_matrix = pd.concat(regression_datas, axis=1, sort=True).fillna(0)
 
     # Add constant term (alpha) to regression matrix if requested
     if is_add_alpha:
@@ -429,7 +429,7 @@ def estimate_cond_regression(prices: pd.DataFrame,
                     y,
                     prediction.rename(ConditionalRegressionColumns.PREDICTION.value),
                     regime_colors
-                ], axis=1)
+                ], axis=1, sort=True)
                 regmodel_out_dict[asset] = pandas_out
 
             # Extract parameter estimates and residual variance
@@ -442,7 +442,7 @@ def estimate_cond_regression(prices: pd.DataFrame,
         model_params.append(estimated_model_params)
 
     # Combine all asset parameters into single DataFrame (assets as rows)
-    model_params_df = pd.concat(model_params, axis=1).T
+    model_params_df = pd.concat(model_params, axis=1, sort=False).T
 
     return model_params_df
 

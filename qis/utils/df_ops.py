@@ -378,7 +378,7 @@ def factor_dict_to_asset_dict(factor_loadings: Dict[str, pd.DataFrame],
         asset_factor_loading = []
         for factor, factor_data in factor_loadings.items():
             asset_factor_loading.append(factor_data[asset].rename(factor))
-        asset_factor_loadings[asset] = pd.concat(asset_factor_loading, axis=1)
+        asset_factor_loadings[asset] = pd.concat(asset_factor_loading, axis=1, sort=True)
 
     return asset_factor_loadings
 
@@ -522,7 +522,7 @@ def df12_merge_with_tz(df1: pd.DataFrame,
     df2.index = df2.index.tz_localize(tz=tz)
 
     # concat
-    dfs = pd.concat([df1, df2], axis=1)
+    dfs = pd.concat([df1, df2], axis=1, sort=True)
     dfs = dfs.ffill().asfreq(freq=freq, method='ffill')
     dfs.index = dfs.index# .tz_localize(tz=tz)
     return dfs
@@ -541,7 +541,9 @@ def merge_dfs_on_column(data_df: pd.DataFrame,
     # align dfs by index_column_in_data_df
     index_df_joint_data = index_df.reindex(index=data_df[index_column_in_data_df].to_list())
     # merge aligned dfs with reset index
-    joint_data = pd.concat([data_df.reset_index(drop=False), index_df_joint_data.reset_index(drop=False)], axis=1)
+    joint_data = pd.concat([data_df.reset_index(drop=False),
+                            index_df_joint_data.reset_index(drop=False)],
+                           axis=1, sort=False)
     joint_data = joint_data.set_index(data_df.index.name)
     return joint_data
 
@@ -630,7 +632,7 @@ def df_price_ffill_between_nans(prices: Union[pd.Series, pd.DataFrame],
             raise NotImplementedError(f"method={method} not supported")
         good_parts.append(good_price)
 
-    bfilled_data = pd.concat(good_parts, axis=1)
+    bfilled_data = pd.concat(good_parts, axis=1, sort=True)
     if bfilled_data.index[0] > prices.index[0]:
         bfilled_data = bfilled_data.reindex(index=prices.index)
 

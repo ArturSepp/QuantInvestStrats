@@ -295,7 +295,7 @@ def _build_pairs_string_horizon(
         per_freq_nav.append(nav)
     if not per_freq_nav:
         return pd.DataFrame(columns=['date', 'asset', 'asset_freq', 'group', 'z', 'r'])
-    full_nav = pd.concat(per_freq_nav, axis=1).sort_index().ffill()
+    full_nav = pd.concat(per_freq_nav, axis=1, sort=True).sort_index().ffill()
     # Resample to horizon_freq
     nav_rs = full_nav.resample(horizon_freq).last().ffill()
     # Returns at this freq

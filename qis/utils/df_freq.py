@@ -4,6 +4,9 @@ convention made explicit. ``df_asfreq`` samples the last observation at or befor
 date, while ``df_resample_at_freq`` and ``df_resample_at_other_index`` aggregate within the period
 by ``agg_func`` and, under ``include_end_date``, carry a final partial period through
 ``agg_remained_data_on_right`` rather than discarding it.
+
+A panel is a mapping from date to value, so the row order it arrives in carries no information:
+``df_asfreq`` sorts an index that is not chronological rather than resampling along it.
 """
 import warnings
 import numpy as np
@@ -57,9 +60,26 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
 
     Note:
         Using include_start_date / include_end_date may produce an irregular index.
+        A df whose index is not in chronological order is sorted before resampling.
     """
     if freq is None or df.empty:
         return df
+
+    # Everything below assumes the panel is in chronological order: the pre-reindex ffill
+    # carries values forward in ROW order, and reindex(method='ffill') raises
+    # "index must be monotonic increasing or decreasing" out of pandas on an unsorted index.
+    #
+    # Such a panel reaches here more easily than it used to. pandas 3.0 changed
+    # pd.concat(axis=1, sort=False) - how a benchmark series and a strategy nav on different
+    # calendars get joined - to leave the union of the two DatetimeIndexes in appearance order:
+    # the dates carried only by the second frame land after the last date of the first. pandas
+    # 2.2 returned a sorted union from the same call, and concat with no explicit sort= still
+    # sorts today under a deprecation that ends that.
+    #
+    # Sorting is a repair rather than a convention: a price panel is a mapping from date to
+    # value, and the order its rows arrive in carries no information.
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
 
     # pd.infer_freq requires >= 3 points and can raise on irregular indices
     if len(df.index) >= 3:

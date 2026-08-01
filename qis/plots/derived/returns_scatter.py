@@ -42,13 +42,13 @@ def plot_returns_scatter(prices: pd.DataFrame,
         price_data_full = prices
     else:
         if isinstance(benchmark_prices, pd.Series):  # use benchmark set by series
-            price_data_full = pd.concat([benchmark_prices, prices], axis=1)
+            price_data_full = pd.concat([benchmark_prices, prices], axis=1, sort=True)
             benchmark = benchmark_prices.name
             benchmark_prices = None
         else:  # for df price data must be sries
             if not isinstance(prices, pd.Series):
                 raise ValueError(f"must be series\n{prices}")
-            price_data_full = pd.concat([prices, benchmark_prices], axis=1)
+            price_data_full = pd.concat([prices, benchmark_prices], axis=1, sort=True)
 
     returns = ret.to_returns(prices=price_data_full,
                              include_start_date=True,

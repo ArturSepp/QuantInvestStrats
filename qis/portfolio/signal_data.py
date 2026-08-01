@@ -75,7 +75,7 @@ class StrategySignalData:
             current_signals_ = current_signals[tickers]
             group_signals[group] = pd.concat([last_signals_.rename(last_date),
                                               current_signals_.rename(current_date)
-                                              ], axis=1)
+                                              ], axis=1, sort=False)
 
             agg_by_group[group] = pd.Series({last_date: np.nanmean(last_signals_),
                                              current_date: np.nanmean(current_signals_)})
@@ -128,9 +128,9 @@ class StrategySignalData:
         if self.ra_carry is not None:
             x_var_name0 = 'carry_change'
             x0 = melt_df_by_columns(ssd.ra_carry.iloc[:-1, :], y_var_name=x_var_name0)[x_var_name0]
-            x = pd.concat([x0, x1, x2, x3], axis=1).dropna()
+            x = pd.concat([x0, x1, x2, x3], axis=1, sort=False).dropna()
         else:
-            x = pd.concat([x1, x2, x3], axis=1).dropna()
+            x = pd.concat([x1, x2, x3], axis=1, sort=False).dropna()
         x_names = x.columns.to_list()
         y = y.reindex(index=x.index)
 
@@ -221,11 +221,11 @@ class StrategySignalData:
                 x = pd.concat([x0[ticker].rename(x_var_name0),
                                x1[ticker].rename(x_var_name1),
                                x2[ticker].rename(x_var_name2),
-                               x3[ticker].rename(x_var_name3)], axis=1)
+                               x3[ticker].rename(x_var_name3)], axis=1, sort=True)
             else:
                 x = pd.concat([x1[ticker].rename(x_var_name1),
                                x2[ticker].rename(x_var_name2),
-                               x3[ticker].rename(x_var_name3)], axis=1)
+                               x3[ticker].rename(x_var_name3)], axis=1, sort=True)
 
             # keep last obs for prediction
             fitted_model = fit_ols(x=x.iloc[:-1, :].to_numpy(), y=y[ticker].iloc[:-1].to_numpy(), order=1, fit_intercept=False)

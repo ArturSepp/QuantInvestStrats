@@ -619,9 +619,10 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
             unsmoothed_dict[frequency] = u
             betas_dict[frequency] = b
             r2_dict[frequency] = r
-        unsmoothed = pd.concat(unsmoothed_dict.values(), axis=1).reindex(columns=prices.columns)
-        betas = pd.concat(betas_dict.values(), axis=1).reindex(columns=prices.columns)
-        r2 = pd.concat(r2_dict.values(), axis=1).reindex(columns=prices.columns)
+        unsmoothed = pd.concat(unsmoothed_dict.values(),
+                               axis=1, sort=True).reindex(columns=prices.columns)
+        betas = pd.concat(betas_dict.values(), axis=1, sort=True).reindex(columns=prices.columns)
+        r2 = pd.concat(r2_dict.values(), axis=1, sort=True).reindex(columns=prices.columns)
 
     if is_log_returns:
         unsmoothed = np.expm1(unsmoothed)

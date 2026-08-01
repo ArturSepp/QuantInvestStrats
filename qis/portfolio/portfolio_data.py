@@ -233,7 +233,7 @@ class PortfolioData:
         navs = self.get_portfolio_nav(time_period=time_period, freq=freq)
         if self.benchmark_prices is not None:
             benchmark_prices = self.benchmark_prices.reindex(index=navs.index, method='ffill')
-            navs = pd.concat([navs, benchmark_prices], axis=1)
+            navs = pd.concat([navs, benchmark_prices], axis=1, sort=True)
         return navs
 
     def get_instruments_pnl(self,
@@ -311,7 +311,7 @@ class PortfolioData:
         """
         total_nav = self.get_portfolio_nav(time_period=time_period)
         group_navs = self.get_group_navs(time_period=time_period, is_add_group_total=False)
-        prices = pd.concat([total_nav, group_navs], axis=1)
+        prices = pd.concat([total_nav, group_navs], axis=1, sort=True)
         return prices
 
     def get_input_weights(self, time_period: TimePeriod = None) -> Union[np.ndarray, pd.DataFrame, Dict[str, float]]:
@@ -401,7 +401,7 @@ class PortfolioData:
             total = dfa.df_nansum(exposures_by_inst, axis=1).rename(total_name)
             net_long = dfa.df_nansum_positive(exposures_by_inst, axis=1).rename('Net Long')
             net_short = dfa.df_nansum_negative(exposures_by_inst, axis=1).rename('Net Short')
-            grouped_weights_agg[group] = pd.concat([total, net_long, net_short], axis=1)
+            grouped_weights_agg[group] = pd.concat([total, net_long, net_short], axis=1, sort=True)
         return grouped_weights_agg, grouped_weights_by_inst
 
     def get_grouped_cum_pnls(self,
@@ -429,7 +429,8 @@ class PortfolioData:
             total = dfa.df_nansum(pnls_by_inst, axis=1).rename(total_name)
             net_long = dfa.df_nansum(pnl_positive_exp[tickers], axis=1).rename('Net Long')
             net_short = dfa.df_nansum(pnl_negative_exp[tickers], axis=1).rename('Net Short')
-            grouped_pnls_agg[group] = pd.concat([total, net_long, net_short], axis=1).cumsum(axis=0)
+            grouped_pnls_agg[group] = pd.concat([total, net_long, net_short],
+                                                axis=1, sort=True).cumsum(axis=0)
         return grouped_pnls_agg, grouped_pnls_by_inst
 
     def get_turnover(self,
@@ -476,7 +477,8 @@ class PortfolioData:
                                                 group_order=group_order)
         else:
             if add_total:
-                turnover = pd.concat([turnover.sum(axis=1).rename(self.nav.name), turnover], axis=1)
+                turnover = pd.concat([turnover.sum(axis=1).rename(self.nav.name), turnover],
+                                     axis=1, sort=True)
 
         if not turnover.empty:  # it may happen for undefined groupings
             if freq is not None:  # first aggregate by freq
@@ -510,7 +512,8 @@ class PortfolioData:
                                              group_order=self.group_order)
         else:
             if add_total:
-                costs = pd.concat([costs.sum(axis=1).rename(self.nav.name), costs], axis=1)
+                costs = pd.concat([costs.sum(axis=1).rename(self.nav.name), costs],
+                                  axis=1, sort=True)
 
         if freq is not None:  # first aggregate by freq
             costs = costs.resample(freq).sum()
@@ -692,7 +695,7 @@ class PortfolioData:
         non_zero_exposures = self.weights.where(np.isclose(self.weights, 0.0) == False, other=np.nan)
         num_invested_instruments = np.sum(np.where(np.isfinite(non_zero_exposures), 1.0, 0.0), axis=1)
         num_invested_instruments = pd.Series(num_invested_instruments, index=self.weights.index, name='Invested')
-        df = pd.concat([num_available_prices, num_invested_instruments], axis=1)
+        df = pd.concat([num_available_prices, num_invested_instruments], axis=1, sort=True)
         if time_period is not None:
             df = time_period.locate(df)
         return df
@@ -714,7 +717,7 @@ class PortfolioData:
         data = pd.concat([weight.rename('Weight'),
                           insts_return.rename('Asset'),
                           portf_return.rename(portfolio_name)],
-                         axis=1).dropna()
+                         axis=1, sort=True).dropna()
         data = data.sort_values('Weight', ascending=False)
         if self.tickers_to_names_map is not None:
             data = data.rename(index=self.tickers_to_names_map)
@@ -764,7 +767,7 @@ class PortfolioData:
                                        annualize=True)
         df = pd.concat([portfolio_vol.rename('instrument weighted vol'),
                         strategy_vol.rename('strategy returns vol')
-                        ], axis=1)
+                        ], axis=1, sort=True)
         if time_period is not None:
             df = time_period.locate(df)
         return df
@@ -952,7 +955,7 @@ class PortfolioData:
         total_group_navs = self.get_total_nav_with_group_navs(time_period=time_period)
         if add_benchmarks and self.benchmark_prices is not None:
             benchmark_prices = self.benchmark_prices.reindex(index=total_group_navs.index, method='ffill')
-            total_group_navs = pd.concat([total_group_navs, benchmark_prices], axis=1)
+            total_group_navs = pd.concat([total_group_navs, benchmark_prices], axis=1, sort=True)
         if ax is None:
             with sns.axes_style('darkgrid'):
                 fig, ax = plt.subplots(1, 1, figsize=(16, 12), tight_layout=True)
@@ -1048,7 +1051,7 @@ class PortfolioData:
         if is_grouped:
             total_nav = self.get_portfolio_nav(time_period=time_period)
             group_navs = self.get_group_navs(time_period=time_period, is_add_group_total=False)
-            prices = pd.concat([total_nav, group_navs], axis=1)
+            prices = pd.concat([total_nav, group_navs], axis=1, sort=True)
             for_title = 'with portfolio groups'
             rows_edge_lines = [len(prices.columns)]
         else:
@@ -1062,7 +1065,9 @@ class PortfolioData:
             else:
                 benchmark = benchmark_price.name
             if benchmark not in prices.columns:
-                prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
+                prices = pd.concat([prices,
+                                    benchmark_price.reindex(index=prices.index, method='ffill')],
+                                   axis=1, sort=True)
             prices = prices.loc[:, ~prices.columns.duplicated(keep='first')]
             title = title or f"RA performance table {for_title} for {perf_params.freq_vol}-freq returns with beta to {benchmark}:" \
                              f" {qis.get_time_period(prices).to_str()}"
@@ -1104,7 +1109,8 @@ class PortfolioData:
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
             title = title or f"Scatterplot of {freq}-freq returns vs {str(benchmark_price.name)}"
-        prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')], axis=1)
+        prices = pd.concat([prices, benchmark_price.reindex(index=prices.index, method='ffill')],
+                           axis=1, sort=True)
         if np.any(prices.columns.duplicated()):
             raise ValueError(f"duplicated columns {prices.columns}")
         local_kwargs = qis.update_kwargs(kwargs=kwargs,
@@ -1154,7 +1160,9 @@ class PortfolioData:
             title = title or f"{heatmap_freq}-returns"
         if benchmark_prices is not None:
             hline_rows = [1, len(prices.columns)]
-            prices = pd.concat([prices, benchmark_prices.reindex(index=prices.index, method='ffill')], axis=1)
+            prices = pd.concat([prices,
+                                benchmark_prices.reindex(index=prices.index, method='ffill')],
+                               axis=1, sort=True)
         else:
             hline_rows = None
 
@@ -1191,7 +1199,9 @@ class PortfolioData:
                               f"of {regime_classifier.freq} returns")
 
         if benchmark_price.name not in prices.columns:
-            prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
+            prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'),
+                                prices],
+                               axis=1, sort=True)
 
         fig = qis.plot_regime_data(regime_classifier=regime_classifier,
                                    prices=prices,
@@ -1222,7 +1232,8 @@ class PortfolioData:
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
             title = title or f"{freq}-returns conditional on vols {str(benchmark_price.name)}"
-        prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices], axis=1)
+        prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices],
+                           axis=1, sort=True)
 
         fig = qis.plot_regime_boxplot(prices=prices,
                                       benchmark=str(benchmark_price.name),

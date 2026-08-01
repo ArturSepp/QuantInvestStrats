@@ -151,7 +151,7 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
         df_to_add = df_to_add.reindex(index=ra_perf_table.index)
         if is_convert_to_str:
             df_to_add = df_to_add.fillna('')
-        df = pd.concat([df, df_to_add], axis=1)
+        df = pd.concat([df, df_to_add], axis=1, sort=False)
 
     df.index.name = column_header
     return df
@@ -286,7 +286,7 @@ def plot_ra_perf_scatter(prices: pd.DataFrame,
 
     # fu.save_df_to_excel(xy, file_name='xy')
     if hue_data is not None:
-        xy = pd.concat([xy, hue_data], axis=1)
+        xy = pd.concat([xy, hue_data], axis=1, sort=False)
         hue = hue_data.name or 'hue'
     else:
         hue = None
@@ -323,7 +323,7 @@ def plot_ra_perf_by_dates(prices: pd.DataFrame,
                                                   perf_params=perf_params)
         this = dfs.series_to_str(ra_perf_table[perf_column.to_str()], var_format=perf_column.to_format(**kwargs))
         datas.append(this.rename(key))
-    df = pd.concat(datas, axis=1)
+    df = pd.concat(datas, axis=1, sort=False)
 
     fig = ptb.plot_df_table(df=df,
                             add_index_as_column=True,

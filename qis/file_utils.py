@@ -493,7 +493,8 @@ def load_df_from_csv(file_name: Optional[str] = None,
                      dayfirst: Optional[bool] = None,
                      tz: str = None,
                      drop_duplicated: bool = False,
-                     file_type: FileTypes = FileTypes.CSV
+                     file_type: FileTypes = FileTypes.CSV,
+                     float_precision: Optional[str] = None
                      ) -> pd.DataFrame:
     """
     read one DataFrame from a CSV under the managed path layout.
@@ -510,6 +511,11 @@ def load_df_from_csv(file_name: Optional[str] = None,
         tz: timezone to localise the index to. None leaves it naive
         drop_duplicated: drop duplicated index entries, keeping the first
         file_type: CSV or CSV_GZ
+        float_precision: float converter pandas reads the file with. None uses pandas' default
+            C converter, which is fast and NOT correctly rounded: a written-then-read float can
+            differ from the original in its last bit. Pass 'round_trip' when the read has to
+            return exactly what was written, e.g. when a stored panel is compared against the
+            frame that produced it
 
     Returns:
         the frame, with a DatetimeIndex when ``is_index`` and ``parse_dates``
@@ -536,10 +542,12 @@ def load_df_from_csv(file_name: Optional[str] = None,
             df = pd.read_csv(filepath_or_buffer=file_path,
                              index_col=index_col,
                              parse_dates=parse_dates,
-                             dayfirst=dayfirst)
+                             dayfirst=dayfirst,
+                             float_precision=float_precision)
 
         except UnicodeDecodeError:  # try without index
-            df = pd.read_csv(filepath_or_buffer=file_path)
+            df = pd.read_csv(filepath_or_buffer=file_path,
+                             float_precision=float_precision)
     else:
         raise FileNotFoundError(f"not found {file_name} with file_path={file_path}")
 
@@ -647,7 +655,8 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
                           is_index: bool = True,
                           dayfirst: Optional[bool] = None,  # will give priority to formats where day come first
                           force_not_found_error: bool = False,
-                          file_type: FileTypes = FileTypes.CSV
+                          file_type: FileTypes = FileTypes.CSV,
+                          float_precision: Optional[str] = None
                           ) -> Dict[str, pd.DataFrame]:
     """
     read a dict of DataFrames, one CSV per key.
@@ -666,6 +675,10 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
         force_not_found_error: raise when a key's file is absent. False skips it, so the returned
             dict may be smaller than ``dataset_keys``
         file_type: CSV or CSV_GZ
+        float_precision: float converter pandas reads the files with. None uses pandas' default
+            C converter, which is fast and NOT correctly rounded. Pass 'round_trip' when the read
+            has to return exactly what ``save_df_dict_to_csv`` wrote, which is what a stored
+            panel compared against its source frame needs
 
     Returns:
         key to frame, containing only the keys whose files were found unless
@@ -689,7 +702,8 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
             data = pd.read_csv(filepath_or_buffer=file_path,
                                index_col=index_col,
                                parse_dates=True,
-                               dayfirst=dayfirst)
+                               dayfirst=dayfirst,
+                               float_precision=float_precision)
             pandas_dict[key] = data
         else:
             message = f"file data {file_path}, {key} not found"

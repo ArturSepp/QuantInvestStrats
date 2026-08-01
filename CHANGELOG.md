@@ -7,6 +7,57 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-08-01
+
+**Every `axis=1` `pd.concat` in library code states `sort=` explicitly, and the three resampling
+entry points sort a panel that reaches them out of order.** pandas 2.2 sorted the union of two
+DatetimeIndexes whatever `sort=` said; pandas 3.0 honours `sort=False` and leaves the union in
+appearance order, and warns that pandas 4 will stop sorting when the argument is absent. So a
+panel joining a benchmark series and a strategy nav on different calendars now arrives unsorted,
+and a call that says nothing means one thing today and another after the next major release. No
+number moves under pandas 3.0 - the reporting goldens are unchanged - and none moves under
+pandas 4 either, which was the point. `load_df_from_csv` also gains `float_precision`, so a CSV
+round trip can be exact.
+
+### Fixed
+- `df_asfreq` sorts a panel whose index is not in chronological order before resampling it, and
+  `compute_periodic_returns` sorts before its ffill/bfill. pandas 3.0 changed
+  `pd.concat(axis=1, sort=False)` to leave the union of two non-identical DatetimeIndexes in
+  appearance order, so a panel joining a benchmark series and a strategy nav on different
+  calendars now arrives unsorted: `df_asfreq` raised `ValueError: index must be monotonic
+  increasing or decreasing` from inside `pandas.reindex`, and the fill in
+  `compute_periodic_returns` ran in row order and carried the terminal price backwards onto the
+  dates a column does not carry, without raising. Covered by
+  `qis/utils/tests/test_df_freq_sorting.py` and
+  `qis/plots/derived/tests/test_returns_heatmap_sorting.py`.
+
+- `prices_at_freq` sorts the same way on its `freq=None` branch, where the ffill runs in place
+  rather than through `df_asfreq`, so `to_returns` without a resample is order-independent too.
+  Covered by `qis/perfstats/tests/test_returns_sorting.py`.
+
+- Every `axis=1` `pd.concat` in library code states `sort=` explicitly - 133 call sites in 39
+  modules. `sort=True` where the joined index is dates, which is what pandas 2.2 did whatever
+  the argument said; `sort=False` where it is instrument or statistic labels, which pandas has
+  never sorted. Three sites were joining non-identical DatetimeIndexes and relying on the
+  implicit sort that pandas 3.0 deprecates and pandas 4 removes: `compute_fx_optimal_hedge`,
+  the FX hedging report, and the multi-frequency nav in `signal_diagnostics`. No number moves
+  under pandas 3.0 - the reporting goldens are unchanged - and none moves under pandas 4 either,
+  which was the point.
+
+### Added
+- `qis/tests/test_concat_sort_convention.py`: an `axis=1` `pd.concat` in library code without an
+  explicit `sort=` fails the suite. What the union of two DatetimeIndexes does when the argument
+  is absent has changed twice in two major pandas versions, and the difference is a scrambled
+  time axis rather than an error.
+
+- `load_df_from_csv(..., float_precision=None)` and
+  `load_df_dict_from_csv(..., float_precision=None)`, forwarded to `pd.read_csv`. pandas' default
+  C float converter is fast and not correctly rounded: a frame written with `save_df_to_csv` and
+  read back differed from the original by up to ~4e-16 per cell on a realistic panel, which makes
+  "the file holds what I wrote" impossible to assert. Passing `float_precision='round_trip'`
+  returns the value bit for bit. The default is `None`, so nothing changes for an existing caller.
+  Both docstrings state why the default converter is not exact and when to pass `'round_trip'`.
+
 ## [5.4.0] - 2026-07-29
 
 **`backtest_model_portfolio` accepts `rebalancing_costs` as a panel of dates x tickers, and the

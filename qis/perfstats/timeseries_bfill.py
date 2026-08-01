@@ -97,7 +97,7 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
     # the index of df = index of pivot_brownian
     df = pd.concat([pivot_brownian,
                     infrequent_cumulative.rename('x_i'), infrequent_cumulative.shift(-1).rename('x_i+1'),
-                    t.rename('t_i'), t1.rename('t_i+1'), dt.rename('dt_i')], axis=1)
+                    t.rename('t_i'), t1.rename('t_i+1'), dt.rename('dt_i')], axis=1, sort=True)
     df['t'] = (df.index - date0).total_seconds() / seconds_per_year
     df = df.ffill()  # ffill data to cover nans for infrequent series
 
@@ -187,7 +187,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
                 bfill_data[start:] = bfill_data[start:].ffill()
 
         bfill_datas.append(bfill_data)
-    bfill_datas = pd.concat(bfill_datas, axis=1).sort_index()
+    bfill_datas = pd.concat(bfill_datas, axis=1, sort=True).sort_index()
 
     if is_prices:
         bfill_datas = ret.returns_to_nav(returns=bfill_datas,

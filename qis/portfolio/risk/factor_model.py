@@ -193,7 +193,7 @@ class LinearModel:
         attribution = exposures.multiply(factor_betas.shift(1))
         if add_total:
             total = attribution.sum(axis=1).rename('Total')
-            attribution = pd.concat([total, attribution], axis=1)
+            attribution = pd.concat([total, attribution], axis=1, sort=True)
         return attribution
 
     def get_factor_alpha(self,
@@ -324,7 +324,7 @@ class LinearModel:
         # Convert variance dictionaries to Series
         portfolio_factor_vars = pd.Series(portfolio_factor_vars, name=factor_var_name)
         idio_vars = pd.Series(idio_vars, name=idiosyncratic_var_name)
-        portfolio_var = pd.concat([portfolio_factor_vars, idio_vars], axis=1)
+        portfolio_var = pd.concat([portfolio_factor_vars, idio_vars], axis=1, sort=True)
         idio_vars_contrib = pd.Series(idio_vars_contrib)
         # Add idiosyncratic risk contribution as a separate column
         factor_risk_contrib_idio[idiosyncratic_var_name] = idio_vars_contrib.to_numpy()
@@ -438,7 +438,7 @@ def compute_benchmarks_beta_attribution_from_prices(portfolio_nav: pd.Series,
     total_attrib = x_attribution.sum(axis=1)
     total = portfolio_nav.pct_change()
     residual = np.subtract(total, total_attrib)
-    joint_attrib = pd.concat([x_attribution, residual.rename(residual_name)], axis=1)
+    joint_attrib = pd.concat([x_attribution, residual.rename(residual_name)], axis=1, sort=True)
     if time_period is not None:
         joint_attrib = time_period.locate(joint_attrib)
     return joint_attrib
@@ -459,9 +459,10 @@ def compute_benchmarks_beta_attribution_from_returns(portfolio_returns: pd.Serie
     x_attribution = (portfolio_benchmark_betas.shift(1)).multiply(benchmark_returns)
     total_attrib = x_attribution.sum(axis=1)
     residual = np.subtract(portfolio_returns, total_attrib)
-    joint_attrib = pd.concat([x_attribution, residual.rename(residual_name)], axis=1)
+    joint_attrib = pd.concat([x_attribution, residual.rename(residual_name)], axis=1, sort=True)
     if total_name is not None:
-        joint_attrib = pd.concat([portfolio_returns.rename(total_name), joint_attrib], axis=1)
+        joint_attrib = pd.concat([portfolio_returns.rename(total_name), joint_attrib],
+                                 axis=1, sort=True)
     if time_period is not None:
         joint_attrib = time_period.locate(joint_attrib)
     joint_attrib.iloc[0, :] = 0.0

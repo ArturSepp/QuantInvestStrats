@@ -386,7 +386,7 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
         data = []
         for idx, sample in enumerate(bootstrap_sample):
             data.append(pd.DataFrame(sample, columns=[f"path_{idx+1}"]))
-        bootstrap_sample = pd.concat(data, axis=1)
+        bootstrap_sample = pd.concat(data, axis=1, sort=False)
 
     else:
         raise ValueError(f"not implemented")
@@ -446,7 +446,7 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
         data = []
         for idx, sample in enumerate(bootstrap_sample):
             data.append(pd.DataFrame(sample, columns=[f"path_{idx+1}"]))
-        bootstrap_sample = pd.concat(data, axis=1)
+        bootstrap_sample = pd.concat(data, axis=1, sort=False)
 
     else:
         raise ValueError(f"not implemented")

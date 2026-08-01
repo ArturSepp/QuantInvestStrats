@@ -64,7 +64,7 @@ def estimate_dimson_beta(asset_returns: Union[pd.Series, pd.DataFrame],
 
     out = {}
     for col in asset_returns.columns:
-        df = pd.concat([asset_returns[col].rename('y'), mkt], axis=1).dropna()
+        df = pd.concat([asset_returns[col].rename('y'), mkt], axis=1, sort=True).dropna()
         n = len(df)
         if n < max(min_obs, num_lags + 3):
             out[col] = dict(beta_0=np.nan, beta_dimson=np.nan, smoothing_ratio=np.nan,

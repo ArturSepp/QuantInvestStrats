@@ -222,9 +222,10 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
 
     # Combine into performance table
     if is_add_ra_perf_table:
-        cond_perf_table = pd.concat([regime_avg, regime_pa1, regime_sharpe, ra_perf_table], axis=1)
+        cond_perf_table = pd.concat([regime_avg, regime_pa1, regime_sharpe, ra_perf_table],
+                                    axis=1, sort=False)
     else:
-        cond_perf_table = pd.concat([regime_avg, regime_pa1, regime_sharpe], axis=1)
+        cond_perf_table = pd.concat([regime_avg, regime_pa1, regime_sharpe], axis=1, sort=False)
 
     regime_datas = {
         RegimeData.REGIME_AVG: regime_avg,
@@ -792,7 +793,7 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
             if not isinstance(benchmark_price, pd.Series):
                 raise ValueError(f"benchmark_price must be pd.Series not {type(benchmark_price)}")
             benchmark_price = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
-            prices = pd.concat([benchmark_price, prices], axis=1)
+            prices = pd.concat([benchmark_price, prices], axis=1, sort=True)
             benchmark = benchmark_price.name
 
     regime_classifier = BenchmarkReturnsQuantilesRegime(

@@ -553,7 +553,7 @@ def portfolio_navs_to_additive(grouped_nav: pd.DataFrame,
     portfolio_nav = grouped_nav[portfolio_name]
     ac_nav_adj = adjust_component_navs_to_portfolio(portfolio_nav=portfolio_nav,
                                                     component_navs=grouped_nav.drop(columns=[portfolio_name]))
-    grouped_nav = pd.concat([portfolio_nav, ac_nav_adj], axis=1)
+    grouped_nav = pd.concat([portfolio_nav, ac_nav_adj], axis=1, sort=True)
     return grouped_nav
 
 
@@ -712,7 +712,7 @@ def compute_net_navs_ex_perf_man_fees(navs: Union[pd.Series, pd.DataFrame],
                                      perf_fee=perf_fee,
                                      perf_fee_frequency=perf_fee_frequency)
             net_returns.append(net)
-        net_returns = pd.concat(net_returns, axis=1)
+        net_returns = pd.concat(net_returns, axis=1, sort=True)
     net_nav = returns_to_nav(returns=net_returns)
     return net_nav
 
@@ -818,7 +818,16 @@ def prices_at_freq(prices: Union[pd.Series, pd.DataFrame],
 
     Returns:
         Resampled price time series
+
+    Note:
+        A prices index that is not in chronological order is sorted first: the fill below runs
+        in row order, and every return computed downstream differences adjacent rows.
     """
+    # freq is not None delegates to df_asfreq, which sorts for its own reasons; this branch
+    # ffills in place and would otherwise carry a later price onto an earlier date
+    if not prices.index.is_monotonic_increasing:
+        prices = prices.sort_index()
+
     if freq is not None:
         if ffill_nans:
             fill_na_method = 'ffill'
@@ -889,7 +898,8 @@ def long_short_to_relative_nav(long_price: pd.Series, short_price: pd.Series) ->
     Returns:
         Relative NAV series (long return minus short return)
     """
-    returns = to_returns(pd.concat([long_price, short_price], axis=1).ffill(), is_first_zero=True)
+    returns = to_returns(pd.concat([long_price, short_price],
+                                   axis=1, sort=True).ffill(), is_first_zero=True)
     relative_returns = np.subtract(returns[long_price.name], returns[short_price.name])
     relative_nav = returns_to_nav(returns=relative_returns, init_period=1)
     return relative_nav
@@ -1202,7 +1212,7 @@ def implied_leverage(levered_returns: Union[pd.Series, pd.DataFrame],
         >>> print(f"Implied leverage: {L:.2f}x")
     """
     if isinstance(levered_returns, pd.Series):
-        joint = pd.concat([levered_returns, unlevered_returns], axis=1).dropna()
+        joint = pd.concat([levered_returns, unlevered_returns], axis=1, sort=True).dropna()
         joint.columns = ['y', 'x']
         if len(joint) < 10:
             return np.nan

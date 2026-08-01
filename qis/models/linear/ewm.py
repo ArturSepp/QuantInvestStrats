@@ -1174,7 +1174,7 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
         xy = np.multiply(x, y)
 
     elif isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.Series):
-        xy = pd.concat([x_data, y_data], axis=1, join='inner')
+        xy = pd.concat([x_data, y_data], axis=1, sort=True, join='inner')
 
         # it will work even if x_data.name is in y_data.columns
         x = npo.to_finite_np(data=xy.iloc[:, 0], fill_value=np.nan)
@@ -1185,7 +1185,7 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
         xy = np.multiply(xn, y)
 
     elif isinstance(x_data, pd.Series) and isinstance(y_data, pd.Series):
-        xy = pd.concat([x_data, y_data], axis=1, join='inner')
+        xy = pd.concat([x_data, y_data], axis=1, sort=True, join='inner')
         x = npo.to_finite_np(data=xy.iloc[:, 0], fill_value=np.nan)
         y = npo.to_finite_np(data=xy.iloc[:, 1], fill_value=np.nan)
         xy = np.multiply(x, y)

@@ -183,7 +183,7 @@ def mult_df_columns_with_vector_group(df: pd.DataFrame,
                                                         is_norm=is_norm,
                                                         nan_fill_zero=nan_fill_zero)
     if return_df:
-        group_conv = pd.concat([v for k, v in group_conv.items()], axis=1)[df.columns]
+        group_conv = pd.concat([v for k, v in group_conv.items()], axis=1, sort=True)[df.columns]
 
     return group_conv
 

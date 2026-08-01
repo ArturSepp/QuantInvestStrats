@@ -61,9 +61,10 @@ def simulate_vol_target_strats_range(prices: Union[pd.DataFrame, pd.Series],
             vt_nav_weights_.columns, vt_navs_.columns = names, names
         vt_nav_weights.append(vt_nav_weights_)
         vt_navs.append(vt_navs_)
-    vt_nav_weights, vt_navs = pd.concat(vt_nav_weights, axis=1), pd.concat(vt_navs, axis=1)
+    vt_nav_weights = pd.concat(vt_nav_weights, axis=1, sort=True)
+    vt_navs = pd.concat(vt_navs, axis=1, sort=True)
     if add_asset:
-        vt_navs = pd.concat([prices, vt_navs], axis=1)
+        vt_navs = pd.concat([prices, vt_navs], axis=1, sort=True)
     return vt_nav_weights, vt_navs
 
 
@@ -117,7 +118,9 @@ def simulate_trend_strats_range(prices: Union[pd.DataFrame, pd.Series],
         tf_nav_weights.append(tf_nav_weights_)
         tf_navs.append(tf_navs_)
         signals.append(signals_)
-    tf_nav_weights, tf_navs, signals = pd.concat(tf_nav_weights, axis=1), pd.concat(tf_navs, axis=1), pd.concat(signals, axis=1)
+    tf_nav_weights = pd.concat(tf_nav_weights, axis=1, sort=True)
+    tf_navs = pd.concat(tf_navs, axis=1, sort=True)
+    signals = pd.concat(signals, axis=1, sort=True)
     if add_asset:
-        tf_navs = pd.concat([prices, tf_navs], axis=1)
+        tf_navs = pd.concat([prices, tf_navs], axis=1, sort=True)
     return tf_nav_weights, tf_navs, signals

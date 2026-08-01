@@ -188,7 +188,7 @@ def compute_aggregate_scores(scores: List[pd.Series],
         - Results are automatically sorted in descending order
         - Useful for creating composite rankings from multiple criteria
     """
-    joint = pd.concat(scores, axis=1).clip(lower=lower_clip, upper=upper_clip)
+    joint = pd.concat(scores, axis=1, sort=False).clip(lower=lower_clip, upper=upper_clip)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         if penalise_nan_values:  # scores with nan are penalised

@@ -1089,7 +1089,8 @@ def create_rebalancing_indicators_from_freqs(rebalancing_freqs: Union[pd.Series,
                                                      include_end_date=include_end_date)
             df = pd.DataFrame(1.0, index=dates_schedule, columns=tickers.index)
             rebalancing_indicators.append(df)
-        rebalancing_indicators = pd.concat(rebalancing_indicators, axis=1).fillna(0.0)[rebalancing_freqs.index]
+        rebalancing_indicators = pd.concat(rebalancing_indicators,
+                                           axis=1, sort=True).fillna(0.0)[rebalancing_freqs.index]
 
     else:
         raise NotImplementedError(f"type(rebalancing_freqs)={type(rebalancing_freqs)}")

@@ -468,7 +468,7 @@ def agg_dfs(dfs: List[pd.DataFrame],
     """
     if len(dfs) == 0:
         raise ValueError("dfs is empty")
-    pd_data = pd.concat([df.stack() for df in dfs], axis=1)
+    pd_data = pd.concat([df.stack() for df in dfs], axis=1, sort=False)
     pd_avg = pd_data.apply(lambda x: agg_func(x.to_numpy()), axis=1)
     avg_data = pd_avg.unstack()
     return avg_data

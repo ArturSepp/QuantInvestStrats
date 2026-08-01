@@ -93,7 +93,7 @@ class MultiPortfolioData:
         navs = []
         for portfolio in self.portfolio_datas:
             navs.append(portfolio.get_portfolio_nav())
-        self.navs = pd.concat(navs, axis=1)
+        self.navs = pd.concat(navs, axis=1, sort=True)
 
         if freq is not None:
             self.navs = self.navs.asfreq(freq=freq, method='ffill')
@@ -124,12 +124,13 @@ class MultiPortfolioData:
         navs = self.navs
         if benchmark is not None:
             if benchmark not in navs.columns:
-                navs = pd.concat([self.benchmark_prices[benchmark].reindex(index=navs.index).ffill(), navs], axis=1)
+                benchmark_nav = self.benchmark_prices[benchmark].reindex(index=navs.index).ffill()
+                navs = pd.concat([benchmark_nav, navs], axis=1, sort=True)
         elif add_benchmarks_to_navs:
             benchmarks = self.benchmark_prices.reindex(index=navs.index).ffill()
             for benchmark in benchmarks.columns:
                 if benchmark not in navs.columns:
-                    navs = pd.concat([navs, benchmarks[benchmark]], axis=1)
+                    navs = pd.concat([navs, benchmarks[benchmark]], axis=1, sort=True)
 
         if time_period is not None:
             navs = time_period.locate(navs)
@@ -155,7 +156,7 @@ class MultiPortfolioData:
         if benchmark is not None:
             benchmark_price = self.get_benchmark_price(benchmark=self.benchmark_prices.columns[0],
                                                        time_period=time_period)
-            prices = pd.concat([prices, benchmark_price], axis=1)
+            prices = pd.concat([prices, benchmark_price], axis=1, sort=True)
         return prices
 
     def get_ra_perf_table(self,
@@ -335,7 +336,7 @@ class MultiPortfolioData:
                                annualization_factor * benchmark_turnover.mean(axis=0).rename(f"{benchmark_ticker} an turnover"),
                                annualization_factor * strategy_cost.mean(axis=0).rename(f"{strategy_ticker} an cost"),
                                annualization_factor * benchmark_cost.mean(axis=0).rename(f"{benchmark_ticker} an cost"),
-                               ], axis=1)
+                               ], axis=1, sort=True)
 
         return tre_table
 
@@ -567,16 +568,16 @@ class MultiPortfolioData:
                     ac_prices_.columns = [f"{portfolio_name}-{x}" for x in ac_prices_.columns]
                     ac_prices.append(ac_prices_)
                     rows_edge_lines.append(sum(rows_edge_lines)+len(ac_prices_.columns))
-            strategy_prices = pd.concat(strategy_prices, axis=1)
+            strategy_prices = pd.concat(strategy_prices, axis=1, sort=True)
 
             benchmark_price = benchmark_price.reindex(index=strategy_prices.index, method='ffill')
             if benchmark_price.name not in strategy_prices.columns:
-                prices = pd.concat([strategy_prices, benchmark_price], axis=1)
+                prices = pd.concat([strategy_prices, benchmark_price], axis=1, sort=True)
             else:
                 prices = strategy_prices
             if add_ac:  # otherwise tables look too bad
-                ac_prices = pd.concat(ac_prices, axis=1)
-                prices = pd.concat([prices, ac_prices], axis=1)
+                ac_prices = pd.concat(ac_prices, axis=1, sort=True)
+                prices = pd.concat([prices, ac_prices], axis=1, sort=True)
 
         ra_perf_title = f"RA performance table for {perf_params.freq_vol}-freq returns with beta to " \
                         f"{benchmark_price.name}: {qis.get_time_period(prices).to_str()}"
@@ -620,7 +621,7 @@ class MultiPortfolioData:
         exposures = []
         for portfolio in self.portfolio_datas:
             exposures.append(portfolio.get_weights(time_period=time_period).sum(axis=1).rename(portfolio.nav.name))
-        exposures = pd.concat(exposures, axis=1)
+        exposures = pd.concat(exposures, axis=1, sort=True)
         freq = infer_data_frequency_label(exposures)
         pts.plot_time_series(df=exposures,
                              var_format=var_format,
@@ -700,7 +701,7 @@ class MultiPortfolioData:
             turnover.append(portfolio.get_turnover(roll_period=turnover_rolling_period, freq=freq_turnover, is_agg=True,
                                                    is_unit_based_traded_volume=is_unit_based_traded_volume).rename(
                 portfolio.nav.name))
-        turnover = pd.concat(turnover, axis=1)
+        turnover = pd.concat(turnover, axis=1, sort=True)
         if time_period is not None:
             turnover = time_period.locate(turnover)
         return turnover
@@ -747,7 +748,7 @@ class MultiPortfolioData:
         for portfolio in self.portfolio_datas:
             costs.append(portfolio.get_costs(roll_period=cost_rolling_period, freq=freq_cost, is_agg=True,
                                              is_unit_based_traded_volume=is_unit_based_traded_volume).rename(portfolio.nav.name))
-        costs = pd.concat(costs, axis=1)
+        costs = pd.concat(costs, axis=1, sort=True)
         if time_period is not None:
             costs = time_period.locate(costs)
         freq = freq_cost or pd.infer_freq(costs.index)
@@ -789,7 +790,7 @@ class MultiPortfolioData:
             fig, axs = plt.subplots(len(benchmark_prices.columns), 1, figsize=(12, 12), tight_layout=True)
 
         for idx, factor in enumerate(benchmark_prices.columns):
-            factor_exposure = pd.concat(factor_exposures[factor], axis=1)
+            factor_exposure = pd.concat(factor_exposures[factor], axis=1, sort=True)
             factor_beta_title = f"{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {factor}"
             pts.plot_time_series(df=factor_exposure,
                                  var_format=var_format,
@@ -837,7 +838,7 @@ class MultiPortfolioData:
         for portfolio_id in portfolio_ids:
             datas.append(self.portfolio_datas[portfolio_id].get_performance_attribution_data(attribution_metric=attribution_metric,
                                                                                              time_period=time_period))
-        data = pd.concat(datas, axis=1)
+        data = pd.concat(datas, axis=1, sort=False)
         data = data.sort_values(data.columns[0], ascending=False)
         kwargs = sop.update_kwargs(kwargs=kwargs,
                                          new_kwargs={'ncols': len(data.columns),
@@ -863,7 +864,7 @@ class MultiPortfolioData:
         inst_returns = self.portfolio_datas[portfolio_id].get_attribution_table_by_instrument(time_period=time_period)
         inst_navs = ret.returns_to_nav(returns=inst_returns, init_period=None)
         strategy_nav = self.portfolio_datas[portfolio_id].get_portfolio_nav(time_period=time_period)
-        prices = pd.concat([inst_navs, strategy_nav], axis=1).dropna()
+        prices = pd.concat([inst_navs, strategy_nav], axis=1, sort=True).dropna()
         rhe.plot_periodic_returns_table(prices=prices,
                                         title=f"{strategy_nav.name} Attribution by Instrument",
                                         freq=freq,
@@ -1022,7 +1023,7 @@ class MultiPortfolioData:
         weights_by_groups = {}
         for group in groups:
             if len(ac_weights_by_groups[group]) > 0:
-                weights_by_groups[group] = pd.concat(ac_weights_by_groups[group], axis=1)
+                weights_by_groups[group] = pd.concat(ac_weights_by_groups[group], axis=1, sort=True)
         return weights_by_groups
 
     def plot_weights_boxplot(self,

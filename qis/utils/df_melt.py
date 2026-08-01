@@ -61,7 +61,7 @@ def melt_scatter_data_with_xdata(df: pd.DataFrame,
     must be same indices
     """
 
-    joint_data = pd.concat([xdata, df], axis=1)
+    joint_data = pd.concat([xdata, df], axis=1, sort=True)
     scatter_data = pd.melt(joint_data,
                            value_vars=df.columns,
                            id_vars=[xdata.name],
@@ -120,7 +120,7 @@ def melt_paired_df(indicator: pd.DataFrame,
     x_pd = pd.melt(indicator, value_vars=indicator.columns.to_list(), var_name=hue_name, value_name=signal_name)
     y_pd = pd.melt(observations, value_vars=observations.columns.to_list(), var_name=temp_hue, value_name=ra_return_name)
     # concat
-    scatter_data = pd.concat([x_pd, y_pd], axis=1).dropna()
+    scatter_data = pd.concat([x_pd, y_pd], axis=1, sort=False).dropna()
     scatter_data = scatter_data.drop(columns=[temp_hue])
     scatter_data = scatter_data.sort_values(by=signal_name)
     return scatter_data

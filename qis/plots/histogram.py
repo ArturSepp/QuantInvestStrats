@@ -98,7 +98,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
         # index is not encessary, nan data will be removed in loop
         df = pd.concat([universe_data,
                         df.reset_index(drop=True)
-                        ], axis=1)
+                        ], axis=1, sort=False)
 
     if colors is None:
         colors = put.get_n_colors(n=n,

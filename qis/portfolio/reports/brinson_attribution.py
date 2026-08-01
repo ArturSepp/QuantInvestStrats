@@ -235,11 +235,11 @@ def compute_brinson_attribution_table(
     # Create time series of total attribution effects for plotting
     allocation_total = grouped_allocation_return[total_column].to_frame(name='Allocation Total')
     selection_total = grouped_selection_return[total_column].to_frame(name='Selection Total')
-    active_total = pd.concat([allocation_total, selection_total], axis=1)
+    active_total = pd.concat([allocation_total, selection_total], axis=1, sort=True)
 
     if not is_exclude_interaction_term:
         interaction_total = grouped_interaction_return[total_column].to_frame(name='Interaction Total')
-        active_total = pd.concat([active_total, interaction_total], axis=1)
+        active_total = pd.concat([active_total, interaction_total], axis=1, sort=True)
 
     return (totals_table, active_total, grouped_allocation_return,
             grouped_selection_return, grouped_interaction_return)

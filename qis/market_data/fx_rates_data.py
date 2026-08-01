@@ -134,7 +134,8 @@ class FxRatesData:
         overwrote the buffer holding ``1 + dt*r_ref``. Fixed here.
         """
         dt = 1.0 / qis.get_annualization_factor(freq)
-        rate_data = pd.concat([self.domestic_rates[local_ccy], self.domestic_rates[reference_ccy]], axis=1)
+        rate_data = pd.concat([self.domestic_rates[local_ccy], self.domestic_rates[reference_ccy]],
+                              axis=1, sort=True)
         numer = 1.0 + dt * rate_data.iloc[:, 0]
         denom = 1.0 + dt * rate_data.iloc[:, 1]
         if is_log_returns:

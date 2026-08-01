@@ -314,9 +314,9 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                                                           **kwargs)
         for inst in strategy_weights.columns:
             df1 = pd.concat([strategy_weights[inst].rename(strategy_name),
-                            benchmark_weights[inst].rename(benchmark_name)], axis=1)
+                            benchmark_weights[inst].rename(benchmark_name)], axis=1, sort=True)
             df2 = pd.concat([strategy_turnover[inst].rename(strategy_name),
-                            benchmark_turnover[inst].rename(benchmark_name)], axis=1)
+                            benchmark_turnover[inst].rename(benchmark_name)], axis=1, sort=True)
             with sns.axes_style("darkgrid"):
                 fig1, axs = plt.subplots(2, 1, figsize=figsize, constrained_layout=True)
                 fig1.suptitle(f'{inst} Exposures and Turnover', fontweight="bold", fontsize=8, color='blue')
@@ -357,10 +357,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         for idx, (group, exposures_agg) in enumerate(strategy_grouped_exposures_agg.items()):
             df1 = pd.concat([strategy_grouped_exposures_agg[group]['Total'].rename(strategy_name),
                              benchmark_grouped_exposures_agg[group]['Total'].rename(benchmark_name)],
-                            axis=1)
+                            axis=1, sort=True)
             df2 = pd.concat([strategy_grouped_pnls_agg[group]['Total'].rename(strategy_name),
                              benchmark_grouped_pnls_agg[group]['Total'].rename(benchmark_name)],
-                            axis=1)
+                            axis=1, sort=True)
 
             datas = {f"{group} aggregated net exposures": df1,
                      f"{group} cumulative P&L attribution": df2}
@@ -382,7 +382,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
         joint_prices = pd.concat([multi_portfolio_data.portfolio_datas[strategy_idx].prices,
                                   multi_portfolio_data.portfolio_datas[benchmark_idx].prices],
-                                 axis=1)
+                                 axis=1, sort=True)
         joint_prices = joint_prices.loc[:, ~joint_prices.columns.duplicated(keep='first')]
         fig = qis.generate_price_history_report(prices=joint_prices,
                                                 **qis.update_kwargs(kwargs, dict(fontsize=4, figsize=figsize,

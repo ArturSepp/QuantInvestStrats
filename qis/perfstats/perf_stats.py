@@ -224,7 +224,7 @@ def _resolve_benchmark(prices: pd.DataFrame,
             return prices, name
         # reindex to prices' calendar with forward-fill for missing observations
         aligned = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
-        prices_out = pd.concat([aligned.rename(name), prices], axis=1)
+        prices_out = pd.concat([aligned.rename(name), prices], axis=1, sort=True)
         return prices_out, name
 
     # Case 3: both supplied — explicit name overrides Series.name
@@ -232,7 +232,7 @@ def _resolve_benchmark(prices: pd.DataFrame,
         # column already present — trust the existing data, ignore benchmark_price
         return prices, benchmark
     aligned = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
-    prices_out = pd.concat([aligned.rename(benchmark), prices], axis=1)
+    prices_out = pd.concat([aligned.rename(benchmark), prices], axis=1, sort=True)
     return prices_out, benchmark
 
 
@@ -492,7 +492,7 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     # "_y" suffixed columns that polluted downstream output.
     overlap = risk_table.columns.intersection(perf_table.columns)
     risk_table_clean = risk_table.drop(columns=overlap)
-    ra_perf_table = pd.concat([perf_table, risk_table_clean], axis=1)
+    ra_perf_table = pd.concat([perf_table, risk_table_clean], axis=1, sort=False)
     return ra_perf_table
 
 
@@ -650,8 +650,8 @@ def compute_info_ratio_table(return_diffs_dict: Dict[str, pd.DataFrame]) -> Tupl
         te, ir = compute_te_ir_errors(return_diffs=data)
         te_ac_datas.append(te.rename(ac))
         ir_ac_datas.append(ir.rename(ac))
-    te_table = pd.concat(te_ac_datas, axis=1)
-    ir_table = pd.concat(ir_ac_datas, axis=1)
+    te_table = pd.concat(te_ac_datas, axis=1, sort=False)
+    ir_table = pd.concat(ir_ac_datas, axis=1, sort=False)
     return te_table, ir_table
 
 
@@ -820,7 +820,8 @@ def compute_drawdowns_stats_table(price: pd.Series,
     time_under_water = time_under_water.replace({0.0: np.nan})
 
     # Pack the three series side-by-side for per-block slicing.
-    joint = pd.concat([max_dd.rename('max_dd'), time_under_water.rename('days'), price], axis=1)
+    joint = pd.concat([max_dd.rename('max_dd'), time_under_water.rename('days'), price],
+                      axis=1, sort=True)
 
     def process_bslice(bslice: pd.DataFrame) -> Dict[str, Any]:
         """Compute summary statistics for a single drawdown episode slice."""

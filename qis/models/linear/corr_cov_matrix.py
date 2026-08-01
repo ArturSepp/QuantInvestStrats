@@ -258,7 +258,7 @@ def compute_ewm_corr_df(df: pd.DataFrame,
         if corr_matrix_output == CorrMatrixOutput.TOP_ROW:  # stop after idx_i = 0
             break
 
-    corrs_by_column = pd.concat(corr_ijs, axis=1)
+    corrs_by_column = pd.concat(corr_ijs, axis=1, sort=False)
     corrs_by_column = corrs_by_column.set_index(df.index)
 
     return corrs_by_column

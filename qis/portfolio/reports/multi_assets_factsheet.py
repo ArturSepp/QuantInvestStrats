@@ -65,12 +65,13 @@ class MultiAssetsReport:
                    time_period: TimePeriod = None
                    ) -> pd.DataFrame:
         if add_benchmarks_to_navs:
-            prices = pd.concat([self.benchmark_prices, self.prices], axis=1)
+            prices = pd.concat([self.benchmark_prices, self.prices], axis=1, sort=True)
         elif benchmark is not None and benchmark not in self.prices.columns:
             if isinstance(self.benchmark_prices, pd.Series):
-                prices = pd.concat([self.benchmark_prices, self.prices], axis=1)
+                prices = pd.concat([self.benchmark_prices, self.prices], axis=1, sort=True)
             else:
-                prices = pd.concat([self.benchmark_prices[benchmark], self.prices], axis=1)
+                prices = pd.concat([self.benchmark_prices[benchmark], self.prices],
+                                   axis=1, sort=True)
         else:
             prices = self.prices
         # check in case
@@ -140,7 +141,7 @@ class MultiAssetsReport:
         """
         plot table with bear/normal/bull sharpes
         """
-        prices = pd.concat([self.prices, self.benchmark_prices], axis=1)
+        prices = pd.concat([self.prices, self.benchmark_prices], axis=1, sort=True)
         if time_period is not None:
             prices = time_period.locate(prices)
 

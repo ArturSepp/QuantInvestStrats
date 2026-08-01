@@ -96,7 +96,7 @@ class SmartDiversificationReport:
                            y_var: PerfStat = PerfStat.SHARPE_RF0
                            ) -> pd.DataFrame:
 
-        portfolio_navs = pd.concat([principal_nav, self.overlay_navs], axis=1)
+        portfolio_navs = pd.concat([principal_nav, self.overlay_navs], axis=1, sort=True)
 
         # the first 100% is the benchmark
         cvar_table, _ = self.regime_classifier.compute_regimes_pa_perf_table(prices=portfolio_navs,
@@ -119,7 +119,7 @@ class SmartDiversificationReport:
             principal_nav = self.principal_nav
 
         if is_include_principal:
-            prices = pd.concat([principal_nav, self.overlay_navs], axis=1)
+            prices = pd.concat([principal_nav, self.overlay_navs], axis=1, sort=True)
         else:
             prices = self.overlay_navs.copy()
 
@@ -157,7 +157,7 @@ class SmartDiversificationReport:
                       **kwargs
                       ) -> plt.Figure:
 
-        prices = pd.concat([self.principal_nav, self.overlay_navs], axis=1)
+        prices = pd.concat([self.principal_nav, self.overlay_navs], axis=1, sort=True)
 
         if time_period is not None:
             prices = time_period.locate(prices)
@@ -210,7 +210,7 @@ class SmartDiversificationReport:
         if overlay_navs is None:
             overlay_navs = self.overlay_navs
 
-        prices = pd.concat([principal_nav, overlay_navs], axis=1)
+        prices = pd.concat([principal_nav, overlay_navs], axis=1, sort=True)
         benchmark = principal_nav.name if isinstance(principal_nav, pd.Series) else principal_nav.columns[0]
 
         if is_names_to_2lines:
@@ -427,7 +427,7 @@ class SmartDiversificationReport:
             principal_nav = self.principal_nav
         if overlay_navs is None:
             overlay_navs = self.overlay_navs
-        prices = pd.concat([principal_nav, overlay_navs], axis=1)
+        prices = pd.concat([principal_nav, overlay_navs], axis=1, sort=True)
         fig = qis.plot_returns_scatter(prices=prices,
                                        benchmark=str(principal_nav.name),
                                        add_45line=add_45line,
@@ -451,7 +451,7 @@ def create_overlay_portfolio_curve(principal_nav: pd.Series,
     """
     compute overlays for weights from 0% to 100%
     """
-    prices = pd.concat([principal_nav, overlay_nav], axis=1)
+    prices = pd.concat([principal_nav, overlay_nav], axis=1, sort=True)
 
     overlay_weights = np.linspace(0, max_overlay_weight, 11)
     portfolio_navs = []
@@ -466,7 +466,7 @@ def create_overlay_portfolio_curve(principal_nav: pd.Series,
                                                  rebalancing_freq=rebalancing_freq).get_portfolio_nav()
         portfolio_nav.name = f"{overlay_nav.name} {'{:.2%}'.format(overlay_weight)}"
         portfolio_navs.append(portfolio_nav)
-    portfolio_navs = pd.concat(portfolio_navs, axis=1)
+    portfolio_navs = pd.concat(portfolio_navs, axis=1, sort=True)
     return portfolio_navs
 
 
