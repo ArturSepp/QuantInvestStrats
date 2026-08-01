@@ -4,11 +4,11 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "832a2baf4b4c2f12c5346c2449e28a99e378758f",
-      "distinct_symbols": 94,
-      "call_sites": 683,
-      "files_scanned": 117,
-      "files_using_qis": 61,
+      "commit": "a2b9eae14b856a0d4e04667bfc12b4dfecfa6c2b",
+      "distinct_symbols": 97,
+      "call_sites": 690,
+      "files_scanned": 149,
+      "files_using_qis": 66,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
         "CorrMatrixOutput",
@@ -33,6 +33,7 @@
         "compute_asset_returns_dict",
         "compute_df_desc_data",
         "compute_ewm",
+        "compute_ewm_covar",
         "compute_ewm_covar_tensor",
         "compute_ewm_covar_tensor_vol_norm_returns",
         "compute_ewm_long_short_filtered_ra_returns",
@@ -40,6 +41,7 @@
         "compute_masked_covar_corr",
         "compute_portfolio_risk_contributions",
         "compute_ra_perf_table",
+        "compute_ra_perf_table_with_benchmark",
         "compute_total_return",
         "covar_to_corr",
         "df_boxplot_by_columns",
@@ -50,6 +52,7 @@
         "df_to_str",
         "df_to_weight_allocation_sum1",
         "estimate_ic_ir",
+        "estimate_rolling_ewma_covar",
         "estimate_signal_diagnostics",
         "fetch_default_report_kwargs",
         "find_upto_date_from_datetime_index",
@@ -108,10 +111,10 @@
     },
     "trendfollowing": {
       "url": "https://github.com/ArturSepp/TrendFollowingSystems.git",
-      "commit": "107da7d49b2476214db86cf1dc284df0a238d2d5",
+      "commit": "356fddaf02148e09f4d10402591366d21a6cbba6",
       "distinct_symbols": 87,
       "call_sites": 443,
-      "files_scanned": 75,
+      "files_scanned": 76,
       "files_using_qis": 35,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
@@ -205,7 +208,7 @@
     },
     "privateassets": {
       "url": "https://github.com/ArturSepp/privateassets.git",
-      "commit": "f82de8fdcbdaa4d5ff74a0c0b62a4d141c83abf9",
+      "commit": "cf599e5b056f3244d883b21e695ddb91d43867c1",
       "distinct_symbols": 5,
       "call_sites": 9,
       "files_scanned": 21,

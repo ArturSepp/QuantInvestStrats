@@ -145,8 +145,8 @@ smoothing.
 
 # Research impact statement
 
-We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 94 of its symbols
-at 683 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
+We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 97 of its symbols
+at 690 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
 at 443 sites. Both counts are taken at the commits recorded in
 `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
 
@@ -159,7 +159,7 @@ cryptocurrency allocation [@sepp2023crypto], the regime-conditional layer work o
 systems [@sepp2026trend], and the resampling layer work on capital market assumptions built from
 multi-asset tradable factors [@sepp2026matf]. The last two are working papers.
 
-Commits run from December 2022 to July 2026, with activity in 37 of the 44 calendar months.
+Commits run from December 2022 to August 2026, with activity in 38 of the 45 calendar months.
 
 # AI usage disclosure
 

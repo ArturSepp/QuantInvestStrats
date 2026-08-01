@@ -1,16 +1,16 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "40ecfbe181e2c89dba11ff1276aedc5cb6b8de23",
+  "measured_at_commit": "14b963b44e6c15fafdd218c3f190a893415636aa",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
-      "value": 37,
+      "value": 38,
       "how": "distinct YYYY-MM with at least one commit",
       "live": false,
-      "paper_phrase": "in 37 of the 44 calendar months"
+      "paper_phrase": "in 38 of the 45 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 37,
+      "value": 39,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -22,7 +22,7 @@
       "paper_phrase": null
     },
     "ai_coauthored_last_day": {
-      "value": "2026-07-29",
+      "value": "2026-08-01",
       "how": "latest AI co-authored commit",
       "live": false,
       "paper_phrase": null
@@ -46,50 +46,50 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 1107,
+      "value": 1119,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 310,
+      "value": 313,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
-      "value": 683,
-      "how": "tools/audit_consumers.py at 832a2baf4b4c",
+      "value": 690,
+      "how": "tools/audit_consumers.py at a2b9eae14b85",
       "live": false,
-      "paper_phrase": "at 683 sites"
+      "paper_phrase": "at 690 sites"
     },
     "consumer_optimalportfolios_symbols": {
-      "value": 94,
-      "how": "tools/audit_consumers.py at 832a2baf4b4c",
+      "value": 97,
+      "how": "tools/audit_consumers.py at a2b9eae14b85",
       "live": false,
-      "paper_phrase": "references 94 of its symbols"
+      "paper_phrase": "references 97 of its symbols"
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
-      "how": "tools/audit_consumers.py at f82de8fdcbda",
+      "how": "tools/audit_consumers.py at cf599e5b056f",
       "live": false,
       "paper_phrase": null
     },
     "consumer_privateassets_symbols": {
       "value": 5,
-      "how": "tools/audit_consumers.py at f82de8fdcbda",
+      "how": "tools/audit_consumers.py at cf599e5b056f",
       "live": false,
       "paper_phrase": null
     },
     "consumer_trendfollowing_call_sites": {
       "value": 443,
-      "how": "tools/audit_consumers.py at 107da7d49b24",
+      "how": "tools/audit_consumers.py at 356fddaf0214",
       "live": false,
       "paper_phrase": "at 443 sites"
     },
     "consumer_trendfollowing_symbols": {
       "value": 87,
-      "how": "tools/audit_consumers.py at 107da7d49b24",
+      "how": "tools/audit_consumers.py at 356fddaf0214",
       "live": false,
       "paper_phrase": "references 87 symbols"
     },
@@ -118,7 +118,7 @@
       "paper_phrase": null
     },
     "last_commit_month": {
-      "value": "2026-07",
+      "value": "2026-08",
       "how": "git log -1 --format=%ad --date=format:%Y-%m",
       "live": false,
       "paper_phrase": null
@@ -130,7 +130,7 @@
       "paper_phrase": null
     },
     "span_months": {
-      "value": 44,
+      "value": 45,
       "how": "calendar months from the first commit to the last, inclusive",
       "live": false,
       "paper_phrase": null
