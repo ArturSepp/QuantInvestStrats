@@ -3,7 +3,12 @@
     "allow": [
       "Bash(python -m pytest *)",
       "Bash(python -m ruff check *)",
-      "Bash(python -m twine check *)"
+      "Bash(python -m twine check *)",
+      "Bash(pytest *)",
+      "Bash(ruff check *)",
+      "Bash(python tools/paper_audit.py --check)",
+      "Bash(python tools/sync_public_api.py --check)",
+      "PowerShell(Get-ChildItem *)"
     ]
   }
 }
