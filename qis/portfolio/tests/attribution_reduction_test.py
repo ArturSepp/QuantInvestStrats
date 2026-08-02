@@ -44,7 +44,9 @@ def test_bar_label_width_calibration() -> None:
     """the measured width of a rotated tick label matches the constant the capacity is built on"""
     labels = ['S&p_500', 'Wheat_minneapol', 'Ust_10y_ultra', 'Gasoil', 'Feeder_cattle']
     for fontsize in (4.0, 5.0, 8.0):
-        fig, ax = plt.subplots(figsize=(6.0, 3.0))
+        # Use a high-DPI canvas so integer-pixel font hinting does not dominate a
+        # physical-width calibration at these deliberately small font sizes.
+        fig, ax = plt.subplots(figsize=(6.0, 3.0), dpi=300)
         qis.plot_bars(df=pd.Series(np.arange(len(labels), dtype=float), index=labels),
                       stacked=False, skip_y_axis=True, x_rotation=90, fontsize=fontsize,
                       legend_loc=None, ax=ax)

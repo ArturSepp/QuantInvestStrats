@@ -51,7 +51,9 @@ def measure_legend_height(n_entries: int,
     Returns:
         legend height in inches
     """
-    fig, ax = plt.subplots(figsize=(8.0, 12.0))
+    # Use a high-DPI canvas so integer-pixel font hinting does not dominate a
+    # physical-height calibration at these deliberately small font sizes.
+    fig, ax = plt.subplots(figsize=(8.0, 12.0), dpi=300)
     labels = [f"series {idx}" for idx in range(n_entries)]
     for idx, label in enumerate(labels):
         ax.plot([0.0, 1.0], [float(idx), float(idx)], label=label)
