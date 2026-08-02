@@ -122,14 +122,14 @@ portfolio reconstruction and reporting inside one object model.
 
 We organise the package into 12 capability groups, which `qis/api.py` names.
 
-The backtester is 323 lines, and that follows from the design assumption rather than from
+The backtester is 376 lines, and that follows from the design assumption rather than from
 compression. Because a strategy is a rule for producing weights, the backtester holds no strategy
 logic: it converts target weights to units at each rebalancing, holds those units until the next
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
 one of the few loops here that cannot be vectorised.
 
-The public interface is `qis.__all__`, which holds 403 names; `qis/api.py` records that list as a
-literal together with a documented core of 116 symbols grouped by capability, and the suite fails
+The public interface is `qis.__all__`, which holds 405 names; `qis/api.py` records that list as a
+literal together with a documented core of 117 symbols grouped by capability, and the suite fails
 when either record disagrees with the namespace.
 
 Properties are enforced by tests rather than by convention: every exported plotting function draws a

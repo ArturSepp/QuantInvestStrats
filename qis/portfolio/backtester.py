@@ -23,12 +23,22 @@ Dates before the first schedule row are costless. A date-indexed Series is rejec
 ambiguous. ``funding_rate`` accrues on the cash balance, ``management_fee`` on nav and
 ``instruments_carry`` per instrument, all annualised and converted to the price grid.
 
+``weight_implementation_lag`` selects the entry price for the units and nothing else: the weight
+observed at t is traded at the price ``weight_implementation_lag`` observations of the price index
+later. It does not shift, resample or otherwise touch prices, so instrument returns are the same
+under any lag.
+
+Weights are taken as given and never modified. An instrument with no price on a rebalancing date
+is not traded and its weight stays in the cash balance; allocating that weight over the priced
+instruments instead is ``qis.generate_static_weights_schedule``, before the backtest.
+
 ``backtest_rebalanced_portfolio`` is the numba kernel underneath: a genuine recursion in nav and
 cash balance, which is why it is not vectorized. Rolling an optimisation through time is
 ``optimalportfolios``; the reporting of what comes out is ``qis/portfolio/reports/``.
 """
 
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -36,6 +46,7 @@ from typing import Union, Dict, Tuple, List, Optional
 # qis
 from qis.utils.dates import generate_rebalancing_indicators, set_rebalancing_timeindex_on_given_timeindex
 from qis.utils.df_ops import multiply_df_by_dt
+from qis.utils.df_to_weights import align_weights_to_columns
 from qis.utils.np_ops import repeat_by_columns, repeat_by_rows
 from qis.utils.struct_ops import assert_list_subset
 from qis.portfolio.portfolio_data import PortfolioData
@@ -83,8 +94,12 @@ def backtest_model_portfolio(prices: pd.DataFrame,
             date, so a cost schedule stated on era boundaries applies from each boundary
             onward. Costs are read at the trade date; dates before the first schedule row
             are costless
-        weight_implementation_lag: days between a weight being observed and traded. Applies
-            only when ``weights`` is a pd.DataFrame, since a fixed vector has no signal date
+        weight_implementation_lag: observations of the price index between a weight being
+            observed and traded, so 1 on a business-day panel trades the next business day. It
+            selects the entry price for the units only and leaves prices and instrument returns
+            untouched. Applies only when ``weights`` is a pd.DataFrame, since a fixed vector has
+            no signal date. A weight whose traded date would fall past the end of the price
+            history is dropped with a warning
         constant_trade_level: size each rebalancing off this notional rather than off current
             nav, so trade size does not compound with performance
         is_rebalanced_at_first_date: rebalance on the first price date as well as on the
@@ -97,30 +112,71 @@ def backtest_model_portfolio(prices: pd.DataFrame,
 
     Raises:
         ValueError: if ``prices`` is not a pd.DataFrame, if a weight vector does not match the
-            number of price columns, if the price history starts after the weights do, if a
-            ``rebalancing_costs`` DataFrame is missing a price column, or if a
-            ``rebalancing_costs`` Series is indexed by dates rather than tickers
+            number of price columns, if the price history starts after the weights do, if two
+            weight dates resolve to the same traded date on the price index, if no weight date
+            is traded at all, if a ``rebalancing_costs`` DataFrame is missing a price column, or
+            if a ``rebalancing_costs`` Series is indexed by dates rather than tickers
         NotImplementedError: if ``weights`` is of an unsupported type
     """
     if not isinstance(prices, pd.DataFrame):
         raise ValueError(f"prices type={type(prices)} must be pd.Dataframe")
-    if isinstance(weights, pd.Series):  # map to dict
-        weights = weights.to_dict()
 
-    if isinstance(weights, Dict):  # map to np
+    # a nan inside an instrument's own reported history is a data defect rather than a universe
+    # change: units are held through it and np.nansum drops the leg from the nav on those dates.
+    # Leading nans (not yet trading) and trailing nans (no longer reporting) are legitimate
+    is_reported = prices.notna()
+    is_inside_history = np.logical_and(is_reported.cumsum().to_numpy() > 0,
+                                       is_reported.iloc[::-1].cumsum().iloc[::-1].to_numpy() > 0)
+    is_interior_nan = np.logical_and(is_inside_history, is_reported.to_numpy() == False)
+    if np.any(is_interior_nan):
+        holed = prices.columns[np.any(is_interior_nan, axis=0)].to_list()
+        first_hole = prices.index[np.any(is_interior_nan, axis=1)][0]
+        warnings.warn(f"prices carry missing values inside the reported history of {holed}, first "
+                      f"at {first_hole:%d%b%Y}: units are held through a nan price and the leg "
+                      f"drops out of the nav on those dates. Carry the last price with "
+                      f"prices.asfreq('B', method='ffill') or prices.ffill()",
+                      UserWarning, stacklevel=2)
+
+    if isinstance(weights, pd.DataFrame):
         assert_list_subset(large_list=prices.columns.to_list(),
-                              list_sample=list(weights.keys()),
+                              list_sample=weights.columns.to_list(),
                               message=f"weights columns must be aligned with price columns")
-        weights = prices.columns.map(weights).to_numpy()
-    elif isinstance(weights, List):
-        weights = np.array(weights)
+        if prices.index[0] > weights.index[0]:
+            raise ValueError(f"price dates {prices.index[0]} are after weights start date {weights.index[0]}")
+        portfolio_weights = weights[prices.columns]  # alighn
 
-    # align weights with prices
-    if isinstance(weights, np.ndarray):
-        if weights.shape[0] != len(prices.columns):
-            raise ValueError(f"number of weights must be aligned with number of price columns")
-        if len(weights.shape) > 1:
-            raise ValueError(f"only single aray is allowed")
+        # implementation lag is only valid for quant-generated weights. It is counted in
+        # observations of the price index, not calendar days: searchsorted places a weight date
+        # on the first price date at or after it, and the lag then moves the trade that many
+        # observations on. Weights are consumed one row per rebalancing flag, so two weight dates
+        # resolving to the same traded date would shift every later row and is an error, not a
+        # collapse
+        lag = weight_implementation_lag if weight_implementation_lag is not None else 0
+        traded_positions = prices.index.searchsorted(portfolio_weights.index) + lag
+        is_traded = traded_positions <= len(prices.index) - 1
+        if not np.any(is_traded):
+            raise ValueError(f"no weight date is traded: every one of the {len(is_traded)} weight "
+                             f"dates falls past the end of the price history at "
+                             f"weight_implementation_lag={lag}")
+        if not np.all(is_traded):
+            warnings.warn(f"{int(np.sum(is_traded == False))} of {len(is_traded)} weight dates "
+                          f"trade past the end of the price history at "
+                          f"weight_implementation_lag={lag} and are dropped, the last traded "
+                          f"weight date is {portfolio_weights.index[is_traded][-1]:%d%b%Y}",
+                          UserWarning, stacklevel=2)
+            portfolio_weights = portfolio_weights.loc[is_traded, :]
+            traded_positions = traded_positions[is_traded]
+        if len(np.unique(traded_positions)) != len(traded_positions):
+            raise ValueError(f"{len(traded_positions)} weight dates resolve to "
+                             f"{len(np.unique(traded_positions))} traded dates on the price index: "
+                             f"weights are consumed one row per rebalancing, so the rows after the "
+                             f"first collision would be applied at the wrong dates. The weights "
+                             f"index must not be denser than the price index")
+        traded_index = prices.index[traded_positions]
+        is_rebalancing = set_rebalancing_timeindex_on_given_timeindex(given_index=prices.index,
+                                                                         rebalancing_index=traded_index)
+    else:
+        weights = align_weights_to_columns(weights=weights, columns=prices.columns).to_numpy()
 
         is_rebalancing = generate_rebalancing_indicators(df=prices,
                                                             freq=rebalancing_freq,
@@ -131,23 +187,20 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                                          index=portfolio_rebalance_dates,
                                          columns=prices.columns)
 
-    elif isinstance(weights, pd.DataFrame):
-        assert_list_subset(large_list=prices.columns.to_list(),
-                              list_sample=weights.columns.to_list(),
-                              message=f"weights columns must be aligned with price columns")
-        if prices.index[0] > weights.index[0]:
-            raise ValueError(f"price dates {prices.index[0]} are after weights start date {weights.index[0]}")
-        portfolio_weights = weights[prices.columns]  # alighn
-
-        # implementation lag is only valid for quant-generated weights
-        if weight_implementation_lag is not None and weight_implementation_lag > 0:
-            rebalancing_index = portfolio_weights.index + pd.Timedelta(days=weight_implementation_lag)
-        else:
-            rebalancing_index = portfolio_weights.index
-        is_rebalancing = set_rebalancing_timeindex_on_given_timeindex(given_index=prices.index,
-                                                                         rebalancing_index=rebalancing_index)
-    else:
-        raise NotImplementedError(f"unsupported weights type = {type(weights)}")
+    # a weighted instrument with no price on its traded date is not traded and its weight stays in
+    # the cash balance. Checked at the traded date rather than the weight date, so a lag that
+    # carries a weight past an instrument's last price is caught too
+    traded_dates = is_rebalancing[is_rebalancing == True].index
+    is_weighted = np.isclose(np.nan_to_num(portfolio_weights.to_numpy()), 0.0) == False
+    is_unfunded = np.logical_and(prices.loc[traded_dates, :].isna().to_numpy(), is_weighted)
+    if np.any(is_unfunded):
+        unfunded = prices.columns[np.any(is_unfunded, axis=0)].to_list()
+        first_unfunded = traded_dates[np.any(is_unfunded, axis=1)][0]
+        warnings.warn(f"weighted instruments {unfunded} have no price on their traded date, first "
+                      f"at {first_unfunded:%d%b%Y}: these legs are not traded and their weight "
+                      f"stays in the cash balance. Allocate over the priced instruments with "
+                      f"qis.generate_static_weights_schedule()",
+                      UserWarning, stacklevel=2)
 
     # adjust rates at rebealncing
     if funding_rate is not None:

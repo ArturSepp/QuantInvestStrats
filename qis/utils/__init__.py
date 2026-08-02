@@ -66,9 +66,11 @@ from qis.utils.df_str import (
 )
 
 from qis.utils.df_to_weights import (
+    align_weights_to_columns,
     df_to_equal_weight_allocation,
     df_to_weight_allocation_sum1,
     df_to_long_only_allocation_sum1,
+    generate_static_weights_schedule,
     mult_df_columns_with_vector
 )
 

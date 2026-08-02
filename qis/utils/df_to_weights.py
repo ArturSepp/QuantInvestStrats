@@ -11,15 +11,23 @@ asset from that date's denominator rather than counting it as a zero weight.
 -1 for the smallest and 0 between - indicators, not weights summing to one, so they need
 normalising before use as an allocation. ``compute_long_short_ind_by_row`` also lives here.
 
+``generate_static_weights_schedule`` is the one function here that takes prices rather than
+scores: it turns a fixed allocation into the rebalancing weight frame the backtester consumes,
+allocating over the instruments live on each rebalancing date. ``align_weights_to_columns`` is
+the shared normaliser for the weight argument that both it and ``qis.backtest_model_portfolio``
+accept, so the two cannot disagree on what a Dict, a List or an np.ndarray means.
+
 Turning a weight frame into a portfolio is ``qis.backtest_model_portfolio``, not this module.
 """
 import numpy as np
 import pandas as pd
-from typing import Union, Optional, Dict
+from typing import Union, Optional, Dict, List
 from enum import Enum
 
 # qis
 import qis.utils.df_groups as dfg
+from qis.utils.dates import generate_rebalancing_indicators
+from qis.utils.struct_ops import assert_list_subset
 
 
 class WeightMethod(str, Enum):
@@ -43,6 +51,145 @@ def compute_long_only_portfolio_weights(data: pd.DataFrame,
     else:
         raise TypeError(f"not implemented method {weight_method}")
     return weights
+
+
+def align_weights_to_columns(weights: Union[Dict[str, float], List[float], np.ndarray,
+                                            pd.Series],
+                             columns: pd.Index
+                             ) -> pd.Series:
+    """
+    align a weight specification to a set of instrument columns.
+
+    A Dict or pd.Series is aligned by name, so the order of the specification does not matter and
+    a column the specification does not name carries nan, which every consumer treats as no
+    position. A List or np.ndarray is positional and must match the column count, since there is
+    no name to align on. This is the normaliser :func:`generate_static_weights_schedule` and
+    ``qis.backtest_model_portfolio`` share, so that one weight argument means one thing.
+
+    Args:
+        weights: target weights as a Dict or pd.Series keyed by ticker, or as a List or
+            np.ndarray in column order
+        columns: instrument columns to align to, normally ``prices.columns``
+
+    Returns:
+        weights indexed by ``columns``, nan where the specification does not name a column
+
+    Raises:
+        ValueError: if a named specification carries a name outside ``columns``, or a positional
+            specification does not match the number of columns or is not one dimensional
+        NotImplementedError: if ``weights`` is of an unsupported type
+    """
+    if isinstance(weights, pd.Series):  # map to dict
+        weights = weights.to_dict()
+
+    if isinstance(weights, Dict):
+        assert_list_subset(large_list=columns.to_list(),
+                           list_sample=list(weights.keys()),
+                           message="weights columns must be aligned with price columns")
+        return pd.Series(columns.map(weights), index=columns, dtype=float)
+
+    if isinstance(weights, List):  # map to np
+        weights = np.array(weights)
+
+    if isinstance(weights, np.ndarray):
+        if weights.shape[0] != len(columns):
+            raise ValueError("number of weights must be aligned with number of price columns")
+        if len(weights.shape) > 1:
+            raise ValueError("only single aray is allowed")
+        return pd.Series(weights, index=columns, dtype=float)
+
+    raise NotImplementedError(f"unsupported weights type = {type(weights)}")
+
+
+def generate_static_weights_schedule(prices: pd.DataFrame,
+                                     weights: Union[Dict[str, float], List[float], np.ndarray,
+                                                    pd.Series],
+                                     rebalancing_freq: str = 'QE',
+                                     is_rescale_to_live_universe: bool = True,
+                                     is_preserve_total_exposure: bool = True,
+                                     include_start_date: bool = True,
+                                     num_warmup_periods: Optional[int] = None
+                                     ) -> pd.DataFrame:
+    """
+    turn a fixed allocation into a rebalancing weight frame over the live universe.
+
+    A static allocation stated once cannot be applied to a panel whose instruments start and stop
+    at different dates: an instrument with no price on a rebalancing date is not traded, and
+    ``qis.backtest_model_portfolio`` leaves its weight in the cash balance, which is the correct
+    contract and rarely the intended allocation. This reallocates that weight over the
+    instruments that are priced on each rebalancing date, and returns the frame to pass back in
+    as ``weights``.
+
+    The universe is read at the rebalancing date and nowhere else, so the construction is point
+    in time: a price observed at *t* is information available at *t*. Instruments are
+    reallocated at rebalancings only - an instrument going live between two rebalancings is
+    admitted at the next one, not when it starts.
+
+    Rescaling preserves the total exposure of the specification rather than forcing the row to
+    one, so a book that is 90% invested by design stays 90% invested when an instrument is
+    missing instead of being silently levered to 100%. The two are the same whenever the
+    specification sums to one.
+
+    Args:
+        prices: instrument prices, columns are tickers. A nan marks an instrument as not
+            allocable on that date
+        weights: target weights, aligned to ``prices.columns`` by :func:`align_weights_to_columns`
+        rebalancing_freq: calendar anchor for the rebalancing dates, passed to
+            :func:`generate_rebalancing_indicators`. The returned dates are the observation dates
+            of ``prices``, so the frame can never rebalance more often than the price panel
+        is_rescale_to_live_universe: reallocate the weight of a missing instrument over the live
+            ones. False returns the specification with missing instruments set to zero, which is
+            the cash-residual behaviour with an explicit 0.0 rather than a nan in the reported
+            weights
+        is_preserve_total_exposure: scale the live weights to the total exposure of
+            ``weights``. False forces every row to sum to one
+        include_start_date: mark the first price date as a rebalancing date, so the allocation
+            is invested from inception. Note this defaults to True where the corresponding
+            ``is_rebalanced_at_first_date`` of ``qis.backtest_model_portfolio`` defaults to False
+        num_warmup_periods: leading observations excluded from the schedule
+
+    Returns:
+        weights indexed by the rebalancing dates that exist in ``prices.index``, columns as
+        ``prices.columns``. A date with no live instrument carries all zeros
+
+    Raises:
+        ValueError: if ``prices`` is not a pd.DataFrame, if the specification has no net
+            exposure to preserve, or if the live weights cancel on a rebalancing date so that
+            the rescaling is undefined
+    """
+    if not isinstance(prices, pd.DataFrame):
+        raise ValueError(f"prices type={type(prices)} must be pd.Dataframe")
+
+    static_weights = align_weights_to_columns(weights=weights, columns=prices.columns).fillna(0.0)
+    rebalancing_dates = generate_rebalancing_indicators(df=prices,
+                                                        freq=rebalancing_freq,
+                                                        include_start_date=include_start_date,
+                                                        num_warmup_periods=num_warmup_periods,
+                                                        return_true_only=True).index
+    is_live = prices.loc[rebalancing_dates, :].notna()
+    live_weights = is_live.multiply(static_weights, axis=1)  # zero where an instrument is unpriced
+
+    if is_rescale_to_live_universe:
+        target_exposure = float(static_weights.sum()) if is_preserve_total_exposure else 1.0
+        if np.isclose(target_exposure, 0.0):
+            raise ValueError(f"weights sum to {target_exposure} so there is no total exposure to "
+                             f"preserve: rescaling a book with no net exposure is undefined, pass "
+                             f"is_rescale_to_live_universe=False")
+        live_sums = live_weights.sum(axis=1).to_numpy()
+        is_cancelling = np.logical_and(is_live.to_numpy().any(axis=1),
+                                       np.isclose(live_sums, 0.0))
+        if np.any(is_cancelling):
+            date = rebalancing_dates[is_cancelling][0]
+            raise ValueError(f"live weights sum to {live_sums[is_cancelling][0]} at "
+                             f"{date:%d%b%Y} while instruments are priced: rescaling to the "
+                             f"target exposure {target_exposure} is undefined because the live "
+                             f"weights cancel")
+        scale = np.divide(target_exposure, live_sums,
+                          out=np.zeros_like(live_sums),
+                          where=np.isclose(live_sums, 0.0) == False)
+        live_weights = live_weights.multiply(scale, axis=0)
+
+    return live_weights
 
 
 def df_to_equal_weight_allocation(df: Union[pd.Series, pd.DataFrame],

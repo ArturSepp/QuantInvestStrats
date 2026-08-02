@@ -7,6 +7,79 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-08-02
+
+**`weight_implementation_lag` is counted in observations of the price index, not in calendar
+days.** It selects the entry price for the units and nothing else: a weight observed at *t* is
+traded at the price `weight_implementation_lag` observations later, and prices and instrument
+returns are untouched. The calendar-day shift it replaces was resolved onto the price grid by
+taking the next available date, so at a lag of two every Thursday/Friday pair landed on the same
+Monday - 106 of 523 weight rows on a two-year daily schedule - and because weights are consumed
+one row per rebalancing a collapsed date did not skip a row, it shifted every later row. A lag of
+one, which is what every `optimalportfolios` call site and every qis example passes, resolves to
+the same observation under both readings and no result at lag=1 moves; results at lag>=2 move and
+were wrong before. `optimalportfolios` already documented the argument as periods, so the two
+packages now agree.
+
+### Fixed
+- `backtest_model_portfolio` raises when two weight dates resolve to the same traded date on the
+  price index, which happens when the weights frame is denser than the price panel - a
+  calendar-daily weights frame against a business-day panel is the common case. Weights are
+  consumed one row per rebalancing flag, so the rows after the first collision were applied at
+  the wrong dates for the rest of the backtest, and the staleness grew: on a 33-row daily
+  schedule at a lag of three, 15 rows were never consumed and the weights traded on 2020-01-31
+  were the ones computed on 2020-01-15. Covered by
+  `qis/portfolio/tests/test_backtester_weights_consistency.py`.
+
+- `weight_implementation_lag` counts observations of the price index rather than calendar days;
+  see the note above. A weight whose traded date would fall past the end of the price history is
+  dropped with a warning rather than silently, and every weight date is now traded exactly once.
+
+### Added
+- `qis.generate_static_weights_schedule(prices, weights, rebalancing_freq=...)` turns a fixed
+  allocation into the rebalancing weight frame `backtest_model_portfolio` consumes, allocating
+  over the instruments priced on each rebalancing date. A static vector against a panel whose
+  instruments start and stop at different dates leaves the missing instrument's weight in the
+  cash balance - the backtester takes weights as given and does not modify them - which is
+  rarely the intended allocation. The universe is read at the rebalancing date only, so the
+  construction is point in time. Rescaling preserves the total exposure of the specification
+  rather than forcing the row to one, so a book that is 90% invested by design stays 90%
+  invested; `is_preserve_total_exposure=False` gives the force-to-one form, and
+  `is_rescale_to_live_universe=False` gives the cash residual with an explicit `0.0` rather than
+  a nan in the reported weights. Core API, `Portfolio and backtesting`.
+
+- `qis.align_weights_to_columns(weights, columns)` is the shared normaliser for the weight
+  argument, so `generate_static_weights_schedule` and `backtest_model_portfolio` cannot disagree
+  on what a Dict, a pd.Series, a List or an np.ndarray means. Behaviour is unchanged: a Dict or
+  pd.Series aligns by name, a List or np.ndarray is positional, and the error contract the
+  backtester documented is preserved.
+
+- `backtest_model_portfolio` warns when a weighted instrument has no price on its traded date -
+  the leg is not traded and its weight stays in cash - and names the instruments and the first
+  date. Checked at the traded date rather than the weight date, so a lag that carries a weight
+  past an instrument's last price is caught too. A zero weight against a missing price is
+  silent, since holding a column at 0.0 before an instrument starts is deliberate.
+
+- `backtest_model_portfolio` warns when prices carry missing values *inside* an instrument's own
+  reported history, and names `prices.asfreq('B', method='ffill')` or `prices.ffill()` as the
+  remedy. Units are held through a nan price and `np.nansum` drops the leg from the nav on those
+  dates, so a hole removes that leg's whole value from the portfolio with no error. Leading nans
+  (not trading yet) and trailing nans (no longer reporting) are legitimate and stay silent.
+
+- `qis/utils/tests/test_static_weights_schedule.py` and
+  `qis/portfolio/tests/test_backtester_weights_consistency.py`, including the regression pin that
+  a lag of one reproduces the calendar-day schedule for `ME`, `QE`, `W-FRI` and `B` weight
+  frequencies.
+
+- `examples/portfolios/static_weight_with_missing_prices.py` and
+  `examples/portfolios/lagged_weight_implementation.py`. Both run on the seeded synthetic panel
+  with no network and no data file, so `test_examples.py` executes them top to bottom rather than
+  only reading them - the first two examples under `examples/portfolios/` that it can. The first
+  shows the cash residual, the reallocated schedule and what preserving the total exposure means
+  for a book that is 90% invested by design; the second runs one monthly trend book at lags of 0,
+  1, 5 and 20 observations, and reports that turnover and realised costs do not move with the lag
+  while return and Sharpe do.
+
 ## [5.5.0] - 2026-08-01
 
 **Every `axis=1` `pd.concat` in library code states `sort=` explicitly, and the three resampling

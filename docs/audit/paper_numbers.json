@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "14b963b44e6c15fafdd218c3f190a893415636aa",
+  "measured_at_commit": "a699be1ccd1f9888af9ee3b1e6bcfbb3f7ead42f",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": "in 38 of the 45 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 39,
+      "value": 41,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -28,16 +28,16 @@
       "paper_phrase": null
     },
     "backtester_nonblank_lines": {
-      "value": 279,
+      "value": 330,
       "how": "nonblank lines of qis/portfolio/backtester.py",
       "live": true,
       "paper_phrase": null
     },
     "backtester_physical_lines": {
-      "value": 323,
+      "value": 376,
       "how": "physical lines of qis/portfolio/backtester.py",
       "live": true,
-      "paper_phrase": "backtester is 323 lines"
+      "paper_phrase": "backtester is 376 lines"
     },
     "capability_groups": {
       "value": 12,
@@ -46,13 +46,13 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 1119,
+      "value": 1158,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 313,
+      "value": 315,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -94,10 +94,10 @@
       "paper_phrase": "references 87 symbols"
     },
     "core_symbols": {
-      "value": 116,
+      "value": 117,
       "how": "len(qis.api.core_api_names())",
       "live": true,
-      "paper_phrase": "documented core of 116 symbols"
+      "paper_phrase": "documented core of 117 symbols"
     },
     "exported_module_bindings": {
       "value": 9,
@@ -106,10 +106,10 @@
       "paper_phrase": null
     },
     "exported_symbols": {
-      "value": 403,
+      "value": 405,
       "how": "len(qis.__all__)",
       "live": true,
-      "paper_phrase": "holds 403 names"
+      "paper_phrase": "holds 405 names"
     },
     "first_commit_month": {
       "value": "2022-12",
