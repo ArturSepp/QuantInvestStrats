@@ -1620,6 +1620,68 @@ def set_labels_frequency(ax: plt.Axes, labels_frequency: int = 5) -> None:
             label.set_visible(False)
 
 
+# a 90-degree-rotated categorical tick label occupies the font's LINE HEIGHT horizontally, not
+# its string width - so shortening the names does not buy room, only a smaller font or a wider
+# axis does. Measured across 3pt to 10pt:
+#     label width (inches) ~ 0.0138 * fontsize
+# The page-level twin of this law, for panel legends, is
+# qis.portfolio.reports.config.estimate_legend_capacity.
+BAR_LABEL_WIDTH_PER_FONTSIZE = 0.0138  # inches of axis width per rotated label per point
+AXIS_SHARE_OF_CELL = 0.96              # share of its gridspec cell a drawn axis keeps
+
+
+def estimate_bar_label_capacity(axis_width: float,
+                                fontsize: float,
+                                min_gap: float = 0.02
+                                ) -> int:
+    """
+    number of rotated categorical labels an axis of this width carries without crowding.
+
+    Args:
+        axis_width: drawing width of the axis in inches, excluding its own decorations
+        fontsize: tick label font size in points
+        min_gap: readable clearance between neighbouring labels, in inches. The default keeps
+            about a third of a character; 0.0 gives the point where labels start to overlap,
+            which is legible only in the sense that nothing is drawn on top of anything else
+
+    Returns:
+        largest number of labels that fits, at least 1
+
+    Raises:
+        ValueError: if axis_width or fontsize is not positive
+    """
+    if axis_width <= 0.0:
+        raise ValueError(f"axis_width must be positive, got {axis_width!r}")
+    if fontsize <= 0.0:
+        raise ValueError(f"fontsize must be positive, got {fontsize!r}")
+    return max(1, int(axis_width / (BAR_LABEL_WIDTH_PER_FONTSIZE * fontsize + min_gap)))
+
+
+def estimate_axis_width(ax: plt.Subplot) -> Optional[float]:
+    """
+    drawing width of an axis in inches, before the figure is drawn.
+
+    ``ax.get_position()`` understates the width of a constrained_layout axis by about a fifth
+    until the layout has run, so the width is taken from the gridspec allocation instead and
+    scaled by the share of a cell a drawn axis keeps once its own decorations are placed.
+
+    Args:
+        ax: the axis to measure
+
+    Returns:
+        width in inches, or None when the axis is not on a gridspec and the width is unknowable
+        before the draw
+    """
+    subplotspec = ax.get_subplotspec()
+    if subplotspec is None:
+        return None
+    gridspec = subplotspec.get_gridspec()
+    colspan = subplotspec.colspan
+    figure_width = ax.get_figure().get_size_inches()[0]
+    cell_width = figure_width * (colspan.stop - colspan.start) / gridspec.ncols
+    return AXIS_SHARE_OF_CELL * cell_width
+
+
 def scale_ax_bar_width(ax: plt.Subplot, scale: float = 0.5) -> None:
     """
     shrink or enlarge width of bars for barplot

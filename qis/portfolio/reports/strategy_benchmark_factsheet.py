@@ -27,8 +27,8 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import AttributionMetric
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
-from qis.portfolio.reports.config import (PERF_PARAMS,
-                                          validate_reporting_frequency, infer_data_frequency_label)
+from qis.portfolio.reports.config import (PERF_PARAMS, validate_reporting_frequency,
+                                          validate_legend_capacity, infer_data_frequency_label)
 from qis.plots.utils import get_df_table_size, set_spines, set_y_limits
 
 
@@ -113,6 +113,16 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                         multi_portfolio_data.portfolio_datas[benchmark_idx].get_portfolio_nav(),
                         multi_portfolio_data.benchmark_prices):
         validate_reporting_frequency(data_series, perf_params.freq)
+
+    # guard: the left column carries one legend row per portfolio, and a legend that outgrows its
+    # panel collapses the layout of the whole page - see config.estimate_legend_capacity
+    n_legend_entries = len(multi_portfolio_data.portfolio_datas)
+    if add_benchmarks_to_navs and multi_portfolio_data.benchmark_prices is not None:
+        benchmarks = multi_portfolio_data.benchmark_prices
+        n_legend_entries += 1 if isinstance(benchmarks, pd.Series) else len(benchmarks.columns)
+    validate_legend_capacity(n_legend_entries=n_legend_entries, figsize=figsize, fontsize=fontsize,
+                             panel_rows=2, gridspec_rows=14,
+                             report_name='strategy-benchmark factsheet')
 
     # native grid of the NAV path: drawdowns / under-water / cumulative are computed on this grid
     # (not resampled to the reporting frequency), so their titles carry this frequency

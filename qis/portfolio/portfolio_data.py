@@ -56,6 +56,7 @@ import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
 import qis.plots.time_series as pts
 import qis.plots.stackplot as pst
+import qis.plots.utils as put
 import qis.plots.derived.prices as ppd
 import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
@@ -71,6 +72,48 @@ from qis.utils.df_str import date_to_str
 # default performance and regime params
 PERF_PARAMS = PerfParams(freq='W-WED')
 regime_classifier = BenchmarkReturnsQuantilesRegime(freq='ME')
+
+
+def reduce_attribution_to_tails(data: pd.Series,
+                                max_bars: int
+                                ) -> Tuple[pd.Series, float]:
+    """
+    keep the extremes of an attribution and fold the middle into a reported total.
+
+    Sorted descending and cut from both ends when the values carry both signs - a P&L
+    attribution, where the losers matter as much as the winners - and from the top only when they
+    do not, which is every share-of-total metric: a risk attribution, costs and turnover are
+    non-negative by construction and have no bottom tail to show.
+
+    The folded value is returned rather than plotted. A single bar carrying sixty instruments
+    dominates the axis and flattens the ones the panel exists to show, so the caller states it in
+    the title instead.
+
+    Args:
+        data: attributed value per instrument
+        max_bars: bars to keep. Split evenly between the two ends when the data is two-sided
+
+    Returns:
+        (kept, folded_value): the retained entries in sorted order, and the sum of what was
+        dropped, so that kept.sum() + folded_value is the original total
+
+    Raises:
+        ValueError: if max_bars is not positive
+    """
+    if max_bars <= 0:
+        raise ValueError(f"max_bars must be positive, got {max_bars!r}")
+    ordered = data.sort_values(ascending=False)
+    if len(ordered.index) <= max_bars:
+        return ordered, 0.0
+    is_two_sided = bool(np.nanmin(ordered) < 0.0 < np.nanmax(ordered))
+    if is_two_sided:
+        n_head = max_bars // 2
+        n_tail = max_bars - n_head
+        kept = pd.concat([ordered.iloc[:n_head], ordered.iloc[len(ordered.index) - n_tail:]])
+    else:
+        kept = ordered.iloc[:max_bars]
+    folded_value = float(np.nansum(ordered.to_numpy()) - np.nansum(kept.to_numpy()))
+    return kept, folded_value
 
 
 class AttributionMetric(str, Enum):
@@ -1310,12 +1353,37 @@ class PortfolioData:
                                      add_top_bar_values: Optional[bool] = None,
                                      remove_zero_data: bool = True,
                                      shorten_instrument_names: bool = True,
+                                     max_bars: Optional[int] = None,
+                                     fontsize: float = 10,
                                      ax: plt.Subplot = None,
                                      **kwargs
                                      ) -> None:
         """
-        performance attribution for p&l and risk
-        shorten_instrument_names: keep 15 strings to improve axis alignment
+        attribute a portfolio metric across its instruments, one bar per instrument.
+
+        The bar order is the instrument order of the portfolio, which is the group order, so the
+        asset-class blocks are visible. That order is kept until the universe outgrows the panel:
+        past roughly 60 instruments on a half-page panel the rotated tick labels overlap and the
+        panel stops naming anything. Past that point ``max_bars`` reduces it to the tails, sorted
+        by the attributed value, with the folded remainder stated in the title. See
+        :func:`reduce_attribution_to_tails` for the reduction and
+        :func:`qis.plots.utils.estimate_bar_label_capacity` for the geometry.
+
+        Args:
+            time_period: window to attribute over. None uses the full history
+            attribution_metric: what is attributed - P&L, its risk share, costs or turnover
+            add_top_bar_values: print the value above each bar. None prints them at 20 bars or
+                fewer, where they fit
+            remove_zero_data: drop instruments whose attribution is zero, which is what an
+                instrument never traded in the window looks like
+            shorten_instrument_names: truncate names to 15 characters. This bounds how far the
+                labels extend below the axis; it does not widen the axis, because a rotated
+                label is as wide as the font is tall whatever the string says
+            max_bars: bars to keep. None reduces only once the labels would crowd, so a panel
+                that reads today is untouched. 0 disables the reduction and plots everything
+            fontsize: tick label font size, which sets how many labels the panel holds
+            ax: axis to draw on
+            **kwargs: forwarded to :func:`qis.plot_bars`
         """
         data = self.get_performance_attribution_data(attribution_metric=attribution_metric,
                                                      time_period=time_period,
@@ -1328,6 +1396,26 @@ class PortfolioData:
         if shorten_instrument_names:
             data.index = [x[:15] for x in data.index]
 
+        # reduce to the tails once the labels would crowd, and say what was folded away
+        title = f"{attribution_metric.value}"
+        if time_period is not None:
+            title += f", for period={time_period.to_str()}"
+        if max_bars is None and ax is not None and isinstance(data, pd.Series):
+            axis_width = put.estimate_axis_width(ax=ax)
+            if axis_width is not None:
+                capacity = put.estimate_bar_label_capacity(axis_width=axis_width,
+                                                           fontsize=fontsize)
+                max_bars = capacity if len(data.index) > capacity else None
+        if max_bars:
+            n_total = len(data.index)
+            is_two_sided = bool(np.nanmin(data) < 0.0 < np.nanmax(data))
+            data, folded_value = reduce_attribution_to_tails(data=data, max_bars=max_bars)
+            n_folded = n_total - len(data.index)
+            if n_folded > 0:
+                side = 'top and bottom' if is_two_sided else 'top'
+                title += (f"\n{side} {len(data.index)} of {n_total}: "
+                          f"{n_folded} folded away, summing to {folded_value:.2%}")
+
         if add_top_bar_values is None:
             if isinstance(data, pd.Series) and len(data.index) <= 20:
                 add_top_bar_values = True
@@ -1337,10 +1425,8 @@ class PortfolioData:
         kwargs = qis.update_kwargs(kwargs=kwargs,
                                    new_kwargs=dict(bbox_to_anchor=(0.5, 1.05),
                                                    add_top_bar_values=add_top_bar_values,
+                                                   fontsize=fontsize,
                                                    x_rotation=90))
-        title = f"{attribution_metric.value}"
-        if time_period is not None:
-            title += f", for period={time_period.to_str()}"
         qis.plot_bars(df=data,
                       skip_y_axis=True,
                       title=title,

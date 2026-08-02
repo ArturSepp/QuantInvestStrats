@@ -21,7 +21,8 @@ from typing import Union, List, Optional, Tuple
 import qis as qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData, RollingPerfStat, LegendStats, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
-                                          validate_reporting_frequency, infer_data_frequency_label)
+                                          validate_reporting_frequency, validate_legend_capacity,
+                                          infer_data_frequency_label)
 from qis.plots.utils import set_title
 from qis.utils.df_str import series_to_str
 
@@ -497,6 +498,16 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     for data_series in (prices, benchmark_prices):
         if data_series is not None:
             validate_reporting_frequency(data_series, perf_params.freq)
+
+    # guard: the left column carries one legend row per asset, and a legend that outgrows its
+    # panel collapses the layout of the whole page - see config.estimate_legend_capacity
+    n_legend_entries = len(prices.columns)
+    if add_benchmarks_to_navs and benchmark_prices is not None:
+        benchmark_columns = ([benchmark_prices.name] if isinstance(benchmark_prices, pd.Series)
+                             else list(benchmark_prices.columns))
+        n_legend_entries += len([x for x in benchmark_columns if x not in prices.columns])
+    validate_legend_capacity(n_legend_entries=n_legend_entries, figsize=figsize, fontsize=fontsize,
+                             panel_rows=2, gridspec_rows=14, report_name='multi-asset factsheet')
 
     # native grid of the price paths: drawdowns / under-water are on this grid (not resampled)
     nav_freq = infer_data_frequency_label(prices)

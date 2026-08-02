@@ -24,7 +24,14 @@ turnover/cost_rolling_period are rolling-sum windows.
 
 The FactsheetConfig field schema is the public kwargs contract: fetch_factsheet_config_kwargs()
 spreads FactsheetConfig._asdict() into the generate_*_factsheet(...) calls, so field names stay stable.
+
+Two page-level guards live here beside the settings, both called from the generate_* entry
+points: validate_reporting_frequency() on the data, and validate_legend_capacity() on the page
+geometry - a panel legend is a fixed height per series and overflowing it collapses the layout of
+the whole page, not only of the panel that overflows.
 """
+import math
+import warnings
 from enum import Enum
 from typing import Dict, Any, Tuple, NamedTuple, Optional, List, Union
 import pandas as pd
@@ -126,6 +133,101 @@ def validate_reporting_frequency(data: Union[pd.Series, pd.DataFrame, pd.Datetim
             f"higher frequency than the data produces meaningless statistics. Request {data_name} reporting "
             f"or coarser, or supply data sampled at {report_name} frequency or finer."
         )
+
+
+# legend geometry of a factsheet page. A panel legend is a FIXED-height decoration carrying one
+# row per series, measured on the labelspacing=0.2 used by qis.plots.utils.set_legend:
+#     legend height (inches) ~ fontsize * (0.0086 + 0.01576 * n_entries)
+# the intercept is frame padding, under a tenth of a row, and is dropped below.
+LEGEND_ROW_HEIGHT_PER_FONTSIZE = 0.01576  # inches per legend entry per point of fontsize
+PANEL_DECORATION_HEIGHT = 0.43            # inches: panel title plus x tick labels
+
+
+def estimate_legend_capacity(figsize: Tuple[float, float],
+                             fontsize: float,
+                             panel_rows: int,
+                             gridspec_rows: int
+                             ) -> int:
+    """
+    number of legend entries a factsheet panel carries before the page layout degrades.
+
+    matplotlib's ``constrained_layout`` counts the part of a legend that spills out of its axes
+    as a layout margin. A panel legend is a fixed height and grows with the number of series, so
+    once it exceeds the panel's cell the solver drives the axes height to zero, warns, and
+    disables itself for the WHOLE figure: every panel on the page then reverts to the raw
+    gridspec and the page reads as collapsed, not only the panel that overflowed.
+
+    Args:
+        figsize: figure size in inches, (width, height)
+        fontsize: base font size of the report, in points
+        panel_rows: gridspec rows spanned by one time-series panel
+        gridspec_rows: total gridspec rows on the page
+
+    Returns:
+        largest number of legend entries leaving the panel axes at full height; 0 when the panel
+        is too small to carry a legend at all
+
+    Raises:
+        ValueError: if fontsize, panel_rows or gridspec_rows is not positive
+    """
+    if fontsize <= 0.0:
+        raise ValueError(f"fontsize must be positive, got {fontsize!r}")
+    if panel_rows <= 0 or gridspec_rows <= 0:
+        raise ValueError(f"panel_rows and gridspec_rows must be positive, "
+                         f"got {panel_rows!r} and {gridspec_rows!r}")
+    usable_height = figsize[1] * panel_rows / gridspec_rows - PANEL_DECORATION_HEIGHT
+    if usable_height <= 0.0:
+        return 0
+    return int(usable_height / (LEGEND_ROW_HEIGHT_PER_FONTSIZE * fontsize))
+
+
+def validate_legend_capacity(n_legend_entries: int,
+                             figsize: Tuple[float, float],
+                             fontsize: float,
+                             panel_rows: int,
+                             gridspec_rows: int,
+                             report_name: str = 'factsheet'
+                             ) -> int:
+    """
+    warn when a page carries more series than its panel legends hold.
+
+    A warning rather than a ValueError: the page still renders, the caller may not care on a
+    screening run, and pages between the capacity and the point where constrained_layout gives
+    up render acceptably today. Nothing is dropped and no number changes - see
+    :func:`estimate_legend_capacity` for the geometry.
+
+    Args:
+        n_legend_entries: series drawn in one time-series panel, benchmarks included
+        figsize: figure size in inches, (width, height)
+        fontsize: base font size of the report, in points
+        panel_rows: gridspec rows spanned by one time-series panel
+        gridspec_rows: total gridspec rows on the page
+        report_name: report named in the warning message
+
+    Returns:
+        the capacity, so a caller can act on it rather than only warn
+    """
+    capacity = estimate_legend_capacity(figsize=figsize, fontsize=fontsize,
+                                        panel_rows=panel_rows, gridspec_rows=gridspec_rows)
+    if n_legend_entries > capacity:
+        usable_height = figsize[1] * panel_rows / gridspec_rows - PANEL_DECORATION_HEIGHT
+        # round the two suggestions AWAY from the constraint: a suggestion that still trips this
+        # warning when the caller applies it is worse than no suggestion
+        fontsize_fit = math.floor(10.0 * usable_height
+                                  / (LEGEND_ROW_HEIGHT_PER_FONTSIZE * n_legend_entries)) / 10.0
+        figsize_fit = math.ceil(10.0 * (n_legend_entries * LEGEND_ROW_HEIGHT_PER_FONTSIZE * fontsize
+                                        + PANEL_DECORATION_HEIGHT)
+                                * gridspec_rows / panel_rows) / 10.0
+        warnings.warn(
+            f"{report_name}: {n_legend_entries} series exceed the panel legend capacity of "
+            f"{capacity} at figsize={figsize} and fontsize={fontsize}. The legends will squeeze "
+            f"the panel axes and matplotlib will collapse the page layout. Report fewer series, "
+            f"or pass fontsize={fontsize_fit:.1f}, or pass figsize=({figsize[0]}, "
+            f"{figsize_fit:.1f}).",
+            stacklevel=3
+        )
+    return capacity
+
 
 # horizons (in years) used to calibrate the rolling windows / EWM spans below.
 # LONG period: vol/var/sharpe use 3y everywhere except DAILY (1y, a 3y span is too slow on daily

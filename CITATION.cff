@@ -9,7 +9,7 @@ authors:
 repository-code: "https://github.com/ArturSepp/QuantInvestStrats"
 url: "https://pypi.org/project/qis/"
 license: MIT
-version: 5.6.0
+version: 5.6.1
 date-released: "2026-08-02"
 keywords:
   - quantitative-finance

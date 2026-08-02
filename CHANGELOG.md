@@ -7,6 +7,74 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.6.1] - 2026-08-02
+
+**Two page-geometry limits that used to produce an unreadable panel in silence are now
+enforced.** Both are the same arithmetic: a decoration sized in points, laid on a panel sized in
+inches, degrades once the series count outgrows the panel. The legend case warns and changes
+nothing drawn. The attribution case reduces what is drawn - `plot_performance_attribution` falls
+back to the tails of the distribution once the instrument labels would crowd, which is the one
+behaviour change in this release. It engages only past the point where the panel had already
+stopped naming anything, so a panel that reads today is untouched, and `max_bars=0` restores the
+old behaviour unconditionally.
+
+**A factsheet carrying more series than its panel legends hold now warns.** A panel legend is a
+fixed height of one row per series, and matplotlib's `constrained_layout` counts the part of it
+that spills out of the axes as a layout margin: once the legend outgrows the panel cell the
+solver drives the axes height to zero and disables itself for the whole figure, so every panel on
+the page reverts to the raw gridspec. One overflowing legend collapses the page, not one panel.
+On A4 portrait at `fontsize=5` the capacity is 15 series, the axes start losing height at 16 and
+the layout collapses at 19; a 22-asset panel produced an unreadable page with no diagnostic other
+than matplotlib's `constrained_layout not applied`, which names neither the cause nor a remedy.
+Nothing is dropped and no number changes - pages that render today render identically.
+
+### Added
+- `qis.portfolio.reports.config.estimate_legend_capacity(figsize, fontsize, panel_rows,
+  gridspec_rows)` returns the number of legend entries a panel carries at full height, and
+  `validate_legend_capacity(...)` warns above it, naming the `fontsize` and the `figsize` that
+  would fit the requested series count. Both are internal; the calibration constant
+  `LEGEND_ROW_HEIGHT_PER_FONTSIZE = 0.01576` in/row/pt is re-measured against matplotlib by
+  `qis/portfolio/tests/legend_capacity_test.py`, so a matplotlib change that invalidates it fails
+  the suite rather than a report.
+- The guard is called by `generate_multi_asset_factsheet` (capacity counted over the asset
+  columns plus any benchmark added to the navs), `generate_multi_portfolio_factsheet` and
+  `generate_strategy_benchmark_factsheet_plt` (over the portfolios plus any benchmark). The three
+  pages share one panel cell, `figsize[1] * 2 / 14`, so they share one capacity.
+
+**An attribution panel wider than its tick labels can name now shows the tails.** A 90-degree
+rotated tick label occupies the font's line height horizontally whatever the instrument is
+called, so `shorten_instrument_names` never bought room: only a smaller font or a wider axis
+does. A half-page panel is 4.09 in and holds 45 labels at `fontsize=5`; an 84-instrument
+portfolio drew 84 bars over a solid smear of overlapping names, on the strategy factsheet summary
+page and on all ten panels of its attribution page.
+
+### Changed
+- `PortfolioData.plot_performance_attribution` takes `max_bars` and `fontsize`. `max_bars=None`,
+  the default, keeps every bar until the labels would crowd and then reduces to the tails sorted
+  by the attributed value; an explicit count forces the reduction; `max_bars=0` disables it. The
+  cut is two-sided for a signed metric - `PNL`, where the losers matter as much as the winners -
+  and top-only for a metric that is non-negative by construction, which is `PNL_RISK`, `COSTS`,
+  `TURNOVER` and `VOL_ADJUSTED_TURNOVER`: a share of a total has no bottom tail to show.
+- The folded remainder is stated in the panel title (`top and bottom 45 of 84: 39 folded away,
+  summing to 18.53%`) rather than drawn as one aggregate bar, which would carry a third of the
+  total and flatten every instrument the panel exists to show. The `sum=` claim in the title is
+  therefore still true and its exception is on the line below it.
+- The instrument order is untouched below the capacity, so the asset-class blocks stay visible on
+  every panel that reads today. Sorting only happens where the alternative is an unreadable page,
+  and it does cost the cross-panel alignment of the attribution page: each panel then sorts by
+  its own metric.
+- Not applied to `MultiPortfolioData.plot_performance_attribution`, which is a separate
+  implementation drawing one column per portfolio on a full-width panel. That geometry holds 92
+  labels and is not at risk at the universe sizes this addresses.
+
+### Added
+- `qis.plots.utils.estimate_bar_label_capacity(axis_width, fontsize)` and `estimate_axis_width(ax)`,
+  the geometry behind the reduction. The constants `BAR_LABEL_WIDTH_PER_FONTSIZE = 0.0138`
+  in/label/pt and `AXIS_SHARE_OF_CELL = 0.96` are re-measured against matplotlib by
+  `qis/portfolio/tests/attribution_reduction_test.py`.
+- `qis.portfolio.portfolio_data.reduce_attribution_to_tails(data, max_bars)` returns the retained
+  entries and the folded total, so `kept.sum() + folded` is the original sum by construction.
+
 ## [5.6.0] - 2026-08-02
 
 **`weight_implementation_lag` is counted in observations of the price index, not in calendar
