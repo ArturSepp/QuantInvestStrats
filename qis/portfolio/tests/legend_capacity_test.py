@@ -92,14 +92,14 @@ def test_estimate_legend_capacity() -> None:
     """the capacity of the shipped page geometries, and its monotonicity"""
     # the two factsheet geometries: 2 of 14 rows and 1 of 7 rows are the same cell
     assert estimate_legend_capacity(figsize=A4_PORTRAIT, fontsize=5,
-                                    panel_rows=2, gridspec_rows=14) == 15
+                                    panel_rows=2, gridspec_rows=14) == 13
     assert estimate_legend_capacity(figsize=A4_PORTRAIT, fontsize=5,
-                                    panel_rows=1, gridspec_rows=7) == 15
+                                    panel_rows=1, gridspec_rows=7) == 13
     # smaller type and a taller page both buy rows
     assert estimate_legend_capacity(figsize=A4_PORTRAIT, fontsize=2.5,
-                                    panel_rows=2, gridspec_rows=14) == 31
+                                    panel_rows=2, gridspec_rows=14) == 27
     assert estimate_legend_capacity(figsize=(8.3, 23.4), fontsize=5,
-                                    panel_rows=2, gridspec_rows=14) == 36
+                                    panel_rows=2, gridspec_rows=14) == 32
     # a panel shorter than its own title and tick labels carries no legend at all
     assert estimate_legend_capacity(figsize=(8.3, 14.0 * PANEL_DECORATION_HEIGHT), fontsize=5,
                                     panel_rows=1, gridspec_rows=14) == 0
@@ -118,7 +118,7 @@ def test_validate_legend_capacity_warns_above_capacity() -> None:
     kwargs = dict(figsize=A4_PORTRAIT, fontsize=5, panel_rows=2, gridspec_rows=14)
     with pytest.warns(UserWarning, match=CAPACITY_WARNING):
         validate_legend_capacity(n_legend_entries=22, **kwargs)
-    assert_no_capacity_warning(validate_legend_capacity, n_legend_entries=15, **kwargs)
+    assert_no_capacity_warning(validate_legend_capacity, n_legend_entries=13, **kwargs)
 
 
 def test_validate_legend_capacity_suggestions_clear_the_guard() -> None:
@@ -139,7 +139,7 @@ def test_multi_asset_factsheet_warns() -> None:
     """the guard is wired into generate_multi_asset_factsheet and is quiet on an A4 page"""
     prices = qis.TimePeriod('31Dec2020', '31Dec2025').locate(generate_synthetic_prices())
     time_period = qis.get_time_period(prices)
-    # 10 assets sit inside the A4 capacity of 15
+    # 10 assets sit inside the A4 capacity of 13
     fig = assert_no_capacity_warning(qis.generate_multi_asset_factsheet,
                                      prices=prices, benchmark=prices.columns[0],
                                      time_period=time_period)

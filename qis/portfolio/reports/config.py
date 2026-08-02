@@ -137,9 +137,9 @@ def validate_reporting_frequency(data: Union[pd.Series, pd.DataFrame, pd.Datetim
 
 # legend geometry of a factsheet page. A panel legend is a FIXED-height decoration carrying one
 # row per series, measured on the labelspacing=0.2 used by qis.plots.utils.set_legend:
-#     legend height (inches) ~ fontsize * (0.0086 + 0.01576 * n_entries)
+#     legend height (inches) ~ fontsize * (0.0086 + 0.01778 * n_entries)
 # the intercept is frame padding, under a tenth of a row, and is dropped below.
-LEGEND_ROW_HEIGHT_PER_FONTSIZE = 0.01576  # inches per legend entry per point of fontsize
+LEGEND_ROW_HEIGHT_PER_FONTSIZE = 0.01778  # inches per legend entry per point of fontsize
 PANEL_DECORATION_HEIGHT = 0.43            # inches: panel title plus x tick labels
 
 
