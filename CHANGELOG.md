@@ -7,7 +7,7 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-## [5.6.1] - 2026-08-02
+## [5.6.1] - 2026-08-03
 
 **Two page-geometry limits that used to produce an unreadable panel in silence are now
 enforced.** Both are the same arithmetic: a decoration sized in points, laid on a panel sized in
@@ -23,8 +23,8 @@ fixed height of one row per series, and matplotlib's `constrained_layout` counts
 that spills out of the axes as a layout margin: once the legend outgrows the panel cell the
 solver drives the axes height to zero and disables itself for the whole figure, so every panel on
 the page reverts to the raw gridspec. One overflowing legend collapses the page, not one panel.
-On A4 portrait at `fontsize=5` the capacity is 15 series, the axes start losing height at 16 and
-the layout collapses at 19; a 22-asset panel produced an unreadable page with no diagnostic other
+On A4 portrait at `fontsize=5` the calibrated capacity is 13 series, so the guard warns at 14; a
+22-asset panel produced an unreadable page with no diagnostic other
 than matplotlib's `constrained_layout not applied`, which names neither the cause nor a remedy.
 Nothing is dropped and no number changes - pages that render today render identically.
 
@@ -33,7 +33,7 @@ Nothing is dropped and no number changes - pages that render today render identi
   gridspec_rows)` returns the number of legend entries a panel carries at full height, and
   `validate_legend_capacity(...)` warns above it, naming the `fontsize` and the `figsize` that
   would fit the requested series count. Both are internal; the calibration constant
-  `LEGEND_ROW_HEIGHT_PER_FONTSIZE = 0.01576` in/row/pt is re-measured against matplotlib by
+  `LEGEND_ROW_HEIGHT_PER_FONTSIZE = 0.01778` in/row/pt is re-measured against matplotlib by
   `qis/portfolio/tests/legend_capacity_test.py`, so a matplotlib change that invalidates it fails
   the suite rather than a report.
 - The guard is called by `generate_multi_asset_factsheet` (capacity counted over the asset
