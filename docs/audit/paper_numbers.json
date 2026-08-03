@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "a699be1ccd1f9888af9ee3b1e6bcfbb3f7ead42f",
+  "measured_at_commit": "94daadbd0b26bc2349a27d3be671e3346d9c9bda",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": "in 38 of the 45 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 41,
+      "value": 42,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -22,7 +22,7 @@
       "paper_phrase": null
     },
     "ai_coauthored_last_day": {
-      "value": "2026-08-01",
+      "value": "2026-08-02",
       "how": "latest AI co-authored commit",
       "live": false,
       "paper_phrase": null
@@ -46,13 +46,13 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 1158,
+      "value": 1176,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 315,
+      "value": 320,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
