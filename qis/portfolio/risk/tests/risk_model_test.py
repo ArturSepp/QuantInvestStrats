@@ -330,3 +330,61 @@ def test_tre_history_matches_legacy_mpd_total_and_groups_on_synthetic_panel() ->
         group_data=universe.group_data,
         strict=False)
     pd.testing.assert_frame_equal(actual_groups, legacy_groups, rtol=1e-12, atol=0.0)
+
+
+def test_exposures_match_literal_assets_by_factors_hand_calculation() -> None:
+    weights = pd.Series([0.5, -0.25, 0.75], index=ASSETS)
+    actual = _factor_model().compute_exposures_at_date(
+        portfolio_weights=weights,
+        date=DATE_1)
+    # Market = 0.5*1.0 - 0.25*0.8 + 0.75*0.2 = 0.45
+    # Rates = 0.5*0.1 - 0.25*(-0.2) + 0.75*1.1 = 0.925
+    expected = pd.Series([0.45, 0.925], index=FACTORS)
+    pd.testing.assert_series_equal(actual, expected, rtol=1e-12, atol=0.0)
+
+
+def test_exposures_satisfy_seeded_linearity_identity() -> None:
+    # Seed 20260808. Linearity independently catches a transpose or accidental normalisation.
+    rng = np.random.default_rng(20260808)
+    weights_1 = pd.Series(rng.normal(size=3), index=ASSETS)
+    weights_2 = pd.Series(rng.normal(size=3), index=ASSETS)
+    scalar_1, scalar_2 = 1.7, -0.4
+    model = _factor_model()
+    combined = model.compute_exposures_at_date(
+        portfolio_weights=scalar_1 * weights_1 + scalar_2 * weights_2,
+        date=DATE_1)
+    separate = (
+        scalar_1 * model.compute_exposures_at_date(
+            portfolio_weights=weights_1, date=DATE_1)
+        + scalar_2 * model.compute_exposures_at_date(
+            portfolio_weights=weights_2, date=DATE_1)
+    )
+    pd.testing.assert_series_equal(combined, separate, rtol=1e-12, atol=0.0)
+
+
+def test_exposures_history_uses_asof_weights_and_leading_zero() -> None:
+    weights = pd.DataFrame(
+        [[0.5, 0.25, 0.25]],
+        index=[pd.Timestamp('2024-01-03')],
+        columns=ASSETS)
+    actual = _factor_model().compute_exposures_history(portfolio_weights=weights)
+    expected_nonzero = _loadings().T @ weights.iloc[0]
+    expected = pd.DataFrame(
+        [[0.0, 0.0], expected_nonzero.to_numpy(), expected_nonzero.to_numpy()],
+        index=pd.DatetimeIndex([DATE_1, DATE_2, DATE_3]),
+        columns=FACTORS)
+    pd.testing.assert_frame_equal(actual, expected, rtol=1e-12, atol=0.0)
+
+
+def test_exposures_covariance_only_model_names_factor_loadings() -> None:
+    with pytest.raises(ValueError, match="factor_loadings"):
+        _model().compute_exposures_at_date(
+            portfolio_weights=pd.Series([1.0], index=['A']),
+            date=DATE_1)
+
+
+def test_exposures_public_method_routes_through_strict_aligner() -> None:
+    with pytest.raises(ValueError, match=r"portfolio_weights.*OUTSIDE"):
+        _factor_model().compute_exposures_at_date(
+            portfolio_weights=pd.Series([0.8, 0.2], index=['A', 'OUTSIDE']),
+            date=DATE_1)

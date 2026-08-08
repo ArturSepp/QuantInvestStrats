@@ -439,6 +439,75 @@ class RiskModel:
             return pd.Series(results, name='Tracking error', dtype=float)
         return pd.DataFrame.from_dict(results, orient='index')
 
+    def compute_exposures_at_date(self,
+                                  portfolio_weights: pd.Series,
+                                  date: pd.Timestamp,
+                                  strict: bool = True,
+                                  ) -> pd.Series:
+        """Compute factor exposures on one covariance date.
+
+        Loadings ``B`` have shape assets x factors and exposure is ``B' w``.
+        The construction-time alignment guarantee is retained: the method does
+        not reindex or relax the loadings matrix.
+
+        Args:
+            portfolio_weights: Portfolio weights indexed by asset.
+            date: Exact covariance-grid date.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            Factor exposure Series indexed by factor.
+
+        Raises:
+            KeyError: If ``date`` is not an exact covariance-grid date.
+            ValueError: If ``factor_loadings`` is missing or weights violate the
+                alignment policy.
+        """
+        self._require_factor_loadings()
+        assert self.factor_loadings is not None
+        weights = self._align_weights(
+            weights=portfolio_weights,
+            date=date,
+            role='portfolio_weights',
+            strict=strict)
+        return self.factor_loadings[pd.Timestamp(date)].T @ weights
+
+    def compute_exposures_history(self,
+                                  portfolio_weights: WeightInput,
+                                  strict: bool = True,
+                                  ) -> pd.DataFrame:
+        """Compute factor exposures on the covariance date grid.
+
+        Dated weights are selected as-of each covariance date using forward
+        fill; dates before the first weight observation receive zero weights.
+        At every date the exposure is ``B_t' w_t`` for asset-by-factor
+        loadings ``B_t``.
+
+        Args:
+            portfolio_weights: Static Series or dated DataFrame of portfolio weights.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            DataFrame with covariance dates as rows and factors as columns.
+
+        Raises:
+            ValueError: If ``factor_loadings`` is missing or weights violate the
+                alignment policy.
+        """
+        self._require_factor_loadings()
+        weight_history = self._aligned_weight_history(
+            weights=portfolio_weights,
+            role='portfolio_weights',
+            strict=strict)
+        results = {
+            date: self.compute_exposures_at_date(
+                portfolio_weights=weight_history.loc[date],
+                date=date,
+                strict=strict)
+            for date in self.dates
+        }
+        return pd.DataFrame.from_dict(results, orient='index')
+
     def _require_factor_loadings(self) -> None:
         """Raise when a factor-exposure method lacks its required field."""
         if self.factor_loadings is None:
