@@ -419,8 +419,8 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
       - rates_data (a periodic rate series as a decimal, e.g. the 3M US T-bill) is passed straight
         into PerfParams and drives the excess-return / excess-Sharpe statistics.
       - if rates_data is None and add_rates_data is True, the 3M US T-bill ('^IRX') is downloaded
-        via yfinance and divided by 100; if that download is empty (e.g. offline) rates_data falls
-        back to None and the report uses zero-rate statistics.
+        via yfinance and divided by 100; if yfinance is unavailable or the download is empty
+        (e.g. offline), rates_data falls back to None and the report uses zero-rate statistics.
       - add_rates_data also selects the displayed performance columns: the excess-return set and
         labels when True, the rf=0 set when False.
 
@@ -428,8 +428,9 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
         factsheet_config: the (frequency, span) preset whose fields become the report kwargs
         rates_data: external risk-free rate series as a decimal. Supplied, it is used as-is and
             no download occurs
-        add_rates_data: when ``rates_data`` is None, download the default 3M US rate and show
-            the excess-return columns. Needs the ``[data]`` extra
+        add_rates_data: when ``rates_data`` is None, try to download the default 3M US rate and
+            show the excess-return columns. Warns and uses zero-rate statistics if the ``[data]``
+            extra is unavailable
         override: final overrides merged into the result, which win over the preset
 
     Returns:
@@ -440,15 +441,22 @@ def fetch_factsheet_config_kwargs(factsheet_config: FactsheetConfig = FACTSHEET_
         if add_rates_data:
             try:
                 import yfinance as yf
-            except ImportError as exc:
-                raise ImportError(
-                    "add_rates_data=True downloads the 3M US T-bill ('^IRX') via the optional "
-                    "dependency yfinance: run `pip install qis[data]`, or pass rates_data directly, "
-                    "or set add_rates_data=False for zero-rate statistics"
-                ) from exc
-            rates_data = yf.download('^IRX', start="1959-12-31", end=None, auto_adjust=True)['Close'].dropna() / 100.0
-            if rates_data.empty:  # if online
+            except ImportError:
+                warnings.warn(
+                    "add_rates_data=True could not download the 3M US T-bill ('^IRX') because "
+                    "the optional dependency yfinance is unavailable; proceeding with "
+                    "rates_data=None. Run `pip install qis[data]` or pass rates_data directly "
+                    "to include risk-free rates.",
+                    stacklevel=2
+                )
                 rates_data = None
+            else:
+                rates_data = (
+                    yf.download('^IRX', start="1959-12-31", end=None, auto_adjust=True)['Close']
+                    .dropna() / 100.0
+                )
+                if rates_data.empty:  # if online
+                    rates_data = None
 
     perf_params = PerfParams(freq=factsheet_config.freq,
                              freq_vol=factsheet_config.vol_freq,

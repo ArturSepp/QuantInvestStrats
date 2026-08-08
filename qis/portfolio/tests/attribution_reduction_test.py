@@ -40,6 +40,26 @@ def build_portfolio_data() -> qis.PortfolioData:
                                         ticker='Test portfolio')
 
 
+def test_performance_attribution_uses_instrument_display_names() -> None:
+    """P&L attribution uses the same configured names as P&L-risk attribution."""
+    portfolio_data = build_portfolio_data()
+    names = {
+        ticker: f'Asset name {idx}'
+        for idx, ticker in enumerate(portfolio_data.prices.columns)
+    }
+    portfolio_data.tickers_to_names_map = names
+
+    pnl = portfolio_data.get_performance_attribution_data(
+        attribution_metric=qis.AttributionMetric.PNL
+    )
+    pnl_risk = portfolio_data.get_performance_attribution_data(
+        attribution_metric=qis.AttributionMetric.PNL_RISK
+    )
+
+    assert pnl.index.tolist() == list(names.values())
+    assert pnl_risk.index.tolist() == list(names.values())
+
+
 def test_bar_label_width_calibration() -> None:
     """the measured width of a rotated tick label matches the constant the capacity is built on"""
     labels = ['S&p_500', 'Wheat_minneapol', 'Ust_10y_ultra', 'Gasoil', 'Feeder_cattle']

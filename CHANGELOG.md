@@ -7,6 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.6.2] - 2026-08-08
+
+### Changed
+- Performance attribution now uses configured instrument display names, matching P&L-risk
+  attribution and the labels shown elsewhere in portfolio reports.
+- Factsheet configuration now warns and falls back to zero-rate statistics when
+  `add_rates_data=True` but the optional `yfinance` dependency is unavailable.
+
 ## [5.6.1] - 2026-08-03
 
 **Two page-geometry limits that used to produce an unreadable panel in silence are now

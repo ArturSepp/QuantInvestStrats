@@ -676,6 +676,8 @@ class PortfolioData:
                                                 ) -> pd.Series:
         navs = self.get_instruments_navs(time_period=time_period, constant_trade_level=constant_trade_level)
         perf = ret.to_total_returns(prices=navs).rename(self.nav.name)
+        if self.tickers_to_names_map is not None:
+            perf = perf.rename(index=self.tickers_to_names_map)
         return perf
 
     def get_instruments_pnl_risk_attribution(self,

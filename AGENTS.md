@@ -135,6 +135,80 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
 - Do not modify `settings.yaml` or `local_path.py` to hardcode a machine-specific path.
 - Examples must run on free data (yfinance) — do not make an example require Bloomberg.
 
+<!-- ===== SHARED AGENT CORE (builder variant) — begin =====
+     Generated from SHARED_AGENT_CORE.md in the maintainer's project knowledge. Do not hand-edit
+     between these markers — propose the change to the maintainer instead. Variants: builder
+     (qis) / consumer / standalone. Last synced 2026-08-08, agent core v1.1. -->
+
+## Domain invariants
+
+Not inferable from any single file, and the source of numerically wrong code that runs clean:
+
+- **No look-ahead, anywhere in a backtest path.** A weight decided at *t* is applied over
+  *[t, t+1]*. Estimation is point-in-time: `MeanAdjType.INSAMPLE` subtracts a full-sample mean
+  and is therefore forward-looking — correct for a descriptive exhibit, wrong inside a backtest.
+- **`qis` holds units, not weights, between rebalancings.** Drift adjustment is the difference
+  between a backtest and a weighted average of returns.
+- **Return convention is stated, never implied** — `qis.to_returns(..., is_log_returns=...)`.
+  Annualisation follows from the frequency; never silently switch convention, frequency, or
+  annualisation factor.
+- **Sharpe has three explicitly labelled conventions**; excess variants need
+  `PerfParams.rates_data`. State which one a number uses.
+- **`BootstrapType.STATIONARY` wraps circularly from qis 5.1.0.** Any result resampled under an
+  earlier version does not reproduce.
+- One convention per concept across the stack. If two packages disagree, that is a bug to
+  report, not a difference to accommodate.
+
+## Stack polarity
+
+`qis` is the base layer of the stack: implementing performance statistics, drawdowns and
+annualisation *here* is the job, and the sibling packages consume them. The dependency rules are
+in Conventions (`TID251`). Never introduce `quantstats`, `pyfolio`, `empyrical`, `ffn`, `bt`, or
+an ad-hoc statistics layer alongside the package's own.
+
+**Never invent a symbol.** If a function, class, or keyword argument is not in the export
+surface (`qis.__all__`), it does not exist. Check in one line —
+`python -c "import qis; print([n for n in dir(qis) if 'unsmooth' in n.lower()])"` — and say a
+symbol is missing rather than producing code that calls it.
+
+## Verification loop
+
+- Plan → patch → verify. Name the verification command and its result when proposing a patch.
+- A second pass is mandatory where a plausible patch can be numerically wrong and still run
+  clean: estimation windows, weight normalisation, annualisation, the unsmoothing path, anything
+  resampled. Verify against a reference computed a different way, and say which.
+- Prove a new test fails before trusting that it passes: reintroduce the defect, watch it fail,
+  restore.
+
+## Escalation and scope
+
+- Stop and propose before proceeding when a change would exceed roughly five files, alter a
+  public signature, or touch a numerical path.
+- Never change numerical results, random seeds, or computed values unless the change is the
+  request.
+- A public-signature change carries a `CHANGELOG.md` entry and a version bump in the same
+  change. Removing a keyword argument from a function taking `**kwargs` is a silent break — the
+  caller's keyword is swallowed and nothing raises. Treat it as breaking.
+- Do not refactor beyond the requested scope. Propose the wider change; do not perform it.
+
+## Concurrent sessions
+
+More than one agent or session may work on this checkout at the same time, so a file can change
+between your read of it and your write.
+
+- Re-read a file from disk immediately before editing it. Never write a file from an earlier
+  read: a whole-file write from a stale copy silently reverts another session's work.
+- Prefer minimal anchored edits over whole-file replacement. If the on-disk content is not what
+  you expected, stop and reconcile your change onto the current content rather than overwrite.
+
+## Roadmap execution
+
+Feature roadmaps live at the repository root as `ROADMAP_<feature>.md`. An execution request
+names the file and the stage. A stage is complete when its stated verification command passes;
+its out-of-scope list is binding.
+
+<!-- ===== SHARED AGENT CORE — end ===== -->
+
 ## Generated records
 
 `docs/audit/` holds measurements rather than prose, and three scripts under `tools/` write them.
