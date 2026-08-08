@@ -241,7 +241,7 @@ class MultiPortfolioData:
                                                 ) -> Union[pd.Series, pd.DataFrame]:
         """
         compute Ex ante  tracking error =
-        (strategy_weights - strategy_weights) @ covar @ (strategy_weights - strategy_weights).T
+        (strategy_weights - benchmark_weights) @ covar @ (strategy_weights - benchmark_weights).T
 
         Delegates the computation to ``qis.portfolio.risk.risk_model.RiskModel``.
         """

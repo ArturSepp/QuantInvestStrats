@@ -18,6 +18,7 @@ to sum to one across factors. The nav-level version of the same question is
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import warnings
 from dataclasses import dataclass
 from typing import Union, Dict, Literal, Tuple, Optional
 # qis
@@ -337,9 +338,32 @@ class LinearModel:
                                    portfolio_weights: pd.DataFrame,
                                    benchmark_weights: pd.DataFrame
                                    ) -> Dict[str, pd.DataFrame]:
+        """Compute factor-only active risk, excluding idiosyncratic risk.
+
+        This legacy method forms portfolio, benchmark, and active factor exposures, then
+        multiplies active exposures by their factor-covariance marginal risks. It does not
+        include an idiosyncratic term. Use
+        ``RiskModel.compute_tre_decomposition_at_date`` for systematic/residual tracking error
+        or ``RiskModel.compute_marginal_tre_at_date`` for Euler tracking-error contributions.
+
+        Args:
+            portfolio_weights: Dated portfolio weights by asset.
+            benchmark_weights: Dated benchmark weights by asset.
+
+        Returns:
+            Dictionary of portfolio, benchmark, and active factor exposures, marginal factor
+            risks, absolute factor risk contributions, and normalized factor contributions.
+
+        Warns:
+            DeprecationWarning: On every direct call; the method remains available in this
+                release with its body unchanged.
         """
-        qqq
-        """
+        warnings.warn(
+            "LinearModel.compute_active_factor_risk is deprecated; use "
+            "qis.RiskModel.compute_tre_decomposition_at_date or "
+            "qis.RiskModel.compute_marginal_tre_at_date",
+            DeprecationWarning,
+            stacklevel=2)
         if self.x_covars is None:
             raise ValueError(f"self.x_covars must be provided")
         if self.residual_vars is None:

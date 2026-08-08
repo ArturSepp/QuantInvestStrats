@@ -16,6 +16,7 @@ covariance carries. The factor-structured version through time is ``factor_model
 """
 import numpy as np
 import pandas as pd
+from enum import Enum
 from typing import Union, Tuple
 
 
@@ -164,8 +165,20 @@ def calculate_active_risk_squared(portfolio_weights: np.ndarray,
     return systematic_risk_sq + idiosyncratic_risk_sq
 
 
-def demo_marginal_active_risk():
-    """Comprehensive demo of marginal active risk calculation."""
+class LocalTest(Enum):
+    """Enumeration of available local diagnostic cases."""
+
+    MARGINAL_ACTIVE_RISK = 1
+
+
+def run_local_test(local_test: LocalTest) -> None:
+    """Run one print-driven local diagnostic.
+
+    Args:
+        local_test: Diagnostic case to run.
+    """
+    if local_test != LocalTest.MARGINAL_ACTIVE_RISK:
+        return
 
     pd.set_option('display.max_rows', 500)
     pd.set_option('display.max_columns', 500)
@@ -374,6 +387,6 @@ def demo_marginal_active_risk():
     print(f"• Risk decomposition verified: {np.isclose(total_risk_contrib, total_active_risk_sq)}")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 
-    demo_marginal_active_risk()
+    run_local_test(local_test=LocalTest.MARGINAL_ACTIVE_RISK)
