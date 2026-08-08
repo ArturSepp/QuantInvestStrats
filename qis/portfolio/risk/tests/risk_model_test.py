@@ -345,7 +345,10 @@ def test_mpd_tracking_error_characterisation_goldens_and_risk_model_parity() -> 
          0.044379020046626944, 0.046352374699966455],
         index=covar_dates.rename(None),
         name='Tracking error')
-    pd.testing.assert_series_equal(legacy_total, expected_total, rtol=1e-15, atol=0.0)
+    # rtol=1e-12, not 1e-15: the golden literals were produced on one machine, and the last
+    # bits of the covariance products are BLAS/pandas-build dependent (observed 1.5e-15
+    # relative drift on a different build, with legacy and delegated still agreeing to 0.0).
+    pd.testing.assert_series_equal(legacy_total, expected_total, rtol=1e-12, atol=0.0)
     actual_total = model.compute_tre_history(
         benchmark_weights=benchmark_weights,
         portfolio_weights=strategy_weights,
@@ -369,13 +372,50 @@ def test_mpd_tracking_error_characterisation_goldens_and_risk_model_parity() -> 
         ],
         index=covar_dates.rename(None),
         columns=['Total', 'Equities', 'Bonds', 'Commodities', 'Alternatives'])
-    pd.testing.assert_frame_equal(legacy_groups, expected_groups, rtol=1e-15, atol=0.0)
+    pd.testing.assert_frame_equal(legacy_groups, expected_groups, rtol=1e-12, atol=0.0)
     actual_groups = model.compute_tre_history(
         benchmark_weights=benchmark_weights,
         portfolio_weights=strategy_weights,
         group_data=universe.group_data,
         strict=False)
     pd.testing.assert_frame_equal(actual_groups, legacy_groups, rtol=1e-12, atol=0.0)
+
+
+def test_mpd_delegation_uses_asof_weights_for_off_grid_weight_dates() -> None:
+    # Behaviour change vs qis 5.6.x, intended. The legacy implementation reindexed the
+    # weight history to the exact covar dates before ffill, so weight rows dated off the
+    # covar grid were dropped entirely: this setup returned 0.0 tracking error on every
+    # date under the 5.6.1 implementation (verified against the released code). The
+    # delegated as-of selection uses the latest weights known at each covar date.
+    rng = np.random.default_rng(20260808)
+    dates = pd.bdate_range('2024-01-01', '2024-03-29')
+    prices = pd.DataFrame(
+        100.0 * np.exp(np.cumsum(0.01 * rng.standard_normal((len(dates), 3)), axis=0)),
+        index=dates,
+        columns=ASSETS)
+    covar_dates = dates[[20, 40, 60]]
+    covar_dict = {date: _covar(scale)
+                  for date, scale in zip(covar_dates, [1.0, 1.1, 0.9])}
+    weight_dates = covar_dates[[0, 1]] + pd.offsets.BDay(1)  # off the covar grid
+    strategy_weights = pd.DataFrame(
+        [[0.5, 0.3, 0.2], [0.6, 0.2, 0.2]], index=weight_dates, columns=ASSETS)
+    benchmark_weights = pd.DataFrame(
+        [[0.4, 0.4, 0.2], [0.4, 0.4, 0.2]], index=weight_dates, columns=ASSETS)
+    strategy = backtest_model_portfolio(
+        prices=prices, weights=strategy_weights, ticker='Off-grid strategy')
+    benchmark = backtest_model_portfolio(
+        prices=prices, weights=benchmark_weights, ticker='Off-grid benchmark')
+
+    actual = MultiPortfolioData(
+        portfolio_datas=[strategy, benchmark],
+        covar_dict=covar_dict).compute_tracking_error_implied_by_covar()
+    expected = RiskModel(covar=covar_dict).compute_tre_history(
+        benchmark_weights=benchmark_weights,
+        portfolio_weights=strategy_weights,
+        strict=False)
+    pd.testing.assert_series_equal(actual, expected, rtol=1e-12, atol=0.0)
+    assert actual.iloc[0] == 0.0  # before the first weight observation
+    assert bool((actual.iloc[1:] > 0.0).all())  # the 5.6.1 implementation reported 0.0 here
 
 
 def test_exposures_match_literal_assets_by_factors_hand_calculation() -> None:

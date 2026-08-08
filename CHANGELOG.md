@@ -9,6 +9,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [5.7.0] - 2026-08-08
 
+**One behaviour change.** `MultiPortfolioData.compute_tracking_error_implied_by_covar` now
+selects weights as-of each covariance date. Callers whose weight dates all lie on the
+covariance date grid see identical numbers (characterisation-tested against 5.6.x output).
+Callers with weight dates off that grid previously received zero tracking error on every
+date — the exact-date reindex silently dropped every off-grid weight row — and now receive
+the tracking error implied by the latest weights known at each covariance date.
+
 ### Added
 - `qis.RiskModel`, a point-in-time covariance risk layer for ex-ante tracking error,
   standalone group tracking error, factor exposures, benchmark beta and loadings,
@@ -17,7 +24,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 - `MultiPortfolioData.compute_tracking_error_implied_by_covar` now delegates internally to
-  `RiskModel` with legacy non-strict alignment; numbers are unchanged.
+  `RiskModel` with legacy non-strict alignment. Numbers are unchanged for weight dates on
+  the covariance grid; off-grid weight dates follow the behaviour note above.
 
 ## [5.6.2] - 2026-08-08
 
