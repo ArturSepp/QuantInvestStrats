@@ -1,0 +1,212 @@
+"""Policy and validation tests for the point-in-time risk model."""
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from qis.portfolio.risk.risk_model import RiskModel, UNASSIGNED_GROUP, WEIGHT_TOL
+
+
+DATE_1 = pd.Timestamp('2024-01-02')
+DATE_2 = pd.Timestamp('2024-01-04')
+DATE_3 = pd.Timestamp('2024-01-08')
+ASSETS = pd.Index(['A', 'B', 'C'])
+FACTORS = pd.Index(['Market', 'Rates'])
+
+
+def _covar(scale: float = 1.0) -> pd.DataFrame:
+    values = scale * np.array([
+        [0.040, 0.006, -0.002],
+        [0.006, 0.025, 0.004],
+        [-0.002, 0.004, 0.016],
+    ])
+    return pd.DataFrame(values, index=ASSETS, columns=ASSETS)
+
+
+def _loadings() -> pd.DataFrame:
+    return pd.DataFrame([
+        [1.0, 0.1],
+        [0.8, -0.2],
+        [0.2, 1.1],
+    ], index=ASSETS, columns=FACTORS)
+
+
+def _factor_covar() -> pd.DataFrame:
+    return pd.DataFrame([[0.03, 0.002], [0.002, 0.01]],
+                        index=FACTORS, columns=FACTORS)
+
+
+def _residual_vars() -> pd.Series:
+    return pd.Series([0.01, 0.008, 0.006], index=ASSETS)
+
+
+def _model() -> RiskModel:
+    return RiskModel(covar={DATE_1: _covar(), DATE_2: _covar(1.1), DATE_3: _covar(0.9)})
+
+
+def _factor_model() -> RiskModel:
+    dates = (DATE_1, DATE_2, DATE_3)
+    return RiskModel(
+        covar={date: _covar() for date in dates},
+        factor_loadings={date: _loadings() for date in dates},
+        factor_covar={date: _factor_covar() for date in dates},
+        residual_vars={date: _residual_vars() for date in dates})
+
+
+def test_missing_and_nan_weights_are_zero_on_covar_universe() -> None:
+    model = _model()
+    actual = model._align_weights(
+        weights=pd.Series({'A': 0.7, 'B': np.nan}),
+        date=DATE_1,
+        role='portfolio_weights')
+    expected = pd.Series([0.7, 0.0, 0.0], index=ASSETS)
+    pd.testing.assert_series_equal(actual, expected)
+
+
+def test_extra_material_weight_raises_with_ticker_and_weight() -> None:
+    model = _model()
+    with pytest.raises(ValueError, match=r"portfolio_weights.*OUTSIDE.*0.25"):
+        model._align_weights(
+            weights=pd.Series({'A': 0.75, 'OUTSIDE': 0.25}),
+            date=DATE_1,
+            role='portfolio_weights')
+
+
+@pytest.mark.parametrize('extra_weight', [0.0, WEIGHT_TOL, np.nan])
+def test_extra_zero_tolerance_or_nan_weight_is_dropped(extra_weight: float) -> None:
+    model = _model()
+    actual = model._align_weights(
+        weights=pd.Series({'A': 1.0, 'OUTSIDE': extra_weight}),
+        date=DATE_1,
+        role='portfolio_weights')
+    expected = pd.Series([1.0, 0.0, 0.0], index=ASSETS)
+    pd.testing.assert_series_equal(actual, expected)
+
+
+def test_strict_false_silently_drops_extra_material_weight() -> None:
+    model = _model()
+    actual = model._align_weights(
+        weights=pd.Series({'A': 0.75, 'OUTSIDE': 0.25}),
+        date=DATE_1,
+        role='portfolio_weights',
+        strict=False)
+    expected = pd.Series([0.75, 0.0, 0.0], index=ASSETS)
+    pd.testing.assert_series_equal(actual, expected)
+
+
+def test_nan_covar_raises_with_date_and_field() -> None:
+    covar = _covar()
+    covar.loc['A', 'B'] = np.nan
+    with pytest.raises(ValueError, match=r"covar\[2024-01-02.*non-finite"):
+        RiskModel(covar={DATE_1: covar})
+
+
+def test_off_grid_date_names_nearest_earlier_grid_date() -> None:
+    with pytest.raises(KeyError, match=r"2024-01-03.*2024-01-02"):
+        _model()._covar_at_date(pd.Timestamp('2024-01-03'))
+
+
+def test_off_grid_date_before_grid_says_no_earlier_date() -> None:
+    with pytest.raises(KeyError, match=r"2023-12-31.*none"):
+        _model()._covar_at_date(pd.Timestamp('2023-12-31'))
+
+
+def test_history_uses_asof_ffill_and_leading_zero_without_lookahead() -> None:
+    weights = pd.DataFrame(
+        [[0.2, 0.8], [0.6, 0.4]],
+        index=[pd.Timestamp('2024-01-03'), pd.Timestamp('2024-01-05')],
+        columns=['A', 'B'])
+    actual = _model()._aligned_weight_history(weights, role='portfolio_weights')
+    expected = pd.DataFrame(
+        [[0.0, 0.0, 0.0], [0.2, 0.8, 0.0], [0.6, 0.4, 0.0]],
+        index=pd.DatetimeIndex([DATE_1, DATE_2, DATE_3]),
+        columns=ASSETS)
+    pd.testing.assert_frame_equal(actual, expected)
+
+
+def test_group_alignment_exposes_missing_labels_as_unassigned() -> None:
+    groups = pd.Series({'A': 'Equity', 'C': np.nan, 'OUTSIDE': 'Ignored'})
+    actual = _model()._align_groups(group_data=groups, date=DATE_1)
+    expected = pd.Series(['Equity', UNASSIGNED_GROUP, UNASSIGNED_GROUP], index=ASSETS)
+    pd.testing.assert_series_equal(actual, expected)
+
+
+def test_factor_loading_asset_mismatch_names_date_and_tickers() -> None:
+    loadings = _loadings().drop(index='C')
+    loadings.loc['OUTSIDE'] = [0.3, 0.4]
+    with pytest.raises(ValueError, match=r"2024-01-02.*missing \['C'\].*OUTSIDE"):
+        RiskModel(covar={DATE_1: _covar()}, factor_loadings={DATE_1: loadings})
+
+
+def test_factor_covar_factor_mismatch_names_date_and_tickers() -> None:
+    factor_covar = _factor_covar().rename(index={'Rates': 'Credit'},
+                                          columns={'Rates': 'Credit'})
+    with pytest.raises(ValueError, match=r"2024-01-02.*Rates.*Credit"):
+        RiskModel(
+            covar={DATE_1: _covar()},
+            factor_loadings={DATE_1: _loadings()},
+            factor_covar={DATE_1: factor_covar},
+            residual_vars={DATE_1: _residual_vars()})
+
+
+def test_residual_variance_asset_mismatch_names_date_and_tickers() -> None:
+    residual_vars = _residual_vars().drop(index='C')
+    residual_vars.loc['OUTSIDE'] = 0.01
+    with pytest.raises(ValueError, match=r"2024-01-02.*missing \['C'\].*OUTSIDE"):
+        RiskModel(
+            covar={DATE_1: _covar()},
+            factor_loadings={DATE_1: _loadings()},
+            factor_covar={DATE_1: _factor_covar()},
+            residual_vars={DATE_1: residual_vars})
+
+
+def test_factor_date_grid_mismatch_names_missing_date() -> None:
+    with pytest.raises(ValueError, match=r"factor_loadings.*2024-01-04"):
+        RiskModel(
+            covar={DATE_1: _covar(), DATE_2: _covar()},
+            factor_loadings={DATE_1: _loadings()})
+
+
+def test_factor_covar_without_loadings_names_missing_field() -> None:
+    with pytest.raises(ValueError, match="factor_loadings"):
+        RiskModel(
+            covar={DATE_1: _covar()},
+            factor_covar={DATE_1: _factor_covar()},
+            residual_vars={DATE_1: _residual_vars()})
+
+
+def test_partial_factor_block_names_residual_vars() -> None:
+    with pytest.raises(ValueError, match="residual_vars"):
+        RiskModel(
+            covar={DATE_1: _covar()},
+            factor_loadings={DATE_1: _loadings()},
+            factor_covar={DATE_1: _factor_covar()})
+
+
+def test_covariance_validation_rejects_asymmetry_at_stated_tolerance() -> None:
+    covar = _covar()
+    covar.loc['A', 'B'] += 1e-8
+    with pytest.raises(ValueError, match=r"not symmetric within 1e-12"):
+        RiskModel(covar={DATE_1: covar})
+
+
+def test_covariance_only_model_names_factor_loadings_when_required() -> None:
+    with pytest.raises(ValueError, match="factor_loadings"):
+        _model()._require_factor_loadings()
+
+
+def test_loadings_only_model_names_factor_covar_when_block_required() -> None:
+    model = RiskModel(covar={DATE_1: _covar()},
+                      factor_loadings={DATE_1: _loadings()})
+    with pytest.raises(ValueError, match="factor_covar"):
+        model._require_factor_block()
+
+
+def test_complete_factor_block_is_normalised_to_covar_and_factor_order() -> None:
+    model = _factor_model()
+    assert model.factor_loadings is not None
+    assert model.factor_covar is not None
+    assert model.residual_vars is not None
+    assert model.factor_loadings[DATE_1].index.equals(ASSETS)
+    assert model.factor_covar[DATE_1].index.equals(FACTORS)
+    assert model.residual_vars[DATE_1].index.equals(ASSETS)
