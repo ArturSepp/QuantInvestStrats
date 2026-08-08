@@ -24,6 +24,7 @@ import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.risk.factor_model import LinearModel
+from qis.portfolio.risk.risk_model import RiskModel
 from qis.portfolio.reports.config import PERF_PARAMS
 from qis.plots.utils import get_n_sns_colors
 from qis.utils.df_str import idx_to_alphabet
@@ -39,6 +40,7 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                               turnover_groups: pd.Series = None,
                                               turnover_order: List[str] = None,
                                               risk_model: LinearModel = None,
+                                              covar_risk_model: Optional[RiskModel] = None,
                                               time_period: TimePeriod = None,
                                               perf_params: PerfParams = PERF_PARAMS,
                                               regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
@@ -49,14 +51,48 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                               add_titles: bool = True,
                                               **kwargs
                                               ) -> Tuple[Dict[str, plt.Figure], Dict[str, pd.DataFrame]]:
-    """
-    weights and tracking error report relative to benchnmark using ac and sub_as groups
+    """Build weights and tracking-error panels for a strategy and benchmark.
+
+    ``risk_model`` and ``covar_risk_model`` are deliberately distinct. The former is the
+    returns-based ``LinearModel`` used by the legacy factor-attribution panels. The latter is
+    the weights-and-covariance ``RiskModel`` used for ex-ante tracking error, factor exposures,
+    and systematic/residual tracking-error decomposition.
+
+    Args:
+        multi_portfolio_data: Strategy and benchmark portfolios with shared report data.
+        strategy_idx: Index of the strategy portfolio.
+        benchmark_idx: Index of the benchmark portfolio.
+        ac_group_data: Asset-class label per instrument.
+        ac_group_order: Asset-class display order.
+        sub_ac_group_data: Sub-asset-class label per instrument.
+        sub_ac_group_order: Sub-asset-class display order.
+        turnover_groups: Group labels used only by the turnover panels.
+        turnover_order: Turnover-group display order.
+        risk_model: Optional returns-based ``LinearModel`` for legacy attribution panels.
+        covar_risk_model: Optional weights-and-covariance ``RiskModel``. Its covariance is used
+            when ``multi_portfolio_data.covar_dict`` is absent; a complete factor block adds
+            tracking-error decomposition and strategy factor-exposure panels.
+        time_period: Optional reporting period.
+        perf_params: Performance-statistic configuration.
+        regime_classifier: Regime definition used for plot backgrounds.
+        add_benchmarks_to_navs: Whether to include benchmark NAVs in the performance panel.
+        tre_max_clip: Optional upper clip for grouped tracking-error lines.
+        figsize: Figure size for each panel.
+        var_format: Weight and contribution formatting string.
+        add_titles: Whether to draw panel titles.
+        **kwargs: Additional plotting arguments.
+
+    Returns:
+        Figure and DataFrame dictionaries keyed by panel name.
     """
     regime_benchmark = multi_portfolio_data.benchmark_prices.columns[0]
     benchmark_price = multi_portfolio_data.benchmark_prices[regime_benchmark]
 
     figs: Dict[str, plt.Figure] = {}
     dfs: Dict[str, pd.DataFrame] = {}
+    report_covar_dict = multi_portfolio_data.covar_dict
+    if report_covar_dict is None and covar_risk_model is not None:
+        report_covar_dict = covar_risk_model.covar
 
     with (sns.axes_style('darkgrid')):
         # navs + ra table
@@ -151,9 +187,9 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                      **kwargs)
         # portfolio vol
         strategy_ex_anti_vol = strategy_data.compute_ex_anti_portfolio_vol_implied_by_covar(
-            covar_dict=multi_portfolio_data.covar_dict)
+            covar_dict=report_covar_dict)
         benchmark_ex_anti_vol = benchmark_data.compute_ex_anti_portfolio_vol_implied_by_covar(
-            covar_dict=multi_portfolio_data.covar_dict)
+            covar_dict=report_covar_dict)
 
         ex_anti_vols = pd.concat([strategy_ex_anti_vol, benchmark_ex_anti_vol], axis=1, sort=True)
         dfs['ex_anti_vols'] = ex_anti_vols
@@ -170,7 +206,8 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                     index=ex_anti_vols.index, regime_classifier=regime_classifier)
 
         # risk contributions
-        rc_kwargs = dict(covar_dict=multi_portfolio_data.covar_dict, freq='QE', normalise=True, time_period=time_period)
+        rc_kwargs = dict(covar_dict=report_covar_dict, freq='QE', normalise=True,
+                         time_period=time_period)
         strategy_risk_contributions_ac = strategy_data.compute_risk_contributions_implied_by_covar(
             group_data=ac_group_data,
             group_order=ac_group_order,
@@ -297,14 +334,39 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
             title = 'Tracking Error'
         else:
             title = None
-        multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
-                                                  benchmark_idx=benchmark_idx,
-                                                  regime_benchmark=regime_benchmark,
-                                                  regime_classifier=regime_classifier,
-                                                  title=title,
-                                                  ax=ax,
-                                                  time_period=time_period,
-                                                  **kwargs)
+        use_covar_risk_model = (
+            multi_portfolio_data.covar_dict is None and covar_risk_model is not None)
+        if use_covar_risk_model:
+            strategy_input_weights = strategy_data.get_weights(freq=None, is_input_weights=True)
+            benchmark_input_weights = benchmark_data.get_weights(freq=None, is_input_weights=True)
+            total_tre = covar_risk_model.compute_tre_history(
+                benchmark_weights=benchmark_input_weights,
+                portfolio_weights=strategy_input_weights,
+                strict=False)
+            if time_period is not None:
+                total_tre = time_period.locate(total_tre)
+            qis.plot_time_series(df=total_tre,
+                                 var_format='{:.2%}',
+                                 legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                                 title=title,
+                                 y_limits=(0.0, None),
+                                 ax=ax,
+                                 **kwargs)
+            if regime_benchmark is not None:
+                multi_portfolio_data.add_regime_shadows(
+                    ax=ax,
+                    regime_benchmark=regime_benchmark,
+                    index=total_tre.index,
+                    regime_classifier=regime_classifier)
+        else:
+            multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
+                                                      benchmark_idx=benchmark_idx,
+                                                      regime_benchmark=regime_benchmark,
+                                                      regime_classifier=regime_classifier,
+                                                      title=title,
+                                                      ax=ax,
+                                                      time_period=time_period,
+                                                      **kwargs)
 
         # group tracking error
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
@@ -313,24 +375,54 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
             title = 'Asset Class Tracking Error'
         else:
             title = None
-        multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
-                                                  benchmark_idx=benchmark_idx,
-                                                  is_grouped=True,
-                                                  group_data=ac_group_data,
-                                                  group_order=ac_group_order,
-                                                  regime_benchmark=regime_benchmark,
-                                                  regime_classifier=regime_classifier,
-                                                  tre_max_clip=tre_max_clip,
-                                                  title=title,
-                                                  ax=ax,
-                                                  time_period=time_period,
-                                                  **kwargs)
-        dfs['ac_tracking_error'] = multi_portfolio_data.compute_tracking_error_implied_by_covar(strategy_idx=strategy_idx,
-                                                                                                benchmark_idx=benchmark_idx,
-                                                                                                is_grouped=True,
-                                                                                                group_data=ac_group_data,
-                                                                                                group_order=ac_group_order,
-                                                                                                total_column='Total')
+        if use_covar_risk_model:
+            grouped_tre = covar_risk_model.compute_tre_history(
+                benchmark_weights=benchmark_input_weights,
+                portfolio_weights=strategy_input_weights,
+                group_data=ac_group_data,
+                total_column='Total',
+                strict=False)
+            if tre_max_clip is not None:
+                group_columns = grouped_tre.columns.drop('Total', errors='ignore')
+                grouped_tre[group_columns] = grouped_tre[group_columns].clip(upper=tre_max_clip)
+            grouped_tre_to_plot = grouped_tre
+            if time_period is not None:
+                grouped_tre_to_plot = time_period.locate(grouped_tre_to_plot)
+            qis.plot_time_series(df=grouped_tre_to_plot,
+                                 var_format='{:.2%}',
+                                 legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+                                 title=title,
+                                 y_limits=(0.0, None),
+                                 ax=ax,
+                                 **kwargs)
+            if regime_benchmark is not None:
+                multi_portfolio_data.add_regime_shadows(
+                    ax=ax,
+                    regime_benchmark=regime_benchmark,
+                    index=grouped_tre_to_plot.index,
+                    regime_classifier=regime_classifier)
+            dfs['ac_tracking_error'] = grouped_tre
+        else:
+            multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
+                                                      benchmark_idx=benchmark_idx,
+                                                      is_grouped=True,
+                                                      group_data=ac_group_data,
+                                                      group_order=ac_group_order,
+                                                      regime_benchmark=regime_benchmark,
+                                                      regime_classifier=regime_classifier,
+                                                      tre_max_clip=tre_max_clip,
+                                                      title=title,
+                                                      ax=ax,
+                                                      time_period=time_period,
+                                                      **kwargs)
+            dfs['ac_tracking_error'] = (
+                multi_portfolio_data.compute_tracking_error_implied_by_covar(
+                    strategy_idx=strategy_idx,
+                    benchmark_idx=benchmark_idx,
+                    is_grouped=True,
+                    group_data=ac_group_data,
+                    group_order=ac_group_order,
+                    total_column='Total'))
 
         # turnover
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
@@ -386,6 +478,40 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                    ax=axs[idx])
             #if not add_titles:
             #    ax.title.set_visible(False)
+
+        # outputs with the weights-and-covariance risk model
+        has_complete_factor_block = (
+            covar_risk_model is not None
+            and covar_risk_model.factor_loadings is not None
+            and covar_risk_model.factor_covar is not None
+            and covar_risk_model.residual_vars is not None)
+        if has_complete_factor_block:
+            strategy_input_weights = strategy_data.get_weights(freq=None, is_input_weights=True)
+            benchmark_input_weights = benchmark_data.get_weights(freq=None, is_input_weights=True)
+            tre_decomposition = covar_risk_model.compute_tre_decomposition_history(
+                benchmark_weights=benchmark_input_weights,
+                portfolio_weights=strategy_input_weights,
+                strict=False)
+            factor_exposures = covar_risk_model.compute_exposures_history(
+                portfolio_weights=strategy_input_weights,
+                strict=False)
+
+            dfs['tre_decomposition'] = tre_decomposition
+            fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+            figs['tre_decomposition'] = fig
+            qis.plot_time_series(df=tre_decomposition,
+                                 title='Tracking Error Decomposition' if add_titles else None,
+                                 var_format='{:.2%}',
+                                 ax=ax)
+
+            dfs['factor_exposures'] = factor_exposures
+            fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+            figs['factor_exposures'] = fig
+            qis.plot_time_series(df=factor_exposures,
+                                 title=(f'{strategy_ticker} Factor Exposures'
+                                        if add_titles else None),
+                                 var_format='{:,.2f}',
+                                 ax=ax)
 
         # outputs with risk model
         if risk_model is not None:
