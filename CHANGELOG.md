@@ -7,6 +7,18 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.7.0] - 2026-08-08
+
+### Added
+- `qis.RiskModel`, a point-in-time covariance risk layer for ex-ante tracking error,
+  standalone group tracking error, factor exposures, benchmark beta and loadings,
+  systematic/residual TE decomposition, and Euler marginal TE contributions.
+- `qis.WEIGHT_TOL`, the documented tolerance used by strict risk-universe alignment.
+
+### Changed
+- `MultiPortfolioData.compute_tracking_error_implied_by_covar` now delegates internally to
+  `RiskModel` with legacy non-strict alignment; numbers are unchanged.
+
 ## [5.6.2] - 2026-08-08
 
 ### Changed

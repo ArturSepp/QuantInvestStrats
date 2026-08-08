@@ -128,8 +128,8 @@ logic: it converts target weights to units at each rebalancing, holds those unit
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
 one of the few loops here that cannot be vectorised.
 
-The public interface is `qis.__all__`, which holds 405 names; `qis/api.py` records that list as a
-literal together with a documented core of 117 symbols grouped by capability, and the suite fails
+The public interface is `qis.__all__`, which holds 407 names; `qis/api.py` records that list as a
+literal together with a documented core of 118 symbols grouped by capability, and the suite fails
 when either record disagrees with the namespace.
 
 Properties are enforced by tests rather than by convention: every exported plotting function draws a

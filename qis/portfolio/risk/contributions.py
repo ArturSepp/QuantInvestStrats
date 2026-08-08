@@ -64,6 +64,9 @@ def compute_benchmark_portfolio_risk_contributions(w_portfolio: Union[np.ndarray
     Returns:
         Risk contributions of active positions (portfolio - benchmark).
 
+        This is the legacy sigma-benchmark normalisation; use
+        ``RiskModel.compute_marginal_tre_at_date`` for Euler contributions that sum to TE.
+
     Raises:
         ValueError: If input types are not compatible.
         AssertionError: If dimensions don't match for numpy arrays.
