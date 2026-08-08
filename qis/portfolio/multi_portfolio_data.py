@@ -52,6 +52,7 @@ import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.drawdowns as cdr
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
+from qis.portfolio.risk.risk_model import RiskModel
 from qis.utils.struct_ops import merge_lists_unique
 
 
@@ -241,45 +242,34 @@ class MultiPortfolioData:
         """
         compute Ex ante  tracking error =
         (strategy_weights - strategy_weights) @ covar @ (strategy_weights - strategy_weights).T
+
+        Delegates the computation to ``qis.portfolio.risk.risk_model.RiskModel``.
         """
         if self.covar_dict is None:
             raise ValueError(f"must pass covar_dict")
         strategy_weights = self.portfolio_datas[strategy_idx].get_weights(freq=None, is_input_weights=True)
         benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(freq=None, is_input_weights=True)
-        covar_index = list(self.covar_dict.keys())
-        investable_assets = self.covar_dict[covar_index[0]].columns.to_list()
-        strategy_weights = strategy_weights.reindex(index=covar_index, columns=investable_assets).ffill().fillna(0.0)
-        benchmark_weights = benchmark_weights.reindex(index=covar_index, columns=investable_assets).ffill().fillna(0.0)
-
-        weight_diffs = benchmark_weights - strategy_weights
+        risk_model = RiskModel(covar=self.covar_dict)
         if not is_grouped:
-            tracking_error = {}
-            for date, pd_covar in self.covar_dict.items():
-                w = weight_diffs.loc[date]
-                tracking_error[date] = np.sqrt(w @ pd_covar @ w.T)
-            tracking_error = pd.Series(tracking_error, name='Tracking error')
-        else:
-            if group_data is None:
-                group_data = self.portfolio_datas[strategy_idx].group_data
-            if group_order is None:
-                group_order = self.portfolio_datas[strategy_idx].group_order
-            group_dict = dfg.get_group_dict(group_data=group_data,
-                                            group_order=group_order,
-                                            total_column=total_column)
-            tracking_error = {key: {} for key in group_dict.keys()}
-            for date, pd_covar in self.covar_dict.items():
-                w = weight_diffs.loc[date]
-                for key, tickers in group_dict.items():
-                    w_g = w.loc[tickers]
-                    pd_covar_g = pd_covar.loc[tickers, tickers]
-                    tracking_error[key][date] = np.sqrt(w_g @ pd_covar_g @ w_g.T)
-            # merge
-            tracking_error_pd = {}
-            for key in group_dict.keys():
-                tracking_error_pd[key] = pd.Series(tracking_error[key], name=key)
-            tracking_error = pd.DataFrame.from_dict(tracking_error_pd, orient='columns')
+            return risk_model.compute_tre_history(
+                benchmark_weights=benchmark_weights,
+                portfolio_weights=strategy_weights,
+                strict=False)
 
-        return tracking_error
+        if group_data is None:
+            group_data = self.portfolio_datas[strategy_idx].group_data
+        if group_order is None:
+            group_order = self.portfolio_datas[strategy_idx].group_order
+        group_dict = dfg.get_group_dict(group_data=group_data,
+                                        group_order=group_order,
+                                        total_column=total_column)
+        tracking_error = risk_model.compute_tre_history(
+            benchmark_weights=benchmark_weights,
+            portfolio_weights=strategy_weights,
+            group_data=group_data,
+            total_column=total_column or 'Total',
+            strict=False)
+        return tracking_error.reindex(columns=list(group_dict), fill_value=0.0)
 
     def compute_tracking_error_table(self,
                                      strategy_idx: int = 0,
