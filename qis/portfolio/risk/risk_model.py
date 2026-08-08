@@ -641,6 +641,189 @@ class RiskModel:
         self._validate_benchmark_variance(benchmark_variance)
         return (covar @ benchmark) / benchmark_variance
 
+    def compute_tre_decomposition_at_date(self,
+                                          benchmark_weights: pd.Series,
+                                          portfolio_weights: pd.Series,
+                                          date: pd.Timestamp,
+                                          strict: bool = True,
+                                          ) -> pd.Series:
+        """Decompose tracking error into factor and residual components.
+
+        For active weights ``d = w_p - w_b``, asset-by-factor loadings ``B``,
+        factor covariance ``Sigma_x``, and diagonal residual variance ``D``,
+        the components are ``TE_f^2 = (B' d)' Sigma_x (B' d)`` and
+        ``TE_r^2 = d' D d``. The returned tracking error is
+        ``sqrt(TE_f^2 + TE_r^2)``. It equals covariance tracking error only
+        when the supplied covariance satisfies ``Sigma = B Sigma_x B' + D``;
+        inconsistent views are not reconciled silently.
+
+        Args:
+            benchmark_weights: Benchmark weights indexed by asset.
+            portfolio_weights: Portfolio weights indexed by asset.
+            date: Exact covariance-grid date.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            Series with ``tracking_error``, ``factor_te``, and ``residual_te``.
+
+        Raises:
+            KeyError: If ``date`` is not an exact covariance-grid date.
+            ValueError: If the factor block is missing or weights violate the
+                alignment policy.
+        """
+        self._require_factor_block()
+        assert self.factor_loadings is not None
+        assert self.factor_covar is not None
+        assert self.residual_vars is not None
+        benchmark = self._align_weights(
+            weights=benchmark_weights,
+            date=date,
+            role='benchmark_weights',
+            strict=strict)
+        portfolio = self._align_weights(
+            weights=portfolio_weights,
+            date=date,
+            role='portfolio_weights',
+            strict=strict)
+        date = pd.Timestamp(date)
+        active_weights = portfolio - benchmark
+        factor_exposures = self.factor_loadings[date].T @ active_weights
+        factor_variance = float(
+            factor_exposures @ self.factor_covar[date] @ factor_exposures)
+        residual_variance = float(
+            active_weights.pow(2.0) @ self.residual_vars[date])
+        return pd.Series({
+            'tracking_error': np.sqrt(factor_variance + residual_variance),
+            'factor_te': np.sqrt(factor_variance),
+            'residual_te': np.sqrt(residual_variance),
+        }, dtype=float)
+
+    def compute_tre_decomposition_history(self,
+                                          benchmark_weights: WeightInput,
+                                          portfolio_weights: WeightInput,
+                                          strict: bool = True,
+                                          ) -> pd.DataFrame:
+        """Compute factor/residual tracking-error decomposition through time.
+
+        Dated weights are selected as-of each covariance date using forward
+        fill. Each row uses the factor-block formulas documented by
+        :meth:`compute_tre_decomposition_at_date`; no annualisation is applied.
+
+        Args:
+            benchmark_weights: Static Series or dated DataFrame of benchmark weights.
+            portfolio_weights: Static Series or dated DataFrame of portfolio weights.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            DataFrame with ``tracking_error``, ``factor_te``, and ``residual_te`` columns.
+
+        Raises:
+            ValueError: If the factor block is missing or weights violate the
+                alignment policy.
+        """
+        self._require_factor_block()
+        benchmark_history = self._aligned_weight_history(
+            weights=benchmark_weights,
+            role='benchmark_weights',
+            strict=strict)
+        portfolio_history = self._aligned_weight_history(
+            weights=portfolio_weights,
+            role='portfolio_weights',
+            strict=strict)
+        results = {
+            date: self.compute_tre_decomposition_at_date(
+                benchmark_weights=benchmark_history.loc[date],
+                portfolio_weights=portfolio_history.loc[date],
+                date=date,
+                strict=strict)
+            for date in self.dates
+        }
+        return pd.DataFrame.from_dict(results, orient='index')
+
+    def compute_marginal_tre_at_date(self,
+                                     benchmark_weights: pd.Series,
+                                     portfolio_weights: pd.Series,
+                                     date: pd.Timestamp,
+                                     group_data: Optional[pd.Series] = None,
+                                     strict: bool = True,
+                                     ) -> pd.DataFrame:
+        """Compute canonical Euler marginal tracking-error contributions.
+
+        With active weights ``d = w_p - w_b`` and
+        ``TE = sqrt(d' Sigma d)``, each asset contribution is
+        ``mcte_i = d_i (Sigma d)_i / TE`` and the contributions sum to TE.
+        At TE equal to zero, all contributions are defined as zero.
+
+        When a complete factor block is present, systematic and residual
+        columns use ``B Sigma_x B' d`` and ``D d`` respectively. They sum to
+        total per asset when ``Sigma = B Sigma_x B' + D``; inconsistent
+        supplied views are shown without silent reconciliation. Group rows
+        aggregate asset contributions additively and therefore differ from
+        the standalone, non-additive group risks returned by ``compute_tre_*``.
+
+        Args:
+            benchmark_weights: Benchmark weights indexed by asset.
+            portfolio_weights: Portfolio weights indexed by asset.
+            date: Exact covariance-grid date.
+            group_data: Optional group label per asset. Missing labels become
+                ``'Unassigned'``.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            Per-asset DataFrame, or a DataFrame with ``Total`` and group rows.
+            Column ``mcte`` is always present; a complete factor block adds
+            ``mcte_systematic`` and ``mcte_residual``.
+
+        Raises:
+            KeyError: If ``date`` is not an exact covariance-grid date.
+            ValueError: If weights or model data violate the alignment policy.
+        """
+        covar = self._covar_at_date(date)
+        benchmark = self._align_weights(
+            weights=benchmark_weights,
+            date=date,
+            role='benchmark_weights',
+            strict=strict)
+        portfolio = self._align_weights(
+            weights=portfolio_weights,
+            date=date,
+            role='portfolio_weights',
+            strict=strict)
+        active_weights = portfolio - benchmark
+        tracking_error = self._compute_tracking_error(
+            active_weights=active_weights, covar=covar)
+        if tracking_error == 0.0:
+            mcte = pd.Series(0.0, index=covar.index)
+        else:
+            mcte = active_weights * (covar @ active_weights) / tracking_error
+        contributions = pd.DataFrame({'mcte': mcte}, index=covar.index)
+
+        if self.factor_covar is not None and self.residual_vars is not None:
+            self._require_factor_block()
+            assert self.factor_loadings is not None
+            date = pd.Timestamp(date)
+            if tracking_error == 0.0:
+                systematic_mcte = pd.Series(0.0, index=covar.index)
+                residual_mcte = pd.Series(0.0, index=covar.index)
+            else:
+                systematic_gradient = (
+                    self.factor_loadings[date]
+                    @ self.factor_covar[date]
+                    @ (self.factor_loadings[date].T @ active_weights))
+                residual_gradient = self.residual_vars[date] * active_weights
+                systematic_mcte = active_weights * systematic_gradient / tracking_error
+                residual_mcte = active_weights * residual_gradient / tracking_error
+            contributions['mcte_systematic'] = systematic_mcte
+            contributions['mcte_residual'] = residual_mcte
+
+        if group_data is None:
+            return contributions
+        groups = self._align_groups(group_data=group_data, date=date)
+        grouped = {'Total': contributions.sum(axis=0)}
+        for group in pd.unique(groups):
+            grouped[group] = contributions.loc[groups == group].sum(axis=0)
+        return pd.DataFrame.from_dict(grouped, orient='index')
+
     def _require_factor_loadings(self) -> None:
         """Raise when a factor-exposure method lacks its required field."""
         if self.factor_loadings is None:

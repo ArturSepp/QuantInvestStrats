@@ -56,6 +56,32 @@ def _factor_model() -> RiskModel:
         residual_vars={date: _residual_vars() for date in dates})
 
 
+def _consistent_factor_model() -> RiskModel:
+    # Seed 20260808. Covariance is assembled independently as B F B' + D.
+    rng = np.random.default_rng(20260808)
+    assets = pd.Index([f'X{idx}' for idx in range(5)])
+    factors = pd.Index([f'F{idx}' for idx in range(3)])
+    loadings = pd.DataFrame(rng.normal(size=(5, 3)), index=assets, columns=factors)
+    factor_root = rng.normal(size=(3, 3))
+    factor_covar = pd.DataFrame(
+        factor_root @ factor_root.T / 100.0,
+        index=factors,
+        columns=factors)
+    residual_vars = pd.Series(rng.uniform(0.003, 0.012, size=5), index=assets)
+    scales = {DATE_1: 1.0, DATE_2: 1.1, DATE_3: 0.9}
+    factor_covars = {date: factor_covar * scale for date, scale in scales.items()}
+    residuals = {date: residual_vars * scale for date, scale in scales.items()}
+    covars = {
+        date: loadings @ factor_covars[date] @ loadings.T + np.diag(residuals[date])
+        for date in scales
+    }
+    return RiskModel(
+        covar=covars,
+        factor_loadings={date: loadings.copy() for date in scales},
+        factor_covar=factor_covars,
+        residual_vars=residuals)
+
+
 def test_missing_and_nan_weights_are_zero_on_covar_universe() -> None:
     model = _model()
     actual = model._align_weights(
@@ -474,4 +500,118 @@ def test_benchmark_beta_r8_error_names_joint_universe_remedy() -> None:
         _model().compute_benchmark_beta_at_date(
             benchmark_weights=benchmark,
             portfolio_weights=portfolio,
+            date=DATE_1)
+
+
+def test_tre_decomposition_matches_covar_te_for_independently_assembled_model() -> None:
+    model = _consistent_factor_model()
+    assets = model.covar[DATE_1].index
+    benchmark = pd.Series([0.30, 0.25, 0.20, 0.15, 0.10], index=assets)
+    portfolio = pd.Series([0.45, 0.10, 0.35, -0.05, 0.15], index=assets)
+    decomposition = model.compute_tre_decomposition_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1)
+    covar_te = model.compute_tre_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1)
+    np.testing.assert_allclose(
+        decomposition['tracking_error'], covar_te, rtol=1e-12, atol=0.0)
+
+
+def test_tre_decomposition_history_has_contract_columns() -> None:
+    model = _consistent_factor_model()
+    assets = model.covar[DATE_1].index
+    benchmark = pd.Series([0.30, 0.25, 0.20, 0.15, 0.10], index=assets)
+    portfolio = pd.Series([0.45, 0.10, 0.35, -0.05, 0.15], index=assets)
+    actual = model.compute_tre_decomposition_history(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio)
+    assert actual.columns.tolist() == ['tracking_error', 'factor_te', 'residual_te']
+    for date in model.dates:
+        expected = model.compute_tre_at_date(
+            benchmark_weights=benchmark,
+            portfolio_weights=portfolio,
+            date=date)
+        np.testing.assert_allclose(
+            actual.loc[date, 'tracking_error'], expected, rtol=1e-12, atol=0.0)
+
+
+def test_marginal_tre_euler_sum_and_factor_split_on_long_short_weights() -> None:
+    model = _consistent_factor_model()
+    assets = model.covar[DATE_1].index
+    benchmark = pd.Series([0.30, 0.25, 0.20, 0.15, 0.10], index=assets)
+    portfolio = pd.Series([0.55, -0.10, 0.40, -0.05, 0.20], index=assets)
+    actual = model.compute_marginal_tre_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1)
+    tracking_error = model.compute_tre_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1)
+    np.testing.assert_allclose(actual['mcte'].sum(), tracking_error, rtol=1e-12, atol=0.0)
+    np.testing.assert_allclose(
+        actual['mcte_systematic'] + actual['mcte_residual'],
+        actual['mcte'],
+        rtol=1e-12,
+        atol=1e-16)
+
+
+def test_marginal_tre_zero_active_weights_returns_all_zero() -> None:
+    model = _consistent_factor_model()
+    weights = pd.Series([0.30, 0.25, 0.20, 0.15, 0.10],
+                        index=model.covar[DATE_1].index)
+    actual = model.compute_marginal_tre_at_date(
+        benchmark_weights=weights,
+        portfolio_weights=weights,
+        date=DATE_1)
+    assert bool((actual == 0.0).all().all())
+
+
+def test_marginal_tre_groups_are_additive_to_total_with_unassigned_visible() -> None:
+    model = _consistent_factor_model()
+    assets = model.covar[DATE_1].index
+    benchmark = pd.Series([0.30, 0.25, 0.20, 0.15, 0.10], index=assets)
+    portfolio = pd.Series([0.55, -0.10, 0.40, -0.05, 0.20], index=assets)
+    groups = pd.Series(['Group 1', 'Group 1', 'Group 2', 'Group 2'], index=assets[:4])
+    actual = model.compute_marginal_tre_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1,
+        group_data=groups)
+    assert actual.index.tolist() == ['Total', 'Group 1', 'Group 2', UNASSIGNED_GROUP]
+    pd.testing.assert_series_equal(
+        actual.drop(index='Total').sum(axis=0),
+        actual.loc['Total'],
+        rtol=1e-12,
+        atol=1e-16,
+        check_names=False)
+
+
+def test_decomposition_covariance_only_model_names_missing_factor_field() -> None:
+    weights = pd.Series([0.5, 0.3, 0.2], index=ASSETS)
+    with pytest.raises(ValueError, match="factor_loadings"):
+        _model().compute_tre_decomposition_at_date(
+            benchmark_weights=weights,
+            portfolio_weights=weights,
+            date=DATE_1)
+
+
+def test_marginal_tre_covariance_only_model_returns_total_column_only() -> None:
+    benchmark = pd.Series([0.5, 0.3, 0.2], index=ASSETS)
+    portfolio = pd.Series([0.4, 0.4, 0.2], index=ASSETS)
+    actual = _model().compute_marginal_tre_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1)
+    assert actual.columns.tolist() == ['mcte']
+
+
+def test_decomposition_public_method_routes_through_strict_aligner() -> None:
+    with pytest.raises(ValueError, match=r"portfolio_weights.*OUTSIDE"):
+        _consistent_factor_model().compute_tre_decomposition_at_date(
+            benchmark_weights=pd.Series({'X0': 1.0}),
+            portfolio_weights=pd.Series({'X0': 0.8, 'OUTSIDE': 0.2}),
             date=DATE_1)
