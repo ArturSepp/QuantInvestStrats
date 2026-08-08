@@ -303,7 +303,7 @@ def test_tre_public_method_routes_through_strict_aligner() -> None:
             date=DATE_1)
 
 
-def test_tre_history_matches_legacy_mpd_total_and_groups_on_synthetic_panel() -> None:
+def test_mpd_tracking_error_characterisation_goldens_and_risk_model_parity() -> None:
     # Frozen generator seed 20260725; clean paths isolate TE arithmetic from reporting defects.
     universe = generate_synthetic_universe(
         start='2021-01-04', end='2021-06-30', seed=20260725, apply_quirks=False)
@@ -340,6 +340,12 @@ def test_tre_history_matches_legacy_mpd_total_and_groups_on_synthetic_panel() ->
     model = RiskModel(covar=covar_dict)
 
     legacy_total = legacy.compute_tracking_error_implied_by_covar()
+    expected_total = pd.Series(
+        [0.043513676445772684, 0.045867442312087316,
+         0.044379020046626944, 0.046352374699966455],
+        index=covar_dates.rename(None),
+        name='Tracking error')
+    pd.testing.assert_series_equal(legacy_total, expected_total, rtol=1e-15, atol=0.0)
     actual_total = model.compute_tre_history(
         benchmark_weights=benchmark_weights,
         portfolio_weights=strategy_weights,
@@ -350,6 +356,20 @@ def test_tre_history_matches_legacy_mpd_total_and_groups_on_synthetic_panel() ->
         is_grouped=True,
         group_data=universe.group_data,
         group_order=universe.group_order)
+    expected_groups = pd.DataFrame(
+        [
+            [0.043513676445772684, 0.05305230594209256, 0.015388323704411528,
+             0.02343475902504267, 0.017030186248985182],
+            [0.045867442312087316, 0.05592204063369915, 0.0162207174259667,
+             0.024702404978773917, 0.017951392507890854],
+            [0.044379020046626944, 0.04576692567903564, 0.0205052974216559,
+             0.02590810091282049, 0.018827579299251294],
+            [0.046352374699966455, 0.04780199485503095, 0.021417084659017645,
+             0.0270601288630048, 0.01966476523040211],
+        ],
+        index=covar_dates.rename(None),
+        columns=['Total', 'Equities', 'Bonds', 'Commodities', 'Alternatives'])
+    pd.testing.assert_frame_equal(legacy_groups, expected_groups, rtol=1e-15, atol=0.0)
     actual_groups = model.compute_tre_history(
         benchmark_weights=benchmark_weights,
         portfolio_weights=strategy_weights,
