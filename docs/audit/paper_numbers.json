@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "28d32c68ded2549412868099561b7af776be32d2",
+  "measured_at_commit": "f2792d3122d0a213db4579866b89f081c93cd9c7",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,13 +46,13 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 1226,
+      "value": 1235,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 331,
+      "value": 333,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -71,25 +71,25 @@
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
-      "how": "tools/audit_consumers.py at cf599e5b056f",
+      "how": "tools/audit_consumers.py at 7b9dad74af19",
       "live": false,
       "paper_phrase": null
     },
     "consumer_privateassets_symbols": {
       "value": 5,
-      "how": "tools/audit_consumers.py at cf599e5b056f",
+      "how": "tools/audit_consumers.py at 7b9dad74af19",
       "live": false,
       "paper_phrase": null
     },
     "consumer_trendfollowing_call_sites": {
       "value": 443,
-      "how": "tools/audit_consumers.py at b4051aa36d7c",
+      "how": "tools/audit_consumers.py at 22a2317eeb88",
       "live": false,
       "paper_phrase": "at 443 sites"
     },
     "consumer_trendfollowing_symbols": {
       "value": 87,
-      "how": "tools/audit_consumers.py at b4051aa36d7c",
+      "how": "tools/audit_consumers.py at 22a2317eeb88",
       "live": false,
       "paper_phrase": "references 87 symbols"
     },
@@ -106,10 +106,10 @@
       "paper_phrase": null
     },
     "exported_symbols": {
-      "value": 407,
+      "value": 408,
       "how": "len(qis.__all__)",
       "live": true,
-      "paper_phrase": "holds 407 names"
+      "paper_phrase": "holds 408 names"
     },
     "first_commit_month": {
       "value": "2022-12",

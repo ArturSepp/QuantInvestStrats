@@ -95,3 +95,5 @@ from qis.perfstats.signal_diagnostics import (
     compute_ic_timeseries,
     estimate_ic_ir,
 )
+
+from qis.perfstats.tracking_error import compute_ewma_realised_tracking_error
