@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from qis.datasets.synthetic import generate_synthetic_universe
+from qis.portfolio.backtester import backtest_model_portfolio
+from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.risk.risk_model import RiskModel, UNASSIGNED_GROUP, WEIGHT_TOL
 
 
@@ -210,3 +213,120 @@ def test_complete_factor_block_is_normalised_to_covar_and_factor_order() -> None
     assert model.factor_loadings[DATE_1].index.equals(ASSETS)
     assert model.factor_covar[DATE_1].index.equals(FACTORS)
     assert model.residual_vars[DATE_1].index.equals(ASSETS)
+
+
+def test_tre_matches_explicit_double_loop_reference_on_seeded_inputs() -> None:
+    # Seed 20260808. The reference deliberately uses scalar loops, not the implementation's
+    # labelled quadratic form or any alignment helper.
+    rng = np.random.default_rng(20260808)
+    random_matrix = rng.normal(size=(5, 5))
+    covar_values = random_matrix @ random_matrix.T / 100.0
+    assets = pd.Index([f'A{idx}' for idx in range(5)])
+    covar = pd.DataFrame(covar_values, index=assets, columns=assets)
+    benchmark = pd.Series(rng.normal(size=5), index=assets)
+    portfolio = pd.Series(rng.normal(size=5), index=assets)
+    active = portfolio - benchmark
+    variance_reference = 0.0
+    for i in range(len(assets)):
+        for j in range(len(assets)):
+            variance_reference += active.iloc[i] * covar.iloc[i, j] * active.iloc[j]
+    expected = np.sqrt(variance_reference)
+
+    actual = RiskModel(covar={DATE_1: covar}).compute_tre_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1)
+    np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=0.0)
+
+
+def test_tre_group_mask_matches_covariance_block_reference() -> None:
+    benchmark = pd.Series([0.4, 0.3, 0.3], index=ASSETS)
+    portfolio = pd.Series([0.6, 0.1, 0.4], index=ASSETS)
+    groups = pd.Series(['Group 1', 'Group 1', 'Group 2'], index=ASSETS)
+    actual = _model().compute_tre_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1,
+        group_data=groups)
+    assert isinstance(actual, pd.Series)
+
+    tickers = ['A', 'B']
+    active_block = (portfolio - benchmark).loc[tickers]
+    covar_block = _covar().loc[tickers, tickers]
+    expected_group = np.sqrt(active_block @ covar_block @ active_block)
+    np.testing.assert_allclose(actual['Group 1'], expected_group, rtol=1e-12, atol=0.0)
+    assert actual['Group 1'] + actual['Group 2'] != pytest.approx(actual['Total'])
+
+
+def test_tre_zero_active_weights_is_exactly_zero() -> None:
+    weights = pd.Series([0.5, 0.3, 0.2], index=ASSETS)
+    actual = _model().compute_tre_at_date(
+        benchmark_weights=weights,
+        portfolio_weights=weights,
+        date=DATE_1)
+    assert actual == 0.0
+
+
+def test_tre_public_method_routes_through_strict_aligner() -> None:
+    benchmark = pd.Series([1.0], index=['A'])
+    portfolio = pd.Series([0.8, 0.2], index=['A', 'OUTSIDE'])
+    with pytest.raises(ValueError, match=r"portfolio_weights.*OUTSIDE"):
+        _model().compute_tre_at_date(
+            benchmark_weights=benchmark,
+            portfolio_weights=portfolio,
+            date=DATE_1)
+
+
+def test_tre_history_matches_legacy_mpd_total_and_groups_on_synthetic_panel() -> None:
+    # Frozen generator seed 20260725; clean paths isolate TE arithmetic from reporting defects.
+    universe = generate_synthetic_universe(
+        start='2021-01-04', end='2021-06-30', seed=20260725, apply_quirks=False)
+    prices = universe.prices
+    assets = prices.columns
+    covar_base = prices.pct_change(fill_method=None).dropna().cov() * 260.0
+    covar_dates = prices.index[[20, 40, 60, 80]]
+    covar_dict = {
+        date: covar_base * scale
+        for date, scale in zip(covar_dates, [0.9, 1.0, 1.1, 1.2])
+    }
+
+    strategy_rows = np.full((2, len(assets)), 1.0 / len(assets))
+    strategy_rows[1, 0] += 0.08
+    strategy_rows[1, 3] -= 0.08
+    benchmark_rows = np.zeros((2, len(assets)))
+    benchmark_rows[:, assets.get_loc('SEQ_US')] = 0.6
+    benchmark_rows[:, assets.get_loc('SBD_TSY')] = 0.4
+    weight_dates = covar_dates[[0, 2]]
+    strategy_weights = pd.DataFrame(strategy_rows, index=weight_dates, columns=assets)
+    benchmark_weights = pd.DataFrame(benchmark_rows, index=weight_dates, columns=assets)
+
+    strategy = backtest_model_portfolio(
+        prices=prices,
+        weights=strategy_weights,
+        ticker='Synthetic strategy')
+    benchmark = backtest_model_portfolio(
+        prices=prices,
+        weights=benchmark_weights,
+        ticker='Synthetic benchmark')
+    legacy = MultiPortfolioData(
+        portfolio_datas=[strategy, benchmark],
+        covar_dict=covar_dict)
+    model = RiskModel(covar=covar_dict)
+
+    legacy_total = legacy.compute_tracking_error_implied_by_covar()
+    actual_total = model.compute_tre_history(
+        benchmark_weights=benchmark_weights,
+        portfolio_weights=strategy_weights,
+        strict=False)
+    pd.testing.assert_series_equal(actual_total, legacy_total, rtol=1e-12, atol=0.0)
+
+    legacy_groups = legacy.compute_tracking_error_implied_by_covar(
+        is_grouped=True,
+        group_data=universe.group_data,
+        group_order=universe.group_order)
+    actual_groups = model.compute_tre_history(
+        benchmark_weights=benchmark_weights,
+        portfolio_weights=strategy_weights,
+        group_data=universe.group_data,
+        strict=False)
+    pd.testing.assert_frame_equal(actual_groups, legacy_groups, rtol=1e-12, atol=0.0)

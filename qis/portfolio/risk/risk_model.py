@@ -323,6 +323,122 @@ class RiskModel:
         assets = self._covar_at_date(date).index
         return group_data.reindex(assets).fillna(UNASSIGNED_GROUP)
 
+    @staticmethod
+    def _compute_tracking_error(active_weights: pd.Series,
+                                covar: pd.DataFrame,
+                                ) -> float:
+        """Compute the square root of the active-weight covariance quadratic form."""
+        variance = float(active_weights @ covar @ active_weights)
+        return float(np.sqrt(variance))
+
+    def compute_tre_at_date(self,
+                            benchmark_weights: pd.Series,
+                            portfolio_weights: pd.Series,
+                            date: pd.Timestamp,
+                            group_data: Optional[pd.Series] = None,
+                            total_column: str = 'Total',
+                            strict: bool = True,
+                            ) -> Union[float, pd.Series]:
+        """Compute ex-ante tracking error on one covariance date.
+
+        For active weights ``d = w_p - w_b``, tracking error is
+        ``sqrt(d' Sigma d)``. When groups are requested, each group result
+        zeroes active weights outside that group before applying the full
+        covariance. These standalone sleeve risks are not additive and are
+        not forced to sum to total tracking error. No annualisation is applied.
+
+        Args:
+            benchmark_weights: Benchmark weights indexed by asset.
+            portfolio_weights: Portfolio weights indexed by asset.
+            date: Exact covariance-grid date.
+            group_data: Optional group label per asset. Missing labels become
+                ``'Unassigned'``.
+            total_column: Label for total tracking error when groups are returned.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            Total tracking error as a float, or total and standalone group
+            tracking errors as a Series.
+
+        Raises:
+            KeyError: If ``date`` is not an exact covariance-grid date.
+            ValueError: If weights or model data violate the alignment policy.
+        """
+        covar = self._covar_at_date(date)
+        benchmark = self._align_weights(
+            weights=benchmark_weights,
+            date=date,
+            role='benchmark_weights',
+            strict=strict)
+        portfolio = self._align_weights(
+            weights=portfolio_weights,
+            date=date,
+            role='portfolio_weights',
+            strict=strict)
+        active_weights = portfolio - benchmark
+        total = self._compute_tracking_error(active_weights=active_weights, covar=covar)
+        if group_data is None:
+            return total
+
+        groups = self._align_groups(group_data=group_data, date=date)
+        results = {total_column: total}
+        for group in pd.unique(groups):
+            group_active_weights = active_weights.where(groups == group, other=0.0)
+            results[group] = self._compute_tracking_error(
+                active_weights=group_active_weights, covar=covar)
+        return pd.Series(results, dtype=float)
+
+    def compute_tre_history(self,
+                            benchmark_weights: WeightInput,
+                            portfolio_weights: WeightInput,
+                            group_data: Optional[pd.Series] = None,
+                            total_column: str = 'Total',
+                            strict: bool = True,
+                            ) -> Union[pd.Series, pd.DataFrame]:
+        """Compute ex-ante tracking error on the covariance date grid.
+
+        Dated weights are selected as-of each covariance date using forward
+        fill; dates before the first weight observation receive zero weights.
+        The mathematics and group convention are those of
+        :meth:`compute_tre_at_date`. No annualisation is applied.
+
+        Args:
+            benchmark_weights: Static Series or dated DataFrame of benchmark weights.
+            portfolio_weights: Static Series or dated DataFrame of portfolio weights.
+            group_data: Optional group label per asset. Missing labels become
+                ``'Unassigned'``.
+            total_column: Label for total tracking error when groups are returned.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            A Series named ``'Tracking error'``, or a DataFrame containing total
+            and standalone group tracking errors.
+
+        Raises:
+            ValueError: If weights or model data violate the alignment policy.
+        """
+        benchmark_history = self._aligned_weight_history(
+            weights=benchmark_weights,
+            role='benchmark_weights',
+            strict=strict)
+        portfolio_history = self._aligned_weight_history(
+            weights=portfolio_weights,
+            role='portfolio_weights',
+            strict=strict)
+        results = {
+            date: self.compute_tre_at_date(
+                benchmark_weights=benchmark_history.loc[date],
+                portfolio_weights=portfolio_history.loc[date],
+                date=date,
+                group_data=group_data,
+                total_column=total_column,
+                strict=strict)
+            for date in self.dates
+        }
+        if group_data is None:
+            return pd.Series(results, name='Tracking error', dtype=float)
+        return pd.DataFrame.from_dict(results, orient='index')
+
     def _require_factor_loadings(self) -> None:
         """Raise when a factor-exposure method lacks its required field."""
         if self.factor_loadings is None:
