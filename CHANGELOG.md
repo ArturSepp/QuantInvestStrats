@@ -7,8 +7,22 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-**Behaviour change.** `MultiPortfolioData.compute_tracking_error_table` labels its unchanged
-per-instrument `mean(pnl_diff) / std(pnl_diff)` ratio column `IR` instead of `TRE`.
+## [5.8.0] - 2026-08-08
+
+**One behaviour change.** `MultiPortfolioData.compute_tracking_error_table` labels its
+unchanged per-instrument `mean(pnl_diff) / std(pnl_diff)` ratio column `IR` instead of `TRE`.
+The values and method name are unchanged.
+
+### Added
+- `qis.compute_ewma_realised_tracking_error`, the canonical annualised EWMA ex-post tracking
+  error from portfolio and benchmark NAVs.
+- `weights_tracking_error_report_by_ac_subac` accepts `covar_risk_model`; its covariance can
+  supply ex-ante tracking-error panels when `MultiPortfolioData.covar_dict` is absent, and a
+  complete factor block adds tracking-error decomposition and strategy factor-exposure panels.
+
+### Deprecated
+- `LinearModel.compute_active_factor_risk`; use
+  `RiskModel.compute_tre_decomposition_at_date` or `compute_marginal_tre_at_date`.
 
 ## [5.7.0] - 2026-08-08
 
