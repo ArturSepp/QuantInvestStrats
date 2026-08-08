@@ -1147,4 +1147,7 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
         if regime_benchmark is not None:
-            self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=tre.index, regime_classifier=regime_classifier)
+            self.add_regime_shadows(ax=ax,
+                                    regime_benchmark=regime_benchmark,
+                                    index=tre.index,
+                                    regime_classifier=regime_classifier)
