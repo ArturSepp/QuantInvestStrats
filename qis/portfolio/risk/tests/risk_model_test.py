@@ -388,3 +388,90 @@ def test_exposures_public_method_routes_through_strict_aligner() -> None:
         _factor_model().compute_exposures_at_date(
             portfolio_weights=pd.Series([0.8, 0.2], index=['A', 'OUTSIDE']),
             date=DATE_1)
+
+
+def test_benchmark_beta_loadings_match_seeded_sliced_constituent_reference() -> None:
+    # Seed 20260808. The reference slices strict-subset constituents before multiplication.
+    rng = np.random.default_rng(20260808)
+    assets = pd.Index([f'A{idx}' for idx in range(6)])
+    random_matrix = rng.normal(size=(6, 6))
+    covar = pd.DataFrame(random_matrix @ random_matrix.T,
+                         index=assets, columns=assets)
+    constituents = pd.Index(['A0', 'A2', 'A5'])
+    benchmark_constituent_weights = pd.Series([0.5, 0.3, 0.2], index=constituents)
+    benchmark = benchmark_constituent_weights.reindex(assets).fillna(0.0)
+    denominator = float(
+        benchmark_constituent_weights
+        @ covar.loc[constituents, constituents]
+        @ benchmark_constituent_weights)
+    expected = (
+        covar.loc[assets, constituents] @ benchmark_constituent_weights / denominator)
+
+    actual = RiskModel(covar={DATE_1: covar}).compute_benchmark_beta_loadings_at_date(
+        benchmark_weights=benchmark,
+        date=DATE_1)
+    pd.testing.assert_series_equal(actual, expected, rtol=1e-12, atol=0.0)
+
+
+def test_benchmark_beta_identities_and_loading_linearity() -> None:
+    benchmark = pd.Series([0.55, 0.35, 0.10], index=ASSETS)
+    portfolio = pd.Series([0.40, 0.45, 0.15], index=ASSETS)
+    model = _model()
+    beta = model.compute_benchmark_beta_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1)
+    benchmark_beta = model.compute_benchmark_beta_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=benchmark,
+        date=DATE_1)
+    loadings = model.compute_benchmark_beta_loadings_at_date(
+        benchmark_weights=benchmark,
+        date=DATE_1)
+    covar = _covar()
+    benchmark_variance = float(benchmark @ covar @ benchmark)
+    active_beta = float((portfolio - benchmark) @ covar @ benchmark) / benchmark_variance
+
+    assert benchmark_beta == 1.0
+    np.testing.assert_allclose(beta - 1.0, active_beta, rtol=1e-12, atol=0.0)
+    np.testing.assert_allclose(loadings @ portfolio, beta, rtol=1e-12, atol=0.0)
+
+
+def test_benchmark_beta_history_uses_asof_portfolio_weights() -> None:
+    benchmark = pd.Series([0.6, 0.4, 0.0], index=ASSETS)
+    portfolio_history = pd.DataFrame(
+        [[0.5, 0.4, 0.1]],
+        index=[pd.Timestamp('2024-01-03')],
+        columns=ASSETS)
+    model = _model()
+    actual = model.compute_benchmark_beta_history(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio_history)
+    expected_nonzero = model.compute_benchmark_beta_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio_history.iloc[0],
+        date=DATE_2)
+    expected = pd.Series(
+        [0.0, expected_nonzero, expected_nonzero],
+        index=pd.DatetimeIndex([DATE_1, DATE_2, DATE_3]),
+        name='Benchmark beta')
+    pd.testing.assert_series_equal(actual, expected, rtol=1e-12, atol=0.0)
+
+
+def test_benchmark_beta_rejects_degenerate_benchmark_with_value() -> None:
+    zero_benchmark = pd.Series(0.0, index=ASSETS)
+    with pytest.raises(ValueError, match=r"benchmark variance.*0.0"):
+        _model().compute_benchmark_beta_at_date(
+            benchmark_weights=zero_benchmark,
+            portfolio_weights=pd.Series([1.0, 0.0, 0.0], index=ASSETS),
+            date=DATE_1)
+
+
+def test_benchmark_beta_r8_error_names_joint_universe_remedy() -> None:
+    benchmark = pd.Series({'A': 0.8, 'OUTSIDE': 0.2})
+    portfolio = pd.Series({'A': 1.0})
+    with pytest.raises(ValueError, match=r"OUTSIDE.*joint universe.*benchmark constituents"):
+        _model().compute_benchmark_beta_at_date(
+            benchmark_weights=benchmark,
+            portfolio_weights=portfolio,
+            date=DATE_1)

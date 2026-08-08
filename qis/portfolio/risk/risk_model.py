@@ -508,6 +508,139 @@ class RiskModel:
         }
         return pd.DataFrame.from_dict(results, orient='index')
 
+    @staticmethod
+    def _validate_benchmark_variance(benchmark_variance: float) -> None:
+        """Reject a benchmark that cannot define covariance beta."""
+        if benchmark_variance <= 0.0:
+            raise ValueError(f"benchmark variance must be positive, got {benchmark_variance}")
+
+    def compute_benchmark_beta_at_date(self,
+                                       benchmark_weights: pd.Series,
+                                       portfolio_weights: pd.Series,
+                                       date: pd.Timestamp,
+                                       strict: bool = True,
+                                       ) -> float:
+        """Compute ex-ante portfolio beta to a weighted benchmark.
+
+        For portfolio weights ``w_p``, benchmark weights ``w_b``, and
+        covariance ``Sigma``, beta is
+        ``(w_p' Sigma w_b) / (w_b' Sigma w_b)``. The factor block is not
+        required.
+
+        Args:
+            benchmark_weights: Benchmark weights indexed by asset.
+            portfolio_weights: Portfolio weights indexed by asset.
+            date: Exact covariance-grid date.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            Scalar ex-ante portfolio beta to the benchmark.
+
+        Raises:
+            KeyError: If ``date`` is not an exact covariance-grid date.
+            ValueError: If weights violate the alignment policy or benchmark
+                variance is nonpositive.
+        """
+        covar = self._covar_at_date(date)
+        benchmark = self._align_weights(
+            weights=benchmark_weights,
+            date=date,
+            role='benchmark_weights',
+            strict=strict,
+            outside_universe_remedy=(
+                "estimate the covariance on the joint universe of assets and "
+                "benchmark constituents upstream"))
+        portfolio = self._align_weights(
+            weights=portfolio_weights,
+            date=date,
+            role='portfolio_weights',
+            strict=strict)
+        benchmark_variance = float(benchmark @ covar @ benchmark)
+        self._validate_benchmark_variance(benchmark_variance)
+        return float(portfolio @ covar @ benchmark) / benchmark_variance
+
+    def compute_benchmark_beta_history(self,
+                                       benchmark_weights: WeightInput,
+                                       portfolio_weights: WeightInput,
+                                       strict: bool = True,
+                                       ) -> pd.Series:
+        """Compute ex-ante benchmark beta on the covariance date grid.
+
+        Dated weights are selected as-of each covariance date using forward
+        fill; dates before the first weight observation receive zero weights.
+        At every date beta is
+        ``(w_p' Sigma w_b) / (w_b' Sigma w_b)``.
+
+        Args:
+            benchmark_weights: Static Series or dated DataFrame of benchmark weights.
+            portfolio_weights: Static Series or dated DataFrame of portfolio weights.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            Series named ``'Benchmark beta'`` on the covariance date grid.
+
+        Raises:
+            ValueError: If weights violate the alignment policy or benchmark
+                variance is nonpositive.
+        """
+        benchmark_history = self._aligned_weight_history(
+            weights=benchmark_weights,
+            role='benchmark_weights',
+            strict=strict,
+            outside_universe_remedy=(
+                "estimate the covariance on the joint universe of assets and "
+                "benchmark constituents upstream"))
+        portfolio_history = self._aligned_weight_history(
+            weights=portfolio_weights,
+            role='portfolio_weights',
+            strict=strict)
+        results = {
+            date: self.compute_benchmark_beta_at_date(
+                benchmark_weights=benchmark_history.loc[date],
+                portfolio_weights=portfolio_history.loc[date],
+                date=date,
+                strict=strict)
+            for date in self.dates
+        }
+        return pd.Series(results, name='Benchmark beta', dtype=float)
+
+    def compute_benchmark_beta_loadings_at_date(self,
+                                                benchmark_weights: pd.Series,
+                                                date: pd.Timestamp,
+                                                strict: bool = True,
+                                                ) -> pd.Series:
+        """Compute per-asset loadings to a weighted benchmark.
+
+        The loading vector is ``c = Sigma w_b / (w_b' Sigma w_b)``, so the
+        beta of any aligned portfolio is the linear form ``c' w_p``. The
+        factor block is not required.
+
+        Args:
+            benchmark_weights: Benchmark weights indexed by asset.
+            date: Exact covariance-grid date.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            Benchmark-beta loading Series indexed by covariance asset.
+
+        Raises:
+            KeyError: If ``date`` is not an exact covariance-grid date.
+            ValueError: If weights violate the alignment policy or benchmark
+                variance is nonpositive.
+        """
+        covar = self._covar_at_date(date)
+        benchmark = self._align_weights(
+            weights=benchmark_weights,
+            date=date,
+            role='benchmark_weights',
+            strict=strict,
+            outside_universe_remedy=(
+                "estimate the covariance on the joint universe of assets and "
+                "benchmark constituents upstream"))
+        benchmark_variance = float(benchmark @ covar @ benchmark)
+        self._validate_benchmark_variance(benchmark_variance)
+        return (covar @ benchmark) / benchmark_variance
+
     def _require_factor_loadings(self) -> None:
         """Raise when a factor-exposure method lacks its required field."""
         if self.factor_loadings is None:
