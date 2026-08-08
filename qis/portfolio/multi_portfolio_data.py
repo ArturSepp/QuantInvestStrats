@@ -280,8 +280,25 @@ class MultiPortfolioData:
                                      is_unit_based_traded_volume: bool = True,
                                      **kwargs
                                      ) -> pd.DataFrame:
-        """
-        compute realised tracking error = mean(P&L diff) / std(P&L diff)
+        """Compute per-instrument performance, information ratio, turnover, and costs.
+
+        The ``IR`` column is the per-instrument information ratio of P&L differences,
+        ``mean(pnl_diff) / std(pnl_diff)``; it is not a tracking error. For realised tracking
+        error from portfolio and benchmark NAVs use
+        ``compute_ewma_realised_tracking_error``. For ex-ante tracking error from weights and a
+        covariance use ``compute_tracking_error_implied_by_covar``.
+
+        Args:
+            strategy_idx: Index of the strategy portfolio.
+            benchmark_idx: Index of the benchmark portfolio.
+            freq: Frequency of the attribution P&L tables.
+            time_period: Optional reporting period.
+            annualization_factor: Scale applied to average turnover and costs.
+            is_unit_based_traded_volume: Whether costs use unit-based traded volume.
+            **kwargs: Reserved for compatibility with report callers.
+
+        Returns:
+            Per-instrument table with the information ratio labelled ``IR``.
         """
         strategy_pnl = self.portfolio_datas[strategy_idx].get_attribution_table_by_instrument(time_period=time_period,
                                                                                               freq=freq)
@@ -318,9 +335,10 @@ class MultiPortfolioData:
         total_diff = total_strategy_perf.subtract(total_benchmark_perf).rename(
             f"{strategy_ticker}-{benchmark_ticker} total perf")
 
-        tre = pd.Series(np.nanmean(pnl_diff, axis=0) / np.nanstd(pnl_diff, axis=0), index=tickers_union, name='TRE')
+        ir = pd.Series(np.nanmean(pnl_diff, axis=0) / np.nanstd(pnl_diff, axis=0),
+                       index=tickers_union, name='IR')
 
-        tre_table = pd.concat([total_diff, tre,
+        tre_table = pd.concat([total_diff, ir,
                                total_strategy_perf, total_benchmark_perf,
                                annualization_factor * strategy_turnover.mean(axis=0).rename(f"{strategy_ticker} an turnover"),
                                annualization_factor * benchmark_turnover.mean(axis=0).rename(f"{benchmark_ticker} an turnover"),

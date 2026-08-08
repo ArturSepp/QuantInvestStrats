@@ -7,6 +7,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+**Behaviour change.** `MultiPortfolioData.compute_tracking_error_table` labels its unchanged
+per-instrument `mean(pnl_diff) / std(pnl_diff)` ratio column `IR` instead of `TRE`.
+
 ## [5.7.0] - 2026-08-08
 
 **One behaviour change.** `MultiPortfolioData.compute_tracking_error_implied_by_covar` now
