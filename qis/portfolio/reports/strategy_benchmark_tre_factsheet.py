@@ -30,6 +30,120 @@ from qis.plots.utils import get_n_sns_colors
 from qis.utils.df_str import idx_to_alphabet
 
 
+def _compute_ex_post_benchmark_series(
+        strategy_nav: pd.Series,
+        benchmark_nav: pd.Series,
+) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    """Compute the 36-month realised TRE, benchmark beta, and annualised alpha series."""
+    realised_tre = qis.compute_ewma_realised_tracking_error(
+        portfolio_nav=strategy_nav,
+        benchmark_nav=benchmark_nav,
+    ).rename('Realised TRE (EWMA 36m)')
+    navs = pd.concat(
+        [strategy_nav.rename('strategy'), benchmark_nav.rename('benchmark')],
+        axis=1,
+        sort=True,
+    ).dropna(how='all').ffill()
+    monthly_returns = qis.to_returns(
+        prices=navs,
+        freq='ME',
+        is_log_returns=False,
+        drop_first=True,
+    )
+    beta, alpha, _, _, _, _ = qis.compute_ewm_beta_alpha_forecast(
+        x_data=monthly_returns['benchmark'],
+        y_data=monthly_returns[['strategy']],
+        span=36,
+        init_type=qis.InitType.X0,
+        beta_init_value=1.0,
+    )
+    ex_post_beta = beta.iloc[:, 0].rename('Ex-post beta (EWMA 36m)')
+    ex_post_alpha = (
+        alpha.iloc[:, 0] * qis.get_annualization_factor('ME')
+    ).rename('Ex-post alpha (EWMA 36m, annualised)')
+    return realised_tre, ex_post_beta, ex_post_alpha
+
+
+def _add_ex_post_benchmark_panels(
+        figs: Dict[str, plt.Figure],
+        dfs: Dict[str, pd.DataFrame],
+        multi_portfolio_data: MultiPortfolioData,
+        regime_benchmark: str,
+        regime_classifier: BenchmarkReturnsQuantilesRegime,
+        realised_tre: pd.Series,
+        ex_post_beta: pd.Series,
+        ex_post_alpha: pd.Series,
+        ex_ante_tre: Optional[pd.Series],
+        ex_ante_beta: Optional[pd.Series],
+        figsize: Tuple[float, float],
+        add_titles: bool,
+        **kwargs,
+) -> None:
+    """Append the additive ex-post report panels and their numeric frames."""
+    tre_series = [realised_tre]
+    if ex_ante_tre is not None:
+        tre_series.insert(0, ex_ante_tre.rename('Ex-ante TRE'))
+    tre_frame = pd.concat(tre_series, axis=1, sort=True)
+    dfs['tre_ex_ante_vs_ex_post'] = tre_frame
+    fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+    figs['tre_ex_ante_vs_ex_post'] = fig
+    qis.plot_time_series(
+        df=tre_frame,
+        title='Ex-ante vs realised tracking error' if add_titles else None,
+        var_format='{:.2%}',
+        y_limits=(0.0, None),
+        ax=ax,
+        **kwargs,
+    )
+    multi_portfolio_data.add_regime_shadows(
+        ax=ax,
+        regime_benchmark=regime_benchmark,
+        index=tre_frame.index,
+        regime_classifier=regime_classifier,
+    )
+
+    if ex_ante_beta is not None:
+        beta_frame = pd.concat(
+            [ex_ante_beta.rename('Ex-ante beta'), ex_post_beta],
+            axis=1,
+            sort=True,
+        )
+        dfs['benchmark_beta_time_series'] = beta_frame
+        fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+        figs['benchmark_beta_time_series'] = fig
+        qis.plot_time_series(
+            df=beta_frame,
+            title='Ex-ante vs ex-post benchmark beta' if add_titles else None,
+            var_format='{:,.2f}',
+            ax=ax,
+            **kwargs,
+        )
+        multi_portfolio_data.add_regime_shadows(
+            ax=ax,
+            regime_benchmark=regime_benchmark,
+            index=beta_frame.index,
+            regime_classifier=regime_classifier,
+        )
+
+    alpha_frame = ex_post_alpha.to_frame()
+    dfs['ex_post_alpha_time_series'] = alpha_frame
+    fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
+    figs['ex_post_alpha_time_series'] = fig
+    qis.plot_time_series(
+        df=alpha_frame,
+        title='Annualised ex-post alpha (EWMA 36m)' if add_titles else None,
+        var_format='{:.2%}',
+        ax=ax,
+        **kwargs,
+    )
+    multi_portfolio_data.add_regime_shadows(
+        ax=ax,
+        regime_benchmark=regime_benchmark,
+        index=alpha_frame.index,
+        regime_classifier=regime_classifier,
+    )
+
+
 def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfolioData,
                                               strategy_idx: int = 0,
                                               benchmark_idx: int = 1,
@@ -185,6 +299,31 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                      hue_var_name='Sub-Asset Class',
                                                      var_format=var_format,
                                                      **kwargs)
+
+        strategy_nav = strategy_data.get_portfolio_nav(time_period=time_period)
+        benchmark_nav = benchmark_data.get_portfolio_nav(time_period=time_period)
+        realised_tre, ex_post_beta, ex_post_alpha = _compute_ex_post_benchmark_series(
+            strategy_nav=strategy_nav,
+            benchmark_nav=benchmark_nav,
+        )
+        if report_covar_dict is None:
+            _add_ex_post_benchmark_panels(
+                figs=figs,
+                dfs=dfs,
+                multi_portfolio_data=multi_portfolio_data,
+                regime_benchmark=regime_benchmark,
+                regime_classifier=regime_classifier,
+                realised_tre=realised_tre,
+                ex_post_beta=ex_post_beta,
+                ex_post_alpha=ex_post_alpha,
+                ex_ante_tre=None,
+                ex_ante_beta=None,
+                figsize=figsize,
+                add_titles=add_titles,
+                **kwargs,
+            )
+            return figs, dfs
+
         # portfolio vol
         strategy_ex_anti_vol = strategy_data.compute_ex_anti_portfolio_vol_implied_by_covar(
             covar_dict=report_covar_dict)
@@ -423,6 +562,37 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                     group_data=ac_group_data,
                     group_order=ac_group_order,
                     total_column='Total'))
+
+        ex_ante_tre = dfs['ac_tracking_error']['Total']
+        if time_period is not None:
+            ex_ante_tre = time_period.locate(ex_ante_tre)
+        benchmark_beta_risk_model = (
+            covar_risk_model if use_covar_risk_model else RiskModel(covar=report_covar_dict)
+        )
+        strategy_input_weights = strategy_data.get_weights(freq=None, is_input_weights=True)
+        benchmark_input_weights = benchmark_data.get_weights(freq=None, is_input_weights=True)
+        ex_ante_beta = benchmark_beta_risk_model.compute_benchmark_beta_history(
+            benchmark_weights=benchmark_input_weights,
+            portfolio_weights=strategy_input_weights,
+            strict=False,
+        )
+        if time_period is not None:
+            ex_ante_beta = time_period.locate(ex_ante_beta)
+        _add_ex_post_benchmark_panels(
+            figs=figs,
+            dfs=dfs,
+            multi_portfolio_data=multi_portfolio_data,
+            regime_benchmark=regime_benchmark,
+            regime_classifier=regime_classifier,
+            realised_tre=realised_tre,
+            ex_post_beta=ex_post_beta,
+            ex_post_alpha=ex_post_alpha,
+            ex_ante_tre=ex_ante_tre,
+            ex_ante_beta=ex_ante_beta,
+            figsize=figsize,
+            add_titles=add_titles,
+            **kwargs,
+        )
 
         # turnover
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)

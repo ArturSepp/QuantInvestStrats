@@ -8,10 +8,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import qis
 from qis.datasets.synthetic import generate_synthetic_universe
 from qis.portfolio.backtester import backtest_model_portfolio
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.strategy_benchmark_tre_factsheet import (
+    _compute_ex_post_benchmark_series,
     weights_tracking_error_report_by_ac_subac,
 )
 from qis.portfolio.risk.risk_model import RiskModel
@@ -46,6 +48,15 @@ PRE_EXISTING_DF_KEYS = {
     'brinson_table_subac',
     'ac_tracking_error',
     'ac_turnover',
+}
+NEW_COVAR_PANEL_KEYS = {
+    'tre_ex_ante_vs_ex_post',
+    'benchmark_beta_time_series',
+    'ex_post_alpha_time_series',
+}
+NEW_NAV_ONLY_PANEL_KEYS = {
+    'tre_ex_ante_vs_ex_post',
+    'ex_post_alpha_time_series',
 }
 
 
@@ -125,10 +136,13 @@ def test_covariance_only_model_preserves_pre_existing_output_keys(report_inputs)
     universe, with_covar, _, covar_model, _ = report_inputs
     absent_figs, absent_dfs = _run_report(with_covar, universe)
     try:
-        assert set(absent_figs) == PRE_EXISTING_FIG_KEYS
-        assert set(absent_dfs) == PRE_EXISTING_DF_KEYS
+        assert set(absent_figs) == PRE_EXISTING_FIG_KEYS | NEW_COVAR_PANEL_KEYS
+        assert set(absent_dfs) == PRE_EXISTING_DF_KEYS | NEW_COVAR_PANEL_KEYS
         absent_fig_keys = set(absent_figs)
         absent_df_keys = set(absent_dfs)
+        absent_pre_existing_dfs = {
+            key: absent_dfs[key].copy() for key in PRE_EXISTING_DF_KEYS
+        }
     finally:
         _close_figures(absent_figs)
 
@@ -136,6 +150,8 @@ def test_covariance_only_model_preserves_pre_existing_output_keys(report_inputs)
     try:
         assert set(model_figs) == absent_fig_keys
         assert set(model_dfs) == absent_df_keys
+        for key, expected in absent_pre_existing_dfs.items():
+            pd.testing.assert_frame_equal(model_dfs[key], expected, rtol=1e-12, atol=0.0)
     finally:
         _close_figures(model_figs)
 
@@ -147,9 +163,110 @@ def test_complete_factor_model_adds_panels_and_supplies_missing_covariance(
     try:
         assert {'tre_decomposition', 'factor_exposures'} <= set(figs)
         assert {'tre_decomposition', 'factor_exposures'} <= set(dfs)
+        assert NEW_COVAR_PANEL_KEYS <= set(figs)
+        assert NEW_COVAR_PANEL_KEYS <= set(dfs)
         assert dfs['tre_decomposition'].columns.tolist() == [
             'tracking_error', 'factor_te', 'residual_te']
         assert dfs['factor_exposures'].columns.tolist() == [
             'Market', *universe.group_order]
     finally:
         _close_figures(figs)
+
+
+def test_nav_only_report_keeps_realised_tre_and_alpha_panels(report_inputs) -> None:
+    universe, _, without_covar, _, _ = report_inputs
+
+    figs, dfs = _run_report(without_covar, universe)
+    try:
+        assert NEW_NAV_ONLY_PANEL_KEYS <= set(figs)
+        assert NEW_NAV_ONLY_PANEL_KEYS <= set(dfs)
+        assert 'benchmark_beta_time_series' not in figs
+        assert 'benchmark_beta_time_series' not in dfs
+        assert dfs['tre_ex_ante_vs_ex_post'].columns.tolist() == [
+            'Realised TRE (EWMA 36m)'
+        ]
+    finally:
+        _close_figures(figs)
+
+
+def test_new_panel_frames_match_independent_ewma_references(report_inputs) -> None:
+    universe, with_covar, _, _, _ = report_inputs
+    figs, dfs = _run_report(with_covar, universe)
+    try:
+        assert dfs['tre_ex_ante_vs_ex_post'].columns.tolist() == [
+            'Ex-ante TRE', 'Realised TRE (EWMA 36m)'
+        ]
+        assert dfs['benchmark_beta_time_series'].columns.tolist() == [
+            'Ex-ante beta', 'Ex-post beta (EWMA 36m)'
+        ]
+        assert dfs['ex_post_alpha_time_series'].columns.tolist() == [
+            'Ex-post alpha (EWMA 36m, annualised)'
+        ]
+    finally:
+        _close_figures(figs)
+
+    long_universe = generate_synthetic_universe(
+        start='2018-01-01',
+        end='2022-12-30',
+        seed=20260725,
+        apply_quirks=False,
+    )
+    strategy_nav = long_universe.prices['SEQ_US']
+    benchmark_nav = long_universe.benchmark_prices.iloc[:, 0]
+    navs = pd.concat(
+        [strategy_nav.rename('strategy'), benchmark_nav.rename('benchmark')],
+        axis=1,
+    ).ffill()
+    monthly_returns = navs.asfreq('ME', method='ffill').pct_change(fill_method=None).dropna()
+    monthly_returns.index.name = None
+    direct_realised_tre = qis.compute_ewm_vol(
+        data=monthly_returns['strategy'] - monthly_returns['benchmark'],
+        span=36,
+        annualize=True,
+        warmup_period=36,
+    ).rename('Realised TRE (EWMA 36m)')
+    realised_tre, report_beta, report_alpha = _compute_ex_post_benchmark_series(
+        strategy_nav=strategy_nav,
+        benchmark_nav=benchmark_nav,
+    )
+    direct_realised_tre.index.name = realised_tre.index.name
+    pd.testing.assert_series_equal(
+        realised_tre.rename('Realised TRE (EWMA 36m)'),
+        direct_realised_tre,
+        rtol=1e-10,
+        atol=0.0,
+    )
+
+    direct_beta, direct_alpha, _, _, _, _ = qis.compute_ewm_beta_alpha_forecast(
+        x_data=monthly_returns['benchmark'],
+        y_data=monthly_returns[['strategy']],
+        span=36,
+        init_type=qis.InitType.X0,
+        beta_init_value=1.0,
+    )
+    expected_alpha = (
+        direct_alpha.iloc[:, 0] * qis.get_annualization_factor('ME')
+    ).rename('Ex-post alpha (EWMA 36m, annualised)')
+    pd.testing.assert_series_equal(report_alpha, expected_alpha, rtol=1e-12, atol=0.0)
+    np.testing.assert_allclose(report_beta.iloc[0], 1.0, rtol=0.0, atol=0.0)
+    pd.testing.assert_series_equal(
+        report_beta,
+        direct_beta.iloc[:, 0].rename('Ex-post beta (EWMA 36m)'),
+        rtol=1e-12,
+        atol=0.0,
+    )
+
+    unseeded_beta = qis.compute_one_factor_ewm_betas(
+        x=monthly_returns['benchmark'],
+        y=monthly_returns[['strategy']],
+        span=36,
+    )
+    seeded_terminal = report_beta.iloc[-1]
+    unseeded_terminal = unseeded_beta.iloc[-1, 0]
+    assert 1.0 < seeded_terminal < unseeded_terminal
+    np.testing.assert_allclose(
+        seeded_terminal,
+        unseeded_terminal,
+        rtol=0.0,
+        atol=0.05,
+    )
