@@ -50,7 +50,6 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               is_grouped: Optional[bool] = True,
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 5,
-                                              heatmap_fontsize: int = 4,
                                               add_joint_instrument_history_report: bool = False,
                                               **kwargs
                                               ) -> List[plt.Figure]:
@@ -84,12 +83,13 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
             the universe size, grouping once there are more than ten instruments
         figsize: page size in inches; the default is A4 portrait
         fontsize: base font size
-        heatmap_fontsize: font size inside the heatmap panels, smaller because the cells are dense
         add_joint_instrument_history_report: add the per-instrument history page
 
     Returns:
         the pages, in order, ready for :func:`save_figs_to_pdf`
     """
+    if 'heatmap_fontsize' in kwargs:
+        raise TypeError("heatmap_fontsize was removed; use fontsize")
     if len(multi_portfolio_data.portfolio_datas) == 1:
         raise ValueError(f"must be at least two strategies")
 
@@ -218,7 +218,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
-                                     new_kwargs=dict(fontsize=heatmap_fontsize, square=False,
+                                     new_kwargs=dict(fontsize=fontsize, square=False,
                                                      x_rotation=90, transpose=True))
 
     # periodic returns

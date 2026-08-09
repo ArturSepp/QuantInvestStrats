@@ -1,8 +1,7 @@
-"""Demonstrate tracking-error and active-risk analytics on an offline synthetic universe.
+"""Demonstrate ex-ante tracking-error analytics on an offline synthetic universe.
 
-The example builds a point-in-time EWMA covariance model, reports ex-ante tracking error,
-benchmark beta, and Euler marginal TE contributions, then compares them with realised EWMA
-tracking error from portfolio and benchmark backtests.
+The example builds a point-in-time EWMA covariance model and reports ex-ante tracking error,
+benchmark beta, and Euler marginal tracking-error contributions.
 """
 import pandas as pd
 
@@ -23,7 +22,7 @@ EWMA_SPAN = 36
 
 
 def run_example() -> None:
-    """Run the offline tracking-error and active-risk example."""
+    """Run the offline ex-ante tracking-error and active-risk example."""
     universe = generate_synthetic_universe(
         start='2014-01-02', end='2025-12-31', apply_quirks=False
     )
@@ -57,33 +56,12 @@ def run_example() -> None:
         group_data=group_data,
     )
 
-    portfolio_nav = qis.backtest_model_portfolio(
-        prices=prices,
-        weights=PORTFOLIO_WEIGHTS.to_dict(),
-        rebalancing_freq=REBALANCING_FREQ,
-        ticker='Active portfolio',
-    ).get_portfolio_nav()
-    benchmark_nav = qis.backtest_model_portfolio(
-        prices=prices,
-        weights=BENCHMARK_WEIGHTS.to_dict(),
-        rebalancing_freq=REBALANCING_FREQ,
-        ticker='Benchmark',
-    ).get_portfolio_nav()
-    realised_tre = qis.compute_ewma_realised_tracking_error(
-        portfolio_nav=portfolio_nav,
-        benchmark_nav=benchmark_nav,
-        ewma_span=EWMA_SPAN,
-        freq=RETURNS_FREQ,
-        is_log_returns=False,
-    )
-
     print(f'Risk date: {risk_date:%Y-%m-%d}')
     print('\nEx-ante tracking error by standalone group, annualised percent:')
     print((100.0 * ex_ante_tre).round(2).to_string())
     print(f'\nBenchmark beta: {benchmark_beta:.3f}')
     print('\nEuler marginal tracking-error contributions, annualised percent:')
     print((100.0 * marginal_tre).round(2).to_string())
-    print(f'\nLatest realised EWMA tracking error: {100.0 * realised_tre.dropna().iloc[-1]:.2f}%')
 
 
 if __name__ == '__main__':

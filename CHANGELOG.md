@@ -7,6 +7,20 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.9.3] - 2026-08-09
+
+**Behaviour change.** The separate `heatmap_fontsize` argument is removed from
+`generate_strategy_factsheet` and `generate_strategy_benchmark_factsheet_plt`; use the shared
+`fontsize` argument instead. Passing the removed keyword raises `TypeError`.
+
+### Changed
+- Split the offline tracking-error example into `ex_anti_tracking_error_and_risk.py` for
+  `RiskModel` ex-ante TE/beta/marginal TE and `ex_post_tracking_error_and_risk.py` for realised
+  EWMA TE, whole-sample TE/IR, and point-in-time EWMA beta/alpha.
+- Strategy factsheet summary and full-history monthly-return heatmaps, and the periodic-return
+  heatmap in the strategy-versus-benchmark factsheet, now inherit the report's `fontsize`.
+- Standalone `plot_returns_heatmap` figures default to 5-point text instead of 8-point text.
+
 ## [5.9.2] - 2026-08-09
 
 **Behaviour changes.** `PerfStat.TE`, `PerfStat.IR`, and `TRE_TABLE_COLUMNS` are removed.
@@ -29,7 +43,7 @@ were silently dropped. The `add_tracking_error_table` factsheet panel is retitle
 ## [5.9.1] - 2026-08-09
 
 ### Added
-- Strategy factsheets limit the summary-page monthly-return heatmap to the latest 20 calendar
+- Strategy factsheets limit the summary-page monthly-return heatmap to the latest 10 calendar
   years by default. Longer histories emit a warning and add a landscape full-history heatmap;
   `monthly_returns_heatmap_max_years=None` restores the single complete summary table.
 - `qis/examples/portfolios/tracking_error_and_risk.py` demonstrates offline ex-ante and
@@ -38,7 +52,8 @@ were silently dropped. The `add_tracking_error_table` factsheet panel is retitle
 ### Changed
 - Strategy-factsheet monthly-return heatmaps scale monthly cells independently from the YTD
   column, so larger annual returns no longer wash out the monthly colour variation. Displayed
-  return annotations are unchanged.
+  return annotations are unchanged; the summary and full-history appendix use the 5-point
+  heatmap font by default.
 - Example-only strategy helpers moved from `qis.portfolio.strats` to
   `qis.examples.portfolios.strats`; direct imports of these non-public modules must use the new
   path.

@@ -68,7 +68,8 @@ examples/
 | `constant_notional_short.py` | Constant-notional vs constant-weight short SPY simulation. |
 | `leveraged_etf_strategies.py` | SSO/IEF leveraged-ETF backtest with rebalancing costs. |
 | `long_short.py` | Long IEF / short LQD pair (Treasury duration vs IG credit). |
-| `tracking_error_and_risk.py` | Offline ex-ante and realised TE, beta, and marginal risk. |
+| `ex_anti_tracking_error_and_risk.py` | Offline ex-ante TE, benchmark beta, and Euler marginal TE through `RiskModel`. |
+| `ex_post_tracking_error_and_risk.py` | Offline realised EWMA TE, whole-sample TE/IR, and EWMA beta/annualised alpha. |
 | `vol_target_and_trend.py` | Vol-target + trend-following sweep via `qis.examples.portfolios.strats.qis_delta1`. |
 
 ## factsheets — full multi-page reports

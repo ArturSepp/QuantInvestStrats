@@ -138,7 +138,7 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
 <!-- ===== SHARED AGENT CORE (builder variant) — begin =====
      Generated from SHARED_AGENT_CORE.md in the maintainer's project knowledge. Do not hand-edit
      between these markers — propose the change to the maintainer instead. Variants: builder
-     (qis) / consumer / standalone. Last synced 2026-08-09, agent core v1.3. -->
+     (qis) / consumer / standalone. Last synced 2026-08-09, agent core v1.4. -->
 
 ## Domain invariants
 
@@ -167,9 +167,10 @@ in Conventions (`TID251`). Never introduce `quantstats`, `pyfolio`, `empyrical`,
 an ad-hoc statistics layer alongside the package's own.
 
 Ex-ante tracking error, factor exposures, benchmark beta, TE decomposition and marginal TE live
-in `qis.RiskModel` (`qis/portfolio/risk/risk_model.py`); the ex-post companion is
-`qis.compute_ewma_realised_tracking_error` (`qis/perfstats/tracking_error.py`). Inside qis,
-extend those modules — a second implementation of `d' Σ d` or of an EWMA of return differences
+in `qis.RiskModel` (`qis/portfolio/risk/risk_model.py`); the ex-post home is the adjacent
+`qis/portfolio/risk/ex_post_tracking_error.py` — `compute_ewma_realised_tracking_error` for the
+EWMA series, `compute_te_ir_errors` / `compute_info_ratio_table` for whole-sample TE/IR
+scalars. Inside qis, extend those modules — a second implementation of `d' Σ d` or of an EWMA of return differences
 anywhere in this repository is a defect.
 
 **Never invent a symbol.** If a function, class, or keyword argument is not in the export

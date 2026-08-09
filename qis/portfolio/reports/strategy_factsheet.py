@@ -65,7 +65,6 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 add_benchmarks_to_navs: bool = False,
                                 figsize: Tuple[float, float] = (8.5, 11.7),  # A4 for portrait
                                 fontsize: int = 5,
-                                heatmap_fontsize: int = 4,
                                 weights_change_lag: int = 20,
                                 add_current_position_var_risk_sheet: bool = False,
                                 add_grouped_weights_sheet: bool = False,
@@ -82,7 +81,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 is_unit_based_traded_volume: bool = True,
                                 df_to_add: pd.DataFrame = None,
                                 factsheet_name: str = None,
-                                monthly_returns_heatmap_max_years: Optional[int] = 20,
+                                monthly_returns_heatmap_max_years: Optional[int] = 10,
                                 **kwargs
                                 ) -> List[plt.Figure]:
     """
@@ -127,7 +126,6 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             panels rather than only as the regression reference
         figsize: page size in inches; the default is A4 portrait
         fontsize: base font size
-        heatmap_fontsize: font size for the heatmap panels, which carry more cells
         monthly_returns_heatmap_max_years: maximum calendar-year rows shown on the summary
             page. Longer histories emit a warning and add a full-history landscape page. None
             keeps the complete history on the summary page and disables the appendix
@@ -153,6 +151,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     Returns:
         one figure per page, in page order
     """
+    if 'heatmap_fontsize' in kwargs:
+        raise TypeError("heatmap_fontsize was removed; use fontsize")
     if monthly_returns_heatmap_max_years is not None and monthly_returns_heatmap_max_years <= 0:
         raise ValueError("monthly_returns_heatmap_max_years must be positive or None, "
                          f"got {monthly_returns_heatmap_max_years}")
@@ -371,7 +371,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                 title=monthly_returns_title,
                                                 **qis.update_kwargs(
                                                     kwargs,
-                                                    dict(fontsize=heatmap_fontsize,
+                                                    dict(fontsize=fontsize,
                                                          date_format='%Y',
                                                          max_years=monthly_returns_heatmap_max_years,
                                                          is_ytd_color_scale_independent=True)))
@@ -428,7 +428,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             ax=appendix_ax,
             time_period=time_period,
             title='Monthly Returns - Full History',
-            **qis.update_kwargs(kwargs, dict(fontsize=max(heatmap_fontsize, fontsize),
+            **qis.update_kwargs(kwargs, dict(fontsize=fontsize,
                                              date_format='%Y',
                                              max_years=None,
                                              is_ytd_color_scale_independent=True)),
