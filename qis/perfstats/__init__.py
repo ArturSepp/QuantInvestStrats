@@ -28,13 +28,11 @@ from qis.perfstats.perf_stats import (
     compute_desc_freq_table,
     compute_rolling_drawdowns,
     compute_rolling_drawdown_time_under_water,
-    compute_info_ratio_table,
     compute_max_current_drawdown,
     compute_performance_table,
     compute_ra_perf_table,
     compute_ra_perf_table_with_benchmark,
     compute_risk_table,
-    compute_te_ir_errors,
     compute_drawdowns_stats_table
 )
 
@@ -95,5 +93,3 @@ from qis.perfstats.signal_diagnostics import (
     compute_ic_timeseries,
     estimate_ic_ir,
 )
-
-from qis.perfstats.tracking_error import compute_ewma_realised_tracking_error

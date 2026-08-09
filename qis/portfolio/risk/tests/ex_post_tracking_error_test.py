@@ -1,8 +1,9 @@
-"""Tests for canonical EWMA realised tracking error."""
+"""Tests for canonical ex-post tracking-error estimators."""
 import numpy as np
 import pandas as pd
 
 import qis
+from qis.datasets.synthetic import generate_synthetic_universe
 
 
 def _nav_from_returns(returns: np.ndarray, scale: float = 1.0) -> pd.Series:
@@ -98,3 +99,69 @@ def test_final_value_matches_explicit_ewma_variance_recursion() -> None:
 
     np.testing.assert_allclose(result.iloc[-1], expected, rtol=1e-10, atol=0.0)
     assert result.name == 'Tracking error'
+
+
+def _synthetic_return_diffs() -> pd.DataFrame:
+    universe = generate_synthetic_universe(
+        start='2010-01-01',
+        end='2015-12-31',
+        apply_quirks=False,
+    )
+    strategy_returns = qis.to_returns(
+        universe.prices[['SEQ_US', 'SBD_TSY']],
+        freq='ME',
+        is_log_returns=False,
+        drop_first=True,
+    )
+    benchmark_returns = qis.to_returns(
+        universe.benchmark_prices.iloc[:, 0],
+        freq='ME',
+        is_log_returns=False,
+        drop_first=True,
+    )
+    return strategy_returns.sub(benchmark_returns, axis=0)
+
+
+def test_in_sample_te_ir_match_pre_move_characterisation() -> None:
+    return_diffs = _synthetic_return_diffs()
+
+    te, ir = qis.compute_te_ir_errors(return_diffs)
+
+    expected_te = pd.Series(
+        {'SEQ_US': 0.07887977676419106, 'SBD_TSY': 0.11823501914914415},
+        name='TE',
+    )
+    expected_ir = pd.Series(
+        {'SEQ_US': 0.032279891161704155, 'SBD_TSY': -0.027047443953465655},
+        name='IR',
+    )
+    pd.testing.assert_series_equal(te, expected_te, rtol=1e-12, atol=0.0)
+    pd.testing.assert_series_equal(ir, expected_ir, rtol=1e-12, atol=0.0)
+
+
+def test_in_sample_te_ir_scaling_and_constant_difference() -> None:
+    return_diffs = _synthetic_return_diffs()
+    return_diffs['constant'] = 0.0
+
+    te, ir = qis.compute_te_ir_errors(return_diffs)
+    scaled_te, scaled_ir = qis.compute_te_ir_errors(3.0 * return_diffs)
+
+    assert te.name == 'TE'
+    assert ir.name == 'IR'
+    assert np.isnan(ir['constant'])
+    pd.testing.assert_series_equal(scaled_te, 3.0 * te, rtol=1e-10, atol=0.0)
+    pd.testing.assert_series_equal(scaled_ir, ir, rtol=1e-10, atol=0.0)
+
+
+def test_compute_info_ratio_table_uses_whole_sample_estimator() -> None:
+    return_diffs = _synthetic_return_diffs()
+    expected_te, expected_ir = qis.compute_te_ir_errors(return_diffs)
+
+    te_table, ir_table = qis.compute_info_ratio_table(
+        {'Base': return_diffs, 'Double': 2.0 * return_diffs}
+    )
+
+    pd.testing.assert_series_equal(te_table['Base'], expected_te.rename('Base'))
+    pd.testing.assert_series_equal(te_table['Double'], (2.0 * expected_te).rename('Double'))
+    pd.testing.assert_series_equal(ir_table['Base'], expected_ir.rename('Base'))
+    pd.testing.assert_series_equal(ir_table['Double'], expected_ir.rename('Double'))

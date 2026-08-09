@@ -16,8 +16,9 @@ The similarly named ``LinearModel`` is a returns-attribution container used by
 the tracking-error factsheet. It is intentionally separate from this
 weights-and-covariance container.
 
-This module contains no ex-post (returns-based) tracking error, covariance
-estimation, or plotting.
+Ex-post tracking error from NAVs and return differences lives in the adjacent
+``ex_post_tracking_error.py`` module. This module contains no ex-post quantity,
+covariance estimation, or plotting.
 """
 
 import numpy as np

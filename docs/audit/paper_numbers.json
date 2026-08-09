@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "d93162c7ce24c1d46d883ca59e06e45cd3d99a89",
+  "measured_at_commit": "f810d0846088fc8e51568adca3710f1d59713605",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,28 +46,28 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 1264,
+      "value": 1269,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 339,
+      "value": 340,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
-      "value": 690,
-      "how": "tools/audit_consumers.py at fa1d0f0d26a5",
+      "value": 705,
+      "how": "tools/audit_consumers.py at 550a7ed834df",
       "live": false,
-      "paper_phrase": "at 690 sites"
+      "paper_phrase": "at 705 sites"
     },
     "consumer_optimalportfolios_symbols": {
-      "value": 97,
-      "how": "tools/audit_consumers.py at fa1d0f0d26a5",
+      "value": 98,
+      "how": "tools/audit_consumers.py at 550a7ed834df",
       "live": false,
-      "paper_phrase": "references 97 of its symbols"
+      "paper_phrase": "references 98 of its symbols"
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
@@ -94,10 +94,10 @@
       "paper_phrase": "references 87 symbols"
     },
     "core_symbols": {
-      "value": 118,
+      "value": 119,
       "how": "len(qis.api.core_api_names())",
       "live": true,
-      "paper_phrase": "documented core of 118 symbols"
+      "paper_phrase": "documented core of 119 symbols"
     },
     "exported_module_bindings": {
       "value": 9,

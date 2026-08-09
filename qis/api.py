@@ -178,7 +178,7 @@ CORE_API: Dict[str, Tuple[str, ...]] = {
     'Portfolio and backtesting': (
         'backtest_model_portfolio', 'generate_static_weights_schedule', 'PortfolioData',
         'MultiPortfolioData', 'RiskModel', 'compute_portfolio_risk_contributions',
-        'EwmLinearModel',
+        'EwmLinearModel', 'compute_ewma_realised_tracking_error',
     ),
     'Factsheets and reporting': (
         'factsheet', 'generate_strategy_factsheet',

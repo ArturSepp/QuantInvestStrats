@@ -1,6 +1,12 @@
 
 from qis.portfolio.risk.risk_model import RiskModel, WEIGHT_TOL
 
+from qis.portfolio.risk.ex_post_tracking_error import (
+    compute_ewma_realised_tracking_error,
+    compute_info_ratio_table,
+    compute_te_ir_errors,
+)
+
 from qis.portfolio.risk.factor_model import (LinearModel,
                                              compute_benchmarks_beta_attribution_from_prices,
                                              compute_benchmarks_beta_attribution_from_returns)

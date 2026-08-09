@@ -607,55 +607,6 @@ def compute_desc_freq_table(df: pd.DataFrame,
 
 
 # =============================================================================
-# TRACKING ERROR / INFORMATION RATIO
-# =============================================================================
-
-def compute_te_ir_errors(return_diffs: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
-    """Compute tracking error and information ratio from return differentials.
-
-    Args:
-        return_diffs: DataFrame of (strategy_return - benchmark_return) per period.
-
-    Returns:
-        Tuple of (tracking_error_series, information_ratio_series), both indexed by
-        the columns of return_diffs and annualised.
-    """
-    vol_dt = np.sqrt(infer_annualisation_factor_from_df(return_diffs))
-    avg = np.nanmean(return_diffs, axis=0)
-    vol = np.nanstd(return_diffs, axis=0, ddof=1)
-    # NumPy 2.x: explicit out= buffer so masked positions (vol==0) are deterministic nan.
-    ir = vol_dt * np.divide(
-        avg, vol,
-        out=np.full_like(avg, np.nan, dtype=float),
-        where=np.greater(vol, 0.0),
-    )
-    te = pd.Series(vol_dt * vol, index=return_diffs.columns, name=PerfStat.TE.to_str())
-    ir = pd.Series(ir, index=return_diffs.columns, name=PerfStat.IR.to_str())
-    return te, ir
-
-
-def compute_info_ratio_table(return_diffs_dict: Dict[str, pd.DataFrame]) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Compute TE and IR tables across multiple asset-class return-diff DataFrames.
-
-    Args:
-        return_diffs_dict: Mapping of asset class label → return-diffs DataFrame.
-
-    Returns:
-        Tuple of (te_table, ir_table) DataFrames, columns = asset classes,
-        rows = strategies.
-    """
-    te_ac_datas = []
-    ir_ac_datas = []
-    for ac, data in return_diffs_dict.items():
-        te, ir = compute_te_ir_errors(return_diffs=data)
-        te_ac_datas.append(te.rename(ac))
-        ir_ac_datas.append(ir.rename(ac))
-    te_table = pd.concat(te_ac_datas, axis=1, sort=False)
-    ir_table = pd.concat(ir_ac_datas, axis=1, sort=False)
-    return te_table, ir_table
-
-
-# =============================================================================
 # DRAWDOWN COMPUTATIONS
 # =============================================================================
 
