@@ -157,10 +157,6 @@ class PerfStat(ColVar, Enum):
     LAST = ColVar(name='Last', short_n='Last', value_type=ValueType.PERCT)
     RANK = ColVar(name='Rank', short_n='Rank', value_type=ValueType.PERCT)
 
-    # tre and ir
-    TE = ColVar(name='TE', short_n='TE', value_type=ValueType.PERCT)
-    IR = ColVar(name='IR', short_n='IR', value_type=ValueType.SHARPE)
-
     # linear ml
     ALPHA = ColVar(name='Alpha', short_n='Alpha', value_type=ValueType.PERCT)
     ALPHA_AN = ColVar(name='An Alpha', short_n='Alpha', value_type=ValueType.PERCT)
@@ -225,18 +221,6 @@ RA_TABLE_COMPACT_COLUMNS = (PerfStat.PA_RETURN,
                             PerfStat.MAX_DD_VOL,
                             PerfStat.SKEWNESS,
                             PerfStat.KURTOSIS)
-
-
-TRE_TABLE_COLUMNS = (PerfStat.TOTAL_RETURN,
-                     PerfStat.AN_ARITH_RETURN,
-                     PerfStat.TE,
-                     PerfStat.IR,
-                     PerfStat.MAX_DD,
-                     PerfStat.MAX_DD_VOL,
-                     PerfStat.SKEWNESS,
-                     PerfStat.KURTOSIS,
-                     PerfStat.WORST,
-                     PerfStat.BEST)
 
 
 class SharpeConvention(Enum):

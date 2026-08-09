@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Removed
+- `PerfStat.TE` and `PerfStat.IR`; `compute_te_ir_errors` keeps the output labels as literal
+  `TE` and `IR` strings.
+- `TRE_TABLE_COLUMNS`; the preset requested statistics no qis table builder supplied, so
+  `get_ra_perf_columns` silently dropped its headline columns.
+
 ## [5.9.1] - 2026-08-09
 
 ### Added

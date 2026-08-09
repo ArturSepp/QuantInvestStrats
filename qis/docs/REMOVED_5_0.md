@@ -1,3 +1,13 @@
+# qis 5.9.2 — removed from the public API
+
+| symbol | replacement or reason |
+| --- | --- |
+| `qis.PerfStat.TE` | Labels are now literal strings in `compute_te_ir_errors`. |
+| `qis.PerfStat.IR` | Labels are now literal strings in `compute_te_ir_errors`. |
+| `qis.TRE_TABLE_COLUMNS` | None — the spec requested statistics no qis table builder fills, and `get_ra_perf_columns` silently dropped them. |
+
+---
+
 # qis 5.0 — removed from the public namespace
 
 **568 -> 373 public symbols.** Nothing is deleted unless listed under *Deleted* below:
