@@ -180,3 +180,4 @@ output/
 
 # Claude Code: shared project settings are committed, per-machine overrides are not
 .claude/settings.local.json
+.codex/

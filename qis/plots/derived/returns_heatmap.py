@@ -125,6 +125,34 @@ def compute_periodic_returns_table(prices: pd.Series,
     return periodic_returns_table
 
 
+def _scale_returns_heatmap_colors(returns_table: pd.DataFrame,
+                                  ytd_name: str = 'YTD'
+                                  ) -> pd.DataFrame:
+    """Scale periodic cells and the annual column on separate symmetric colour ranges.
+
+    Args:
+        returns_table: actual returns, with the annual return in ``ytd_name``
+        ytd_name: name of the annual-return column
+
+    Returns:
+        values scaled to [-1, 1] within the periodic and annual blocks; NaNs are preserved
+    """
+    color_table = returns_table.astype(float).copy()
+    column_groups = [[column for column in color_table.columns if column != ytd_name]]
+    if ytd_name in color_table.columns:
+        column_groups.append([ytd_name])
+
+    for columns in column_groups:
+        if not columns:
+            continue
+        values = color_table.loc[:, columns].to_numpy()
+        finite_values = np.abs(values[np.isfinite(values)])
+        scale = np.max(finite_values) if finite_values.size > 0 else 0.0
+        if scale > 0.0:
+            color_table.loc[:, columns] = color_table.loc[:, columns] / scale
+    return color_table
+
+
 def plot_returns_heatmap(prices: pd.Series,
                          heatmap_freq: str = 'YE',
                          heatmap_column_freq: Optional[str] = 'ME',  # colums for pivot
@@ -139,8 +167,37 @@ def plot_returns_heatmap(prices: pd.Series,
                          hline_rows: List[int] = None,
                          figsize: Tuple[float, float] = None,
                          ax: plt.Subplot = None,
+                         max_years: Optional[int] = None,
+                         is_ytd_color_scale_independent: bool = False,
                          **kwargs
                          ) -> plt.Figure:
+    """Plot periodic returns as a colour-coded calendar table.
+
+    Styling arguments shared by exported plot functions are documented in
+    ``qis/docs/plotting_kwargs.md``.
+
+    Args:
+        prices: price or NAV series used to compute periodic returns.
+        heatmap_freq: frequency defining table rows.
+        heatmap_column_freq: frequency defining periodic-return columns.
+        date_format: row-label date format.
+        is_inverse_order: whether to show the latest row first.
+        is_add_annual_column: whether to append the annual return column.
+        ytd_name: label for the annual return column.
+        max_years: maximum number of calendar rows to show; None keeps all rows.
+        is_ytd_color_scale_independent: whether periodic cells and the annual column use
+            separate symmetric colour ranges while retaining the original annotations.
+        **kwargs: forwarded to ``plot_heatmap``.
+
+    Returns:
+        The created figure, or None when drawing on a supplied axis.
+
+    Raises:
+        ValueError: If ``max_years`` is not positive or None.
+    """
+
+    if max_years is not None and max_years <= 0:
+        raise ValueError(f"max_years must be positive or None, got {max_years}")
 
     periodic_returns_table = compute_periodic_returns_table(prices=prices,
                                                             heatmap_freq=heatmap_freq,
@@ -149,6 +206,11 @@ def plot_returns_heatmap(prices: pd.Series,
                                                             is_inverse_order=is_inverse_order,
                                                             is_add_annual_column=is_add_annual_column,
                                                             ytd_name=ytd_name)
+    if max_years is not None and len(periodic_returns_table.index) > max_years:
+        if is_inverse_order:
+            periodic_returns_table = periodic_returns_table.iloc[:max_years, :]
+        else:
+            periodic_returns_table = periodic_returns_table.iloc[-max_years:, :]
     if is_add_annual_column:
         shift = 4 if heatmap_column_freq == 'QE' else 12
         vline_columns_ = [0, shift]
@@ -171,15 +233,36 @@ def plot_returns_heatmap(prices: pd.Series,
     if periodic_returns_table.size == 0:
         return fig
 
-    phe.plot_heatmap(df=periodic_returns_table,
+    heatmap_table = periodic_returns_table
+    var_format = "0.1%"
+    heatmap_kwargs = kwargs.copy()
+    if is_ytd_color_scale_independent and ytd_name in periodic_returns_table.columns:
+        heatmap_table = _scale_returns_heatmap_colors(returns_table=periodic_returns_table,
+                                                      ytd_name=ytd_name)
+        annot = heatmap_kwargs.pop('annot', True)
+        if annot is True:
+            formatted_returns = periodic_returns_table.apply(
+                lambda column: column.map(lambda value: f"{value:0.1%}" if pd.notna(value) else '')
+            )
+            heatmap_kwargs['annot'] = formatted_returns.to_numpy()
+            var_format = None
+        elif annot is not False:
+            heatmap_kwargs['annot'] = annot
+            var_format = None
+        else:
+            heatmap_kwargs['annot'] = False
+        heatmap_kwargs['vmin'] = -1.0
+        heatmap_kwargs['vmax'] = 1.0
+
+    phe.plot_heatmap(df=heatmap_table,
                      cmap=cmap,
-                     var_format="0.1%",
+                     var_format=var_format,
                      alpha=alpha,
                      fontsize=fontsize,
                      vline_columns=vline_columns_,
                      hline_rows=hline_rows,
                      ax=ax,
-                     **kwargs)
+                     **heatmap_kwargs)
 
     return fig
 

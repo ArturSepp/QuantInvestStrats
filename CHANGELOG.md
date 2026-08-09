@@ -7,6 +7,30 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.9.1] - 2026-08-09
+
+### Added
+- Strategy factsheets limit the summary-page monthly-return heatmap to the latest 20 calendar
+  years by default. Longer histories emit a warning and add a landscape full-history heatmap;
+  `monthly_returns_heatmap_max_years=None` restores the single complete summary table.
+- `qis/examples/portfolios/tracking_error_and_risk.py` demonstrates offline ex-ante and
+  realised tracking error, benchmark beta, and marginal risk.
+
+### Changed
+- Strategy-factsheet monthly-return heatmaps scale monthly cells independently from the YTD
+  column, so larger annual returns no longer wash out the monthly colour variation. Displayed
+  return annotations are unchanged.
+- Example-only strategy helpers moved from `qis.portfolio.strats` to
+  `qis.examples.portfolios.strats`; direct imports of these non-public modules must use the new
+  path.
+
+## [5.9.0] - 2026-08-09
+
+### Added
+- `qis.compute_ewm_beta_alpha_forecast` accepts `beta_init_value`, a point-in-time,
+  one-observation beta prior. The first finite beta equals the seed and subsequent estimates
+  use the existing EWMA cross-moment recursion; omitting it preserves existing results.
+
 ## [5.8.0] - 2026-08-08
 
 **One behaviour change.** `MultiPortfolioData.compute_tracking_error_table` labels its

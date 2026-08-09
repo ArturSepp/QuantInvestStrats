@@ -1261,15 +1261,46 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
                                     ewm_lambda: Union[float, np.ndarray] = 0.94,
                                     mean_adj_type: MeanAdjType = MeanAdjType.NONE,
                                     init_type: InitType = InitType.MEAN,
+                                    beta_init_value: Optional[
+                                        Union[float, np.ndarray]
+                                    ] = None,
                                     annualize: bool = False,
                                     nan_backfill: NanBackfill = NanBackfill.FFILL
-                                    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                                    ) -> Tuple[
+                                        pd.DataFrame,
+                                        pd.DataFrame,
+                                        pd.DataFrame,
+                                        pd.DataFrame,
+                                        pd.DataFrame,
+                                        pd.DataFrame,
+                                    ]:
+    """Compute one-factor EWMA beta, alpha, prediction and diagnostics.
 
-    """
-    compute 1-d ewm beta for x and y
-    x can be either series or dataframe
-    cross_xy[t] = (1-lambda)*x[t]*y[t] + lambda*cross_xy[t-1]
-    returns betas, ewm_alpha and annualized vars of resid and beta
+    The unseeded path estimates beta as the ratio of exponentially weighted
+    cross-moments. When ``beta_init_value`` is supplied, the first jointly
+    finite, nonzero factor observation is replaced by a one-observation beta
+    prior. This makes the first finite beta equal to the seed and lets later
+    observations update the same cross-moment recursion without look-ahead.
+
+    Args:
+        x_data: Factor-return Series, or one factor-return column per asset.
+        y_data: Asset-return columns.
+        span: EWMA span. Overrides ``ewm_lambda`` when supplied.
+        ewm_lambda: EWMA decay used when ``span`` is None.
+        mean_adj_type: Point-in-time mean-adjustment convention.
+        init_type: Initial condition for unseeded moments and residual alpha.
+        beta_init_value: Optional scalar or per-asset initial beta prior.
+        annualize: Whether to annualize factor and residual variances.
+        nan_backfill: Missing-observation recursion convention.
+
+    Returns:
+        Beta, alpha, prediction, factor variance, residual variance and R-squared frames.
+
+    Raises:
+        ValueError: If ``beta_init_value`` cannot broadcast to the asset columns
+            or contains a non-finite value.
+        IndexError: If paired factor and asset frames have different column counts.
+        NotImplementedError: If the input container combination is unsupported.
     """
     # adjust indices in case
     if not x_data.index.equals(y_data.index):
@@ -1294,26 +1325,64 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
     # 2  take gen arrays and convert to ndarray to use with numbdas
     if isinstance(x_data, pd.Series) and isinstance(y_data, pd.DataFrame):  # extend to df
         x_data = x_data.to_frame()
-        x = npo.np_array_to_n_column_array(a=npo.to_finite_np(data=x_data, fill_value=np.nan), ncols=len(y_data.columns))
+        x = npo.np_array_to_n_column_array(
+            a=npo.to_finite_np(data=x_data, fill_value=np.nan),
+            ncols=len(y_data.columns),
+        )
         y = npo.to_finite_np(data=y_data, fill_value=np.nan)
     elif isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.DataFrame):
         if not len(x_data.columns) == len(y_data.columns):
-            raise IndexError(f"x_data and y_data must have the same number of columns")
+            raise IndexError("x_data and y_data must have the same number of columns")
         # should be same dimensions
         x = npo.to_finite_np(data=x_data, fill_value=np.nan)
         y = npo.to_finite_np(data=y_data, fill_value=np.nan)
     else:
-        raise NotImplementedError(f"in compute_ewm_beta_resid: not implemented types {type(x_data)} and {type(y_data)}")
+        raise NotImplementedError(
+            'in compute_ewm_beta_resid: not implemented types '
+            f'{type(x_data)} and {type(y_data)}'
+        )
 
     # compute covar
     xy = np.multiply(x, y)
+    x2 = np.square(x)
+    xy_init = set_init_dim1(data=xy, init_type=init_type)
+    x2_init = set_init_dim1(data=x2, init_type=init_type)
+    if beta_init_value is not None:
+        try:
+            beta_init = np.broadcast_to(
+                np.asarray(beta_init_value, dtype=float),
+                (y.shape[1],),
+            ).copy()
+        except ValueError as error:
+            raise ValueError(
+                'beta_init_value must be scalar or match y_data columns'
+            ) from error
+        if not np.isfinite(beta_init).all():
+            raise ValueError('beta_init_value must contain only finite values')
+        xy_init = np.asarray(xy_init, dtype=float).copy()
+        x2_init = np.asarray(x2_init, dtype=float).copy()
+        for column in range(y.shape[1]):
+            informative = np.flatnonzero(
+                np.isfinite(x[:, column])
+                & np.isfinite(y[:, column])
+                & ~np.isclose(x[:, column], 0.0)
+            )
+            if informative.size == 0:
+                continue
+            first = informative[0]
+            prior_variance = x2[first, column]
+            x2[:first, column] = np.nan
+            xy[:first, column] = np.nan
+            x2[first, column] = prior_variance
+            xy[first, column] = beta_init[column] * prior_variance
+            x2_init[column] = prior_variance
+            xy_init[column] = beta_init[column] * prior_variance
     xy_covar = ewm_recursion(a=xy, span=span, ewm_lambda=ewm_lambda,
-                             init_value=set_init_dim1(data=xy, init_type=init_type))
+                             init_value=xy_init)
 
     # compute x var
-    x2 = np.square(x)
     x_var = ewm_recursion(a=x2, span=span, ewm_lambda=ewm_lambda,
-                          init_value=set_init_dim1(data=x2, init_type=init_type))
+                          init_value=x2_init)
 
     # compute beta
     # NumPy 2.x: explicit out= so masked positions (x_var≈0) are deterministic nan,
@@ -1350,11 +1419,25 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
     x_var = pd.DataFrame(data=x_var, index=y_data.index)
 
     # compute r2
-    y_var0 = y_data.subtract(compute_ewm(data=y_data, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill))
-    y_var = an * ewm_recursion(a=np.square(y_var0.to_numpy()), span=span, ewm_lambda=ewm_lambda,
-                               init_value=np.zeros(len(y_data.columns)), nan_backfill=nan_backfill)
+    y_var0 = y_data.subtract(compute_ewm(
+        data=y_data,
+        span=span,
+        ewm_lambda=ewm_lambda,
+        nan_backfill=nan_backfill,
+    ))
+    y_var = an * ewm_recursion(
+        a=np.square(y_var0.to_numpy()),
+        span=span,
+        ewm_lambda=ewm_lambda,
+        init_value=np.zeros(len(y_data.columns)),
+        nan_backfill=nan_backfill,
+    )
     # NumPy 2.x: work on ndarray with explicit out=; rebuild frame afterwards.
-    resid_var_np = resid_var.to_numpy(dtype=float) if isinstance(resid_var, pd.DataFrame) else np.asarray(resid_var, dtype=float)
+    resid_var_np = (
+        resid_var.to_numpy(dtype=float)
+        if isinstance(resid_var, pd.DataFrame)
+        else np.asarray(resid_var, dtype=float)
+    )
     ewm_r2_np = 1.0 - np.divide(
         resid_var_np, y_var,
         out=np.full_like(resid_var_np, np.nan),

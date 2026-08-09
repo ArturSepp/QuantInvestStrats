@@ -82,6 +82,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 is_unit_based_traded_volume: bool = True,
                                 df_to_add: pd.DataFrame = None,
                                 factsheet_name: str = None,
+                                monthly_returns_heatmap_max_years: Optional[int] = 20,
                                 **kwargs
                                 ) -> List[plt.Figure]:
     """
@@ -127,6 +128,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         figsize: page size in inches; the default is A4 portrait
         fontsize: base font size
         heatmap_fontsize: font size for the heatmap panels, which carry more cells
+        monthly_returns_heatmap_max_years: maximum calendar-year rows shown on the summary
+            page. Longer histories emit a warning and add a full-history landscape page. None
+            keeps the complete history on the summary page and disables the appendix
         weights_change_lag: lookback for the weight-change report, in periods
         add_current_position_var_risk_sheet: append current positions with their value-at-risk
         add_grouped_weights_sheet: append weights aggregated by ``group_data``
@@ -149,6 +153,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     Returns:
         one figure per page, in page order
     """
+    if monthly_returns_heatmap_max_years is not None and monthly_returns_heatmap_max_years <= 0:
+        raise ValueError("monthly_returns_heatmap_max_years must be positive or None, "
+                         f"got {monthly_returns_heatmap_max_years}")
+
     # align
     if isinstance(benchmark_prices, pd.Series):
         benchmark_prices = benchmark_prices.to_frame()
@@ -181,6 +189,27 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     # set reporting time period here
     if time_period is None:
         time_period = qis.get_time_period(portfolio_nav)
+
+    monthly_returns_table = qis.compute_periodic_returns_table(
+        prices=portfolio_nav,
+        heatmap_freq='YE',
+        column_period='ME',
+        row_date_format='%Y',
+        is_inverse_order=True,
+        is_add_annual_column=True,
+    )
+    num_monthly_returns_years = len(monthly_returns_table.index)
+    is_add_monthly_returns_appendix = (
+        monthly_returns_heatmap_max_years is not None
+        and num_monthly_returns_years > monthly_returns_heatmap_max_years
+    )
+    if is_add_monthly_returns_appendix:
+        warnings.warn(
+            f"Monthly returns history contains {num_monthly_returns_years} calendar years; "
+            f"displaying the latest {monthly_returns_heatmap_max_years} calendar years on the "
+            "summary page and appending a full-history heatmap.",
+            UserWarning,
+        )
 
     # guard: the requested reporting frequency must not be finer than the NAV's own sampling
     # frequency (e.g. weekly/daily reporting on monthly data would up-sample to nonsense)
@@ -332,11 +361,20 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # heatmap
     ax = fig.add_subplot(gs[2:4, 2:])
+    if is_add_monthly_returns_appendix:
+        monthly_returns_title = (f"Monthly Returns - Last "
+                                 f"{monthly_returns_heatmap_max_years} Calendar Years")
+    else:
+        monthly_returns_title = 'Monthly Returns'
     portfolio_data.plot_monthly_returns_heatmap(ax=ax,
                                                 time_period=time_period,
-                                                title='Monthly Returns',
-                                                **qis.update_kwargs(kwargs, dict(fontsize=heatmap_fontsize,
-                                                                                 date_format='%Y')))
+                                                title=monthly_returns_title,
+                                                **qis.update_kwargs(
+                                                    kwargs,
+                                                    dict(fontsize=heatmap_fontsize,
+                                                         date_format='%Y',
+                                                         max_years=monthly_returns_heatmap_max_years,
+                                                         is_ytd_color_scale_independent=True)))
 
     # periodic returns
     ax = fig.add_subplot(gs[4:6, 2:])
@@ -382,6 +420,20 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     figs = [fig]
+
+    if is_add_monthly_returns_appendix:
+        appendix_figsize = (max(figsize), min(figsize))
+        appendix_fig, appendix_ax = plt.subplots(figsize=appendix_figsize, constrained_layout=True)
+        portfolio_data.plot_monthly_returns_heatmap(
+            ax=appendix_ax,
+            time_period=time_period,
+            title='Monthly Returns - Full History',
+            **qis.update_kwargs(kwargs, dict(fontsize=max(heatmap_fontsize, fontsize),
+                                             date_format='%Y',
+                                             max_years=None,
+                                             is_ytd_color_scale_independent=True)),
+        )
+        figs.append(appendix_fig)
 
     if add_current_position_var_risk_sheet:
         # qqq

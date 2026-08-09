@@ -2,7 +2,7 @@
 Sweep vol-target and trend-following strategies across span parameters.
 
 Uses ``simulate_vol_target_strats_range`` and ``simulate_trend_strats_range``
-from ``qis.portfolio.strats.quant_strats_delta1`` to produce per-span NAV grids,
+from ``qis.examples.portfolios.strats.qis_delta1`` to produce per-span NAV grids,
 then renders multi-page A4 reports comparing prices, weights, return
 distributions, and QQ plots across the parameter range.
 """
@@ -20,7 +20,10 @@ import qis
 
 
 # strats
-from qis.portfolio.strats.quant_strats_delta1 import simulate_vol_target_strats_range, simulate_trend_strats_range
+from qis.examples.portfolios.strats.qis_delta1 import (
+    simulate_trend_strats_range,
+    simulate_vol_target_strats_range,
+)
 
 FIG_SIZE = (8.3, 11.7)  # A4 for portrait
 
