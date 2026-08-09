@@ -7,11 +7,24 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-### Removed
-- `PerfStat.TE` and `PerfStat.IR`; `compute_te_ir_errors` keeps the output labels as literal
-  `TE` and `IR` strings.
-- `TRE_TABLE_COLUMNS`; the preset requested statistics no qis table builder supplied, so
-  `get_ra_perf_columns` silently dropped its headline columns.
+## [5.9.2] - 2026-08-09
+
+**Behaviour changes.** `PerfStat.TE`, `PerfStat.IR`, and `TRE_TABLE_COLUMNS` are removed.
+The in-sample `compute_te_ir_errors` output labels remain the literal strings `TE` and `IR`;
+the removed preset requested statistics no qis table builder supplied, so its headline columns
+were silently dropped. The `add_tracking_error_table` factsheet panel is retitled
+"Per-instrument attribution and IR"; the compatibility keyword keeps its historical name.
+
+### Added
+- `weights_tracking_error_report_by_ac_subac` adds realised-TRE, ex-ante versus ex-post
+  benchmark-beta, and annualised ex-post-alpha panels. NAV-only input still produces realised
+  TRE and alpha; covariance-dependent beta is omitted when no covariance path is available.
+- `compute_ewma_realised_tracking_error` is part of the documented `CORE_API` portfolio group.
+
+### Changed
+- The internal implementations of `compute_ewma_realised_tracking_error`,
+  `compute_te_ir_errors`, and `compute_info_ratio_table` moved from `qis.perfstats` modules to
+  `qis.portfolio.risk.ex_post_tracking_error`; their top-level `qis` imports are unchanged.
 
 ## [5.9.1] - 2026-08-09
 

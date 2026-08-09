@@ -77,7 +77,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         add_strategy_factsheet: append the full single-strategy factsheet
         add_grouped_exposures: report exposures by group in that appended factsheet
         add_grouped_cum_pnl: report cumulative P&L by group in that appended factsheet
-        add_tracking_error_table: add the tracking-error table
+        add_tracking_error_table: add the per-instrument attribution and IR table; the keyword
+            keeps its historical name for compatibility
         add_exposures_comp: add the strategy-versus-benchmark exposure comparison
         is_grouped: report annual returns by asset class rather than by instrument. None decides by
             the universe size, grouping once there are more than ten instruments
@@ -299,7 +300,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                                       benchmark_idx=benchmark_idx,
                                                                       **kwargs)
         fig1, ax = plt.subplots(1, 1, figsize=get_df_table_size(df=tre_table), constrained_layout=True)
-        fig1.suptitle(f'{backtest_name} Tracking error table', fontweight="bold", fontsize=8, color='blue')
+        fig1.suptitle(f'{backtest_name} Per-instrument attribution and IR',
+                      fontweight="bold", fontsize=8, color='blue')
         figs.append(fig1)
         qis.plot_df_table(df=tre_table,
                           first_row_height=0.075,
