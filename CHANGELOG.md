@@ -7,6 +7,21 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.9.4] - 2026-08-11
+
+### Fixed
+- Brinson attribution now preserves canonical ticker alignment when portfolios use display-name
+  mappings, so group assignments and attribution values remain unchanged.
+
+### Changed
+- The strategy factsheet's full-history monthly-return appendix is now centered on a portrait
+  page and adapts its plot dimensions to the number of calendar-year rows.
+- When a strategy has more than 10 portfolio groups, the dense RA performance, YE-return, and
+  regime-Sharpe summary panels now show the strategy and benchmark only and emit one warning;
+  other grouped panels remain unchanged. The same limit applies to grouped RA tables in the
+  strategy-versus-benchmark factsheet and grouped regime-Sharpe panels in the multi-strategy
+  factsheet.
+
 ## [5.9.3] - 2026-08-09
 
 **Behaviour change.** The separate `heatmap_fontsize` argument is removed from

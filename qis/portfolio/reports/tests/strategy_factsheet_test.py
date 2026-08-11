@@ -14,20 +14,25 @@ from qis.plots.derived.returns_heatmap import plot_returns_heatmap
 from qis.portfolio.reports.strategy_benchmark_factsheet import (
     generate_strategy_benchmark_factsheet_plt,
 )
+from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
+from qis.portfolio.reports import strategy_factsheet
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 
 
-def _make_portfolio_data() -> tuple[qis.PortfolioData, pd.DataFrame]:
+def _make_portfolio_data(
+        n_assets: int = 3,
+        n_years: int = 6,
+) -> tuple[qis.PortfolioData, pd.DataFrame]:
     rng = np.random.default_rng(17)
-    index = pd.bdate_range(end='2025-12-31', periods=6 * 260)
-    returns = 0.0002 + 0.008 * rng.standard_normal((len(index), 3))
+    index = pd.bdate_range(end='2025-12-31', periods=n_years * 260)
+    returns = 0.0002 + 0.008 * rng.standard_normal((len(index), n_assets))
     prices = pd.DataFrame(100.0 * np.exp(np.cumsum(returns, axis=0)),
                           index=index,
-                          columns=['A', 'B', 'C'])
+                          columns=[f'Asset {idx + 1}' for idx in range(n_assets)])
     rebalancing_dates = prices.resample('ME').last().index
-    weights = pd.DataFrame(1.0 / 3.0, index=rebalancing_dates, columns=prices.columns)
+    weights = pd.DataFrame(1.0 / n_assets, index=rebalancing_dates, columns=prices.columns)
     portfolio = qis.backtest_model_portfolio(prices=prices, weights=weights, ticker='Strategy')
-    return portfolio, prices[['A']]
+    return portfolio, prices.iloc[:, [0]].rename(columns={prices.columns[0]: 'Benchmark'})
 
 
 def test_monthly_returns_summary_defaults() -> None:
@@ -68,7 +73,109 @@ def test_long_history_warns_limits_summary_and_appends_full_heatmap() -> None:
         assert {text.get_fontsize() for text in appendix_ax.texts} == {7.0}
         assert {text.get_fontsize() for text in periodic_returns_ax.texts} == {7.0}
         width, height = figs[1].get_size_inches()
-        assert width > height
+        assert height > width
+        appendix_position = appendix_ax.get_position()
+        assert appendix_position.width < 0.9
+        assert appendix_position.height < 0.8
+    finally:
+        plt.close('all')
+
+
+def test_full_history_heatmap_layout_adapts_to_year_rows() -> None:
+    short = strategy_factsheet._get_monthly_returns_appendix_bounds(
+        num_years=10, num_columns=13, figsize=(8.5, 11.7))
+    medium = strategy_factsheet._get_monthly_returns_appendix_bounds(
+        num_years=22, num_columns=13, figsize=(8.5, 11.7))
+    long = strategy_factsheet._get_monthly_returns_appendix_bounds(
+        num_years=40, num_columns=13, figsize=(8.5, 11.7))
+
+    assert short[3] < medium[3] < long[3]
+    assert short[2] == pytest.approx(medium[2])
+    assert long[2] < medium[2]
+    for left, bottom, width, height in (short, medium, long):
+        assert 0.0 < left < 1.0
+        assert 0.0 < bottom < 1.0
+        assert 0.0 < width < 1.0
+        assert 0.0 < height < 1.0
+        assert left + width < 1.0
+        assert bottom + height < 1.0
+
+
+def test_more_than_ten_groups_use_strategy_only_summary_tables() -> None:
+    portfolio, benchmark_prices = _make_portfolio_data(n_assets=11, n_years=3)
+
+    with pytest.warns(UserWarning, match='11 portfolio groups.*maximum of 10') as warnings_:
+        figs = generate_strategy_factsheet(
+            portfolio_data=portfolio,
+            benchmark_prices=benchmark_prices,
+            is_grouped=True,
+        )
+    try:
+        assert sum('portfolio groups' in str(warning.message) for warning in warnings_) == 1
+        titles = [ax.get_title() for ax in figs[0].axes]
+        assert any(title.startswith('RA performance table  for') for title in titles)
+        assert 'YE-returns' in titles
+        assert any(title.startswith('Sharpe ratio attribution to Benchmark') for title in titles)
+        assert not any('with portfolio groups' in title for title in titles)
+        assert not any('returns by groups' in title for title in titles)
+        assert not any('attribution by groups' in title for title in titles)
+    finally:
+        plt.close('all')
+
+
+def test_strategy_benchmark_factsheet_limits_grouped_ra_tables(monkeypatch) -> None:
+    strategy, benchmark_prices = _make_portfolio_data(n_assets=11, n_years=3)
+    benchmark_portfolio, _ = _make_portfolio_data(n_assets=11, n_years=3)
+    benchmark_portfolio.set_ticker('Benchmark Portfolio')
+    multi_portfolio = qis.MultiPortfolioData(
+        portfolio_datas=[strategy, benchmark_portfolio],
+        benchmark_prices=benchmark_prices,
+    )
+    grouped_arguments = []
+    original_plot = multi_portfolio.plot_ac_ra_perf_table
+
+    def capture_grouping(*args, **kwargs):
+        grouped_arguments.append(kwargs['is_grouped'])
+        return original_plot(*args, **kwargs)
+
+    monkeypatch.setattr(multi_portfolio, 'plot_ac_ra_perf_table', capture_grouping)
+    with pytest.warns(UserWarning, match='11 portfolio groups.*maximum of 10') as warnings_:
+        generate_strategy_benchmark_factsheet_plt(
+            multi_portfolio_data=multi_portfolio,
+            add_brinson_attribution=False,
+            is_grouped=True,
+        )
+    try:
+        assert sum('portfolio groups' in str(warning.message) for warning in warnings_) == 1
+        assert grouped_arguments == [False, False]
+    finally:
+        plt.close('all')
+
+
+def test_multi_strategy_factsheet_limits_grouped_sharpe(monkeypatch) -> None:
+    strategy, benchmark_prices = _make_portfolio_data(n_assets=11, n_years=3)
+    second_strategy, _ = _make_portfolio_data(n_assets=11, n_years=3)
+    second_strategy.set_ticker('Second Strategy')
+    multi_portfolio = qis.MultiPortfolioData(
+        portfolio_datas=[strategy, second_strategy],
+        benchmark_prices=benchmark_prices,
+    )
+    grouped_arguments = []
+    original_plot = multi_portfolio.plot_regime_data
+
+    def capture_grouping(*args, **kwargs):
+        grouped_arguments.append(kwargs['is_grouped'])
+        return original_plot(*args, **kwargs)
+
+    monkeypatch.setattr(multi_portfolio, 'plot_regime_data', capture_grouping)
+    with pytest.warns(UserWarning, match='11 portfolio groups.*maximum of 10') as warnings_:
+        generate_multi_portfolio_factsheet(
+            multi_portfolio_data=multi_portfolio,
+            group_data=strategy.group_data,
+        )
+    try:
+        assert sum('portfolio groups' in str(warning.message) for warning in warnings_) == 1
+        assert grouped_arguments == [False]
     finally:
         plt.close('all')
 

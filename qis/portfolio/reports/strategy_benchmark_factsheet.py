@@ -26,7 +26,10 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 # portfolio
 from qis.portfolio.portfolio_data import AttributionMetric
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
+from qis.portfolio.reports.strategy_factsheet import (
+    _use_grouped_summary_tables,
+    generate_strategy_factsheet,
+)
 from qis.portfolio.reports.config import (PERF_PARAMS, validate_reporting_frequency,
                                           validate_legend_capacity, infer_data_frequency_label)
 from qis.plots.utils import get_df_table_size, set_spines, set_y_limits
@@ -80,7 +83,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
             keeps its historical name for compatibility
         add_exposures_comp: add the strategy-versus-benchmark exposure comparison
         is_grouped: report annual returns by asset class rather than by instrument. None decides by
-            the universe size, grouping once there are more than ten instruments
+            the universe size, grouping once there are more than ten instruments. More than ten
+            groups are omitted from the RA summary tables with a warning
         figsize: page size in inches; the default is A4 portrait
         fontsize: base font size
         add_joint_instrument_history_report: add the per-instrument history page
@@ -102,6 +106,11 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         if is_grouped is False:
             if len(multi_portfolio_data.portfolio_datas[0].get_weights().columns) >= 10:  # tables look too bad
                 is_grouped = True
+    is_grouped_for_summary_tables = _use_grouped_summary_tables(
+        portfolio_data=multi_portfolio_data.portfolio_datas[strategy_idx],
+        is_grouped=is_grouped and not add_benchmarks_to_navs,
+        panel_names='the RA performance panels',
+    )
 
     # set reporting time period here
     if time_period is None:
@@ -199,7 +208,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                benchmark_price=benchmark_price,
                                                add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                perf_params=perf_params,
-                                               is_grouped=is_grouped,
+                                               is_grouped=is_grouped_for_summary_tables,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period, n_years=1)
@@ -213,7 +222,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                benchmark_price=benchmark_price,
                                                add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                perf_params=perf_params,
-                                               is_grouped=is_grouped,
+                                               is_grouped=is_grouped_for_summary_tables,
                                                **local_kwargs)
 
     # periodic returns

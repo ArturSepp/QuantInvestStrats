@@ -931,10 +931,12 @@ class MultiPortfolioData:
                                     is_exclude_interaction_term: bool = True
                                     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
-        strategy_pnl = self.portfolio_datas[strategy_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
+        strategy_pnl = self.portfolio_datas[strategy_idx]._get_attribution_table_by_instrument_canonical(
+            time_period=time_period, freq=freq)
         strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
 
-        benchmark_pnl = self.portfolio_datas[benchmark_idx].get_attribution_table_by_instrument(time_period=time_period, freq=freq)
+        benchmark_pnl = self.portfolio_datas[benchmark_idx]._get_attribution_table_by_instrument_canonical(
+            time_period=time_period, freq=freq)
         benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=freq, is_input_weights=False)
 
         if group_data is None:

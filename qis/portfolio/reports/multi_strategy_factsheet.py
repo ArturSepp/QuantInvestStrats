@@ -24,7 +24,10 @@ from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegim
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.config import (PERF_PARAMS, validate_reporting_frequency,
                                           validate_legend_capacity, infer_data_frequency_label)
-from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
+from qis.portfolio.reports.strategy_factsheet import (
+    _use_grouped_summary_tables,
+    generate_strategy_factsheet,
+)
 
 
 def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
@@ -62,7 +65,8 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
         add_benchmarks_to_navs: include the benchmarks as additional lines in the performance panels
         figsize: page size in inches; the default is A4 portrait
         group_data: asset-class label per instrument, indexed by instrument. Given, exposures and
-            turnover are reported by group
+            turnover are reported by group. More than ten groups are omitted from the
+            regime-Sharpe panels with a warning
         add_group_exposures_and_pnl: add the per-group exposure and P&L pages
         add_strategy_factsheets: append a full single-strategy factsheet for each portfolio
         fontsize: base font size, small by default because a factsheet page is dense
@@ -74,6 +78,11 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
         is_grouped = True
     else:
         is_grouped = False
+    is_grouped_for_summary_tables = _use_grouped_summary_tables(
+        portfolio_data=multi_portfolio_data.portfolio_datas[0],
+        is_grouped=is_grouped,
+        panel_names='the Sharpe-ratio panels',
+    )
 
     if regime_benchmark is None and multi_portfolio_data.benchmark_prices is not None:
         regime_benchmark = multi_portfolio_data.benchmark_prices.columns[0]
@@ -211,14 +220,14 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
 
     if len(multi_portfolio_data.benchmark_prices.columns) > 1:
         multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 2]),
-                                              is_grouped=is_grouped,
+                                              is_grouped=is_grouped_for_summary_tables,
                                               time_period=time_period,
                                               perf_params=perf_params,
                                               regime_classifier=regime_classifier,
                                               benchmark=multi_portfolio_data.benchmark_prices.columns[0],
                                               **kwargs)
         multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 3]),
-                                              is_grouped=is_grouped,
+                                              is_grouped=is_grouped_for_summary_tables,
                                               time_period=time_period,
                                               perf_params=perf_params,
                                               regime_classifier=regime_classifier,
@@ -226,7 +235,7 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                               **kwargs)
     else:
         multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 2:]),
-                                              is_grouped=is_grouped,
+                                              is_grouped=is_grouped_for_summary_tables,
                                               time_period=time_period,
                                               perf_params=perf_params,
                                               regime_classifier=regime_classifier,

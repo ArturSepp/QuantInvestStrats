@@ -1,6 +1,7 @@
 # QuantInvestStrats (`qis`)
 
-**qis package implements analytics for visualisation of financial data, performance reporting, factsheets and analysis of quantitative strategies.**
+**qis implements analytics for financial-data visualisation, performance and risk analysis,
+portfolio backtesting, and factsheet reporting for quantitative strategies.**
 
 [![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square)](https://pypi.org/project/qis/)
 [![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square)](https://pypi.org/project/qis/)
@@ -30,6 +31,19 @@ dependency path increasing sequentially as follows.
 Function ```backtest_model_portfolio()```  in ```qis.portfolio.backtester.py``` takes instrument prices 
 and simulated weights from a generic strategy and compute the total return, performance attribution, and risk analysis
 
+Risk and tracking-error analytics are consolidated in ```qis.portfolio.risk```. The public
+```qis.RiskModel``` is the point-in-time weights-and-covariance layer for ex-ante tracking
+error, standalone group risk, factor exposures, benchmark beta and loadings,
+systematic/residual tracking-error decomposition, and Euler marginal tracking-error
+contributions. Ex-post analytics use portfolio and benchmark NAVs or return differences:
+```compute_ewma_realised_tracking_error``` produces a conditional annualised series, while
+```compute_te_ir_errors``` and ```compute_info_ratio_table``` produce whole-sample tracking
+error and information-ratio estimates. The
+```weights_tracking_error_report_by_ac_subac``` report brings these views together with
+ex-ante versus realised tracking error, ex-ante versus ex-post beta, annualised ex-post alpha,
+and optional factor panels. Some established API names retain the abbreviation ```tre```, but
+all refer to tracking error.
+
 ```qis.market_data``` is an auxiliary module of market-data containers and FX analytics. ```FxRatesData``` holds FX spot and domestic short-rate panels and derives cross rates, covered-interest-parity forward premia, carry decomposition, and reference-currency / FX-hedged return translation of multi-asset panels, together with single- and multi-asset FX-hedging reports. ```FactorsData``` is a generic container for tradable-factor prices. Examples build the container from free Yahoo data or from Bloomberg via ```bbg-fetch```; see the module README at ```qis/market_data/README.md``` for the data contract and conventions.
 
 ```qis.examples``` contains runnable scripts showcasing the analytics, organised by sub-package:
@@ -40,7 +54,7 @@ and simulated weights from a generic strategy and compute the total return, perf
 
 * ```qis.examples.regimes``` — regime-conditional analytics: bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study.
 
-* ```qis.examples.portfolios``` — backtests using ```backtest_model_portfolio```: balanced 60/40 with and without a BTC sleeve, constant-notional short, leveraged-ETF combinations, long/short pairs, and vol-target / trend-following parameter sweeps.
+* ```qis.examples.portfolios``` — backtests using ```backtest_model_portfolio```: balanced 60/40 with and without a BTC sleeve, constant-notional short, leveraged-ETF combinations, long/short pairs, vol-target / trend-following parameter sweeps, and separate offline ex-ante and ex-post tracking-error workflows.
 
 * ```qis.examples.factsheets``` — full multi-page factsheets for simulated and actual strategies, cross-sectional asset-class comparisons, multi-strategy parameter sweeps, and optional pybloqs-rendered variants.
 
@@ -221,10 +235,10 @@ Run example in ```qis.examples.factsheets.multi_strategy.py``` https://github.co
 
 ### 6. Runnable examples <a name="runnable-examples"></a>
 
-All 58 examples are plain scripts under
+The examples are plain scripts under
 [`qis/examples/`](https://github.com/ArturSepp/QuantInvestStrats/tree/main/qis/examples), each
-runnable top to bottom. `qis/tests/test_examples.py` checks every one of them for symbols and
-keyword arguments that exist, and runs the nine that need no data vendor.
+runnable top to bottom. `qis/tests/test_examples.py` checks them for symbols and keyword
+arguments that exist, and runs the examples that need no data vendor.
 
 The four factsheet archetypes shown above are
 [`multi_assets.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/multi_assets.py),
@@ -233,6 +247,12 @@ The four factsheet archetypes shown above are
 and
 [`multi_strategy.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/factsheets/multi_strategy.py).
 
+The consolidated tracking-error analytics are demonstrated offline in
+[`ex_anti_tracking_error_and_risk.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/portfolios/ex_anti_tracking_error_and_risk.py)
+for the covariance-based ex-ante view and
+[`ex_post_tracking_error_and_risk.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/qis/examples/portfolios/ex_post_tracking_error_and_risk.py)
+for realised EWMA tracking error, whole-sample TE/IR, and EWMA beta/alpha.
+
 
 ## Ecosystem
 
@@ -240,7 +260,7 @@ This package is part of an open-source Python stack for quantitative finance —
 
 | Package | Purpose |
 |---|---|
-| [`qis`](https://github.com/ArturSepp/QuantInvestStrats) *(this package)* | Performance analytics, factsheets, and visualisation |
+| [`qis`](https://github.com/ArturSepp/QuantInvestStrats) *(this package)* | Performance and risk analytics, factsheets, and visualisation |
 | [`optimalportfolios`](https://github.com/ArturSepp/OptimalPortfolios) | Portfolio construction and backtesting |
 | [`factorlasso`](https://github.com/ArturSepp/factorlasso) | Sparse factor models and factor covariance estimation |
 | [`bbg-fetch`](https://github.com/ArturSepp/BloombergFetch) | Bloomberg data fetching |
@@ -310,7 +330,7 @@ If you use QIS in your research, please cite it as:
   title={qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies},
   author={Sepp, Artur},
   year={2026},
-  version={5.9.3},
+  version={5.9.4},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

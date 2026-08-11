@@ -42,6 +42,55 @@ from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
 from qis.plots.utils import TrendLine, align_y_limits_axs, set_spines
 
 
+MAX_GROUPS_FOR_SUMMARY_TABLES = 10
+_MONTHLY_RETURNS_APPENDIX_MAX_WIDTH = 0.80
+_MONTHLY_RETURNS_APPENDIX_MAX_HEIGHT = 0.72
+_MONTHLY_RETURNS_HEATMAP_CELL_ASPECT = 1.50
+
+
+def _get_monthly_returns_appendix_bounds(num_years: int,
+                                         num_columns: int,
+                                         figsize: Tuple[float, float]
+                                         ) -> Tuple[float, float, float, float]:
+    """Return centered axes bounds that preserve readable monthly-return cell proportions."""
+    if num_years <= 0 or num_columns <= 0:
+        raise ValueError("num_years and num_columns must be positive")
+
+    page_width, page_height = figsize
+    max_width = page_width * _MONTHLY_RETURNS_APPENDIX_MAX_WIDTH
+    max_height = page_height * _MONTHLY_RETURNS_APPENDIX_MAX_HEIGHT
+    width = min(
+        max_width,
+        max_height * num_columns * _MONTHLY_RETURNS_HEATMAP_CELL_ASPECT / num_years,
+    )
+    height = width * num_years / (num_columns * _MONTHLY_RETURNS_HEATMAP_CELL_ASPECT)
+    left = 0.5 * (1.0 - width / page_width)
+    bottom = 0.5 * (1.0 - height / page_height)
+    return left, bottom, width / page_width, height / page_height
+
+
+def _use_grouped_summary_tables(
+        portfolio_data: PortfolioData,
+        is_grouped: bool,
+        panel_names: str = 'RA performance, YE-returns, and Sharpe-ratio panels',
+) -> bool:
+    """Limit dense summary tables while leaving other grouped report panels unchanged."""
+    if not is_grouped or portfolio_data.group_data is None:
+        return is_grouped
+
+    num_groups = int(portfolio_data.group_data.nunique(dropna=True))
+    if num_groups <= MAX_GROUPS_FOR_SUMMARY_TABLES:
+        return True
+
+    warnings.warn(
+        f"The portfolio contains {num_groups} portfolio groups, exceeding the maximum of "
+        f"{MAX_GROUPS_FOR_SUMMARY_TABLES} for readable summary tables; rendering "
+        f"{panel_names} without portfolio groups.",
+        UserWarning,
+    )
+    return False
+
+
 def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 benchmark_prices: Union[pd.DataFrame, pd.Series],
                                 time_period: TimePeriod = None,
@@ -127,8 +176,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         figsize: page size in inches; the default is A4 portrait
         fontsize: base font size
         monthly_returns_heatmap_max_years: maximum calendar-year rows shown on the summary
-            page. Longer histories emit a warning and add a full-history landscape page. None
-            keeps the complete history on the summary page and disables the appendix
+            page. Longer histories emit a warning and add an adaptive full-history portrait
+            page. None keeps the complete history on the summary page and disables the appendix
         weights_change_lag: lookback for the weight-change report, in periods
         add_current_position_var_risk_sheet: append current positions with their value-at-risk
         add_grouped_weights_sheet: append weights aggregated by ``group_data``
@@ -169,6 +218,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         if len(portfolio_data.get_weights().columns) >= 10:  # otherwise tables look too bad
             warnings.warn(f"report for more than 10 assets is not supported for is_grouped=False, switching to is_grouped=True ")
             is_grouped = True
+    is_grouped_for_summary_tables = _use_grouped_summary_tables(
+        portfolio_data=portfolio_data,
+        is_grouped=is_grouped,
+    )
 
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
@@ -336,7 +389,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                           benchmark_price=benchmark_price1,
                                           time_period=time_period,
                                           perf_params=perf_params,
-                                          is_grouped=is_grouped,
+                                          is_grouped=is_grouped_for_summary_tables,
                                           **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
     else:  # plot two tables
         ax = fig.add_subplot(gs[0, 2:])
@@ -381,13 +434,13 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
                                      new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=True))
     portfolio_data.plot_periodic_returns(benchmark_prices=benchmark_price1,
-                                         is_grouped=is_grouped,
+                                         is_grouped=is_grouped_for_summary_tables,
                                          time_period=time_period,
                                          ax=ax,
                                          **local_kwargs)
 
     # regime data
-    portfolio_data.plot_regime_data(is_grouped=is_grouped,
+    portfolio_data.plot_regime_data(is_grouped=is_grouped_for_summary_tables,
                                     benchmark_price=benchmark_prices[regime_benchmark],
                                     time_period=time_period,
                                     perf_params=perf_params,
@@ -422,8 +475,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     figs = [fig]
 
     if is_add_monthly_returns_appendix:
-        appendix_figsize = (max(figsize), min(figsize))
-        appendix_fig, appendix_ax = plt.subplots(figsize=appendix_figsize, constrained_layout=True)
+        appendix_figsize = (min(figsize), max(figsize))
+        appendix_bounds = _get_monthly_returns_appendix_bounds(
+            num_years=num_monthly_returns_years,
+            num_columns=len(monthly_returns_table.columns),
+            figsize=appendix_figsize,
+        )
+        appendix_fig = plt.figure(figsize=appendix_figsize)
+        appendix_ax = appendix_fig.add_axes(appendix_bounds)
         portfolio_data.plot_monthly_returns_heatmap(
             ax=appendix_ax,
             time_period=time_period,

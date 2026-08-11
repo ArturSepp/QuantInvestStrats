@@ -60,6 +60,52 @@ def test_performance_attribution_uses_instrument_display_names() -> None:
     assert pnl_risk.index.tolist() == list(names.values())
 
 
+def test_brinson_keeps_canonical_alignment_with_display_names() -> None:
+    """Display names must not change Brinson groups or attribution values."""
+    strategy = build_portfolio_data()
+    benchmark_weights = {
+        ticker: weight
+        for ticker, weight in zip(
+            strategy.prices.columns,
+            np.linspace(1.0, 2.0, len(strategy.prices.columns)),
+        )
+    }
+    total_weight = sum(benchmark_weights.values())
+    benchmark_weights = {
+        ticker: weight / total_weight
+        for ticker, weight in benchmark_weights.items()
+    }
+    benchmark = qis.backtest_model_portfolio(
+        prices=strategy.prices,
+        weights=benchmark_weights,
+        ticker='Benchmark',
+    )
+    group_order = ['EQ', 'FI', 'ALTS', 'Cash']
+    group_data = pd.Series(
+        [group_order[idx % len(group_order)]
+         for idx in range(len(strategy.prices.columns))],
+        index=strategy.prices.columns,
+    )
+    for portfolio in (strategy, benchmark):
+        portfolio.set_group_data(group_data=group_data, group_order=group_order)
+    multi_portfolio = qis.MultiPortfolioData(
+        portfolio_datas=[strategy, benchmark],
+        benchmark_prices=strategy.prices.iloc[:, [0]],
+    )
+    expected = multi_portfolio.compute_brinson_attribution(freq='ME')
+
+    display_names = {
+        ticker: f'Asset name {idx}'
+        for idx, ticker in enumerate(strategy.prices.columns)
+    }
+    for portfolio in (strategy, benchmark):
+        portfolio.tickers_to_names_map = display_names
+    actual = multi_portfolio.compute_brinson_attribution(freq='ME')
+
+    for expected_frame, actual_frame in zip(expected, actual):
+        pd.testing.assert_frame_equal(actual_frame, expected_frame)
+
+
 def test_bar_label_width_calibration() -> None:
     """the measured width of a rotated tick label matches the constant the capacity is built on"""
     labels = ['S&p_500', 'Wheat_minneapol', 'Ust_10y_ultra', 'Gasoil', 'Feeder_cattle']
