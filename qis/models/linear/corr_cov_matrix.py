@@ -121,9 +121,9 @@ def compute_masked_covar_corr(data: Union[np.ndarray, pd.DataFrame],
     covariance or correlation of a returns panel, computed pairwise over the observed entries.
 
     A ragged panel has no common sample: dropping rows with any missing value can discard most of
-    the history, and filling with zero biases the estimate towards zero. Masked arrays compute each
-    pair on the observations both series have, which uses all the data at the cost of a matrix that
-    is not guaranteed positive semi-definite. Check before feeding it to an optimiser.
+    the history, and filling with zero biases the estimate towards zero. Each pair is computed on
+    the observations both series have, which uses all the data at the cost of a matrix that is not
+    guaranteed positive semi-definite. Check before feeding it to an optimiser.
 
     Args:
         data: returns, rows are dates and columns are assets
@@ -148,10 +148,9 @@ def compute_masked_covar_corr(data: Union[np.ndarray, pd.DataFrame],
         if is_covar:
             covar = np.ma.cov(np.ma.masked_invalid(data_np), rowvar=False, bias=bias, allow_masked=True).data
         else:
-            # NumPy 2.x removed `bias` from np.ma.corrcoef (and np.corrcoef). It was
-            # deprecation-warned since NumPy 1.10 because bias/ddof cancel in correlation
-            # normalization — the argument had no effect on the result.
-            covar = np.ma.corrcoef(np.ma.masked_invalid(data_np), rowvar=False, allow_masked=True).data
+            # Masked corrcoef can normalise a pairwise covariance with full-history variances,
+            # producing correlations outside [-1, 1] for ragged histories.
+            covar = pd.DataFrame(data_np).corr().to_numpy()
     else:
         if is_covar:
             covar = np.cov(data_np, rowvar=False, bias=bias)

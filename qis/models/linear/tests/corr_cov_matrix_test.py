@@ -6,7 +6,12 @@ from enum import Enum
 # qis
 import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
-from qis.models.linear.corr_cov_matrix import corr_to_pivot_row, compute_ewm_corr_df, matrix_regularization
+from qis.models.linear.corr_cov_matrix import (
+    compute_ewm_corr_df,
+    compute_masked_covar_corr,
+    corr_to_pivot_row,
+    matrix_regularization,
+)
 
 
 class LocalTests(Enum):
@@ -14,6 +19,19 @@ class LocalTests(Enum):
     EWMA_CORR_MATRIX = 2
     PLOT_CORR_MATRIX = 3
     MATRIX_REGULARIZATION = 4
+
+
+def test_compute_masked_corr_uses_pairwise_complete_observations():
+    """Keep ragged-history correlations bounded and equal to pandas pairwise correlation."""
+    data = pd.DataFrame({
+        'long': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0],
+        'short': [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 0.0, 1.0, 2.0, 3.0],
+    })
+
+    actual = compute_masked_covar_corr(data=data, is_covar=False)
+
+    pd.testing.assert_frame_equal(actual, data.corr())
+    assert np.nanmax(np.abs(actual.to_numpy())) <= 1.0
 
 
 def run_local_test(local_test: LocalTests):
