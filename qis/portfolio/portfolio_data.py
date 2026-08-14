@@ -1411,6 +1411,12 @@ class PortfolioData:
         if shorten_instrument_names:
             data.index = [x[:15] for x in data.index]
 
+        is_pnl_attribution = attribution_metric in (
+            AttributionMetric.PNL,
+            AttributionMetric.PNL_RISK,
+        )
+        pnl_var_format = '{:,.1%}'
+
         # reduce to the tails once the labels would crowd, and say what was folded away
         title = f"{attribution_metric.value}"
         if time_period is not None:
@@ -1428,8 +1434,12 @@ class PortfolioData:
             n_folded = n_total - len(data.index)
             if n_folded > 0:
                 side = 'top and bottom' if is_two_sided else 'top'
+                folded_value_label = (
+                    pnl_var_format.format(folded_value)
+                    if is_pnl_attribution else f'{folded_value:.2%}'
+                )
                 title += (f"\n{side} {len(data.index)} of {n_total}: "
-                          f"{n_folded} folded away, summing to {folded_value:.2%}")
+                          f"{n_folded} folded away, summing to {folded_value_label}")
 
         if add_top_bar_values is None:
             if isinstance(data, pd.Series) and len(data.index) <= 20:
@@ -1446,7 +1456,8 @@ class PortfolioData:
                       skip_y_axis=True,
                       title=title,
                       stacked=False,
-                      yvar_format='{:,.1%}' if add_top_bar_values else '{:,.2%}',
+                      yvar_format=(pnl_var_format if is_pnl_attribution or add_top_bar_values
+                                   else '{:,.2%}'),
                       ax=ax,
                       **kwargs)
 

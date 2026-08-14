@@ -222,6 +222,27 @@ def test_plot_performance_attribution_reduces_only_when_crowded() -> None:
     assert bar_count(figsize=(2.8, 11.7), max_bars=0, fontsize=12) == n_bars
 
 
+@pytest.mark.parametrize(
+    'attribution_metric',
+    [qis.AttributionMetric.PNL, qis.AttributionMetric.PNL_RISK],
+)
+def test_pnl_attribution_uses_one_decimal_percent_format(attribution_metric) -> None:
+    """P&L and risk attribution keep 0.0% precision even without top labels."""
+    portfolio_data = build_portfolio_data()
+    fig, ax = plt.subplots(figsize=(6.0, 3.0))
+    portfolio_data.plot_performance_attribution(
+        attribution_metric=attribution_metric,
+        add_top_bar_values=False,
+        fontsize=5,
+        legend_loc=None,
+        ax=ax,
+    )
+    formatter = ax.yaxis.get_major_formatter()
+    assert formatter(0.0) == '0.0%'
+    assert formatter(0.1234) == '12.3%'
+    plt.close(fig)
+
+
 def test_plot_performance_attribution_states_the_fold() -> None:
     """the title carries what was folded away, so the stated sum cannot be misread"""
     portfolio_data = build_portfolio_data()

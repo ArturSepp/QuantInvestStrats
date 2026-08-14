@@ -14,6 +14,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   mappings, so group assignments and attribution values remain unchanged.
 
 ### Changed
+- P&L Attribution and P&L Risk Attribution panels now use one-decimal percentage formatting
+  (`0.0%`) consistently for axes, bar labels, and folded-tail totals.
 - The strategy factsheet's full-history monthly-return appendix is now centered on a portrait
   page and adapts its plot dimensions to the number of calendar-year rows.
 - When a strategy has more than 10 portfolio groups, the dense RA performance, YE-return, and
