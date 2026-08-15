@@ -61,6 +61,7 @@ portfolio_backtesting
 incomplete_and_mixed_frequency_data
 private_asset_unsmoothing
 fx_hedging_and_market_data
+package_comparison
 ```
 
 ```{toctree}
