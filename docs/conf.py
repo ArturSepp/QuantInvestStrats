@@ -14,6 +14,7 @@ Two things are generated at build time rather than checked in:
 # packages
 import importlib.metadata
 import inspect
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -73,6 +74,7 @@ source_suffix = {'.rst': 'restructuredtext', '.md': 'markdown'}
 html_theme = 'furo'
 html_title = ('qis - performance analytics, portfolio backtesting, risk analysis, and '
               'factsheet reporting in Python')
+html_baseurl = os.environ.get('READTHEDOCS_CANONICAL_URL', '/')
 html_static_path = []
 
 # suppress the warning autosummary emits for symbols that are re-exported under a short name

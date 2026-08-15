@@ -1,3 +1,11 @@
+---
+myst:
+  html_meta:
+    description: >-
+      qis provides performance analytics, portfolio backtesting, risk analysis, and factsheet
+      reporting for quantitative investment strategies in Python.
+---
+
 # qis: performance analytics, portfolio backtesting, risk analysis, and factsheet reporting
 
 qis - performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in
@@ -21,6 +29,16 @@ qis.factsheet(universe.prices,
 That snippet needs no network and no data vendor: the panel is generated in-process from a fixed
 seed and carries the defects real panels carry — ragged starts, missing observations, stale
 prices, a delisted tail and a monthly-reported illiquid sleeve.
+
+## Project resources
+
+- [PyPI package](https://pypi.org/project/qis/)
+- [Source repository](https://github.com/ArturSepp/QuantInvestStrats)
+- [Issue tracker](https://github.com/ArturSepp/QuantInvestStrats/issues)
+- [Changelog](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CHANGELOG.md)
+- [Citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
+- [JOSS submission paper](https://github.com/ArturSepp/QuantInvestStrats/blob/main/paper.md)
+  (under review; not accepted or published)
 
 ```{toctree}
 :maxdepth: 2

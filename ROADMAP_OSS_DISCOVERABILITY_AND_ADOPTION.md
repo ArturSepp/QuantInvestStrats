@@ -588,3 +588,6 @@ credentialed unknowns distinguished; quickstart test passed in 16.81 seconds on 
 2026-08-15 · D1 · main · PASS-LOCAL · canonical identity aligned; strict Sphinx, metadata tests,
 package build, Twine validation, and wheel Summary inspection passed. Three docstring-only fixes
 were included with maintainer approval to clear pre-existing strict-Sphinx warnings.
+2026-08-15 · D2 · main · PASS-LOCAL · strict Sphinx and local canonical, title, description, and
+navigation checks passed; deployed HTTP, robots, sitemap, and canonical checks are recorded in the
+D0 baseline.
