@@ -74,9 +74,6 @@ html_theme = 'furo'
 html_title = ('qis - performance analytics, portfolio backtesting, risk analysis, and '
               'factsheet reporting in Python')
 html_static_path = []
-html_meta = {
-    'google-site-verification': 'cddUZk3Gsd1MySw42Rwuq_rMzUDcMNkJWekObx-QS9Y',
-}
 
 # suppress the warning autosummary emits for symbols that are re-exported under a short name
 suppress_warnings = ['autosummary']
