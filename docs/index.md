@@ -52,6 +52,15 @@ gallery
 
 ```{toctree}
 :maxdepth: 1
+:caption: Focused guides
+
+performance_analytics_and_sharpe
+factsheets_and_reporting
+tracking_error_and_risk
+```
+
+```{toctree}
+:maxdepth: 1
 :caption: Conventions
 
 _included/sharpe_conventions
