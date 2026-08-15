@@ -57,6 +57,10 @@ gallery
 performance_analytics_and_sharpe
 factsheets_and_reporting
 tracking_error_and_risk
+portfolio_backtesting
+incomplete_and_mixed_frequency_data
+private_asset_unsmoothing
+fx_hedging_and_market_data
 ```
 
 ```{toctree}
