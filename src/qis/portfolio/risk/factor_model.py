@@ -33,89 +33,24 @@ from qis.portfolio.risk.contributions import calculate_marginal_active_risk
 class LinearModel:
     """A linear factor model for analyzing asset returns using multiple factors.
 
-    This class implements a linear factor model of the form y = loadings^T @ x + alpha,
-    where factors (x) explain asset returns (y) through time-varying factor loadings.
+    This class implements a linear factor model in which factors explain asset returns through
+    time-varying loadings and an unexplained alpha component.
     The model supports factor attribution analysis, alpha calculation, model diagnostics,
     and performance evaluation.
 
-    The linear relationship assumes:
-    - y_t = β_t^T * x_t + α_t
-    - Where β_t are the factor loadings (betas) at time t
-    - x_t are the factor returns at time t
-    - α_t is the unexplained return (alpha) at time t
-
     Attributes:
-        x (pd.DataFrame or pd.Series): Factor data of shape (T, N) where T is time periods
-            and N is number of factors. Each column represents a different factor's
-            time series returns.
-        y (pd.DataFrame or pd.Series): Asset data of shape (T, M) where T is time periods
-            and M is number of assets. Each column represents a different asset's
-            time series returns.
-        loadings (Dict[str, pd.DataFrame], optional): Estimated factor loadings for each
-            factor. Keys are factor names (matching x.columns), values are DataFrames
-            with shape (T, M) containing time-varying loadings for each asset.
+        x: Factor returns with dates as rows and factors as columns.
+        y: Asset returns with dates as rows and assets as columns.
+        loadings: Estimated time-varying factor loadings keyed by factor name.
+        x_covars: Factor covariance matrices keyed by estimation date.
+        residual_vars: Asset-specific residual variances by date.
 
-    Methods:
-        Core Analysis:
-            - get_factor_loadings(): Retrieve loadings for specific factors
-            - get_asset_factor_betas(): Get factor exposures for specific assets
-            - get_asset_factor_attribution(): Calculate factor attribution for returns
-            - get_factor_alpha(): Calculate unexplained returns (alpha) and explained returns
-
-        Portfolio Analysis:
-            - compute_agg_factor_exposures(): Aggregate factor exposures using portfolio weights
-
-        Model Diagnostics:
-            - get_model_ewm_r2(): Calculate exponentially weighted R-squared
-            - get_model_residuals_corrs(): Analyze residual correlations
-
-        Visualization:
-            - plot_factor_loadings(): Plot factor loading time series
-            - print(): Debug output of model components
-
-    Example:
-        ```python
-        # Create factor and asset return data
-        factors = pd.DataFrame({
-            'Market': market_returns,
-            'Size': size_returns,
-            'Value': value_returns
-        }, index=dates)
-
-        assets = pd.DataFrame({
-            'Stock_A': stock_a_returns,
-            'Stock_B': stock_b_returns
-        }, index=dates)
-
-        # Assume loadings have been estimated elsewhere
-        loadings = {
-            'Market': market_betas_df,  # Shape: (T, 2) for 2 assets
-            'Size': size_betas_df,
-            'Value': value_betas_df
-        }
-
-        # Create model
-        model = LinearModel(x=factors, y=assets, loadings=loadings)
-
-        # Analyze factor attribution for Stock_A
-        attribution = model.get_asset_factor_attribution(asset='Stock_A')
-
-        # Calculate model alpha (unexplained returns)
-        alpha, explained = model.get_factor_alpha(lag=1)
-
-        # Check model fit
-        r2 = model.get_model_ewm_r2(span=52)
-        ```
-        See example implementation with EwmLinearModel
-    Notes:
-        - Factor loadings are assumed to be pre-estimated (e.g., via rolling regression)
-        - Time series must be aligned with matching indices
-        - The model supports both in-sample (lag=0) and out-of-sample (lag=1) analysis
-        - All DataFrames should have datetime indices for proper time series handling
-        - Missing values in loadings or returns may affect calculations
+    Note:
+        Factor loadings are assumed to be pre-estimated. Inputs must use aligned datetime
+        indices; missing loadings or returns may affect the resulting attribution.
 
     Raises:
-        AssertionError: If loadings keys don't match factor column names in x
+        AssertionError: If loading keys do not match the factor columns in ``x``.
     """
 
     x: Union[pd.DataFrame, pd.Series] # t, x_n factors
@@ -250,33 +185,26 @@ class LinearModel:
                                          idiosyncratic_var_name: str = 'Idiosyncratic'
                                          ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Compute factor risk contributions and their ratios for portfolio weights over time.
+
         Calculates the contribution of each factor to portfolio risk using factor loadings,
         covariance matrices, and residual variances. This method performs risk decomposition
         by computing how much each systematic factor and idiosyncratic risk contribute to
         the total portfolio variance.
-        The calculation follows the standard risk attribution framework:
-        - Portfolio variance = w'Bfactor_covB'w + w'Dresidual_varw
-        - Factor risk contribution = (factor_exposure * marginal_contribution) / total_variance
-        - Marginal contribution = factor_covariance @ factor_exposure
+
         Args:
             weights: Portfolio weights DataFrame with dates as index and assets as columns.
-                    Each row represents portfolio weights at a specific date, with columns
-                    corresponding to individual assets/securities.
+                Each row represents portfolio weights at a specific date.
             factor_var_name: Name for the factor risk column in output. Defaults to 'Systematic'.
-            idiosyncratic_var_name: Name for the idiosyncratic risk column in output. Defaults to 'Idiosyncratic'.
+            idiosyncratic_var_name: Name for the idiosyncratic risk column in output. Defaults
+                to 'Idiosyncratic'.
+
         Returns:
-            A tuple containing five elements:
-                factor_rcs_ratios: DataFrame of normalized risk contribution ratios where each
-                                 row sums to 1.0, including both systematic factors and
-                                 idiosyncratic risk.
-                factor_risk_contrib_idio: DataFrame of absolute factor risk contributions
-                                        normalized by total portfolio variance (systematic + idiosyncratic).
-                factor_risk_contrib: DataFrame of factor risk contributions normalized by
-                                   systematic variance only (excludes idiosyncratic risk).
-                portfolio_var: DataFrame containing systematic (factor-based) variance and idiosyncratic variance for each date.
+            Tuple containing total-risk contribution ratios, factor contributions normalized by
+            total variance, factor contributions normalized by systematic variance, and the
+            systematic and idiosyncratic portfolio variance panel.
+
         Raises:
-            ValueError: If x_covars (factor covariance matrices) is None.
-            ValueError: If residual_vars (asset-specific residual variances) is None.
+            ValueError: If factor covariance matrices or residual variances are unavailable.
         """
         if self.x_covars is None:
             raise ValueError(f"self.x_covars must be provided")

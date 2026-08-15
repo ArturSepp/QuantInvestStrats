@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Aligned the PyPI summary, README opening, and documentation titles around `qis` performance
+  analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python.
 - Moved runnable examples from `src/qis/examples/` to the repository-root `examples/` tree,
   matching the project layout used by `optimalportfolios` and keeping examples out of wheels.
 

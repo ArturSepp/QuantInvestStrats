@@ -71,7 +71,8 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 source_suffix = {'.rst': 'restructuredtext', '.md': 'markdown'}
 
 html_theme = 'furo'
-html_title = f"qis {release}"
+html_title = ('qis - performance analytics, portfolio backtesting, risk analysis, and '
+              'factsheet reporting in Python')
 html_static_path = []
 
 # suppress the warning autosummary emits for symbols that are re-exported under a short name

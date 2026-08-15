@@ -1,7 +1,10 @@
 # QuantInvestStrats (`qis`)
 
-**qis implements analytics for financial-data visualisation, performance and risk analysis,
-portfolio backtesting, and factsheet reporting for quantitative strategies.**
+**qis - performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in
+Python.**
+
+Quantitative Investment Strategies covers time-series and cross-sectional performance,
+drift-aware portfolio histories, ex-ante and ex-post risk, and reproducible reports.
 
 [![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square)](https://pypi.org/project/qis/)
 [![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square)](https://pypi.org/project/qis/)

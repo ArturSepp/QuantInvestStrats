@@ -49,8 +49,7 @@ def plot_scatter_regression(prices: pd.DataFrame,
                             ax: Optional[plt.Subplot] = None,
                             **kwargs
                             ) -> Optional[plt.Figure]:
-    """
-    Plot scatter regression with regime-conditional betas.
+    """Plot scatter regression with regime-conditional betas.
 
     Creates a scatter plot showing asset returns vs benchmark returns, with fitted
     regression lines that have different slopes (betas) for each market regime.
@@ -59,8 +58,10 @@ def plot_scatter_regression(prices: pd.DataFrame,
     Args:
         prices: DataFrame of asset prices with benchmark included
         regime_benchmark: Column name of benchmark asset for regime classification
-        regime_classifier: Regime classifier instance (default: BenchmarkReturnsQuantilesRegime with default params)
+        regime_classifier: Regime classifier instance. Uses
+            ``BenchmarkReturnsQuantilesRegime`` by default.
         drop_benchmark: If True, exclude benchmark from regression outputs
+        is_add_alpha: If True, include regression intercepts.
         x_var_format: Format string for x-axis values (benchmark returns)
         y_var_format: Format string for y-axis values (asset returns)
         beta_format: Format string for displaying beta values in legend
@@ -76,32 +77,6 @@ def plot_scatter_regression(prices: pd.DataFrame,
 
     Returns:
         Figure object if new figure created, None if plotting on existing axis
-
-    Examples:
-        # Plot with quantile regimes (default)
-        fig = plot_scatter_regression(
-            prices=prices,
-            regime_benchmark='SPY',
-            regime_classifier=BenchmarkReturnsQuantilesRegime(freq='QE')
-            ),
-            is_asset_detailed=True
-        )
-
-        # Plot with positive/negative regimes
-        fig = plot_scatter_regression(
-            prices=prices,
-            regime_benchmark='SPY',
-            regime_classifier=BenchmarkReturnsPositiveNegativeRegime(freq='ME')
-            ),
-            is_asset_detailed=True
-        )
-
-        # Plot with default settings
-        fig = plot_scatter_regression(
-            prices=prices[['SPY', 'TLT']],
-            regime_benchmark='SPY',
-            add_last_date=True
-        )
     """
     # Create new figure if axis not provided
     if ax is None:

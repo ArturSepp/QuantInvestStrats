@@ -67,9 +67,8 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
                                                      Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     """Jointly EWMA-fit phi_1 (own-lag) and beta_1 (lagged factor) and unsmooth.
 
-    Model:      r_t = phi_1 r_{t-1} + beta_1 F_{t-1} + e_t      (fitted jointly)
-    Inversion:  r_t^u = (r_t - phi_1 r_{t-1}) / (1 - phi_1)
-                        + beta_1 (F_t - F_{t-1}) / (1 - phi_1)
+    The fitted model is ``r[t] = phi1 * r[t-1] + beta1 * F[t-1] + e[t]``. The inversion is
+    ``r_u[t] = (r[t] - phi1 * r[t-1] + beta1 * (F[t] - F[t-1])) / (1 - phi1)``.
 
     Fits phi_1 and beta_1 in one regression of r_t on [r_{t-1}, F_{t-1}] with a
     time-varying EWMA beta pair (``compute_ewm_xy_beta_tensor``,

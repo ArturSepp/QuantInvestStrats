@@ -1,7 +1,10 @@
-# qis
+# qis: performance analytics, portfolio backtesting, risk analysis, and factsheet reporting
 
-Python analytics for visualisation of financial data, performance reporting, factsheets and
-analysis of quantitative strategies.
+qis - performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in
+Python.
+
+Quantitative Investment Strategies covers time-series and cross-sectional performance,
+drift-aware portfolio histories, ex-ante and ex-post risk, and reproducible reports.
 
 Install with `pip install qis`, then build a factsheet from a price panel:
 
