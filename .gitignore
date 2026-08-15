@@ -11,7 +11,7 @@ Scripts/
 
 # YAML
 *.yaml
-!/qis/settings.yaml
+!/src/qis/settings.yaml
 # read the docs build config; the blanket rule above would otherwise hide it
 !/.readthedocs.yaml
 
@@ -150,23 +150,24 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-legacy/
 futures_strats/
 my_projects/
 testing/
 get_local_keys.py
 TODOs.md
-qis/examples/figures/perf1.PNG
-qis/examples/figures/perf2.PNG
-qis/examples/figures/perf3.PNG
+src/qis/examples/figures/perf1.PNG
+src/qis/examples/figures/perf2.PNG
+src/qis/examples/figures/perf3.PNG
 
 /quant_strats/
-/roadmap/
-
+/agents/
+/legacy/
 
 # Bloomberg fetch cache
 data_cache.parquet
 *_cache.parquet
+# This example fixture is intentionally versioned; preserve it when the package moves.
+!src/qis/examples/_helpers/data_cache.parquet
 
 # analysis outputs
 output/

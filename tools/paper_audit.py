@@ -4,7 +4,7 @@ generate the record of every number the JOSS paper quotes.
 A count pasted into prose goes stale silently: the repository moves, the sentence does not, and
 nothing fails. Five counts in ``paper.md`` had drifted within two days of being written. This
 script measures each of them and writes ``docs/audit/paper_numbers.json``;
-``qis/tests/test_paper_audit.py`` then fails when the record, the repository and the paper
+``src/qis/tests/test_paper_audit.py`` then fails when the record, the repository and the paper
 disagree.
 
 Metrics are of two kinds. A **live** metric is measurable from the installed package or the
@@ -26,7 +26,7 @@ comparison and return 0, and an incomplete check that reports success is worse t
 Plain write mode is unaffected: it prints the same warnings and writes the record anyway, because
 a partial record is still the best measurement available and its gaps are visible in the file.
 ``--check`` is not wired into CI: the git metrics move on every commit, so a CI gate on them would
-fail on every push. ``qis/tests/test_paper_audit.py`` enforces the part that holds still.
+fail on every push. ``src/qis/tests/test_paper_audit.py`` enforces the part that holds still.
 
 ``measured_at_commit`` is the commit that was checked out when the record was written, which is
 the parent of the commit that carries the record. It cannot be otherwise: writing the value would
@@ -46,7 +46,7 @@ REPO_ROOT: Path = Path(__file__).resolve().parent.parent
 RECORD_PATH: Path = REPO_ROOT.joinpath('docs', 'audit', 'paper_numbers.json')
 CONSUMERS_PATH: Path = REPO_ROOT.joinpath('docs', 'audit', 'consumers.json')
 PAPER_PATH: Path = REPO_ROOT.joinpath('paper.md')
-BACKTESTER_PATH: Path = REPO_ROOT.joinpath('qis', 'portfolio', 'backtester.py')
+BACKTESTER_PATH: Path = REPO_ROOT.joinpath('src', 'qis', 'portfolio', 'backtester.py')
 
 # a [TODO: ...] marker is a note to the author, not manuscript text, so it counts against
 # neither the word guidance nor the unrecorded-number check
@@ -143,7 +143,7 @@ def count_exported_symbols() -> Dict[str, int]:
     """
     the size of the public namespace, split into callables and module bindings.
 
-    ``qis.__all__`` is the definition of public, fixed at the end of ``qis/__init__.py``. It is
+    ``qis.__all__`` is the definition of public, fixed at the end of ``src/qis/__init__.py``. It is
     used rather than ``dir(qis)`` because importing a submodule binds its name on the package,
     so ``dir(qis)`` depends on what a process has imported and ``__all__`` does not. The module
     bindings are subpackages that the wildcard re-exports leave visible; they are counted
@@ -232,12 +232,12 @@ def measure() -> AuditResult:
     backtester = count_source_lines(BACKTESTER_PATH)
     result.metrics['backtester_physical_lines'] = Metric(
         value=backtester['physical'],
-        how='physical lines of qis/portfolio/backtester.py',
+        how='physical lines of src/qis/portfolio/backtester.py',
         live=True,
         paper_phrase=f"backtester is {backtester['physical']} lines")
     result.metrics['backtester_nonblank_lines'] = Metric(
         value=backtester['nonblank'],
-        how='nonblank lines of qis/portfolio/backtester.py',
+        how='nonblank lines of src/qis/portfolio/backtester.py',
         live=True)
 
     words = len(paper_body(PAPER_PATH.read_text(encoding='utf-8')).split())
@@ -324,8 +324,8 @@ def to_record(result: AuditResult) -> Dict[str, Any]:
     return dict(
         generated_by='tools/paper_audit.py',
         measured_at_commit=result.commit,
-        note=('every number paper.md quotes. Regenerate with python tools/paper_audit.py; '
-              'qis/tests/test_paper_audit.py fails when this file and the repository disagree.'),
+        note=('every number paper.md quotes. Regenerate with python tools/paper_audit.py; the '
+              'package paper-audit test fails when this file and the repository disagree.'),
         metrics={name: metric.to_json() for name, metric in sorted(result.metrics.items())})
 
 

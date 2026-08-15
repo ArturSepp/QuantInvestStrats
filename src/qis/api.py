@@ -1,7 +1,7 @@
 """
 the documented core of the qis public API.
 
-Public means exported from ``qis/__init__.py``. That set is what may be imported, and it does
+Public means exported from ``src/qis/__init__.py``. That set is what may be imported, and it does
 not change here. This module records a smaller set - the core - which is what the documentation
 promises: every name in ``CORE_API`` carries an ``Args`` or ``Attributes`` block, is
 demonstrated in the cookbook, and is what the paper describes. The rest stay exported and
@@ -16,7 +16,7 @@ revisions pinned in ``docs/audit/consumers.json``.
 Counts are deliberately absent from this docstring. The export count, the core count and the
 number of capability groups all move when the namespace moves, and a count written into prose
 goes stale without anything failing. They are generated into ``docs/audit/paper_numbers.json``
-by ``tools/paper_audit.py``, and ``qis/tests/test_paper_audit.py`` fails when that record and
+by ``tools/paper_audit.py``, and ``src/qis/tests/test_paper_audit.py`` fails when that record and
 the repository disagree. The version of this docstring written on 2026-07-26 carried five such
 counts and four of them were wrong within a day.
 
@@ -27,16 +27,16 @@ the FAJ replication code migrates onto them.
 Grouping is by capability rather than by defining module, so moving a symbol between subpackages
 costs no documentation change. ``docs/conf.py`` renders these groups directly.
 
-``qis/tests/test_core_api.py`` enforces the promise: a core symbol without documented arguments
+``src/qis/tests/test_core_api.py`` enforces the promise: a core symbol without documented arguments
 fails the suite.
 """
 # packages
 from typing import Dict, Tuple
 
-# every name the package exports, enumerated rather than inferred. ``qis/__init__.py`` sets
+# every name the package exports, enumerated rather than inferred. ``src/qis/__init__.py`` sets
 # ``__all__`` from its own namespace, so this tuple does not decide what is public; it records
 # what is, in a form a diff can show. Adding an export without adding it here fails
-# ``qis/tests/test_core_api.py``. Regenerate with ``python tools/sync_public_api.py``.
+# ``src/qis/tests/test_core_api.py``. Regenerate with ``python tools/sync_public_api.py``.
 PUBLIC_API: Tuple[str, ...] = (
     'AttributionMetric', 'BENCHMARK_TABLE_COLUMNS', 'BENCHMARK_TABLE_COLUMNS2',
     'BenchmarkReturnsPositiveNegativeRegime', 'BenchmarkReturnsQuantilesRegime',

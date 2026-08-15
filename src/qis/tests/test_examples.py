@@ -1,7 +1,7 @@
 """
 The examples are documentation, so they are tested like documentation.
 
-``qis/examples/`` had three calls to symbols that were implemented, documented and not exported,
+``src/qis/examples/`` had three calls to symbols that were implemented, documented and not exported,
 and every one of them raised ``AttributeError`` the moment anybody ran the file. Nothing caught
 it, because nothing executes the examples: most of them pull prices from ``yfinance``, so they
 cannot run on a core install or in CI.

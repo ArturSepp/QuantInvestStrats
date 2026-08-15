@@ -6,7 +6,7 @@ one of them will disagree without either being wrong.
 
 This page measures one such case end to end, because the argument is easier to accept from a
 number than from a principle. Everything below is produced by
-`qis/examples/models/bootstrap_convention.py`, which runs in about three seconds and needs no
+`src/qis/examples/models/bootstrap_convention.py`, which runs in about three seconds and needs no
 network and no data file.
 
 ## The convention

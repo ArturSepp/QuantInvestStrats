@@ -195,7 +195,7 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
     missing = [parameter for parameter in required if parameter not in defaults]
     if len(missing) > 0:
         raise KeyError(f"{name} needs {missing!r}; add an entry to the explicit table in "
-                       f"qis/plots/tests/plot_smoke_test.py")
+                       f"src/qis/plots/tests/plot_smoke_test.py")
     return {parameter: defaults[parameter] for parameter in required}
 
 

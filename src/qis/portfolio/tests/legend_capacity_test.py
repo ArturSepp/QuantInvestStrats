@@ -12,7 +12,7 @@ from matplotlib rather than trusting ``LEGEND_ROW_HEIGHT_PER_FONTSIZE``, so a ma
 that invalidates the calibration fails here rather than silently in a report. The tests below it
 pin the arithmetic and the wiring into ``generate_multi_asset_factsheet``.
 
-Whether a rendered page looks right is `qis/tests/test_reporting_goldens.py`, not this module.
+Whether a rendered page looks right is `src/qis/tests/test_reporting_goldens.py`, not this module.
 """
 # packages
 import warnings

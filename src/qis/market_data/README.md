@@ -7,7 +7,7 @@ deliberately free of any production wiring: the Bloomberg builders, the ticker u
 MATF factor model stay in `rosaa` (see [What stays in rosaa](#what-stays-in-rosaa)).
 
 ```
-qis/market_data/
+src/qis/market_data/
   __init__.py                 exports FxRatesData, load_fx_rates_data, FactorsData
   fx_rates_data.py            FxRatesData container + load_fx_rates_data (CSV reader)
   fx_hedging.py               pure FX math (leaf): local/FX decomposition, vol/beta, optimal hedge
@@ -16,7 +16,7 @@ qis/market_data/
     fx_hedging_report.py      single- and multi-asset FX-hedging tearsheets (on qis.plots)
   tests/                      factors_data_test, fx_cip_identity_test, fx_rates_data_test
 
-qis/examples/market_data/     runnable demos (under qis.examples, per the package convention)
+src/qis/examples/market_data/ runnable demos (under qis.examples, per the package convention)
   fx_rates_data_yahoo_example.py     build FxRatesData from free Yahoo data + exercise it
   fx_rates_data_bloomberg_example.py build FxRatesData from Bloomberg via bbg-fetch + exercise it
   fx_cip_identity_yahoo_example.py   covered-interest-parity identity check on Yahoo data
@@ -188,7 +188,7 @@ for database-backed loading. Accessors: `factor_names`, `get_factor_prices(facto
 
 ## Examples and the data backends
 
-`qis/examples/market_data/` provides two ways to build an `FxRatesData` and exercise it (cross rates, CIP forward
+`src/qis/examples/market_data/` provides two ways to build an `FxRatesData` and exercise it (cross rates, CIP forward
 premia, FX total-return NAVs, money-market cash NAVs, reference-currency translation, and the hedging
 reports). Each file has a `LocalTests` dispatcher; run a case from `__main__`.
 

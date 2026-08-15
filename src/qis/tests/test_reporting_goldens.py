@@ -9,10 +9,10 @@ Baseline images are environment-specific (matplotlib and freetype versions chang
 so generate them in YOUR environment before enabling comparison:
 
     # 1) create the baselines once (renders and saves them; performs no comparison):
-    pytest qis/tests/test_reporting_goldens.py --mpl-generate-path=qis/tests/baseline
+    pytest src/qis/tests/test_reporting_goldens.py --mpl-generate-path=src/qis/tests/baseline
 
     # 2) thereafter, compare future renders against them:
-    pytest qis/tests/test_reporting_goldens.py --mpl
+    pytest src/qis/tests/test_reporting_goldens.py --mpl
 
 Without the --mpl flag (a plain `pytest` run) these tests still execute and pass but perform no
 image comparison, so they are safe to leave in the default suite. The RMS `tolerance` below is set
@@ -51,7 +51,7 @@ def _multi_asset_figure(reporting_frequency: ReportingFrequency):
     return generate_multi_asset_factsheet(prices=prices, benchmark='A0', time_period=tp, **kw)
 
 
-# common pytest-mpl settings: baselines under qis/tests/baseline, generous RMS tolerance, fixed dpi
+# common pytest-mpl settings: package-local baselines, generous RMS tolerance and fixed dpi
 _MPL_KW = dict(baseline_dir='baseline', tolerance=25, savefig_kwargs={'dpi': 80})
 
 

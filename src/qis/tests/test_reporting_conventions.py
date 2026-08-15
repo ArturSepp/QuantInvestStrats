@@ -13,8 +13,8 @@ These lock the conventions established across the reporting-frequency work:
   * the FactsheetConfig field / generator-parameter contract.
 
 Everything runs on a deterministic synthetic GBM panel - no network, reproducible.
-Run:           pytest qis/tests/test_reporting_conventions.py
-Fast subset:   pytest qis/tests/test_reporting_conventions.py -k "not label and not facade"
+Run:           pytest src/qis/tests/test_reporting_conventions.py
+Fast subset:   pytest src/qis/tests/test_reporting_conventions.py -k "not label and not facade"
 (the rendering tests - 'label' and 'facade' - dominate runtime; the rest are sub-second.)
 """
 import inspect

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qis"
-version = "5.9.4"
+version = "5.10.0"
 description = "Quantitative Investment Strategies (QIS) package implements Python analytics for visualisation of financial data, performance reporting, analysis of quantitative strategies"
 readme = "README.md"
 license = "MIT"
@@ -118,6 +118,7 @@ Repository = "https://github.com/ArturSepp/QuantInvestStrats.git"
 Issues = "https://github.com/ArturSepp/QuantInvestStrats/issues"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["qis*"]
 exclude = ["tests*", "docs*"]
 
@@ -125,8 +126,8 @@ exclude = ["tests*", "docs*"]
 qis = ["*.yaml"]
 
 [tool.pytest.ini_options]
-# tests live inside the package, in qis/<subpackage>/tests/, not in a top-level tests/
-testpaths = ["qis"]
+# tests live inside the package, in src/qis/<subpackage>/tests/, not in a top-level tests/
+testpaths = ["src/qis"]
 norecursedirs = [".*", "examples", "notebooks", "build", "dist", "*.egg-info", "__pycache__"]
 # importlib import mode: test modules are resolved by full path, so the two
 # test_signal_diagnostics.py files in different subpackages do not collide
@@ -180,14 +181,14 @@ pandas = "pd"
 # one of the 398 imports across them is "unused" by F401's definition and none is a defect
 "**/__init__.py" = ["F401"]
 # examples are documentation and run top to bottom: a module-level yfinance import is correct
-"qis/examples/**" = ["TID253"]
+"src/qis/examples/**" = ["TID253"]
 # modules dedicated to one optional backend. None is reachable from qis/__init__.py, so
 # `import qis` on a core install never touches them (checked: pybloqs, plotly and sqlalchemy are
 # absent from sys.modules after `import qis`).
-"qis/plots/derived/gantt_data_history.py" = ["TID253"]
-"qis/portfolio/reports/multi_strategy_factsheet_pybloqs.py" = ["TID253"]
-"qis/portfolio/reports/strategy_benchmark_factsheet_pybloqs.py" = ["TID253"]
-"qis/sql_engine.py" = ["TID253"]
+"src/qis/plots/derived/gantt_data_history.py" = ["TID253"]
+"src/qis/portfolio/reports/multi_strategy_factsheet_pybloqs.py" = ["TID253"]
+"src/qis/portfolio/reports/strategy_benchmark_factsheet_pybloqs.py" = ["TID253"]
+"src/qis/sql_engine.py" = ["TID253"]
 
 [tool.coverage.run]
 source = ["qis"]

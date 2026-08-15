@@ -1,7 +1,7 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "8e01e2c907c300c8ef115cec0fafc0fb8b499341",
-  "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; qis/tests/test_paper_audit.py fails when this file and the repository disagree.",
+  "measured_at_commit": "3ca134d6f13363bbac2108cda6ae384d6dd49487",
+  "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
       "value": 38,
@@ -29,13 +29,13 @@
     },
     "backtester_nonblank_lines": {
       "value": 330,
-      "how": "nonblank lines of qis/portfolio/backtester.py",
+      "how": "nonblank lines of src/qis/portfolio/backtester.py",
       "live": true,
       "paper_phrase": null
     },
     "backtester_physical_lines": {
       "value": 376,
-      "how": "physical lines of qis/portfolio/backtester.py",
+      "how": "physical lines of src/qis/portfolio/backtester.py",
       "live": true,
       "paper_phrase": "backtester is 376 lines"
     },
@@ -46,26 +46,26 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 1286,
+      "value": 1289,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 345,
+      "value": 349,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
-      "value": 705,
-      "how": "tools/audit_consumers.py at 550a7ed834df",
+      "value": 747,
+      "how": "tools/audit_consumers.py at fb8848d327c0",
       "live": false,
-      "paper_phrase": "at 705 sites"
+      "paper_phrase": "at 747 sites"
     },
     "consumer_optimalportfolios_symbols": {
       "value": 98,
-      "how": "tools/audit_consumers.py at 550a7ed834df",
+      "how": "tools/audit_consumers.py at fb8848d327c0",
       "live": false,
       "paper_phrase": "references 98 of its symbols"
     },
@@ -83,13 +83,13 @@
     },
     "consumer_trendfollowing_call_sites": {
       "value": 443,
-      "how": "tools/audit_consumers.py at 22a2317eeb88",
+      "how": "tools/audit_consumers.py at ffdecbbe5157",
       "live": false,
       "paper_phrase": "at 443 sites"
     },
     "consumer_trendfollowing_symbols": {
       "value": 87,
-      "how": "tools/audit_consumers.py at 22a2317eeb88",
+      "how": "tools/audit_consumers.py at ffdecbbe5157",
       "live": false,
       "paper_phrase": "references 87 symbols"
     },

@@ -57,5 +57,5 @@ from qis.market_data.__init__ import *
 # ``from qis import *`` has always bound them and removing them would be a silent break.
 #
 # ``qis.api.PUBLIC_API`` records the same names in a diffable literal, and
-# ``qis/tests/test_core_api.py`` fails when the two disagree.
+# ``src/qis/tests/test_core_api.py`` fails when the two disagree.
 __all__ = [_name for _name in dir() if not _name.startswith('_')]

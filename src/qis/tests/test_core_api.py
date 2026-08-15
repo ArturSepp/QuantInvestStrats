@@ -1,7 +1,7 @@
 """
 The documented core of the public API must stay documented.
 
-``qis/api.py`` records which exported symbols are core: the ones a published package or qis's
+``src/qis/api.py`` records which exported symbols are core: the ones a published package or qis's
 own documentation calls. This file turns that record into a promise. A core symbol must resolve
 from the top-level namespace and carry an ``Args`` or ``Attributes`` block, so that "the core
 API is documented" is a claim a reader can check rather than an intention.
@@ -11,7 +11,8 @@ outside it must be documented, and a symbol inside it must still be undocumented
 docstring therefore fails the suite until the name is removed from the list, which is what keeps
 the list from going stale and quietly hiding finished work.
 
-Same shape as ``qis/plots/tests/plot_smoke_test.py`` and ``qis/tests/test_examples.py``: an
+Same shape as ``src/qis/plots/tests/plot_smoke_test.py`` and
+``src/qis/tests/test_examples.py``: an
 enforced invariant rather than a convention nobody runs.
 """
 # packages
@@ -77,7 +78,7 @@ def _documentable(name: str) -> bool:
 def test_core_api_is_exported() -> None:
     """every core name resolves from the top-level namespace."""
     missing = [name for name in core_api_names() if not hasattr(qis, name)]
-    assert not missing, f"qis/api.py lists names that qis does not export: {missing}"
+    assert not missing, f"src/qis/api.py lists names that qis does not export: {missing}"
 
 
 def test_core_api_has_no_duplicates() -> None:

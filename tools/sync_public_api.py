@@ -1,13 +1,13 @@
 """
-regenerate ``PUBLIC_API`` in ``qis/api.py`` from the package namespace.
+regenerate ``PUBLIC_API`` in ``src/qis/api.py`` from the package namespace.
 
-``qis/__init__.py`` assembles the namespace with wildcard re-exports from six subpackage
+``src/qis/__init__.py`` assembles the namespace with wildcard re-exports from six subpackage
 initialisers, so the public surface is a consequence of six other files rather than something
 written down anywhere. ``PUBLIC_API`` writes it down. It does not decide what is public - the
 namespace does - but it puts the surface in a diff, so adding or losing an export is a line a
 reviewer can see rather than a number that quietly moves.
 
-``qis/tests/test_core_api.py`` fails when the tuple and the namespace disagree, and names this
+``src/qis/tests/test_core_api.py`` fails when the tuple and the namespace disagree, and names this
 script in the failure message.
 
 Run it from the repository root::
@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 REPO_ROOT: Path = Path(__file__).resolve().parent.parent
-API_PATH: Path = REPO_ROOT.joinpath('qis', 'api.py')
+API_PATH: Path = REPO_ROOT.joinpath('src', 'qis', 'api.py')
 
 TUPLE_PATTERN = re.compile(r'^PUBLIC_API: Tuple\[str, \.\.\.\] = \(\n.*?^\)\n',
                            flags=re.M | re.S)
@@ -36,7 +36,7 @@ def exported_names() -> Tuple[str, ...]:
 
     ``qis.__all__`` rather than ``dir(qis)``: importing a submodule binds its name on the
     package, so ``dir(qis)`` grows as a session imports more of it, while ``__all__`` is fixed
-    at the end of ``qis/__init__.py`` and is the same set every time.
+    at the end of ``src/qis/__init__.py`` and is the same set every time.
 
     Returns:
         the names in ``qis.__all__``, sorted
@@ -80,7 +80,7 @@ def main() -> int:
     source = API_PATH.read_text(encoding='utf-8')
     match = TUPLE_PATTERN.search(source)
     if match is None:
-        print('PUBLIC_API assignment not found in qis/api.py', file=sys.stderr)
+        print('PUBLIC_API assignment not found in src/qis/api.py', file=sys.stderr)
         return 1
 
     if match.group(0) == rendered:

@@ -72,8 +72,8 @@ convention, the four `*_reporting_frequencies.py` runners that render each repor
 
 ## Tests
 
-`qis/tests/test_reporting_conventions.py` locks the calibration presets, the up-sampling guard, the
+`src/qis/tests/test_reporting_conventions.py` locks the calibration presets, the up-sampling guard, the
 per-panel frequency labels (all four reports), the frequency-invariant vs frequency-dependent
 statistics, and the `FactsheetConfig`-to-generator parameter contract.
-`qis/tests/test_reporting_goldens.py` is the optional `pytest-mpl` visual-regression tier (run with
+`src/qis/tests/test_reporting_goldens.py` is the optional `pytest-mpl` visual-regression tier (run with
 `--mpl` after generating baselines locally).

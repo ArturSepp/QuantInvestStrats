@@ -6,15 +6,15 @@ describes: a link points at a file that exists, an in-page anchor points at a se
 exists, the README's core dependency list is the list ``pip install qis`` actually resolves, and
 every name a README code block uses is a name the blocks above it bound.
 
-**Links.** The README told a reader to run ``qis/examples/performances.py`` and to look in
-``qis/examples/notebooks``. Neither path had existed since the examples were reorganised into
+**Links.** The README told a reader to run ``src/qis/examples/performances.py`` and to look in
+``src/qis/examples/notebooks``. Neither path had existed since the examples were reorganised into
 subdirectories, and nothing failed, because a dead link in a markdown file is invisible until
 somebody clicks it. The same class covers image references, which are the most numerous links in
 the README and the easiest to strand when a figure is renamed.
 
 Two kinds of link are checked, both resolvable without a network:
 
-  * a relative path, as in ``![image info](qis/examples/figures/perf1.PNG)``;
+  * a relative path, as in ``![image info](src/qis/examples/figures/perf1.PNG)``;
   * a ``github.com/<owner>/<repo>/blob/<ref>/<path>`` url pointing back into this repository,
     which is how the README refers to its own example scripts.
 
@@ -59,11 +59,16 @@ import pytest
 # qis / project
 import qis
 
-REPO_ROOT: Path = Path(qis.__file__).resolve().parent.parent
+REPO_ROOT: Path = Path(qis.__file__).resolve().parents[2]
+IS_REPOSITORY_CHECKOUT: bool = REPO_ROOT.joinpath('pyproject.toml').is_file()
+
+pytestmark = pytest.mark.skipif(
+    not IS_REPOSITORY_CHECKOUT,
+    reason='repository documentation is absent from an installed wheel')
 
 # the markdown files a reader actually reads; generated output and vendored notebooks are not
 DOCUMENT_GLOBS: List[str] = ['README.md', 'CONTRIBUTING.md', 'AGENTS.md', 'CHANGELOG.md',
-                             'paper.md', 'docs/*.md', 'qis/docs/*.md']
+                             'paper.md', 'docs/*.md', 'src/qis/docs/*.md']
 
 # written by docs/conf.py during the sphinx build, so absent from a checkout by design
 GENERATED_PREFIXES: List[str] = ['docs/_included/', 'docs/api/']
@@ -99,8 +104,8 @@ def _links_in(path: Path) -> List[Link]:
 
     A github blob url names a path from the repository root. A relative markdown link names a
     path from the directory of the document it is written in, which is not the same thing:
-    ``qis/docs/gallery.md`` linking to ``images/multi_asset.png`` means
-    ``qis/docs/images/multi_asset.png``.
+    ``src/qis/docs/gallery.md`` linking to ``images/multi_asset.png`` means
+    ``src/qis/docs/images/multi_asset.png``.
 
     Targets are normalised to forward slashes with ``as_posix``. ``str()`` on a ``Path`` gives
     backslashes on Windows, and every prefix compared against a target here is written with
@@ -397,7 +402,7 @@ def _loaded_names(tree: ast.AST) -> Set[str]:
             if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)}
 
 
-README_BLOCKS: List[CodeBlock] = _readme_python_blocks()
+README_BLOCKS: List[CodeBlock] = _readme_python_blocks() if IS_REPOSITORY_CHECKOUT else []
 BLOCK_IDS: List[str] = [f'README.md:{block.line}' for block in README_BLOCKS]
 
 

@@ -7,6 +7,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.10.0] - 2026-08-15
+
+### Changed
+
+- Adopted the standard `src/` package layout, moving the import package to `src/qis/` while
+  preserving the installed `qis` import name and public API. Packaging, tests, linting,
+  documentation and audit tooling now resolve the new source root, and CI verifies the built
+  wheel independently of the editable installation.
+
 ## [5.9.4] - 2026-08-11
 
 ### Fixed

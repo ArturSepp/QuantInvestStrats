@@ -120,4 +120,54 @@ jobs:
 
     - name: Repo-wide violation count (report only, never fails)
       if: always()
-      run: ruff check qis/ --statistics || true
+      run: ruff check src/qis/ --statistics || true
+
+  wheel:
+    # Editable installs exercise the src tree, not the artifact users receive. Build and install
+    # the wheel in a clean environment so missing packages, tests or package data cannot pass CI.
+    name: built wheel (core install)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: pip
+
+    - name: Build the wheel
+      run: |
+        python -m pip install --upgrade pip build
+        python -m build --wheel
+
+    - name: Assert package tests and documentation ship
+      run: |
+        python - <<'PY'
+        import glob
+        import zipfile
+
+        wheels = glob.glob("dist/*.whl")
+        assert len(wheels) == 1, f"expected one wheel, found {wheels}"
+        with zipfile.ZipFile(wheels[0]) as archive:
+            names = set(archive.namelist())
+        tests = [name for name in names if name.startswith("qis/") and name.endswith("_test.py")]
+        assert tests, "the wheel ships no qis test modules"
+        assert "qis/docs/plotting_kwargs.md" in names, "the wheel misses packaged documentation"
+        assert "qis/settings.yaml" in names, "the wheel misses settings.yaml"
+        print(f"{wheels[0]}: {len(tests)} test modules and required package data present")
+        PY
+
+    - name: Install the wheel into a clean environment
+      run: |
+        python -m venv "$RUNNER_TEMP/qis-wheel-venv"
+        "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pip install --upgrade pip
+        "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pip install "$(ls dist/*.whl)" pytest
+
+    - name: Run the shipped suite against the installed wheel
+      run: |
+        mkdir -p "$RUNNER_TEMP/qis-wheel-check"
+        cd "$RUNNER_TEMP/qis-wheel-check"
+        "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pytest --pyargs qis -q

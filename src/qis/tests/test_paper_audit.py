@@ -40,10 +40,15 @@ import pytest
 # qis / project
 import qis
 
-REPO_ROOT: Path = Path(qis.__file__).resolve().parent.parent
+REPO_ROOT: Path = Path(qis.__file__).resolve().parents[2]
 RECORD_PATH: Path = REPO_ROOT.joinpath('docs', 'audit', 'paper_numbers.json')
 PAPER_PATH: Path = REPO_ROOT.joinpath('paper.md')
-BACKTESTER_PATH: Path = REPO_ROOT.joinpath('qis', 'portfolio', 'backtester.py')
+BACKTESTER_PATH: Path = REPO_ROOT.joinpath('src', 'qis', 'portfolio', 'backtester.py')
+IS_REPOSITORY_CHECKOUT: bool = REPO_ROOT.joinpath('pyproject.toml').is_file()
+
+pytestmark = pytest.mark.skipif(
+    not IS_REPOSITORY_CHECKOUT,
+    reason='repository audit records are absent from an installed wheel')
 
 # integers of three digits or more that appear in paper.md and are not measurements of this
 # repository. Each needs a reason: the list is what keeps check 3 from becoming a rubber stamp.
@@ -123,7 +128,10 @@ def test_record_exists_and_names_its_commit() -> None:
     assert len(record.get('metrics', {})) >= 10, 'the record is nearly empty; regenerate it'
 
 
-@pytest.mark.parametrize('metric', sorted(_live_measurements()))
+LIVE_METRICS: List[str] = sorted(_live_measurements()) if IS_REPOSITORY_CHECKOUT else []
+
+
+@pytest.mark.parametrize('metric', LIVE_METRICS)
 def test_live_metric_matches_the_record(metric: str) -> None:
     """a metric the paper quotes still has the value the record and the paper carry."""
     record = _record()
@@ -147,7 +155,10 @@ def _phrases() -> List[str]:
                    if metric.get('paper_phrase')})
 
 
-@pytest.mark.parametrize('phrase', _phrases())
+PAPER_PHRASES: List[str] = _phrases() if IS_REPOSITORY_CHECKOUT else []
+
+
+@pytest.mark.parametrize('phrase', PAPER_PHRASES)
 def test_paper_quotes_the_recorded_value(phrase: str) -> None:
     """
     a number corrected in the record is corrected in the manuscript too.

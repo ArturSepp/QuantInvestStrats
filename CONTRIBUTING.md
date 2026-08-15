@@ -43,8 +43,8 @@ and section you are reading.
 git clone https://github.com/ArturSepp/QuantInvestStrats.git
 cd QuantInvestStrats
 pip install -e ".[data]"
-pytest qis/            # tests live inside the package, not in a top-level tests/
-ruff check qis/
+pytest src/qis/            # tests live inside the package, not in a top-level tests/
+ruff check src/qis/
 ```
 
 `AGENTS.md` in this repository documents the layout, commands, conventions, and

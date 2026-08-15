@@ -24,7 +24,7 @@ import yaml
 # qis / project
 import qis
 
-REPO_ROOT: Path = Path(qis.__file__).resolve().parent.parent
+REPO_ROOT: Path = Path(qis.__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.skipif(
     not REPO_ROOT.joinpath('pyproject.toml').is_file(),

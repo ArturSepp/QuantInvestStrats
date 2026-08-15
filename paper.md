@@ -120,7 +120,7 @@ portfolio reconstruction and reporting inside one object model.
 
 # Software design
 
-We organise the package into 12 capability groups, which `qis/api.py` names.
+We organise the package into 12 capability groups, which `src/qis/api.py` names.
 
 The backtester is 376 lines, and that follows from the design assumption rather than from
 compression. Because a strategy is a rule for producing weights, the backtester holds no strategy
@@ -128,7 +128,7 @@ logic: it converts target weights to units at each rebalancing, holds those unit
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
 one of the few loops here that cannot be vectorised.
 
-The public interface is `qis.__all__`, which holds 407 names; `qis/api.py` records that list as a
+The public interface is `qis.__all__`, which holds 407 names; `src/qis/api.py` records that list as a
 literal together with a documented core of 119 symbols grouped by capability, and the suite fails
 when either record disagrees with the namespace.
 
@@ -146,7 +146,7 @@ smoothing.
 # Research impact statement
 
 We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 98 of its symbols
-at 705 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
+at 747 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
 at 443 sites. Both counts are taken at the commits recorded in
 `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
 

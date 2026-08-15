@@ -4,11 +4,11 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "88f0a50050eb69cc965d7ee214696172bff11605",
+      "commit": "fb8848d327c0585eaf0933dba6137ec6b8338bbf",
       "distinct_symbols": 98,
-      "call_sites": 724,
-      "files_scanned": 185,
-      "files_using_qis": 73,
+      "call_sites": 747,
+      "files_scanned": 204,
+      "files_using_qis": 80,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
         "CorrMatrixOutput",

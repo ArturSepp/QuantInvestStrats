@@ -18,7 +18,7 @@ import pytest
 # qis / project
 import qis
 
-REPO_ROOT: Path = Path(qis.__file__).resolve().parent.parent
+REPO_ROOT: Path = Path(qis.__file__).resolve().parents[2]
 QUICKSTART_PATH: Path = REPO_ROOT.joinpath('docs', 'quickstart.md')
 
 FENCED_PYTHON = re.compile(r'```python\n(.*?)```', flags=re.S)
