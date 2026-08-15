@@ -170,4 +170,5 @@ jobs:
       run: |
         mkdir -p "$RUNNER_TEMP/qis-wheel-check"
         cd "$RUNNER_TEMP/qis-wheel-check"
-        "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pytest --pyargs qis -q
+        "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pytest --pyargs qis -q \
+          --import-mode=importlib
