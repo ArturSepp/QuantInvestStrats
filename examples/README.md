@@ -15,7 +15,8 @@ examples/
 ├── perfstats/                    qis.perfstats — performance metrics on price series
 ├── models/                       qis.models — EWM, regression, vol estimation, bootstrap
 ├── regimes/                      qis.perfstats.regime_classifier — regime-conditional analytics
-├── portfolios/                   qis.backtest_model_portfolio — backtests
+├── portfolios/                   qis.backtest_model_portfolio — scheduled backtests
+├── discrete_portfolio/           bar-by-bar orders, fills, and trade ledgers
 ├── factsheets/                   qis.generate_*_factsheet — full factsheets
 ├── plots/                        qis.plots — plotting primitives showcase
 ├── utils/                        qis.utils — date schedules
@@ -72,6 +73,12 @@ examples/
 | `ex_anti_tracking_error_and_risk.py` | Offline ex-ante TE, benchmark beta, and Euler marginal TE through `RiskModel`. |
 | `ex_post_tracking_error_and_risk.py` | Offline realised EWMA TE, whole-sample TE/IR, and EWMA beta/annualised alpha. |
 | `vol_target_and_trend.py` | Vol-target + trend-following sweep via `examples.portfolios.strats.qis_delta1`. |
+
+## discrete_portfolio — event-based backtests
+
+| File | What it shows |
+|---|---|
+| `discrete_trend_backtest.py` | Long/flat moving-average momentum events on free SPY 5-minute bars: orders are emitted only when momentum changes sign, then fill on the next observation and aggregate into a trade ledger and `PortfolioData`. Requires `qis[data]`; change `INTERVAL` to `"1m"` for 1-minute bars. |
 
 ## factsheets — full multi-page reports
 
