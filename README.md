@@ -75,17 +75,18 @@ description; examples that need a Bloomberg terminal are flagged inline.
 # Table of contents
 1. [Analytics](#analytics)
 2. [Installation](#installation)
-3. [Examples](#examples)
+3. [Offline quickstart](#offline-quickstart)
+4. [Examples](#examples)
    1. [Visualization of price data](#price)
    2. [Multi assets factsheet](#multiassets)
    3. [Strategy factsheet](#strategy)
    4. [Strategy benchmark factsheet](#strategybenchmark)
    5. [Multi strategy factsheet](#multistrategy)
    6. [Runnable examples](#runnable-examples)
-4. [Contributions](#contributions)
-5. [Changelog](#changelog)
-6. [ToDos](#todos)
-7. [Disclaimer](#disclaimer)
+5. [Contributions](#contributions)
+6. [Changelog](#changelog)
+7. [ToDos](#todos)
+8. [Disclaimer](#disclaimer)
 
 
 ## Installation <a name="installation"></a>
@@ -129,9 +130,32 @@ Optional dependencies:
 See `pyproject.toml` for the full list of optional extras (`reports`, `visualization`, `io`, `database`, `jupyter`, `dev`, `all`).
 
 
+## Offline quickstart <a name="offline-quickstart"></a>
+
+The authoritative first-success workflow is
+[`examples/getting_started/offline_quickstart.py`](examples/getting_started/offline_quickstart.py).
+It generates seeded data in-process, builds a live-universe-aware quarterly weight schedule,
+backtests with explicit transaction costs, and prints performance plus benchmark-relative risk.
+It needs only the core `qis` installation and writes no files.
+
+From a repository checkout:
+
+```bash
+python examples/getting_started/offline_quickstart.py
+```
+
+With only `pip install qis`, copy the complete code from the
+[hosted offline quickstart](https://quantinveststrats.readthedocs.io/en/latest/quickstart.html).
+That page includes the runnable script directly, so the README, documentation, and example cannot
+develop independent full-code versions.
+
+
 ## Examples <a name="examples"></a>
 
 ### 1. Visualization of price data <a name="price"></a>
+
+This is an optional network-backed plotting example. For the core-install first-success path, use
+the offline quickstart above.
 
 The script is located at [`examples/perfstats/quickstart.py`](examples/perfstats/quickstart.py).
 Run `python -m examples.perfstats.quickstart` from the repository root to produce the figures

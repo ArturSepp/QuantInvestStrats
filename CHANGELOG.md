@@ -13,6 +13,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python.
 - Moved runnable examples from `src/qis/examples/` to the repository-root `examples/` tree,
   matching the project layout used by `optimalportfolios` and keeping examples out of wheels.
+- Added one authoritative, core-only offline quickstart for synthetic data, a live-universe-aware
+  quarterly backtest, explicit return/Sharpe conventions, and benchmark-relative risk. The
+  documentation includes the runnable script directly and the README points to the same file.
 
 ## [5.10.0] - 2026-08-15
 

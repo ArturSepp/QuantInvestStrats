@@ -14,21 +14,12 @@ Python.
 Quantitative Investment Strategies covers time-series and cross-sectional performance,
 drift-aware portfolio histories, ex-ante and ex-post risk, and reproducible reports.
 
-Install with `pip install qis`, then build a factsheet from a price panel:
-
-```python
-import qis
-from qis.datasets import generate_synthetic_universe
-
-universe = generate_synthetic_universe()
-qis.factsheet(universe.prices,
-              benchmark_prices=universe.benchmark_prices,
-              reporting_frequency='monthly')
-```
-
-That snippet needs no network and no data vendor: the panel is generated in-process from a fixed
-seed and carries the defects real panels carry — ragged starts, missing observations, stale
-prices, a delisted tail and a monthly-reported illiquid sleeve.
+Install with `pip install qis`, then follow the [offline quickstart](quickstart.md) for a
+deterministic portfolio backtest, performance table, and benchmark-relative result. Its single
+source is
+[`examples/getting_started/offline_quickstart.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/getting_started/offline_quickstart.py):
+the documentation includes that complete runnable file rather than maintaining another code copy.
+It needs no network, data vendor, credentials, optional extra, or output directory.
 
 ## Project resources
 

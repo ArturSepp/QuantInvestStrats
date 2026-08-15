@@ -1,62 +1,79 @@
-"""
-the quickstart page runs, and its backtest produces a sane nav.
+"""The documentation quickstart executes its authoritative offline example.
 
-``docs/quickstart.md`` shipped two defects that every existing test missed: it passed
-``rebalancing_costs=10`` where the argument is fractional — 10 runs clean and produces a nav
-near -3e83 — and it called ``get_navs``, which does not exist. Doc snippets are documentation
-of record on the hosted site, so this module executes every fenced python block exactly as a
-reader would, top to bottom in one namespace.
-
-The nav-bound assertion is the half that catches the units defect, which raises nothing.
+The executable script is the source of truth. ``docs/quickstart.md`` includes it with MyST
+``literalinclude`` instead of maintaining a second code copy, while the README and docs landing
+page point to the same path. The test resolves that inclusion, runs it, and checks its compact
+evidence of success.
 """
+
 # packages
 import re
+import runpy
 from pathlib import Path
-from typing import Dict, List
-import matplotlib
+
 import pytest
+
 # qis / project
 import qis
 
+
 REPO_ROOT: Path = Path(qis.__file__).resolve().parents[2]
 QUICKSTART_PATH: Path = REPO_ROOT.joinpath('docs', 'quickstart.md')
+DOCS_INDEX_PATH: Path = REPO_ROOT.joinpath('docs', 'index.md')
+README_PATH: Path = REPO_ROOT.joinpath('README.md')
+EXAMPLE_PATH: Path = REPO_ROOT.joinpath(
+    'examples', 'getting_started', 'offline_quickstart.py'
+)
+EXAMPLE_REPOSITORY_PATH = 'examples/getting_started/offline_quickstart.py'
 
-FENCED_PYTHON = re.compile(r'```python\n(.*?)```', flags=re.S)
+LITERALINCLUDE = re.compile(r'^```\{literalinclude\}\s+([^\n]+)$', flags=re.MULTILINE)
 
 
-def _python_blocks() -> List[str]:
-    """the fenced python blocks of the quickstart page, or a skip outside a repository checkout."""
+def _included_example() -> Path:
+    """Resolve the quickstart's one literalinclude, or skip outside a checkout."""
     if not QUICKSTART_PATH.is_file():
         pytest.skip(f'{QUICKSTART_PATH} is absent; this test runs from a repository checkout')
-    return FENCED_PYTHON.findall(QUICKSTART_PATH.read_text(encoding='utf-8'))
+    matches = LITERALINCLUDE.findall(QUICKSTART_PATH.read_text(encoding='utf-8'))
+    assert len(matches) == 1, f'expected one authoritative literalinclude, got {matches}'
+    return QUICKSTART_PATH.parent.joinpath(matches[0]).resolve()
 
 
-def test_quickstart_executes_and_the_nav_is_sane(tmp_path, monkeypatch) -> None:
-    """
-    every fenced python block on the quickstart page executes in order in one namespace.
+def test_quickstart_references_one_authoritative_example() -> None:
+    """The quickstart, landing page, and README all resolve to the same script."""
+    included = _included_example()
+    assert included == EXAMPLE_PATH.resolve()
+    assert EXAMPLE_REPOSITORY_PATH in DOCS_INDEX_PATH.read_text(encoding='utf-8')
+    assert EXAMPLE_REPOSITORY_PATH in README_PATH.read_text(encoding='utf-8')
+
+
+def test_quickstart_executes_and_reports_sane_results(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+) -> None:
+    """Execute the included script and validate its deterministic evidence.
 
     Args:
-        tmp_path: pytest working directory; the factsheet block writes a pdf into the cwd
-        monkeypatch: used to chdir into tmp_path for the duration of the test
+        tmp_path: isolated working directory, proving that no repository output is required.
+        monkeypatch: changes the working directory for the script.
+        capsys: captures the compact output contract.
     """
-    matplotlib.use('Agg', force=True)
     monkeypatch.chdir(tmp_path)
-    blocks = _python_blocks()
-    assert len(blocks) >= 3, f'expected at least 3 quickstart python blocks, got {len(blocks)}'
-    namespace: Dict = {}
-    for index, block in enumerate(blocks):
-        try:
-            exec(compile(block, filename=f'quickstart.md block {index}', mode='exec'), namespace)
-        except Exception as exc:
-            raise AssertionError(f'quickstart block {index} raised {exc!r}:\n{block}') from exc
+    namespace = runpy.run_path(str(_included_example()), run_name='__main__')
 
-    assert 'portfolio_data' in namespace, 'the backtest block should define portfolio_data'
-    nav = namespace['portfolio_data'].get_portfolio_nav()
+    portfolio_data = namespace['portfolio_data']
+    nav = portfolio_data.get_portfolio_nav()
     assert bool(nav.notna().all()), 'quickstart nav contains nans'
-    final_nav = float(nav.iloc[-1])
-    assert 0.0 < final_nav < 1.0e6, (
-        f'quickstart nav ends at {final_nav!r}; an absurd value here is the symptom of a wrong '
-        f'rebalancing_costs unit — the argument is fractional, 0.0010 is 10 bp')
+    assert float(nav.iloc[-1]) == pytest.approx(120.1104, abs=0.00005)
 
-    import matplotlib.pyplot as plt
-    plt.close('all')
+    schedule = namespace['weight_schedule']
+    prices = namespace['prices']
+    assert schedule.shape == (33, 3)
+    assert bool((schedule.where(prices.loc[schedule.index].notna(), 0.0) == schedule).all().all())
+    assert bool(schedule.sum(axis=1).eq(1.0).all())
+
+    output = capsys.readouterr().out
+    assert 'Prices: business-day frequency, shape=(2087, 3)' in output
+    assert 'Final NAV: 120.1104' in output
+    assert 'TE=0.0299, IR=-0.2898' in output
+    assert 'no file is written here' in output
