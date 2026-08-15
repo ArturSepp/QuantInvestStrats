@@ -16,7 +16,7 @@ src/qis/market_data/
     fx_hedging_report.py      single- and multi-asset FX-hedging tearsheets (on qis.plots)
   tests/                      factors_data_test, fx_cip_identity_test, fx_rates_data_test
 
-src/qis/examples/market_data/ runnable demos (under qis.examples, per the package convention)
+examples/market_data/          repository-only runnable demos
   fx_rates_data_yahoo_example.py     build FxRatesData from free Yahoo data + exercise it
   fx_rates_data_bloomberg_example.py build FxRatesData from Bloomberg via bbg-fetch + exercise it
   fx_cip_identity_yahoo_example.py   covered-interest-parity identity check on Yahoo data
@@ -188,7 +188,7 @@ for database-backed loading. Accessors: `factor_names`, `get_factor_prices(facto
 
 ## Examples and the data backends
 
-`src/qis/examples/market_data/` provides two ways to build an `FxRatesData` and exercise it (cross rates, CIP forward
+`examples/market_data/` provides two ways to build an `FxRatesData` and exercise it (cross rates, CIP forward
 premia, FX total-return NAVs, money-market cash NAVs, reference-currency translation, and the hedging
 reports). Each file has a `LocalTests` dispatcher; run a case from `__main__`.
 

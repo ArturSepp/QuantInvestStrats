@@ -32,9 +32,9 @@ from qis import TimePeriod, ReportingFrequency
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_factsheet
 # reuse the exact universe + reporting-frequency grid from the single-strategy runner
-from qis.examples.factsheets.strategy_reporting_frequencies import (UNIVERSE_DATA,
-                                                                    REPORTING_FREQUENCIES,
-                                                                    load_universe)
+from examples.factsheets.strategy_reporting_frequencies import (UNIVERSE_DATA,
+                                                                REPORTING_FREQUENCIES,
+                                                                load_universe)
 
 
 def run_global_multi_asset_report(use_synthetic_data: bool = False,

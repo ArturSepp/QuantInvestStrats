@@ -6,7 +6,7 @@ one of them will disagree without either being wrong.
 
 This page measures one such case end to end, because the argument is easier to accept from a
 number than from a principle. Everything below is produced by
-`src/qis/examples/models/bootstrap_convention.py`, which runs in about three seconds and needs no
+`examples/models/bootstrap_convention.py`, which runs in about three seconds and needs no
 network and no data file.
 
 ## The convention
@@ -75,7 +75,7 @@ convention that produced the numbers without opening the code.
 ## Reproducing the tables
 
 ```bash
-python -m qis.examples.models.bootstrap_convention
+python -m examples.models.bootstrap_convention
 ```
 
 Both tables are printed. The script is executed by the test suite on every run, so the numbers on

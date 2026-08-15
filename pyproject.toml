@@ -181,7 +181,7 @@ pandas = "pd"
 # one of the 398 imports across them is "unused" by F401's definition and none is a defect
 "**/__init__.py" = ["F401"]
 # examples are documentation and run top to bottom: a module-level yfinance import is correct
-"src/qis/examples/**" = ["TID253"]
+"examples/**" = ["TID253"]
 # modules dedicated to one optional backend. None is reachable from qis/__init__.py, so
 # `import qis` on a core install never touches them (checked: pybloqs, plotly and sqlalchemy are
 # absent from sys.modules after `import qis`).

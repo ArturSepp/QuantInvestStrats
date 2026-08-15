@@ -6,15 +6,15 @@ describes: a link points at a file that exists, an in-page anchor points at a se
 exists, the README's core dependency list is the list ``pip install qis`` actually resolves, and
 every name a README code block uses is a name the blocks above it bound.
 
-**Links.** The README told a reader to run ``src/qis/examples/performances.py`` and to look in
-``src/qis/examples/notebooks``. Neither path had existed since the examples were reorganised into
+**Links.** The README told a reader to run ``examples/performances.py`` and to look in
+``examples/notebooks``. Neither path had existed since the examples were reorganised into
 subdirectories, and nothing failed, because a dead link in a markdown file is invisible until
 somebody clicks it. The same class covers image references, which are the most numerous links in
 the README and the easiest to strand when a figure is renamed.
 
 Two kinds of link are checked, both resolvable without a network:
 
-  * a relative path, as in ``![image info](src/qis/examples/figures/perf1.PNG)``;
+  * a relative path, as in ``![image info](examples/figures/perf1.PNG)``;
   * a ``github.com/<owner>/<repo>/blob/<ref>/<path>`` url pointing back into this repository,
     which is how the README refers to its own example scripts.
 

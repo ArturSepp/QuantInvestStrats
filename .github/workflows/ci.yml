@@ -154,7 +154,9 @@ jobs:
         with zipfile.ZipFile(wheels[0]) as archive:
             names = set(archive.namelist())
         tests = [name for name in names if name.startswith("qis/") and name.endswith("_test.py")]
+        examples = [name for name in names if name.startswith("qis/examples/")]
         assert tests, "the wheel ships no qis test modules"
+        assert not examples, f"repository examples leaked into the wheel: {examples[:5]}"
         assert "qis/docs/plotting_kwargs.md" in names, "the wheel misses packaged documentation"
         assert "qis/settings.yaml" in names, "the wheel misses settings.yaml"
         print(f"{wheels[0]}: {len(tests)} test modules and required package data present")

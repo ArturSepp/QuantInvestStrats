@@ -17,7 +17,8 @@ block appears. The section headings are the whole difference:
                                         description
 
 This test looks for the underlined-heading form anywhere in a qis docstring and fails on it.
-Scope is the whole package including ``examples/``, since the examples are documentation too.
+Scope is the whole package plus root-level ``examples/`` in a repository checkout, since the
+examples are documentation too.
 """
 # packages
 import ast
@@ -29,6 +30,9 @@ import pytest
 import qis
 
 PACKAGE_ROOT = Path(qis.__file__).parent
+REPO_ROOT = Path(qis.__file__).resolve().parents[2]
+EXAMPLES_ROOT = REPO_ROOT.joinpath('examples')
+IS_REPOSITORY_CHECKOUT = REPO_ROOT.joinpath('pyproject.toml').is_file()
 
 # a numpydoc section is a heading on its own line underlined by dashes. Matching the underline
 # is what makes this specific: the bare word "Returns" is ordinary prose in a docstring.
@@ -39,12 +43,15 @@ NUMPYDOC_SECTION = re.compile(
 
 
 def _python_files() -> List[Path]:
-    """every module in the installed package, sorted."""
-    return sorted(PACKAGE_ROOT.rglob('*.py'))
+    """every package module, plus repository examples when they are available."""
+    files = list(PACKAGE_ROOT.rglob('*.py'))
+    if IS_REPOSITORY_CHECKOUT:
+        files.extend(EXAMPLES_ROOT.rglob('*.py'))
+    return sorted(files)
 
 
 FILES = _python_files()
-FILE_IDS = [str(path.relative_to(PACKAGE_ROOT)) for path in FILES]
+FILE_IDS = [str(path.relative_to(REPO_ROOT)) for path in FILES]
 
 
 def _numpydoc_docstrings(path: Path) -> List[Tuple[str, int, str]]:

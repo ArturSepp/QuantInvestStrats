@@ -1,7 +1,8 @@
 # qis examples
 
-Worked examples organised by `qis` sub-package. Each script is runnable
-standalone and either prints output or shows a matplotlib figure.
+Worked examples organised by `qis` sub-package. They are repository documentation and are not
+included in the installed wheel. Run a script from the repository root as a module, for example
+`python -m examples.perfstats.quickstart`; each either prints output or shows a matplotlib figure.
 
 Most examples pull data from `yfinance`. A few use Bloomberg via `bbg_fetch`
 and require an open Bloomberg terminal — those are noted below.
@@ -70,7 +71,7 @@ examples/
 | `long_short.py` | Long IEF / short LQD pair (Treasury duration vs IG credit). |
 | `ex_anti_tracking_error_and_risk.py` | Offline ex-ante TE, benchmark beta, and Euler marginal TE through `RiskModel`. |
 | `ex_post_tracking_error_and_risk.py` | Offline realised EWMA TE, whole-sample TE/IR, and EWMA beta/annualised alpha. |
-| `vol_target_and_trend.py` | Vol-target + trend-following sweep via `qis.examples.portfolios.strats.qis_delta1`. |
+| `vol_target_and_trend.py` | Vol-target + trend-following sweep via `examples.portfolios.strats.qis_delta1`. |
 
 ## factsheets — full multi-page reports
 

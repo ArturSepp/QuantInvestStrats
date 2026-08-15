@@ -10,7 +10,7 @@ This script measures what the choice costs. It reports how often each observatio
 each convention, then applies both to a series whose drift rises through the sample, which is
 where an uneven draw turns into a biased statistic.
 
-Run it with ``python -m qis.examples.models.bootstrap_convention``. No network, no data file,
+Run it with ``python -m examples.models.bootstrap_convention``. No network, no data file,
 about three seconds including the numba compile.
 """
 # packages

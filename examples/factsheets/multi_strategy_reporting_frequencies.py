@@ -33,9 +33,9 @@ from qis import TimePeriod, MultiPortfolioData, ReportingFrequency
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 # reuse the exact universe + reporting-frequency grid from the single-strategy runner
-from qis.examples.factsheets.strategy_reporting_frequencies import (UNIVERSE_DATA,
-                                                                    REPORTING_FREQUENCIES,
-                                                                    load_universe)
+from examples.factsheets.strategy_reporting_frequencies import (UNIVERSE_DATA,
+                                                                REPORTING_FREQUENCIES,
+                                                                load_universe)
 
 # EWMA spans for the vol-parity parameter sweep (one strategy per span), as in multi_strategy.py
 SWEEP_SPANS: Tuple[int, ...] = (5, 10, 20, 40, 60, 120)

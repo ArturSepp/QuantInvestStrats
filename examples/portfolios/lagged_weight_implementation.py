@@ -14,7 +14,7 @@ the weight rows cannot slip out of step with the rebalancing schedule.
 
 The strategy is a long-only trend book on the seeded synthetic universe, rebalanced monthly, so
 the signal is autocorrelated and delaying its implementation costs something measurable. Run it
-with ``python -m qis.examples.portfolios.lagged_weight_implementation``. No network, no data file.
+with ``python -m examples.portfolios.lagged_weight_implementation``. No network, no data file.
 """
 # packages
 import warnings

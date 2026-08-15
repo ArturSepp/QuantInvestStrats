@@ -18,7 +18,7 @@ import yfinance as yf
 import qis as qis
 from enum import Enum
 
-from qis.examples.market_data.fx_rates_data_yahoo_example import fetch_fx_rates_data_from_yahoo
+from examples.market_data.fx_rates_data_yahoo_example import fetch_fx_rates_data_from_yahoo
 
 ASSET = 'SPY'            # a USD-denominated asset
 REFERENCE_CCY = 'CHF'    # non-USD investor frame

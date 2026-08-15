@@ -98,7 +98,7 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
     belongs in the lower package — say so rather than adding the import.
   - `TID253` fails a **module-level** import of an optional extra (`yfinance`,
     `pandas_datareader`, `pybloqs`, `plotly`, `pyarrow`, `psycopg2`, `sqlalchemy`); the same
-    import inside a function passes, which is the documented pattern. `src/qis/examples/**` and the
+    import inside a function passes, which is the documented pattern. `examples/**` and the
     four modules dedicated to a single optional backend are named in `per-file-ignores` — add to
     that list only for a module `qis/__init__.py` cannot reach.
   - `ICN` pins `import numpy as np` and `import pandas as pd`. Ruff's default alias map is

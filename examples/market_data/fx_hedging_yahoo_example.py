@@ -17,7 +17,7 @@ import yfinance as yf
 import qis as qis
 from enum import Enum
 
-from qis.examples.market_data.fx_rates_data_yahoo_example import fetch_fx_rates_data_from_yahoo
+from examples.market_data.fx_rates_data_yahoo_example import fetch_fx_rates_data_from_yahoo
 from qis.market_data.fx_hedging import (compute_fx_optimal_hedge,
                                         compute_fx_vol_beta,
                                         compute_performance_of_local_ccy_asset_in_reference_ccy)

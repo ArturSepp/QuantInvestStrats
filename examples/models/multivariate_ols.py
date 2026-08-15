@@ -3,7 +3,7 @@ Demonstrate ``qis.fit_multivariate_ols``: multivariate OLS that returns
 predictions, fitted parameters, and a formatted equation string.
 
 Run with:
-    python -m qis.examples.models.multivariate_ols
+    python -m examples.models.multivariate_ols
 """
 import numpy as np
 import pandas as pd

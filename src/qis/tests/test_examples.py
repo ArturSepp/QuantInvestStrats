@@ -1,7 +1,7 @@
 """
 The examples are documentation, so they are tested like documentation.
 
-``src/qis/examples/`` had three calls to symbols that were implemented, documented and not exported,
+``examples/`` had three calls to symbols that were implemented, documented and not exported,
 and every one of them raised ``AttributeError`` the moment anybody ran the file. Nothing caught
 it, because nothing executes the examples: most of them pull prices from ``yfinance``, so they
 cannot run on a core install or in CI.
@@ -45,7 +45,13 @@ import pytest
 # qis / project
 import qis
 
-EXAMPLES_DIR = Path(qis.__file__).parent.joinpath('examples')
+REPO_ROOT = Path(qis.__file__).resolve().parents[2]
+EXAMPLES_DIR = REPO_ROOT.joinpath('examples')
+IS_REPOSITORY_CHECKOUT = REPO_ROOT.joinpath('pyproject.toml').is_file()
+
+pytestmark = pytest.mark.skipif(
+    not IS_REPOSITORY_CHECKOUT,
+    reason='repository examples are absent from an installed wheel')
 
 # an example that mentions any of these reaches a data vendor and cannot run unattended
 NETWORK_MARKERS = ('yfinance', 'yf.', 'bbg_fetch', 'pandas_datareader', 'blpapi')
@@ -72,6 +78,11 @@ EXAMPLE_FILES = _example_files()
 OFFLINE_EXAMPLE_FILES = [path for path in EXAMPLE_FILES if _is_offline(path)]
 EXAMPLE_IDS = [str(path.relative_to(EXAMPLES_DIR)) for path in EXAMPLE_FILES]
 OFFLINE_IDS = [str(path.relative_to(EXAMPLES_DIR)) for path in OFFLINE_EXAMPLE_FILES]
+
+
+def test_examples_are_found() -> None:
+    """the root examples directory is populated, so parametrized checks cannot pass empty."""
+    assert EXAMPLE_FILES, f"no Python examples found below {EXAMPLES_DIR}"
 
 
 def _parse(path: Path) -> ast.Module:
@@ -240,7 +251,11 @@ def test_offline_example_runs(path: Path,
     """
     environment: Dict[str, str] = dict(os.environ)
     environment['MPLBACKEND'] = 'Agg'
-    completed = subprocess.run([sys.executable, str(path)],
+    python_path = environment.get('PYTHONPATH')
+    environment['PYTHONPATH'] = (str(REPO_ROOT) if python_path is None
+                                 else os.pathsep.join((str(REPO_ROOT), python_path)))
+    module = '.'.join(('examples', *path.relative_to(EXAMPLES_DIR).with_suffix('').parts))
+    completed = subprocess.run([sys.executable, '-m', module],
                                cwd=str(tmp_path),
                                env=environment,
                                capture_output=True,

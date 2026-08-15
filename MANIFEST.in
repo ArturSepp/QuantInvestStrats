@@ -17,7 +17,7 @@ recursive-include src/qis/static *.css *.js
 recursive-include src/qis *.yml *.yaml *.json *.txt *.md
 
 # Explicitly exclude figures, notebooks, and image files
-recursive-exclude src/qis/examples/figures *
+recursive-exclude examples/figures *
 recursive-exclude src/qis *figures*
 global-exclude *.png
 global-exclude *.jpg

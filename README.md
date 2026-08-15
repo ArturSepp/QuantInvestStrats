@@ -46,25 +46,27 @@ all refer to tracking error.
 
 ```qis.market_data``` is an auxiliary module of market-data containers and FX analytics. ```FxRatesData``` holds FX spot and domestic short-rate panels and derives cross rates, covered-interest-parity forward premia, carry decomposition, and reference-currency / FX-hedged return translation of multi-asset panels, together with single- and multi-asset FX-hedging reports. ```FactorsData``` is a generic container for tradable-factor prices. Examples build the container from free Yahoo data or from Bloomberg via ```bbg-fetch```; see the module README at ```src/qis/market_data/README.md``` for the data contract and conventions.
 
-```qis.examples``` contains runnable scripts showcasing the analytics, organised by sub-package:
+The repository-root [`examples/`](examples/) directory contains runnable scripts showcasing the
+analytics. It is intentionally separate from the installed `qis` package:
 
-* ```qis.examples.perfstats``` — performance metrics on price series: quickstart usage, Sharpe vs Sortino across return frequencies, rolling performance, bond-ETF risk/return frontier, multi-figure performance reports, miss-best-worst-days impact, infrequent-returns interpolation, and an end-to-end de-levering / unsmoothing walkthrough on a bundled BDC vs private-credit dataset.
+* ```examples/perfstats``` — performance metrics on price series: quickstart usage, Sharpe vs Sortino across return frequencies, rolling performance, bond-ETF risk/return frontier, multi-figure performance reports, miss-best-worst-days impact, infrequent-returns interpolation, and an end-to-end de-levering / unsmoothing walkthrough on a bundled BDC vs private-credit dataset.
 
-* ```qis.examples.models``` — numba-vs-pandas EWM kernel benchmarks, multivariate EWM linear factor models, multivariate OLS, EWM correlation tables, OHLC realised-volatility estimators, intraday/overnight return decomposition, rolling correlations, and block bootstrap of price paths.
+* ```examples/models``` — numba-vs-pandas EWM kernel benchmarks, multivariate EWM linear factor models, multivariate OLS, EWM correlation tables, OHLC realised-volatility estimators, intraday/overnight return decomposition, rolling correlations, and block bootstrap of price paths.
 
-* ```qis.examples.regimes``` — regime-conditional analytics: bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study.
+* ```examples/regimes``` — regime-conditional analytics: bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study.
 
-* ```qis.examples.portfolios``` — backtests using ```backtest_model_portfolio```: balanced 60/40 with and without a BTC sleeve, constant-notional short, leveraged-ETF combinations, long/short pairs, vol-target / trend-following parameter sweeps, and separate offline ex-ante and ex-post tracking-error workflows.
+* ```examples/portfolios``` — backtests using ```backtest_model_portfolio```: balanced 60/40 with and without a BTC sleeve, constant-notional short, leveraged-ETF combinations, long/short pairs, vol-target / trend-following parameter sweeps, and separate offline ex-ante and ex-post tracking-error workflows.
 
-* ```qis.examples.factsheets``` — full multi-page factsheets for simulated and actual strategies, cross-sectional asset-class comparisons, multi-strategy parameter sweeps, and optional pybloqs-rendered variants.
+* ```examples/factsheets``` — full multi-page factsheets for simulated and actual strategies, cross-sectional asset-class comparisons, multi-strategy parameter sweeps, and optional pybloqs-rendered variants.
 
-* ```qis.examples.plots``` — plotting primitives showcase: dual-axis figures, scatter with regression diagnostics.
+* ```examples/plots``` — plotting primitives showcase: dual-axis figures, scatter with regression diagnostics.
 
-* ```qis.examples.utils``` — date schedules and rolling calendars: option / futures roll generation via ```generate_fixed_maturity_rolls```.
+* ```examples/utils``` — date schedules and rolling calendars: option / futures roll generation via ```generate_fixed_maturity_rolls```.
 
-* ```qis.examples.case_studies``` — cross-cutting domain studies: VIX beta to equities and bonds, VIX term-structure correlation with SPX, conditional returns on the front-month short-VIX strategy, credit-spread regression vs equity / rates.
+* ```examples/case_studies``` — cross-cutting domain studies: VIX beta to equities and bonds, VIX term-structure correlation with SPX, conditional returns on the front-month short-VIX strategy, credit-spread regression vs equity / rates.
 
-A README inside ```src/qis/examples/``` lists every script with a one-line description; examples that need a Bloomberg terminal are flagged inline.
+The [`examples/README.md`](examples/README.md) index lists every script with a one-line
+description; examples that need a Bloomberg terminal are flagged inline.
 
 
 # Table of contents
@@ -128,7 +130,10 @@ See `pyproject.toml` for the full list of optional extras (`reports`, `visualiza
 
 ### 1. Visualization of price data <a name="price"></a>
 
-The script is located in ```qis.examples.perfstats.quickstart``` (https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/perfstats/quickstart.py). Run it to produce the figures below; `perf1` to `perf3` are excluded from the repository by `.gitignore` on size, so only the last is embedded here.
+The script is located at [`examples/perfstats/quickstart.py`](examples/perfstats/quickstart.py).
+Run `python -m examples.perfstats.quickstart` from the repository root to produce the figures
+below; `perf1` to `perf3` are excluded from the repository by `.gitignore` on size, so only the
+last is embedded here.
 
 ```python 
 import matplotlib.pyplot as plt
@@ -186,7 +191,7 @@ fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
                                           title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')} benchmarked with SPY",
                                           perf_params=perf_params)
 ```
-![image info](src/qis/examples/figures/perf4.PNG)
+![image info](examples/figures/perf4.PNG)
 
 
 
@@ -195,9 +200,9 @@ This report is adopted for reporting the risk-adjusted performance
 of several assets with the goal
 of cross-sectional comparision
 
-Run example in ```qis.examples.factsheets.multi_assets.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/factsheets/multi_assets.py
+Run [`examples/factsheets/multi_assets.py`](examples/factsheets/multi_assets.py).
 
-![image info](src/qis/examples/figures/multiassets.PNG)
+![image info](examples/figures/multiassets.PNG)
 
 
 ### 3. Strategy factsheet <a name="strategy"></a>
@@ -205,52 +210,52 @@ This report is adopted for report performance, risk, and trading statistics
 for either backtested or actual strategy
     with strategy data passed as PortfolioData object
 
-Run example in ```qis.examples.factsheets.strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/factsheets/strategy.py
+Run [`examples/factsheets/strategy.py`](examples/factsheets/strategy.py).
 
-![image info](src/qis/examples/figures/strategy1.PNG)
-![image info](src/qis/examples/figures/strategy2.PNG)
-![image info](src/qis/examples/figures/strategy3.PNG)
+![image info](examples/figures/strategy1.PNG)
+![image info](examples/figures/strategy2.PNG)
+![image info](examples/figures/strategy3.PNG)
 
 ### 4. Strategy benchmark factsheet <a name="strategybenchmark"></a>
 This report is adopted for report performance and marginal comparison
   of strategy vs a benchmark strategy 
 (data for both are passed using individual PortfolioData object)
 
-Run example in ```qis.examples.factsheets.strategy_benchmark.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/factsheets/strategy_benchmark.py
+Run [`examples/factsheets/strategy_benchmark.py`](examples/factsheets/strategy_benchmark.py).
 
-![image info](src/qis/examples/figures/strategy_benchmark.PNG)
+![image info](examples/figures/strategy_benchmark.PNG)
 
 Brinson-Fachler performance attribution (https://en.wikipedia.org/wiki/Performance_attribution)
-![image info](src/qis/examples/figures/brinson_attribution.PNG)
+![image info](examples/figures/brinson_attribution.PNG)
 
 
 ### 5. Multi strategy factsheet <a name="multistrategy"></a>
 This report is adopted to examine the sensitivity of 
 backtested strategy to a parameter or set of parameters:
 
-Run example in ```qis.examples.factsheets.multi_strategy.py``` https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/factsheets/multi_strategy.py
+Run [`examples/factsheets/multi_strategy.py`](examples/factsheets/multi_strategy.py).
 
-![image info](src/qis/examples/figures/multi_strategy.PNG)
+![image info](examples/figures/multi_strategy.PNG)
 
 
 ### 6. Runnable examples <a name="runnable-examples"></a>
 
 The examples are plain scripts under
-[`src/qis/examples/`](https://github.com/ArturSepp/QuantInvestStrats/tree/main/src/qis/examples), each
+[`examples/`](https://github.com/ArturSepp/QuantInvestStrats/tree/main/examples), each
 runnable top to bottom. `src/qis/tests/test_examples.py` checks them for symbols and keyword
 arguments that exist, and runs the examples that need no data vendor.
 
 The four factsheet archetypes shown above are
-[`multi_assets.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/factsheets/multi_assets.py),
-[`strategy.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/factsheets/strategy.py),
-[`strategy_benchmark.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/factsheets/strategy_benchmark.py)
+[`multi_assets.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/multi_assets.py),
+[`strategy.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/strategy.py),
+[`strategy_benchmark.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/strategy_benchmark.py)
 and
-[`multi_strategy.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/factsheets/multi_strategy.py).
+[`multi_strategy.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/multi_strategy.py).
 
 The consolidated tracking-error analytics are demonstrated offline in
-[`ex_anti_tracking_error_and_risk.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/portfolios/ex_anti_tracking_error_and_risk.py)
+[`ex_anti_tracking_error_and_risk.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/ex_anti_tracking_error_and_risk.py)
 for the covariance-based ex-ante view and
-[`ex_post_tracking_error_and_risk.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/examples/portfolios/ex_post_tracking_error_and_risk.py)
+[`ex_post_tracking_error_and_risk.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/ex_post_tracking_error_and_risk.py)
 for realised EWMA tracking error, whole-sample TE/IR, and EWMA beta/alpha.
 
 

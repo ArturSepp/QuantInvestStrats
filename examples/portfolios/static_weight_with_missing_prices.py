@@ -13,7 +13,7 @@ the missing weight over them, preserving the total exposure of the specification
 forcing the row to one, so a book that is 90% invested by design stays 90% invested.
 
 The panel is the seeded synthetic universe, whose ``SEQ_EM`` leg starts five years after the
-other two. Run it with ``python -m qis.examples.portfolios.static_weight_with_missing_prices``.
+other two. Run it with ``python -m examples.portfolios.static_weight_with_missing_prices``.
 No network, no data file.
 """
 # packages

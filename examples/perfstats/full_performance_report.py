@@ -4,19 +4,19 @@ periodic returns table, cumulative price, price + drawdown, regime-conditional
 scatter.
 
 The layout itself is reused across examples and lives in
-``qis.examples._helpers.reporting_helpers.generate_performance_report``.
+``examples._helpers.reporting_helpers.generate_performance_report``.
 This file just shows how to drive it on several universe configurations
 (ETFs, crypto, trend-following ETFs, vol ETFs, etc.).
 
 Run with:
-    python -m qis.examples.perfstats.full_performance_report
+    python -m examples.perfstats.full_performance_report
 """
 import matplotlib.pyplot as plt
 import yfinance as yf
 from enum import Enum
 
 import qis as qis
-from qis.examples._helpers.reporting_helpers import generate_performance_report
+from examples._helpers.reporting_helpers import generate_performance_report
 
 
 class Universe(Enum):

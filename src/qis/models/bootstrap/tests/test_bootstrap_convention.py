@@ -2,7 +2,7 @@
 the numbers in the convention example are pinned, not just executed.
 
 ``src/qis/tests/test_examples.py`` runs the example at
-``src/qis/examples/models/bootstrap_convention.py`` and fails on a nonzero exit code. That is a
+``examples/models/bootstrap_convention.py`` and fails on a nonzero exit code. That is a
 check that the script runs, not a check that it is right: the
 first observation could be drawn at 0.20 instead of 0.110, the annualised bias could move from
 +2.15% to +5%, and the example would still exit zero. Those numbers are quoted in
@@ -36,11 +36,15 @@ import pytest
 # qis / project
 import qis
 
-EXAMPLE_PATH: Path = Path(qis.__file__).parent.joinpath('examples', 'models',
-                                                        'bootstrap_convention.py')
 REPO_ROOT: Path = Path(qis.__file__).resolve().parents[2]
+EXAMPLE_PATH: Path = REPO_ROOT.joinpath('examples', 'models', 'bootstrap_convention.py')
 REPRODUCIBILITY_PATH: Path = REPO_ROOT.joinpath('docs', 'reproducibility.md')
 PAPER_PATH: Path = REPO_ROOT.joinpath('paper.md')
+IS_REPOSITORY_CHECKOUT: bool = REPO_ROOT.joinpath('pyproject.toml').is_file()
+
+pytestmark = pytest.mark.skipif(
+    not IS_REPOSITORY_CHECKOUT,
+    reason='repository convention example is absent from an installed wheel')
 
 # half a unit in the last digit each quantity is published to
 FREQUENCY_TOLERANCE: float = 0.0005     # published to three decimals
@@ -52,7 +56,7 @@ def _load_example() -> ModuleType:
     """
     import the example module from its file.
 
-    ``src/qis/examples`` carries no ``__init__.py`` and is not part of the installed
+    Root-level ``examples`` carries no ``__init__.py`` and is not part of the installed
     distribution, so it is loaded by path exactly as ``test_examples.py`` locates it.
 
     Returns:
@@ -221,7 +225,7 @@ def test_reproducibility_page_states_the_measured_values(published: str) -> None
     normalised = re.sub(r'[−–—]', '-', page).replace('**', '')
     assert published in normalised, (
         f"docs/reproducibility.md no longer states {published!r}. Regenerate the page from "
-        f"python -m qis.examples.models.bootstrap_convention")
+        f"python -m examples.models.bootstrap_convention")
 
 
 @pytest.fixture(scope='module')
