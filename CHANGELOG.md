@@ -7,6 +7,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.11.0] - 2026-08-16
+
+### Added
+
+- Added `qis.discrete_portfolio`, an event-driven portfolio replay engine with explicit orders,
+  fills, signed-unit holdings, cash accounting, order/trade ledgers, pluggable execution models,
+  and an adapter to the existing `PortfolioData` reporting surface. Its default contract makes
+  decisions at *t* and executes them at *t+1*.
+
 ### Changed
 
 - Aligned the PyPI summary, README opening, and documentation titles around `qis` performance
