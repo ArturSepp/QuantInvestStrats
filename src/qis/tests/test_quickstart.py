@@ -61,6 +61,8 @@ def test_quickstart_references_one_authoritative_example() -> None:
 
 def test_colab_notebook_is_a_clean_mirror_of_authoritative_example() -> None:
     """The hosted notebook adds setup only; its workflow cannot drift from D6."""
+    if not README_PATH.is_file():
+        pytest.skip('the repository-only Colab notebook is absent from installed wheels')
     if not NOTEBOOK_PATH.is_file():
         pytest.fail(f'approved Colab notebook is missing: {NOTEBOOK_PATH}')
 
