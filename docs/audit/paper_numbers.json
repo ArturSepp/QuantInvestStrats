@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "39dffac4d536bda25dd48efe0b71f0188cdf1589",
+  "measured_at_commit": "cc0a0491e0e3b66934d8003510cf1bdfe9e3bde2",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -52,20 +52,20 @@
       "paper_phrase": null
     },
     "commits": {
-      "value": 364,
+      "value": 366,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
-      "value": 747,
-      "how": "tools/audit_consumers.py at fb8848d327c0",
+      "value": 756,
+      "how": "tools/audit_consumers.py at 895ee3c03170",
       "live": false,
-      "paper_phrase": "at 747 sites"
+      "paper_phrase": "at 756 sites"
     },
     "consumer_optimalportfolios_symbols": {
       "value": 98,
-      "how": "tools/audit_consumers.py at fb8848d327c0",
+      "how": "tools/audit_consumers.py at 895ee3c03170",
       "live": false,
       "paper_phrase": "references 98 of its symbols"
     },
