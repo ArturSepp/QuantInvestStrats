@@ -132,6 +132,8 @@ See `pyproject.toml` for the full list of optional extras (`reports`, `visualiza
 
 ## Offline quickstart <a name="offline-quickstart"></a>
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArturSepp/QuantInvestStrats/blob/main/notebooks/offline_quickstart_colab.ipynb)
+
 The authoritative first-success workflow is
 [`examples/getting_started/offline_quickstart.py`](examples/getting_started/offline_quickstart.py).
 It generates seeded data in-process, builds a live-universe-aware quarterly weight schedule,
@@ -148,6 +150,9 @@ With only `pip install qis`, copy the complete code from the
 [hosted offline quickstart](https://quantinveststrats.readthedocs.io/en/latest/quickstart.html).
 That page includes the runnable script directly, so the README, documentation, and example cannot
 develop independent full-code versions.
+
+The Colab entry point installs the latest release from public PyPI, reports its exact version and
+import path, and runs that same mechanically checked source with no saved notebook outputs.
 
 
 ## Examples <a name="examples"></a>

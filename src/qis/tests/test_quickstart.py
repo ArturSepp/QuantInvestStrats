@@ -7,6 +7,7 @@ evidence of success.
 """
 
 # packages
+import json
 import re
 import runpy
 from pathlib import Path
@@ -25,6 +26,18 @@ EXAMPLE_PATH: Path = REPO_ROOT.joinpath(
     'examples', 'getting_started', 'offline_quickstart.py'
 )
 EXAMPLE_REPOSITORY_PATH = 'examples/getting_started/offline_quickstart.py'
+NOTEBOOK_PATH: Path = REPO_ROOT.joinpath('notebooks', 'offline_quickstart_colab.ipynb')
+COLAB_URL = (
+    'https://colab.research.google.com/github/ArturSepp/QuantInvestStrats/'
+    'blob/main/notebooks/offline_quickstart_colab.ipynb'
+)
+STABLE_QUICKSTART_URL = (
+    'https://quantinveststrats.readthedocs.io/en/stable/quickstart.html'
+)
+CANONICAL_SOURCE_URL = (
+    'https://github.com/ArturSepp/QuantInvestStrats/blob/main/'
+    'examples/getting_started/offline_quickstart.py'
+)
 
 LITERALINCLUDE = re.compile(r'^```\{literalinclude\}\s+([^\n]+)$', flags=re.MULTILINE)
 
@@ -44,6 +57,38 @@ def test_quickstart_references_one_authoritative_example() -> None:
     assert included == EXAMPLE_PATH.resolve()
     assert EXAMPLE_REPOSITORY_PATH in DOCS_INDEX_PATH.read_text(encoding='utf-8')
     assert EXAMPLE_REPOSITORY_PATH in README_PATH.read_text(encoding='utf-8')
+
+
+def test_colab_notebook_is_a_clean_mirror_of_authoritative_example() -> None:
+    """The hosted notebook adds setup only; its workflow cannot drift from D6."""
+    if not NOTEBOOK_PATH.is_file():
+        pytest.fail(f'approved Colab notebook is missing: {NOTEBOOK_PATH}')
+
+    notebook = json.loads(NOTEBOOK_PATH.read_text(encoding='utf-8'))
+    assert notebook['nbformat'] == 4
+    cells = notebook['cells']
+    code_cells = [cell for cell in cells if cell['cell_type'] == 'code']
+    workflow_cells = [
+        cell for cell in code_cells if 'd6-source' in cell.get('metadata', {}).get('tags', [])
+    ]
+    assert len(workflow_cells) == 1
+    assert ''.join(workflow_cells[0]['source']) == EXAMPLE_PATH.read_text(encoding='utf-8')
+
+    setup_source = '\n'.join(''.join(cell['source']) for cell in code_cells[:-1])
+    assert 'https://pypi.org/simple' in setup_source
+    assert 'qis==' not in setup_source
+    assert "version('qis')" in setup_source
+    assert 'qis.__file__' in setup_source
+    assert all(cell['execution_count'] is None and cell['outputs'] == [] for cell in code_cells)
+    assert all(not cell.get('attachments') for cell in cells)
+
+    markdown = '\n'.join(
+        ''.join(cell['source']) for cell in cells if cell['cell_type'] == 'markdown'
+    )
+    assert STABLE_QUICKSTART_URL in markdown
+    assert CANONICAL_SOURCE_URL in markdown
+    assert COLAB_URL in QUICKSTART_PATH.read_text(encoding='utf-8')
+    assert COLAB_URL in README_PATH.read_text(encoding='utf-8')
 
 
 def test_quickstart_executes_and_reports_sane_results(

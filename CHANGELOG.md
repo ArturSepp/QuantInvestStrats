@@ -16,6 +16,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Added one authoritative, core-only offline quickstart for synthetic data, a live-universe-aware
   quarterly backtest, explicit return/Sharpe conventions, and benchmark-relative risk. The
   documentation includes the runnable script directly and the README points to the same file.
+- Added an optional clean Colab entry point that installs the latest PyPI release, reports its
+  version and import path, and mirrors the authoritative offline quickstart under a mechanical
+  drift check without committing notebook outputs.
 
 ## [5.10.0] - 2026-08-15
 

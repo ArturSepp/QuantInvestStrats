@@ -8,11 +8,18 @@ myst:
 
 # Offline quickstart
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArturSepp/QuantInvestStrats/blob/main/notebooks/offline_quickstart_colab.ipynb)
+
 This workflow needs only `pip install qis`: no network access, credentials, optional extras,
 data files, or repository-local imports. It uses a seeded business-day panel, creates quarterly
 targets over the instruments live at each decision date, and reports performance plus
 benchmark-relative risk. A clean-wheel verification run took **6.5 seconds on Windows with
 Python 3.12**, including imports and first-use compilation.
+
+The optional Colab notebook installs the latest release directly from PyPI, prints the installed
+version and import path, then runs the same authoritative workflow below. Its workflow cell is
+checked mechanically against the source script and is always committed without execution state
+or outputs. For a release-aligned page, use the [stable documentation](https://quantinveststrats.readthedocs.io/en/stable/quickstart.html).
 
 From a repository checkout, run:
 
