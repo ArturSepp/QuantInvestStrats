@@ -132,6 +132,16 @@ def _close_figures(figures) -> None:
         plt.close(figure)
 
 
+def test_ra_performance_table_is_rendered_once(report_inputs) -> None:
+    universe, with_covar, _, _, _ = report_inputs
+    figs, _ = _run_report(with_covar, universe)
+    try:
+        assert len(figs['ra_table'].axes) == 1
+        assert len(figs['ra_table'].axes[0].tables) == 1
+    finally:
+        _close_figures(figs)
+
+
 def test_covariance_only_model_preserves_pre_existing_output_keys(report_inputs) -> None:
     universe, with_covar, _, covar_model, _ = report_inputs
     absent_figs, absent_dfs = _run_report(with_covar, universe)

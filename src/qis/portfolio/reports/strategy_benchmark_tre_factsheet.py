@@ -26,6 +26,7 @@ from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.risk.factor_model import LinearModel
 from qis.portfolio.risk.risk_model import RiskModel
 from qis.portfolio.reports.config import PERF_PARAMS
+from qis.plots.derived.perf_table import get_ra_perf_benchmark_columns
 from qis.plots.utils import get_n_sns_colors
 from qis.utils.df_str import idx_to_alphabet
 
@@ -236,15 +237,25 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                                 add_turnover=True,
                                                                 ax=ax,
                                                                 **kwargs)
-        # ra perf table without strings
-        ra_perf_table = multi_portfolio_data.plot_ra_perf_table(benchmark_price=benchmark_price,
-                                                                add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                                                perf_params=perf_params,
-                                                                time_period=time_period,
-                                                                add_turnover=True,
-                                                                is_convert_to_str=False,
-                                                                ax=ax,
-                                                                **kwargs)
+        # Keep a full-precision frame for callers without drawing it over the formatted table.
+        prices = multi_portfolio_data.get_navs(
+            benchmark=regime_benchmark,
+            add_benchmarks_to_navs=add_benchmarks_to_navs,
+            time_period=time_period,
+        )
+        turnover = multi_portfolio_data.get_turnover(
+            time_period=time_period,
+            **kwargs,
+        ).mean(axis=0).to_frame('Turnover')
+        ra_perf_table = get_ra_perf_benchmark_columns(
+            prices=prices,
+            benchmark=regime_benchmark,
+            benchmark_price=benchmark_price,
+            perf_params=perf_params,
+            is_convert_to_str=False,
+            df_to_add=qis.df_to_str(turnover, var_format='{:,.0%}'),
+            **kwargs,
+        )
         dfs['ra_perf_table'] = ra_perf_table
 
         # strategy weights

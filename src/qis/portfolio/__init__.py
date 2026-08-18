@@ -31,8 +31,12 @@ from qis.portfolio.risk.ewm_covar_risk import (limit_weights_to_max_var_limit,
                                                compute_portfolio_correlated_var_by_groups,
                                                compute_portfolio_independent_var_by_ac)
 
-from qis.portfolio.risk.contributions import (compute_portfolio_risk_contributions,
-                                              compute_benchmark_portfolio_risk_contributions)
+from qis.portfolio.risk.contributions import (
+    compute_benchmark_portfolio_risk_contributions,
+    compute_group_portfolio_risk_contribution_ratios,
+    compute_portfolio_risk_contribution_ratios,
+    compute_portfolio_risk_contributions,
+)
 
 from qis.portfolio.backtester import (backtest_model_portfolio, backtest_rebalanced_portfolio)
 

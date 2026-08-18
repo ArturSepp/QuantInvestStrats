@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.11.1] - 2026-08-18
+
+### Added
+
+- Added normalized asset and grouped Euler risk-contribution ratios to
+  `qis.portfolio.risk.contributions`, giving the OSS stack one canonical implementation for
+  covariance-implied risk attribution while preserving the existing volatility-unit API.
+
+### Fixed
+
+- Prevented the strategy-versus-benchmark tracking-error report from drawing its risk-adjusted
+  performance table twice while preserving the full-precision table returned to callers.
+
 ## [5.11.0] - 2026-08-16
 
 ### Added

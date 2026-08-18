@@ -128,8 +128,8 @@ logic: it converts target weights to units at each rebalancing, holds those unit
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
 one of the few loops here that cannot be vectorised.
 
-The public interface is `qis.__all__`, which holds 407 names; `src/qis/api.py` records that list as a
-literal together with a documented core of 119 symbols grouped by capability, and the suite fails
+The public interface is `qis.__all__`, which holds 409 names; `src/qis/api.py` records that list as a
+literal together with a documented core of 121 symbols grouped by capability, and the suite fails
 when either record disagrees with the namespace.
 
 Properties are enforced by tests rather than by convention: every exported plotting function draws a
@@ -146,8 +146,8 @@ smoothing.
 # Research impact statement
 
 We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 98 of its symbols
-at 756 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
-at 443 sites. Both counts are taken at the commits recorded in
+at 766 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
+at 441 sites. Both counts are taken at the commits recorded in
 `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
 
 A third public package, `privateassets`, applies the unsmoothing layer to private-asset

@@ -47,6 +47,12 @@ ex-ante versus realised tracking error, ex-ante versus ex-post beta, annualised 
 and optional factor panels. Some established API names retain the abbreviation ```tre```, but
 all refer to tracking error.
 
+Covariance-implied Euler attribution also lives here for the whole OSS stack:
+```compute_portfolio_risk_contributions``` returns asset contributions in volatility units,
+```compute_portfolio_risk_contribution_ratios``` returns their dimensionless shares, and
+```compute_group_portfolio_risk_contribution_ratios``` aggregates those shares over clusters,
+sectors, asset classes, or any other complete labelled partition.
+
 ```qis.market_data``` is an auxiliary module of market-data containers and FX analytics. ```FxRatesData``` holds FX spot and domestic short-rate panels and derives cross rates, covered-interest-parity forward premia, carry decomposition, and reference-currency / FX-hedged return translation of multi-asset panels, together with single- and multi-asset FX-hedging reports. ```FactorsData``` is a generic container for tradable-factor prices. Examples build the container from free Yahoo data or from Bloomberg via ```bbg-fetch```; see the module README at ```src/qis/market_data/README.md``` for the data contract and conventions.
 
 The repository-root [`examples/`](examples/) directory contains runnable scripts showcasing the
@@ -367,7 +373,7 @@ If you use QIS in your research, please cite it as:
   title={qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies},
   author={Sepp, Artur},
   year={2026},
-  version={5.11.0},
+  version={5.11.1},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

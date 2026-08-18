@@ -183,3 +183,5 @@ output/
 # Claude Code: shared project settings are committed, per-machine overrides are not
 .claude/settings.local.json
 .codex/
+/.codex_m2_baseline_fd67159bdcc745df9661da57e925cf28
+/.codex_staging
