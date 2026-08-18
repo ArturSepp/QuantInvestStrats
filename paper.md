@@ -29,8 +29,8 @@ regime-conditional statistics, currency hedging, and return unsmoothing.
 
 We designed `qis` around one assumption: a strategy is a rule for producing weights, and, for the
 simulation and reporting workflows `qis` targets, everything downstream of those weights is
-reconstruction rather than research. The researcher keeps the signal and the portfolio
-construction — the things that actually matter for a successful research and investment process;
+reconstruction rather than research. The researcher develops the signal and the portfolio
+construction — the things that actually matter for a successful investment process;
 the rest belongs to the library.
 
 `qis` is the base layer of a stack of quantitative finance packages — `optimalportfolios`,
@@ -40,15 +40,14 @@ released under the MIT licence.
 
 # Statement of need
 
-Reported performance numbers depend on conventions that are rarely stated. Annualisation depends on
+Reported portfolio performance numbers depend on conventions that are rarely stated. Volatility depends on
 the return frequency, a Sharpe ratio on whether a risk-free rate is subtracted and on which rate,
 and a backtested return on whether holdings drift between rebalancings or are reset every period.
 Two implementations of the same strategy can therefore report different numbers without either
-containing an error, and the difference is invisible in the output.
+containing an error.
 
 We answer each of these questions once, inside the library, and report the answer beside the
-number. The return convention is an argument rather than an assumption, annualisation follows
-from the stated frequency, three Sharpe conventions are named and selected explicitly, and the
+number. The return convention is an argument rather than an assumption, three Sharpe conventions are named and selected explicitly, and the
 reporting frequency appears on every rendered panel. The simulation holds units between
 rebalancings, so the realised weights drift with prices, which is what a portfolio does.
 
@@ -115,8 +114,7 @@ corrects the serial correlation induced by appraisal-based valuation, which matt
 assets and hedge funds [@getmansky2004]. Regime-conditional reporting partitions every statistic
 by benchmark return quantile [@Sepp2019]. A third, paired block bootstrap resampling — one index
 draw across several aligned panels, so a factor and a residual panel resample together
-[@politis1994] — has the primitive noted above; what has no counterpart is its coupling to
-portfolio reconstruction and reporting inside one object model.
+[@politis1994] — has the primitive noted above.
 
 # Software design
 
@@ -135,8 +133,7 @@ when either record disagrees with the namespace.
 Properties are enforced by tests rather than by convention: every exported plotting function draws a
 figure on a synthetic panel; every example references symbols and keyword arguments that exist;
 every core symbol documents its arguments and documents none it does not take; documentation links
-resolve; and the measurements this paper quotes match a generated record. The convention measurement
-above is pinned to its published values rather than only executed. Every example that needs no data
+resolve; and the measurements this paper quotes match a generated record. Every example that needs no data
 vendor runs in the suite; the rest are checked statically.
 
 The suite runs without network access on a core installation, from a frozen seeded simulator
