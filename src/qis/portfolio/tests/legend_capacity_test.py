@@ -146,8 +146,14 @@ def test_multi_asset_factsheet_validates_capacity(monkeypatch: pytest.MonkeyPatc
     fig = qis.generate_multi_asset_factsheet(prices=prices, benchmark=prices.columns[0],
                                              time_period=time_period)
     plt.close(fig)
-    assert len(calls) == 1
-    assert calls[0]['n_legend_entries'] == len(prices.columns)
+    assert calls == [{
+        'n_legend_entries': len(prices.columns),
+        'figsize': A4_PORTRAIT,
+        'fontsize': 5,
+        'panel_rows': 2,
+        'gridspec_rows': 14,
+        'report_name': 'multi-asset factsheet',
+    }]
 
 
 class LocalTest:

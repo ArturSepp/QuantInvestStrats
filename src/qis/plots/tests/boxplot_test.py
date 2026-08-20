@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -54,6 +55,44 @@ def test_plot_box_palette_matches_hue_cardinality(
         plt.close(fig)
 
     assert requested_sizes == [expected_n_colors]
+
+
+def test_plot_box_palette_includes_unused_categorical_hues(
+        monkeypatch: pytest.MonkeyPatch,
+        ) -> None:
+    """Keep one palette color for every declared categorical hue.
+
+    Args:
+        monkeypatch: Pytest fixture used to record the requested palette size.
+    """
+    data = pd.DataFrame({
+        'x': ['left', 'left', 'middle', 'middle', 'right', 'right'],
+        'hue': pd.Categorical(
+            ['h0', 'h1', 'h0', 'h1', 'h0', 'h1'],
+            categories=['h0', 'h1', 'unused'],
+        ),
+        'value': np.arange(6, dtype=float),
+    })
+    requested_sizes: list[int] = []
+    original_get_n_colors = put.get_n_colors
+
+    def capture_palette_size(n: int):
+        requested_sizes.append(n)
+        return original_get_n_colors(n=n)
+
+    monkeypatch.setattr(put, 'get_n_colors', capture_palette_size)
+    fig, ax = plt.subplots()
+    try:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            plot_box(df=data, x='x', y='value', hue='hue', legend_loc=None, ax=ax)
+        palette_warnings = [warning for warning in caught
+                            if 'palette list has fewer values' in str(warning.message)]
+    finally:
+        plt.close(fig)
+
+    assert requested_sizes == [3]
+    assert palette_warnings == []
 
 
 class LocalTests(Enum):
