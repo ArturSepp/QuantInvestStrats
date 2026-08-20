@@ -686,7 +686,10 @@ class PortfolioData:
         pnl = self.get_instruments_pnl(time_period=time_period)
         # portfolio_pnl = pnl.sum(axis=1)
 
-        pnl_risk = np.nanstd(pnl.replace({0.0: np.nan}), axis=0)
+        pnl_values = pnl.replace({0.0: np.nan}).to_numpy()
+        # np.nanstd warns on an all-NaN instrument; NaN is the intended risk for that column.
+        pnl_risk = np.array([np.nan if np.isnan(values).all() else np.nanstd(values)
+                             for values in pnl_values.T])
         # portfolio_pnl_risk = np.nanstd(portfolio_pnl.replace({0.0: np.nan}), axis=0)
         # pnl_risk_ratio = pnl_risk / portfolio_pnl_risk
         pnl_risk_ratio = pnl_risk / np.nansum(pnl_risk)

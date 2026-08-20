@@ -13,6 +13,7 @@ trusting them, so a matplotlib release that invalidates either fails here rather
 a report. The rest pin the reduction's arithmetic and its wiring.
 """
 # packages
+import warnings
 import matplotlib
 matplotlib.use('Agg')  # noqa: E402  - a headless backend, set before pyplot is imported
 import numpy as np
@@ -33,8 +34,9 @@ ONE_SIDED = pd.Series([5.0, 3.0, 1.0, 0.4, 0.1, 0.05], index=list('abcdef'))
 
 
 def build_portfolio_data() -> qis.PortfolioData:
-    """an equal-weight portfolio over the seeded synthetic panel"""
-    prices = qis.TimePeriod('31Dec2020', '31Dec2025').locate(generate_synthetic_prices())
+    """an equal-weight portfolio over a quirk-free seeded panel for reduction-only tests"""
+    prices = qis.TimePeriod('31Dec2020', '31Dec2025').locate(
+        generate_synthetic_prices(apply_quirks=False))
     weights = pd.DataFrame(1.0 / len(prices.columns), index=prices.index, columns=prices.columns)
     return qis.backtest_model_portfolio(prices=prices, weights=weights.iloc[::21, :],
                                         ticker='Test portfolio')
@@ -58,6 +60,38 @@ def test_performance_attribution_uses_instrument_display_names() -> None:
 
     assert pnl.index.tolist() == list(names.values())
     assert pnl_risk.index.tolist() == list(names.values())
+
+
+def test_pnl_risk_attribution_handles_all_zero_instrument_without_warning(
+        monkeypatch: pytest.MonkeyPatch,
+        ) -> None:
+    """Preserve finite risk shares when one instrument has only zero P&L.
+
+    Args:
+        monkeypatch: Pytest fixture used to provide deterministic instrument P&L.
+    """
+    portfolio_data = build_portfolio_data()
+    pnl = pd.DataFrame({
+        'all_zero': [0.0, 0.0, 0.0, 0.0],
+        'unit_risk': [1.0, -1.0, 1.0, -1.0],
+        'double_risk': [2.0, -2.0, 2.0, -2.0],
+    })
+    monkeypatch.setattr(
+        portfolio_data,
+        'get_instruments_pnl',
+        lambda time_period=None: pnl,
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        actual = portfolio_data.get_instruments_pnl_risk_attribution()
+
+    expected = pd.Series(
+        [np.nan, 1.0 / 3.0, 2.0 / 3.0],
+        index=pnl.columns,
+        name=portfolio_data.nav.name,
+    )
+    pd.testing.assert_series_equal(actual, expected)
 
 
 def test_brinson_keeps_canonical_alignment_with_display_names() -> None:
