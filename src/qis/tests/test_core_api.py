@@ -94,29 +94,27 @@ def test_pending_list_is_a_subset_of_the_core() -> None:
     assert not stray, f"PENDING_DOCSTRINGS names non-core symbols: {stray}"
 
 
-@pytest.mark.parametrize('name', sorted(set(core_api_names()) - PENDING_DOCSTRINGS
-                                        - set(PROSE_DOCUMENTED)))
+@pytest.mark.parametrize('name', sorted(name for name in set(core_api_names())
+                                        - PENDING_DOCSTRINGS - set(PROSE_DOCUMENTED)
+                                        if _documentable(name)))
 def test_core_symbol_is_documented(name: str) -> None:
     """a core symbol carries an Args or Attributes block."""
-    if not _documentable(name):
-        pytest.skip(f"{name} is a constant, not a callable")
     assert _is_documented(getattr(qis, name)), (
         f"qis.{name} is core but has no Args:/Attributes: block. Write it, or move the name "
         f"out of CORE_API if it is not core after all")
 
 
-@pytest.mark.parametrize('name', sorted(PENDING_DOCSTRINGS))
-def test_pending_symbol_is_still_undocumented(name: str) -> None:
+def test_pending_symbols_are_still_undocumented() -> None:
     """
     the backlog must shrink when work lands.
 
     A name here that is now documented means the docstring was written and the list not updated.
     Remove it from PENDING_DOCSTRINGS; the check above then holds it documented forever.
     """
-    if not _documentable(name):
-        pytest.skip(f"{name} is a constant, not a callable")
-    assert not _is_documented(getattr(qis, name)), (
-        f"qis.{name} is documented now - remove it from PENDING_DOCSTRINGS")
+    for name in sorted(PENDING_DOCSTRINGS):
+        assert _documentable(name), f"{name} is a constant, not a callable"
+        assert not _is_documented(getattr(qis, name)), (
+            f"qis.{name} is documented now - remove it from PENDING_DOCSTRINGS")
 
 
 def test_capability_groups_are_named() -> None:
@@ -150,7 +148,9 @@ def _documented_argument_names(obj: Any) -> List[str]:
     return re.findall(r'^    (\w+):', block.group(1), flags=re.M)
 
 
-@pytest.mark.parametrize('name', sorted(set(core_api_names()) - set(PROSE_DOCUMENTED)))
+@pytest.mark.parametrize('name', sorted(
+    name for name in set(core_api_names()) - set(PROSE_DOCUMENTED)
+    if _documentable(name) and len(_documented_argument_names(getattr(qis, name))) > 0))
 def test_documented_arguments_exist(name: str) -> None:
     """
     an Args: block cannot name an argument the function does not take.
@@ -159,12 +159,8 @@ def test_documented_arguments_exist(name: str) -> None:
     argument that does not exist; here it is a docstring doing the same, which is worse,
     because a reader has no way to find out except by trying it.
     """
-    if not _documentable(name):
-        pytest.skip(f"{name} is a constant, not a callable")
     obj = getattr(qis, name)
     documented = _documented_argument_names(obj)
-    if len(documented) == 0:
-        pytest.skip(f"{name} has no Args: block")
     try:
         parameters = set(inspect.signature(getattr(obj, 'py_func', obj)).parameters)
     except (ValueError, TypeError):

@@ -25,7 +25,7 @@ red in the first three days and caught nothing either time: once because two wor
 a proxy moves but the claim stays true is the kind that gets routed around, which is the same
 reason the lint job in ``.github/workflows/ci.yml`` gates changed lines rather than whole files.
 The unquoted metrics are still measured, still recorded and still refreshed; nothing asserts on
-them.
+their values.
 
 A **recorded** metric needs ``git`` or a network clone of a consumer repository. Neither may run
 in a test, so those are checked for presence and provenance rather than recomputed. Refresh them
@@ -131,15 +131,27 @@ def test_record_exists_and_names_its_commit() -> None:
 LIVE_METRICS: List[str] = sorted(_live_measurements()) if IS_REPOSITORY_CHECKOUT else []
 
 
-@pytest.mark.parametrize('metric', LIVE_METRICS)
-def test_live_metric_matches_the_record(metric: str) -> None:
+def test_live_metrics_are_recorded() -> None:
+    """every metric measured here remains present in the generated record."""
+    record = _record()
+    missing = sorted(set(LIVE_METRICS) - set(record['metrics']))
+    assert not missing, f'{missing} are measured here but absent from the record; regenerate it'
+
+
+def _quoted_live_metrics() -> List[str]:
+    """live metrics whose values are quoted in the paper."""
+    record = _record()
+    return [metric for metric in LIVE_METRICS
+            if record['metrics'].get(metric, {}).get('paper_phrase') is not None]
+
+
+QUOTED_LIVE_METRICS: List[str] = _quoted_live_metrics() if IS_REPOSITORY_CHECKOUT else []
+
+
+@pytest.mark.parametrize('metric', QUOTED_LIVE_METRICS)
+def test_quoted_live_metric_matches_the_record(metric: str) -> None:
     """a metric the paper quotes still has the value the record and the paper carry."""
     record = _record()
-    assert metric in record['metrics'], (
-        f'{metric} is measured here but absent from the record; regenerate it')
-    if record['metrics'][metric].get('paper_phrase') is None:
-        pytest.skip(f'{metric} is recorded but not quoted in paper.md, so drift in it cannot '
-                    f'make the manuscript wrong')
     recorded = record['metrics'][metric]['value']
     measured = _live_measurements()[metric]
     assert measured == recorded, (

@@ -138,8 +138,10 @@ def test_lag_is_counted_in_observations_not_calendar_days(clean_prices: pd.DataF
     weights = pd.DataFrame(np.array([[0.6, 0.4]] * len(clean_prices.index)),
                            index=clean_prices.index, columns=clean_prices.columns)
     for lag in [1, 2, 3]:
-        portfolio_data = qis.backtest_model_portfolio(prices=clean_prices, weights=weights,
-                                                     weight_implementation_lag=lag)
+        with pytest.warns(
+                UserWarning, match='weight dates trade past the end of the price history'):
+            portfolio_data = qis.backtest_model_portfolio(prices=clean_prices, weights=weights,
+                                                         weight_implementation_lag=lag)
         is_rebalancing = portfolio_data.is_rebalancing
         traded_dates = is_rebalancing[is_rebalancing == True].index
         assert len(traded_dates) == len(weights.index) - lag, f"rows lost at lag={lag}"
@@ -156,8 +158,10 @@ def test_lag_does_not_touch_instrument_returns(clean_prices: pd.DataFrame) -> No
     weights = pd.DataFrame(np.array([[0.6, 0.4]] * len(clean_prices.index)),
                            index=clean_prices.index, columns=clean_prices.columns)
     unlagged = qis.backtest_model_portfolio(prices=clean_prices, weights=weights)
-    lagged = qis.backtest_model_portfolio(prices=clean_prices, weights=weights,
-                                          weight_implementation_lag=2)
+    with pytest.warns(
+            UserWarning, match='weight dates trade past the end of the price history'):
+        lagged = qis.backtest_model_portfolio(prices=clean_prices, weights=weights,
+                                              weight_implementation_lag=2)
     assert unlagged.prices.equals(lagged.prices)
     assert np.allclose(qis.to_returns(unlagged.prices, drop_first=True).to_numpy(),
                        qis.to_returns(lagged.prices, drop_first=True).to_numpy())

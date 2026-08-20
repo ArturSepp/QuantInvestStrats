@@ -314,7 +314,8 @@ def _render_portfolio_report(report_kind, p_strategy, mpd, benchmark_prices, tim
                          ids=['monthly', 'quarterly'])
 def test_portfolio_report_labels(portfolios, prices, report_kind, rf, grid, s_long):
     p_strategy, mpd = portfolios
-    tp = qis.get_time_period(df=prices)  # full history -> long horizon
+    prices = prices.loc[prices.index > prices.index[-1] - pd.DateOffset(years=8)]
+    tp = qis.get_time_period(df=prices)  # eight years -> long horizon
     kw = fetch_default_report_kwargs(time_period=tp, reporting_frequency=rf)
     figs = _render_portfolio_report(report_kind, p_strategy, mpd, prices[['A0']], tp, kw)
     figs = list(figs) if isinstance(figs, (list, tuple)) else [figs]

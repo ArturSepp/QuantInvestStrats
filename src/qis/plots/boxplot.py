@@ -92,7 +92,8 @@ def plot_box(df: Union[pd.Series, pd.DataFrame],
         if hue is None:
             palette = put.get_data_group_colors(df=df, x=x, y=y)
         else:
-            palette = put.get_n_colors(n=len(df[x].unique()))
+            n_colors = len(hue_order) if hue_order is not None else df[hue].nunique()
+            palette = put.get_n_colors(n=n_colors)
 
     sns.boxplot(x=x, y=y, data=df,
                 hue=hue or x,

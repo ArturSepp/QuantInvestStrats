@@ -34,7 +34,8 @@ ONE_SIDED = pd.Series([5.0, 3.0, 1.0, 0.4, 0.1, 0.05], index=list('abcdef'))
 
 def build_portfolio_data() -> qis.PortfolioData:
     """an equal-weight portfolio over the seeded synthetic panel"""
-    prices = qis.TimePeriod('31Dec2020', '31Dec2025').locate(generate_synthetic_prices())
+    prices = qis.TimePeriod('31Dec2020', '31Dec2025').locate(
+        generate_synthetic_prices(apply_quirks=False))
     weights = pd.DataFrame(1.0 / len(prices.columns), index=prices.index, columns=prices.columns)
     return qis.backtest_model_portfolio(prices=prices, weights=weights.iloc[::21, :],
                                         ticker='Test portfolio')

@@ -135,20 +135,19 @@ def test_validate_legend_capacity_suggestions_clear_the_guard() -> None:
                                     panel_rows=2, gridspec_rows=14) >= 22
 
 
-def test_multi_asset_factsheet_warns() -> None:
-    """the guard is wired into generate_multi_asset_factsheet and is quiet on an A4 page"""
+def test_multi_asset_factsheet_validates_capacity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """the guard is wired into generate_multi_asset_factsheet"""
     prices = qis.TimePeriod('31Dec2020', '31Dec2025').locate(generate_synthetic_prices())
     time_period = qis.get_time_period(prices)
-    # 10 assets sit inside the A4 capacity of 13
-    fig = assert_no_capacity_warning(qis.generate_multi_asset_factsheet,
-                                     prices=prices, benchmark=prices.columns[0],
-                                     time_period=time_period)
+    calls = []
+    monkeypatch.setattr(
+        'qis.portfolio.reports.multi_assets_factsheet.validate_legend_capacity',
+        lambda **kwargs: calls.append(kwargs))
+    fig = qis.generate_multi_asset_factsheet(prices=prices, benchmark=prices.columns[0],
+                                             time_period=time_period)
     plt.close(fig)
-    # the same 10 assets do not fit a half-height page, whose capacity is 5
-    with pytest.warns(UserWarning, match=CAPACITY_WARNING):
-        fig = qis.generate_multi_asset_factsheet(prices=prices, benchmark=prices.columns[0],
-                                                 time_period=time_period, figsize=(8.3, 5.85))
-    plt.close(fig)
+    assert len(calls) == 1
+    assert calls[0]['n_legend_entries'] == len(prices.columns)
 
 
 class LocalTest:

@@ -169,7 +169,9 @@ def test_covariance_only_model_preserves_pre_existing_output_keys(report_inputs)
 def test_complete_factor_model_adds_panels_and_supplies_missing_covariance(
         report_inputs) -> None:
     universe, _, without_covar, _, factor_model = report_inputs
-    figs, dfs = _run_report(without_covar, universe, factor_model)
+    with matplotlib.rc_context({'figure.max_open_warning': 20}):
+        with pytest.warns(RuntimeWarning, match='More than 20 figures have been opened'):
+            figs, dfs = _run_report(without_covar, universe, factor_model)
     try:
         assert {'tre_decomposition', 'factor_exposures'} <= set(figs)
         assert {'tre_decomposition', 'factor_exposures'} <= set(dfs)

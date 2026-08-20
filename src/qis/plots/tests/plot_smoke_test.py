@@ -126,6 +126,10 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
     Raises:
         KeyError: if the function needs an argument that has no fixture
     """
+    if name == 'plot_exposures_strategy_vs_benchmark_stack':
+        return dict(strategy_exposures=fx.exposures, benchmark_exposures=fx.exposures,
+                    axs=plt.subplots(1, 2)[1])
+
     explicit = {
         'plot_box': dict(df=fx.returns, x=fx.returns.columns[0], y=fx.returns.columns[1]),
         'plot_brinson_attribution_table': dict(zip(
@@ -139,9 +143,6 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
         'plot_corr_matrix_from_covar': dict(covar=fx.covar),
         'plot_data_timeseries': dict(data=fx.prices),
         'plot_df_table_with_ci': dict(df=fx.small_table, df_ci=fx.small_table.abs()),
-        'plot_exposures_strategy_vs_benchmark_stack': dict(
-            strategy_exposures=fx.exposures, benchmark_exposures=fx.exposures,
-            axs=plt.subplots(1, 2)[1]),
         'plot_histplot2d': dict(df=fx.two_columns),
         # each value is an x/y frame: first column is x, second is y
         'plot_lines_list': dict(xy_datas={'a': fx.returns.iloc[:, :2].reset_index(drop=True),
@@ -221,4 +222,5 @@ def test_every_exported_plot_function_is_covered(fx: Fixtures) -> None:
             _call_kwargs(name=name, fx=fx)
         except KeyError:
             uncovered.append(name)
+    plt.close('all')
     assert uncovered == [], f"exported plot functions with no fixture: {uncovered!r}"

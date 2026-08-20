@@ -174,9 +174,10 @@ def test_generated_prefix_is_exercised(prefix: str) -> None:
 @pytest.mark.parametrize('link', ALL_LINKS, ids=LINK_IDS)
 def test_internal_link_resolves(link: Link) -> None:
     """a link into this repository points at a file or directory that is here."""
-    if any(link.target.startswith(prefix) for prefix in GENERATED_PREFIXES):
-        pytest.skip(f'{link.target} is written by docs/conf.py at build time')
     resolved = REPO_ROOT.joinpath(link.target)
+    if (any(link.target.startswith(prefix) for prefix in GENERATED_PREFIXES)
+            and not resolved.exists()):
+        pytest.skip(f'{link.target} is written by docs/conf.py at build time')
     assert resolved.exists(), (
         f"{link.document} links to {link.target}, which does not exist. "
         f"Written as {link.raw!r}")
