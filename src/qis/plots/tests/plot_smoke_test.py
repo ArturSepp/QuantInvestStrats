@@ -126,6 +126,9 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
     Raises:
         KeyError: if the function needs an argument that has no fixture
     """
+    # Build this axes fixture lazily. Putting plt.subplots() in the explicit dictionary would
+    # create an unused figure during every fixture lookup because dictionary values are evaluated
+    # eagerly.
     if name == 'plot_exposures_strategy_vs_benchmark_stack':
         return dict(strategy_exposures=fx.exposures, benchmark_exposures=fx.exposures,
                     axs=plt.subplots(1, 2)[1])

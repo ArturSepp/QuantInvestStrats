@@ -687,6 +687,7 @@ class PortfolioData:
         # portfolio_pnl = pnl.sum(axis=1)
 
         pnl_values = pnl.replace({0.0: np.nan}).to_numpy()
+        # np.nanstd warns on an all-NaN instrument; NaN is the intended risk for that column.
         pnl_risk = np.array([np.nan if np.isnan(values).all() else np.nanstd(values)
                              for values in pnl_values.T])
         # portfolio_pnl_risk = np.nanstd(portfolio_pnl.replace({0.0: np.nan}), axis=0)
