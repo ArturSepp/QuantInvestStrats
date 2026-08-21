@@ -95,6 +95,38 @@ def test_numpy_constant_trade_level_accumulates_each_column() -> None:
     np.testing.assert_array_equal(returns, original_returns)
 
 
+def test_numpy_constant_trade_level_preserves_and_resumes_missing_histories() -> None:
+    """Preserve missing observations without contaminating later additive NAVs.
+
+    The columns cover a return missing between observations, a ragged start plus a later gap,
+    and a history that never starts. Each observed return accumulates against its column's fixed
+    unit notional, while the caller-owned missing observations remain missing in the output.
+    """
+    returns = np.array([
+        [0.00, np.nan, np.nan],
+        [0.10, 0.20, np.nan],
+        [np.nan, -0.10, np.nan],
+        [0.05, np.nan, np.nan],
+        [-0.02, 0.03, np.nan],
+    ])
+    original_returns = returns.copy()
+    expected_nav = np.array([
+        [1.00, np.nan, np.nan],
+        [1.10, 1.20, np.nan],
+        [np.nan, 1.10, np.nan],
+        [1.15, np.nan, np.nan],
+        [1.13, 1.13, np.nan],
+    ])
+
+    actual_nav = returns_to_nav(
+        returns=returns,
+        constant_trade_level=True,
+    )
+
+    _assert_array_close(actual_nav, expected_nav)
+    np.testing.assert_array_equal(returns, original_returns)
+
+
 # =============================================================================
 # Option composition
 # =============================================================================
