@@ -1491,7 +1491,9 @@ def get_data_group_colors(df: pd.DataFrame,
                           is_bullish: bool = True
                           ) -> List[Tuple[float, float, float]]:
 
-    avg = df.groupby(x, sort=False).mean().sort_values(y)[y]
+    # ``observed=False`` preserves the historical palette for unused categorical levels and
+    # avoids the Pandas 2.3 warning about its Pandas 3 default change.
+    avg = df.groupby(x, sort=False, observed=False).mean().sort_values(y)[y]
     colorise = compute_heatmap_colors(a=avg.to_numpy())
     if not is_bullish:
         colorise = colorise[::-1]
