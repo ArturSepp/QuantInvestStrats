@@ -16,6 +16,7 @@ import importlib.metadata
 import inspect
 import os
 import shutil
+import stat
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -211,12 +212,28 @@ def _write_api_index() -> None:
     api_dir.joinpath('index.rst').write_text(''.join(lines), encoding='utf-8')
 
 
+def _remove_readonly_tree_entry(
+        function: Any,
+        path: str,
+        _exc_info: Any,
+) -> None:
+    """Retry removal of a generated documentation entry after making it writable.
+
+    Args:
+        function: removal function that failed inside ``shutil.rmtree``
+        path: generated file or directory carrying a Windows read-only attribute
+        _exc_info: exception tuple supplied by ``shutil.rmtree``; unused after the retry
+    """
+    os.chmod(path, os.stat(path).st_mode | stat.S_IWRITE)
+    function(path)
+
+
 def _mirror_package_notes() -> None:
     """Copy ``src/qis/docs/`` into ``docs/_included/`` for the Sphinx toctree."""
     source = REPO_ROOT.joinpath('src', 'qis', 'docs')
     target = DOCS_DIR.joinpath('_included')
     if target.exists():
-        shutil.rmtree(target)
+        shutil.rmtree(target, onerror=_remove_readonly_tree_entry)
     if source.exists():
         shutil.copytree(source, target)
 

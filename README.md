@@ -319,6 +319,10 @@ Dependency links within the stack: `optimalportfolios` builds on `qis` and `fact
 If you are interested in extending and improving QIS analytics, 
 please consider contributing to the library.
 
+Development setup and CI-equivalent commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
+[GOVERNANCE.md](GOVERNANCE.md) records the maintainer decision model, release and compatibility
+policy, support expectations, and private route for sensitive reports.
+
 I have found it is a good practice to isolate general purpose and low level analytics and visualizations, which can be outsourced and shared, while keeping 
 the focus on developing high level commercial applications.
 

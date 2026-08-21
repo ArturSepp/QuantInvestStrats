@@ -26,6 +26,7 @@ It needs no network, data vendor, credentials, optional extra, or output directo
 - [PyPI package](https://pypi.org/project/qis/)
 - [Source repository](https://github.com/ArturSepp/QuantInvestStrats)
 - [Issue tracker](https://github.com/ArturSepp/QuantInvestStrats/issues)
+- [Governance, maintenance, and support](https://github.com/ArturSepp/QuantInvestStrats/blob/main/GOVERNANCE.md)
 - [Changelog](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CHANGELOG.md)
 - [Citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
 - [JOSS submission paper](https://github.com/ArturSepp/QuantInvestStrats/blob/main/paper.md)
@@ -46,6 +47,7 @@ gallery
 :caption: Focused guides
 
 performance_analytics_and_sharpe
+software_design
 factsheets_and_reporting
 tracking_error_and_risk
 portfolio_backtesting

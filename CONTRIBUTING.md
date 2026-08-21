@@ -37,19 +37,65 @@ Open an issue and describe what you are trying to do. Questions about methodolog
 welcome; where a question is really about the published papers, please say which paper
 and section you are reading.
 
+Support is best-effort and has no guaranteed response time. The decision model, maintenance
+expectations, release policy, and private route for sensitive reports are documented in
+[GOVERNANCE.md](GOVERNANCE.md).
+
 ## Development setup
 
 ```bash
 git clone https://github.com/ArturSepp/QuantInvestStrats.git
 cd QuantInvestStrats
-pip install -e ".[data]"
-pytest src/qis/            # tests live inside the package, not in a top-level tests/
-ruff check src/qis/
+uv sync --group test --locked
+uv run --no-sync pytest
 ```
 
-`AGENTS.md` in this repository documents the layout, commands, conventions, and
-constraints in more detail — it is written for AI coding agents but is equally useful
-to human contributors.
+The first command installs the core package plus the PEP 735 `test` dependency group exactly as
+recorded in `uv.lock`; it fails instead of re-resolving when the lock and `pyproject.toml` differ.
+Tests live inside `src/qis/`, and the project configuration supplies that path automatically.
+
+The CI extras and coverage lane is:
+
+```bash
+uv sync --group test --extra data --extra io --locked
+uv run --no-sync pytest --cov=qis --cov-report=term:skip-covered
+```
+
+The static gates use the locked `lint` group without installing the scientific stack:
+
+```bash
+uv run --locked --only-group lint ruff check --select TID251,TID253,ICN,F src/qis/
+uv run --locked --only-group lint interrogate src/qis
+```
+
+The bare `ruff check src/qis/` command also selects the legacy `E` and `W` backlog and is not the
+CI gate. CI additionally checks newly added lines with `.github/lint_changed_lines.py`. Running an
+`--only-group lint` command replaces the active project environment; run the first `uv sync`
+command again before returning to tests.
+
+Build the documentation with warnings treated as errors:
+
+```bash
+uv sync --extra docs --locked
+uv run --no-sync sphinx-build -W -b html docs tmp/docs-build
+```
+
+Build and inspect the wheel before a packaging change:
+
+```bash
+uv build --sdist --clear --out-dir dist
+uv build --wheel dist/*.tar.gz --out-dir dist
+```
+
+Building the wheel from the source distribution reproduces CI and prevents files left in a local
+build tree from leaking into the release artifact.
+
+After installing that wheel and `pytest` into a clean environment, the supported post-install
+check is `python -m pytest --pyargs qis`. The CI wheel job also runs the offline quickstart from
+outside the checkout and verifies its deterministic NAV and benchmark-relative output.
+
+`AGENTS.md` documents the layout, numerical conventions, verification loop, and scope constraints
+in more detail. It is written for coding agents but is equally useful to human contributors.
 
 ## Pull requests
 
@@ -57,7 +103,7 @@ to human contributors.
   are likely to be asked to split.
 - Add or update tests for behaviour you change. A bug fix should come with a test that
   fails before the fix.
-- Run the test suite and `ruff` before submitting.
+- Run the documented CI-equivalent command set before submitting.
 - Do not bump the version in `pyproject.toml` or `CITATION.cff`; releases are cut
   separately.
 - Do not commit generated output: figures, factsheets, backtest results, or data files.
