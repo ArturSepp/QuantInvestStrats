@@ -1,12 +1,13 @@
 """Regression coverage for ``first_date`` return-to-NAV initialization.
 
 The public ``returns_to_nav`` API documents ``first_date`` as the date on which a NAV starts at
-one. These tests use short, fully observed return paths so the cutoff behavior can be separated
-from ragged-start and missing-data policies. Expected NAVs are calculated directly from gross
+one. These tests use short fully observed and ragged return paths to separate cutoff behavior
+from caller ownership and missing-data policy. Expected NAVs are calculated directly from gross
 return factors, without calling another package conversion function.
 """
 # packages
 from typing import cast
+import numpy as np
 import pandas as pd
 
 # qis
@@ -92,6 +93,36 @@ def test_returns_to_nav_honors_first_date_with_default_initialization() -> None:
     pd.testing.assert_series_equal(actual_nav, _expected_series_nav())
 
 
+def test_returns_to_nav_first_date_preserves_missing_histories() -> None:
+    """Keep missing cells missing while zeroing observed returns through the cutoff.
+
+    A global cutoff must not manufacture return observations for an asset that starts later or
+    never starts. The fully observed asset is rebased through 2024-01-02, while the later asset
+    begins with its first genuine 4% return and the all-missing asset remains entirely missing.
+    """
+    returns = pd.DataFrame({
+        'observed': [0.10, 0.20, -0.10, 0.05],
+        'late_start': [np.nan, np.nan, 0.04, 0.01],
+        'never_started': [np.nan, np.nan, np.nan, np.nan],
+    }, index=_DATES)
+    original_returns = returns.copy(deep=True)
+    expected_nav = pd.DataFrame({
+        'observed': [1.0, 1.0, 0.90, 0.945],
+        'late_start': [np.nan, np.nan, 1.04, 1.0504],
+        'never_started': [np.nan, np.nan, np.nan, np.nan],
+    }, index=_DATES)
+
+    actual_nav = returns_to_nav(
+        returns=returns,
+        first_date=_FIRST_DATE,
+        ffill_between_nans=False,
+    )
+
+    assert isinstance(actual_nav, pd.DataFrame)
+    pd.testing.assert_frame_equal(actual_nav, expected_nav)
+    pd.testing.assert_frame_equal(returns, original_returns)
+
+
 # =============================================================================
 # Caller ownership
 # =============================================================================
@@ -122,9 +153,9 @@ def test_returns_to_nav_first_date_does_not_mutate_series() -> None:
 def test_returns_to_nav_first_date_does_not_mutate_frame() -> None:
     """Preserve every DataFrame column while applying the explicit cutoff.
 
-    Fully observed columns avoid mixing caller ownership with the unresolved policy for a
-    later-starting asset's leading NaNs. Asset A compounds to ``0.945`` and asset B independently
-    compounds to ``1.04 * 1.01 = 1.0504`` after both are initialized at one.
+    Fully observed columns isolate caller ownership from the separately tested missing-data
+    policy. Asset A compounds to ``0.945`` and asset B independently compounds to
+    ``1.04 * 1.01 = 1.0504`` after both are initialized at one.
     """
     returns = _make_frame_returns()
     original_returns = returns.copy(deep=True)
