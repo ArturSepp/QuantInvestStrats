@@ -758,7 +758,10 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
 
     # Compute NAV using arithmetic or geometric compounding
     if constant_trade_level:
-        strategy_nav = returns.cumsum(skipna=True, axis=0).add(1.0)
+        if isinstance(returns, np.ndarray):
+            strategy_nav = np.cumsum(returns, axis=0) + 1.0
+        else:
+            strategy_nav = returns.cumsum(skipna=True, axis=0).add(1.0)
     else:
         if isinstance(returns, np.ndarray):
             strategy_nav = np.cumprod(1.0+returns, axis=0)
