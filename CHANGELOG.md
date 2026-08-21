@@ -7,6 +7,20 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.11.2] - 2026-08-21
+
+### Changed
+
+- Updated the JOSS manuscript and references for the current submission requirements.
+- Cleaned actionable pytest warnings and skip handling, including categorical boxplot palette
+  sizing and all-missing instrument risk calculations.
+
+### Fixed
+
+- Preserved fully missing Series and DataFrame return histories during return-to-NAV conversion,
+  rather than manufacturing a unit NAV, while retaining warnings for unsupported initialisation
+  periods.
+
 ## [5.11.1] - 2026-08-18
 
 ### Added
