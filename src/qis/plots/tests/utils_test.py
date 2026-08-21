@@ -1,8 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import warnings
 from enum import Enum
 from qis.plots.utils import (get_n_colors, get_n_sns_colors, create_dummy_line,
-                            LegendStats, get_legend_lines, get_cmap_colors, compute_heatmap_colors)
+                            LegendStats, get_legend_lines, get_cmap_colors, compute_heatmap_colors,
+                            get_data_group_colors)
 
 
 class LocalTests(Enum):
@@ -12,6 +15,24 @@ class LocalTests(Enum):
     SNS_COLORS = 4
     HEATMAP_COLORS = 5
     GET_COLORS = 6
+
+
+def test_group_colors_include_unobserved_categories_without_future_warning():
+    """Categorical palettes retain the pre-Pandas-3 treatment of unused categories."""
+    data = pd.DataFrame({
+        'bucket': pd.Categorical(
+            ['low', 'high'], categories=['low', 'mid', 'high'], ordered=True,
+        ),
+        'value': [1.0, 3.0],
+    })
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', FutureWarning)
+        actual = get_data_group_colors(df=data, x='bucket', y='value')
+
+    # The function sorts by the observed means and leaves the unused level (NaN) last.
+    expected = compute_heatmap_colors(a=np.array([1.0, 3.0, np.nan]))
+    np.testing.assert_allclose(actual, expected, equal_nan=True)
 
 
 def run_local_test(local_test: LocalTests):

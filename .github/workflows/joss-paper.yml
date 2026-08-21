@@ -1,5 +1,8 @@
 name: JOSS paper
 
+permissions:
+  contents: read
+
 # Renders paper.md to PDF with the JOSS template on every change to the paper, so the
 # submission is never blocked on a rendering surprise. The artifact is the paper as the
 # reviewer will see it.
@@ -15,13 +18,16 @@ jobs:
   paper:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build the draft PDF
-        uses: openjournals/openjournals-draft-action@master
+        # Open Journals does not publish version tags; pin the reviewed master revision.
+        uses: openjournals/openjournals-draft-action@85a18372e48f551d8af9ddb7a747de685fbbb01c
         with:
           journal: joss
           paper-path: paper.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: paper
           path: paper.pdf
+          if-no-files-found: error
+          retention-days: 14

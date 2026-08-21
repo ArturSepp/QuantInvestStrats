@@ -589,7 +589,12 @@ def compute_desc_freq_table(df: pd.DataFrame,
         DataFrame indexed by original column with descriptive statistic columns:
         AVG, STD, QUANT_M_1STD (16th percentile), MEDIAN, QUANT_P1_STD (84th percentile).
     """
-    freq_data = df.resample(freq).agg(agg_func)
+    # Pandas 2.3 warns that a callable ``np.sum`` will stop dispatching to Resampler.sum in
+    # Pandas 3.  Keep the documented, historical period-sum semantics explicit across versions.
+    if agg_func is np.sum:
+        freq_data = df.resample(freq).sum()
+    else:
+        freq_data = df.resample(freq).agg(agg_func)
 
     # drop na rows for all
     freq_data = freq_data.dropna(axis=0, how='any')

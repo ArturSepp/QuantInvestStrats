@@ -111,6 +111,19 @@ all = [
     "qis[data,reports,visualization,io,database,jupyter,docs]",
 ]
 
+# PEP 735 groups are repository tooling, not installable package extras.  CI uses these groups so
+# the core matrix does not silently acquire the data extra carried by the historical ``dev`` extra.
+[dependency-groups]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+]
+lint = [
+    "interrogate==1.7.0",
+    "ruff==0.14.2",
+]
+
 [project.urls]
 Homepage = "https://github.com/ArturSepp/QuantInvestStrats"
 Documentation = "https://quantinveststrats.readthedocs.io"
@@ -123,7 +136,7 @@ include = ["qis*"]
 exclude = ["tests*", "docs*"]
 
 [tool.setuptools.package-data]
-qis = ["*.yaml"]
+qis = ["*.yaml", "docs/*.md"]
 
 [tool.pytest.ini_options]
 # tests live inside the package, in src/qis/<subpackage>/tests/, not in a top-level tests/
@@ -131,9 +144,18 @@ testpaths = ["src/qis"]
 norecursedirs = [".*", "examples", "notebooks", "build", "dist", "*.egg-info", "__pycache__"]
 # importlib import mode: test modules are resolved by full path, so the two
 # test_signal_diagnostics.py files in different subpackages do not collide
-addopts = "-ra -q --tb=short --import-mode=importlib"
+addopts = "-ra -q --tb=short --import-mode=importlib --strict-config --strict-markers"
 markers = [
     "mpl_image_compare: figure regression test; inert unless the pytest-mpl plugin is installed",
+]
+filterwarnings = [
+    # These are upstream deprecations emitted by seaborn against current matplotlib.  Match both
+    # message and originating module so an unrelated warning cannot disappear under the filter.
+    "ignore:The set_bad function will be deprecated.*:PendingDeprecationWarning:seaborn.matrix",
+    "ignore:vert.*bool was deprecated.*:matplotlib._api.deprecation.MatplotlibDeprecationWarning:seaborn.categorical",
+    # A deprecation or future-compatibility warning originating in qis is actionable and gates CI.
+    "error::DeprecationWarning:qis\\..*",
+    "error::FutureWarning:qis\\..*",
 ]
 
 [tool.ruff]
@@ -190,6 +212,19 @@ pandas = "pd"
 "src/qis/portfolio/reports/strategy_benchmark_factsheet_pybloqs.py" = ["TID253"]
 "src/qis/sql_engine.py" = ["TID253"]
 
+[tool.interrogate]
+# User-facing source is the documentation target; pytest functions are verification rather than
+# API documentation.  ``*tests`` is separator-independent because interrogate appends its own
+# wildcard before matching paths.  The measured production-source baseline is 68.5%.
+fail-under = 68
+exclude = ["*tests"]
+
 [tool.coverage.run]
 source = ["qis"]
 omit = ["*/tests/*", "*/examples/*"]
+
+[tool.coverage.report]
+# This is a regression ratchet, not the destination.  Reports and plots remain measured because
+# they are core qis functionality; raise the floor as substantive legacy tests are converted.
+precision = 2
+fail_under = 53

@@ -1,5 +1,10 @@
 name: CI
 
+# Every job only checks out and reads the repository.  Declare the minimum token scope rather
+# than inheriting repository defaults, especially for pull requests that execute changed code.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -15,46 +20,49 @@ env:
   MPLBACKEND: Agg  # no display on the runner
 
 jobs:
-  # the path a reviewer follows: pip install qis, then pytest. Nothing optional installed.
+  # The Linux cells cover every supported interpreter.  Windows and macOS run the authoritative
+  # 3.12 version to exercise platform paths and plotting backends without multiplying the
+  # eight-to-sixteen-minute suite across a 15-cell Cartesian product.  One Linux cell consumes
+  # uv.lock exactly; the other six resolve current compatible dependencies.
   test:
-    name: pytest (core install, py${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: pytest (core, ${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: ubuntu-latest
+            python-version: "3.10"
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: ubuntu-latest
+            python-version: "3.12"
+            locked: true
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: ubuntu-latest
+            python-version: "3.14"
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Install uv and Python ${{ matrix.python-version }}
+      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       with:
         python-version: ${{ matrix.python-version }}
-        cache: pip
 
-    - name: Install
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-        pip install pytest
-
-    - name: Verify core imports
-      run: |
-        python -c "
-        import qis
-        from qis import (
-            TimePeriod, PerfParams, PortfolioData,
-            compute_ewm, compute_ewm_covar,
-            to_returns, backtest_model_portfolio,
-            set_group_loadings, generate_rebalancing_indicators,
-        )
-        print('All imports OK')
-        "
+    - name: Sync the core test environment
+      # The primary cell fails if pyproject.toml and uv.lock disagree.  Floating cells upgrade the
+      # resolution so compatibility with what a new installer receives remains covered.
+      run: uv sync --group test ${{ matrix.locked && '--locked' || '--upgrade' }}
 
     - name: Run tests
-      run: pytest
+      run: uv run --no-sync pytest
 
   # the same suite with the optional extras present, so the tests skipped above actually run
   test-extras:
@@ -63,24 +71,20 @@ jobs:
     timeout-minutes: 30
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Install uv and Python
+      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       with:
         python-version: "3.12"
-        cache: pip
 
-    - name: Install
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[data,io]"
-        pip install pytest pytest-cov
+    - name: Sync the locked data and io environment
+      run: uv sync --group test --extra data --extra io --locked
 
     - name: Run tests with coverage
-      # the coverage number is reported, not gated: raising it is tracked work, not a merge
-      # condition
-      run: pytest --cov=qis --cov-report=term:skip-covered
+      # [tool.coverage.report] owns the regression floor; the report remains broad because plots
+      # and factsheets are core qis functionality rather than disposable presentation wrappers.
+      run: uv run --no-sync pytest --cov=qis --cov-report=term:skip-covered
 
   lint:
     name: ruff (changed files)
@@ -88,19 +92,14 @@ jobs:
     timeout-minutes: 10
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         fetch-depth: 0
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Install uv and Python
+      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       with:
         python-version: "3.12"
-        cache: pip
-
-    - name: Install ruff
-      # pinned exactly: an unpinned linter turns someone else's release into a red build
-      run: pip install ruff==0.14.2
 
     - name: Lint lines changed by this push or pull request
       # the package carries ~2,250 pre-existing violations, so gating whole files would fail on
@@ -116,11 +115,16 @@ jobs:
           echo "no usable base commit for a diff; skipping the gate"
           exit 0
         fi
-        python .github/lint_changed_lines.py "$BASE" "${{ github.sha }}"
+        uv run --locked --only-group lint python .github/lint_changed_lines.py \
+          "$BASE" "${{ github.sha }}"
+
+    - name: Check production docstring coverage
+      if: ${{ !cancelled() }}
+      run: uv run --locked --only-group lint interrogate src/qis
 
     - name: Repo-wide violation count (report only, never fails)
       if: always()
-      run: ruff check src/qis/ --statistics || true
+      run: uv run --locked --only-group lint ruff check src/qis/ --statistics || true
 
   wheel:
     # Editable installs exercise the src tree, not the artifact users receive. Build and install
@@ -130,18 +134,17 @@ jobs:
     timeout-minutes: 30
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Install uv and Python
+      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       with:
         python-version: "3.12"
-        cache: pip
 
-    - name: Build the wheel
+    - name: Build the wheel from the source distribution
       run: |
-        python -m pip install --upgrade pip build
-        python -m build --wheel
+        uv build --sdist --clear --out-dir dist
+        uv build --wheel dist/*.tar.gz --out-dir dist
 
     - name: Assert package tests and documentation ship
       run: |
@@ -155,18 +158,43 @@ jobs:
             names = set(archive.namelist())
         tests = [name for name in names if name.startswith("qis/") and name.endswith("_test.py")]
         examples = [name for name in names if name.startswith("qis/examples/")]
+        bytecode = [
+            name for name in names
+            if "/__pycache__/" in name or name.endswith((".pyc", ".pyo"))
+        ]
+        expected_docs = {
+            "qis/docs/REMOVED_5_0.md",
+            "qis/docs/factsheets.md",
+            "qis/docs/frequency_convention_note.md",
+            "qis/docs/plotting_kwargs.md",
+            "qis/docs/reporting_frequencies.md",
+            "qis/docs/sharpe_conventions.md",
+        }
+        missing_docs = sorted(expected_docs - names)
         assert tests, "the wheel ships no qis test modules"
         assert not examples, f"repository examples leaked into the wheel: {examples[:5]}"
-        assert "qis/docs/plotting_kwargs.md" in names, "the wheel misses packaged documentation"
+        assert not bytecode, f"Python bytecode leaked into the wheel: {bytecode[:5]}"
+        assert not missing_docs, f"the wheel misses packaged documentation: {missing_docs}"
         assert "qis/settings.yaml" in names, "the wheel misses settings.yaml"
         print(f"{wheels[0]}: {len(tests)} test modules and required package data present")
         PY
 
     - name: Install the wheel into a clean environment
       run: |
-        python -m venv "$RUNNER_TEMP/qis-wheel-venv"
-        "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pip install --upgrade pip
-        "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pip install "$(ls dist/*.whl)" pytest
+        uv venv --python 3.12 "$RUNNER_TEMP/qis-wheel-venv"
+        uv pip install --python "$RUNNER_TEMP/qis-wheel-venv/bin/python" \
+          "$(ls dist/*.whl)" pytest
+
+    - name: Run the offline quickstart against the installed wheel
+      # Execute from outside the checkout.  The script path is repository-owned documentation,
+      # but its qis import and synthetic data resolve entirely through the clean wheel environment.
+      run: |
+        mkdir -p "$RUNNER_TEMP/qis-quickstart-check"
+        cd "$RUNNER_TEMP/qis-quickstart-check"
+        "$RUNNER_TEMP/qis-wheel-venv/bin/python" \
+          "$GITHUB_WORKSPACE/examples/getting_started/offline_quickstart.py" | tee quickstart.txt
+        grep -F "Final NAV: 120.1104" quickstart.txt
+        grep -F "TE=0.0299, IR=-0.2898" quickstart.txt
 
     - name: Run the shipped suite against the installed wheel
       run: |
