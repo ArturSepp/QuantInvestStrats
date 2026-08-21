@@ -998,6 +998,10 @@ def to_zero_first_nonnan_returns(returns: Union[pd.Series, pd.DataFrame],
         raise ValueError(f"init_period must be integer")
 
     returns: Union[pd.Series, pd.DataFrame] = returns.copy(deep=True)
+    if init_period not in (0, 1):
+        warnings.warn(f"in to_zero_first_nonnan_returns init_period={init_period} is not supported")
+        return returns
+
     if isinstance(returns, pd.Series) and returns.isna().all():
         return returns
 
@@ -1035,9 +1039,6 @@ def to_zero_first_nonnan_returns(returns: Union[pd.Series, pd.DataFrame],
                 if returns[column].isna().all():
                     continue
                 returns.loc[first_nonnan_index_, column] = 0.0
-    else:
-        warnings.warn(f"in to_zero_first_nonnan_returns init_period={init_period} is not supported")
-
     return returns
 
 

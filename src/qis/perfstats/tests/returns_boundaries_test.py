@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 # qis
-from qis.perfstats.returns import returns_to_nav, to_returns
+from qis.perfstats.returns import returns_to_nav, to_returns, to_zero_first_nonnan_returns
 
 
 # =============================================================================
@@ -263,6 +263,18 @@ def test_returns_to_nav_preserves_all_nan_columns(
     )
     _assert_series_close(actual_series_nav, expected_series_nav)
     pd.testing.assert_series_equal(all_nan_series, expected_series_nav)
+
+
+def test_all_nan_series_warns_for_unsupported_init_period() -> None:
+    """Retain the unsupported-mode warning when an entire Series is missing."""
+    returns = pd.Series(np.nan, index=_DATES, name='never_started')
+    expected_returns = returns.copy(deep=True)
+
+    with pytest.warns(UserWarning, match='init_period=2 is not supported'):
+        actual_returns = to_zero_first_nonnan_returns(returns=returns, init_period=2)
+
+    _assert_series_close(actual_returns, expected_returns)
+    pd.testing.assert_series_equal(returns, expected_returns)
 
 
 # =============================================================================
