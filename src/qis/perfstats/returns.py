@@ -734,7 +734,7 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
         init_period: If 1, set first non-NaN return to zero; if 0, set previous value to zero
         terminal_value: Target terminal NAV value for scaling
         init_value: Target initial NAV value (default: 1.0)
-        first_date: Date to start NAV at 1.0
+        first_date: Date to start NAV at 1.0; takes precedence over init_period
         freq: Resampling frequency
         constant_trade_level: If True, use arithmetic cumsum; if False, use geometric compounding
         ffill_between_nans: Forward-fill NAV between NaN returns
@@ -743,15 +743,15 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
     Returns:
         NAV time series starting at init_value (or 1.0)
     """
-    # Set first return to zero if needed
-    if init_period is not None and isinstance(returns, np.ndarray) is False:
-        returns = to_zero_first_nonnan_returns(returns=returns, init_period=init_period)
-    elif first_date is not None:
-        # Set returns to zero up to first_date
+    # Apply an explicit pandas cutoff before the fallback initialization convention.
+    if first_date is not None and isinstance(returns, (pd.Series, pd.DataFrame)):
+        returns = returns.copy(deep=True)
         if isinstance(returns, pd.DataFrame):
             returns.loc[:first_date, :] = 0.0
-        elif isinstance(returns, pd.Series):
+        else:
             returns.loc[:first_date] = 0.0
+    elif init_period is not None and isinstance(returns, np.ndarray) is False:
+        returns = to_zero_first_nonnan_returns(returns=returns, init_period=init_period)
 
     # Convert log returns to simple returns
     if is_log_returns:
