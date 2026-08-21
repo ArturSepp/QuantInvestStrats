@@ -19,7 +19,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from typing import Union, List, Optional, Tuple, Dict
-from enum import Enum
 # qis
 import qis.utils.dates as da
 import qis.perfstats.returns as ret
@@ -84,7 +83,7 @@ def compute_periodic_returns_table(prices: pd.Series,
     implemented only for single asset with price passed as series
     """
     if not isinstance(prices, pd.Series):
-        raise ValueError(f"prices must be pd.Series")
+        raise ValueError("prices must be pd.Series")
 
     if column_period is None:
         # insert returns returns table
@@ -309,7 +308,7 @@ def compute_periodic_returns(prices: pd.DataFrame,
     index are periods, columns are prices.columns
     """
     if not isinstance(prices, pd.DataFrame):
-        raise ValueError(f"prices must be dataframe")
+        raise ValueError("prices must be dataframe")
     if time_period is not None:
         prices = time_period.locate(prices)
 
@@ -450,91 +449,3 @@ def plot_sorted_periodic_returns(prices: pd.DataFrame,
                             ax=ax,
                             **kwargs)
     return fig
-
-
-class LocalTests(Enum):
-    PERIODIC_RETURNS_BY_ROW = 1
-    RETURNS_HEATMAP = 2
-    RETURNS_TABLE = 3
-    PERIODIC_RETURNS_TABLE = 4
-    PERIODIC_RETURNS_TABLE_A = 5
-    SORTED_PERIODIC_RETURNS_TABLE = 6
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data().dropna()
-
-    if local_test == LocalTests.PERIODIC_RETURNS_BY_ROW:
-        periodic_returns_table = compute_periodic_returns_by_row_table(prices=prices['SPY'],
-                                                                       heatmap_freq='YE',
-                                                                       column_period='ME')
-        print(periodic_returns_table)
-
-    elif local_test == LocalTests.RETURNS_HEATMAP:
-        periodic_returns_table = compute_periodic_returns_table(prices=prices['SPY'],
-                                                                column_period='ME',
-                                                                is_add_annual_column=True,
-                                                                is_inverse_order=True)
-        print(periodic_returns_table)
-
-        plot_returns_heatmap(prices=prices['SPY'],
-                             heatmap_column_freq='ME',
-                             heatmap_freq='YE',
-                             #date_format='%b-%Y',
-                             is_add_annual_column=True,
-                             is_inverse_order=True)
-
-    elif local_test == LocalTests.RETURNS_TABLE:
-        time_period_dict = {'Q1': da.TimePeriod(start='31Dec2019', end='31Mar2020'),
-                            'Q2': da.TimePeriod(start='31Mar2020', end='30Jun2020'),
-                            'YTD': da.TimePeriod(start='31Dec2019', end='30Jun2020')}
-        plot_returns_table(prices=prices.iloc[:, :10],
-                           time_period_dict=time_period_dict,
-                           vline_columns=[2],
-                           hline_rows=[1],
-                           transpose=False,
-                           is_inverse_order=True)
-
-    elif local_test == LocalTests.PERIODIC_RETURNS_TABLE:
-
-        time_period = None
-
-        plot_periodic_returns_table(prices=prices,
-                                                time_period=time_period,
-                                                date_format='%b-%y',
-                                                freq='YE',
-                                                x_rotation=90,
-                                                df_out_name='heatmap1y')
-
-    elif local_test == LocalTests.PERIODIC_RETURNS_TABLE_A:
-
-        time_period = da.TimePeriod(start='28Feb2010', end='31Jan2021')
-        plot_periodic_returns_table(prices=prices,
-                                                time_period=time_period,
-                                                date_format='%b-%y',
-                                                freq='YE',
-                                                x_rotation=90,
-                                                df_out_name='heatmap1y')
-
-    elif local_test == LocalTests.SORTED_PERIODIC_RETURNS_TABLE:
-        time_period = da.TimePeriod(start='28Feb2010', end='31Jan2021')
-        plot_sorted_periodic_returns(prices=prices.iloc[:, :20],
-                                     time_period=time_period,
-                                     date_format='%b-%y',
-                                     freq='YE',
-                                     x_rotation=90,
-                                     add_total=False)
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.PERIODIC_RETURNS_BY_ROW)

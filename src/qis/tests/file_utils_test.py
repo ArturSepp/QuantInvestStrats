@@ -392,7 +392,3 @@ class TestParquet:
                                               file_name=None,
                                               local_path=str(tmp_path))
         assert set(loaded.keys()) == {'df', 's'}
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

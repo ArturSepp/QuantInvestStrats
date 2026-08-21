@@ -22,7 +22,7 @@ from qis.portfolio.reports.config import fetch_default_report_kwargs
 from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strategy_benchmark_factsheet_plt,
                                                                 generate_strategy_benchmark_active_perf_plt,
                                                                 generate_performance_attribution_report)
-from qis.tests.price_data_test import load_etf_data
+from qis.run_local.price_data_run import load_etf_data
 
 
 def fetch_universe_data(live_prices: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:

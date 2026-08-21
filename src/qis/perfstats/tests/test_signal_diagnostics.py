@@ -329,7 +329,3 @@ class TestPerAssetBetas:
         # horizon column must preserve the order [1, 2, 3, 6]
         cats = list(df['horizon'].cat.categories)
         assert cats == ['1', '2', '3', '6']
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

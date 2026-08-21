@@ -27,9 +27,6 @@ from qis.perfstats.signal_diagnostics import (
     estimate_signal_diagnostics,
 )
 from qis.plots.derived.signal_diagnostics_plot import (
-    plot_signal_diagnostics,
-    plot_signal_diagnostics_boxplot,
-    plot_signal_diagnostics_group_boxplot,
     plot_signal_diagnostics_for_returns,
     plot_signal_diagnostics_beta_boxplot,
 )
@@ -414,7 +411,3 @@ class TestPlotApi:
             horizons=[1], num_buckets=10,
         )
         assert isinstance(fig, plt.Figure)
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

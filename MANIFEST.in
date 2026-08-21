@@ -10,6 +10,11 @@ include requirements*.txt
 # Include all Python source files
 recursive-include src/qis *.py
 
+# Development runners belong to a checkout, not to source or wheel distributions
+prune src/qis/run_local
+prune src/qis/*/run_local
+prune src/qis/*/*/run_local
+
 # Include specific data files that the package needs
 recursive-include src/qis/data *.csv
 recursive-include src/qis/templates *.html

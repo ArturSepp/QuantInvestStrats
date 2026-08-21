@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Callable, Optional, Dict, Union
-from enum import Enum
 # qis
 import qis.utils.dates as da
 import qis.utils.df_str as dfs
@@ -134,8 +133,6 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
                                                              perf_params=perf_params,
                                                              **kwargs)
     df = pd.DataFrame(index=ra_perf_table.index)
-    df_str = pd.DataFrame(index=ra_perf_table.index)
-    df_num = pd.DataFrame(index=ra_perf_table.index)
     for perf_column in perf_columns:
         if is_convert_to_str:
             # here we can shorten the performance var for outputs
@@ -468,81 +465,3 @@ def plot_best_worst_returns(price: pd.Series,
                     ax=ax,
                     **kwargs)
     return fig
-
-
-class LocalTests(Enum):
-    PLOT_RA_PERF_TABLE = 1
-    PLOT_RA_PERF_SCATTER = 2
-    PLOT_RA_PERF_TABLE_BENCHMARK = 3
-    PLOT_DESC_FREQ_TABLE = 4
-    PLOT_SHARPE_BARPLOT = 5
-    PLOT_SHARPE_BY_DATES = 6
-    PLOT_PERF_FOR_START_END_PERIOD = 7
-    PLOT_TOP_BOTTOM_PERFORMERS = 8
-    PLOT_TOP_BOTTOM_RETURNS = 9
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data().dropna()
-    print(prices)
-
-    if local_test == LocalTests.PLOT_RA_PERF_TABLE:
-
-        perf_params = PerfParams(freq='B')
-        prices = prices.iloc[:, :5]
-        plot_ra_perf_table(prices=prices,
-                           perf_columns=rpt.COMPACT_TABLE_COLUMNS,
-                           perf_params=perf_params)
-
-    elif local_test == LocalTests.PLOT_RA_PERF_SCATTER:
-
-        perf_params = PerfParams(freq='B')
-        plot_ra_perf_scatter(prices=prices,
-                             perf_params=perf_params)
-
-    elif local_test == LocalTests.PLOT_RA_PERF_TABLE_BENCHMARK:
-        perf_params = PerfParams(freq='ME')
-        plot_ra_perf_table_benchmark(prices=prices,
-                                     benchmark='SPY',
-                                     perf_params=perf_params,
-                                     transpose=False)
-
-    elif local_test == LocalTests.PLOT_DESC_FREQ_TABLE:
-        freq_data = plot_desc_freq_table(df=prices,
-                                         freq='YE',
-                                         agg_func=np.mean)
-        print(freq_data)
-
-    elif local_test == LocalTests.PLOT_SHARPE_BARPLOT:
-        plot_ra_perf_bars(prices=prices, perf_column=PerfStat.MAX_DD)
-
-    elif local_test == LocalTests.PLOT_SHARPE_BY_DATES:
-        prices = prices
-
-        time_period_dict = {'1y': da.TimePeriod(start='30Jun2019', end='30Jun2020'),
-                            '3y': da.TimePeriod(start='30Jun2017', end='30Jun2020'),
-                            '5y': da.TimePeriod(start='30Jun2015', end='30Jun2020')}
-        plot_ra_perf_by_dates(prices=prices,
-                              time_period_dict=time_period_dict)
-
-    elif local_test == LocalTests.PLOT_PERF_FOR_START_END_PERIOD:
-        plot_ra_perf_annual_matrix(price=prices.iloc[:, 0])
-
-    elif local_test == LocalTests.PLOT_TOP_BOTTOM_PERFORMERS:
-        plot_top_bottom_performers(prices=prices, num_assets=2)
-
-    elif local_test == LocalTests.PLOT_TOP_BOTTOM_RETURNS:
-        plot_best_worst_returns(price=prices.iloc[:, 0])
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.PLOT_RA_PERF_TABLE_BENCHMARK)

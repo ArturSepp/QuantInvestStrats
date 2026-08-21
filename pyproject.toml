@@ -133,7 +133,13 @@ Issues = "https://github.com/ArturSepp/QuantInvestStrats/issues"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["qis*"]
-exclude = ["tests*", "docs*"]
+exclude = [
+    "tests*",
+    "docs*",
+    "qis.run_local*",
+    "qis.*.run_local*",
+    "qis.*.*.run_local*",
+]
 
 [tool.setuptools.package-data]
 qis = ["*.yaml", "docs/*.md"]
@@ -211,17 +217,21 @@ pandas = "pd"
 "src/qis/portfolio/reports/multi_strategy_factsheet_pybloqs.py" = ["TID253"]
 "src/qis/portfolio/reports/strategy_benchmark_factsheet_pybloqs.py" = ["TID253"]
 "src/qis/sql_engine.py" = ["TID253"]
+# Development-only runners may exercise an optional backend and retain legacy analytical lines
+# longer than the production limit. Production modules never import this tree;
+# ``module_layout_test.py`` enforces that one-way boundary.
+"src/qis/**/run_local/*_run.py" = ["E501", "TID253"]
 
 [tool.interrogate]
 # User-facing source is the documentation target; pytest functions are verification rather than
 # API documentation.  ``*tests`` is separator-independent because interrogate appends its own
 # wildcard before matching paths.  The measured production-source baseline is 68.5%.
 fail-under = 68
-exclude = ["*tests"]
+exclude = ["*tests", "*run_local"]
 
 [tool.coverage.run]
 source = ["qis"]
-omit = ["*/tests/*", "*/examples/*"]
+omit = ["*/tests/*", "*/examples/*", "*/run_local/*"]
 
 [tool.coverage.report]
 # This is a regression ratchet, not the destination.  Reports and plots remain measured because

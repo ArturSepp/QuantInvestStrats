@@ -288,23 +288,3 @@ def test_plot_performance_attribution_states_the_fold() -> None:
     assert n_bars == 4
     assert 'top and bottom 4 of' in title
     assert 'folded away, summing to' in title
-
-
-class LocalTest:
-    """runnable checks, not part of the pytest suite"""
-    CAPACITY_TABLE = 1
-
-
-def run_local_test(local_test: LocalTest):
-    if local_test == LocalTest.CAPACITY_TABLE:
-        rows = []
-        for axis_width in (2.0, 4.09, 6.0, 8.19):
-            for fontsize in (3.0, 4.0, 5.0, 8.0):
-                rows.append(dict(axis_width=axis_width, fontsize=fontsize,
-                                 capacity=estimate_bar_label_capacity(axis_width=axis_width,
-                                                                      fontsize=fontsize)))
-        print(pd.DataFrame(rows).pivot(index='axis_width', columns='fontsize', values='capacity'))
-
-
-if __name__ == '__main__':
-    run_local_test(local_test=LocalTest.CAPACITY_TABLE)

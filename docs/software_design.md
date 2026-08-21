@@ -109,6 +109,11 @@ Linux, Windows, and macOS at the primary interpreter. A separate locked lane exe
 I/O extras with a line-coverage ratchet. Static checks defend import direction, optional-dependency
 boundaries, naming conventions, and production docstring coverage.
 
+Automated tests stay in source-adjacent `tests/` packages. Interactive or local-data diagnostics
+stay equally close to their implementation, but under `run_local/` as `<subject>_run.py`. Those
+runners use `Locals` plus `run_local(local=...)`; production modules never import them and wheels
+do not distribute them.
+
 The wheel job builds the artifact users receive, verifies its tests and package documentation,
 installs it into a clean environment, runs the shipped suite outside the checkout, and executes the
 [offline quickstart](quickstart.md) against the installed artifact. Contributor commands matching

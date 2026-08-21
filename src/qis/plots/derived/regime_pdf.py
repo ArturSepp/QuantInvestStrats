@@ -8,7 +8,6 @@ regimes rather than overlaying them - it applies to the histogram branch only.
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from enum import Enum
 from matplotlib.ticker import FuncFormatter
 
 # qis
@@ -67,31 +66,3 @@ def plot_regime_pdf(prices: pd.DataFrame,
         ax.set_title(label=title, **kwargs)
 
     return fig
-
-
-class LocalTests(Enum):
-    REGIME_PDF = 1
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data()[['SPY', 'TLT']].dropna()
-
-    if local_test == LocalTests.REGIME_PDF:
-        with sns.axes_style("darkgrid"):
-            fig, axs = plt.subplots(1, 2, figsize=(15, 8), tight_layout=True)
-            plot_regime_pdf(prices=prices, benchmark='SPY', is_histogram=False, ax=axs[0])
-            plot_regime_pdf(prices=prices, benchmark='SPY', is_histogram=True, ax=axs[1])
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.REGIME_PDF)

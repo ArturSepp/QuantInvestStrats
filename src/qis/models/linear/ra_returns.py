@@ -187,7 +187,7 @@ def map_signal_to_weight(signals: pd.DataFrame,
 
     elif signal_map_type == SignalMapType.ExpCDF:
         if np.any(np.less_equal(tail_level, slope_right)) or np.any(np.less_equal(tail_level, slope_left)):
-            raise ValueError(f"must be tail>slope_positive and tail > slope_negative")
+            raise ValueError("must be tail>slope_positive and tail > slope_negative")
         scale_negative = 1.5625 * scale / np.log(tail_level / (tail_level - slope_left))
         scale_positive = 1.5625 * scale / np.log(tail_level / (tail_level - slope_right))
         s_negative = - tail_level * (1.0 - np.exp(-np.square(x - loc) / scale_negative))
@@ -401,33 +401,3 @@ def compute_returns_transform(returns: pd.DataFrame,
     else:
         raise TypeError(f"returns_transform {returns_transform} of {type(returns_transform)} not implemented")
     return returns_transform
-
-
-class LocalTests(Enum):
-    RA_RETURNS = 1
-    TRANSFORM = 2
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data().dropna()
-    returns = prices.pct_change()
-
-    if local_test == LocalTests.RA_RETURNS:
-        df = compute_ra_returns(returns=returns)
-        print(df)
-
-    elif local_test == LocalTests.TRANSFORM:
-        df = compute_returns_transform(returns=returns)
-        print(df)
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.RA_RETURNS)

@@ -47,9 +47,3 @@ def test_csv_round_trip(tmp_path) -> None:
     fd = FactorsData.load(local_path=f"{tmp_path}/", factors=_Factors)
     # csv does not carry the index freq, so it is not part of the round-trip contract
     pd.testing.assert_frame_equal(fd.factors_prices, prices, check_freq=False)
-
-
-if __name__ == '__main__':
-    test_construct_and_accessors()
-    test_generic_without_factors()
-    print("ok")

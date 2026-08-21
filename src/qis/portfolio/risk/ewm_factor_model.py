@@ -15,16 +15,13 @@ betas and a residual. The base class is in ``qis/portfolio/risk/factor_model.py`
 # packages
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from typing import Optional, Union
-from enum import Enum
 
 # qis
 import qis as qis
 from qis import TimePeriod
 import qis.utils.df_ops as dfo
 import qis.perfstats.returns as ret
-import qis.plots.time_series as pts
 import qis.models.linear.ewm as ewm
 from qis.models.linear.ewm import MeanAdjType, InitType
 from qis.portfolio.risk.factor_model import LinearModel, compute_benchmarks_beta_attribution_from_prices
@@ -189,69 +186,3 @@ def estimate_ewm_factor_model(asset_prices: Union[pd.Series, pd.DataFrame],
     ewm_linear_model = EwmLinearModel(x=x.reindex(index=y.index), y=y)
     ewm_linear_model.fit(span=span, is_x_correlated=True, mean_adj_type=mean_adj_type)
     return ewm_linear_model
-
-
-class LocalTests(Enum):
-    MODEL = 1
-    ATTRIBUTION = 2
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data().dropna()
-
-    if local_test == LocalTests.MODEL:
-        returns = np.log(prices.divide(prices.shift(1)))
-
-        # factors
-        factors = ['SPY', 'TLT', 'GLD']
-        # factors = ['SPY']
-        factor_returns = returns[factors]
-
-        # assets
-        is_check = False
-        if is_check:
-            asset_returns = returns[factors]
-            asset_returns.columns = [f"{x.split('_')[0]}_asset" for x in factors]
-        else:
-            assets = ['QQQ', 'HYG']
-            asset_returns = returns[assets]
-        ewm_linear_model = EwmLinearModel(x=factor_returns, y=asset_returns)
-        ewm_linear_model.fit(ewm_lambda=0.94, is_x_correlated=True)
-
-        ewm_linear_model.print()
-        ewm_linear_model.plot_factor_loadings(factor='SPY')
-
-        factor_alpha, explained_returns = ewm_linear_model.get_factor_alpha()
-        pts.plot_time_series(df=factor_alpha.cumsum(axis=0), title='Cumulative alpha')
-        pts.plot_time_series(df=explained_returns.cumsum(axis=0), title='Cumulative explained return')
-
-    elif local_test == LocalTests.ATTRIBUTION:
-        benchmark_prices = prices[['SPY', 'TLT']]
-        instrument_prices = prices[['QQQ', 'HYG', 'GLD']]
-        exposures = pd.DataFrame(1.0/3.0, index=instrument_prices.index, columns=instrument_prices.columns)
-        portfolio_nav = ret.returns_to_nav(returns=(exposures.shift(1)).multiply(instrument_prices.pct_change()).sum(axis=1))
-        print(portfolio_nav)
-
-        attribution = compute_portfolio_benchmark_ewm_beta_alpha_attribution(instrument_prices=instrument_prices,
-                                                                             weights=exposures,
-                                                                             benchmark_prices=benchmark_prices,
-                                                                             portfolio_nav=portfolio_nav,
-                                                                             time_period=None,
-                                                                             freq_beta='W-WED',
-                                                                             factor_beta_span=52,  # quarter
-                                                                             residual_name='Alpha')
-        pts.plot_time_series(df=attribution.cumsum(axis=0))
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.MODEL)

@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Optional, Union
-from enum import Enum
 
 # qis
 from qis.utils.df_melt import melt_scatter_data_with_xvar
@@ -90,48 +89,3 @@ def plot_returns_scatter(prices: pd.DataFrame,
                        ax=ax,
                        **kwargs)
     return fig
-
-
-class LocalTests(Enum):
-    RETURNS = 1
-    RETURNS2 = 2
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data().dropna()
-
-    if local_test == LocalTests.RETURNS:
-        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-        global_kwargs = dict(fontsize=8, linewidth=0.5, weight='normal', markersize=1)
-        plot_returns_scatter(prices=prices,
-                             benchmark='SPY',
-                             var_format='{:.2%}',
-                             ax=ax,
-                             **global_kwargs)
-
-    elif local_test == LocalTests.RETURNS2:
-
-        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-        global_kwargs = dict(fontsize=8, linewidth=0.5, weight='normal', markersize=1)
-
-        plot_returns_scatter(prices=prices[['SPY', 'TLT']],
-                             benchmark='TLT',
-                             y_column='benchmarks',
-                             ylabel='SPY',
-                             var_format='{:.2%}',
-                             ax=ax,
-                             **global_kwargs)
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.RETURNS)

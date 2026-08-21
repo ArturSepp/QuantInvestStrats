@@ -258,10 +258,3 @@ def test_cip_identity_unhedged_drift() -> None:
         "may be reducing to the hedged identity even when h=0 — verify that "
         "the hedge ratio is actually being consumed by the forward-cost term."
     )
-
-
-if __name__ == '__main__':
-    pd.set_option('display.width', 180)
-    test_cip_identity()
-    test_cip_identity_unhedged_drift()
-    print('\nAll CIP identity tests passed.')

@@ -21,7 +21,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from dataclasses import dataclass
-from enum import Enum
 from typing import Dict, Union, List, Optional, Tuple
 import qis as qis
 from qis import PerfStat, RegimeData, BenchmarkReturnsQuantilesRegime, PerfParams
@@ -410,7 +409,7 @@ class SmartDiversificationReport:
                 y_curve = np.poly1d(curve_poly)(x_lin)  # fill in
                 sns.lineplot(x=x_lin, y=y_curve, marker='None', color='blue', ax=ax)
             except np.linalg.LinAlgError:
-                warnings.warn(f"SVD did not converge in Linear Least Squares")
+                warnings.warn("SVD did not converge in Linear Least Squares")
 
         return fig
 
@@ -494,43 +493,8 @@ def safe_polyfit(x, y, degree=3) -> np.ndarray:
             poly = np.polyfit(x_clean, y_clean, deg)
             return poly
         except np.linalg.LinAlgError:
-            warnings.warn(f"SVD did not converge in Linear Least Squares")
+            warnings.warn("SVD did not converge in Linear Least Squares")
             continue
 
     # Ultimate fallback: return mean
     return np.array([np.mean(y_clean)])
-
-
-class LocalTests(Enum):
-    CURVE = 1
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data()
-    print(prices)
-    overlays = ['TLT', 'GLD']
-    prices = prices[['SPY']+overlays].dropna()
-
-    if local_test == LocalTests.CURVE:
-
-        sd_report = SmartDiversificationReport(principal_nav=prices.iloc[:, 0], overlay_navs=prices[overlays])
-
-        # strategies_report.plot_nav()
-        sd_report.plot_smart_diversification_curve(x_var=PerfStat.BEAR_SHARPE,
-                                                   y_var=PerfStat.SHARPE_RF0,
-                                                   title='Total Sharpe vs Bear Sharpe')
-        # strategies_report.plot_smart_diversification_curve(x_var=PerfStat.VOL, y_var=PerfStat.PA_RETURN, title='Total P.A vs Vol')
-
-        plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.CURVE)

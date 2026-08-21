@@ -25,7 +25,6 @@ identities checked:
 # packages
 import numpy as np
 import pandas as pd
-from enum import Enum
 # qis
 import qis.perfstats.returns as ret
 from qis.perfstats.config import PerfStat, PerfParams, RegimeData, ReturnTypes, SharpeConvention
@@ -245,32 +244,3 @@ def test_regime_sharpe_decomposition_conventions() -> None:
                                np.array([0.458513, -0.001405, -0.296900]), atol=1e-6)
     np.testing.assert_allclose(pa_sharpes.loc['benchmark'].to_numpy(),
                                np.array([-0.820954, 0.052139, 0.885227]), atol=1e-6)
-
-
-
-class LocalTests(Enum):
-    RETURN_CONVENTIONS = 1
-    SHARPE_CONVENTIONS = 2
-    EXCESS_SHARPE_CONVENTIONS = 3
-    REGIME_SHARPE_CONVENTIONS = 4
-    ALL = 5
-
-
-def run_local_test(local_test: LocalTests):
-    """run local tests for development and debugging purposes"""
-    if local_test in (LocalTests.RETURN_CONVENTIONS, LocalTests.ALL):
-        test_return_conventions()
-        print("return conventions regression guard passed")
-    if local_test in (LocalTests.SHARPE_CONVENTIONS, LocalTests.ALL):
-        test_sharpe_conventions()
-        print("sharpe conventions regression guard passed")
-    if local_test in (LocalTests.EXCESS_SHARPE_CONVENTIONS, LocalTests.ALL):
-        test_excess_sharpe_conventions()
-        print("excess sharpe conventions regression guard passed")
-    if local_test in (LocalTests.REGIME_SHARPE_CONVENTIONS, LocalTests.ALL):
-        test_regime_sharpe_decomposition_conventions()
-        print("regime sharpe decomposition regression guard passed")
-
-
-if __name__ == '__main__':
-    run_local_test(local_test=LocalTests.ALL)

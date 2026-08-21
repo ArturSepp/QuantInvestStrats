@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Optional
-from enum import Enum
 
 # qis
 import qis.utils.df_cut as dfc
@@ -67,29 +66,3 @@ def plot_quantile_class_table(data: pd.DataFrame,
                       index_column_name=hue_name,
                       ax=ax,
                       **kwargs)
-
-
-class LocalTests(Enum):
-    QUANTILE_CLASS_TABLE = 1
-
-
-def run_local_test(local_test: LocalTests):
-    """Run local tests for development and debugging purposes.
-
-    These are integration tests that download real data and generate reports.
-    Use for quick verification during development.
-    """
-
-    from qis.tests.price_data_test import load_etf_data
-    prices = load_etf_data().dropna()
-    returns = prices.asfreq('QE', method='ffill').pct_change().dropna()
-
-    if local_test == LocalTests.QUANTILE_CLASS_TABLE:
-        plot_quantile_class_table(data=returns, x_column='SPY', num_buckets=4, hue_name='quantile regime')
-
-    plt.show()
-
-
-if __name__ == '__main__':
-
-    run_local_test(local_test=LocalTests.QUANTILE_CLASS_TABLE)

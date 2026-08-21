@@ -53,6 +53,10 @@ uv run --no-sync pytest
 The first command installs the core package plus the PEP 735 `test` dependency group exactly as
 recorded in `uv.lock`; it fails instead of re-resolving when the lock and `pyproject.toml` differ.
 Tests live inside `src/qis/`, and the project configuration supplies that path automatically.
+Files matching `*_test.py` or `test_*.py` contain automated pytest tests only. A diagnostic that
+needs local data, interactive plots, or visual inspection lives beside the component it develops
+as `run_local/<subject>_run.py`, using `Locals` and `run_local(local=...)`. These development-only
+runners are excluded from wheels.
 
 The CI extras and coverage lane is:
 

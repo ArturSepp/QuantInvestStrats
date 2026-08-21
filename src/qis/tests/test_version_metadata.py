@@ -112,7 +112,3 @@ def test_citation_cff_date_released_is_a_date() -> None:
     assert date_released is not None, "CITATION.cff has no date-released field"
     assert re.fullmatch(r'\d{4}-\d{2}-\d{2}', date_released), (
         f"date-released must be YYYY-MM-DD, got {date_released!r}")
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

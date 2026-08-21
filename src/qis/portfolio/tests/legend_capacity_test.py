@@ -19,7 +19,6 @@ import warnings
 import matplotlib
 matplotlib.use('Agg')  # noqa: E402  - a headless backend, set before pyplot is imported
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import pytest
 # qis
@@ -154,25 +153,3 @@ def test_multi_asset_factsheet_validates_capacity(monkeypatch: pytest.MonkeyPatc
         'gridspec_rows': 14,
         'report_name': 'multi-asset factsheet',
     }]
-
-
-class LocalTest:
-    """runnable checks, not part of the pytest suite"""
-    LEGEND_HEIGHT_TABLE = 1
-
-
-def run_local_test(local_test: LocalTest):
-    if local_test == LocalTest.LEGEND_HEIGHT_TABLE:
-        rows = []
-        for fontsize in (2.5, 3.5, 5.0, 8.0):
-            for n_entries in (5, 10, 15, 20, 30):
-                rows.append(dict(fontsize=fontsize,
-                                 n_entries=n_entries,
-                                 measured=measure_legend_height(n_entries=n_entries,
-                                                                fontsize=fontsize),
-                                 model=fontsize * LEGEND_ROW_HEIGHT_PER_FONTSIZE * n_entries))
-        print(pd.DataFrame(rows))
-
-
-if __name__ == '__main__':
-    run_local_test(local_test=LocalTest.LEGEND_HEIGHT_TABLE)
