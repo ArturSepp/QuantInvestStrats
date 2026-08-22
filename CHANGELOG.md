@@ -25,6 +25,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   first realized price interval.
 - Preserved every DataFrame column returned by compounded excess-return calculations instead of
   returning only the first column; Series output remains scalar.
+- Preserved the final non-overlapping older observation when `bfill_timeseries()` combines
+  adjacent provider histories.
 
 ## [5.12.0] - 2026-08-22
 
