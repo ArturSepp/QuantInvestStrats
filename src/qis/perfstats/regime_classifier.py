@@ -54,21 +54,23 @@ def compute_mean_freq_regimes(sampled_returns_with_regime_id: pd.DataFrame) -> T
     """Compute mean returns and frequency for each regime.
 
     Args:
-        sampled_returns_with_regime_id: DataFrame with returns and regime column
+        sampled_returns_with_regime_id: DataFrame with asset returns and a benchmark-defined
+            regime column. Frequencies count classified dates and are shared across assets,
+            independently of missing asset returns.
 
     Returns:
-        Tuple of (regime means DataFrame, normalized regime frequencies Series)
+        Tuple of (regime means DataFrame, normalized classified-date frequencies Series)
     """
     regime_groups = sampled_returns_with_regime_id.groupby([RegimeClassifier.REGIME_COLUMN], observed=False)
     regime_means = regime_groups.mean()
-    regime_dims = regime_groups.count().iloc[:, 0]
+    # Regimes are benchmark-defined, so count dates rather than non-missing asset returns.
+    regime_dims = regime_groups.size()
 
-    # Replace nans and normalize
-    regime_dims[np.isnan(regime_dims)] = 0.0
     norm_sum = np.sum(regime_dims)
 
     if np.isclose(norm_sum, 0.0):
-        norm_q = np.zeros_like(regime_dims)
+        # Preserve the categorical regime index and Series type for an empty sample.
+        norm_q = regime_dims.astype(float)
     else:
         norm_q = regime_dims / norm_sum
 
