@@ -704,12 +704,13 @@ def compute_max_current_drawdown(prices: Union[pd.DataFrame, pd.Series]
         elements are scalar floats.
     """
     max_dd_data = compute_rolling_drawdowns(prices=prices)
+    # fmin.reduce keeps nanmin's finite results but does not warn for an all-NaN slice.
     if isinstance(prices, pd.DataFrame):
-        max_dds = np.nanmin(max_dd_data.to_numpy(), axis=0)
+        max_dds = np.fmin.reduce(max_dd_data.to_numpy(), axis=0)
         current_dds = max_dd_data.iloc[-1, :].to_numpy()
     else:
         # Series case: return scalars (not arrays) to match the actual return shape.
-        max_dds = float(np.nanmin(max_dd_data.to_numpy()))
+        max_dds = float(np.fmin.reduce(max_dd_data.to_numpy()))
         current_dds = float(max_dd_data.iloc[-1])
     return max_dds, current_dds
 
