@@ -291,3 +291,11 @@ provider-neutral panels.
 `src/qis/tests/baseline/` is empty and `pytest-mpl` is not in any extra, so the four
 `@pytest.mark.mpl_image_compare` tests in `src/qis/tests/test_reporting_goldens.py` run their bodies
 and compare nothing.
+
+## Python environment
+
+- Keep this repository's Python environment outside OneDrive at `C:\Python\QuantInvestStrats312`.
+- Never create, use, or install packages into a repository-local `.venv`.
+- Use `C:\Python\QuantInvestStrats312\Scripts\python.exe` for all Python commands.
+- Run tools through that interpreter, for example `C:\Python\QuantInvestStrats312\Scripts\python.exe -m pytest` and `C:\Python\QuantInvestStrats312\Scripts\python.exe -m pip`.
+- If the environment is missing, create it with `py -3.12 -m venv C:\Python\QuantInvestStrats312`; do not create `.venv` under the repository.
