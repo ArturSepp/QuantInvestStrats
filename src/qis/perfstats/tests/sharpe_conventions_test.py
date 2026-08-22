@@ -20,7 +20,8 @@ sharpe conventions (with excess variants under rates_data):
 
 identities checked:
     SR_log ~= SR_pa (exp-map twins), SR_arith - SR_pa ~= sigma_ann / 2 (volatility drag),
-    all excess objects collapse to plain at rf = 0 and sit strictly below at rf > 0
+    all excess objects collapse to plain at rf = 0 and sit strictly below at rf > 0,
+    lagged funding uses an observable pre-sample rate without losing the initial NAV boundary
 """
 # packages
 import numpy as np
@@ -32,6 +33,8 @@ from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime, Reg
 from qis.perfstats.perf_stats import compute_ra_perf_table
 
 AN_FACTOR = 12  # reference series is monthly
+ANNUALIZATION_DAYS_PER_YEAR = 365.25
+FUNDING_DAYS_PER_YEAR = 365.0
 RATE_ANN = 0.02  # flat annualised funding rate for excess tests
 
 
@@ -51,6 +54,51 @@ def generate_reference_prices(num_periods: int = 360,  # 30y monthly
     return prices
 
 
+def _generate_flat_rates(price_index: pd.Index) -> pd.Series:
+    """Create flat rates with the observation required before the first price date.
+
+    The production convention charges each period using the rate observable one
+    observation earlier. The extra month-end makes that rate available at the
+    initial zero-return boundary without using contemporaneous information.
+
+    Args:
+        price_index: Month-end dates of the reference price history.
+
+    Returns:
+        Flat annualized rates containing one pre-sample month-end observation.
+    """
+    datetime_index = pd.DatetimeIndex(price_index)
+    prior_month_end = datetime_index[0] - pd.offsets.MonthEnd()
+    rate_index = datetime_index.insert(0, prior_month_end)
+    return pd.Series(RATE_ANN, index=rate_index)
+
+
+def _compute_expected_pa_excess_return(prices: pd.DataFrame) -> float:
+    """Calculate compounded excess performance without a QIS return helper.
+
+    Funding uses the preceding observable annual rate and actual calendar days
+    divided by 365. The initial row is a zero-return NAV boundary, and the final
+    compounded result is annualized from elapsed calendar days divided by 365.25.
+
+    Args:
+        prices: Single-column reference price history.
+
+    Returns:
+        Independently calculated per-annum compounded excess return.
+    """
+    asset_prices = prices.iloc[:, 0]
+    simple_returns = asset_prices.pct_change()
+    elapsed_days = prices.index.to_series().diff().dt.days
+    funding_costs = RATE_ANN * elapsed_days / FUNDING_DAYS_PER_YEAR
+    excess_returns = simple_returns.subtract(funding_costs)
+
+    # The first row establishes NAV at one; no priced interval ends on that date.
+    excess_returns.iloc[0] = 0.0
+    excess_nav = excess_returns.add(1.0).cumprod()
+    num_years = (prices.index[-1] - prices.index[0]).days / ANNUALIZATION_DAYS_PER_YEAR
+    return float((excess_nav.iloc[-1] / excess_nav.iloc[0]) ** (1.0 / num_years) - 1.0)
+
+
 def _check_value(label: str,
                  got: float,
                  expected: float,
@@ -64,7 +112,7 @@ def _check_value(label: str,
 def _compute_tables() -> tuple:
     """reference tables at rf=0 and with flat rates, plus the sampled return series"""
     prices = generate_reference_prices()
-    rates_data = pd.Series(RATE_ANN, index=prices.index)
+    rates_data = _generate_flat_rates(price_index=prices.index)
     ra_perf_table = compute_ra_perf_table(prices=prices, perf_params=PerfParams(freq_vol='ME'))
     ra_perf_table_ex = compute_ra_perf_table(prices=prices,
                                              perf_params=PerfParams(freq_vol='ME', rates_data=rates_data))
@@ -153,9 +201,37 @@ def test_sharpe_conventions() -> None:
                  float(table_rel[PerfStat.SHARPE_ARITH.to_str()].iloc[0]), sr_arith)
 
 
+def test_compute_excess_returns_uses_pre_sample_rate_after_lag() -> None:
+    """Require a pre-sample rate while preserving the one-period lag contract.
+
+    With one-day intervals, annual rates of 73.0% and 109.5% produce funding
+    costs of 0.002 and 0.003. Subtracting those independently calculated costs
+    from 10% returns gives 0.098 and 0.097. The earlier 36.5% observation makes
+    the initial zero-duration boundary finite; removing it must restore the
+    intentional initial NaN because no lagged rate is then observable.
+    """
+    return_dates = pd.date_range('2024-01-01', periods=3, freq='D')
+    returns = pd.Series([0.0, 0.1, 0.1], index=return_dates, name='asset')
+    rate_dates = pd.date_range('2023-12-31', periods=4, freq='D')
+    rates = pd.Series([0.365, 0.730, 1.095, 1.460], index=rate_dates, name='rate')
+    expected = pd.Series([0.0, 0.098, 0.097], index=return_dates, name='asset')
+    returns_before = returns.copy(deep=True)
+    rates_before = rates.copy(deep=True)
+
+    actual = ret.compute_excess_returns(returns=returns, rates_data=rates)
+
+    pd.testing.assert_series_equal(actual, expected, check_exact=False, rtol=0.0, atol=1e-15)
+    without_prior_rate = ret.compute_excess_returns(returns=returns, rates_data=rates.iloc[1:])
+    assert pd.isna(without_prior_rate.iloc[0])
+    pd.testing.assert_series_equal(without_prior_rate.iloc[1:], expected.iloc[1:],
+                                   check_exact=False, rtol=0.0, atol=1e-15)
+    pd.testing.assert_series_equal(returns, returns_before)
+    pd.testing.assert_series_equal(rates, rates_before)
+
+
 def test_excess_sharpe_conventions() -> None:
     """pin every excess convention with a flat rf > 0 and the excess < plain ordering"""
-    _, table, table_ex, _, _, excess_simple_returns = _compute_tables()
+    prices, table, table_ex, _, _, excess_simple_returns = _compute_tables()
 
     def stat(perf_stat: PerfStat) -> float:
         return float(table_ex[perf_stat.to_str()].iloc[0])
@@ -163,6 +239,8 @@ def test_excess_sharpe_conventions() -> None:
     vol = stat(PerfStat.VOL)
 
     # compound excess: SHARPE_EXCESS = PA_EXCESS_RETURN / vol, numerator below plain
+    pa_excess_manual = _compute_expected_pa_excess_return(prices=prices)
+    _check_value('PA_EXCESS_RETURN', stat(PerfStat.PA_EXCESS_RETURN), pa_excess_manual)
     if not stat(PerfStat.PA_EXCESS_RETURN) < stat(PerfStat.PA_RETURN):
         raise ValueError(f"PA_EXCESS_RETURN not below PA_RETURN: got {stat(PerfStat.PA_EXCESS_RETURN)!r}")
     _check_value('SHARPE_EXCESS', stat(PerfStat.SHARPE_EXCESS), stat(PerfStat.PA_EXCESS_RETURN) / vol)
