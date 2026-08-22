@@ -458,13 +458,11 @@ def compute_pa_excess_compounded_returns(returns: Union[pd.Series, pd.DataFrame]
         annualize_less_1y: Annualize periods <1 year
 
     Returns:
-        Annualized excess return (scalar)
+        Array of annualized excess returns for DataFrame input, float for Series input
     """
     excess_returns = compute_excess_returns(returns=returns, rates_data=rates_data)
     prices = returns_to_nav(returns=excess_returns, first_date=first_date)
     compounded_return_pa = compute_pa_return(prices=prices, annualize_less_1y=annualize_less_1y)
-    if isinstance(compounded_return_pa, np.ndarray):
-        compounded_return_pa = compounded_return_pa[0]
     return compounded_return_pa
 
 
