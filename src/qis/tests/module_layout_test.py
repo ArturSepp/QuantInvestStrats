@@ -6,10 +6,19 @@ import ast
 import importlib
 from pathlib import Path
 
+import pytest
+
 import qis
 
 
 PACKAGE_ROOT = Path(qis.__file__).resolve().parent
+REPO_ROOT = PACKAGE_ROOT.parents[1]
+IS_REPOSITORY_CHECKOUT = REPO_ROOT.joinpath("pyproject.toml").is_file()
+
+requires_development_runners = pytest.mark.skipif(
+    not IS_REPOSITORY_CHECKOUT,
+    reason="development runners are intentionally absent from an installed wheel",
+)
 
 
 def _tree(path: Path) -> ast.Module:
@@ -102,6 +111,7 @@ def test_pytest_modules_are_pure_automated_tests() -> None:
     assert failures == [], "pytest/development boundary violations:\n" + "\n".join(failures)
 
 
+@requires_development_runners
 def test_source_adjacent_development_runner_layout() -> None:
     """Development runners use ``run_local/<subject>_run.py`` and the new API."""
     failures: list[str] = []
@@ -143,6 +153,7 @@ def test_source_adjacent_development_runner_layout() -> None:
     assert failures == [], "development-runner layout violations:\n" + "\n".join(failures)
 
 
+@requires_development_runners
 def test_development_runners_import_on_a_core_install() -> None:
     """Every development runner imports without executing its selected case."""
     runners = sorted(

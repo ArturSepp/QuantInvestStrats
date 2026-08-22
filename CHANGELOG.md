@@ -7,6 +7,29 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.11.3] - 2026-08-22
+
+### Added
+
+- Added NumPy-array support for constant-trade-level NAV conversion, including per-column
+  initial-value scaling and log-return conversion.
+- Added governance and software-design documentation and expanded the supported-platform CI
+  matrix with installed-wheel verification.
+
+### Changed
+
+- Separated source-adjacent development runners from the automated pytest suite and kept those
+  runners out of installed distributions.
+
+### Fixed
+
+- Made an explicit `first_date` take precedence during return-to-NAV initialization without
+  mutating caller-owned data or manufacturing NAV histories for missing observations.
+- Preserved leading, intermittent, and entirely missing NumPy histories during additive NAV
+  accumulation while allowing later observed returns to resume the path.
+- Scoped development-runner layout checks to repository checkouts so the shipped test suite runs
+  correctly against an installed wheel.
+
 ## [5.11.2] - 2026-08-21
 
 ### Changed

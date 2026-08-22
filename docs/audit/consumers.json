@@ -4,10 +4,10 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "1f09d5c452bbd17221c7f2d9bf4ee278e4790fbe",
-      "distinct_symbols": 98,
-      "call_sites": 766,
-      "files_scanned": 222,
+      "commit": "2026d5b7bc5c3408270134fbed6756d8afecb042",
+      "distinct_symbols": 96,
+      "call_sites": 762,
+      "files_scanned": 216,
       "files_using_qis": 86,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
@@ -34,7 +34,6 @@
         "compute_asset_returns_dict",
         "compute_df_desc_data",
         "compute_ewm",
-        "compute_ewm_covar",
         "compute_ewm_covar_tensor",
         "compute_ewm_covar_tensor_vol_norm_returns",
         "compute_ewm_long_short_filtered_ra_returns",
@@ -42,7 +41,6 @@
         "compute_masked_covar_corr",
         "compute_portfolio_risk_contributions",
         "compute_ra_perf_table",
-        "compute_ra_perf_table_with_benchmark",
         "compute_total_return",
         "covar_to_corr",
         "df_boxplot_by_columns",
@@ -112,7 +110,7 @@
     },
     "trendfollowing": {
       "url": "https://github.com/ArturSepp/TrendFollowingSystems.git",
-      "commit": "488d02f75efb76cffdaef4646c16c44ea4b681c1",
+      "commit": "1fe907dd5ec21ecd14d144728a3f49e2ba8bea02",
       "distinct_symbols": 87,
       "call_sites": 441,
       "files_scanned": 85,
