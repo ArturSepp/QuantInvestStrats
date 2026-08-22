@@ -27,6 +27,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   returning only the first column; Series output remains scalar.
 - Preserved the final non-overlapping older observation when `bfill_timeseries()` combines
   adjacent provider histories.
+- Made regime frequencies depend on benchmark-classified dates rather than asset missingness or
+  DataFrame column order.
 
 ## [5.12.0] - 2026-08-22
 
