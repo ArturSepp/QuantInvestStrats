@@ -14,6 +14,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Fixed automatic annualization in `compute_sharpe_arithmetic()`, restoring inferred Sharpe
+  calculations for Series and DataFrame inputs.
 - Made maximum/current drawdown calculations warning-free for all-missing Series and DataFrame
   columns while preserving NaN results.
 - Corrected drawdown episode tables to include peak and recovery boundaries, distinguish

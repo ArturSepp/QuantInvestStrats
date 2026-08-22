@@ -842,5 +842,7 @@ def compute_sharpe_arithmetic(returns: Union[pd.Series, pd.DataFrame],
     if not isinstance(returns, (pd.Series, pd.DataFrame)):
         raise ValueError(f"returns must be pd.Series or pd.DataFrame, got {type(returns)!r}")
     if af is None:
-        af = infer_annualisation_factor_from_df(df=returns.to_frame() if isinstance(returns, pd.Series) else returns)
+        af = infer_annualisation_factor_from_df(
+            data=returns.to_frame() if isinstance(returns, pd.Series) else returns
+        )
     return np.sqrt(af) * returns.mean() / returns.std(ddof=ddof)
