@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Corrected arithmetic-excess statistics to charge the observable lagged funding rate over the
+  first realized price interval.
 - Preserved every DataFrame column returned by compounded excess-return calculations instead of
   returning only the first column; Series output remains scalar.
 
