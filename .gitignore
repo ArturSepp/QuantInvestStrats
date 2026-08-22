@@ -153,8 +153,6 @@ dmypy.json
 futures_strats/
 my_projects/
 testing/
-get_local_keys.py
-TODOs.md
 examples/figures/perf1.PNG
 examples/figures/perf2.PNG
 examples/figures/perf3.PNG
