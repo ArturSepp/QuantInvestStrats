@@ -168,7 +168,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
                 newer_start = dfo.get_nonnan_index(newer)
                 # print(f"{column}\n{older_start}\n{newer_start}")
                 if older_start < newer_start:  # bffill
-                    bffill_part = older[:newer_start].iloc[:-1]  # first filerr to newer start and out of last overlap
+                    bffill_part = older.loc[older.index < newer_start]  # retain earlier dates
                     bfill_data = pd.concat([bffill_part, newer[newer_start:]], axis=0)
                 else:
                     bfill_data = newer
