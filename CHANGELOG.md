@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserved every DataFrame column returned by compounded excess-return calculations instead of
+  returning only the first column; Series output remains scalar.
+
 ## [5.12.0] - 2026-08-22
 
 ### Changed
