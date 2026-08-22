@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security reports
+    url: https://github.com/ArturSepp/QuantInvestStrats/blob/main/GOVERNANCE.md#support-and-sensitive-reports
+    about: Follow the private reporting route; do not disclose sensitive details in a public issue.

@@ -1,18 +1,17 @@
 # QuantInvestStrats (`qis`)
 
+[![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square)](https://pypi.org/project/qis/)
+[![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square)](https://pypi.org/project/qis/)
+[![License](https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square)](LICENSE.txt)
+[![CI](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml)
+[![Docs](https://readthedocs.org/projects/quantinveststrats/badge/?version=latest)](https://quantinveststrats.readthedocs.io/en/latest/)
+[![Downloads](https://static.pepy.tech/badge/qis)](https://pepy.tech/project/qis)
+
 **qis - performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in
 Python.**
 
 Quantitative Investment Strategies covers time-series and cross-sectional performance,
 drift-aware portfolio histories, ex-ante and ex-post risk, and reproducible reports.
-
-[![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square)](https://pypi.org/project/qis/)
-[![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square)](https://pypi.org/project/qis/)
-[![License](https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square)](LICENSE.txt)
-[![CI](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg)](https://github.com/ArturSepp/QuantInvestStrats/actions)
-[![Docs](https://readthedocs.org/projects/quantinveststrats/badge/?version=latest)](https://quantinveststrats.readthedocs.io/en/latest/)
-[![Downloads](https://static.pepy.tech/badge/qis)](https://pepy.tech/project/qis)
-[![Monthly](https://static.pepy.tech/badge/qis/month)](https://pepy.tech/project/qis)
 
 ---
 

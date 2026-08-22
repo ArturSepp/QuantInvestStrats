@@ -99,14 +99,6 @@ docs = [
     "furo>=2024.8.6",
 ]
 
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-mock>=3.10.0",
-    "ruff>=0.14,<0.15",  # CI pins the exact patch; see .github/workflows/ci.yml
-    "qis[data]",
-]
-
 all = [
     "qis[data,reports,visualization,io,database,jupyter,docs]",
 ]
@@ -122,6 +114,9 @@ test = [
 lint = [
     "interrogate==1.7.0",
     "ruff==0.14.2",
+]
+audit = [
+    "pip-audit==2.10.1",
 ]
 
 [project.urls]
