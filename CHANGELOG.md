@@ -7,6 +7,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.12.0] - 2026-08-22
+
+### Changed
+
+- Promoted the staged 5.11.x improvements to the next tagged release, covering canonical
+  normalized risk contributions, the tracking-error report correction, JOSS manuscript updates,
+  robust return-to-NAV handling across pandas and NumPy, and expanded cross-platform
+  installed-wheel verification.
+
 ## [5.11.3] - 2026-08-22
 
 ### Added
