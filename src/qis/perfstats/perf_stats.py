@@ -34,7 +34,7 @@ statistics belong in ``qis/perfstats/regime_classifier.py``.
 import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis, skew
-from typing import Callable, Union, Dict, Tuple, Any, Optional, Literal
+from typing import Callable, Union, Tuple, Optional, Literal
 
 # qis
 import qis.utils.regression as ols
@@ -755,77 +755,76 @@ def compute_drawdowns_stats_table(price: pd.Series,
                                   ) -> pd.DataFrame:
     """Compute a sorted table of drawdown episodes and their statistics.
 
-    Splits the running drawdown series into NaN-separated blocks (each block is one
-    drawdown episode from peak to recovery), computes summary statistics per block,
-    sorts by max drawdown depth and optionally truncates to the worst N.
-
-    Block detection uses a pandas-version-stable groupby on a cumulative-sum index
-    rather than relying on SparseArray internals (which have shifted across pandas
-    releases).
+    Each episode starts when its running peak level was first reached immediately before
+    prices fall and ends at either the observation that recovers that peak or the final
+    underwater observation. Episodes are sorted by maximum drawdown depth, then by start
+    date to resolve equal depths.
 
     Args:
         price: Price level Series.
         max_num: Maximum number of drawdown episodes to return (worst N).
         freq: Frequency to rebase to before block detection. Default 'D' (calendar
-            days) gives recovery times in wall-clock days. Pass None to skip rebasing.
+            days) gives durations in wall-clock days. Pass None to count durations on
+            the original observation grid.
 
     Returns:
         DataFrame sorted by max_dd ascending, with columns:
         start, trough, end, max_dd, days_dd, days_to_trough, days_recovery,
         peak, bottom, recovery, is_recovered.
     """
+    columns = ['start', 'trough', 'end', 'max_dd', 'days_dd', 'days_to_trough',
+               'days_recovery', 'peak', 'bottom', 'recovery', 'is_recovered']
+    sampled_price = price.copy(deep=True)
     if freq is not None:
-        price = price.asfreq(freq, method='ffill')
-    max_dd, time_under_water = compute_rolling_drawdown_time_under_water(prices=price)
-    # Replace zeros with NaN so that NaN-separated blocks delimit drawdown episodes.
-    max_dd = max_dd.replace({0.0: np.nan})
-    time_under_water = time_under_water.replace({0.0: np.nan})
+        sampled_price = sampled_price.asfreq(freq, method='ffill')
+    sampled_price = sampled_price.ffill()
+    drawdown = compute_rolling_drawdowns(prices=sampled_price)
+    underwater_positions = np.flatnonzero(drawdown.lt(0.0).to_numpy())
+    if underwater_positions.size == 0:
+        return pd.DataFrame(columns=columns)
 
-    # Pack the three series side-by-side for per-block slicing.
-    joint = pd.concat([max_dd.rename('max_dd'), time_under_water.rename('days'), price],
-                      axis=1, sort=True)
+    def get_duration(start_position: int, end_position: int) -> float:
+        """Return observation periods for native data and elapsed days after rebasing."""
+        if freq is None:
+            return float(end_position - start_position)
+        elapsed = sampled_price.index[end_position] - sampled_price.index[start_position]
+        return float(elapsed / pd.Timedelta(days=1))
 
-    def process_bslice(bslice: pd.DataFrame) -> Dict[str, Any]:
-        """Compute summary statistics for a single drawdown episode slice."""
-        max_idx = np.argmin(bslice['max_dd'].to_numpy())
-        # An episode is recovered if the price at the end of the block has returned
-        # to or above the peak at the start of the block.
-        is_recovered = bool(bslice[price.name].iloc[-1] >= bslice[price.name].iloc[0])
-        out = dict(start=bslice.index[0],
-                   trough=bslice.index[max_idx],
-                   end=bslice.index[-1],
-                   max_dd=bslice['max_dd'].iloc[max_idx],
-                   days_dd=bslice['days'].iloc[-1],
-                   days_to_trough=bslice['days'].iloc[max_idx],
-                   days_recovery=bslice['days'].iloc[-1]-bslice['days'].iloc[max_idx],
-                   peak=bslice[price.name].iloc[0],
-                   bottom=bslice[price.name].iloc[max_idx],
-                   recovery=bslice[price.name].iloc[-1],
-                   is_recovered=is_recovered)
-        return out
+    split_points = np.flatnonzero(np.diff(underwater_positions) > 1) + 1
+    episodes = np.split(underwater_positions, split_points)
+    outputs = []
+    for episode in episodes:
+        first_underwater = int(episode[0])
+        prior_peaks = np.flatnonzero(drawdown.iloc[:first_underwater].eq(0.0).to_numpy())
+        if prior_peaks.size == 0:
+            continue
+        peak_position = int(prior_peaks[-1])
+        peak_value = sampled_price.iloc[peak_position]
+        while (peak_position > 0
+               and sampled_price.iloc[peak_position - 1] == peak_value
+               and drawdown.iloc[peak_position - 1] == 0.0):
+            peak_position -= 1
+        last_underwater = int(episode[-1])
+        recovery_position = last_underwater + 1
+        is_recovered = recovery_position < len(drawdown) and bool(
+            drawdown.iloc[recovery_position] >= 0.0
+        )
+        end_position = recovery_position if is_recovered else last_underwater
+        trough_position = int(episode[np.argmin(drawdown.iloc[episode].to_numpy())])
+        outputs.append(dict(start=sampled_price.index[peak_position],
+                            trough=sampled_price.index[trough_position],
+                            end=sampled_price.index[end_position],
+                            max_dd=drawdown.iloc[trough_position],
+                            days_dd=get_duration(peak_position, end_position),
+                            days_to_trough=get_duration(peak_position, trough_position),
+                            days_recovery=get_duration(trough_position, end_position),
+                            peak=sampled_price.iloc[peak_position],
+                            bottom=sampled_price.iloc[trough_position],
+                            recovery=sampled_price.iloc[end_position],
+                            is_recovered=is_recovered))
 
-    # ── Pandas-version-stable block detection ──
-    # Mark observations that are "in drawdown" (max_dd is not NaN). Each NaN
-    # increments a counter; consecutive non-NaN values share the same counter
-    # value, giving us a natural group key per drawdown episode.
-    is_in_dd = max_dd.notna()
-    # cumsum on the negated mask: each True in (~is_in_dd) bumps the counter,
-    # so all observations within a single drawdown share the same group id.
-    block_id = (~is_in_dd).cumsum()
-    # Group only the in-drawdown rows; each group is one episode.
-    outputs = {}
-    for bid, bslice in joint[is_in_dd].groupby(block_id[is_in_dd]):
-        if not bslice.empty:
-            outputs[bid] = process_bslice(bslice=bslice)
-
-    df = pd.DataFrame.from_dict(outputs, orient='index')
-    if df.empty:
-        # No drawdown episodes — return empty table with expected columns
-        return pd.DataFrame(columns=['start', 'trough', 'end', 'max_dd', 'days_dd',
-                                     'days_to_trough', 'days_recovery', 'peak',
-                                     'bottom', 'recovery', 'is_recovered'])
-
-    df = df.sort_values(by='max_dd')
+    df = pd.DataFrame(outputs, columns=columns)
+    df = df.sort_values(by=['max_dd', 'start'], kind='mergesort').reset_index(drop=True)
     if max_num is not None:
         df = df.iloc[:max_num, :]
     return df

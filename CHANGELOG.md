@@ -14,6 +14,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Corrected drawdown episode tables to include peak and recovery boundaries, distinguish
+  recovered from ongoing episodes, support unnamed Series, and preserve calendar-day duration
+  units after rebasing.
 - Corrected arithmetic-excess statistics to charge the observable lagged funding rate over the
   first realized price interval.
 - Preserved every DataFrame column returned by compounded excess-return calculations instead of
