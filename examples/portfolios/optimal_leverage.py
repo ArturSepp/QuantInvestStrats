@@ -44,8 +44,14 @@ def compute_one_factor_weights(mu_market: float = 0.06,
     betas = np.array([leg_betas[0], -leg_betas[1]])
 
     sigma = np.array([
-        [leg_betas[0] ** 2 * sigma_market2 + leg_varthetas[0], -leg_betas[0] * leg_betas[1]  * sigma_market2],
-        [-leg_betas[0] * leg_betas[1] * sigma_market2, leg_betas[1] ** 2 * sigma_market2 + leg_varthetas[1]]
+        [
+            leg_betas[0] ** 2 * sigma_market2 + leg_varthetas[0],
+            -leg_betas[0] * leg_betas[1] * sigma_market2,
+        ],
+        [
+            -leg_betas[0] * leg_betas[1] * sigma_market2,
+            leg_betas[1] ** 2 * sigma_market2 + leg_varthetas[1],
+        ],
     ])
     sigma_inv = np.linalg.inv(sigma)
     divisor = betas.T @ sigma_inv @ betas
@@ -56,9 +62,14 @@ def compute_one_factor_weights(mu_market: float = 0.06,
           f"vol={np.sqrt(weights.T @ sigma @ weights):0.2%}, "
           f"betas={betas.T @ weights:0.2f}")
 
-    output = dict(gamma=gamma,
-                  weight_long=weights[0], weight_short=weights[1],
-                  returns=mus.T @ weights, vol=np.sqrt(weights.T @ sigma @ weights), beta=betas.T @ weights)
+    output = dict(
+        gamma=gamma,
+        weight_long=weights[0],
+        weight_short=weights[1],
+        returns=mus.T @ weights,
+        vol=np.sqrt(weights.T @ sigma @ weights),
+        beta=betas.T @ weights,
+    )
 
     return output
 
@@ -113,9 +124,12 @@ def run_local_test(local_test: LocalTests):
         gammas = np.linspace(2.0, 15, 31)
         outputs = {}
         for gamma in gammas:
-            outputs[f"gamma={gamma:0.2f}"] = compute_one_factor_weights(mu_market=mu_market,
-                                                                        sigma_market=sigma_market,
-                                                                        gamma=gamma, beta_target=beta_target)
+            outputs[f"gamma={gamma:0.2f}"] = compute_one_factor_weights(
+                mu_market=mu_market,
+                sigma_market=sigma_market,
+                gamma=gamma,
+                beta_target=beta_target,
+            )
         outputs = pd.DataFrame.from_dict(outputs, orient='index')
         print(outputs)
 
@@ -127,7 +141,8 @@ def run_local_test(local_test: LocalTests):
                           title='Weights',
                           xlabel='risk-aversion lambda',
                           ylabel='weights', ax=axs[0, 0])
-            leverage_long_to_sort = np.divide(df['weight_long'], df['weight_short']).rename('Long to Short')
+            leverage_long_to_sort = np.divide(
+                df['weight_long'], df['weight_short']).rename('Long to Short')
             qis.plot_line(df=leverage_long_to_sort,
                           title='Ratio of long to short weights',
                           xlabel='risk-aversion lambda',
@@ -155,11 +170,19 @@ def run_local_test(local_test: LocalTests):
                           ylabel='sharpe', ax=ax)
 
             ax.axhline(y=mu_market/sigma_market, color='red', linestyle='--', linewidth=1.5)
-            ax.annotate('Expected market Sharpe', xy=(gammas[0], mu_market/sigma_market), color='red')
+            ax.annotate(
+                'Expected market Sharpe',
+                xy=(gammas[0], mu_market/sigma_market),
+                color='red',
+            )
 
             #qis.set_suptitle(fig, f"beta-target={beta_target:.2f}")
 
-        qis.save_fig(fig=fig, file_name=f"beta_target_{beta_target:.2f}", local_path=qis.local_path.get_output_path())
+        qis.save_fig(
+            fig=fig,
+            file_name=f"beta_target_{beta_target:.2f}",
+            local_path=None,
+        )
 
     plt.show()
 
