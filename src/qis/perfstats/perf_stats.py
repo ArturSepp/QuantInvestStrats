@@ -364,7 +364,13 @@ def compute_risk_table(prices: pd.DataFrame,
     if perf_params.rates_data is not None:
         # periodic excess simple returns r_m - rf_{m-1}*dt_m, lag=1 rate convention
         # consistent with the compounded excess-nav path in returns.py
-        excess_returns_arith = ret.compute_excess_returns(returns=returns_arith, rates_data=perf_params.rates_data)
+        # Restore the price boundary removed by drop_first so the first realized return has an
+        # elapsed funding interval. The boundary remains NaN and is discarded after alignment.
+        returns_arith_with_boundary = returns_arith.reindex(sampled_prices_vol.index)
+        excess_returns_arith = ret.compute_excess_returns(
+            returns=returns_arith_with_boundary,
+            rates_data=perf_params.rates_data,
+        ).loc[returns_arith.index]
         avg_arith_excess_return = excess_returns_arith.mean()
         sharpe_arith_excess = vol_dt * avg_arith_excess_return.divide(excess_returns_arith.std(ddof=1))
     else:  # rf = 0: excess objects collapse to plain, mirroring the pa excess convention

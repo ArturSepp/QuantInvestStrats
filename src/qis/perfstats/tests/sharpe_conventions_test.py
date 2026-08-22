@@ -116,9 +116,13 @@ def _compute_tables() -> tuple:
     ra_perf_table = compute_ra_perf_table(prices=prices, perf_params=PerfParams(freq_vol='ME'))
     ra_perf_table_ex = compute_ra_perf_table(prices=prices,
                                              perf_params=PerfParams(freq_vol='ME', rates_data=rates_data))
-    simple_returns = prices.pct_change().dropna()
+    simple_returns_with_boundary = prices.pct_change()
+    simple_returns = simple_returns_with_boundary.dropna()
     log_returns = np.log(prices).diff().dropna()
-    excess_simple_returns = ret.compute_excess_returns(returns=simple_returns, rates_data=rates_data)
+    excess_simple_returns = ret.compute_excess_returns(
+        returns=simple_returns_with_boundary,
+        rates_data=rates_data,
+    ).dropna()
     return prices, ra_perf_table, ra_perf_table_ex, simple_returns, log_returns, excess_simple_returns
 
 
