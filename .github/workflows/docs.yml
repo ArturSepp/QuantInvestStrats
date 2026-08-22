@@ -1,0 +1,49 @@
+# SHARED CI CORE v1.0 — T2 — synced 2026-08-22
+name: Documentation
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - pyproject.toml
+      - uv.lock
+      - src/qis/**
+      - .github/workflows/docs.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/**
+      - pyproject.toml
+      - uv.lock
+      - src/qis/**
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  MPLBACKEND: Agg
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+      - name: Sync documentation environment
+        run: uv sync --locked --extra docs
+      - name: Build HTML with warnings as errors
+        run: uv run --no-sync python -m sphinx -E -W --keep-going -b html docs docs/_build/html
+      - name: Check documentation links
+        run: uv run --no-sync python -m sphinx -E -W -b linkcheck docs docs/_build/linkcheck

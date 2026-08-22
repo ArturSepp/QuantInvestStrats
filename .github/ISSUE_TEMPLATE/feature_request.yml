@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a focused addition within qis's analytics and reporting boundary.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: research_task
+    attributes:
+      label: Research or user task
+      description: Describe the task before proposing an API.
+    validations:
+      required: true
+  - type: textarea
+    id: current_gap
+    attributes:
+      label: Current limitation
+      description: Explain why the public API does not already handle it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include return, frequency, annualisation, missing-data, and point-in-time conventions.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Performance or risk statistic
+        - Portfolio analytics or reporting
+        - Plotting or visualisation
+        - Optional data or storage integration
+        - Documentation or example
+        - Packaging or developer tooling
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Project boundary
+      options:
+        - label: This does not require committing or redistributing proprietary or licensed data.
+          required: true
+        - label: I considered whether the functionality belongs in a sibling package such as optimalportfolios or factorlasso.
+          required: true

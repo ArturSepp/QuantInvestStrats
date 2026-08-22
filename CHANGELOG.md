@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Removed
+
+- Retired the legacy `dev` extra; contributor tooling now lives exclusively in the PEP 735
+  `test`, `lint`, and `audit` dependency groups.
+
 ### Fixed
 
 - Preserved every DataFrame column returned by compounded excess-return calculations instead of

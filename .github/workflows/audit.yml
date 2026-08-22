@@ -1,0 +1,105 @@
+# SHARED CI CORE v1.0 — T2 — synced 2026-08-22
+name: Audit
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/audit.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/audit.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  MPLBACKEND: Agg
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      with:
+        python-version: "3.12"
+
+    - name: Resolve the latest all-extras tree
+      run: |
+        uv pip compile --all-extras --python-version 3.12 --quiet \
+          pyproject.toml -o "$RUNNER_TEMP/requirements-audit.txt"
+
+    - name: Audit the dependency tree for known vulnerabilities
+      run: uv run --locked --only-group audit pip-audit -r "$RUNNER_TEMP/requirements-audit.txt"
+
+    - name: Audit the locked environment for known vulnerabilities
+      if: ${{ !cancelled() }}
+      run: |
+        uv export --locked --all-extras --no-emit-project --quiet \
+          --format requirements-txt -o "$RUNNER_TEMP/requirements-locked.txt"
+        uv run --locked --only-group audit pip-audit -r "$RUNNER_TEMP/requirements-locked.txt"
+
+    - name: Assert no optional module has arrived in the core tree
+      if: ${{ !cancelled() }}
+      run: |
+        uv pip compile --python-version 3.12 --quiet \
+          pyproject.toml -o "$RUNNER_TEMP/requirements-core.txt"
+        uv pip compile --group test --python-version 3.12 --quiet \
+          pyproject.toml -o "$RUNNER_TEMP/requirements-test.txt"
+        uv run --no-project python - "$RUNNER_TEMP/requirements-core.txt" \
+                                    "$RUNNER_TEMP/requirements-test.txt" <<'PY'
+        import sys, tomllib
+
+        def normalise(name):
+            return name.lower().replace("_", "-").replace(".", "-")
+
+        with open("pyproject.toml", "rb") as fh:
+            cfg = tomllib.load(fh)
+        banned = cfg["tool"]["ruff"]["lint"]["flake8-tidy-imports"]["banned-module-level-imports"]
+        assert banned, "the ban list is empty; this check would assert nothing"
+
+        def resolved(path):
+            names = set()
+            for line in open(path):
+                line = line.split("#", 1)[0].strip()
+                if line and not line.startswith("-"):
+                    names.add(normalise(line.split("==")[0]))
+            return names
+
+        def leaks(names):
+            return sorted(
+                f"{module} (as {distribution})"
+                for module in banned
+                for distribution in names
+                if distribution == normalise(module)
+                or distribution.startswith(normalise(module) + "-")
+            )
+
+        failures = []
+        for label, path in (("core", sys.argv[1]), ("test", sys.argv[2])):
+            found = leaks(resolved(path))
+            if found:
+                failures.append(f"{label} tree: {', '.join(found)}")
+            else:
+                print(f"{label} tree clean: none of the {len(banned)} banned modules")
+
+        if failures:
+            sys.exit("optional modules reached a core/test tree:\n" + "\n".join(failures))
+        PY

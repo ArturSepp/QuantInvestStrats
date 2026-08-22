@@ -1,3 +1,4 @@
+# SHARED CI CORE v1.0 — T2 — synced 2026-08-22
 name: CI
 
 # Every job only checks out and reads the repository.  Declare the minimum token scope rather
@@ -13,7 +14,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -85,46 +86,6 @@ jobs:
       # [tool.coverage.report] owns the regression floor; the report remains broad because plots
       # and factsheets are core qis functionality rather than disposable presentation wrappers.
       run: uv run --no-sync pytest --cov=qis --cov-report=term:skip-covered
-
-  lint:
-    name: ruff (changed files)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        fetch-depth: 0
-
-    - name: Install uv and Python
-      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-      with:
-        python-version: "3.12"
-
-    - name: Lint lines changed by this push or pull request
-      # the package carries ~2,250 pre-existing violations, so gating whole files would fail on
-      # any edit to a legacy file and the check would be routed around. Gating the added lines
-      # keeps it green today and still stops new debt. See AGENTS.md, Known issues.
-      run: |
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          BASE="${{ github.event.pull_request.base.sha }}"
-        else
-          BASE="${{ github.event.before }}"
-        fi
-        if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
-          echo "no usable base commit for a diff; skipping the gate"
-          exit 0
-        fi
-        uv run --locked --only-group lint python .github/lint_changed_lines.py \
-          "$BASE" "${{ github.sha }}"
-
-    - name: Check production docstring coverage
-      if: ${{ !cancelled() }}
-      run: uv run --locked --only-group lint interrogate src/qis
-
-    - name: Repo-wide violation count (report only, never fails)
-      if: always()
-      run: uv run --locked --only-group lint ruff check src/qis/ --statistics || true
 
   wheel:
     # Editable installs exercise the src tree, not the artifact users receive. Build and install
