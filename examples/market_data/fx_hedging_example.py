@@ -9,7 +9,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import qis as qis
 from enum import Enum
-from typing import Tuple
 
 from qis.market_data import FxRatesData, load_fx_rates_data
 from qis.market_data.fx_hedging import (compute_fx_optimal_hedge,
@@ -73,28 +72,29 @@ def run_local_test(local_test: LocalTests):
         local_ccy = 'USD'
         reference_ccy = 'CHF'
         freq = 'ME'
-        dt = 1.0 / 12.0
         # get rates universe
-        local_to_reference_fx_rate = fx_rates_data.get_local_to_reference_fx_rate(local_ccy=local_ccy,
-                                                                                  reference_ccy=reference_ccy)
-        forward_rate_for_local_ccy = fx_rates_data.get_forward_rate_for_local_ccy(local_ccy=local_ccy,
-                                                                                  reference_ccy=reference_ccy, dt=dt)
-        carry_fx_nav = fx_rates_data.get_carry_fx_return_nav(local_ccy=local_ccy, reference_ccy=reference_ccy,
-                                                             freq=freq)
+        local_to_reference_fx_rate = fx_rates_data.get_local_to_reference_fx_rate(
+            local_ccy=local_ccy, reference_ccy=reference_ccy)
+        forward_rate_for_local_ccy = fx_rates_data.get_forward_rate_for_local_ccy(
+            local_ccy=local_ccy, reference_ccy=reference_ccy, freq=freq)
+        carry_fx_nav = fx_rates_data.get_carry_fx_return_nav(
+            local_ccy=local_ccy, reference_ccy=reference_ccy, freq=freq)
 
         kwargs = dict(asset_price_local_ccy=asset_price_local_ccy,
                       local_to_reference_fx_rate=local_to_reference_fx_rate,
                       forward_rate_for_local_ccy=forward_rate_for_local_ccy, freq=freq)
 
-        optimal_hedge, max_carry, beta_hedged = compute_fx_optimal_hedge(**kwargs, dt=dt)
+        optimal_hedge, max_carry, beta_hedged = compute_fx_optimal_hedge(**kwargs)
 
         hedges = pd.concat([optimal_hedge, max_carry, beta_hedged], axis=1)
         qis.plot_time_series(hedges, title='hedges')
 
         nav0, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(hedge_ratio=0.0, **kwargs)
-        nav05, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(hedge_ratio=0.5, **kwargs)
+        nav05, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(
+            hedge_ratio=0.5, **kwargs)
         nav1, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(hedge_ratio=1.0, **kwargs)
-        nav_optimal, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(hedge_ratio=optimal_hedge, **kwargs)
+        nav_optimal, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(
+            hedge_ratio=optimal_hedge, **kwargs)
 
         navs = pd.concat([asset_price_local_ccy,
                           local_to_reference_fx_rate.rename(f"{carry_fx_nav.name} spot return"),
@@ -103,9 +103,11 @@ def run_local_test(local_test: LocalTests):
                           nav_optimal.rename('Optimal')], axis=1)
         qis.plot_prices_with_dd(prices=navs, perf_params=qis.PerfParams(freq='ME'))
 
-        fx_vol, fx_beta = compute_fx_vol_beta(asset_price_local_ccy=asset_price_local_ccy,
-                                              local_to_reference_fx_rate=local_to_reference_fx_rate, freq=freq,
-                                              span=3 * 12)
+        fx_vol, fx_beta = compute_fx_vol_beta(
+            asset_price_local_ccy=asset_price_local_ccy,
+            local_to_reference_fx_rate=local_to_reference_fx_rate,
+            freq=freq,
+            span=3 * 12)
         qis.plot_time_series(fx_beta)
         qis.plot_time_series(fx_vol)
 
@@ -151,11 +153,14 @@ def run_local_test(local_test: LocalTests):
         fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
         local_ccys = pd.Series('USD', index=usd_assets.columns)
         usd_assets.loc[:'31Dec2004', 'HY Bonds'] = pd.NA
-        local_returns, excess_returns, local_rates_df = fx_rates_data.compute_returns_adjusted_by_local_rate(asset_prices=usd_assets,
-                                                                             local_ccys=local_ccys)
+        local_returns, excess_returns, local_rates_df = (
+            fx_rates_data.compute_returns_adjusted_by_local_rate(
+                asset_prices=usd_assets, local_ccys=local_ccys))
         print(local_returns)
-        local_returns, excess_returns, local_rates_df = fx_rates_data.compute_returns_adjusted_by_local_rate(asset_prices=usd_assets,
-                                                                             local_ccys=pd.Series('USD', index=usd_assets.columns))
+        local_returns, excess_returns, local_rates_df = (
+            fx_rates_data.compute_returns_adjusted_by_local_rate(
+                asset_prices=usd_assets,
+                local_ccys=pd.Series('USD', index=usd_assets.columns)))
         print(local_returns)
 
     plt.show()

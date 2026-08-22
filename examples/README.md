@@ -36,6 +36,7 @@ examples/
 | `cboe_vol_strats_perf.py` | CBOE SVRPO vol strat vs SPY — uses a CSV ship in `qis.get_resource_path()`. |
 | `miss_best_worst_days_impact.py` | Performance with the best / worst N days per month removed. |
 | `infrequent_returns_interpolation.py` | `interpolate_infrequent_returns` for monthly/quarterly hedge-fund-like series. |
+| `timeseries_backfill.py` | Extend a newer provider history backwards with `bfill_timeseries`, preserving its recent price path. |
 | `unsmoothing_and_delevering.py` | End-to-end walkthrough of `delever_returns`, `implied_leverage`, `unsmooth_returns_ar1_ewma` and `unsmooth_returns_glm` on a bundled OCSL/GCF dataset. |
 
 ## models — EWM, regression, vol estimation
@@ -51,6 +52,7 @@ examples/
 | `crypto_intraday_vol.py` | BTC hourly EWMA vol — handles 24/7 markets without weekend gaps. |
 | `overnight_intraday_returns.py` | Decomposes close-to-close returns into overnight + intraday components. |
 | `bootstrap_analysis.py` | Block bootstrap of price paths via `bootstrap_price_data`. |
+| `pca_variance_explained.py` | Rolling EWMA-covariance PCA variance shares on the seeded synthetic universe. |
 
 ## regimes — regime-conditional analytics
 
@@ -73,6 +75,7 @@ examples/
 | `ex_anti_tracking_error_and_risk.py` | Offline ex-ante TE, benchmark beta, and Euler marginal TE through `RiskModel`. |
 | `ex_post_tracking_error_and_risk.py` | Offline realised EWMA TE, whole-sample TE/IR, and EWMA beta/annualised alpha. |
 | `vol_target_and_trend.py` | Vol-target + trend-following sweep via `examples.portfolios.strats.qis_delta1`. |
+| `seasonality_backtest.py` | Point-in-time calendar-month seasonality with annual trailing-window refits. |
 
 ## discrete_portfolio — event-based backtests
 
