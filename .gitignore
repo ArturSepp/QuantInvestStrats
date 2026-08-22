@@ -1,12 +1,5 @@
-# created by virtualenv automatically
-
+# Local release and test scratch
 /qis-*/
-/build/
-/dist/
-*.egg-info/
-
-Lib/
-Scripts/
 /tmp/
 
 # YAML
@@ -150,16 +143,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-futures_strats/
-my_projects/
-testing/
-examples/figures/perf1.PNG
-examples/figures/perf2.PNG
-examples/figures/perf3.PNG
-
-/quant_strats/
+# Maintainer-only project records
 /agents/
-/legacy/
 
 # Bloomberg fetch cache
 data_cache.parquet
@@ -173,13 +158,6 @@ output/
 *.xlsx
 *.pdf
 
-/qis-*/
-/build/
-/dist/
-*.egg-info/
-
 # Claude Code: shared project settings are committed, per-machine overrides are not
 .claude/settings.local.json
 .codex/
-/.codex_m2_baseline_fd67159bdcc745df9661da57e925cf28
-/.codex_staging
