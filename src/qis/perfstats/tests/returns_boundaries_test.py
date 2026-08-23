@@ -265,6 +265,32 @@ def test_returns_to_nav_preserves_all_nan_columns(
     pd.testing.assert_series_equal(all_nan_series, expected_series_nav)
 
 
+@pytest.mark.parametrize('init_period', [0, 1])
+def test_zero_first_nonnan_returns_preserves_all_nan_inputs(init_period: int) -> None:
+    """Leave Series and DataFrame inputs unchanged when no valid return exists.
+
+    Args:
+        init_period: Whether initialization would otherwise occur before or on the first return.
+    """
+    all_nan_series = pd.Series(np.nan, index=_DATES, name='never_started')
+    all_nan_frame = pd.DataFrame({
+        'first': np.nan,
+        'second': np.nan,
+    }, index=_DATES)
+
+    actual_series = to_zero_first_nonnan_returns(
+        returns=all_nan_series,
+        init_period=init_period,
+    )
+    actual_frame = to_zero_first_nonnan_returns(
+        returns=all_nan_frame,
+        init_period=init_period,
+    )
+
+    pd.testing.assert_series_equal(actual_series, all_nan_series)
+    pd.testing.assert_frame_equal(actual_frame, all_nan_frame)
+
+
 def test_all_nan_series_warns_for_unsupported_init_period() -> None:
     """Retain the unsupported-mode warning when an entire Series is missing."""
     returns = pd.Series(np.nan, index=_DATES, name='never_started')
