@@ -319,3 +319,47 @@ def test_bfill_timeseries_forward_fills_price_levels_on_expanded_grid() -> None:
         is_prices=True,
         check_exact=False,
     )
+
+
+def test_bfill_timeseries_carries_off_grid_price_into_requested_grid() -> None:
+    """Carry a weekend price into the first business date of the requested grid.
+
+    Saturday January 6 is outside a business-day index but is the latest available level for
+    Monday January 8. Frequency conversion must therefore use that 100 price rather than create
+    a leading missing value. The Tuesday and Wednesday provider levels remain anchored.
+    """
+    older = pd.Series(
+        [100.0, 110.0],
+        index=pd.DatetimeIndex(["2024-01-06", "2024-01-09"]),
+        name="Older provider",
+    )
+    newer = pd.Series(
+        [110.0, 121.0],
+        index=pd.DatetimeIndex(["2024-01-09", "2024-01-10"]),
+        name=_ASSET_NAME,
+    )
+    original_older = older.copy(deep=True)
+    original_newer = newer.copy(deep=True)
+    expected = pd.Series(
+        [100.0, 110.0, 121.0],
+        index=pd.bdate_range("2024-01-08", "2024-01-10"),
+        name=_ASSET_NAME,
+    )
+
+    actual = bfill_timeseries(
+        df_newer=newer,
+        df_older=older,
+        freq="B",
+        is_prices=True,
+    )
+
+    assert isinstance(actual, pd.Series)
+    pd.testing.assert_series_equal(
+        actual,
+        expected,
+        check_exact=False,
+        rtol=0.0,
+        atol=_TOLERANCE,
+    )
+    pd.testing.assert_series_equal(older, original_older, check_exact=True)
+    pd.testing.assert_series_equal(newer, original_newer, check_exact=True)

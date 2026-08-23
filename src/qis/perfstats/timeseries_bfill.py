@@ -214,10 +214,11 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
     # Short splices have no inferable frequency but can still be expanded safely.
     inferred_freq = pd.infer_freq(bfill_datas.index) if len(bfill_datas.index) >= 3 else None
     if inferred_freq != freq:
-        bfill_datas = bfill_datas.asfreq(freq)
         if is_prices:
-            # Preserve price levels on dates introduced by the expanded grid.
-            bfill_datas = bfill_datas.ffill()
+            # Carry the latest source price even when its date is outside the target grid.
+            bfill_datas = bfill_datas.asfreq(freq, method='ffill').ffill()
+        else:
+            bfill_datas = bfill_datas.asfreq(freq)
 
     if fill_method is not None and is_prices is False:
         # Apply return policies after expansion so inserted dates follow the selected convention.
