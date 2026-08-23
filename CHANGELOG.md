@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Made annualized `AVG_WITH_POSITIVE_PROB` and `SKEW_KURTOSIS` descriptive tables return their
+  reduced schemas instead of raising while removing the volatility column.
+
 ## [5.15.0] - 2026-08-24
 
 ### Fixed

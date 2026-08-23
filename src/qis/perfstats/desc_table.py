@@ -83,7 +83,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         desc_table_type: which set of statistics to report; positive-probability modes use each
             column's non-missing observation count as the denominator
         var_format: format applied to the statistics
-        annualize_vol: report volatility per annum rather than per period
+        annualize_vol: report volatility per annum rather than per period; reduced modes omit
+            the volatility column selected by this convention
         is_add_tstat: add the t-statistic of the mean
         norm_variable_display_type: format applied to the t-statistic
 
@@ -110,11 +111,13 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     if annualize_vol:
         an_factor = infer_annualisation_factor_from_df(data=df)
         vol = std * np.sqrt(an_factor)
-        descriptive_table[PerfStat.STD_AN.to_str()] = [var_format.format(x) for x in vol]
+        volatility_column = PerfStat.STD_AN.value.name
     else:
         an_factor = 1.0
         vol = std
-        descriptive_table[PerfStat.STD.to_str()] = [var_format.format(x) for x in std]
+        volatility_column = PerfStat.STD.value.name
+    # Keep the selected label so reduced modes remove the column they actually created.
+    descriptive_table[volatility_column] = [var_format.format(x) for x in vol]
 
     if is_add_tstat:
         an_mean = an_factor * mean
@@ -133,8 +136,9 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         pass
 
     elif desc_table_type == desc_table_type.AVG_WITH_POSITIVE_PROB:
-        descriptive_table = descriptive_table.drop(PerfStat.AVG.to_str(), axis=1)
-        descriptive_table = descriptive_table.drop(PerfStat.STD.to_str(), axis=1)
+        # Remove the setup columns before reporting the reduced positive-only schema.
+        descriptive_table = descriptive_table.drop(
+            [PerfStat.AVG.value.name, volatility_column], axis=1)
 
         prob = _compute_positive_probability(data=data_np)
         descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
@@ -154,8 +158,9 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         descriptive_table[PerfStat.NORMTEST.to_str(short=True, short_n=True)] = ['{:.2f}'.format(x) for x in ps]
 
     elif desc_table_type == desc_table_type.SKEW_KURTOSIS:
-        descriptive_table = descriptive_table.drop(PerfStat.AVG.to_str(), axis=1)
-        descriptive_table = descriptive_table.drop(PerfStat.STD.to_str(), axis=1)
+        # Remove the setup columns before reporting the reduced moment-only schema.
+        descriptive_table = descriptive_table.drop(
+            [PerfStat.AVG.value.name, volatility_column], axis=1)
         descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in skew(data_np, axis=0, nan_policy=nan_policy)]
         descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in kurtosis(data_np, axis=0, nan_policy=nan_policy)]
     elif desc_table_type == desc_table_type.WITH_SCORE:
