@@ -42,6 +42,7 @@ _DESC_TABLE_MODULE = cast(_DescTableModuleProtocol, desc_table_module)
 
 _DATES = pd.date_range('2024-01-31', periods=4, freq='ME')
 
+_ALL_MISSING_ASSET = 'All Missing Asset'
 _COMPLETE_ASSET = 'Complete Asset'
 _POSITIVE_COLUMN = 'Positive'
 _RAGGED_ASSET = 'Ragged Asset'
@@ -54,6 +55,7 @@ def _mixed_history_returns() -> pd.DataFrame:
     ``Complete Asset`` has two positive returns among four observations, with a supplied zero
     remaining in the denominator. ``Ragged Asset`` has one positive return among two observed
     returns. ``Sparse Positive Asset`` has two positive returns and no other observed return.
+    ``All Missing Asset`` has no observations and therefore no positive probability.
 
     Returns:
         Four-row return panel in the reporting order used by expected output.
@@ -63,6 +65,7 @@ def _mixed_history_returns() -> pd.DataFrame:
             _RAGGED_ASSET: (np.nan, 0.02, -0.01, np.nan),
             _COMPLETE_ASSET: (0.01, -0.02, 0.00, 0.03),
             _SPARSE_POSITIVE_ASSET: (np.nan, 0.04, 0.05, np.nan),
+            _ALL_MISSING_ASSET: (np.nan, np.nan, np.nan, np.nan),
         },
         index=_DATES,
     )
@@ -75,8 +78,13 @@ def _expected_positive_probabilities() -> pd.Series:
         Positive-probability strings indexed in the original asset order.
     """
     return pd.Series(
-        ('50.0%', '50.0%', '100.0%'),
-        index=(_RAGGED_ASSET, _COMPLETE_ASSET, _SPARSE_POSITIVE_ASSET),
+        ('50.0%', '50.0%', '100.0%', 'nan%'),
+        index=(
+            _RAGGED_ASSET,
+            _COMPLETE_ASSET,
+            _SPARSE_POSITIVE_ASSET,
+            _ALL_MISSING_ASSET,
+        ),
         name=_POSITIVE_COLUMN,
     )
 
@@ -85,6 +93,8 @@ def _expected_positive_probabilities() -> pd.Series:
 # Available-observation denominator contract
 # =============================================================================
 
+@pytest.mark.filterwarnings('ignore:Mean of empty slice:RuntimeWarning')
+@pytest.mark.filterwarnings('ignore:Degrees of freedom <= 0 for slice:RuntimeWarning')
 @pytest.mark.parametrize(
     ('desc_table_type', 'expected_columns'),
     (
@@ -104,9 +114,11 @@ def test_compute_desc_table_positive_probability_uses_available_observations(
     """Exclude missing returns from each asset's probability denominator.
 
     The direct ratios are ``1 / 2`` for the ragged asset, ``2 / 4`` for the complete asset, and
-    ``2 / 2`` for the sparse positive asset. The complete fixture also proves that a supplied zero
-    is observed but not positive. Both public table modes must report the same positive column,
-    retain their established surrounding columns, and leave the input unchanged.
+    ``2 / 2`` for the sparse positive asset. The all-missing asset has a zero denominator and
+    therefore displays ``nan%``. The complete fixture also proves that a supplied zero is observed
+    but not positive. Both public table modes must report the same positive column, retain their
+    established surrounding columns, and leave the input unchanged. Existing all-missing mean and
+    standard-deviation warnings are outside this probability contract and filtered at test scope.
 
     Args:
         desc_table_type: Positive-probability table mode under test.
