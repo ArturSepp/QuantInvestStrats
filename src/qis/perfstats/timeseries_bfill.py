@@ -122,12 +122,28 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
 def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent data
                      df_older: Union[pd.DataFrame, pd.Series],  # older price is preserved to the end
                      freq: str = 'B',
-                     fill_method: Optional[str] = None,  # for return use to_zero, else ffill
+                     fill_method: Optional[str] = None,  # None, 'to_zero', or 'ffill' for returns
                      is_prices: bool = False
                      ) -> Union[pd.DataFrame, pd.Series]:
-    """
-    append column-wise older df data to df new data
-    nb output columns are always data_newer columns
+    """Extend newer time series backward with older provider histories.
+
+    Args:
+        df_newer: Newer Series or DataFrame whose labels and columns define the output.
+        df_older: Older object of the same pandas type, used before each newer history begins.
+        freq: Frequency of the returned date grid.
+        fill_method: Return-gap policy. ``None`` preserves missing returns, ``'to_zero'`` fills
+            missing returns with zero after each column begins, and ``'ffill'`` carries its last
+            observed return forward. For price inputs, the policy is applied in return space.
+        is_prices: Whether the supplied data are price levels. Expanded price grids carry the
+            last observed level forward.
+
+    Returns:
+        Backfilled data on the requested grid, matching the newer input's pandas type, labels,
+        and column order.
+
+    Raises:
+        NotImplementedError: If the newer and older inputs are not both Series or both
+            DataFrames.
     """
     is_series_out = False
     if isinstance(df_newer, pd.Series) and isinstance(df_older, pd.Series):
@@ -179,7 +195,8 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         if bfill_data.index.is_unique is False:  # check if index is unique
             bfill_data = bfill_data.iloc[bfill_data.index.duplicated(keep='last') == False]
 
-        if fill_method is not None:
+        # Price gaps must be resolved in return space before levels are reconstructed.
+        if fill_method is not None and is_prices:
             start = dfo.get_nonnan_index(bfill_data)
             if fill_method == 'to_zero':
                 bfill_data[start:] = bfill_data[start:].fillna(value=0.0)
@@ -194,8 +211,26 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
                                          init_period=None,
                                          terminal_value=terminal_value)
 
-    if pd.infer_freq(bfill_datas.index) != freq:
-        bfill_datas = bfill_datas.asfreq(freq, method='ffill').ffill()
+    # Short splices have no inferable frequency but can still be expanded safely.
+    inferred_freq = pd.infer_freq(bfill_datas.index) if len(bfill_datas.index) >= 3 else None
+    if inferred_freq != freq:
+        if is_prices:
+            # Carry the latest source price even when its date is outside the target grid.
+            bfill_datas = bfill_datas.asfreq(freq, method='ffill').ffill()
+        else:
+            bfill_datas = bfill_datas.asfreq(freq)
+
+    if fill_method is not None and is_prices is False:
+        # Apply return policies after expansion so inserted dates follow the selected convention.
+        for column in bfill_datas:
+            # An all-missing column has no observation from which its fill policy can begin.
+            if not bfill_datas[column].notna().any():
+                continue
+            start = dfo.get_nonnan_index(bfill_datas[column])
+            if fill_method == 'to_zero':
+                bfill_datas.loc[start:, column] = bfill_datas.loc[start:, column].fillna(0.0)
+            else:
+                bfill_datas.loc[start:, column] = bfill_datas.loc[start:, column].ffill()
 
     if is_series_out:
         bfill_datas = bfill_datas.iloc[:, 0]

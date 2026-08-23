@@ -11,6 +11,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Aligned time-varying financing rates by date in `lever_returns()` and
   `delever_returns()`, preserving pandas shape and labels and exact zero-leverage identity.
+- Made `bfill_timeseries()` honor return fill policies on expanded frequency grids and support
+  one- and two-observation histories without requiring frequency inference.
 
 ## [5.13.0] - 2026-08-23
 
