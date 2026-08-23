@@ -17,6 +17,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   missing-value filling.
 - Preserved all-missing newer price columns without older counterparts in
   `bfill_timeseries()` instead of raising during terminal-value alignment.
+- Kept return- and volatility-quantile regime IDs, colors, and report columns aligned with the
+  number and order of successfully created buckets.
 
 ## [5.13.0] - 2026-08-23
 

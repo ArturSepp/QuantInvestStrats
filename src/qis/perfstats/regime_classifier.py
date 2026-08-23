@@ -37,7 +37,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
 from matplotlib._color_data import CSS4_COLORS as mcolors
-from typing import Union, Dict, List, Tuple, Any
+from matplotlib.colors import to_hex
+from typing import Union, Dict, List, Tuple, Any, cast
 from enum import Enum
 
 import qis.utils.df_cut as dfc
@@ -339,6 +340,10 @@ class RegimeClassifier(ABC):
             **regime_id_func_kwargs
         )
 
+        # Data-derived classifiers can expose their ordered IDs only after classification.
+        if regime_ids is None:
+            regime_ids = self.get_regime_ids()
+
         cond_perf_table, regime_datas = compute_regimes_pa_perf_table_from_sampled_returns(
             sampled_returns_with_regime_id=sampled_returns_with_regime_id,
             prices=prices,
@@ -386,7 +391,9 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
 
     Classifies periods into regimes based on quantiles of benchmark returns,
     enabling analysis of performance in different market environments
-    (e.g., bear, normal, bull markets).
+    (e.g., bear, normal, bull markets). Without an explicit mapping, three buckets
+    retain the semantic Bear/Normal/Bull IDs; other bucket counts receive ordered
+    Q1 through Qn IDs.
     """
 
     def __init__(self,
@@ -401,18 +408,38 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
             return_type: Type of returns to compute
             q: Quantile boundaries or number of quantiles (default: [0.0, 0.16, 0.84, 1.0],
                 the one-sigma cut: P(Z < -1) = 15.87% rounds to 16%, central mass 68%
-                against the normal's 68.27%. Changed from [0.0, 0.17, 0.83, 1.0] in 5.0.7)
-            regime_ids_colors: Mapping of regime names to colors
+                against the normal's 68.27%. Changed from [0.0, 0.17, 0.83, 1.0] in 5.0.7).
+                Three buckets use Bear/Normal/Bull by default; other counts use ordered Q1-Qn IDs.
+            regime_ids_colors: Optional ordered mapping of regime names to colors. Its length must
+                equal the number of quantile buckets.
         """
         super().__init__()
         self.freq = freq
         self.return_type = return_type
         self.q = q if q is not None else np.array([0.0, 0.16, 0.84, 1.0])  # one-sigma default, see compute_regime_sharpe_decomposition
-        self.regime_ids_colors = regime_ids_colors or {
-            'Bear': mcolors['salmon'],
-            'Normal': mcolors['yellowgreen'],
-            'Bull': mcolors['darkgreen']
-        }
+        num_buckets = (int(cast(int, self.q)) if np.isscalar(self.q)
+                       else len(np.asarray(self.q)) - 1)
+
+        # Keep one ordered ID and color per bucket while preserving the semantic three-band case.
+        if regime_ids_colors is None:
+            if num_buckets == 3:
+                self.regime_ids_colors = {
+                    'Bear': str(mcolors['salmon']),
+                    'Normal': str(mcolors['yellowgreen']),
+                    'Bull': str(mcolors['darkgreen'])
+                }
+            else:
+                cmap = plt.get_cmap('RdYlGn', num_buckets)
+                self.regime_ids_colors = {
+                    f'Q{n + 1}': to_hex(cmap(n)) for n in range(num_buckets)
+                }
+        elif len(regime_ids_colors) != num_buckets:
+            raise ValueError(
+                f"{num_buckets} quantile buckets require {num_buckets} regime labels and colors; "
+                f"received {len(regime_ids_colors)}"
+            )
+        else:
+            self.regime_ids_colors = dict(regime_ids_colors)
 
     def compute_sampled_returns_with_regime_id(self,
                                                prices: Union[pd.DataFrame, pd.Series],
@@ -637,7 +664,9 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
     """Regime classifier based on benchmark volatility quantiles.
 
     Classifies periods based on realized volatility levels, enabling analysis
-    of performance in different volatility environments.
+    of performance in different volatility environments. After classification,
+    the data-derived threshold IDs and their colors are available through the
+    inherited regime metadata interface.
     """
 
     def __init__(self,
@@ -672,7 +701,8 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             include_end_date: Include last period
 
         Returns:
-            DataFrame with returns and regime classification
+            DataFrame with returns and regime classification. The ordered threshold IDs and one
+            color per ID are also available through ``get_regime_ids_colors()``.
         """
         vols = ret.compute_sampled_vols(
             prices=prices[benchmark],
@@ -703,10 +733,12 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
 
         sampled_returns_with_regime_id[self.REGIME_COLUMN] = classificator[hue_name]
 
-        # Generate colors using colormap
+        # Publish data-derived labels through the shared metadata contract while preserving the
+        # existing RGBA output returned by get_regime_colors().
         cmap = plt.get_cmap('RdYlGn', len(labels))
         colors = [cmap(n) for n in range(len(labels))]
         self.regime_colors = {k: v for k, v in zip(labels, colors)}
+        self.regime_ids_colors = {k: to_hex(cmap(n)) for n, k in enumerate(labels)}
 
         return sampled_returns_with_regime_id
 
@@ -732,6 +764,7 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             include_end_date=True
         )
 
+        # Defer dynamic volatility IDs until the base method has classified this price panel.
         return super().compute_regimes_pa_perf_table(
             regime_id_func_kwargs=regime_id_func_kwargs,
             prices=prices,
@@ -739,8 +772,7 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             perf_params=perf_params,
             freq=self.freq,
             is_report_pa_returns=True,
-            is_use_benchmark_means=False,
-            regime_ids=self.get_regime_ids()
+            is_use_benchmark_means=False
         )
 
     def get_regime_colors(self) -> List[Tuple[float, ...]]:
