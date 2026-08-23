@@ -1114,15 +1114,17 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
         leverage: Leverage ratio L (debt / equity). For a 1.5x levered fund pass 0.5;
             for a 3x ETF pass 2.0; for the typical BDC at 1.0x debt-to-equity pass 1.0.
         financing_rate: Annualised financing rate. Pass a float for constant cost
-            (e.g. risk-free rate as a crude proxy), or a Series indexed on the same
-            frequency as returns for time-varying financing (recommended for accuracy).
+            (e.g. risk-free rate as a crude proxy), or a Series indexed by date for
+            time-varying financing (recommended for accuracy). Series observations are
+            aligned to return dates and forward-filled from prior observations only.
             Default 0.0 ignores financing — only correct if the portfolio earns the
             financing rate on its borrowed capital, which is rarely the case.
         periods_per_year: Annualisation factor used to convert the financing rate
             to per-period. If None, inferred from the index frequency.
 
     Returns:
-        De-levered returns matching the input shape.
+        De-levered returns matching the input shape and pandas labels. Zero leverage
+        returns an independent copy, even when financing data is unavailable.
 
     Note:
         This assumes constant leverage and a single-tier financing structure. Real
@@ -1136,6 +1138,10 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
         >>> ocsl_unlev = delever_returns(ocsl_returns, leverage=1.07,
         ...                              financing_rate=0.061)
     """
+    # Preserve an exact identity before unavailable financing can propagate NaNs.
+    if leverage == 0.0:
+        return returns.copy()
+
     if periods_per_year is None:
         periods_per_year = int(round(infer_annualisation_factor_from_df(
             returns if isinstance(returns, pd.DataFrame) else returns.to_frame()
@@ -1148,7 +1154,15 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
     else:
         rf_per_period = float(financing_rate) / periods_per_year
 
-    return (returns + leverage * rf_per_period) / (1.0 + leverage)
+    if isinstance(returns, pd.DataFrame) and isinstance(rf_per_period, pd.Series):
+        # Apply each financing observation across all assets on the same date.
+        return returns.add(leverage * rf_per_period, axis=0) / (1.0 + leverage)
+
+    # Restore the return label that Series alignment can otherwise discard.
+    result = (returns + leverage * rf_per_period) / (1.0 + leverage)
+    if isinstance(result, pd.Series) and isinstance(returns, pd.Series):
+        result.name = returns.name
+    return result
 
 
 def lever_returns(returns: Union[pd.Series, pd.DataFrame],
@@ -1168,17 +1182,23 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
     Args:
         returns: Period returns of the unlevered asset (Series or DataFrame).
         leverage: Leverage ratio L (debt / equity).
-        financing_rate: Annualised financing rate (float or Series).
+        financing_rate: Annualised financing rate (float or Series). Series observations
+            are aligned to return dates and forward-filled from prior observations only.
         periods_per_year: Annualisation factor. If None, inferred from index.
 
     Returns:
-        Levered returns matching the input shape.
+        Levered returns matching the input shape and pandas labels. Zero leverage
+        returns an independent copy, even when financing data is unavailable.
 
     Example:
         >>> # Show what GCF would look like at 1x leverage with BDC-like financing
         >>> gcf_levered = lever_returns(gcf_returns, leverage=1.0,
         ...                             financing_rate=0.061)
     """
+    # Preserve an exact identity before unavailable financing can propagate NaNs.
+    if leverage == 0.0:
+        return returns.copy()
+
     if periods_per_year is None:
         periods_per_year = int(round(infer_annualisation_factor_from_df(
             returns if isinstance(returns, pd.DataFrame) else returns.to_frame()
@@ -1189,7 +1209,15 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
     else:
         rf_per_period = float(financing_rate) / periods_per_year
 
-    return (1.0 + leverage) * returns - leverage * rf_per_period
+    if isinstance(returns, pd.DataFrame) and isinstance(rf_per_period, pd.Series):
+        # Apply each financing observation across all assets on the same date.
+        return ((1.0 + leverage) * returns).sub(leverage * rf_per_period, axis=0)
+
+    # Restore the return label that Series alignment can otherwise discard.
+    result = (1.0 + leverage) * returns - leverage * rf_per_period
+    if isinstance(result, pd.Series) and isinstance(returns, pd.Series):
+        result.name = returns.name
+    return result
 
 
 def implied_leverage(levered_returns: Union[pd.Series, pd.DataFrame],
