@@ -204,3 +204,14 @@ def test_core_is_a_subset_of_public() -> None:
     """
     outside = sorted(set(core_api_names()) - set(PUBLIC_API))
     assert not outside, f"CORE_API names symbols outside PUBLIC_API: {outside}"
+
+
+def test_ohlc_estimators_are_not_exported_from_qis() -> None:
+    """OHLC estimation belongs to stochvolmodels.estimation, not the qis API."""
+    removed_names = {
+        'OhlcEstimatorType',
+        'estimate_hf_ohlc_vol',
+        'estimate_ohlc_var',
+    }
+    assert removed_names.isdisjoint(qis.__all__)
+    assert all(not hasattr(qis, name) for name in removed_names)

@@ -7,8 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-08-23
+
 ### Removed
 
+- Removed `OhlcEstimatorType`, `estimate_ohlc_var`, `estimate_hf_ohlc_vol`, and the
+  `qis.models.stats.ohlc_vol` module. These model-facing estimators now live in
+  `stochvolmodels.estimation`.
 - Retired the legacy `dev` extra; contributor tooling now lives exclusively in the PEP 735
   `test`, `lint`, and `audit` dependency groups.
 

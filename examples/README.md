@@ -48,7 +48,6 @@ examples/
 | `ewm_correlation_table.py` | EWMA correlation heatmap-table via `plot_returns_ewm_corr_table`. |
 | `multivariate_ols.py` | `fit_multivariate_ols` with intercept / no-intercept. |
 | `rolling_correlations.py` | Rolling 3m/6m/12m correlations between BTC and QQQ. |
-| `ohlc_volatility_estimators.py` | OHLC realised-vol estimators via `estimate_hf_ohlc_vol`. |
 | `crypto_intraday_vol.py` | BTC hourly EWMA vol — handles 24/7 markets without weekend gaps. |
 | `overnight_intraday_returns.py` | Decomposes close-to-close returns into overnight + intraday components. |
 | `bootstrap_analysis.py` | Block bootstrap of price paths via `bootstrap_price_data`. |

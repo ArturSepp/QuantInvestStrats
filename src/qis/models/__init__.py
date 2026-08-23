@@ -93,12 +93,6 @@ from qis.models.bootstrap.bootstrap_numba import (
     generate_bootstrapped_indices
 )
 
-from qis.models.stats.ohlc_vol import (
-    OhlcEstimatorType,
-    estimate_hf_ohlc_vol,
-    estimate_ohlc_var
-)
-
 from qis.models.linear.ewm_winsor_outliers import (
     ReplacementType,
     OutlierPolicy,
@@ -123,7 +117,6 @@ from qis.models.unsmoothing.dimson_beta import estimate_dimson_beta
 from qis.models.unsmoothing.factor_lag import adjust_returns_with_factor_lag
 
 from qis.models.unsmoothing.joint_lag import adjust_returns_with_joint_unsmoothing
-
 
 
 
