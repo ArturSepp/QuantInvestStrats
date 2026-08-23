@@ -13,6 +13,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `delever_returns()`, preserving pandas shape and labels and exact zero-leverage identity.
 - Made `bfill_timeseries()` honor return fill policies on expanded frequency grids and support
   one- and two-observation histories without requiring frequency inference.
+- Made `bfill_timeseries()` independent of provider row order before boundary selection and
+  missing-value filling.
 
 ## [5.13.0] - 2026-08-23
 
