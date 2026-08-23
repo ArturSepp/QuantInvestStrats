@@ -38,6 +38,27 @@ class DescTableType(Enum):
     WITH_MEDIAN = 9
 
 
+def _compute_positive_probability(data: np.ndarray) -> np.ndarray:
+    """Compute each column's positive share over its observed values.
+
+    Args:
+        data: Two-dimensional numerical observations arranged by row and column.
+
+    Returns:
+        Positive-observation probability for each column, or NaN when a column has no
+        observations.
+    """
+    # Missing returns are absent observations, not non-positive outcomes.
+    observed_counts = np.sum(np.logical_not(np.isnan(data)), axis=0)
+    positive_counts = np.sum(np.greater(data, 0.0), axis=0)
+    return np.divide(
+        positive_counts,
+        observed_counts,
+        out=np.full_like(positive_counts, np.nan, dtype=float),
+        where=np.greater(observed_counts, 0),
+    )
+
+
 def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
                        desc_table_type: DescTableType = DescTableType.SHORT,
                        var_format: str = '{:.2f}',
@@ -53,11 +74,14 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     Values are returned as formatted strings, not numbers, because this feeds the table
     renderer directly — use the underlying statistic functions if the numbers are wanted.
     Columns may contain nans; statistics are computed on the available observations.
+    Positive probabilities divide positive returns by non-missing observations in each column;
+    zero returns are observed and non-positive.
 
     Args:
         df: returns panel, index is time and columns are tickers; a Series is treated as one
             column named after it
-        desc_table_type: which set of statistics to report
+        desc_table_type: which set of statistics to report; positive-probability modes use each
+            column's non-missing observation count as the denominator
         var_format: format applied to the statistics
         annualize_vol: report volatility per annum rather than per period
         is_add_tstat: add the t-statistic of the mean
@@ -112,13 +136,11 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         descriptive_table = descriptive_table.drop(PerfStat.AVG.to_str(), axis=1)
         descriptive_table = descriptive_table.drop(PerfStat.STD.to_str(), axis=1)
 
-        positive = np.where(np.greater(data_np, 0.0), 1.0, 0.0)
-        prob = np.sum(positive, axis=0) / data_np.shape[0]
+        prob = _compute_positive_probability(data=data_np)
         descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_POSITIVE_PROB:
-        positive = np.where(np.greater(data_np, 0.0), 1.0, 0.0)
-        prob = np.sum(positive, axis=0) / data_np.shape[0]
+        prob = _compute_positive_probability(data=data_np)
         descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_KURTOSIS:
