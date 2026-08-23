@@ -128,8 +128,10 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
     """Extend newer time series backward with older provider histories.
 
     Args:
-        df_newer: Newer Series or DataFrame whose labels and columns define the output.
-        df_older: Older object of the same pandas type, used before each newer history begins.
+        df_newer: Newer Series or DataFrame whose labels and columns define the output. Its rows
+            are interpreted in increasing date order without modifying the caller's object.
+        df_older: Older object of the same pandas type, used before each newer history begins. Its
+            rows are also interpreted in increasing date order without modifying the caller.
         freq: Frequency of the returned date grid.
         fill_method: Return-gap policy. ``None`` preserves missing returns, ``'to_zero'`` fills
             missing returns with zero after each column begins, and ``'ffill'`` carries its last
@@ -138,8 +140,8 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             last observed level forward.
 
     Returns:
-        Backfilled data on the requested grid, matching the newer input's pandas type, labels,
-        and column order.
+        Chronologically ordered backfilled data on the requested grid, matching the newer input's
+        pandas type, labels, and column order.
 
     Raises:
         NotImplementedError: If the newer and older inputs are not both Series or both
@@ -155,6 +157,12 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         pass
     else:
         raise NotImplementedError(f"type1={type(df_newer)}, type2={type(df_older)}") 
+
+    # Provider row order carries no information; boundaries and fills must run chronologically.
+    if not df_newer.index.is_monotonic_increasing:
+        df_newer = df_newer.sort_index()
+    if not df_older.index.is_monotonic_increasing:
+        df_older = df_older.sort_index()
     
     if is_prices:
 
