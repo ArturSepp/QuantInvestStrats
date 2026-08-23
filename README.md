@@ -200,7 +200,7 @@ with sns.axes_style("darkgrid"):
 ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
 # set parameters for computing performance stats including returns vols and regressions
 perf_params = qis.PerfParams(freq='ME', freq_reg='QE', rates_data=ust_3m_rate)
-# perf_columns is list to display different perfomance metrics from enumeration PerfStat
+# perf_columns is list to display different performance metrics from enumeration PerfStat
 fig = qis.plot_ra_perf_table(prices=prices,
                              perf_columns=[PerfStat.TOTAL_RETURN, PerfStat.PA_RETURN, PerfStat.PA_EXCESS_RETURN,
                                            PerfStat.VOL, PerfStat.SHARPE_RF0,
@@ -235,7 +235,7 @@ fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
 ### 2. Multi assets factsheet <a name="multiassets"></a>
 This report is adopted for reporting the risk-adjusted performance 
 of several assets with the goal
-of cross-sectional comparision
+of cross-sectional comparison
 
 Run [`examples/factsheets/multi_assets.py`](examples/factsheets/multi_assets.py).
 
