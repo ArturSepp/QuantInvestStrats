@@ -15,6 +15,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   one- and two-observation histories without requiring frequency inference.
 - Made `bfill_timeseries()` independent of provider row order before boundary selection and
   missing-value filling.
+- Preserved all-missing newer price columns without older counterparts in
+  `bfill_timeseries()` instead of raising during terminal-value alignment.
 
 ## [5.13.0] - 2026-08-23
 

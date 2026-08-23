@@ -15,7 +15,7 @@ over a shared overlap and requires the older columns to be a subset of the newer
 # packages
 import numpy as np
 import pandas as pd
-from typing import Optional, Union, List, Tuple
+from typing import Optional, Union, List, Tuple, cast
 # qis
 import qis.utils.df_ops as dfo
 import qis.utils.np_ops as npo
@@ -127,6 +127,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
                      ) -> Union[pd.DataFrame, pd.Series]:
     """Extend newer time series backward with older provider histories.
 
+    For price DataFrames, a newer all-missing column without an older counterpart remains
+    entirely missing.
+
     Args:
         df_newer: Newer Series or DataFrame whose labels and columns define the output. Its rows
             are interpreted in increasing date order without modifying the caller's object.
@@ -172,7 +175,11 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
 
         terminal_value = dfo.get_last_nonnan_values(df_newer)
         if np.any(np.isnan(terminal_value)):
-            terminal_value_old = dfo.get_last_nonnan_values(df_older[df_newer.columns])
+            # Preserve the newer schema when an older terminal history is unavailable.
+            aligned_older = cast(pd.DataFrame, df_older).reindex(
+                columns=cast(pd.DataFrame, df_newer).columns
+            )
+            terminal_value_old = dfo.get_last_nonnan_values(aligned_older)
             terminal_value = np.where(np.isnan(terminal_value), terminal_value_old, terminal_value)
 
         df_newer = ret.to_returns(df_newer)
