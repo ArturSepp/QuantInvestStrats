@@ -34,6 +34,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   adjacent provider histories.
 - Made regime frequencies depend on benchmark-classified dates rather than asset missingness or
   DataFrame column order.
+- Made descriptive-table positive probabilities use each asset's non-missing observations rather
+  than the panel's total row count.
 
 ## [5.12.0] - 2026-08-22
 
