@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Aligned time-varying financing rates by date in `lever_returns()` and
+  `delever_returns()`, preserving pandas shape and labels and exact zero-leverage identity.
+
 ## [5.13.0] - 2026-08-23
 
 ### Removed
