@@ -147,9 +147,17 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         pandas type, labels, and column order.
 
     Raises:
+        ValueError: If ``fill_method`` is not ``None``, ``'to_zero'``, or ``'ffill'``.
         NotImplementedError: If the newer and older inputs are not both Series or both
             DataFrames.
     """
+    # Reject unsupported policies before the fallback branch can silently treat them as ffill.
+    if fill_method is not None and (
+            not isinstance(fill_method, str) or fill_method not in ('to_zero', 'ffill')):
+        raise ValueError(
+            f"fill_method must be None, 'to_zero', or 'ffill', got {fill_method!r}"
+        )
+
     is_series_out = False
     if isinstance(df_newer, pd.Series) and isinstance(df_older, pd.Series):
         # will be error if not same type
