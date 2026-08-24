@@ -15,7 +15,7 @@ over a shared overlap and requires the older columns to be a subset of the newer
 # packages
 import numpy as np
 import pandas as pd
-from typing import Optional, Union, List, Tuple
+from typing import Optional, Union, List, Tuple, cast
 # qis
 import qis.utils.df_ops as dfo
 import qis.utils.np_ops as npo
@@ -127,6 +127,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
                      ) -> Union[pd.DataFrame, pd.Series]:
     """Extend newer time series backward with older provider histories.
 
+    For price DataFrames, a newer all-missing column without an older counterpart remains
+    entirely missing.
+
     Args:
         df_newer: Newer Series or DataFrame whose labels and columns define the output. Its rows
             are interpreted in increasing date order without modifying the caller's object.
@@ -164,15 +167,26 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
     if not df_older.index.is_monotonic_increasing:
         df_older = df_older.sort_index()
     
+    price_fallback_columns = []
     if is_prices:
 
         # make sure no negative prices
         df_newer = df_ffill_negatives(df_newer)
         df_older = df_ffill_negatives(df_older)
+        newer_prices = cast(pd.DataFrame, df_newer)
+        older_prices = cast(pd.DataFrame, df_older)
+        price_fallback_columns = [
+            column for column in newer_prices.columns
+            if column in older_prices.columns
+            and newer_prices[column].isna().all()
+            and older_prices[column].notna().any()
+        ]
 
         terminal_value = dfo.get_last_nonnan_values(df_newer)
         if np.any(np.isnan(terminal_value)):
-            terminal_value_old = dfo.get_last_nonnan_values(df_older[df_newer.columns])
+            # Preserve the newer schema when an older terminal history is unavailable.
+            aligned_older = older_prices.reindex(columns=newer_prices.columns)
+            terminal_value_old = dfo.get_last_nonnan_values(aligned_older)
             terminal_value = np.where(np.isnan(terminal_value), terminal_value_old, terminal_value)
 
         df_newer = ret.to_returns(df_newer)
@@ -218,6 +232,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         bfill_datas = ret.returns_to_nav(returns=bfill_datas,
                                          init_period=None,
                                          terminal_value=terminal_value)
+        # Carry available older-only histories independently of grid-resampling side effects.
+        for column in price_fallback_columns:
+            bfill_datas[column] = bfill_datas[column].ffill()
 
     # Short splices have no inferable frequency but can still be expanded safely.
     inferred_freq = pd.infer_freq(bfill_datas.index) if len(bfill_datas.index) >= 3 else None
