@@ -7,10 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.15.0] - 2026-08-24
+
 ### Fixed
 
 - Preserved missing benchmark observations in positive/negative regime classification instead of
   assigning them to the positive regime.
+- Removed a stale optional PyBloqs example mode that referenced a report generator which does not
+  exist.
 
 ## [5.14.0] - 2026-08-24
 

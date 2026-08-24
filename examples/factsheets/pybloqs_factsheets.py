@@ -5,15 +5,13 @@ Optional: pybloqs-rendered factsheets.
 not import it. To run this example, install pybloqs and apply the small
 jinja patch documented below.
 
-This file demonstrates three pybloqs report types:
+This file demonstrates two pybloqs report types:
 
   ``Mode.RA_PERFORMANCE``       — five-figure performance report wrapped in
                                   a pybloqs ``VStack``.
   ``Mode.MULTI_PORTFOLIO``      — multi-strategy factsheet (volparity sweep
                                   across spans) via
                                   ``generate_multi_portfolio_factsheet_with_pybloqs``.
-  ``Mode.STRATEGY_BENCHMARK``   — single strategy vs benchmark via
-                                  ``generate_strategy_benchmark_factsheet_with_pybloqs``.
 
 ────────────────────────────────────────────────────────────────────────────
 pybloqs jinja patch (required for pandas >= 2.x)
@@ -44,9 +42,6 @@ try:
     import pybloqs as p
     from qis.portfolio.reports.multi_strategy_factsheet_pybloqs import (
         generate_multi_portfolio_factsheet_with_pybloqs,
-    )
-    from qis.portfolio.reports.strategy_benchmark_factsheet_pybloqs import (
-        generate_strategy_benchmark_factsheet_with_pybloqs,
     )
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
@@ -208,7 +203,6 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
 class Mode(Enum):
     RA_PERFORMANCE = 1
     MULTI_PORTFOLIO = 2
-    STRATEGY_BENCHMARK = 3
 
 
 def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
@@ -232,7 +226,6 @@ def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
         plt.show()
         return
 
-    # MULTI_PORTFOLIO and STRATEGY_BENCHMARK both need a MultiPortfolioData
     time_period = qis.TimePeriod('31Dec2005', '21Apr2025')
     prices, benchmark_prices, group_data = fetch_riskparity_universe_data()
     multi = generate_volparity_multi_strategy(
@@ -244,25 +237,13 @@ def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
         rebalancing_costs=0.0010,
     )
 
-    if mode == Mode.MULTI_PORTFOLIO:
-        report = generate_multi_portfolio_factsheet_with_pybloqs(
-            multi_portfolio_data=multi,
-            time_period=time_period,
-            **fetch_default_report_kwargs(time_period=time_period))
-        out = f"{qis.local_path.get_output_path()}_volparity_span_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.pdf"
-        report.save(out)
-        print(f"saved multi-portfolio report to {out}")
-
-    elif mode == Mode.STRATEGY_BENCHMARK:
-        report = generate_strategy_benchmark_factsheet_with_pybloqs(
-            multi_portfolio_data=multi,
-            strategy_idx=-1,
-            benchmark_idx=0,
-            time_period=time_period,
-            **fetch_default_report_kwargs(time_period=time_period))
-        out = f"{qis.local_path.get_output_path()}_volparity_pybloq_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.pdf"
-        report.save(out)
-        print(f"saved strategy-benchmark report to {out}")
+    report = generate_multi_portfolio_factsheet_with_pybloqs(
+        multi_portfolio_data=multi,
+        time_period=time_period,
+        **fetch_default_report_kwargs(time_period=time_period))
+    out = f"{qis.local_path.get_output_path()}_volparity_span_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.pdf"
+    report.save(out)
+    print(f"saved multi-portfolio report to {out}")
 
 
 if __name__ == '__main__':
