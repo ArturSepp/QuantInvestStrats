@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Supported pandas nullable floating price panels in `to_returns()` without changing return
+  conventions or accepted NumPy-backed results.
+
 ## [5.19.0] - 2026-08-28
 
 ### Added
