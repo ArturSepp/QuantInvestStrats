@@ -167,18 +167,25 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
     if not df_older.index.is_monotonic_increasing:
         df_older = df_older.sort_index()
     
+    price_fallback_columns = []
     if is_prices:
 
         # make sure no negative prices
         df_newer = df_ffill_negatives(df_newer)
         df_older = df_ffill_negatives(df_older)
+        newer_prices = cast(pd.DataFrame, df_newer)
+        older_prices = cast(pd.DataFrame, df_older)
+        price_fallback_columns = [
+            column for column in newer_prices.columns
+            if column in older_prices.columns
+            and newer_prices[column].isna().all()
+            and older_prices[column].notna().any()
+        ]
 
         terminal_value = dfo.get_last_nonnan_values(df_newer)
         if np.any(np.isnan(terminal_value)):
             # Preserve the newer schema when an older terminal history is unavailable.
-            aligned_older = cast(pd.DataFrame, df_older).reindex(
-                columns=cast(pd.DataFrame, df_newer).columns
-            )
+            aligned_older = older_prices.reindex(columns=newer_prices.columns)
             terminal_value_old = dfo.get_last_nonnan_values(aligned_older)
             terminal_value = np.where(np.isnan(terminal_value), terminal_value_old, terminal_value)
 
@@ -225,6 +232,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         bfill_datas = ret.returns_to_nav(returns=bfill_datas,
                                          init_period=None,
                                          terminal_value=terminal_value)
+        # Carry available older-only histories independently of grid-resampling side effects.
+        for column in price_fallback_columns:
+            bfill_datas[column] = bfill_datas[column].ffill()
 
     # Short splices have no inferable frequency but can still be expanded safely.
     inferred_freq = pd.infer_freq(bfill_datas.index) if len(bfill_datas.index) >= 3 else None

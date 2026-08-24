@@ -186,14 +186,15 @@ def test_bfill_prices_preserves_absent_column_with_off_grid_shared_price() -> No
 # Existing older-provider fallback control
 # =============================================================================
 
-def test_bfill_prices_retains_available_older_fallback() -> None:
-    """Continue using older prices when an all-missing newer asset has a match.
+def test_bfill_prices_retains_available_older_fallback_with_absent_column() -> None:
+    """Continue using older prices alongside an absent all-missing asset.
 
     The fallback asset's older prices are ``[50, 55, 60.5]``. Its newer history is entirely
     missing, so the established price behavior carries the terminal 60.5 level over the three
-    newer dates. The shared asset provides the same independently scaled control as the absent
-    column regression. This distinguishes a genuinely absent history from an available older
-    history and guards the existing terminal fallback while checking input ownership.
+    newer dates. The absent asset has no history from either provider and must remain missing.
+    The shared asset provides the same independently scaled control as the primary regression.
+    Keeping all three columns in one call proves that the absent asset cannot disable the valid
+    older fallback while also checking schema order and input ownership.
     """
     older, newer = _price_histories_with_absent_older_column()
     older = pd.DataFrame(
@@ -203,12 +204,13 @@ def test_bfill_prices_retains_available_older_fallback() -> None:
         },
         index=older.index,
     )
-    newer = newer.rename(columns={_ABSENT_ASSET: _FALLBACK_ASSET})
+    newer.insert(loc=1, column=_FALLBACK_ASSET, value=np.nan)
     original_older = older.copy(deep=True)
     original_newer = newer.copy(deep=True)
     scale = _NEWER_SHARED_PRICES[0] / _OLDER_SHARED_PRICES[-1]
     expected = pd.DataFrame(
         {
+            _ABSENT_ASSET: np.full(6, np.nan, dtype=float),
             _FALLBACK_ASSET: (50.0, 55.0, 60.5, 60.5, 60.5, 60.5),
             _SHARED_ASSET: (
                 _OLDER_SHARED_PRICES[0] * scale,
