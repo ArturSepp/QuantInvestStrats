@@ -26,6 +26,29 @@ def test_risk_contribution_ratios_normalise_existing_euler_identity() -> None:
     assert ratios.sum() == pytest.approx(1.0, abs=1e-15)
 
 
+def test_absolute_risk_contributions_match_independent_euler_formula() -> None:
+    """Positive-risk behavior remains w_i times its covariance gradient over volatility."""
+    portfolio_vol = float(np.sqrt(WEIGHTS @ COVAR @ WEIGHTS))
+    expected = (WEIGHTS * (COVAR @ WEIGHTS) / portfolio_vol)
+
+    actual = qis.compute_portfolio_risk_contributions(w=WEIGHTS, covar=COVAR)
+
+    pd.testing.assert_series_equal(actual, expected)
+
+
+def test_absolute_risk_contributions_guard_zero_risk_for_both_containers() -> None:
+    """A zero-risk portfolio has zero absolute contributions rather than undefined 0/0."""
+    series = qis.compute_portfolio_risk_contributions(
+        w=pd.Series(0.0, index=ASSETS), covar=COVAR,
+    )
+    pd.testing.assert_series_equal(series, pd.Series(0.0, index=ASSETS))
+
+    array = qis.compute_portfolio_risk_contributions(
+        w=np.zeros(len(ASSETS)), covar=COVAR.to_numpy(),
+    )
+    np.testing.assert_array_equal(array, np.zeros(len(ASSETS)))
+
+
 def test_risk_contribution_ratios_align_labels_and_guard_zero_risk() -> None:
     """The covariance universe controls alignment and zero risk maps to zero ratios."""
     extended = pd.concat([WEIGHTS, pd.Series({"outside": 9.0})])

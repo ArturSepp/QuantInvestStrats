@@ -31,7 +31,8 @@ def compute_portfolio_risk_contributions(w: Union[np.ndarray, pd.Series],
         covar: Covariance matrix as array or DataFrame.
 
     Returns:
-        Risk contributions for each asset.
+        Risk contributions for each asset. A non-positive-variance portfolio
+        has no risk to attribute and returns zeros.
 
     Raises:
         ValueError: If input types are not compatible.
@@ -43,7 +44,12 @@ def compute_portfolio_risk_contributions(w: Union[np.ndarray, pd.Series],
         assert covar.shape[0] == covar.shape[1] == w.shape[0]
     else:
         raise ValueError(f"unnsuported types {type(w)} and {type(covar)}")
-    portfolio_vol = np.sqrt(w.T @ covar @ w)
+    portfolio_var = float(w.T @ covar @ w)
+    if portfolio_var <= 0.0:
+        if isinstance(w, pd.Series):
+            return pd.Series(0.0, index=w.index)
+        return np.zeros_like(w, dtype=float)
+    portfolio_vol = np.sqrt(portfolio_var)
     marginal_risk_contribution = covar @ w.T
     rc = np.multiply(marginal_risk_contribution, w) / portfolio_vol
     return rc

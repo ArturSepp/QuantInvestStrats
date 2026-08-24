@@ -9,8 +9,8 @@ authors:
 repository-code: "https://github.com/ArturSepp/QuantInvestStrats"
 url: "https://pypi.org/project/qis/"
 license: MIT
-version: 5.13.0
-date-released: "2026-08-23"
+version: 5.14.0
+date-released: "2026-08-24"
 keywords:
   - quantitative-finance
   - performance-attribution

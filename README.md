@@ -37,7 +37,9 @@ Risk and tracking-error analytics are consolidated in ```qis.portfolio.risk```. 
 ```qis.RiskModel``` is the point-in-time weights-and-covariance layer for ex-ante tracking
 error, standalone group risk, factor exposures, benchmark beta and loadings,
 systematic/residual tracking-error decomposition, and Euler marginal tracking-error
-contributions. Ex-post analytics use portfolio and benchmark NAVs or return differences:
+contributions. Its loading-matrix interface also supports fractional, overlapping, and signed
+standalone sleeves without reducing them to categorical groups. Ex-post analytics use portfolio
+and benchmark NAVs or return differences:
 ```compute_ewma_realised_tracking_error``` produces a conditional annualised series, while
 ```compute_te_ir_errors``` and ```compute_info_ratio_table``` produce whole-sample tracking
 error and information-ratio estimates. The
@@ -376,7 +378,7 @@ If you use QIS in your research, please cite it as:
   title={qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies},
   author={Sepp, Artur},
   year={2026},
-  version={5.13.0},
+  version={5.14.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

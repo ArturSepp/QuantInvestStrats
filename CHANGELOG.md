@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.14.0] - 2026-08-24
+
+### Added
+
+- Added `RiskModel.compute_tre_by_group_loadings_at_date()` as the canonical ex-ante
+  tracking-error calculation for fractional, overlapping, or signed asset-by-group loadings.
+
 ### Fixed
 
 - Aligned time-varying financing rates by date in `lever_returns()` and
@@ -19,6 +26,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `bfill_timeseries()` instead of raising during terminal-value alignment.
 - Kept return- and volatility-quantile regime IDs, colors, and report columns aligned with the
   number and order of successfully created buckets.
+- Made `compute_portfolio_risk_contributions()` return typed zeros for a
+  non-positive-variance portfolio instead of undefined `0/0` values.
 
 ## [5.13.0] - 2026-08-23
 

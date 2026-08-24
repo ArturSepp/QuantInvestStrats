@@ -284,6 +284,135 @@ def test_tre_group_mask_matches_covariance_block_reference() -> None:
     assert actual['Group 1'] + actual['Group 2'] != pytest.approx(actual['Total'])
 
 
+def test_tre_group_loadings_match_independent_fractional_overlapping_reference() -> None:
+    # Seed 20260824. The oracle evaluates all quadratic forms independently with einsum.
+    rng = np.random.default_rng(20260824)
+    assets = pd.Index([f'L{idx}' for idx in range(6)])
+    covar_root = rng.normal(size=(len(assets), len(assets)))
+    covar = pd.DataFrame(covar_root @ covar_root.T, index=assets, columns=assets)
+    benchmark = pd.Series(rng.normal(size=len(assets)), index=assets)
+    portfolio = pd.Series(rng.normal(size=len(assets)), index=assets)
+    group_loadings = pd.DataFrame(
+        rng.uniform(-0.5, 1.0, size=(len(assets), 3)),
+        index=assets,
+        columns=['Rates', 'Credit', 'Equity'],
+    )
+    group_loadings['All'] = 1.0
+
+    actual = RiskModel(covar={DATE_1: covar}).compute_tre_by_group_loadings_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1,
+        group_loadings=group_loadings,
+    )
+
+    active = (portfolio - benchmark).to_numpy(dtype=float)
+    loadings = group_loadings.to_numpy(dtype=float)
+    masked_active = active[:, None] * loadings
+    covar_values = covar.to_numpy(dtype=float)
+    expected = np.sqrt(np.concatenate((
+        [np.einsum('i,ij,j->', active, covar_values, active)],
+        np.einsum('ig,ij,jg->g', masked_active, covar_values, masked_active),
+    )))
+    assert actual.index.tolist() == ['Total', 'Rates', 'Credit', 'Equity', 'All']
+    np.testing.assert_allclose(actual.to_numpy(), expected, rtol=1e-12, atol=0.0)
+    assert actual['All'] == actual['Total']
+    assert actual[['Rates', 'Credit', 'Equity']].sum() != pytest.approx(actual['Total'])
+
+
+def test_tre_group_loadings_one_hot_match_categorical_groups() -> None:
+    benchmark = pd.Series([0.4, 0.3, 0.3], index=ASSETS)
+    portfolio = pd.Series([0.6, 0.1, 0.4], index=ASSETS)
+    groups = pd.Series(['Group 1', 'Group 1', 'Group 2'], index=ASSETS)
+    loadings = pd.DataFrame({
+        'Group 1': [1.0, 1.0, 0.0],
+        'Group 2': [0.0, 0.0, 1.0],
+    }, index=ASSETS)
+
+    categorical = _model().compute_tre_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1,
+        group_data=groups)
+    loading_based = _model().compute_tre_by_group_loadings_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1,
+        group_loadings=loadings)
+
+    pd.testing.assert_series_equal(loading_based, categorical)
+
+
+def test_tre_group_loadings_align_missing_nan_and_extra_assets() -> None:
+    benchmark = pd.Series(0.0, index=ASSETS)
+    portfolio = pd.Series([0.2, -0.1, 0.3], index=ASSETS)
+    loadings = pd.DataFrame(
+        {'Partial': [0.5, np.nan, 9.0], 'Zero': [0.0, np.nan, 2.0]},
+        index=['A', 'C', 'OUTSIDE'],
+    )
+
+    actual = _model().compute_tre_by_group_loadings_at_date(
+        benchmark_weights=benchmark,
+        portfolio_weights=portfolio,
+        date=DATE_1,
+        group_loadings=loadings)
+
+    expected_partial_weights = pd.Series([0.1, 0.0, 0.0], index=ASSETS)
+    expected_partial = np.sqrt(expected_partial_weights @ _covar() @ expected_partial_weights)
+    assert actual['Partial'] == pytest.approx(expected_partial)
+    assert actual['Zero'] == 0.0
+
+
+@pytest.mark.parametrize(
+    ('group_loadings', 'message'),
+    [
+        (pd.Series([1.0], index=['A']), 'pd.DataFrame'),
+        (pd.DataFrame([[1.0], [1.0]], index=['A', 'A'], columns=['Group']),
+         'duplicate assets'),
+        (pd.DataFrame([[1.0, 0.0]], index=['A'], columns=['Group', 'Group']),
+         'duplicate groups'),
+        (pd.DataFrame({'Group': ['bad']}, index=['A']), 'numeric values'),
+        (pd.DataFrame({'Group': [np.inf]}, index=['A']), 'infinite values'),
+    ],
+)
+def test_tre_group_loadings_reject_invalid_matrices(group_loadings, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        _model().compute_tre_by_group_loadings_at_date(
+            benchmark_weights=pd.Series(0.0, index=ASSETS),
+            portfolio_weights=pd.Series(0.0, index=ASSETS),
+            date=DATE_1,
+            group_loadings=group_loadings)
+
+
+def test_tre_group_loadings_reject_total_label_collision() -> None:
+    with pytest.raises(ValueError, match='total_column.*duplicates'):
+        _model().compute_tre_by_group_loadings_at_date(
+            benchmark_weights=pd.Series(0.0, index=ASSETS),
+            portfolio_weights=pd.Series(0.0, index=ASSETS),
+            date=DATE_1,
+            group_loadings=pd.DataFrame({'Total': 1.0}, index=ASSETS))
+
+
+def test_tre_group_loadings_zero_active_weights_are_exact_zeros() -> None:
+    weights = pd.Series([0.5, 0.3, 0.2], index=ASSETS)
+    actual = _model().compute_tre_by_group_loadings_at_date(
+        benchmark_weights=weights,
+        portfolio_weights=weights,
+        date=DATE_1,
+        group_loadings=pd.DataFrame({'All': 1.0, 'None': 0.0}, index=ASSETS))
+    expected = pd.Series({'Total': 0.0, 'All': 0.0, 'None': 0.0})
+    pd.testing.assert_series_equal(actual, expected)
+
+
+def test_tre_group_loadings_route_through_strict_weight_aligner() -> None:
+    with pytest.raises(ValueError, match=r"portfolio_weights.*OUTSIDE"):
+        _model().compute_tre_by_group_loadings_at_date(
+            benchmark_weights=pd.Series([1.0], index=['A']),
+            portfolio_weights=pd.Series([0.8, 0.2], index=['A', 'OUTSIDE']),
+            date=DATE_1,
+            group_loadings=pd.DataFrame({'Group': 1.0}, index=ASSETS))
+
+
 def test_tre_zero_active_weights_is_exactly_zero() -> None:
     weights = pd.Series([0.5, 0.3, 0.2], index=ASSETS)
     actual = _model().compute_tre_at_date(

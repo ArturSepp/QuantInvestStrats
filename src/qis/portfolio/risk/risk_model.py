@@ -324,6 +324,32 @@ class RiskModel:
         assets = self._covar_at_date(date).index
         return group_data.reindex(assets).fillna(UNASSIGNED_GROUP)
 
+    def _align_group_loadings(self,
+                              group_loadings: pd.DataFrame,
+                              date: pd.Timestamp,
+                              ) -> pd.DataFrame:
+        """Validate and align an asset-by-group loading matrix to covariance assets."""
+        if not isinstance(group_loadings, pd.DataFrame):
+            raise ValueError(
+                f"group_loadings must be a pd.DataFrame, got "
+                f"{type(group_loadings).__name__}")
+        if group_loadings.index.has_duplicates:
+            duplicates = group_loadings.index[
+                group_loadings.index.duplicated()].tolist()
+            raise ValueError(f"group_loadings has duplicate assets {duplicates}")
+        if group_loadings.columns.has_duplicates:
+            duplicates = group_loadings.columns[
+                group_loadings.columns.duplicated()].tolist()
+            raise ValueError(f"group_loadings has duplicate groups {duplicates}")
+        try:
+            numeric_loadings = group_loadings.astype(float)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("group_loadings must contain numeric values") from exc
+        if np.isinf(numeric_loadings.to_numpy(dtype=float)).any():
+            raise ValueError("group_loadings contains infinite values")
+        assets = self._covar_at_date(date).index
+        return numeric_loadings.reindex(index=assets).fillna(0.0)
+
     @staticmethod
     def _compute_tracking_error(active_weights: pd.Series,
                                 covar: pd.DataFrame,
@@ -387,6 +413,73 @@ class RiskModel:
             group_active_weights = active_weights.where(groups == group, other=0.0)
             results[group] = self._compute_tracking_error(
                 active_weights=group_active_weights, covar=covar)
+        return pd.Series(results, dtype=float)
+
+    def compute_tre_by_group_loadings_at_date(
+            self,
+            benchmark_weights: pd.Series,
+            portfolio_weights: pd.Series,
+            date: pd.Timestamp,
+            group_loadings: pd.DataFrame,
+            total_column: str = 'Total',
+            strict: bool = True,
+    ) -> pd.Series:
+        """Compute ex-ante tracking error for fractional or overlapping group loadings.
+
+        For active weights ``d = w_p - w_b`` and an asset-by-group loading
+        matrix ``L``, group ``g`` has standalone tracking error
+        ``sqrt((d * L_g)' Sigma (d * L_g))``. Loadings may be fractional,
+        overlapping, or signed and need not sum to one. Group tracking errors
+        are not additive and are not forced to sum to total tracking error.
+        Missing covariance-universe rows and loading NaNs become zero; extra
+        loading rows are ignored. No annualisation is applied.
+
+        Args:
+            benchmark_weights: Benchmark weights indexed by asset.
+            portfolio_weights: Portfolio weights indexed by asset.
+            date: Exact covariance-grid date.
+            group_loadings: Asset-by-group loading matrix. Column order defines
+                result order.
+            total_column: Label for total tracking error.
+            strict: If True, reject material weights outside the covariance universe.
+
+        Returns:
+            Series containing total and standalone group tracking errors.
+
+        Raises:
+            KeyError: If ``date`` is not an exact covariance-grid date.
+            ValueError: If weights or group loadings violate the alignment policy,
+                loading labels are duplicated, values are nonnumeric or infinite,
+                or ``total_column`` duplicates a group label.
+        """
+        covar = self._covar_at_date(date)
+        benchmark = self._align_weights(
+            weights=benchmark_weights,
+            date=date,
+            role='benchmark_weights',
+            strict=strict)
+        portfolio = self._align_weights(
+            weights=portfolio_weights,
+            date=date,
+            role='portfolio_weights',
+            strict=strict)
+        loadings = self._align_group_loadings(
+            group_loadings=group_loadings,
+            date=date)
+        if total_column in loadings.columns:
+            raise ValueError(
+                f"total_column {total_column!r} duplicates a group_loadings column")
+
+        active_weights = portfolio - benchmark
+        results = {
+            total_column: self._compute_tracking_error(
+                active_weights=active_weights,
+                covar=covar),
+        }
+        for group in loadings.columns:
+            results[group] = self._compute_tracking_error(
+                active_weights=active_weights * loadings[group],
+                covar=covar)
         return pd.Series(results, dtype=float)
 
     def compute_tre_history(self,
