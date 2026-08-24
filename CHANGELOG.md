@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserved missing benchmark observations in positive/negative regime classification instead of
+  assigning them to the positive regime.
+
 ## [5.14.0] - 2026-08-24
 
 ### Added

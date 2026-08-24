@@ -550,7 +550,7 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
     """Regime classifier based on positive vs negative benchmark returns.
 
     Classifies periods into two simple regimes based on benchmark return sign,
-    useful for up/down market analysis.
+    useful for up/down market analysis. Missing benchmark returns remain unclassified.
     """
 
     def __init__(self,
@@ -587,7 +587,8 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
             include_end_date: Include last period
 
         Returns:
-            DataFrame with returns and regime classification
+            DataFrame with returns and regime classification. Missing benchmark returns have a
+            missing regime ID.
 
         Raises:
             ValueError: If insufficient data for classification
@@ -609,13 +610,21 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
                 f"Decrease regime frequency"
             )
 
-        benchmark_returns = sampled_returns_with_regime_id[benchmark]
+        benchmark_returns = cast(pd.Series, sampled_returns_with_regime_id[benchmark])
         regime_ids = self.get_regime_ids()
 
+        # A missing benchmark return has no sign and must not enter either frequency bucket.
+        observed = benchmark_returns.notna()
         regime_classification = pd.Series(
-            np.where(benchmark_returns < 0, regime_ids[0], regime_ids[1]),
+            np.nan,
             index=benchmark_returns.index,
-            name=self.REGIME_COLUMN
+            name=self.REGIME_COLUMN,
+            dtype=object,
+        )
+        regime_classification.loc[observed] = np.where(
+            benchmark_returns.loc[observed] < 0,
+            regime_ids[0],
+            regime_ids[1],
         )
 
         sampled_returns_with_regime_id[self.REGIME_COLUMN] = regime_classification
