@@ -241,7 +241,8 @@ def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
         multi_portfolio_data=multi,
         time_period=time_period,
         **fetch_default_report_kwargs(time_period=time_period))
-    out = f"{qis.local_path.get_output_path()}_volparity_span_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.pdf"
+    timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M')
+    out = f"{qis.local_path.get_output_path()}_volparity_span_report_{timestamp}.pdf"
     report.save(out)
     print(f"saved multi-portfolio report to {out}")
 
