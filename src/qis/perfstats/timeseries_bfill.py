@@ -275,9 +275,24 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
                        df_older: Union[pd.DataFrame, pd.Series],  # older price is preserved to the end
                        numerical_check_columns: List[str] = None
                        ) -> Tuple[Union[pd.DataFrame, pd.Series], Optional[pd.Series]]:
-    """
-    append time series by colomns
-    force alignment of columns
+    """Append older history before newer data with newer values winning overlaps.
+
+    Args:
+        df_newer: Newer Series or DataFrame. Rows are interpreted in increasing index order
+            without modifying the caller's object.
+        df_older: Older object of the same pandas type. Its DataFrame columns must be a subset of
+            the newer columns, and its rows are also interpreted in increasing index order.
+        numerical_check_columns: Columns for which to return mean absolute differences over the
+            aligned overlap. ``None`` skips the diagnostic.
+
+    Returns:
+        A chronologically ordered appended object matching the input pandas type, plus the
+        optional overlap-difference Series. Newer values take precedence on shared dates;
+        duplicate dates within a provider retain the last supplied observation.
+
+    Raises:
+        ValueError: If the inputs have different pandas types or their converted columns cannot
+            be aligned.
     """
     is_series = False
     if isinstance(df_newer, pd.Series) and isinstance(df_older, pd.Series):
@@ -288,6 +303,12 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
         pass
     else:
         raise ValueError(f"{type(df_older)} not aligned with {type(df_newer)}")
+
+    # Row storage order carries no information; boundaries and overlap checks are chronological.
+    if not df_newer.index.is_monotonic_increasing:
+        df_newer = df_newer.sort_index(kind='stable')
+    if not df_older.index.is_monotonic_increasing:
+        df_older = df_older.sort_index(kind='stable')
 
     sop.assert_list_subset(large_list=df_newer.columns.to_list(),
                            list_sample=df_older.columns.to_list())
