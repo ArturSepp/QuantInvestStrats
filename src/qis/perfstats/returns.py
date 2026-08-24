@@ -32,6 +32,8 @@ statistics such as Sharpe are assembled in ``qis/perfstats/perf_stats.py``.
 """
 # packages
 import warnings
+from math import isfinite
+from numbers import Integral, Real
 import numpy as np
 import pandas as pd
 from typing import Union, Dict, Optional
@@ -1091,6 +1093,35 @@ def get_excess_returns_nav(prices: Union[pd.DataFrame, pd.Series],
 # is already present, so no additional imports are needed.
 
 
+def _validate_leverage_parameters(leverage: object,
+                                  periods_per_year: object) -> None:
+    """Validate the shared scalar domain of the public leverage transforms.
+
+    Args:
+        leverage: Candidate debt-to-equity ratio.
+        periods_per_year: Candidate annualization factor or ``None``.
+
+    Raises:
+        ValueError: If leverage is not a finite nonnegative real scalar, or if
+            periods_per_year is neither ``None`` nor a positive integer.
+    """
+    if (isinstance(leverage, (bool, np.bool_))
+            or not isinstance(leverage, Real)
+            or not isfinite(leverage)
+            or leverage < 0.0):
+        raise ValueError(
+            f"leverage must be a finite non-negative real number, got {leverage!r}"
+        )
+
+    if (periods_per_year is not None
+            and (isinstance(periods_per_year, (bool, np.bool_))
+                 or not isinstance(periods_per_year, Integral)
+                 or periods_per_year <= 0)):
+        raise ValueError(
+            f"periods_per_year must be a positive integer or None, got {periods_per_year!r}"
+        )
+
+
 def delever_returns(returns: Union[pd.Series, pd.DataFrame],
                     leverage: float,
                     financing_rate: Union[float, pd.Series] = 0.0,
@@ -1111,20 +1142,25 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
 
     Args:
         returns: Period returns of the levered portfolio (Series or DataFrame).
-        leverage: Leverage ratio L (debt / equity). For a 1.5x levered fund pass 0.5;
-            for a 3x ETF pass 2.0; for the typical BDC at 1.0x debt-to-equity pass 1.0.
+        leverage: Finite, nonnegative leverage ratio L (debt / equity). Booleans are invalid.
+            For a 1.5x levered fund pass 0.5; for a 3x ETF pass 2.0; for the typical BDC at
+            1.0x debt-to-equity pass 1.0.
         financing_rate: Annualised financing rate. Pass a float for constant cost
             (e.g. risk-free rate as a crude proxy), or a Series indexed by date for
             time-varying financing (recommended for accuracy). Series observations are
             aligned to return dates and forward-filled from prior observations only.
             Default 0.0 ignores financing — only correct if the portfolio earns the
             financing rate on its borrowed capital, which is rarely the case.
-        periods_per_year: Annualisation factor used to convert the financing rate
-            to per-period. If None, inferred from the index frequency.
+        periods_per_year: Strictly positive integer annualisation factor used to convert the
+            financing rate to per-period. If None, inferred from the index frequency.
 
     Returns:
         De-levered returns matching the input shape and pandas labels. Zero leverage
         returns an independent copy, even when financing data is unavailable.
+
+    Raises:
+        ValueError: If leverage is not a finite nonnegative real scalar, or if an explicit
+            periods_per_year is not a positive integer.
 
     Note:
         This assumes constant leverage and a single-tier financing structure. Real
@@ -1138,6 +1174,9 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
         >>> ocsl_unlev = delever_returns(ocsl_returns, leverage=1.07,
         ...                              financing_rate=0.061)
     """
+    # Validate explicit inputs before zero leverage can bypass an invalid annualization factor.
+    _validate_leverage_parameters(leverage=leverage, periods_per_year=periods_per_year)
+
     # Preserve an exact identity before unavailable financing can propagate NaNs.
     if leverage == 0.0:
         return returns.copy()
@@ -1181,20 +1220,28 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
 
     Args:
         returns: Period returns of the unlevered asset (Series or DataFrame).
-        leverage: Leverage ratio L (debt / equity).
+        leverage: Finite, nonnegative leverage ratio L (debt / equity). Booleans are invalid.
         financing_rate: Annualised financing rate (float or Series). Series observations
             are aligned to return dates and forward-filled from prior observations only.
-        periods_per_year: Annualisation factor. If None, inferred from index.
+        periods_per_year: Strictly positive integer annualisation factor. If None, inferred
+            from the index.
 
     Returns:
         Levered returns matching the input shape and pandas labels. Zero leverage
         returns an independent copy, even when financing data is unavailable.
+
+    Raises:
+        ValueError: If leverage is not a finite nonnegative real scalar, or if an explicit
+            periods_per_year is not a positive integer.
 
     Example:
         >>> # Show what GCF would look like at 1x leverage with BDC-like financing
         >>> gcf_levered = lever_returns(gcf_returns, leverage=1.0,
         ...                             financing_rate=0.061)
     """
+    # Validate explicit inputs before zero leverage can bypass an invalid annualization factor.
+    _validate_leverage_parameters(leverage=leverage, periods_per_year=periods_per_year)
+
     # Preserve an exact identity before unavailable financing can propagate NaNs.
     if leverage == 0.0:
         return returns.copy()

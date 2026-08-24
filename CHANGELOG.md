@@ -13,6 +13,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   retaining their original order.
 - Made optional `compute_desc_table()` t-statistics undefined for zero-volatility samples instead
   of returning infinity with a divide-by-zero warning.
+- Rejected invalid leverage ratios and annualization factors in `lever_returns()` and
+  `delever_returns()` with consistent descriptive errors before applying either transform.
 
 ## [5.17.0] - 2026-08-25
 
