@@ -17,6 +17,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `delever_returns()` with consistent descriptive errors before applying either transform.
 - Made leverage funding alignment independent of financing-Series storage order and rejected
   ambiguous duplicate funding dates for nonzero leverage with a descriptive error.
+- Processed unique performance-fee return dates chronologically, rejected duplicate dates, and
+  crystallized fees on the latest available observation on or before calendar period ends.
 
 ## [5.17.0] - 2026-08-25
 

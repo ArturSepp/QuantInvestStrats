@@ -618,22 +618,37 @@ def compute_net_return_ex_perf_man_fees(gross_return: pd.Series,
     """Compute net returns after management and performance fees.
 
     Args:
-        gross_return: Gross return time series
+        gross_return: Gross return time series. Unique dates are interpreted chronologically
+            regardless of physical row order.
         man_fee: Annual management fee (e.g., 0.01 for 1%)
         perf_fee: Performance fee rate on profits above HWM (e.g., 0.2 for 20%)
-        perf_fee_frequency: Frequency for performance fee crystallization (e.g., 'YE')
+        perf_fee_frequency: Frequency for performance fee crystallization (e.g., 'YE'). Calendar
+            boundaries use the latest available observation on or before the period end.
 
     Returns:
-        Net return time series after fees
+        Net return time series after fees in increasing date order.
+
+    Raises:
+        ValueError: If gross_return contains duplicate dates.
     """
+    # Fee state is path-dependent, so physical row order cannot define its chronology.
+    if not gross_return.index.is_unique:
+        raise ValueError("gross_return index must not contain duplicate dates")
+    gross_return = gross_return.sort_index()
+
     # Generate performance fee crystallization dates
     perf_fee_cristalization_schedule = da.generate_dates_schedule(
         time_period=da.TimePeriod(gross_return.index[0], gross_return.index[-1]),
         freq=perf_fee_frequency)
 
-    perf_cris_dates = np.isin(element=gross_return.index,
-                              test_elements=perf_fee_cristalization_schedule,
-                              assume_unique=True)
+    # Map off-grid calendar ends backward so later returns never enter the prior fee period.
+    perf_cris_positions = np.asarray(
+        gross_return.index.searchsorted(perf_fee_cristalization_schedule, side='right'),
+        dtype=int,
+    ) - 1
+    perf_cris_positions = perf_cris_positions[perf_cris_positions >= 0]
+    perf_cris_dates = np.zeros(len(gross_return.index), dtype=bool)
+    perf_cris_dates[perf_cris_positions] = True
 
     # Initialize tracking DataFrame
     nav_data = pd.DataFrame(data=0.0,
