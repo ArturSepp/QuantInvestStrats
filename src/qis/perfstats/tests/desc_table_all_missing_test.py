@@ -5,12 +5,12 @@ dates but no observed values still belongs in that table: each undefined statist
 established formatted missing representation without emitting reduction warnings or preventing
 other assets from being reported.
 
-The shared eight-date panel pairs an all-missing asset with a symmetric finite control. Eight
-observations satisfy the normality test's minimum sample size, isolating warnings caused by the
-missing column. The finite expectations below come from direct counts and centered moments; the
-normality p-value is an unchanged accepted-output control. Tests cover every implemented table
-mode, exact schemas and strings, named Series/DataFrame consistency, formatting, optional
-t-statistics, nullable ``Float64`` compatibility, and caller ownership.
+The base eight-date panel pairs an all-missing asset with a symmetric finite control. Normality
+cases use a separate symmetric 20-date panel so every supported SciPy version remains above its
+small-sample warning boundary. The finite expectations below come from direct counts and centered
+moments; the normality p-value is an unchanged accepted-output control. Tests cover every
+implemented table mode, exact schemas and strings, named Series/DataFrame consistency, formatting,
+optional t-statistics, nullable ``Float64`` compatibility, and caller ownership.
 """
 
 import warnings
@@ -53,6 +53,8 @@ _DATES = pd.date_range('2024-01-31', periods=8, freq='ME')
 _ALL_MISSING_ASSET = 'All Missing Asset'
 _FINITE_ASSET = 'Finite Asset'
 _FINITE_VALUES = (-4.0, -3.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0)
+_NORMALITY_FINITE_VALUES = tuple(float(value) for value in range(-10, 0)) + tuple(
+    float(value) for value in range(1, 11))
 _SECOND_FINITE_ASSET = 'Second Finite Asset'
 
 _IMPLEMENTED_MODES = tuple(
@@ -83,10 +85,10 @@ _EXPECTED_COLUMNS: dict[DescTableType, tuple[tuple[str, str, str], ...]] = {
     ),
     DescTableType.WITH_NORMAL_PVAL: (
         ('Avg', '0.00', 'nan'),
-        ('Std', '2.93', 'nan'),
+        ('Std', '6.37', 'nan'),
         ('Skew', '0.0', 'nan'),
-        ('Kurt', '-1.4', 'nan'),
-        ('P-val', '0.28', 'nan'),
+        ('Kurt', '-1.3', 'nan'),
+        ('P-val', '0.08', 'nan'),
     ),
     DescTableType.WITH_SCORE: (
         ('Avg', '0.00', 'nan'),
@@ -119,27 +121,54 @@ _EXPECTED_COLUMNS: dict[DescTableType, tuple[tuple[str, str, str], ...]] = {
 }
 
 
-def _mixed_returns() -> pd.DataFrame:
-    """Create one finite and one all-missing asset over the same dates.
+def _finite_values(desc_table_type: DescTableType) -> tuple[float, ...]:
+    """Select a finite fixture that is warning-free for the requested mode.
 
-    The finite values sum to zero, have squared deviations totaling 60, and contain four
-    positives among eight observations. Their sample standard deviation is therefore
-    ``sqrt(60 / 7)``, while symmetry makes skewness zero. Their second and fourth central
-    moments are 7.5 and 88.5, giving excess kurtosis ``88.5 / 7.5**2 - 3``.
+    The 20 normality observations have squared deviations totaling 770, so their sample standard
+    deviation is ``sqrt(770 / 19)``. Their second and fourth central moments are 38.5 and 2533.3,
+    giving Fisher excess kurtosis ``2533.3 / 38.5**2 - 3 = -1.290909...``.
+
+    Args:
+        desc_table_type: Descriptive-table mode under test.
 
     Returns:
-        Eight-row return panel in the expected reporting order.
+        Symmetric finite observations used by that mode.
     """
+    if desc_table_type is DescTableType.WITH_NORMAL_PVAL:
+        return _NORMALITY_FINITE_VALUES
+    return _FINITE_VALUES
+
+
+def _mixed_returns(desc_table_type: DescTableType) -> pd.DataFrame:
+    """Create one finite and one all-missing asset over the same dates.
+
+    The base finite values sum to zero, have squared deviations totaling 60, and contain four
+    positives among eight observations. Their sample standard deviation is therefore
+    ``sqrt(60 / 7)``, while symmetry makes skewness zero. Their second and fourth central
+    moments are 7.5 and 88.5, giving excess kurtosis ``88.5 / 7.5**2 - 3``. The normality mode
+    substitutes the 20-point fixture documented by ``_finite_values``.
+
+    Args:
+        desc_table_type: Descriptive-table mode that determines the finite fixture length.
+
+    Returns:
+        Return panel in the expected reporting order and mode-specific sample length.
+    """
+    finite_values = _finite_values(desc_table_type)
+    dates = pd.date_range('2024-01-31', periods=len(finite_values), freq='ME')
     return pd.DataFrame(
         {
-            _FINITE_ASSET: _FINITE_VALUES,
-            _ALL_MISSING_ASSET: (np.nan,) * len(_DATES),
+            _FINITE_ASSET: finite_values,
+            _ALL_MISSING_ASSET: (np.nan,) * len(dates),
         },
-        index=_DATES,
+        index=dates,
     )
 
 
-def _nullable_returns(*, include_all_missing: bool) -> pd.DataFrame:
+def _nullable_returns(
+        desc_table_type: DescTableType,
+        *,
+        include_all_missing: bool) -> pd.DataFrame:
     """Create a multi-column nullable panel with optional all-missing history.
 
     Two independently stored finite columns exercise the extension-array conversion across a
@@ -147,18 +176,21 @@ def _nullable_returns(*, include_all_missing: bool) -> pd.DataFrame:
     same fixture covers both finite-only and mixed finite/all-missing nullable boundaries.
 
     Args:
+        desc_table_type: Descriptive-table mode that determines the finite fixture length.
         include_all_missing: Whether to append the all-missing nullable column.
 
     Returns:
-        Eight-row return panel whose columns all use pandas nullable ``Float64`` dtype.
+        Return panel whose columns use pandas nullable ``Float64`` and the mode-specific length.
     """
+    finite_values = _finite_values(desc_table_type)
+    dates = pd.date_range('2024-01-31', periods=len(finite_values), freq='ME')
     values: dict[str, tuple[float, ...]] = {
-        _FINITE_ASSET: _FINITE_VALUES,
-        _SECOND_FINITE_ASSET: _FINITE_VALUES,
+        _FINITE_ASSET: finite_values,
+        _SECOND_FINITE_ASSET: finite_values,
     }
     if include_all_missing:
-        values[_ALL_MISSING_ASSET] = (np.nan,) * len(_DATES)
-    return pd.DataFrame(values, index=_DATES).astype('Float64')
+        values[_ALL_MISSING_ASSET] = (np.nan,) * len(dates)
+    return pd.DataFrame(values, index=dates).astype('Float64')
 
 
 def _expected_table(desc_table_type: DescTableType) -> pd.DataFrame:
@@ -254,7 +286,7 @@ def test_compute_desc_table_all_missing_column_returns_undefined_statistics(
     Args:
         desc_table_type: Implemented descriptive-table mode under test.
     """
-    returns = _mixed_returns()
+    returns = _mixed_returns(desc_table_type)
     original_returns = returns.copy(deep=True)
 
     actual = _compute_without_warnings(returns, desc_table_type)
@@ -283,7 +315,8 @@ def test_compute_desc_table_nullable_float64_returns_exact_statistics(
         desc_table_type: Implemented descriptive-table mode under test.
         include_all_missing: Whether the nullable panel contains the all-missing asset.
     """
-    returns = _nullable_returns(include_all_missing=include_all_missing)
+    returns = _nullable_returns(
+        desc_table_type, include_all_missing=include_all_missing)
     original_returns = returns.copy(deep=True)
     assert returns.dtypes.astype(str).tolist() == ['Float64'] * len(returns.columns)
 
@@ -308,7 +341,7 @@ def test_compute_desc_table_nullable_float64_supports_annualized_reduced_modes(
     Args:
         desc_table_type: Reduced descriptive-table mode under test.
     """
-    returns = _nullable_returns(include_all_missing=True)
+    returns = _nullable_returns(desc_table_type, include_all_missing=True)
     original_returns = returns.copy(deep=True)
 
     actual = _compute_without_warnings(
@@ -373,7 +406,7 @@ def test_compute_desc_table_all_missing_named_series_matches_dataframe(
     Args:
         desc_table_type: Implemented descriptive-table mode under test.
     """
-    returns = _mixed_returns()[_ALL_MISSING_ASSET]
+    returns = _mixed_returns(desc_table_type)[_ALL_MISSING_ASSET]
     returns_frame = returns.to_frame()
     original_returns = returns.copy(deep=True)
     original_frame = returns_frame.copy(deep=True)
