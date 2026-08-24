@@ -259,3 +259,30 @@ def test_positive_negative_regime_preserves_series_shape_name_and_input() -> Non
     pd.testing.assert_frame_equal(series_result, frame_result)
     pd.testing.assert_series_equal(benchmark, original_benchmark, check_exact=True)
     pd.testing.assert_frame_equal(benchmark_frame, original_frame, check_exact=True)
+
+
+def test_positive_negative_regime_supports_nullable_benchmark_missing_values() -> None:
+    """Classify observed nullable returns without evaluating ``pd.NA`` as a boolean."""
+    benchmark = pd.Series(
+        _BENCHMARK_PRICES,
+        index=_DATES,
+        name=_BENCHMARK_NAME,
+        dtype="Float64",
+    )
+    original_benchmark = benchmark.copy(deep=True)
+    expected_regimes = pd.Series(
+        (np.nan, np.nan, "Negative", np.nan, np.nan, "Positive", "Positive"),
+        index=_DATES,
+        name=_REGIME_COLUMN,
+        dtype=object,
+    )
+
+    actual = _classifier().compute_sampled_returns_with_regime_id(
+        prices=benchmark,
+        benchmark=_BENCHMARK_NAME,
+        include_start_date=True,
+        include_end_date=True,
+    )
+
+    pd.testing.assert_series_equal(actual[_REGIME_COLUMN], expected_regimes)
+    pd.testing.assert_series_equal(benchmark, original_benchmark, check_exact=True)

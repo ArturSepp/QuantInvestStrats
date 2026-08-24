@@ -614,11 +614,18 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
         regime_ids = self.get_regime_ids()
 
         # A missing benchmark return has no sign and must not enter either frequency bucket.
+        observed = benchmark_returns.notna()
         regime_classification = pd.Series(
-            np.where(benchmark_returns < 0, regime_ids[0], regime_ids[1]),
+            np.nan,
             index=benchmark_returns.index,
-            name=self.REGIME_COLUMN
-        ).mask(benchmark_returns.isna())
+            name=self.REGIME_COLUMN,
+            dtype=object,
+        )
+        regime_classification.loc[observed] = np.where(
+            benchmark_returns.loc[observed] < 0,
+            regime_ids[0],
+            regime_ids[1],
+        )
 
         sampled_returns_with_regime_id[self.REGIME_COLUMN] = regime_classification
 
