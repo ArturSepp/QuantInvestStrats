@@ -9,9 +9,9 @@ value. Values come back as formatted strings because the table renderer takes th
 
 ``annualize_vol`` scales the standard deviation by the square root of the factor inferred from
 the index via ``infer_annualisation_factor_from_df``, reporting ``STD_AN`` rather than ``STD``.
-``is_add_tstat`` divides the mean by that volatility, nan where the mean is not positive; with
-``annualize_vol`` off ``an_factor`` is 1.0, so neither side is annualised. Risk-adjusted
-statistics are ``perf_stats.py``.
+``is_add_tstat`` divides the mean by that volatility, nan unless both adjusted mean and
+volatility are positive; with ``annualize_vol`` off ``an_factor`` is 1.0, so neither side is
+annualised. Risk-adjusted statistics are ``perf_stats.py``.
 """
 # packages
 import numpy as np
@@ -133,7 +133,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         var_format: format applied to the statistics
         annualize_vol: report volatility per annum rather than per period; reduced modes omit
             the volatility column selected by this convention
-        is_add_tstat: add the t-statistic of the mean
+        is_add_tstat: add the t-statistic of the mean when adjusted mean and volatility are
+            positive; otherwise report the formatted missing value
         norm_variable_display_type: format applied to the t-statistic
 
     Returns:
@@ -171,13 +172,14 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
 
     if is_add_tstat:
         an_mean = an_factor * mean
-        # NumPy 2.x: explicit out= so masked positions are deterministic nan, not uninitialized memory.
-        # NB: original mask is `an_mean > 0`, not `vol > 0` — preserved; revisit if the intent was
-        # actually to guard div-by-zero on vol rather than to filter on mean sign.
+        # A zero-volatility sample has no defined displayed statistic.
         tstats = np.divide(
             an_mean, vol,
             out=np.full_like(an_mean, np.nan, dtype=float),
-            where=np.greater(an_mean, 0.0),
+            where=np.logical_and(
+                np.greater(an_mean, 0.0),
+                np.greater(vol, 0.0),
+            ),
         )
         descriptive_table[PerfStat.T_STAT.to_str()] = [norm_variable_display_type.format(x) for x in tstats]
 
