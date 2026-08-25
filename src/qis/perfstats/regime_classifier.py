@@ -38,6 +38,7 @@ import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
 from matplotlib._color_data import CSS4_COLORS as mcolors
 from matplotlib.colors import to_hex
+from numbers import Integral
 from typing import Union, Dict, List, Tuple, Any, cast
 from enum import Enum
 
@@ -687,12 +688,19 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
         Args:
             freq: Sampling frequency for volatility calculation
             return_type: Type of returns to compute
-            q: Number of quantile buckets
+            q: Positive integer number of quantile buckets. NumPy integer scalars are accepted;
+                booleans are invalid.
+
+        Raises:
+            ValueError: If ``q`` is not a positive integer.
         """
         super().__init__()
+        # One positive integer must control both qcut allocation and published regime metadata.
+        if isinstance(q, (bool, np.bool_)) or not isinstance(q, Integral) or q <= 0:
+            raise ValueError(f"q must be a positive integer, got {q!r}")
         self.freq = freq
         self.return_type = return_type
-        self.q = q
+        self.q = int(q)
         self.regime_colors: Dict[str, Tuple[float, ...]] = {}
 
     def compute_sampled_returns_with_regime_id(self,
@@ -712,6 +720,9 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
         Returns:
             DataFrame with returns and regime classification. The ordered threshold IDs and one
             color per ID are also available through ``get_regime_ids_colors()``.
+
+        Raises:
+            ValueError: If fewer than ``q`` volatility quantile bands contain observations.
         """
         vols = ret.compute_sampled_vols(
             prices=prices[benchmark],
@@ -719,6 +730,29 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             include_start_date=include_start_date,
             include_end_date=include_end_date
         )
+
+        valid_vols = vols.dropna()
+        if self.q > 0 and not valid_vols.empty:
+            # Require every requested band to contain data before publishing its ID and color.
+            quantile_classification, quantile_edges = cast(
+                Tuple[pd.Categorical, np.ndarray],
+                pd.qcut(
+                    x=valid_vols.to_numpy(dtype=float),
+                    q=self.q,
+                    duplicates='drop',
+                    retbins=True,
+                ),
+            )
+            occupied_codes = quantile_classification.codes[quantile_classification.codes >= 0]
+            num_nonempty_bands = int(np.unique(occupied_codes).size)
+            if num_nonempty_bands < self.q:
+                unique_edges = np.unique(np.asarray(quantile_edges, dtype=float)).tolist()
+                raise ValueError(
+                    f"Volatility regime benchmark '{benchmark}' is degenerate for q={self.q}: "
+                    f"only {num_nonempty_bands} of {self.q} quantile bands are non-empty "
+                    f"(edges={unique_edges}).\n"
+                    f"Use fewer buckets or a longer or more variable benchmark history."
+                )
 
         hue_name = f"{benchmark} vol"
         classificator, labels = dfc.add_quantile_classification(
