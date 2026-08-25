@@ -7,6 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.16.0] - 2026-08-25
+
+### Changed
+
+- Split excluded Brinson interaction effects equally between allocation and selection while
+  preserving total active return, and revised the factsheet page to show grouped active effects
+  with regime backgrounds.
+
 ### Fixed
 
 - Made annualized `AVG_WITH_POSITIVE_PROB` and `SKEW_KURTOSIS` descriptive tables return their

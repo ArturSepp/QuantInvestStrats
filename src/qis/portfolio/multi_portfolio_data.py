@@ -21,8 +21,8 @@ Two portfolios are compared by index rather than by name, ``strategy_idx`` again
         ``annualization_factor``, 260 by default.
 
     Brinson attribution splits active return into allocation, selection and interaction on
-        *realised* weights; ``is_exclude_interaction_term=True`` by default folds interaction
-        into selection.
+        *realised* weights; ``is_exclude_interaction_term=True`` by default splits interaction
+        equally between allocation and selection.
 
 Entry points are ``get_navs``, ``get_ra_perf_table``, ``compute_tracking_error_implied_by_covar``
 and ``compute_brinson_attribution``, plus a ``plot_*`` family drawing one panel onto a supplied
@@ -980,7 +980,7 @@ class MultiPortfolioData:
                                              time_period=time_period,
                                              is_exclude_interaction_term=is_exclude_interaction_term)
 
-        fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inters = qis.plot_brinson_attribution_table(
+        brinson_figs = qis.plot_brinson_attribution_table(
             totals_table=totals_table,
             active_total=active_total,
             grouped_allocation_return=grouped_allocation_return,
@@ -990,7 +990,8 @@ class MultiPortfolioData:
             is_exclude_interaction_term=is_exclude_interaction_term,
             axs=axs,
             **kwargs)
-        return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inters
+        fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_final = brinson_figs
+        return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_final
 
     def get_grouped_weights(self,
                             is_input_weights: bool = True,

@@ -52,7 +52,8 @@ def compute_brinson_attribution_table(
         asset_class_data: Mapping of assets to asset classes. Index: assets, Values: classes.
         group_order: Optional ordering for asset classes in output tables.
         total_column: Name for the total/summary column in outputs.
-        is_exclude_interaction_term: If True, allocates interaction effect to selection.
+        is_exclude_interaction_term: If True, allocates half of the interaction effect to
+            allocation and half to selection.
         strategy_name: Display name for strategy in output tables.
         benchmark_name: Display name for benchmark in output tables.
 
@@ -165,9 +166,9 @@ def compute_brinson_attribution_table(
 
     # Interaction term handling
     if is_exclude_interaction_term:
-        # Common practice: Allocate interaction effect to selection component
-        # Alternative approaches: split 50/50 between allocation and selection
-        grouped_selection_return = grouped_selection_return + grouped_interaction_return
+        half_interaction_return = 0.5 * grouped_interaction_return
+        grouped_allocation_return = grouped_allocation_return + half_interaction_return
+        grouped_selection_return = grouped_selection_return + half_interaction_return
         grouped_interaction_return = 0.0 * grouped_interaction_return
 
     # Summary statistics table creation
@@ -237,7 +238,8 @@ def compute_brinson_attribution_table(
     active_total = pd.concat([allocation_total, selection_total], axis=1, sort=True)
 
     if not is_exclude_interaction_term:
-        interaction_total = grouped_interaction_return[total_column].to_frame(name='Interaction Total')
+        interaction_total = grouped_interaction_return[total_column].to_frame(
+            name='Interaction Total')
         active_total = pd.concat([active_total, interaction_total], axis=1, sort=True)
 
     return (totals_table, active_total, grouped_allocation_return,
@@ -261,9 +263,12 @@ def plot_brinson_attribution_table(
     Generates a multi-panel visualization including:
     1. Summary table with attribution statistics
     2. Time series of cumulative total attribution effects
-    3. Time series of cumulative allocation effects by asset class
-    4. Time series of cumulative selection effects by asset class
-    5. Time series of cumulative interaction effects by asset class
+    3. Time series of cumulative active effects by asset class when interaction is excluded
+    4. Time series of cumulative allocation effects by asset class
+    5. Time series of cumulative selection effects by asset class
+
+    When interaction is reported separately, panel 3 is omitted and panel 5 shows cumulative
+    interaction effects instead.
 
     Args:
         totals_table: Summary statistics table from compute_brinson_attribution_table.
@@ -273,13 +278,15 @@ def plot_brinson_attribution_table(
         grouped_interaction_return: Interaction effects by asset class over time.
         var_format: Format string for displaying numeric values (default: percentage).
         total_column: Name of the total column for portfolio-level aggregation.
-        is_exclude_interaction_term: Whether interaction terms are excluded from analysis.
+        is_exclude_interaction_term: Whether interaction terms are split equally between
+            allocation and selection.
         axs: Optional list of matplotlib axes for plotting (if None, creates new figures).
         **kwargs: Additional arguments passed to plotting functions.
 
     Returns:
-        Tuple of matplotlib figures: (table_fig, active_fig, allocation_fig,
-                                    selection_fig, interaction_fig)
+        Tuple of matplotlib figures: (table_fig, active_fig, allocation_fig, selection_fig,
+            final_fig). ``final_fig`` is grouped active effects when interaction is excluded and
+            interaction effects otherwise.
 
     Example:
         >>> # After running compute_brinson_attribution_table
@@ -287,7 +294,7 @@ def plot_brinson_attribution_table(
         ...     totals_table, active_total, allocation_return,
         ...     selection_return, interaction_return
         ... )
-        >>> table_fig, active_fig, alloc_fig, select_fig, interact_fig = figs
+        >>> table_fig, active_fig, alloc_fig, select_fig, final_fig = figs
         >>> plt.show()
     """
     # Generate formatted summary table
@@ -310,6 +317,24 @@ def plot_brinson_attribution_table(
         **kwargs
     )
 
+    if is_exclude_interaction_term:
+        grouped_active_return = (
+            grouped_allocation_return + grouped_selection_return
+        ).drop(columns=total_column, errors='ignore')
+        fig_ts_final = pts.plot_time_series(
+            df=grouped_active_return.cumsum(axis=0),
+            var_format='{:.0%}',
+            title='Total Cumulative Active Effects by Groups',
+            legend_stats=qis.LegendStats.LAST_NONNAN,
+            ax=axs[2],
+            **kwargs
+        )
+        allocation_ax = axs[3]
+        selection_ax = axs[4]
+    else:
+        allocation_ax = axs[2]
+        selection_ax = axs[3]
+
     # Plot cumulative allocation effects by asset class
     cum_allocation_return = grouped_allocation_return.cumsum(axis=0)
     fig_ts_alloc = pts.plot_time_series(
@@ -317,7 +342,7 @@ def plot_brinson_attribution_table(
         var_format='{:.0%}',
         title='Cumulative Asset Class Allocation Effects',
         legend_stats=qis.LegendStats.LAST_NONNAN,
-        ax=axs[2],
+        ax=allocation_ax,
         **kwargs
     )
 
@@ -326,24 +351,24 @@ def plot_brinson_attribution_table(
     fig_ts_sel = pts.plot_time_series(
         df=cum_selection_return,
         var_format='{:.0%}',
-        title='Cumulative Asset Class Selection Effects',
+        title='Cumulative Instrument Selection Effects',
         legend_stats=qis.LegendStats.LAST_NONNAN,
-        ax=axs[3],
+        ax=selection_ax,
         **kwargs
     )
 
-    # Plot cumulative interaction effects by asset class (with trend line)
-    cum_interaction_return = grouped_interaction_return.cumsum(axis=0)
-    fig_ts_inter = pts.plot_time_series(
-        df=cum_interaction_return,
-        trend_line=pts.TrendLine.TREND_LINE,
-        var_format='{:.0%}',
-        title='Cumulative Asset Class Interaction Effects',
-        ax=axs[4],
-        **kwargs
-    )
+    if not is_exclude_interaction_term:
+        cum_interaction_return = grouped_interaction_return.cumsum(axis=0)
+        fig_ts_final = pts.plot_time_series(
+            df=cum_interaction_return,
+            trend_line=pts.TrendLine.TREND_LINE,
+            var_format='{:.0%}',
+            title='Cumulative Asset Class Interaction Effects',
+            ax=axs[4],
+            **kwargs
+        )
 
-    return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_inter
+    return fig_table, fig_active_total, fig_ts_alloc, fig_ts_sel, fig_ts_final
 
 
 def plot_brinson_totals_table(
