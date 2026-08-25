@@ -299,3 +299,10 @@ and compare nothing.
 - Use `C:\Python\QuantInvestStrats312\Scripts\python.exe` for all Python commands.
 - Run tools through that interpreter, for example `C:\Python\QuantInvestStrats312\Scripts\python.exe -m pytest` and `C:\Python\QuantInvestStrats312\Scripts\python.exe -m pip`.
 - If the environment is missing, create it with `py -3.12 -m venv C:\Python\QuantInvestStrats312`; do not create `.venv` under the repository.
+
+## Temporary workspace hygiene
+
+- Pytest's cache is configured outside OneDrive at `~/.cache/qis/pytest`.
+- Never create `tmp/`, `.pytest*`, or `.codex*` work directories inside the checkout.
+- Use a task-specific directory below `tempfile.gettempdir()` under
+  `QuantInvestStrats/<task-id>`, and remove it after verification.
