@@ -21,8 +21,8 @@ Two portfolios are compared by index rather than by name, ``strategy_idx`` again
         ``annualization_factor``, 260 by default.
 
     Brinson attribution splits active return into allocation, selection and interaction on
-        *realised* weights; ``is_exclude_interaction_term=True`` by default splits interaction
-        equally between allocation and selection.
+        *realised* weights; ``is_exclude_interaction_term=True`` by default assigns interaction
+        entirely to instrument selection.
 
 Entry points are ``get_navs``, ``get_ra_perf_table``, ``compute_tracking_error_implied_by_covar``
 and ``compute_brinson_attribution``, plus a ``plot_*`` family drawing one panel onto a supplied

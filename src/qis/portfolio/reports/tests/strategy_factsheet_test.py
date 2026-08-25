@@ -210,7 +210,7 @@ def test_removed_heatmap_fontsize_keyword_is_rejected() -> None:
         )
 
 
-def test_brinson_splits_interaction_equally_and_preserves_active_return() -> None:
+def test_brinson_assigns_interaction_to_selection_and_preserves_active_return() -> None:
     index = pd.DatetimeIndex(['2025-01-31'])
     columns = ['Equity', 'Bonds']
     group_data = pd.Series(columns, index=columns)
@@ -238,10 +238,8 @@ def test_brinson_splits_interaction_equally_and_preserves_active_return() -> Non
     raw_allocation, raw_selection, raw_interaction = raw[2:]
     split_allocation, split_selection, split_interaction = split[2:]
 
-    pd.testing.assert_frame_equal(split_allocation,
-                                  raw_allocation + 0.5 * raw_interaction)
-    pd.testing.assert_frame_equal(split_selection,
-                                  raw_selection + 0.5 * raw_interaction)
+    pd.testing.assert_frame_equal(split_allocation, raw_allocation)
+    pd.testing.assert_frame_equal(split_selection, raw_selection + raw_interaction)
     assert np.allclose(split_interaction.to_numpy(), 0.0)
     pd.testing.assert_frame_equal(
         split_allocation + split_selection,
@@ -278,14 +276,18 @@ def test_brinson_page_uses_requested_layout_titles_and_regime_backgrounds() -> N
             'Net exposure diff Strategy-Benchmark Portfolio',
         }
         assert set(axes_by_title) == expected_titles
-        assert 'Interaction returns added 50%/50%' in brinson_page._suptitle.get_text()
+        assert 'Interaction returns added 100% to instrument selection' in (
+            brinson_page._suptitle.get_text()
+        )
 
+        active_total = axes_by_title['Cumulative Active Attribution Effects']
         active_by_group = axes_by_title['Total Cumulative Active Effects by Groups']
         allocation = axes_by_title['Cumulative Asset Class Allocation Effects']
         selection = axes_by_title['Cumulative Instrument Selection Effects']
         exposure = axes_by_title['Net exposure diff Strategy-Benchmark Portfolio']
-        assert active_by_group.get_position().x0 < allocation.get_position().x0
-        assert active_by_group.get_position().y0 > selection.get_position().y0
+        assert active_by_group.get_position().x0 > active_total.get_position().x0
+        assert active_by_group.get_position().y0 > active_total.get_position().y0
+        assert active_total.get_position().x0 < allocation.get_position().x0
         assert selection.get_position().x0 < exposure.get_position().x0
         for ax in axes_by_title.values():
             assert ax.patches

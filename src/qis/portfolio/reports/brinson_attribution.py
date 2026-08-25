@@ -52,8 +52,8 @@ def compute_brinson_attribution_table(
         asset_class_data: Mapping of assets to asset classes. Index: assets, Values: classes.
         group_order: Optional ordering for asset classes in output tables.
         total_column: Name for the total/summary column in outputs.
-        is_exclude_interaction_term: If True, allocates half of the interaction effect to
-            allocation and half to selection.
+        is_exclude_interaction_term: If True, assigns the interaction effect entirely to
+            instrument selection.
         strategy_name: Display name for strategy in output tables.
         benchmark_name: Display name for benchmark in output tables.
 
@@ -166,9 +166,7 @@ def compute_brinson_attribution_table(
 
     # Interaction term handling
     if is_exclude_interaction_term:
-        half_interaction_return = 0.5 * grouped_interaction_return
-        grouped_allocation_return = grouped_allocation_return + half_interaction_return
-        grouped_selection_return = grouped_selection_return + half_interaction_return
+        grouped_selection_return = grouped_selection_return + grouped_interaction_return
         grouped_interaction_return = 0.0 * grouped_interaction_return
 
     # Summary statistics table creation
@@ -278,8 +276,8 @@ def plot_brinson_attribution_table(
         grouped_interaction_return: Interaction effects by asset class over time.
         var_format: Format string for displaying numeric values (default: percentage).
         total_column: Name of the total column for portfolio-level aggregation.
-        is_exclude_interaction_term: Whether interaction terms are split equally between
-            allocation and selection.
+        is_exclude_interaction_term: Whether interaction terms are assigned entirely to
+            instrument selection instead of reported separately.
         axs: Optional list of matplotlib axes for plotting (if None, creates new figures).
         **kwargs: Additional arguments passed to plotting functions.
 

@@ -7,6 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.17.0] - 2026-08-25
+
+### Changed
+
+- Assign excluded Brinson interaction effects entirely to instrument selection while preserving
+  total active return, and revise the factsheet page ordering to show grouped active effects in
+  the top-right panel and cumulative active attribution in the middle-left panel.
+
 ## [5.16.0] - 2026-08-25
 
 ### Changed

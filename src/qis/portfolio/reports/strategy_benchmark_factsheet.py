@@ -5,8 +5,8 @@ one strategy against one benchmark: a ``MultiPortfolioData`` in, a list of A4 pa
 against ``benchmark_idx``, and returns one ``plt.Figure`` per page. Page one always renders the
 joint performance, exposure and cost panels beside the risk-adjusted tables, regime Sharpes and
 the per-instrument P&L difference. ``add_brinson_attribution`` is the one flag on by default,
-appending the allocation / selection page - the call splits the interaction term equally between
-allocation and selection. The other page flags are off; ``add_benchmarks_to_navs`` adds benchmark
+appending the allocation / selection page - the call assigns the interaction term to instrument
+selection. The other page flags are off; ``add_benchmarks_to_navs`` adds benchmark
 lines to the page-one panels rather than a page, and ``add_grouped_exposures`` /
 ``add_grouped_cum_pnl``
 apply only to the factsheet appended by ``add_strategy_factsheet``. Frequencies are per panel and
@@ -76,7 +76,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         backtest_name: title of the report
         add_benchmarks_to_navs: include the benchmarks as additional lines in the performance panels
         add_brinson_attribution: add the allocation / selection decomposition, with interaction
-            split equally between them
+            assigned entirely to instrument selection
         add_exposures_pnl_attribution: add the exposure and P&L attribution pages
         add_strategy_factsheet: append the full single-strategy factsheet
         add_grouped_exposures: report exposures by group in that appended factsheet
@@ -289,12 +289,12 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
             this_name = backtest_name if backtest_name is not None else ''
             fig1.suptitle(
                 f'{this_name} Brinson performance attribution report\n'
-                'Interaction returns added 50%/50% to allocation and instrument selection',
+                'Interaction returns added 100% to instrument selection',
                 fontweight='bold', fontsize=8, color='blue')
             figs.append(fig1)
             gs = fig1.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)
-            axs = [fig1.add_subplot(gs[0, 0]), fig1.add_subplot(gs[0, 1]),
-                   fig1.add_subplot(gs[1, 0]), fig1.add_subplot(gs[1, 1]),
+            axs = [fig1.add_subplot(gs[0, 0]), fig1.add_subplot(gs[1, 0]),
+                   fig1.add_subplot(gs[0, 1]), fig1.add_subplot(gs[1, 1]),
                    fig1.add_subplot(gs[2, 0])]
             multi_portfolio_data.plot_brinson_attribution(strategy_idx=strategy_idx,
                                                           benchmark_idx=benchmark_idx,
