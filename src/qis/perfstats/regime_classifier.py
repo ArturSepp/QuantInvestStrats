@@ -550,8 +550,9 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
 class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
     """Regime classifier based on positive vs negative benchmark returns.
 
-    Classifies periods into two simple regimes based on benchmark return sign,
-    useful for up/down market analysis. Missing benchmark returns remain unclassified.
+    Classifies periods into two ordered regimes based on benchmark return sign,
+    useful for up/down market analysis. Both regime categories remain available for aggregation
+    when one is unobserved, while missing benchmark returns remain unclassified.
     """
 
     def __init__(self,
@@ -563,15 +564,29 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
         Args:
             freq: Sampling frequency (default: 'QE' for quarter-end)
             return_type: Type of returns to compute
-            regime_ids_colors: Mapping of regime names to colors
+            regime_ids_colors: Optional ordered mapping of exactly two regime names to colors.
+                The first entry classifies negative returns and the second classifies zero or
+                positive returns.
+
+        Raises:
+            ValueError: If an explicit mapping does not contain exactly two entries.
         """
         super().__init__()
         self.freq = freq
         self.return_type = return_type
-        self.regime_ids_colors = regime_ids_colors or {
-            'Negative': mcolors['salmon'],
-            'Positive': mcolors['darkgreen']
-        }
+        # Keep two ordered metadata entries aligned with the classifier's two sign states.
+        if regime_ids_colors is None:
+            self.regime_ids_colors = {
+                'Negative': mcolors['salmon'],
+                'Positive': mcolors['darkgreen']
+            }
+        elif len(regime_ids_colors) != 2:
+            raise ValueError(
+                'Positive/negative regimes require exactly 2 regime labels and colors; '
+                f'received {len(regime_ids_colors)}'
+            )
+        else:
+            self.regime_ids_colors = dict(regime_ids_colors)
 
     def compute_sampled_returns_with_regime_id(self,
                                                prices: Union[pd.DataFrame, pd.Series],
@@ -588,8 +603,8 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
             include_end_date: Include last period
 
         Returns:
-            DataFrame with returns and regime classification. Missing benchmark returns have a
-            missing regime ID.
+            DataFrame with returns and an ordered categorical regime classification containing
+            both configured IDs. Missing benchmark returns have a missing regime ID.
 
         Raises:
             ValueError: If insufficient data for classification
@@ -626,6 +641,12 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
             benchmark_returns.loc[observed] < 0,
             regime_ids[0],
             regime_ids[1],
+        )
+        # Retain both ordered categories so aggregation preserves an unobserved sign regime.
+        regime_classification = pd.Series(
+            pd.Categorical(regime_classification, categories=regime_ids, ordered=True),
+            index=benchmark_returns.index,
+            name=self.REGIME_COLUMN,
         )
 
         sampled_returns_with_regime_id[self.REGIME_COLUMN] = regime_classification

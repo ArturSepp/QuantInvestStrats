@@ -149,7 +149,12 @@ def test_positive_negative_regime_preserves_missing_benchmark_returns() -> None:
     expected = _expected_classified_returns()
     expected_frequencies = pd.Series(
         (1.0 / 3.0, 2.0 / 3.0),
-        index=pd.Index(("Negative", "Positive"), name=_REGIME_COLUMN),
+        index=pd.CategoricalIndex(
+            ("Negative", "Positive"),
+            categories=("Negative", "Positive"),
+            ordered=True,
+            name=_REGIME_COLUMN,
+        ),
     )
 
     actual = _classifier().compute_sampled_returns_with_regime_id(
@@ -164,6 +169,7 @@ def test_positive_negative_regime_preserves_missing_benchmark_returns() -> None:
         actual,
         expected,
         check_dtype=False,
+        check_categorical=False,
         check_exact=False,
         rtol=0.0,
         atol=_TOLERANCE,
@@ -211,6 +217,7 @@ def test_positive_negative_regime_preserves_custom_names_and_missing_mask() -> N
         actual,
         expected,
         check_dtype=False,
+        check_categorical=False,
         check_exact=False,
         rtol=0.0,
         atol=_TOLERANCE,
@@ -252,6 +259,7 @@ def test_positive_negative_regime_preserves_series_shape_name_and_input() -> Non
         series_result,
         expected,
         check_dtype=False,
+        check_categorical=False,
         check_exact=False,
         rtol=0.0,
         atol=_TOLERANCE,
@@ -271,10 +279,13 @@ def test_positive_negative_regime_supports_nullable_benchmark_missing_values() -
     )
     original_benchmark = benchmark.copy(deep=True)
     expected_regimes = pd.Series(
-        (np.nan, np.nan, "Negative", np.nan, np.nan, "Positive", "Positive"),
+        pd.Categorical(
+            (np.nan, np.nan, "Negative", np.nan, np.nan, "Positive", "Positive"),
+            categories=("Negative", "Positive"),
+            ordered=True,
+        ),
         index=_DATES,
         name=_REGIME_COLUMN,
-        dtype=object,
     )
 
     actual = _classifier().compute_sampled_returns_with_regime_id(
