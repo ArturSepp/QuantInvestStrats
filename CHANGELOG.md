@@ -11,6 +11,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Made `compute_desc_table()` score repeated DataFrame column labels independently while
   retaining their original order.
+- Made optional `compute_desc_table()` t-statistics undefined for zero-volatility samples instead
+  of returning infinity with a divide-by-zero warning.
 
 ## [5.17.0] - 2026-08-25
 
