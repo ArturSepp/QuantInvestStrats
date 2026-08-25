@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Processed unique performance-fee return dates chronologically, rejected duplicate dates, and
+  crystallized fees on the latest available observation on or before calendar period ends.
+
 ## [5.18.0] - 2026-08-25
 
 ### Added
