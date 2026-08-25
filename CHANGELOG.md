@@ -11,6 +11,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Made annualized `AVG_WITH_POSITIVE_PROB` and `SKEW_KURTOSIS` descriptive tables return their
   reduced schemas instead of raising while removing the volatility column.
+- Made `compute_desc_table()` support nullable `Float64` / `pd.NA` inputs and return formatted
+  missing statistics for all-missing dated columns without reduction warnings or score-mode errors.
 
 ## [5.15.0] - 2026-08-24
 

@@ -16,7 +16,7 @@ statistics are ``perf_stats.py``.
 # packages
 import numpy as np
 import pandas as pd
-from typing import Union
+from typing import Callable, Union
 from scipy.stats import skew, kurtosis, percentileofscore, normaltest
 from enum import Enum
 
@@ -59,6 +59,50 @@ def _compute_positive_probability(data: np.ndarray) -> np.ndarray:
     )
 
 
+def _reduce_observed(
+        data: np.ndarray,
+        reduction: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+    """Apply a reduction without passing all-missing dated columns to it.
+
+    Args:
+        data: Two-dimensional numerical observations arranged by row and column.
+        reduction: Column-wise reduction returning one value per supplied column.
+
+    Returns:
+        Reduction values in input-column order, with NaN for columns without observations.
+    """
+    # Empty panels need a separate accept-or-reject contract; preserve their existing behavior.
+    if data.shape[0] == 0:
+        return reduction(data)
+
+    observed_columns = np.any(np.logical_not(np.isnan(data)), axis=0)
+    values = np.full(data.shape[1], np.nan, dtype=float)
+    if np.any(observed_columns):
+        values[observed_columns] = reduction(data[:, observed_columns])
+    return values
+
+
+def _add_moment_columns(
+        descriptive_table: pd.DataFrame,
+        data: np.ndarray,
+        value_format: str) -> None:
+    """Add formatted skewness and kurtosis for each observed input column.
+
+    Args:
+        descriptive_table: Output table to which the two moment columns are added.
+        data: Two-dimensional numerical observations arranged by row and column.
+        value_format: Display format applied to each moment.
+    """
+    skews = _reduce_observed(
+        data, lambda values: skew(values, axis=0, nan_policy='omit'))
+    kurts = _reduce_observed(
+        data, lambda values: kurtosis(values, axis=0, nan_policy='omit'))
+    descriptive_table[PerfStat.SKEWNESS.value.short] = [
+        value_format.format(x) for x in skews]
+    descriptive_table[PerfStat.KURTOSIS.value.short_n] = [
+        value_format.format(x) for x in kurts]
+
+
 def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
                        desc_table_type: DescTableType = DescTableType.SHORT,
                        var_format: str = '{:.2f}',
@@ -73,7 +117,10 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     Transposes the panel: the input is time by ticker, the output is ticker by statistic.
     Values are returned as formatted strings, not numbers, because this feeds the table
     renderer directly — use the underlying statistic functions if the numbers are wanted.
-    Columns may contain nans; statistics are computed on the available observations.
+    Columns may contain nans or ``pd.NA`` in nullable numeric dtypes; both are treated as missing,
+    and statistics are computed on the available observations.
+    Dated columns without observations remain in the table with formatted missing statistics
+    and do not emit reduction warnings.
     Positive probabilities divide positive returns by non-missing observations in each column;
     zero returns are observed and non-positive.
 
@@ -102,9 +149,11 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     else:
         raise TypeError(f"unsupported data type = {type(df)}")
 
-    data_np = df.to_numpy()
-    mean = np.nanmean(data_np, axis=0)
-    std = np.nanstd(data_np, ddof=1, axis=0)
+    # Normalize nullable pandas values so numerical reducers receive np.nan rather than pd.NA.
+    data_np = df.to_numpy(dtype=float, na_value=np.nan)
+    # Skip all-missing dated columns so undefined base statistics remain NaN without warnings.
+    mean = _reduce_observed(data_np, lambda values: np.nanmean(values, axis=0))
+    std = _reduce_observed(data_np, lambda values: np.nanstd(values, ddof=1, axis=0))
 
     descriptive_table[PerfStat.AVG.to_str()] = [var_format.format(x) for x in mean]
 
@@ -148,50 +197,64 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_KURTOSIS:
-        descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in skew(data_np, axis=0, nan_policy=nan_policy)]
-        descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in kurtosis(data_np, axis=0, nan_policy=nan_policy)]
+        # Evaluate moments only for observed columns so SciPy does not warn for empty samples.
+        _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
 
     elif desc_table_type == desc_table_type.WITH_NORMAL_PVAL:
-        descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in skew(data_np, axis=0, nan_policy=nan_policy)]
-        descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in kurtosis(data_np, axis=0, nan_policy=nan_policy)]
-        k2, ps = normaltest(a=data_np, axis=0, nan_policy='omit')
-        descriptive_table[PerfStat.NORMTEST.to_str(short=True, short_n=True)] = ['{:.2f}'.format(x) for x in ps]
+        # Apply moments and normality only where a sample exists, retaining NaN elsewhere.
+        _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
+        ps = _reduce_observed(
+            data_np, lambda values: normaltest(
+                a=values, axis=0, nan_policy=nan_policy)[1])
+        descriptive_table[PerfStat.NORMTEST.value.short_n] = [
+            '{:.2f}'.format(x) for x in ps]
 
     elif desc_table_type == desc_table_type.SKEW_KURTOSIS:
-        # Remove the setup columns before reporting the reduced moment-only schema.
+        # Remove setup columns and leave unobserved moments undefined in the reduced schema.
         descriptive_table = descriptive_table.drop(
             [PerfStat.AVG.value.name, volatility_column], axis=1)
-        descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in skew(data_np, axis=0, nan_policy=nan_policy)]
-        descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] = [norm_variable_display_type.format(x) for x in kurtosis(data_np, axis=0, nan_policy=nan_policy)]
+        _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
     elif desc_table_type == desc_table_type.WITH_SCORE:
         column_data = [df[column].dropna() for column in df.columns]
-        percentiles = [percentileofscore(a=x, score=x.iloc[-1], kind='rank') for x in column_data]
-        descriptive_table[PerfStat.LAST.to_str()] = [var_format.format(x.iloc[-1]) for x in column_data]
+        # A dated but unobserved history has neither a last value nor a percentile rank.
+        if df.index.empty:
+            last_values = [x.iloc[-1] for x in column_data]
+        else:
+            last_values = [x.iloc[-1] if not x.empty else np.nan for x in column_data]
+        percentiles = [
+            percentileofscore(a=x, score=last_value, kind='rank') if not x.empty else np.nan
+            for x, last_value in zip(column_data, last_values)
+        ]
+        descriptive_table[PerfStat.LAST.value.name] = [var_format.format(x) for x in last_values]
         descriptive_table[PerfStat.RANK.to_str()] = ['{:.0%}'.format(0.01*x) for x in percentiles]
 
     elif desc_table_type == desc_table_type.EXTENSIVE:
-        descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] \
-            = [norm_variable_display_type.format(x) for x in skew(df.values, axis=0, nan_policy=nan_policy)]
-        descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] \
-            = [norm_variable_display_type.format(x) for x in kurtosis(df.values, axis=0, nan_policy=nan_policy)]
+        # Apply each extended reduction only to columns containing observations.
+        _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
+        minimums = _reduce_observed(data_np, lambda values: np.nanmin(values, axis=0))
+        lower_quantiles = _reduce_observed(
+            data_np, lambda values: np.nanquantile(values, q=0.16, axis=0))
+        medians = _reduce_observed(data_np, lambda values: np.nanmedian(values, axis=0))
+        upper_quantiles = _reduce_observed(
+            data_np, lambda values: np.nanquantile(values, q=0.84, axis=0))
+        maximums = _reduce_observed(data_np, lambda values: np.nanmax(values, axis=0))
         descriptive_table[PerfStat.MIN.to_str()] \
-            = [var_format.format(x) for x in np.nanmin(df.values, axis=0)]
+            = [var_format.format(x) for x in minimums]
         descriptive_table[PerfStat.QUANT_M_1STD.to_str(short=True)]\
-            = [var_format.format(x) for x in np.nanquantile(df.values, q=0.16, axis=0)]
+            = [var_format.format(x) for x in lower_quantiles]
         descriptive_table[PerfStat.MEDIAN.to_str(short=True)] \
-            = [var_format.format(x) for x in np.nanmedian(df.values, axis=0)]
+            = [var_format.format(x) for x in medians]
         descriptive_table[PerfStat.QUANT_P1_STD.to_str(short=True)] \
-            = [var_format.format(x) for x in np.nanquantile(df.values, q=0.84, axis=0)]
+            = [var_format.format(x) for x in upper_quantiles]
         descriptive_table[PerfStat.MAX.to_str()] \
-            = [var_format.format(x) for x in np.nanmax(df.values, axis=0)]
+            = [var_format.format(x) for x in maximums]
 
     elif desc_table_type == desc_table_type.WITH_MEDIAN:
+        # Leave unobserved medians and moments as NaN without invoking warning-producing reducers.
+        medians = _reduce_observed(data_np, lambda values: np.nanmedian(values, axis=0))
         descriptive_table[PerfStat.MEDIAN.to_str(short=True)] \
-            = [var_format.format(x) for x in np.nanmedian(df.values, axis=0)]
-        descriptive_table[PerfStat.SKEWNESS.to_str(short=True, short_n=True)] \
-            = [norm_variable_display_type.format(x) for x in skew(df.values, axis=0, nan_policy=nan_policy)]
-        descriptive_table[PerfStat.KURTOSIS.to_str(short=True, short_n=True)] \
-            = [norm_variable_display_type.format(x) for x in kurtosis(df.values, axis=0, nan_policy=nan_policy)]
+            = [var_format.format(x) for x in medians]
+        _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
 
     else:
         raise TypeError(f"desc_table_type={desc_table_type} is not implemented")
