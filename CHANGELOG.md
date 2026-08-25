@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Made `compute_desc_table()` score repeated DataFrame column labels independently while
+  retaining their original order.
+
 ## [5.17.0] - 2026-08-25
 
 ### Changed

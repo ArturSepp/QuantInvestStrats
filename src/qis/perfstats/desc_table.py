@@ -126,7 +126,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
 
     Args:
         df: returns panel, index is time and columns are tickers; a Series is treated as one
-            column named after it
+            column named after it; repeated DataFrame column labels are retained and calculated
+            independently
         desc_table_type: which set of statistics to report; positive-probability modes use each
             column's non-missing observation count as the denominator
         var_format: format applied to the statistics
@@ -215,7 +216,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             [PerfStat.AVG.value.name, volatility_column], axis=1)
         _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
     elif desc_table_type == desc_table_type.WITH_SCORE:
-        column_data = [df[column].dropna() for column in df.columns]
+        # Iterate physical columns so repeated labels are scored independently.
+        column_data = [column.dropna() for _, column in df.items()]
         # A dated but unobserved history has neither a last value nor a percentile rank.
         if df.index.empty:
             last_values = [x.iloc[-1] for x in column_data]
