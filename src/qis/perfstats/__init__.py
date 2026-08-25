@@ -14,6 +14,11 @@ from qis.perfstats.config import (
 
 from qis.perfstats.desc_table import DescTableType, compute_desc_table
 
+from qis.perfstats.model_layer_attribution import (
+    ModelLayerAlphaBetaAttribution,
+    compute_model_layer_alpha_beta_attribution,
+)
+
 from qis.perfstats.perf_stats import (
     STANDARD_TABLE_COLUMNS,
     LN_TABLE_COLUMNS,

@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.18.0] - 2026-08-25
+
+### Added
+
+- Added full-sample model-layer alpha/beta attribution in log-return space, including exact
+  systematic, standalone-layer, and integration contributions.
+
 ### Fixed
 
 - Made `compute_desc_table()` score repeated DataFrame column labels independently while

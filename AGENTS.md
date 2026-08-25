@@ -298,11 +298,21 @@ and compare nothing.
 - Never create, use, or install packages into a repository-local `.venv`.
 - Use `C:\Python\QuantInvestStrats312\Scripts\python.exe` for all Python commands.
 - Run tools through that interpreter, for example `C:\Python\QuantInvestStrats312\Scripts\python.exe -m pytest` and `C:\Python\QuantInvestStrats312\Scripts\python.exe -m pip`.
-- If the environment is missing, create it with `py -3.12 -m venv C:\Python\QuantInvestStrats312`; do not create `.venv` under the repository.
+- Treat the pinned environment as durable machine-local infrastructure; do not delete, recreate,
+  install into or upgrade it unless the task explicitly requires that change.
+- If it is missing, report it. Put any agent-created disposable environment below
+  `$env:AGENT_LOCAL_ROOT\envs\QuantInvestStrats\<machine-task>`; never create `.venv` under the
+  repository.
 
 ## Temporary workspace hygiene
 
-- Pytest's cache is configured outside OneDrive at `~/.cache/qis/pytest`.
-- Never create `tmp/`, `.pytest*`, or `.codex*` work directories inside the checkout.
-- Use a task-specific directory below `tempfile.gettempdir()` under
-  `QuantInvestStrats/<task-id>`, and remove it after verification.
+- The primary checkout and its complete `.git` directory remain in OneDrive. Never relocate Git
+  metadata, configure an external object directory or use a machine-local clone as authoritative.
+- Agent-created environments, caches, scratch, diagnostics, builds, analyses and run output go
+  below the local C-drive root in `$env:AGENT_LOCAL_ROOT`, in a machine- and task-specific
+  directory. Copy back only intentional durable deliverables.
+- Pure test and release runs use a `git archive` source export on C. Isolated source edits may use
+  a locked, machine-named C-drive linked worktree; checkpoint intentional changes to its task
+  branch before pausing or handoff.
+- Never prune, repair, unlock or remove another computer's or task's worktree. Never use desktop
+  and laptop concurrently against the OneDrive-backed repository root.
