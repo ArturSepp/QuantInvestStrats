@@ -15,6 +15,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   of returning infinity with a divide-by-zero warning.
 - Rejected invalid leverage ratios and annualization factors in `lever_returns()` and
   `delever_returns()` with consistent descriptive errors before applying either transform.
+- Made leverage funding alignment independent of financing-Series storage order and rejected
+  ambiguous duplicate funding dates for nonzero leverage with a descriptive error.
 
 ## [5.17.0] - 2026-08-25
 

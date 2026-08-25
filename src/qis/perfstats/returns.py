@@ -1122,6 +1122,34 @@ def _validate_leverage_parameters(leverage: object,
         )
 
 
+def _get_periodic_financing_rate(financing_rate: Union[float, pd.Series],
+                                 returns_index: pd.Index,
+                                 periods_per_year: int
+                                 ) -> Union[float, pd.Series]:
+    """Convert annual financing to a chronologically aligned periodic rate.
+
+    Args:
+        financing_rate: Constant annual rate or a date-indexed Series of annual rates.
+        returns_index: Return dates to which a financing Series is aligned.
+        periods_per_year: Annualization factor used for periodic conversion.
+
+    Returns:
+        Constant periodic rate or a Series aligned to returns_index.
+
+    Raises:
+        ValueError: If a financing Series contains duplicate dates.
+    """
+    # Enforce unique chronology so forward-fill uses one observable prior rate.
+    if isinstance(financing_rate, pd.Series):
+        if not financing_rate.index.is_unique:
+            raise ValueError("financing_rate index must not contain duplicate dates")
+
+        financing_rate = financing_rate.sort_index()
+        return financing_rate.reindex(returns_index, method='ffill') / periods_per_year
+
+    return float(financing_rate) / periods_per_year
+
+
 def delever_returns(returns: Union[pd.Series, pd.DataFrame],
                     leverage: float,
                     financing_rate: Union[float, pd.Series] = 0.0,
@@ -1148,9 +1176,10 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
         financing_rate: Annualised financing rate. Pass a float for constant cost
             (e.g. risk-free rate as a crude proxy), or a Series indexed by date for
             time-varying financing (recommended for accuracy). Series observations are
-            aligned to return dates and forward-filled from prior observations only.
-            Default 0.0 ignores financing — only correct if the portfolio earns the
-            financing rate on its borrowed capital, which is rarely the case.
+            sorted chronologically, aligned to return dates, and forward-filled from prior
+            observations only. Duplicate Series dates are invalid for nonzero leverage. Default
+            0.0 ignores financing — only correct if the portfolio earns the financing rate on its
+            borrowed capital, which is rarely the case.
         periods_per_year: Strictly positive integer annualisation factor used to convert the
             financing rate to per-period. If None, inferred from the index frequency.
 
@@ -1160,7 +1189,8 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
 
     Raises:
         ValueError: If leverage is not a finite nonnegative real scalar, or if an explicit
-            periods_per_year is not a positive integer.
+            periods_per_year is not a positive integer, or if nonzero leverage is used with a
+            financing Series containing duplicate dates.
 
     Note:
         This assumes constant leverage and a single-tier financing structure. Real
@@ -1186,12 +1216,10 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
             returns if isinstance(returns, pd.DataFrame) else returns.to_frame()
         )))
 
-    # Convert financing rate to per-period
-    if isinstance(financing_rate, pd.Series):
-        # align to returns index, forward-fill to handle missing observations
-        rf_per_period = financing_rate.reindex(returns.index, method='ffill') / periods_per_year
-    else:
-        rf_per_period = float(financing_rate) / periods_per_year
+    # Apply the shared chronological funding contract before the inverse equation.
+    rf_per_period = _get_periodic_financing_rate(financing_rate=financing_rate,
+                                                 returns_index=returns.index,
+                                                 periods_per_year=periods_per_year)
 
     if isinstance(returns, pd.DataFrame) and isinstance(rf_per_period, pd.Series):
         # Apply each financing observation across all assets on the same date.
@@ -1222,9 +1250,10 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
         returns: Period returns of the unlevered asset (Series or DataFrame).
         leverage: Finite, nonnegative leverage ratio L (debt / equity). Booleans are invalid.
         financing_rate: Annualised financing rate (float or Series). Series observations
-            are aligned to return dates and forward-filled from prior observations only.
-        periods_per_year: Strictly positive integer annualisation factor. If None, inferred
-            from the index.
+            are sorted chronologically, aligned to return dates, and forward-filled from prior
+            observations only. Duplicate Series dates are invalid for nonzero leverage.
+        periods_per_year: Strictly positive integer annualisation factor. If None, inferred from
+            the index.
 
     Returns:
         Levered returns matching the input shape and pandas labels. Zero leverage
@@ -1232,7 +1261,8 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
 
     Raises:
         ValueError: If leverage is not a finite nonnegative real scalar, or if an explicit
-            periods_per_year is not a positive integer.
+            periods_per_year is not a positive integer, or if nonzero leverage is used with a
+            financing Series containing duplicate dates.
 
     Example:
         >>> # Show what GCF would look like at 1x leverage with BDC-like financing
@@ -1251,10 +1281,10 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
             returns if isinstance(returns, pd.DataFrame) else returns.to_frame()
         )))
 
-    if isinstance(financing_rate, pd.Series):
-        rf_per_period = financing_rate.reindex(returns.index, method='ffill') / periods_per_year
-    else:
-        rf_per_period = float(financing_rate) / periods_per_year
+    # Apply the shared chronological funding contract before the forward equation.
+    rf_per_period = _get_periodic_financing_rate(financing_rate=financing_rate,
+                                                 returns_index=returns.index,
+                                                 periods_per_year=periods_per_year)
 
     if isinstance(returns, pd.DataFrame) and isinstance(rf_per_period, pd.Series):
         # Apply each financing observation across all assets on the same date.
