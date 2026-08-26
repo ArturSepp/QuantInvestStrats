@@ -61,24 +61,24 @@ def _compute_positive_probability(data: np.ndarray) -> np.ndarray:
 
 def _reduce_observed(
         data: np.ndarray,
-        reduction: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
-    """Apply a reduction without passing all-missing dated columns to it.
+        reduction: Callable[[np.ndarray], np.ndarray],
+        minimum_observations: int = 1) -> np.ndarray:
+    """Apply a reduction only to columns meeting its sample-size requirement.
 
     Args:
         data: Two-dimensional numerical observations arranged by row and column.
         reduction: Column-wise reduction returning one value per supplied column.
+        minimum_observations: Required number of non-missing values in each column.
 
     Returns:
-        Reduction values in input-column order, with NaN for columns without observations.
+        Reduction values in input-column order, with NaN for undersized columns.
     """
-    # Empty panels need a separate accept-or-reject contract; preserve their existing behavior.
-    if data.shape[0] == 0:
-        return reduction(data)
-
-    observed_columns = np.any(np.logical_not(np.isnan(data)), axis=0)
+    # Select columns per statistic so undersized samples never reach warning-producing reducers.
+    observation_counts = np.sum(np.logical_not(np.isnan(data)), axis=0)
+    eligible_columns = np.greater_equal(observation_counts, minimum_observations)
     values = np.full(data.shape[1], np.nan, dtype=float)
-    if np.any(observed_columns):
-        values[observed_columns] = reduction(data[:, observed_columns])
+    if np.any(eligible_columns):
+        values[eligible_columns] = reduction(data[:, eligible_columns])
     return values
 
 
@@ -93,10 +93,13 @@ def _add_moment_columns(
         data: Two-dimensional numerical observations arranged by row and column.
         value_format: Display format applied to each moment.
     """
+    # Two observations define the displayed moments; smaller samples remain explicitly missing.
     skews = _reduce_observed(
-        data, lambda values: skew(values, axis=0, nan_policy='omit'))
+        data, lambda values: skew(values, axis=0, nan_policy='omit'),
+        minimum_observations=2)
     kurts = _reduce_observed(
-        data, lambda values: kurtosis(values, axis=0, nan_policy='omit'))
+        data, lambda values: kurtosis(values, axis=0, nan_policy='omit'),
+        minimum_observations=2)
     descriptive_table[PerfStat.SKEWNESS.value.short] = [
         value_format.format(x) for x in skews]
     descriptive_table[PerfStat.KURTOSIS.value.short_n] = [
@@ -121,6 +124,9 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     and statistics are computed on the available observations.
     Dated columns without observations remain in the table with formatted missing statistics
     and do not emit reduction warnings.
+    Statistics whose columns do not meet their minimum sample sizes also remain formatted as
+    missing: sample standard deviation, skewness, and kurtosis require two observations, while
+    the normality p-value requires 20 observations.
     Positive probabilities divide positive returns by non-missing observations in each column;
     zero returns are observed and non-positive.
 
@@ -142,6 +148,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
 
     Raises:
         TypeError: if ``df`` is neither pd.DataFrame nor pd.Series
+        ValueError: if ``df`` contains no observations
     """
     if isinstance(df, pd.DataFrame):
         descriptive_table = pd.DataFrame(index=df.columns)
@@ -151,11 +158,18 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     else:
         raise TypeError(f"unsupported data type = {type(df)}")
 
+    # Reject zero rows uniformly before reducers or annualization produce incidental outcomes.
+    if df.index.empty:
+        raise ValueError("data must contain at least one observation")
+
     # Normalize nullable pandas values so numerical reducers receive np.nan rather than pd.NA.
     data_np = df.to_numpy(dtype=float, na_value=np.nan)
     # Skip all-missing dated columns so undefined base statistics remain NaN without warnings.
     mean = _reduce_observed(data_np, lambda values: np.nanmean(values, axis=0))
-    std = _reduce_observed(data_np, lambda values: np.nanstd(values, ddof=1, axis=0))
+    std = _reduce_observed(
+        data_np,
+        lambda values: np.nanstd(values, ddof=1, axis=0),
+        minimum_observations=2)
 
     descriptive_table[PerfStat.AVG.to_str()] = [var_format.format(x) for x in mean]
 
@@ -206,9 +220,11 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     elif desc_table_type == desc_table_type.WITH_NORMAL_PVAL:
         # Apply moments and normality only where a sample exists, retaining NaN elsewhere.
         _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
+        # Require SciPy's warning-free accuracy threshold, not only its eight-value hard minimum.
         ps = _reduce_observed(
-            data_np, lambda values: normaltest(
-                a=values, axis=0, nan_policy=nan_policy)[1])
+            data_np,
+            lambda values: normaltest(a=values, axis=0, nan_policy=nan_policy)[1],
+            minimum_observations=20)
         descriptive_table[PerfStat.NORMTEST.value.short_n] = [
             '{:.2f}'.format(x) for x in ps]
 
@@ -221,10 +237,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         # Iterate physical columns so repeated labels are scored independently.
         column_data = [column.dropna() for _, column in df.items()]
         # A dated but unobserved history has neither a last value nor a percentile rank.
-        if df.index.empty:
-            last_values = [x.iloc[-1] for x in column_data]
-        else:
-            last_values = [x.iloc[-1] if not x.empty else np.nan for x in column_data]
+        last_values = [x.iloc[-1] if not x.empty else np.nan for x in column_data]
         percentiles = [
             percentileofscore(a=x, score=last_value, kind='rank') if not x.empty else np.nan
             for x, last_value in zip(column_data, last_values)
