@@ -158,9 +158,11 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
 
     Args:
         df_newer: Newer Series or DataFrame whose labels and columns define the output. Its rows
-            are interpreted in increasing date order without modifying the caller's object.
+            are interpreted in increasing date order without modifying the caller's object. A
+            zero-row object retains its declared schema; a zero-column DataFrame is invalid.
         df_older: Older object of the same pandas type, used before each newer history begins. Its
-            rows are also interpreted in increasing date order without modifying the caller.
+            rows are also interpreted in increasing date order without modifying the caller. A
+            zero-row object or zero-column DataFrame is treated as an unavailable provider.
         freq: Frequency of the returned date grid.
         fill_method: Return-gap policy. ``None`` preserves missing returns, ``'to_zero'`` fills
             missing returns with zero after each column begins, and ``'ffill'`` carries its last
@@ -171,10 +173,14 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
 
     Returns:
         Chronologically ordered backfilled data on the requested grid with matching frequency
-        metadata, preserving the newer input's pandas type, labels, and column order.
+        metadata, preserving the newer input's pandas type, labels, and column order. If one
+        provider has no observations, the available provider supplies the result under the newer
+        schema and existing frequency and fill policies; if both have no observations, an owned
+        empty object with that schema is returned.
 
     Raises:
-        ValueError: If ``fill_method`` is not ``None``, ``'to_zero'``, or ``'ffill'``.
+        ValueError: If the newer DataFrame has no columns, or if ``fill_method`` is not ``None``,
+            ``'to_zero'``, or ``'ffill'``.
         NotImplementedError: If the newer and older inputs are not both Series or both
             DataFrames.
     """
@@ -201,6 +207,28 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         df_newer = df_newer.sort_index()
     if not df_older.index.is_monotonic_increasing:
         df_older = df_older.sort_index()
+
+    if df_newer.shape[1] == 0:
+        raise ValueError("df_newer must contain at least one column")
+
+    newer_has_no_rows = len(df_newer.index) == 0
+    older_has_no_data = len(df_older.index) == 0 or df_older.shape[1] == 0
+    if newer_has_no_rows and older_has_no_data:
+        # With no observations, the newer declaration is the complete output contract.
+        empty_result = df_newer.asfreq(freq)
+        if is_series_out:
+            empty_series = cast(pd.Series, empty_result.iloc[:, 0])
+            return empty_series
+        return empty_result
+    if older_has_no_data:
+        # Reuse the established single-provider path without letting empty dates affect the grid.
+        df_older = df_newer
+    elif newer_has_no_rows:
+        # The newer schema still controls labels, order, and dtypes when only older data exist.
+        df_newer = df_newer.reindex(index=df_older.index)
+        df_newer.update(df_older)
+        df_older = df_newer
+
     # Price reconstruction must retain dates even when their calculated return is missing.
     provider_index = df_newer.index.union(df_older.index).sort_values()
     
