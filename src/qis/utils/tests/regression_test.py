@@ -3,7 +3,7 @@
 import numpy as np
 from scipy.stats import norm
 
-from qis.utils.regression import estimate_ols_alpha_beta_hac
+from qis.utils.regression import estimate_ols_alpha_beta_hac, newey_west_lag_rule
 
 
 def _manual_hac_alpha_beta(
@@ -72,3 +72,12 @@ def test_estimate_ols_alpha_beta_hac_matches_matrix_reference() -> None:
         expected_interval,
         atol=1.0e-12,
     )
+
+
+def test_newey_west_lag_rule() -> None:
+    """Newey-West's rule returns the documented floor and rejects empty samples."""
+    assert newey_west_lag_rule(nobs=260) == 4
+    assert newey_west_lag_rule(nobs=100) == 4
+    assert newey_west_lag_rule(nobs=86) == 3
+    with np.testing.assert_raises(ValueError):
+        newey_west_lag_rule(nobs=0)

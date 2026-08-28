@@ -7,8 +7,35 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Exposed `hac_lags` and `confidence_level` on
+  `compute_model_layer_alpha_beta_attribution` and recorded `freq`, `hac_lags` and
+  `confidence_level` on `ModelLayerAlphaBetaAttribution`; added the opt-in
+  `newey_west_lag_rule()` helper. Defaults unchanged.
+- Added the `Risk Layer Return` column to model-layer `component_returns`.
+
+### Changed
+
+- Replaced the by-construction reconstruction checks in model-layer attribution with a finiteness
+  guard.
+- Documented and regression-tested the established calendar-boundary behavior of
+  `split_to_samples()` for the `TrendFollowingSystems` consumer.
+
+### Deprecated
+
+- Deprecated the public `TrainLivePeriod` and `TrainLiveSamples` compatibility containers for
+  removal in qis 6.0; use application-specific period pairs and standard mappings instead.
+
+### Removed
+
+- Removed the legacy module-level `split_to_train_live_samples()` and `get_data_samples_df()`
+  helpers; `split_to_samples()` remains the supported calendar-period slicer.
+
 ### Fixed
 
+- Trimmed model-layer NAVs to their common valid range before resampling, so a layer that ends
+  early no longer contributes forward-filled zero returns to the common sample.
 - Preserved finite newer and single-observation older price anchors when
   `bfill_timeseries()` reconstructs joined price histories.
 - Supported pandas nullable floating price panels in `to_returns()` without changing return

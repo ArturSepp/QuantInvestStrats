@@ -8,7 +8,8 @@ p-value, returning zeros with a warning rather than raising when the fit fails.
 ``estimate_ols_alpha_beta_hac`` returns the same point estimates together with a Bartlett-kernel
 HAC standard error, p-value and confidence interval for alpha. ``reg_model_params_to_str`` formats
 the fitted equation for a chart legend, and annualises the intercept as expm1(a α) when
-``alpha_an_factor`` is passed.
+``alpha_an_factor`` is passed. ``newey_west_lag_rule`` supplies the opt-in Newey-West rule of thumb
+for callers that do not want to select a fixed Bartlett lag count.
 
 Every fit runs through ``filter_x_y`` first: rows where any of x or y is non-finite are dropped,
 so a prediction is indexed on the surviving rows, not on the full input. ``order`` is a
@@ -44,6 +45,23 @@ class OlsAlphaBetaHacResult:
     alpha_pvalue: float
     alpha_hac_se: float
     alpha_confidence_interval: tuple[float, float]
+
+
+def newey_west_lag_rule(nobs: int) -> int:
+    """Return the Newey-West (1994) rule-of-thumb Bartlett lag count.
+
+    Args:
+        nobs: Positive number of observations in the estimation sample.
+
+    Returns:
+        The floor of ``4 * (nobs / 100) ** (2 / 9)``.
+
+    Raises:
+        ValueError: If ``nobs`` is not positive.
+    """
+    if nobs < 1:
+        raise ValueError(f'nobs must be positive, got {nobs}')
+    return int(np.floor(4.0 * (nobs / 100.0) ** (2.0 / 9.0)))
 
 
 def fit_multivariate_ols(x: pd.DataFrame,
@@ -88,11 +106,26 @@ def fit_multivariate_ols(x: pd.DataFrame,
     try:
         r2 = f", R\N{SUPERSCRIPT TWO}={fitted_model.rsquared:.0%}"
     except (AttributeError, ValueError):
-        r2 = f", R\N{SUPERSCRIPT TWO}=0.0%"
+        r2 = ", R\N{SUPERSCRIPT TWO}=0.0%"
     if fit_intercept:
-        reg_label = "y=" + f"{alpha_format.format(params.iloc[0])}" + "".join([f"{beta_format.format(x)}*{key}" for key, x in params.iloc[1:].to_dict().items()]) + r2
+        reg_label = (
+            "y="
+            + alpha_format.format(params.iloc[0])
+            + "".join([
+                f"{beta_format.format(x)}*{key}"
+                for key, x in params.iloc[1:].to_dict().items()
+            ])
+            + r2
+        )
     else:
-        reg_label = "y=" + "".join([f"{beta_format.format(x)}*{key}" for key, x in params.to_dict().items()]) + r2
+        reg_label = (
+            "y="
+            + "".join([
+                f"{beta_format.format(x)}*{key}"
+                for key, x in params.to_dict().items()
+            ])
+            + r2
+        )
     return prediction, params, reg_label
 
 
@@ -259,7 +292,7 @@ def reg_model_params_to_str(reg_model: RegModel,
     try:
         r2 = f", R\N{SUPERSCRIPT TWO}={reg_model.rsquared:.0%}"
     except (AttributeError, ValueError):
-        r2 = f", R\N{SUPERSCRIPT TWO}=0.0%"
+        r2 = ", R\N{SUPERSCRIPT TWO}=0.0%"
 
     if r2_only:
         text_str = f" R\N{SUPERSCRIPT TWO}={reg_model.rsquared:.0%}"
@@ -276,28 +309,52 @@ def reg_model_params_to_str(reg_model: RegModel,
             idx1 = 0
 
         if order == 1:
-            text_str = 'y=' + beta_format.format(reg_model.params[idx1]) + 'X' \
-                       + alpha \
-                       + f', R\N{SUPERSCRIPT TWO}=' + '{0:.0%}'.format(reg_model.rsquared)
+            text_str = (
+                'y='
+                + beta_format.format(reg_model.params[idx1])
+                + 'X'
+                + alpha
+                + ', R\N{SUPERSCRIPT TWO}='
+                + '{0:.0%}'.format(reg_model.rsquared)
+            )
 
         elif order == 2:
             if fit_intercept:  # with intercept
-                text_str = 'y=' + beta_format.format(reg_model.params[idx1+1]) + 'X' + f'\N{SUPERSCRIPT TWO}' \
-                            + beta_format.format(reg_model.params[idx1]) + 'X' \
-                            + alpha + r2
-            else :  # without intercept
-                text_str = 'y=' + beta_format.format(reg_model.params[idx1+1]) + 'X' + f'\N{SUPERSCRIPT TWO}' \
-                            + beta_format.format(reg_model.params[idx1]) + 'X' \
-                            + alpha \
-                            + f', R\N{SUPERSCRIPT TWO}=' + '{0:.0%}'.format(reg_model.rsquared)
+                text_str = (
+                    'y='
+                    + beta_format.format(reg_model.params[idx1+1])
+                    + 'X\N{SUPERSCRIPT TWO}'
+                    + beta_format.format(reg_model.params[idx1])
+                    + 'X'
+                    + alpha
+                    + r2
+                )
+            else:  # without intercept
+                text_str = (
+                    'y='
+                    + beta_format.format(reg_model.params[idx1+1])
+                    + 'X\N{SUPERSCRIPT TWO}'
+                    + beta_format.format(reg_model.params[idx1])
+                    + 'X'
+                    + alpha
+                    + ', R\N{SUPERSCRIPT TWO}='
+                    + '{0:.0%}'.format(reg_model.rsquared)
+                )
 
         elif order == 3:
             try:
-                text_str = 'y=' + beta_format.format(reg_model.params[idx1+2]) + 'x' + f'\N{SUPERSCRIPT THREE}' \
-                           + beta_format.format(reg_model.params[idx1+1]) + 'x' + f'\N{SUPERSCRIPT TWO}' \
-                           + beta_format.format(reg_model.params[idx1]) + 'x' \
-                           + alpha \
-                           + f', R\N{SUPERSCRIPT TWO}=' + '{0:.0%}'.format(reg_model.rsquared)
+                text_str = (
+                    'y='
+                    + beta_format.format(reg_model.params[idx1+2])
+                    + 'x\N{SUPERSCRIPT THREE}'
+                    + beta_format.format(reg_model.params[idx1+1])
+                    + 'x\N{SUPERSCRIPT TWO}'
+                    + beta_format.format(reg_model.params[idx1])
+                    + 'x'
+                    + alpha
+                    + ', R\N{SUPERSCRIPT TWO}='
+                    + '{0:.0%}'.format(reg_model.rsquared)
+                )
             except (AttributeError, IndexError, ValueError):
                 text_str = 'model cannot be estimated'
         else:

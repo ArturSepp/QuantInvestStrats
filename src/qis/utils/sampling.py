@@ -1,74 +1,106 @@
-"""
-splitting a date range into training and live windows for out-of-sample work.
-``split_to_train_live_samples`` builds update dates by calendar at ``model_update_freq`` between
-the first and last index dates - they need not be members of the index - and pairs each with the
-``roll_period`` window before it and the period after, as ``TrainLiveSamples`` of
-``TrainLivePeriod``. ``split_to_samples`` cuts the data itself into per-period frames.
+"""Calendar-period slicing for dated pandas objects.
+
+``split_to_samples`` is the supported implementation. ``TrainLivePeriod`` and
+``TrainLiveSamples`` remain temporarily as deprecated public compatibility containers.
 """
 # packages
-import pandas as pd
+import warnings
 from dataclasses import dataclass
 from typing import NamedTuple, Dict, Union
+
+import pandas as pd
 # qis
 from qis.utils.dates import TimePeriod
 
 
 class TrainLivePeriod(NamedTuple):
+    """Deprecated pair of training and live periods.
+
+    Use an application-specific structure containing two ``TimePeriod`` values instead.
+
+    Attributes:
+        train: Estimation period.
+        live: Subsequent out-of-sample period.
+
+    Warns:
+        DeprecationWarning: On construction; the tuple remains available through qis 5.x.
+    """
     train: TimePeriod
     live: TimePeriod
 
 
+_train_live_period_new = TrainLivePeriod.__new__
+
+
+def _deprecated_train_live_period_new(
+        cls: type[TrainLivePeriod],
+        train: TimePeriod,
+        live: TimePeriod,
+) -> TrainLivePeriod:
+    warnings.warn(
+        "TrainLivePeriod is deprecated and will be removed in qis 6.0; use an "
+        "application-specific pair of TimePeriod values",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _train_live_period_new(cls, train, live)
+
+
+# NamedTuple rejects an in-class __new__ override. Wrapping its generated constructor here keeps
+# the exact tuple class, signature, fields, repr, and pickle identity during the deprecation cycle.
+TrainLivePeriod.__new__ = staticmethod(_deprecated_train_live_period_new)
+
+
 @dataclass
 class TrainLiveSamples:
-    """
-    dictionary when the traning start with TrainLivePeriod
+    """Deprecated mapping of update dates to training/live periods.
+
+    Use a standard mapping from update dates to application-specific train/live period pairs.
+
+    Attributes:
+        train_live_dates: Mapping populated through ``add``.
+
+    Warns:
+        DeprecationWarning: On construction; the container remains available through qis 5.x.
     """
     train_live_dates: Dict[TimePeriod, TrainLivePeriod] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        warnings.warn(
+            "TrainLiveSamples is deprecated and will be removed in qis 6.0; use a standard "
+            "mapping of update dates to train/live TimePeriod pairs",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.train_live_dates = {}
 
-    def add(self, date: TimePeriod, train_live_period: TrainLivePeriod):
+    def add(self, date: TimePeriod, train_live_period: TrainLivePeriod) -> None:
         self.train_live_dates[date] = train_live_period
 
-    def print(self):
+    def print(self) -> None:
         for key, samples in self.train_live_dates.items():
             print(f"{key}: train={samples.train.to_str()}, live={samples.live.to_str()}")
 
 
-def split_to_train_live_samples(ts_index: Union[pd.DatetimeIndex, pd.Index],
-                                model_update_freq: 'str' = 'ME',
-                                roll_period: int = 12
-                                ) -> TrainLiveSamples:
-    """
-    ts index is split into overlapping periods at freq = model_update_freq and period lenth of roll_period
-    """
-    update_dates = pd.date_range(start=ts_index[0],
-                                 end=ts_index[-1],
-                                 freq=model_update_freq,
-                                 inclusive='right')
-
-    train_live_samples = TrainLiveSamples()
-    for idx, date in enumerate(update_dates):
-        # x_data is shifted backward
-        # last point in y_data is applied for forecast
-        # data used for estimation is [last_update, current update date]
-        model_update_date = update_dates[idx - 1]
-
-        if idx > roll_period + 1:
-            date_t_0 = update_dates[idx-roll_period-1]
-            train = TimePeriod(start=date_t_0, end=model_update_date).shift_end_date_by_days(backward=True)
-            live = TimePeriod(start=model_update_date, end=date).shift_start_date_by_days(backward=False)
-
-            train_live_samples.add(model_update_date, TrainLivePeriod(train, live))
-
-    return train_live_samples
-
-
 def split_to_samples(data: Union[pd.DataFrame, pd.Series],
-                     sample_freq: 'str' = 'YE',
+                     sample_freq: str = 'YE',
                      start_to_one: bool = False
-                     ) -> Dict[pd.Timestamp, pd.DataFrame]:
+                     ) -> Dict[pd.Timestamp, Union[pd.DataFrame, pd.Series]]:
+    """Slice a dated pandas object into established calendar-boundary samples.
+
+    The output retains the historical QIS contract: generated calendar boundaries start from
+    the third boundary and exclude the final, potentially incomplete period. Pandas label slicing
+    includes an observation on the preceding boundary, so adjacent samples can share that anchor.
+
+    Args:
+        data: Series or DataFrame with a monotonic ``DatetimeIndex``.
+        sample_freq: Pandas calendar frequency used to generate sample boundaries.
+        start_to_one: Whether to divide each sample by its first observation.
+
+    Returns:
+        Insertion-ordered mapping from each included period end to the corresponding slice. The
+        value type matches ``data``.
+    """
     data1 = data.resample(sample_freq).last()
     ts_index = data1.index
     update_dates = pd.date_range(start=ts_index[0],
@@ -83,16 +115,3 @@ def split_to_samples(data: Union[pd.DataFrame, pd.Series],
             data_samples[date] = period_data
 
     return data_samples
-
-
-def get_data_samples_df(data: Union[pd.DataFrame, pd.Series],
-                        sample_freq: 'str' = 'YE',
-                        start_to_one: bool = False
-                        ) -> pd.DataFrame:
-    data_samples = {}
-    data_samples_dict = split_to_samples(data, sample_freq=sample_freq, start_to_one=start_to_one)
-    for key, kdata in data_samples_dict.items():
-        data_samples[key] = kdata.reset_index(drop=True)
-    data_samples_df = pd.DataFrame.from_dict(data_samples)
-    data_samples_df = data_samples_df.ffill()
-    return data_samples_df

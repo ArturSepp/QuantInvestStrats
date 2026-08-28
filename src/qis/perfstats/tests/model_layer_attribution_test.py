@@ -210,3 +210,94 @@ def test_monthly_alpha_intervals_use_hac3_and_annualise_the_bounds() -> None:
             <= result.regression_table['An Alpha']).all()
     assert (result.regression_table['An Alpha']
             <= result.regression_table['An Alpha CI High']).all()
+
+
+def test_common_sample_trims_to_latest_start_and_earliest_end() -> None:
+    """Ragged daily NAVs are trimmed before resampling to the common valid range."""
+    index = pd.bdate_range('2005-01-03', '2007-12-31')
+    generator = np.random.default_rng(seed=1)
+    log_returns = 0.0003 + 0.01 * generator.standard_normal((len(index) - 1, 4))
+    navs = pd.DataFrame(
+        np.vstack((np.ones(4), np.exp(np.cumsum(log_returns, axis=0)))),
+        index=index,
+        columns=['Benchmark', 'Risk Layer', 'Alpha Layer', 'Full Model'],
+    )
+    risk_nav = navs['Risk Layer'].where(navs.index >= pd.Timestamp('2005-03-15'))
+    alpha_nav = navs['Alpha Layer'].where(navs.index <= pd.Timestamp('2007-06-15'))
+
+    result = compute_model_layer_alpha_beta_attribution(
+        benchmark_nav=navs['Benchmark'],
+        risk_layer_nav=risk_nav,
+        alpha_layer_nav=alpha_nav,
+        full_model_nav=navs['Full Model'],
+        freq='ME',
+    )
+
+    assert result.periodic_returns.index[0] == pd.Timestamp('2005-04-30')
+    assert result.periodic_returns.index[-1] == pd.Timestamp('2007-05-31')
+    assert len(result.periodic_returns) == 26
+    assert (result.periodic_returns == 0.0).sum().sum() == 0
+
+    with np.testing.assert_raises(ValueError):
+        compute_model_layer_alpha_beta_attribution(
+            benchmark_nav=navs['Benchmark'],
+            risk_layer_nav=risk_nav,
+            alpha_layer_nav=pd.Series(np.nan, index=index),
+            full_model_nav=navs['Full Model'],
+            freq='ME',
+        )
+
+
+def test_hac_lags_and_confidence_level_are_recorded_and_applied() -> None:
+    """Custom HAC settings affect inference only and are recorded on the result."""
+    benchmark_returns = np.array([
+        -0.030, 0.012, 0.021, -0.008, 0.025, -0.017,
+        0.009, 0.018, -0.011, 0.026, 0.004, -0.019,
+        0.014, 0.007, -0.006, 0.023, -0.013, 0.016,
+        0.005, -0.010, 0.020, -0.004, 0.011, 0.015,
+    ])
+    noise = np.array([
+        0.0020, -0.0010, 0.0015, -0.0020, 0.0005, 0.0010,
+        -0.0015, 0.0025, -0.0005, 0.0010, -0.0010, 0.0015,
+        -0.0025, 0.0005, 0.0020, -0.0010, 0.0010, -0.0005,
+        0.0015, -0.0020, 0.0005, 0.0010, -0.0015, 0.0020,
+    ])
+    risk_returns = 0.002 + 0.82 * benchmark_returns + noise
+    alpha_returns = 0.003 + 0.18 * benchmark_returns - 0.5 * noise
+    integration_returns = 0.001 - 0.07 * benchmark_returns + 0.25 * noise
+    full_returns = risk_returns + alpha_returns + integration_returns
+    index = pd.date_range('2020-12-31', periods=25, freq='ME')
+    kwargs = {
+        'benchmark_nav': _nav_from_log_returns(benchmark_returns, index),
+        'risk_layer_nav': _nav_from_log_returns(risk_returns, index),
+        'alpha_layer_nav': _nav_from_log_returns(alpha_returns, index),
+        'full_model_nav': _nav_from_log_returns(full_returns, index),
+        'freq': 'ME',
+    }
+
+    default_result = compute_model_layer_alpha_beta_attribution(**kwargs)
+    custom_result = compute_model_layer_alpha_beta_attribution(
+        **kwargs,
+        hac_lags=5,
+        confidence_level=0.90,
+    )
+
+    columns = ['Alpha', 'An Alpha', 'Beta']
+    pd.testing.assert_frame_equal(
+        custom_result.regression_table[columns],
+        default_result.regression_table[columns],
+    )
+    assert not np.allclose(
+        custom_result.regression_table['Alpha HAC SE'],
+        default_result.regression_table['Alpha HAC SE'],
+    )
+    risk_row = custom_result.regression_table.loc['Risk Layer']
+    expected_half_width = 12.0 * norm.ppf(0.95) * risk_row['Alpha HAC SE']
+    np.testing.assert_allclose(
+        0.5 * (risk_row['An Alpha CI High'] - risk_row['An Alpha CI Low']),
+        expected_half_width,
+        atol=1.0e-12,
+    )
+    assert custom_result.freq == 'ME'
+    assert custom_result.hac_lags == 5
+    assert custom_result.confidence_level == 0.90
