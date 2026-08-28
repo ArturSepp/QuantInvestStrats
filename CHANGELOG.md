@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Restored `unsmooth_returns_glm()` compatibility with statsmodels 0.15 after removal of the
+  deprecated `AutoReg.old_names` argument.
 - Rejected unsupported `bfill_timeseries()` fill policies instead of silently treating them as
   forward-fill.
 - Processed unique performance-fee return dates chronologically, rejected duplicate dates, and

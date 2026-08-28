@@ -780,7 +780,7 @@ def _unsmooth_glm_single(returns: pd.Series,
                 f"insufficient observations: {len(clean)} returns for AR({ar_order}) "
                 f"(need at least {4 * ar_order})"
             )
-        model = AutoReg(clean.values, lags=ar_order, old_names=False).fit()
+        model = AutoReg(clean.values, lags=ar_order).fit()
         theta = np.asarray(model.params[1:])
     theta_sum = float(theta.sum())
     vol_inflation = 1.0 / (1.0 - theta_sum) if theta_sum < 1.0 else np.inf
