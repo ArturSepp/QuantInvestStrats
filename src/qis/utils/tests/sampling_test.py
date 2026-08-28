@@ -1,12 +1,10 @@
-"""Contracts for calendar-period sampling and its deprecated compatibility containers."""
-import inspect
-
+"""Contracts for calendar-period sampling and removal of obsolete helpers."""
 import pandas as pd
 import pytest
 
+import qis
 from qis.utils import sampling
-from qis.utils.dates import TimePeriod
-from qis.utils.sampling import TrainLivePeriod, TrainLiveSamples, split_to_samples
+from qis.utils.sampling import split_to_samples
 
 
 def _monthly_boundary_data(as_series: bool = False) -> pd.DataFrame | pd.Series:
@@ -66,36 +64,12 @@ def test_split_to_samples_normalizes_each_sample_without_mutating_input(
     _assert_pandas_equal(data, original)
 
 
-def test_train_live_period_is_deprecated_but_retains_named_tuple_contract() -> None:
-    train = TimePeriod('2023-01-01', '2023-12-31')
-    live = TimePeriod('2024-01-01', '2024-12-31')
-
-    with pytest.warns(DeprecationWarning, match='TrainLivePeriod is deprecated') as record:
-        period = TrainLivePeriod(train=train, live=live)
-
-    assert len(record) == 1
-    assert period.train is train
-    assert period.live is live
-    assert tuple(period) == (train, live)
-    assert period._fields == ('train', 'live')
-    assert tuple(inspect.signature(TrainLivePeriod).parameters) == ('train', 'live')
-
-
-def test_train_live_samples_is_deprecated_but_retains_mapping_contract() -> None:
-    key = pd.Timestamp('2024-01-31')
-    train = TimePeriod('2023-01-01', '2023-12-31')
-    live = TimePeriod('2024-01-01', '2024-01-31')
-    with pytest.warns(DeprecationWarning):
-        period = TrainLivePeriod(train=train, live=live)
-
-    with pytest.warns(DeprecationWarning, match='TrainLiveSamples is deprecated') as record:
-        samples = TrainLiveSamples()
-    samples.add(key, period)
-
-    assert len(record) == 1
-    assert samples.train_live_dates == {key: period}
-
-
 def test_obsolete_sampling_reshapers_are_removed() -> None:
     assert not hasattr(sampling, 'split_to_train_live_samples')
     assert not hasattr(sampling, 'get_data_samples_df')
+
+
+def test_obsolete_sampling_types_are_removed() -> None:
+    for name in ('TrainLivePeriod', 'TrainLiveSamples'):
+        assert not hasattr(sampling, name)
+        assert not hasattr(qis, name)

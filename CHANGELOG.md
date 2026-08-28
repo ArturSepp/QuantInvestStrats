@@ -22,15 +22,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Documented and regression-tested the established calendar-boundary behavior of
   `split_to_samples()` for the `TrendFollowingSystems` consumer.
 
-### Deprecated
-
-- Deprecated the public `TrainLivePeriod` and `TrainLiveSamples` compatibility containers for
-  removal in qis 6.0; use application-specific period pairs and standard mappings instead.
-
 ### Removed
 
-- Removed the legacy module-level `split_to_train_live_samples()` and `get_data_samples_df()`
-  helpers; `split_to_samples()` remains the supported calendar-period slicer.
+- Removed the unused public `TrainLivePeriod` and `TrainLiveSamples` containers and the legacy
+  module-level `split_to_train_live_samples()` and `get_data_samples_df()` helpers;
+  `split_to_samples()` remains the supported calendar-period slicer.
 
 ### Fixed
 

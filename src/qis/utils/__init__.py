@@ -92,11 +92,6 @@ from qis.utils.np_ops import (
 
 from qis.utils.regression import fit_multivariate_ols
 
-from qis.utils.sampling import (
-    TrainLivePeriod,
-    TrainLiveSamples
-)
-
 from qis.utils.struct_ops import (
     assert_list_subset,
     to_flat_list,
