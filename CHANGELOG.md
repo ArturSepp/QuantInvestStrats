@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Made `append_time_series()` independent of input row order before overlap selection,
+  comparison, and concatenation.
 - Restored `unsmooth_returns_glm()` compatibility with statsmodels 0.15 after removal of the
   deprecated `AutoReg.old_names` argument.
 - Rejected unsupported `bfill_timeseries()` fill policies instead of silently treating them as
