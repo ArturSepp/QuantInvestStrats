@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.19.0] - 2026-08-28
+
+### Added
+
+- Extended model-layer attribution with the standalone signal-layer return and an optional net
+  full-model NAV whose exact log-return trading-cost drag reconciles gross and net performance.
+
 ### Fixed
 
 - Made `append_time_series()` independent of input row order before overlap selection,

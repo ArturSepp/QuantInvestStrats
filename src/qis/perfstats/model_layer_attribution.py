@@ -6,6 +6,7 @@ it is not a point-in-time estimator for use inside a backtest.
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -21,9 +22,11 @@ class ModelLayerAlphaBetaAttribution:
     """Full-sample alpha/beta decomposition of model-layer NAVs.
 
     Attributes:
-        periodic_returns: Common-sample log returns for the four supplied NAVs.
-        regression_table: Full-sample OLS statistics for each layer and integration.
-        component_returns: Exact periodic log-return decomposition of the full model.
+        periodic_returns: Common-sample log returns for the supplied gross and optional net NAVs.
+        regression_table: Full-sample OLS statistics for each layer, integration, and optional net
+            model.
+        component_returns: Exact periodic log-return decomposition of the gross and optional net
+            full model.
         annualised_components: Annualised mean log-return contributions.
     """
 
@@ -39,14 +42,17 @@ def compute_model_layer_alpha_beta_attribution(
         alpha_layer_nav: pd.Series,
         full_model_nav: pd.Series,
         freq: str = 'QE',
+        full_model_net_nav: Optional[pd.Series] = None,
 ) -> ModelLayerAlphaBetaAttribution:
     """Compute a full-sample OLS decomposition of model-layer log returns.
 
     Each observed layer is regressed on the benchmark. The full-model log return is then
     decomposed into its systematic return, risk-layer alpha, alpha-layer alpha and integration
     alpha. The integration term captures the non-additivity of the two standalone layers relative
-    to the fully constrained model. The four contributions reconstruct the full-model log return
-    in every observation.
+    to the fully constrained model. The four gross contributions reconstruct the full-model log
+    return in every observation. When ``full_model_net_nav`` is supplied, trading-cost drag is the
+    exact log-return difference between the net and gross full models and extends the bridge to the
+    net return.
 
     Args:
         benchmark_nav: Benchmark NAV or price index.
@@ -54,6 +60,7 @@ def compute_model_layer_alpha_beta_attribution(
         alpha_layer_nav: NAV of the standalone alpha or signal portfolio.
         full_model_nav: NAV of the fully integrated model.
         freq: Regression and return frequency. Defaults to quarter-end.
+        full_model_net_nav: Optional NAV of the same fully integrated model after trading costs.
 
     Returns:
         Alpha/beta regression statistics and exact log-return components.
@@ -63,13 +70,16 @@ def compute_model_layer_alpha_beta_attribution(
         ValueError: If the common sample is too short or the benchmark has no variation.
         RuntimeError: If the resulting decomposition does not reconcile.
     """
+    nav_series = {
+        'Benchmark': benchmark_nav,
+        'Risk Layer': risk_layer_nav,
+        'Alpha Layer': alpha_layer_nav,
+        'Full Model': full_model_nav,
+    }
+    if full_model_net_nav is not None:
+        nav_series['Full Model Net'] = full_model_net_nav
     navs = pd.concat(
-        {
-            'Benchmark': benchmark_nav,
-            'Risk Layer': risk_layer_nav,
-            'Alpha Layer': alpha_layer_nav,
-            'Full Model': full_model_nav,
-        },
+        nav_series,
         axis=1,
         sort=True,
     ).sort_index()
@@ -114,7 +124,10 @@ def compute_model_layer_alpha_beta_attribution(
         }
     }
     benchmark_returns = layer_returns['Benchmark']
-    for layer in ['Risk Layer', 'Alpha Layer', 'Integration', 'Full Model']:
+    regression_layers = ['Risk Layer', 'Alpha Layer', 'Integration', 'Full Model']
+    if full_model_net_nav is not None:
+        regression_layers.append('Full Model Net')
+    for layer in regression_layers:
         alpha, beta, r_squared, alpha_pvalue = ols.estimate_ols_alpha_beta(
             x=benchmark_returns,
             y=layer_returns[layer],
@@ -133,6 +146,7 @@ def compute_model_layer_alpha_beta_attribution(
     betas = regression_table[beta_column]
     component_returns = pd.DataFrame({
         'Benchmark Return': benchmark_returns,
+        'Alpha Layer Return': layer_returns['Alpha Layer'],
         'Systematic Return': betas['Full Model'] * benchmark_returns,
         'Risk Layer Alpha': (
             layer_returns['Risk Layer'] - betas['Risk Layer'] * benchmark_returns
@@ -163,6 +177,22 @@ def compute_model_layer_alpha_beta_attribution(
         raise RuntimeError(
             'model-layer components do not reconstruct the full-model log return'
         )
+    if full_model_net_nav is not None:
+        component_returns['Trading Cost Drag'] = (
+            layer_returns['Full Model Net'] - layer_returns['Full Model']
+        )
+        component_returns['Full Model Net Return'] = layer_returns['Full Model Net']
+        net_bridge_columns = bridge_columns + ['Trading Cost Drag']
+        net_reconstructed = component_returns[net_bridge_columns].sum(axis=1)
+        if not np.allclose(
+                net_reconstructed,
+                component_returns['Full Model Net Return'],
+                atol=1.0e-12,
+                rtol=0.0,
+        ):
+            raise RuntimeError(
+                'model-layer components do not reconstruct the net full-model log return'
+            )
     annualised_components = annualisation * component_returns.mean(axis=0)
     return ModelLayerAlphaBetaAttribution(
         periodic_returns=periodic_returns,
