@@ -304,15 +304,40 @@ and compare nothing.
   `$env:AGENT_LOCAL_ROOT\envs\QuantInvestStrats\<machine-task>`; never create `.venv` under the
   repository.
 
-## Temporary workspace hygiene
+<!-- BEGIN ONEDRIVE GIT / C-LOCAL AGENT POLICY -->
+## OneDrive Git durability and C-local execution
 
-- The primary checkout and its complete `.git` directory remain in OneDrive. Never relocate Git
-  metadata, configure an external object directory or use a machine-local clone as authoritative.
-- Agent-created environments, caches, scratch, diagnostics, builds, analyses and run output go
-  below the local C-drive root in `$env:AGENT_LOCAL_ROOT`, in a machine- and task-specific
-  directory. Copy back only intentional durable deliverables.
-- Pure test and release runs use a `git archive` source export on C. Isolated source edits may use
-  a locked, machine-named C-drive linked worktree; checkpoint intentional changes to its task
-  branch before pausing or handoff.
-- Never prune, repair, unlock or remove another computer's or task's worktree. Never use desktop
-  and laptop concurrently against the OneDrive-backed repository root.
+- The primary checkout and its complete `.git` directory are the authoritative durable
+  repository state and must remain under OneDrive. This includes the object database, index,
+  unpushed commits, stashes, refs, reflogs, linked-worktree administration, hooks and local
+  repository configuration. Never relocate any of them to `C:\git`, temp storage,
+  `$env:AGENT_LOCAL_ROOT`, an external object directory, or a machine-local clone.
+- Agent-created environments, caches, scratch files, diagnostics, builds, analyses, test
+  output and run output belong below the local C-drive root `$env:AGENT_LOCAL_ROOT`, in a
+  machine- and task-specific directory. Never create a repository-local `.venv`, cache, or
+  disposable run directory in OneDrive. Copy back only intentional durable deliverables.
+- Pure test and release runs use a `git archive` source export on C. Isolated source edits may
+  use a locked, machine-named C-drive linked worktree; checkpoint intentional changes to a
+  machine-namespaced branch or stash before pausing or handing off.
+- Never prune, repair, unlock, rename or remove another computer's or task's worktree. Never
+  use desktop and laptop concurrently against the OneDrive-backed repository root.
+<!-- BEGIN C-LOCAL GENERATED STATE HELPERS -->
+### Mandatory C-local generated-state helpers
+
+- Before Python, uv, pytest, Ruff, mypy, coverage, or similar Python-tool work in this
+  repository or linked worktree, run the shared setup in the PowerShell session that will
+  run those tools:
+  `. "$env:USERPROFILE\OneDrive\analytics\my_github\_agent_tools\Enter-AgentRepo.ps1"`.
+  Run it again after switching repositories or worktrees. Do not override the paths it sets
+  back into OneDrive.
+- The setup routes bytecode, tool caches, coverage data, temporary files, uv environments,
+  builds, analyses, outputs, and runs below `$env:LOCALAPPDATA\AgentWork`. Never create or
+  use repository-local `.venv`, `__pycache__`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`,
+  or equivalent generated-state directories.
+- Build LaTeX only through
+  `& "$env:USERPROFILE\OneDrive\analytics\my_github\_agent_tools\Build-AgentLatex.ps1"`
+  with `-MainTex <path>`. The helper keeps auxiliary and output files on C. Use `-Publish`
+  only to copy an intentional final PDF beside its source; use `-ForcePublish` only after
+  reviewing an existing destination.
+<!-- END C-LOCAL GENERATED STATE HELPERS -->
+<!-- END ONEDRIVE GIT / C-LOCAL AGENT POLICY -->
