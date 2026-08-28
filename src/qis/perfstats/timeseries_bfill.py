@@ -143,8 +143,8 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             last observed level forward.
 
     Returns:
-        Chronologically ordered backfilled data on the requested grid, matching the newer input's
-        pandas type, labels, and column order.
+        Chronologically ordered backfilled data on the requested grid with matching frequency
+        metadata, preserving the newer input's pandas type, labels, and column order.
 
     Raises:
         ValueError: If ``fill_method`` is not ``None``, ``'to_zero'``, or ``'ffill'``.
@@ -252,6 +252,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             bfill_datas = bfill_datas.asfreq(freq, method='ffill').ffill()
         else:
             bfill_datas = bfill_datas.asfreq(freq)
+    elif cast(pd.DatetimeIndex, bfill_datas.index).freq is None:
+        # A regular result should advertise the requested cadence regardless of input metadata.
+        bfill_datas = bfill_datas.asfreq(freq)
 
     if fill_method is not None and is_prices is False:
         # Apply return policies after expansion so inserted dates follow the selected convention.

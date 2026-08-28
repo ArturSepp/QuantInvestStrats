@@ -22,6 +22,7 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   deprecated `AutoReg.old_names` argument.
 - Rejected unsupported `bfill_timeseries()` fill policies instead of silently treating them as
   forward-fill.
+- Made `bfill_timeseries()` return canonical frequency metadata for already-regular output grids.
 - Processed unique performance-fee return dates chronologically, rejected duplicate dates, and
   crystallized fees on the latest available observation on or before calendar period ends.
 
