@@ -119,6 +119,31 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
     return infrequent_return_backfill
 
 
+def _add_price_return_anchors(price_returns: pd.DataFrame,
+                              prices: pd.DataFrame,
+                              prior_returns: Optional[pd.DataFrame] = None
+                              ) -> None:
+    """Retain first observed provider prices as zero-return NAV anchors.
+
+    Args:
+        price_returns: Fresh return frame to update in place.
+        prices: Provider prices whose first finite level may require an anchor.
+        prior_returns: Earlier-provider returns that can already anchor a newer history.
+    """
+    for column, price_series in prices.items():
+        if price_series.isna().all():
+            continue
+        first_price_date = cast(pd.Timestamp, dfo.get_nonnan_index(price_series))
+        has_prior_anchor = False
+        if prior_returns is not None and column in prior_returns.columns:
+            prior_return_series = prior_returns[column]
+            prior_observations = prior_return_series.loc[:first_price_date]
+            has_prior_anchor = bool(prior_observations.notna().any())
+        if not has_prior_anchor:
+            # A zero return preserves the supplied level without inventing price movement.
+            price_returns.loc[first_price_date, column] = 0.0
+
+
 def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent data
                      df_older: Union[pd.DataFrame, pd.Series],  # older price is preserved to the end
                      freq: str = 'B',
@@ -127,8 +152,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
                      ) -> Union[pd.DataFrame, pd.Series]:
     """Extend newer time series backward with older provider histories.
 
-    For price DataFrames, a newer all-missing column without an older counterpart remains
-    entirely missing.
+    For price inputs, a provider's first observed level supplies a zero-return NAV anchor when no
+    usable earlier return exists. A newer all-missing DataFrame column without an older
+    counterpart remains entirely missing.
 
     Args:
         df_newer: Newer Series or DataFrame whose labels and columns define the output. Its rows
@@ -139,8 +165,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         fill_method: Return-gap policy. ``None`` preserves missing returns, ``'to_zero'`` fills
             missing returns with zero after each column begins, and ``'ffill'`` carries its last
             observed return forward. For price inputs, the policy is applied in return space.
-        is_prices: Whether the supplied data are price levels. Expanded price grids carry the
-            last observed level forward.
+        is_prices: Whether the supplied data are price levels. First observed provider prices are
+            retained when no earlier return can anchor them, and expanded grids carry the last
+            observed level forward.
 
     Returns:
         Chronologically ordered backfilled data on the requested grid with matching frequency
@@ -174,6 +201,8 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         df_newer = df_newer.sort_index()
     if not df_older.index.is_monotonic_increasing:
         df_older = df_older.sort_index()
+    # Price reconstruction must retain dates even when their calculated return is missing.
+    provider_index = df_newer.index.union(df_older.index).sort_values()
     
     price_fallback_columns = []
     if is_prices:
@@ -197,8 +226,13 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             terminal_value_old = dfo.get_last_nonnan_values(aligned_older)
             terminal_value = np.where(np.isnan(terminal_value), terminal_value_old, terminal_value)
 
-        df_newer = ret.to_returns(df_newer)
-        df_older = ret.to_returns(df_older, is_first_zero=True)  # the time series will start from first day of df_older
+        df_newer = cast(pd.DataFrame, ret.to_returns(newer_prices))
+        df_older = cast(pd.DataFrame, ret.to_returns(older_prices))
+        # Anchor older prices first so only genuinely unanchored newer histories are initialized.
+        _add_price_return_anchors(price_returns=df_older, prices=older_prices)
+        _add_price_return_anchors(price_returns=df_newer,
+                                  prices=newer_prices,
+                                  prior_returns=df_older)
     else:
         terminal_value = None
 
@@ -237,9 +271,13 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
     bfill_datas = pd.concat(bfill_datas, axis=1, sort=True).sort_index()
 
     if is_prices:
+        # Preserve price dates whose missing returns still delimit a valid provider history.
+        bfill_datas = bfill_datas.reindex(provider_index)
         bfill_datas = ret.returns_to_nav(returns=bfill_datas,
                                          init_period=None,
                                          terminal_value=terminal_value)
+        # Restore trailing provider dates removed by between-NaN NAV cleanup before fallback fill.
+        bfill_datas = bfill_datas.reindex(provider_index)
         # Carry available older-only histories independently of grid-resampling side effects.
         for column in price_fallback_columns:
             bfill_datas[column] = bfill_datas[column].ffill()

@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Preserved finite newer and single-observation older price anchors when
+  `bfill_timeseries()` reconstructs joined price histories.
 - Supported pandas nullable floating price panels in `to_returns()` without changing return
   conventions or accepted NumPy-backed results.
 

@@ -6,9 +6,8 @@ use literal references for every return mode and first-observation option. A mix
 two finite assets, ragged and all-missing histories, and terminal non-positive observations in one
 call so pandas' physical multi-column representation cannot hide behind one-column coverage.
 
-The downstream backfill control intentionally retains the accepted missing first-price result
-owned by PR 30. This module changes nullable conversion only; it must not establish a different
-price-initialization, frequency, or fill convention.
+The downstream backfill control also verifies that nullable conversion retains an independently
+supplied first-price anchor without changing frequency or fill conventions.
 """
 
 import warnings
@@ -367,11 +366,10 @@ def test_to_returns_retains_nullable_series_and_one_column_behavior() -> None:
 
 
 def test_bfill_timeseries_supports_nullable_mixed_price_panel() -> None:
-    """Enable nullable conversion without changing accepted backfill values.
+    """Retain nullable conversion and the coincident ragged price anchor.
 
-    The ragged Tuesday price remains missing in this PR's expected result because its lost initial
-    anchor is the separate PR 30 defect. Fallback, shared, and absent columns pin the accepted
-    mixed-state, off-grid, schema, warning, and ownership behavior around this conversion fix.
+    Fallback, shared, and absent columns pin the mixed-state, off-grid, schema, warning, and
+    ownership behavior around the Tuesday ragged anchor.
     """
     older = _as_nullable(
         pd.DataFrame(
@@ -400,7 +398,7 @@ def test_bfill_timeseries_supports_nullable_mixed_price_panel() -> None:
         pd.DataFrame(
             {
                 "Absent": (np.nan, np.nan, np.nan),
-                _RAGGED: (np.nan, np.nan, 231.0),
+                _RAGGED: (np.nan, 210.0, 231.0),
                 "Fallback": (50.0, 55.0, 55.0),
                 "Shared": (100.0, 110.0, 121.0),
             },

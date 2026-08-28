@@ -309,9 +309,9 @@ def test_bfill_timeseries_preserves_mixed_off_grid_prices_and_frequency(
     """Retain every accepted price state while pinning business-day metadata.
 
     Saturday's shared and fallback prices carry into Monday, fallback remains 55 on Wednesday,
-    and the absent asset remains missing. The accepted implementation currently leaves ragged
-    missing through Tuesday before reaching 231 on Wednesday; PR 30 owns that separate price-
-    initialization defect. These literal values ensure metadata work changes no numerical state.
+    and the absent asset remains missing. The coincident ragged price anchors Tuesday at 210
+    before reaching 231 on Wednesday. These literal values ensure metadata work retains every
+    price state while assigning the requested frequency.
 
     Args:
         older_positions: Positional permutation applied to the older price provider.
@@ -339,7 +339,7 @@ def test_bfill_timeseries_preserves_mixed_off_grid_prices_and_frequency(
     expected = pd.DataFrame(
         {
             _ABSENT_ASSET: (np.nan, np.nan, np.nan),
-            _RAGGED_ASSET: (np.nan, np.nan, 231.0),
+            _RAGGED_ASSET: (np.nan, 210.0, 231.0),
             _FALLBACK_ASSET: (50.0, 55.0, 55.0),
             _SHARED_ASSET: (100.0, 110.0, 121.0),
         },
