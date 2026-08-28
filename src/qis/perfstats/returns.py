@@ -95,7 +95,7 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
     """Convert prices to returns with specified methodology.
 
     Args:
-        prices: Price time series
+        prices: Numeric price time series. Pandas nullable floating values are supported
         is_log_returns: If True, compute log returns (overrides return_type)
         return_type: Type of return calculation (LOG, RELATIVE, DIFFERENCE, LEVEL, LEVEL0)
         freq: Resampling frequency (e.g., 'D', 'W', 'M')
@@ -107,7 +107,9 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
         **kwargs: Additional arguments
 
     Returns:
-        Return time series with NaN for invalid observations
+        Return time series matching the input's pandas shape and labels. A missing or non-positive
+        normalized current price produces a missing observation, and nullable floating inputs
+        retain a nullable output dtype
     """
     # Resample prices to specified frequency
     prices = prices_at_freq(prices=prices, freq=freq,
@@ -115,9 +117,8 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
                             include_end_date=include_end_date,
                             ffill_nans=ffill_nans)
 
-    # Identify valid prices (non-NaN and positive)
-    prices_np = prices.to_numpy()
-    ind_good = np.logical_and(np.isnan(prices_np) == False, np.greater(prices_np, 0.0))
+    # Keep validation label-aligned and compatible with pandas nullable floating dtypes.
+    ind_good = prices.notna() & prices.gt(0.0)
 
     # Compute returns based on type
     if return_type == ReturnTypes.LOG or is_log_returns:
