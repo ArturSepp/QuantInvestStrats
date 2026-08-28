@@ -1,8 +1,28 @@
 """Full-sample alpha/beta attribution for layered portfolio models.
 
-The decomposition is defined in log-return space so its systematic, standalone-layer and
-integration contributions add exactly through time. It is descriptive and full-sample by design;
-it is not a point-in-time estimator for use inside a backtest.
+The methodology starts from benchmark, standalone risk-layer, standalone alpha-layer and fully
+integrated model NAVs. An optional net full-model NAV may be supplied to measure realised trading
+cost drag. All NAVs are aligned to their common finite sample and converted at ``freq`` to log
+returns, ``r[t] = log(NAV[t] / NAV[t-1])``. Log returns are required because their additive identity
+lets the component bridge reconstruct the full model in every observation and over time.
+
+For each observed or derived layer L, the module estimates the descriptive full-sample regression
+``r_L[t] = alpha_L + beta_L * r_B[t] + epsilon_L[t]``, where B is the supplied benchmark. The point
+estimates are OLS. Alpha inference uses a Bartlett-kernel HAC covariance with three lags, the
+statsmodels small-sample correction, a normal reference distribution and a two-sided 95% interval.
+Alpha and its confidence bounds are annualised linearly by the factor implied by ``freq``; beta,
+R² and the periodic HAC standard error are not annualised. The generic regression and HAC
+calculation lives in ``qis.utils.regression``; this module only assigns ``PerfStat`` labels.
+
+The gross full-model return is separated into four exact periodic components: systematic return is
+``beta_F * r_B``; risk-layer contribution is ``r_R - beta_R * r_B``; standalone signal alpha is
+``r_A - beta_A * r_B``; and integration alpha is the residual required to reconcile these three
+terms to ``r_F``. Thus integration measures what the constrained full model adds beyond simply
+combining the standalone risk and signal effects. If a net NAV is supplied, trading-cost drag is
+the exact log-return difference ``r_F_net - r_F`` and extends the same identity to net performance.
+
+This is an ex-post explanatory analysis, not a point-in-time estimator and not an input to the
+portfolio backtest. Its full-sample coefficients must not be interpreted as implementable forecasts.
 """
 
 from dataclasses import dataclass
@@ -17,6 +37,13 @@ from qis.perfstats.config import PerfStat
 from qis.utils.annualisation import get_annualization_factor
 
 
+ALPHA_HAC_LAGS: int = 3
+ALPHA_CONFIDENCE_LEVEL: float = 0.95
+ALPHA_HAC_SE_COLUMN: str = 'Alpha HAC SE'
+ALPHA_AN_CI_LOW_COLUMN: str = 'An Alpha CI Low'
+ALPHA_AN_CI_HIGH_COLUMN: str = 'An Alpha CI High'
+
+
 @dataclass(frozen=True)
 class ModelLayerAlphaBetaAttribution:
     """Full-sample alpha/beta decomposition of model-layer NAVs.
@@ -24,7 +51,7 @@ class ModelLayerAlphaBetaAttribution:
     Attributes:
         periodic_returns: Common-sample log returns for the supplied gross and optional net NAVs.
         regression_table: Full-sample OLS statistics for each layer, integration, and optional net
-            model.
+            model, including annualised 95% Bartlett HAC(3) alpha confidence bounds.
         component_returns: Exact periodic log-return decomposition of the gross and optional net
             full model.
         annualised_components: Annualised mean log-return contributions.
@@ -53,6 +80,10 @@ def compute_model_layer_alpha_beta_attribution(
     return in every observation. When ``full_model_net_nav`` is supplied, trading-cost drag is the
     exact log-return difference between the net and gross full models and extends the bridge to the
     net return.
+
+    Alpha p-values and confidence intervals use Bartlett-kernel heteroskedasticity and
+    autocorrelation-consistent standard errors with three lags. Confidence bounds are 95% and are
+    annualised linearly using the factor implied by ``freq``.
 
     Args:
         benchmark_nav: Benchmark NAV or price index.
@@ -121,6 +152,9 @@ def compute_model_layer_alpha_beta_attribution(
             beta_column: 1.0,
             r2_column: 1.0,
             pvalue_column: 1.0,
+            ALPHA_HAC_SE_COLUMN: 0.0,
+            ALPHA_AN_CI_LOW_COLUMN: 0.0,
+            ALPHA_AN_CI_HIGH_COLUMN: 0.0,
         }
     }
     benchmark_returns = layer_returns['Benchmark']
@@ -128,18 +162,28 @@ def compute_model_layer_alpha_beta_attribution(
     if full_model_net_nav is not None:
         regression_layers.append('Full Model Net')
     for layer in regression_layers:
-        alpha, beta, r_squared, alpha_pvalue = ols.estimate_ols_alpha_beta(
-            x=benchmark_returns,
-            y=layer_returns[layer],
-        )
-        if not np.isfinite(alpha) or not np.isfinite(beta):
-            raise ValueError(f'OLS failed for {layer}')
+        try:
+            regression_result = ols.estimate_ols_alpha_beta_hac(
+                x=benchmark_returns,
+                y=layer_returns[layer],
+                hac_lags=ALPHA_HAC_LAGS,
+                confidence_level=ALPHA_CONFIDENCE_LEVEL,
+            )
+        except Exception as exception:
+            raise ValueError(f'OLS failed for {layer}') from exception
         regression_rows[layer] = {
-            alpha_column: alpha,
-            annualised_alpha_column: annualisation * alpha,
-            beta_column: beta,
-            r2_column: r_squared,
-            pvalue_column: alpha_pvalue,
+            alpha_column: regression_result.alpha,
+            annualised_alpha_column: annualisation * regression_result.alpha,
+            beta_column: regression_result.beta,
+            r2_column: regression_result.r_squared,
+            pvalue_column: regression_result.alpha_pvalue,
+            ALPHA_HAC_SE_COLUMN: regression_result.alpha_hac_se,
+            ALPHA_AN_CI_LOW_COLUMN: (
+                annualisation * regression_result.alpha_confidence_interval[0]
+            ),
+            ALPHA_AN_CI_HIGH_COLUMN: (
+                annualisation * regression_result.alpha_confidence_interval[1]
+            ),
         }
     regression_table = pd.DataFrame.from_dict(regression_rows, orient='index')
 

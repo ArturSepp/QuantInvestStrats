@@ -86,7 +86,7 @@ Do not import from `qis/examples/`. It is documentation and is restructured with
 
 ---
 
-## 4. Moved out of the namespace (207 symbols)
+## 4. Moved out of the namespace (206 symbols)
 
 Grouped by the module to import from.
 
@@ -346,11 +346,10 @@ from qis.perfstats.config import (
 )
 ```
 
-### `qis.utils.regression` (5)
+### `qis.utils.regression` (4)
 
 ```python
 from qis.utils.regression import (
-    estimate_alpha_beta_paired_dfs,
     estimate_ols_alpha_beta,
     fit_ols,
     get_ols_x,

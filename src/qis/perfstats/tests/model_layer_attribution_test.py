@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 from qis.perfstats.model_layer_attribution import (
     ModelLayerAlphaBetaAttribution,
@@ -13,6 +14,34 @@ def _nav_from_log_returns(log_returns: np.ndarray, index: pd.DatetimeIndex) -> p
     """Convert a deterministic log-return path to a NAV series."""
     values = np.exp(np.concatenate(([0.0], np.cumsum(log_returns))))
     return pd.Series(values, index=index)
+
+
+def _manual_hac_alpha_interval(
+        benchmark_returns: np.ndarray,
+        layer_returns: np.ndarray,
+        lags: int = 3,
+) -> tuple[float, float, float, float]:
+    """Compute a Bartlett-kernel HAC alpha interval independently of the production helper."""
+    x = np.column_stack((np.ones_like(benchmark_returns), benchmark_returns))
+    xtx_inv = np.linalg.inv(x.T @ x)
+    params = xtx_inv @ x.T @ layer_returns
+    residuals = layer_returns - x @ params
+    scores = x * residuals[:, None]
+    meat = scores.T @ scores
+    for lag in range(1, lags + 1):
+        weight = 1.0 - lag / (lags + 1.0)
+        lagged_cross_product = scores[lag:].T @ scores[:-lag]
+        meat += weight * (lagged_cross_product + lagged_cross_product.T)
+    n_obs, n_params = x.shape
+    covariance = (n_obs / (n_obs - n_params)) * xtx_inv @ meat @ xtx_inv
+    alpha_se = np.sqrt(covariance[0, 0])
+    critical_value = norm.ppf(0.975)
+    return (
+        params[0],
+        alpha_se,
+        params[0] - critical_value * alpha_se,
+        params[0] + critical_value * alpha_se,
+    )
 
 
 def test_model_layer_attribution_recovers_log_alpha_beta_and_reconstructs() -> None:
@@ -138,3 +167,46 @@ def test_optional_net_nav_adds_exact_cost_drag_and_net_reconstruction() -> None:
         atol=1.0e-14,
     )
     assert 'Full Model Net' in result.regression_table.index
+
+
+def test_monthly_alpha_intervals_use_hac3_and_annualise_the_bounds() -> None:
+    """Monthly alpha bounds match an independent Bartlett HAC(3) calculation."""
+    benchmark_returns = np.array([
+        -0.030, 0.012, 0.021, -0.008, 0.025, -0.017,
+        0.009, 0.018, -0.011, 0.026, 0.004, -0.019,
+        0.014, 0.007, -0.006, 0.023, -0.013, 0.016,
+        0.005, -0.010, 0.020, -0.004, 0.011, 0.015,
+    ])
+    risk_noise = np.array([
+        0.0020, -0.0010, 0.0015, -0.0020, 0.0005, 0.0010,
+        -0.0015, 0.0025, -0.0005, 0.0010, -0.0010, 0.0015,
+        -0.0025, 0.0005, 0.0020, -0.0010, 0.0010, -0.0005,
+        0.0015, -0.0020, 0.0005, 0.0010, -0.0015, 0.0020,
+    ])
+    risk_returns = 0.002 + 0.82 * benchmark_returns + risk_noise
+    alpha_returns = 0.003 + 0.18 * benchmark_returns - 0.5 * risk_noise
+    integration_returns = 0.001 - 0.07 * benchmark_returns + 0.25 * risk_noise
+    full_returns = risk_returns + alpha_returns + integration_returns
+    index = pd.date_range('2020-12-31', periods=25, freq='ME')
+
+    result = compute_model_layer_alpha_beta_attribution(
+        benchmark_nav=_nav_from_log_returns(benchmark_returns, index),
+        risk_layer_nav=_nav_from_log_returns(risk_returns, index),
+        alpha_layer_nav=_nav_from_log_returns(alpha_returns, index),
+        full_model_nav=_nav_from_log_returns(full_returns, index),
+        freq='ME',
+    )
+    alpha, alpha_se, ci_low, ci_high = _manual_hac_alpha_interval(
+        benchmark_returns=benchmark_returns,
+        layer_returns=risk_returns,
+    )
+
+    risk_row = result.regression_table.loc['Risk Layer']
+    np.testing.assert_allclose(risk_row['An Alpha'], 12.0 * alpha, atol=1.0e-12)
+    np.testing.assert_allclose(risk_row['Alpha HAC SE'], alpha_se, atol=1.0e-12)
+    np.testing.assert_allclose(risk_row['An Alpha CI Low'], 12.0 * ci_low, atol=1.0e-12)
+    np.testing.assert_allclose(risk_row['An Alpha CI High'], 12.0 * ci_high, atol=1.0e-12)
+    assert (result.regression_table['An Alpha CI Low']
+            <= result.regression_table['An Alpha']).all()
+    assert (result.regression_table['An Alpha']
+            <= result.regression_table['An Alpha CI High']).all()

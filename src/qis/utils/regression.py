@@ -3,9 +3,11 @@ statsmodels OLS wrappers: fit, extract alpha and beta, and render the fitted equ
 
 ``fit_multivariate_ols`` regresses a Series on the columns of a frame and returns, in that order,
 the prediction, the parameters and a formatted label of the fitted equation; ``fit_ols`` is the
-array form; ``estimate_ols_alpha_beta`` reduces a fit to alpha, beta, R² and the alpha p-value,
-returning zeros with a warning rather than raising when the fit fails. ``reg_model_params_to_str``
-formats the fitted equation for a chart legend, and annualises the intercept as expm1(a α) when
+array form. ``estimate_ols_alpha_beta`` reduces a fit to alpha, beta, R² and the conventional alpha
+p-value, returning zeros with a warning rather than raising when the fit fails.
+``estimate_ols_alpha_beta_hac`` returns the same point estimates together with a Bartlett-kernel
+HAC standard error, p-value and confidence interval for alpha. ``reg_model_params_to_str`` formats
+the fitted equation for a chart legend, and annualises the intercept as expm1(a α) when
 ``alpha_an_factor`` is passed.
 
 Every fit runs through ``filter_x_y`` first: rows where any of x or y is non-finite are dropped,
@@ -14,12 +16,34 @@ polynomial degree in a single x, not a second regressor - ``get_ols_x`` stacks x
 up to order 4. These are static, full-sample fits; time-varying betas are in ``ewm.py``.
 """
 # packages
+from dataclasses import dataclass
 import warnings
 import numpy as np
 import pandas as pd
 from statsmodels import api as sm
 from statsmodels.regression.linear_model import RegressionResults as RegModel
 from typing import Tuple, Union
+
+
+@dataclass(frozen=True)
+class OlsAlphaBetaHacResult:
+    """Generic OLS alpha/beta estimates with HAC inference for the intercept.
+
+    Attributes:
+        alpha: OLS intercept.
+        beta: OLS slope on the first explanatory variable.
+        r_squared: Conventional OLS coefficient of determination.
+        alpha_pvalue: Normal-reference p-value using the HAC intercept standard error.
+        alpha_hac_se: Bartlett-kernel HAC standard error of the intercept.
+        alpha_confidence_interval: Lower and upper HAC confidence bounds for the intercept.
+    """
+
+    alpha: float
+    beta: float
+    r_squared: float
+    alpha_pvalue: float
+    alpha_hac_se: float
+    alpha_confidence_interval: tuple[float, float]
 
 
 def fit_multivariate_ols(x: pd.DataFrame,
@@ -86,6 +110,77 @@ def fit_ols(x: np.ndarray,
     return reg_model
 
 
+def estimate_ols_alpha_beta_hac(
+        x: Union[np.ndarray, pd.Series, pd.DataFrame],
+        y: Union[np.ndarray, pd.Series],
+        hac_lags: int = 3,
+        confidence_level: float = 0.95,
+) -> OlsAlphaBetaHacResult:
+    """Estimate OLS alpha/beta with Bartlett-kernel HAC inference for alpha.
+
+    The point estimates and R² come from ordinary least squares with an intercept. Inference for
+    alpha uses statsmodels' heteroskedasticity and autocorrelation-consistent covariance with the
+    small-sample correction and a normal reference distribution. The requested lag count is capped
+    at one less than the number of retained observations.
+
+    Args:
+        x: Explanatory variable; non-finite observations are removed jointly with ``y``.
+        y: Dependent variable aligned with ``x``.
+        hac_lags: Maximum number of Bartlett-kernel autocovariance lags.
+        confidence_level: Two-sided confidence level for the alpha interval.
+
+    Returns:
+        Generic OLS estimates and HAC inference without performance-reporting labels.
+
+    Raises:
+        ValueError: If the HAC settings are invalid, estimation fails, or outputs are non-finite.
+    """
+    if hac_lags < 0:
+        raise ValueError('hac_lags must be non-negative')
+    if not 0.0 < confidence_level < 1.0:
+        raise ValueError('confidence_level must be between zero and one')
+    try:
+        reg_model = fit_ols(x=x, y=y)
+        effective_hac_lags = min(hac_lags, int(reg_model.nobs) - 1)
+        robust_model = reg_model.get_robustcov_results(
+            cov_type='HAC',
+            maxlags=effective_hac_lags,
+            use_correction=True,
+            use_t=False,
+        )
+        alpha = float(robust_model.params[0])
+        beta = float(robust_model.params[1])
+        r_squared = float(reg_model.rsquared)
+        alpha_pvalue = float(robust_model.pvalues[0])
+        alpha_hac_se = float(robust_model.bse[0])
+        alpha_confidence_interval_array = np.asarray(
+            robust_model.conf_int(alpha=1.0 - confidence_level),
+            dtype=float,
+        )[0]
+    except Exception as exception:
+        raise ValueError('OLS HAC estimation failed') from exception
+    if not np.isfinite([
+            alpha,
+            beta,
+            alpha_pvalue,
+            alpha_hac_se,
+            *alpha_confidence_interval_array,
+    ]).all():
+        raise ValueError('OLS HAC estimation produced non-finite outputs')
+    alpha_confidence_interval = (
+        float(alpha_confidence_interval_array[0]),
+        float(alpha_confidence_interval_array[1]),
+    )
+    return OlsAlphaBetaHacResult(
+        alpha=alpha,
+        beta=beta,
+        r_squared=r_squared,
+        alpha_pvalue=alpha_pvalue,
+        alpha_hac_se=alpha_hac_se,
+        alpha_confidence_interval=alpha_confidence_interval,
+    )
+
+
 def filter_x_y(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     if x.ndim == 1:  # x is 1-dimensional
         cond = np.logical_and(np.isfinite(x), np.isfinite(y))
@@ -125,30 +220,6 @@ def estimate_ols_alpha_beta(x: Union[np.ndarray, pd.Series, pd.DataFrame],
             beta = reg_model.params[0]
     r2 = reg_model.rsquared
     return alpha, beta, r2, alpha_pvalue
-
-
-def estimate_alpha_beta_paired_dfs(x: pd.DataFrame,
-                                   y: pd.DataFrame,
-                                   fit_intercept: bool = True
-                                   ) -> Tuple[pd.Series, pd.Series]:
-    """
-    ols for paired x and y dfs, default axis=0
-    """
-    # align:
-    x = x.dropna()
-    y = y.dropna()
-    y = y.loc[x.index, x.columns]
-    x_np = x.to_numpy()
-    y_np = y.to_numpy()
-    ncols = len(x.columns)
-    alphas, betas = np.zeros(ncols), np.zeros(ncols)
-    for idx in np.arange(ncols):
-        alphas[idx], betas[idx], _, _ = estimate_ols_alpha_beta(x=x_np[:, idx],
-                                                                y=y_np[:, idx],
-                                                                fit_intercept=fit_intercept)
-    alphas = pd.Series(alphas, index=x.columns)
-    betas = pd.Series(betas, index=x.columns)
-    return alphas, betas
 
 
 def get_ols_x(x: np.ndarray, order: int, fit_intercept: bool = True) -> np.ndarray:
