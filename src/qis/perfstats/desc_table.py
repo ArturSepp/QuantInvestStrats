@@ -9,9 +9,8 @@ value. Values come back as formatted strings because the table renderer takes th
 
 ``annualize_vol`` scales the standard deviation by the square root of the factor inferred from
 the index via ``infer_annualisation_factor_from_df``, reporting ``STD_AN`` rather than ``STD``.
-``is_add_tstat`` divides the mean by that volatility, nan unless both adjusted mean and
-volatility are positive; with ``annualize_vol`` off ``an_factor`` is 1.0, so neither side is
-annualised. Risk-adjusted statistics are ``perf_stats.py``.
+``is_add_tstat`` reports the signed sample mean divided by its standard error, independently of
+whether the volatility column is annualised. Risk-adjusted statistics are ``perf_stats.py``.
 """
 # packages
 import numpy as np
@@ -82,6 +81,34 @@ def _reduce_observed(
     return values
 
 
+def compute_sample_mean_tstat(
+        mean: np.ndarray,
+        sample_std: np.ndarray,
+        observation_counts: np.ndarray) -> np.ndarray:
+    """Compute signed one-sample t-statistics from column summaries.
+
+    Args:
+        mean: Sample mean for each column.
+        sample_std: Sample standard deviation with ``ddof=1`` for each column.
+        observation_counts: Non-missing sample size for each column.
+
+    Returns:
+        Mean divided by its standard error, with NaN for undersized or zero-volatility samples.
+    """
+    # Sample inference uses observed counts and is independent of display annualization.
+    eligible_columns = (
+        np.greater_equal(observation_counts, 2)
+        & np.greater(sample_std, 0.0)
+        & np.isfinite(sample_std)
+    )
+    return np.divide(
+        mean * np.sqrt(observation_counts),
+        sample_std,
+        out=np.full_like(mean, np.nan, dtype=float),
+        where=eligible_columns,
+    )
+
+
 def _add_moment_columns(
         descriptive_table: pd.DataFrame,
         data: np.ndarray,
@@ -139,8 +166,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         var_format: format applied to the statistics
         annualize_vol: report volatility per annum rather than per period; reduced modes omit
             the volatility column selected by this convention
-        is_add_tstat: add the t-statistic of the mean when adjusted mean and volatility are
-            positive; otherwise report the formatted missing value
+        is_add_tstat: add the signed sample mean divided by its standard error; samples with fewer
+            than two observations or non-positive sample volatility remain formatted as missing
         norm_variable_display_type: format applied to the t-statistic
 
     Returns:
@@ -164,6 +191,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
 
     # Normalize nullable pandas values so numerical reducers receive np.nan rather than pd.NA.
     data_np = df.to_numpy(dtype=float, na_value=np.nan)
+    observation_counts = np.sum(np.logical_not(np.isnan(data_np)), axis=0)
     # Skip all-missing dated columns so undefined base statistics remain NaN without warnings.
     mean = _reduce_observed(data_np, lambda values: np.nanmean(values, axis=0))
     std = _reduce_observed(
@@ -185,15 +213,11 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     descriptive_table[volatility_column] = [var_format.format(x) for x in vol]
 
     if is_add_tstat:
-        an_mean = an_factor * mean
-        # A zero-volatility sample has no defined displayed statistic.
-        tstats = np.divide(
-            an_mean, vol,
-            out=np.full_like(an_mean, np.nan, dtype=float),
-            where=np.logical_and(
-                np.greater(an_mean, 0.0),
-                np.greater(vol, 0.0),
-            ),
+        # Keep inference signed and sample-based even when volatility is displayed annually.
+        tstats = compute_sample_mean_tstat(
+            mean=mean,
+            sample_std=std,
+            observation_counts=observation_counts,
         )
         descriptive_table[PerfStat.T_STAT.to_str()] = [norm_variable_display_type.format(x) for x in tstats]
 
