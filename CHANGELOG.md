@@ -55,6 +55,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `bfill_timeseries()` reconstructs joined price histories.
 - Supported pandas nullable floating price panels in `to_returns()` without changing return
   conventions or accepted NumPy-backed results.
+- Preserved both ordered positive/negative benchmark-return regimes when one is unobserved and
+  rejected custom regime mappings that do not contain exactly two entries.
 
 ## [5.19.0] - 2026-08-28
 
