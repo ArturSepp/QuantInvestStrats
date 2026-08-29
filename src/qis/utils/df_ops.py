@@ -20,8 +20,6 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from typing import Union, List, Optional, Dict, Tuple, Type, Any, Literal
-# qis
-import qis.utils.np_ops as npo
 
 
 def df_zero_like(df: pd.DataFrame) -> pd.DataFrame:
@@ -73,44 +71,6 @@ def df_joint_indicator(indicator1: pd.DataFrame,
         data = data.astype(np.float64)
 
     return pd.DataFrame(data=data, index=indicator1.index, columns=indicator1.columns)
-
-
-def norm_df_by_ax_mean(data: Union[np.ndarray, pd.DataFrame],
-                       proportiontocut: Optional[float] = None,  # for treaming mean,
-                       is_zero_mean: bool = True,
-                       axis: int = 1
-                       ) -> pd.DataFrame:
-    """
-    to unit norm data
-    axis: 0: time-series row-wise mean; 1: cross-sectional columns-wise mean
-    """
-
-    if isinstance(data, pd.DataFrame):
-        a = data.to_numpy()
-    else:
-        a = data
-
-    if is_zero_mean:
-        if proportiontocut is not None:
-            mean = npo.np_array_to_df_columns(a=stats.trim_mean(a=a,
-                                                                proportiontocut=proportiontocut, axis=axis),
-                                              ncols=len(data.columns))
-        else:
-            mean = np.nanmean(a=a, axis=axis, keepdims=True)
-        a = a - mean
-
-    std = np.nanstd(a=a, axis=axis, ddof=1, keepdims=True)
-    # NumPy 2.x: explicit nan-filled `out` for masked positions (std <= 0).
-    norm_data = np.divide(
-        a, std,
-        out=np.full_like(a, np.nan, dtype=float),
-        where=np.greater(std, 0.0),
-    )
-
-    if isinstance(data, pd.DataFrame):
-        norm_data = pd.DataFrame(data=norm_data, columns=data.columns, index=data.index)
-
-    return norm_data
 
 
 def drop_first_nan_data(df: Union[pd.Series, pd.DataFrame],

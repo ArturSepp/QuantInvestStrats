@@ -10,9 +10,10 @@
 
 # qis 5.0 — removed from the public namespace
 
-**568 -> 373 public symbols.** Nothing is deleted unless listed under *Deleted* below:
-the top-level `qis` namespace is reduced, and every other symbol is still importable
-from its defining module.
+**568 -> 373 public symbols.** At the 5.0 transition, nothing was deleted unless listed under
+*Deleted* below: the top-level `qis` namespace was reduced, and every other symbol remained
+importable from its defining module. Two subsequently unused deep-import helpers are also recorded
+below.
 
 ```python
 qis.set_spines(ax)                        # 4.x  -> AttributeError in 5.0
@@ -66,6 +67,8 @@ Its first parameter is renamed from `df` to `data`.
 | `qis.df_price_fill_first_nan_by_cross_median` | deleted; use `qis.utils.df_ops.df_fill_first_nan_by_cross_median` |
 | `qis.econ_data_report` | module `qis.plots.reports.econ_data_single` deleted |
 | `qis.replace_nan_by_median` | deleted; no replacement |
+| `qis.utils.df_ops.norm_df_by_ax_mean` | deleted after 5.19; unused |
+| `qis.utils.np_ops.select_non_nan_x_y` | deleted after 5.19; OLS paths use `qis.utils.regression.filter_x_y` |
 
 `qis/plots/reports/` is removed. `price_history.py` and `gantt_data_history.py` moved to
 `qis/plots/derived/`; `econ_data_single.py` and `reports/utils.py` are deleted.
@@ -142,7 +145,7 @@ from qis.plots.utils import (
 )
 ```
 
-### `qis.utils.df_ops` (26)
+### `qis.utils.df_ops` (25)
 
 ```python
 from qis.utils.df_ops import (
@@ -169,13 +172,12 @@ from qis.utils.df_ops import (
     get_last_nonnan_values,
     merge_dfs_on_column,
     multiply_df_by_dt,
-    norm_df_by_ax_mean,
     np_txy_tensor_to_pd_dict,
     reindex_upto_last_nonnan
 )
 ```
 
-### `qis.utils.np_ops` (24)
+### `qis.utils.np_ops` (23)
 
 ```python
 from qis.utils.np_ops import (
@@ -198,7 +200,6 @@ from qis.utils.np_ops import (
     repeat_by_columns,
     repeat_by_rows,
     running_mean,
-    select_non_nan_x_y,
     set_nans_for_warmup_period,
     to_finite_np,
     to_finite_ratio,

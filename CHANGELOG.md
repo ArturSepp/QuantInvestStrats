@@ -31,6 +31,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Removed the unused public `TrainLivePeriod` and `TrainLiveSamples` containers and the legacy
   module-level `split_to_train_live_samples()` and `get_data_samples_df()` helpers;
   `split_to_samples()` remains the supported calendar-period slicer.
+- Removed the unused deep-import helpers `qis.utils.np_ops.select_non_nan_x_y` and
+  `qis.utils.df_ops.norm_df_by_ax_mean`; regression data cleanup continues to use
+  `qis.utils.regression.filter_x_y`.
 
 ### Fixed
 
