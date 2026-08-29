@@ -6,8 +6,11 @@ the prediction, the parameters and a formatted label of the fitted equation; ``f
 array form. ``estimate_ols_alpha_beta`` reduces a fit to alpha, beta, R² and the conventional alpha
 p-value, returning zeros with a warning rather than raising when the fit fails.
 ``estimate_ols_alpha_beta_hac`` returns the same point estimates together with a Bartlett-kernel
-HAC standard error, p-value and confidence interval for alpha. ``reg_model_params_to_str`` formats
-the fitted equation for a chart legend, and annualises the intercept as expm1(a α) when
+HAC standard error, p-value and confidence interval for alpha. ``estimate_hac_mean`` is the
+constant-only case: a sample mean with the same Bartlett HAC inference and the one-parameter
+small-sample correction, for a return series that has no regressor.
+``reg_model_params_to_str`` formats the fitted equation for a chart legend, and annualises the
+intercept as expm1(a α) when
 ``alpha_an_factor`` is passed. ``newey_west_lag_rule`` supplies the opt-in Newey-West rule of thumb
 for callers that do not want to select a fixed Bartlett lag count.
 
@@ -45,6 +48,25 @@ class OlsAlphaBetaHacResult:
     alpha_pvalue: float
     alpha_hac_se: float
     alpha_confidence_interval: tuple[float, float]
+
+
+@dataclass(frozen=True)
+class HacMeanResult:
+    """Sample mean with Bartlett-kernel HAC inference.
+
+    Attributes:
+        mean: Sample mean of the retained finite observations.
+        hac_se: Bartlett-kernel HAC standard error of the mean with the ``T/(T-1)`` correction.
+        pvalue: Normal-reference two-sided p-value of the mean against zero.
+        confidence_interval: Lower and upper HAC confidence bounds for the mean.
+        nobs: Number of retained finite observations.
+    """
+
+    mean: float
+    hac_se: float
+    pvalue: float
+    confidence_interval: tuple[float, float]
+    nobs: int
 
 
 def newey_west_lag_rule(nobs: int) -> int:
@@ -211,6 +233,68 @@ def estimate_ols_alpha_beta_hac(
         alpha_pvalue=alpha_pvalue,
         alpha_hac_se=alpha_hac_se,
         alpha_confidence_interval=alpha_confidence_interval,
+    )
+
+
+def estimate_hac_mean(
+        y: Union[np.ndarray, pd.Series],
+        hac_lags: int = 3,
+        confidence_level: float = 0.95,
+) -> HacMeanResult:
+    """Estimate a sample mean with Bartlett-kernel HAC inference.
+
+    The mean is the intercept of a regression on a constant only, so the covariance is the
+    Bartlett HAC covariance of the demeaned series with the one-parameter small-sample correction
+    ``T/(T-1)`` and a normal reference distribution. Use it for the mean of a return series that
+    has no regressor, such as a total-return component; ``estimate_ols_alpha_beta_hac`` is the
+    two-parameter case with a benchmark. The requested lag count is capped at one less than the
+    number of retained observations.
+
+    Args:
+        y: Observations; non-finite values are removed.
+        hac_lags: Maximum number of Bartlett-kernel autocovariance lags.
+        confidence_level: Two-sided confidence level for the interval.
+
+    Returns:
+        The mean, its HAC standard error, p-value, interval and the retained sample size.
+
+    Raises:
+        ValueError: If the HAC settings are invalid, fewer than two finite observations remain,
+            estimation fails, or outputs are non-finite.
+    """
+    if hac_lags < 0:
+        raise ValueError(f'hac_lags must be non-negative, got {hac_lags}')
+    if not 0.0 < confidence_level < 1.0:
+        raise ValueError(f'confidence_level must be between zero and one, got {confidence_level}')
+    values = np.asarray(y, dtype=float).ravel()
+    values = values[np.isfinite(values)]
+    nobs = int(values.shape[0])
+    if nobs < 2:
+        raise ValueError(
+            f'HAC mean estimation requires at least two finite observations, got {nobs}'
+        )
+    try:
+        reg_model = sm.OLS(values, np.ones((nobs, 1), dtype=float)).fit()
+        robust_model = reg_model.get_robustcov_results(
+            cov_type='HAC',
+            maxlags=min(hac_lags, nobs - 1),
+            use_correction=True,
+            use_t=False,
+        )
+        mean = float(robust_model.params[0])
+        hac_se = float(robust_model.bse[0])
+        pvalue = float(robust_model.pvalues[0])
+        interval = np.asarray(robust_model.conf_int(alpha=1.0 - confidence_level), dtype=float)[0]
+    except Exception as exception:
+        raise ValueError('HAC mean estimation failed') from exception
+    if not np.isfinite([mean, hac_se, pvalue, *interval]).all():
+        raise ValueError('HAC mean estimation produced non-finite outputs')
+    return HacMeanResult(
+        mean=mean,
+        hac_se=hac_se,
+        pvalue=pvalue,
+        confidence_interval=(float(interval[0]), float(interval[1])),
+        nobs=nobs,
     )
 
 

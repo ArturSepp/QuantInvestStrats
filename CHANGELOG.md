@@ -7,8 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.20.0] - 2026-08-29
+
 ### Added
 
+- Added `ModelLayerNavs`, `ModelFeatureAlphaBetaAttribution` and
+  `compute_model_feature_alpha_beta_attribution()` for complete factorial experiments over model
+  features, including Harsanyi interactions, order-independent Shapley paths, HAC inference and
+  pathwise reconstruction audits.
 - Exposed `hac_lags` and `confidence_level` on
   `compute_model_layer_alpha_beta_attribution` and recorded `freq`, `hac_lags` and
   `confidence_level` on `ModelLayerAlphaBetaAttribution`; added the opt-in
@@ -45,6 +51,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Added `estimate_hac_mean()`, a constant-only Bartlett HAC estimator for the mean of a return
+  series, and used it for the total-return intervals of the model-feature attribution summary.
+  The previous zero-regressor fit emitted a `SingularMatrixWarning` on every call and applied
+  the two-parameter small-sample correction to a one-parameter mean; the intervals now carry
+  the `T/(T-1)` correction, which narrows them by a factor `sqrt((T-2)/(T-1))`.
 - Enabled the MyST `dollarmath` extension in `docs/conf.py`, so `$` and `$$` equations render in
   the Sphinx site; the frequency convention note previously rendered them as literal text.
 - Trimmed model-layer NAVs to their common valid range before resampling, so a layer that ends
@@ -62,6 +73,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Rejected zero-row descriptive-table inputs consistently and returned warning-free missing
   statistics for columns below each statistic's sample minimum, including normality below 20
   observations.
+- Made the local ETF price runner fall back to the operating-system user cache and create its
+  destination directory when `settings.yaml` still contains the distributed path placeholder.
 
 ## [5.19.0] - 2026-08-28
 

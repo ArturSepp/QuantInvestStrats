@@ -19,6 +19,12 @@ from qis.perfstats.model_layer_attribution import (
     compute_model_layer_alpha_beta_attribution,
 )
 
+from qis.perfstats.model_feature_attribution import (
+    ModelFeatureAlphaBetaAttribution,
+    ModelLayerNavs,
+    compute_model_feature_alpha_beta_attribution,
+)
+
 from qis.perfstats.perf_stats import (
     STANDARD_TABLE_COLUMNS,
     LN_TABLE_COLUMNS,

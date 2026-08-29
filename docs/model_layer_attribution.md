@@ -4,7 +4,8 @@ myst:
     description: >-
       Decompose the return of a layered quantitative portfolio model into systematic return,
       risk-layer alpha, standalone signal alpha, and integration alpha, each with a
-      heteroskedasticity and autocorrelation consistent (HAC) confidence interval, using qis.
+      heteroskedasticity and autocorrelation consistent (HAC) confidence interval; attribute
+      changes to multiple model features; and construct additive cumulative-alpha paths using qis.
 ---
 
 # Model-layer attribution: risk, signal, and integration alpha
@@ -27,8 +28,10 @@ sum of the standalone effects. The four components reconstruct the full-model lo
 period, their sample means reconstruct the annualised return, and each alpha component is an OLS
 intercept with a standard error.
 
-The entry point is `qis.compute_model_layer_alpha_beta_attribution`, which returns a
-`qis.ModelLayerAlphaBetaAttribution`.
+The entry point for one model is `qis.compute_model_layer_alpha_beta_attribution`, which returns a
+`qis.ModelLayerAlphaBetaAttribution`. For a complete experiment over several model features,
+`qis.compute_model_feature_alpha_beta_attribution` returns factorial interactions,
+order-independent Shapley effects, and a model-layer alpha/beta attribution for every effect.
 
 The method is descriptive and ex post. Its full-sample
 coefficients are not point-in-time estimates and are not inputs to a backtest.
@@ -38,12 +41,14 @@ coefficients are not point-in-time estimates and are not inputs to a backtest.
 | Question | qis object | Required input | Output |
 |---|---|---|---|
 | What did the risk layer, the signals, and their integration each add to the full model's return, and with what uncertainty? | `compute_model_layer_alpha_beta_attribution` | benchmark, risk-layer, signal-sleeve and full-model NAVs, optional net NAV | regression table with HAC intervals, exact periodic components, annualised components |
+| Which model features changed risk-layer, signal-layer, integration and total full-model alpha or beta? | `compute_model_feature_alpha_beta_attribution` | complete $2^n$ coalition map of `ModelLayerNavs` bundles | factorial and Shapley effect paths, one layer attribution per effect, summary table and identity checks |
 | What were whole-sample TE and IR against a benchmark? | `compute_te_ir_errors` | periodic strategy-minus-benchmark returns | annualised TE and IR |
 | How did benchmark beta and alpha evolve through time? | `compute_ewm_beta_alpha_forecast` | periodic returns | EWMA beta and alpha series |
 | What active risk do current weights carry under a covariance model? | `RiskModel` | dated covariances and weights | ex-ante tracking error and contributions |
 
-The attribution is the only object in this table that takes several model variants at once. It
-measures how they combine, not how one of them tracks a benchmark.
+The two attribution objects are the only entries in this table that compare several model layers
+or variants at once. They measure how layers and model changes combine, not how one portfolio
+tracks a benchmark through time.
 
 ## Inputs and the common sample
 
@@ -189,6 +194,56 @@ benchmark exposure, so the integration beta is near $-1$ by construction, for ex
 $0.85 - 1.05 - 1.00 = -1.20$. On the excess basis for the sleeve the same integration term
 has beta near $-0.20$, with identical alphas and intervals. The integration term is a
 log-return residual, not a tradeable portfolio, and its beta should be read on the excess basis.
+
+## Additive cumulative alpha through time
+
+The annualised alpha table answers how much each component contributed on average. The same
+`component_returns` output also shows when the contribution accumulated. For return date $t_k$,
+define the cumulative alpha contribution of layer $L$ by
+
+$$
+C_L(t_k)=\sum_{t=1}^{k} a_L(t), \qquad L \in \{R,A,I\}.
+$$
+
+Because the bridge identity holds in every period, the cumulative total model alpha
+$C_F(t_k) = \sum_{t=1}^{k} \big(r_F(t) - \hat\beta_F \, r_B(t)\big)$ is additive at every date,
+
+$$
+C_F(t_k)=C_R(t_k)+C_A(t_k)+C_I(t_k).
+$$
+
+No new regression is run for this chart. The full-sample OLS betas used to construct
+`Risk Layer Alpha`, `Alpha Layer Alpha` and `Integration Alpha` remain fixed, and the chart simply
+cumulatively sums those exact periodic components. The following produces percentage-point paths
+with an explicit 0% origin one attribution period before the first return:
+
+```python
+import pandas as pd
+
+alpha_paths = attribution.component_returns.loc[:, [
+    'Risk Layer Alpha',
+    'Alpha Layer Alpha',
+    'Integration Alpha',
+]].rename(columns={
+    'Risk Layer Alpha': 'Risk-layer alpha',
+    'Alpha Layer Alpha': 'Standalone signal alpha',
+    'Integration Alpha': 'Integration alpha',
+}).cumsum().mul(100.0)
+
+alpha_paths.insert(0, 'Total model alpha', alpha_paths.sum(axis=1))
+initial_date = alpha_paths.index[0] - pd.tseries.frequencies.to_offset(attribution.freq)
+alpha_paths = pd.concat([
+    pd.DataFrame(0.0, index=[initial_date], columns=alpha_paths.columns),
+    alpha_paths,
+])
+```
+
+The vertical axis is cumulative log-return contribution in percentage points. It is not a wealth
+index. In particular, do not use `100 * exp(cumsum(alpha))` for an additive alpha-attribution
+chart. That construction is a compounded pseudo-NAV: its components reconcile multiplicatively,
+whereas the alpha bridge is defined and interpreted additively. The cumulative paths are
+descriptive because their betas are full-sample estimates; they are not point-in-time alpha
+forecasts.
 
 ## Inference: HAC standard errors and intervals
 
@@ -372,6 +427,109 @@ of a table difference have no meaning. A feature that changes only the covarianc
 $\Delta_A \equiv 0$, and its effect is read from the risk and integration rows. A feature
 that changes only a signal has $\Delta_R \equiv 0$.
 
+## Alpha/beta attribution by multiple model features
+
+`qis.compute_model_feature_alpha_beta_attribution` extends the single-feature ratio analysis to a
+complete factorial experiment. A scenario is keyed by the `frozenset` of features enabled in that
+run; the empty coalition is the production baseline. For $n$ features, all $2^n$ coalitions must be
+supplied, and every coalition must use the same benchmark path.
+
+For a layer $L$, let $v_L(S)$ be the log return in the scenario with coalition $S$. QIS first
+computes the Harsanyi dividend for every non-empty coalition $T$,
+
+$$
+d_L(T)=\sum_{S\subseteq T}(-1)^{|T|-|S|}v_L(S).
+$$
+
+Singleton dividends are direct feature effects; larger coalitions are interactions. Their sum is
+the joint all-features-versus-production effect. QIS then assigns the interactions without an
+arbitrary feature order using the Shapley value,
+
+$$
+\phi_{i,L}=\sum_{S\subseteq N\setminus\{i\}}
+\frac{|S|!(n-|S|-1)!}{n!}
+\left[v_L(S\cup\{i\})-v_L(S)\right].
+$$
+
+For two features the Shapley effect of feature $i$ is the average of its effect with and without
+the other feature, $\phi_{i,L} = d_L(\{i\}) + \tfrac{1}{2} d_L(\{1, 2\})$, so each feature
+receives half of the interaction. Both decompositions are calculated pathwise from NAV products,
+so the factorial effects and the Shapley feature paths independently reconstruct the joint log
+return at every observation. Each
+Shapley path is passed to `compute_model_layer_alpha_beta_attribution`; its alpha, beta and HAC
+interval are therefore estimated from one effect-return series rather than by subtracting two
+regression tables.
+
+```python
+scenarios = {
+    frozenset(): qis.ModelLayerNavs(
+        benchmark_nav=benchmark_nav,
+        risk_layer_nav=production_risk_nav,
+        alpha_layer_nav=production_signal_nav,
+        full_model_nav=production_full_nav,
+    ),
+    frozenset({'risk_span'}): risk_span_layer_navs,
+    frozenset({'signal_span'}): signal_span_layer_navs,
+    frozenset({'risk_span', 'signal_span'}): both_spans_layer_navs,
+}
+
+decomposition = qis.compute_model_feature_alpha_beta_attribution(
+    scenario_layer_navs=scenarios,
+    freq='ME',
+    hac_lags=3,
+)
+
+feature_table = decomposition.summary.loc['Shapley']
+risk_span_attribution = decomposition.feature_attributions['risk_span']
+pair_interaction = decomposition.factorial_effect_attributions[
+    frozenset({'risk_span', 'signal_span'})
+]
+```
+
+When net full-model NAVs are supplied, they must be present in every coalition. The summary then
+includes both gross and net total-return intervals and the net-model regression. Scenario
+construction remains outside QIS: the caller decides what enabling a feature means and supplies
+the resulting NAVs.
+
+### Reading the feature-attribution result
+
+`ModelFeatureAlphaBetaAttribution` keeps the scenario paths, effect paths and statistical
+attributions separate:
+
+- `scenario_layer_navs` contains the aligned, rebased `ModelLayerNavs` input for every coalition.
+- `factorial_effect_navs` and `factorial_effect_attributions` contain the Harsanyi direct effects
+  and interactions. Singleton coalitions are direct effects; larger coalitions are interactions.
+- `shapley_feature_navs` and `feature_attributions` contain the order-independent allocation of
+  all interactions to individual features.
+- `joint_effect_navs` and `joint_attribution` measure all features enabled versus production.
+- `summary` provides factorial, Shapley and joint return estimates, alpha estimates, betas,
+  p-values and confidence intervals in one table.
+- `identity_errors` audits that both the factorial effects and Shapley effects reconstruct the
+  joint path, and that every model-layer alpha bridge reconciles.
+
+Every value in `feature_attributions` is a normal `ModelLayerAlphaBetaAttribution`. Consequently,
+the additive cumulative-alpha construction above applies without modification to one feature's
+Shapley effect. For example:
+
+```python
+risk_span = decomposition.feature_attributions['risk_span']
+risk_span_alpha_paths = risk_span.component_returns.loc[:, [
+    'Risk Layer Alpha',
+    'Alpha Layer Alpha',
+    'Integration Alpha',
+]].cumsum().mul(100.0)
+risk_span_alpha_paths.insert(
+    0,
+    'Total feature alpha',
+    risk_span_alpha_paths.sum(axis=1),
+)
+```
+
+The resulting total path answers when the Shapley-allocated alpha effect of `risk_span`
+accumulated. Its three component paths show whether that effect came through the risk layer, the
+standalone signal layer, or integration in the constrained full model. As for the base model, the
+paths are additive log-return percentage points, not compounded feature NAVs.
+
 ## Conventions and limitations
 
 - Returns are log returns at `freq`, and alphas are annualised linearly by the periods per year
@@ -387,6 +545,8 @@ that changes only a signal has $\Delta_R \equiv 0$.
   early end.
 - The integration term is a log-return residual, not a portfolio. Its beta is read on the
   excess basis for the sleeve.
+- Cumulative alpha paths are arithmetic sums of the periodic log-return components. Compounding
+  them into NAV indices changes the question from additive alpha attribution to wealth impact.
 - A Sharpe bridge built by adding the components sequentially depends on the order of addition,
   because the volatility of a sum is not the sum of the volatilities. Only the return bridge is
   order-free.
@@ -395,5 +555,7 @@ that changes only a signal has $\Delta_R \equiv 0$.
 
 - {doc}`Generated attribution API <api/generated/qis.compute_model_layer_alpha_beta_attribution>`
 - {doc}`Generated result API <api/generated/qis.ModelLayerAlphaBetaAttribution>`
+- {doc}`Generated feature API <api/generated/qis.compute_model_feature_alpha_beta_attribution>`
+- {doc}`Generated feature result API <api/generated/qis.ModelFeatureAlphaBetaAttribution>`
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)
 - [Simulated example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/model_layer_attribution_simulated.py)

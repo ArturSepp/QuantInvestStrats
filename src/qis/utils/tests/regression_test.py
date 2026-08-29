@@ -1,9 +1,15 @@
 """Tests for generic OLS regression inference utilities."""
 
+import warnings
+
 import numpy as np
 from scipy.stats import norm
 
-from qis.utils.regression import estimate_ols_alpha_beta_hac, newey_west_lag_rule
+from qis.utils.regression import (
+    estimate_hac_mean,
+    estimate_ols_alpha_beta_hac,
+    newey_west_lag_rule,
+)
 
 
 def _manual_hac_alpha_beta(
@@ -81,3 +87,52 @@ def test_newey_west_lag_rule() -> None:
     assert newey_west_lag_rule(nobs=86) == 3
     with np.testing.assert_raises(ValueError):
         newey_west_lag_rule(nobs=0)
+
+
+def _manual_hac_mean(y: np.ndarray, lags: int) -> tuple[float, float, float, tuple[float, float]]:
+    """Compute a constant-only Bartlett HAC mean independently of the production helper."""
+    n_obs = y.shape[0]
+    mean = float(y.mean())
+    scores = y - mean
+    meat = float(scores @ scores)
+    for lag in range(1, lags + 1):
+        weight = 1.0 - lag / (lags + 1.0)
+        meat += 2.0 * weight * float(scores[lag:] @ scores[:-lag])
+    variance = (n_obs / (n_obs - 1)) * meat / n_obs ** 2
+    se = float(np.sqrt(variance))
+    pvalue = float(2.0 * norm.sf(abs(mean / se)))
+    critical_value = norm.ppf(0.975)
+    return mean, se, pvalue, (mean - critical_value * se, mean + critical_value * se)
+
+
+def test_estimate_hac_mean_matches_matrix_reference_without_warnings() -> None:
+    """The constant-only HAC mean matches the hand-rolled estimator and emits no warning."""
+    y = np.array([
+        0.0120, -0.0080, 0.0150, -0.0020, 0.0050, 0.0100, -0.0150, 0.0250,
+        -0.0050, 0.0100, -0.0100, 0.0150, -0.0250, 0.0050, 0.0200, -0.0100,
+        0.0100, -0.0050, 0.0150, -0.0200, 0.0050, 0.0100, -0.0150, 0.0200,
+    ])
+    expected_mean, expected_se, expected_pvalue, expected_interval = _manual_hac_mean(y=y, lags=3)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        result = estimate_hac_mean(y=y, hac_lags=3, confidence_level=0.95)
+
+    assert result.nobs == y.shape[0]
+    np.testing.assert_allclose(result.mean, expected_mean, atol=1.0e-12)
+    np.testing.assert_allclose(result.hac_se, expected_se, atol=1.0e-12)
+    np.testing.assert_allclose(result.pvalue, expected_pvalue, atol=1.0e-12)
+    np.testing.assert_allclose(result.confidence_interval, expected_interval, atol=1.0e-12)
+
+
+def test_estimate_hac_mean_drops_non_finite_and_rejects_short_samples() -> None:
+    """Non-finite observations are removed before estimation and short samples raise."""
+    y = np.array([0.01, np.nan, -0.02, np.inf, 0.03, 0.005])
+    result = estimate_hac_mean(y=y, hac_lags=1)
+    assert result.nobs == 4
+    expected_mean = np.array([0.01, -0.02, 0.03, 0.005]).mean()
+    np.testing.assert_allclose(result.mean, expected_mean, atol=1.0e-15)
+    with np.testing.assert_raises(ValueError):
+        estimate_hac_mean(y=np.array([0.01]), hac_lags=1)
+    with np.testing.assert_raises(ValueError):
+        estimate_hac_mean(y=y, hac_lags=-1)
