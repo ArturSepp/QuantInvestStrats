@@ -57,6 +57,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   conventions or accepted NumPy-backed results.
 - Preserved both ordered positive/negative benchmark-return regimes when one is unobserved and
   rejected custom regime mappings that do not contain exactly two entries.
+- Unified the historical `qis.plots.derived.desc_table` path with the canonical descriptive-table
+  enum and implementation while preserving deep-import compatibility.
 
 ## [5.19.0] - 2026-08-28
 
