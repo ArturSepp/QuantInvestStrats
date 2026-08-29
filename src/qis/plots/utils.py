@@ -270,36 +270,6 @@ def set_ax_tick_labels(ax: plt.Subplot,
         #    ax.set_yticklabels([])
 
 
-def validate_returns_plot(prices: Union[pd.DataFrame, pd.Series],
-                          min_number: int = 20,  # 4 years of q returns
-                          freq: str = 'QE',
-                          fontsize: int = 8,
-                          ax: plt.Figure = None,
-                          **kwargs
-                          ) -> Tuple[bool, Optional[plt.Figure]]:
-    if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(8, 4))
-    else:
-        fig = None
-
-    # num_returns = len(prices.asfreq(freq, method='ffill').dropna().index)
-    num_returns = len(prices.asfreq(freq, method='ffill').index)
-    if num_returns < min_number:
-        is_good = False
-        text = f"the number of available returns = {str(num_returns)}\n is not sufficient to make figure"
-        ax.text(0.1, 0.5, text,
-                transform=ax.transAxes,
-                style='italic',
-                fontsize=fontsize,
-                bbox={'facecolor': 'red', 'alpha': 0.5, 'pad': 10})
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-    else:
-        is_good = True
-
-    return is_good, fig
-
-
 def set_spines(ax: plt.Subplot,
                top_spine: bool = False,
                bottom_spine: bool = True,
@@ -493,26 +463,6 @@ def align_y_limits_axs(axs: List[plt.Subplot],
         for idx, ax in enumerate(axs):
             if idx > 0:
                 ax.axes.get_yaxis().set_visible(False)
-
-
-def align_x_limits_ax12(ax1: plt.Subplot,
-                        ax2: plt.Subplot,
-                        is_invisible_x_ax1: bool = False,
-                        is_invisible_y_ax2: bool = False,
-                        **kwargs
-                        ) -> None:
-
-    xmin1, xmax1 = ax1.get_xlim()
-    xmin2, xmax2 = ax2.get_xlim()
-    xmin = np.minimum(xmin1, xmin2)
-    xmax = np.maximum(xmax1, xmax2)
-    ax1.set_xlim(xmin, xmax)
-    ax2.set_xlim(xmin, xmax)
-
-    if is_invisible_x_ax1:
-        ax1.axes.get_xaxis().set_visible(False)
-    if is_invisible_y_ax2:
-        ax2.axes.get_yaxis().set_visible(False)
 
 
 def align_x_limits_axs(axs: List[plt.Subplot],
@@ -1269,14 +1219,6 @@ def get_n_colors(n: int,
                                     **kwargs)
     else:
         colors = get_n_cmap_colors(n=n, type=type)
-        """
-        colors = get_n_mlt_colors(n=n,
-                                  first_color_fixed=first_color_fixed,
-                                  last_color_fixed=last_color_fixed,
-                                  fixed_color=fixed_color,  # oragne
-                                  type=type,
-                                  **kwargs)
-        """
     return colors
 
 
@@ -1306,28 +1248,6 @@ def get_n_fixed_colors(n: int,
 
     if n_to_extend > 0:
         colors.extend(get_n_cmap_colors(n=n_to_extend, type=type, is_hex=is_hex))
-    if last_color_fixed:
-        colors[-1] = fixed_color
-    return colors
-
-
-def get_n_mlt_colors(n: int,
-                     first_color_fixed: bool = False,
-                     last_color_fixed: bool = False,
-                     fixed_color: str = '#EF5A13',  # orange
-                     **kwargs
-                     ) -> List[str]:
-    """
-    colors as '#00284A', '#008B75', ...
-    """
-    if first_color_fixed:
-        colors = [fixed_color]
-        n -= 1
-    else:
-        colors = []
-    # colors.extend(get_n_cmap_colors(n=n, type=type, is_hex=is_hex))
-    colors.extend(get_n_sns_colors(n=n))
-
     if last_color_fixed:
         colors[-1] = fixed_color
     return colors

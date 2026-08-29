@@ -38,19 +38,6 @@ def df_indicator_like(df: pd.DataFrame, type: Type = bool) -> pd.DataFrame:
     return pd.DataFrame(data=data, index=df.index, columns=df.columns)
 
 
-def dfs_indicators(dfs: List[pd.DataFrame], type: Type = bool) -> pd.DataFrame:
-    """
-    return df_indicator = True if list dfs is not none
-    nb: need to check that dfs are aligned
-    """
-    def to_indicator(df: pd.DataFrame) -> np.ndarray:
-        return np.where(np.isnan(df.to_numpy(dtype=np.float64)), False, True)
-    indicators = to_indicator(df=dfs[0])
-    for df in dfs[1:]:
-        indicators = np.logical_and(indicators, to_indicator(df=df))
-    return pd.DataFrame(data=indicators, index=dfs[0].index, columns=dfs[0].columns).astype(type)
-
-
 def df_joint_indicator(indicator1: pd.DataFrame,
                        indicator2: Union[np.ndarray, pd.DataFrame],
                        to_float: bool = False
@@ -324,77 +311,6 @@ def np_txy_tensor_to_pd_dict(np_tensor_txy: np.ndarray,
     return factor_loadings
 
 
-def factor_dict_to_asset_dict(factor_loadings: Dict[str, pd.DataFrame],
-                              asset_names: Optional[Union[pd.Index, List[str]]] = None  # column names in set
-                              ) -> Dict[str, pd.DataFrame]:
-    """
-    revert the dictionary Dict[factor/model: set[assets] to Dict[assets: set factor)
-    """
-    if asset_names is None:
-        asset_names = factor_loadings[list(factor_loadings.keys())[0]].columns
-
-    asset_factor_loadings = {}
-    for asset in asset_names:
-        asset_factor_loading = []
-        for factor, factor_data in factor_loadings.items():
-            asset_factor_loading.append(factor_data[asset].rename(factor))
-        asset_factor_loadings[asset] = pd.concat(asset_factor_loading, axis=1, sort=True)
-
-    return asset_factor_loadings
-
-
-def df_time_dict_to_pd(factor_loadings_dict: Dict[pd.Timestamp, pd.DataFrame],
-                       is_factor_view: bool = True,
-                       is_zeros_to_nan: bool = False
-                       ) -> Dict[str, pd.DataFrame]:
-    """
-    {time: set[factor, asset}
-    convert to:
-    factor view = dict{factor: set[timeindex, asset]}
-    asset view = dict{asset: set[timeindex, factor]}
-    """
-    data0 = next(iter(factor_loadings_dict.values()))
-    factor_names = data0.index
-    asset_names = data0.columns
-    dateindex = pd.DatetimeIndex(factor_loadings_dict.keys())
-
-    np_tensor_txy = np.full((len(dateindex), len(factor_names), len(asset_names)), np.nan)
-    for idx, data in enumerate(factor_loadings_dict.values()):
-        np_tensor_txy[idx, :, :] = data.to_numpy()
-
-    if is_zeros_to_nan:
-        np_tensor_txy = np.where(np.isclose(np_tensor_txy, 0.0), np.nan, np_tensor_txy)
-
-    factor_loadings = np_txy_tensor_to_pd_dict(np_tensor_txy=np_tensor_txy,
-                                               dateindex=dateindex,
-                                               factor_names=factor_names,
-                                               asset_names=asset_names,
-                                               is_factor_view=is_factor_view)
-    return factor_loadings
-
-
-def dfs_to_upper_lower_diag(df_upper: pd.DataFrame,
-                            df_lower: pd.DataFrame,
-                            diagonal: pd.Series
-                            ) -> pd.DataFrame:
-    """
-    create up/low/diag copz
-    nb must be square matrizes
-    """
-    nrows = len(df_upper.index)
-    out: pd.DataFrame = df_upper.copy()
-    for i in range(nrows):
-        out.iloc[i, i] = diagonal.iloc[i]
-        for j in range(nrows):
-            if i < j:
-                out.iloc[i, j] = df_upper.iloc[i, j]
-            elif i > j:
-                out.iloc[i, j] = df_lower.iloc[i, j]
-            else:
-                pass
-    return out
-
-
 def compute_last_score(df: Union[pd.DataFrame, pd.Series], is_percent: bool = True) -> pd.Series:
     """
     columnwise score for last value in data
@@ -465,27 +381,6 @@ def align_df1_to_df2(df1: pd.DataFrame,
             raise ValueError(f"df1 and df2 columns are not matched: {df1.columns} vs {df2.columns}")
 
     return df1_, df2_
-
-
-def df12_merge_with_tz(df1: pd.DataFrame,
-                       df2: pd.DataFrame,
-                       tz: Optional[str] = None,
-                       freq: str = 'B'
-                       ) -> pd.DataFrame:
-    """
-    tz sensetive alignment
-    """
-    # localize index and convert to common time zeone
-    df1 = df1.copy()
-    df1.index = df1.index.tz_localize(tz=tz)
-    df2 = df2.copy()
-    df2.index = df2.index.tz_localize(tz=tz)
-
-    # concat
-    dfs = pd.concat([df1, df2], axis=1, sort=True)
-    dfs = dfs.ffill().asfreq(freq=freq, method='ffill')
-    dfs.index = dfs.index# .tz_localize(tz=tz)
-    return dfs
 
 
 def merge_dfs_on_column(data_df: pd.DataFrame,

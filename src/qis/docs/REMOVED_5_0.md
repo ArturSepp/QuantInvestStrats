@@ -59,7 +59,7 @@ Its first parameter is renamed from `df` to `data`.
 
 ---
 
-## 2. Deleted (no replacement in the namespace)
+## 2. Deleted
 
 | symbol | note |
 | --- | --- |
@@ -69,6 +69,29 @@ Its first parameter is renamed from `df` to `data`.
 | `qis.replace_nan_by_median` | deleted; no replacement |
 | `qis.utils.df_ops.norm_df_by_ax_mean` | deleted after 5.19; unused |
 | `qis.utils.np_ops.select_non_nan_x_y` | deleted after 5.19; OLS paths use `qis.utils.regression.filter_x_y` |
+| `qis.plots.contour.contour_multi` | deleted after 5.19; unused and its defaults were invalid |
+| `qis.plots.utils.validate_returns_plot` | deleted after 5.19; unused |
+| `qis.plots.utils.align_x_limits_ax12` | deleted after 5.19; use `align_x_limits_axs` |
+| `qis.plots.utils.get_n_mlt_colors` | deleted after 5.19; use the active palette helpers |
+| `qis.plots.table.set_column_edge_color` | deleted after 5.19; unused |
+| `qis.portfolio.reports.strategy_benchmark_tre_factsheet.plot_exposures_long_short_groups` | deleted after 5.19; unused |
+| `qis.utils.df_ops.dfs_indicators` | deleted after 5.19; unused |
+| `qis.utils.df_ops.factor_dict_to_asset_dict` | deleted after 5.19; unused |
+| `qis.utils.df_ops.df_time_dict_to_pd` | deleted after 5.19; unused |
+| `qis.utils.df_ops.dfs_to_upper_lower_diag` | deleted after 5.19; unused |
+| `qis.utils.df_ops.df12_merge_with_tz` | deleted after 5.19; unused |
+| `qis.utils.np_ops.np_matrix_add_array` | deleted after 5.19; unused and dimensionally defective |
+| `qis.utils.np_ops.to_nearest_values` | deleted after 5.19; unused |
+| `qis.utils.struct_ops.split_dict` | deleted after 5.19; unused |
+| `qis.utils.dates.shift_time_period_by_days` | deleted after 5.19; unused |
+| `qis.utils.dates.get_month_days` | deleted after 5.19; use `calendar.monthrange` |
+| `qis.utils.dates.months_between` | deleted after 5.19; unused and incomplete |
+| `qis.utils.dates.min_timestamp` | deleted after 5.19; unused |
+| `qis.utils.df_to_weights.WeightMethod` | deleted after 5.19 with its sole consumer |
+| `qis.utils.df_to_weights.compute_long_only_portfolio_weights` | deleted after 5.19; use the supported allocation helpers |
+| `qis.utils.df_to_weights.fill_long_short_signal` | deleted after 5.19 with its defective callers |
+| `qis.utils.df_to_weights.compute_long_short_ind_by_row` | deleted after 5.19; use `df_to_top_bottom_n_indicators` |
+| `qis.utils.df_to_weights.compute_long_short_ind` | deleted after 5.19; use `df_to_top_bottom_n_indicators` |
 
 `qis/plots/reports/` is removed. `price_history.py` and `gantt_data_history.py` moved to
 `qis/plots/derived/`; `econ_data_single.py` and `reports/utils.py` are deleted.
@@ -93,12 +116,11 @@ Do not import from `qis/examples/`. It is documentation and is restructured with
 
 Grouped by the module to import from.
 
-### `qis.plots.utils` (45)
+### `qis.plots.utils` (42)
 
 ```python
 from qis.plots.utils import (
     add_scatter_points,
-    align_x_limits_ax12,
     align_x_limits_axs,
     align_xy_limits,
     align_y_limits_ax12,
@@ -118,7 +140,6 @@ from qis.plots.utils import (
     get_n_fixed_colors,
     get_n_hatch,
     get_n_markers,
-    get_n_mlt_colors,
     get_n_sns_colors,
     get_table_lines_for_group_data,
     map_dates_index_to_str,
@@ -140,12 +161,11 @@ from qis.plots.utils import (
     set_title,
     set_x_limits,
     set_y_limits,
-    subplot_border,
-    validate_returns_plot
+    subplot_border
 )
 ```
 
-### `qis.utils.df_ops` (25)
+### `qis.utils.df_ops` (20)
 
 ```python
 from qis.utils.df_ops import (
@@ -153,7 +173,6 @@ from qis.utils.df_ops import (
     align_dfs_dict_with_df,
     compute_last_score,
     compute_nans_zeros_ratio_after_first_non_nan,
-    df12_merge_with_tz,
     df_align_to_common_index,
     df_ffill_negatives,
     df_fill_first_nan_by_cross_median,
@@ -161,12 +180,8 @@ from qis.utils.df_ops import (
     df_joint_indicator,
     df_ones_like,
     df_price_ffill_between_nans,
-    df_time_dict_to_pd,
     df_zero_like,
-    dfs_indicators,
-    dfs_to_upper_lower_diag,
     drop_first_nan_data,
-    factor_dict_to_asset_dict,
     get_first_nonnan_values,
     get_last_nonnan,
     get_last_nonnan_values,
@@ -177,7 +192,7 @@ from qis.utils.df_ops import (
 )
 ```
 
-### `qis.utils.np_ops` (23)
+### `qis.utils.np_ops` (21)
 
 ```python
 from qis.utils.np_ops import (
@@ -190,7 +205,6 @@ from qis.utils.np_ops import (
     np_array_to_t_rows_array,
     np_cumsum,
     np_get_sorted_idx,
-    np_matrix_add_array,
     np_nanmean,
     np_nanstd,
     np_nansum,
@@ -202,29 +216,24 @@ from qis.utils.np_ops import (
     running_mean,
     set_nans_for_warmup_period,
     to_finite_np,
-    to_finite_ratio,
-    to_nearest_values
+    to_finite_ratio
 )
 ```
 
-### `qis.utils.dates` (15)
+### `qis.utils.dates` (11)
 
 ```python
 from qis.utils.dates import (
     generate_sample_dates,
     get_current_time_with_tz,
-    get_month_days,
     get_sample_dates_idx,
     get_weekday,
     get_year_quarter,
     is_leap_year,
-    min_timestamp,
-    months_between,
     set_rebalancing_timeindex_on_given_timeindex,
     shift_date_by_day,
     shift_dates_by_n_years,
     shift_dates_by_year,
-    shift_time_period_by_days,
     split_df_by_freq
 )
 ```
@@ -250,7 +259,7 @@ from qis.utils.df_str import (
 )
 ```
 
-### `qis.utils.struct_ops` (10)
+### `qis.utils.struct_ops` (9)
 
 ```python
 from qis.utils.struct_ops import (
@@ -262,8 +271,7 @@ from qis.utils.struct_ops import (
     list_to_unique_and_dub,
     merge_lists_unique,
     move_item_to_first,
-    separate_number_from_string,
-    split_dict
+    separate_number_from_string
 )
 ```
 
@@ -282,27 +290,22 @@ from qis.perfstats.perf_stats import (
 )
 ```
 
-### `qis.utils.df_to_weights` (7)
+### `qis.utils.df_to_weights` (3)
 
 ```python
 from qis.utils.df_to_weights import (
-    compute_long_only_portfolio_weights,
-    compute_long_short_ind,
-    compute_long_short_ind_by_row,
     df_nans_to_one_zero,
     df_to_top_bottom_n_indicators,
-    fill_long_short_signal,
     mult_df_columns_with_vector_group
 )
 ```
 
-### `qis.plots.table` (6)
+### `qis.plots.table` (5)
 
 ```python
 from qis.plots.table import (
     set_align_for_column,
     set_cells_facecolor,
-    set_column_edge_color,
     set_data_colors,
     set_diag_cells_facecolor,
     set_row_edge_color

@@ -12,7 +12,6 @@ not contained in ``large_list``, or prints them and returns False when ``is_stop
 mutated - the copy is the point, since it is how one defaults dict is passed down to several
 panels without one panel's override leaking into the next.
 """
-import itertools
 import pandas as pd
 from collections.abc import Iterable
 from typing import Dict, Tuple, List, Any, NamedTuple, Union, Optional
@@ -160,19 +159,6 @@ def flatten_dict_tuples(dict_tuples: Dict[str, Union[Any, NamedTuple]]) -> Dict[
     return data
 
 
-def split_dict(d: Dict) -> Tuple[Dict, Dict]:
-    """
-    split dictionary into 2 parts
-    """
-    n = len(d) // 2
-    i = iter(d.items())
-
-    d1 = dict(itertools.islice(i, n))   # grab first n items
-    d2 = dict(i)                        # grab the rest
-
-    return d1, d2
-
-
 def flatten(items: Iterable) -> Any:
     """
     flatten list/items from any nested iterable
@@ -237,4 +223,3 @@ def separate_number_from_string(string: str) -> List[str]:
             newword = ''
 
     return groups
-

@@ -34,6 +34,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Removed the unused deep-import helpers `qis.utils.np_ops.select_non_nan_x_y` and
   `qis.utils.df_ops.norm_df_by_ax_mean`; regression data cleanup continues to use
   `qis.utils.regression.filter_x_y`.
+- Removed 23 additional unused deep-import symbols across low-level DataFrame, NumPy, date,
+  plotting and structure utilities, including the defective legacy long-short indicator path;
+  `df_to_top_bottom_n_indicators()` remains the supported top/bottom selector.
 
 ### Fixed
 

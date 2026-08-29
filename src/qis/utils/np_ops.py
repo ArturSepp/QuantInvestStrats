@@ -375,18 +375,6 @@ def np_array_to_matrix(a: np.ndarray, ncols: int) -> np.ndarray:
     return matrix
 
 
-def np_matrix_add_array(matrix: np.ndarray,  # dim = T*N
-                        array: np.ndarray,  # dim[a] = N or T(todo)
-                        axis: int = 1  # 1 if dim[a] = N, 0 if dim[a] = T(todo)
-                        ) -> np.ndarray:
-    if axis == 1:
-        m_array = np_array_to_t_rows_array(a=array, t_rows=matrix.shape[1])
-        matrix_add = matrix + m_array
-    else:
-        raise ValueError(f"axis=0 is not imlemneted")
-    return matrix_add
-
-
 class RollFillType(Enum):
     NAN = 1  # empty is filled by nan
     ROLLOVER = 2  # corresponds to np.roll
@@ -508,19 +496,6 @@ def find_nearest(a: np.ndarray,
         a = np.asarray(a)
         idx = (np.abs(a - value)).argmin()
     return a[idx]
-
-
-def to_nearest_values(a: np.ndarray,
-                      values: np.ndarray,
-                      is_sorted: bool = True
-                      ) -> np.ndarray:
-    """
-    map array of values to nearest elements in array a
-    """
-    values_ = np.zeros_like(values)
-    for idx, value in enumerate(values):
-        values_[idx] = find_nearest(a=a, value=value, is_sorted=is_sorted)
-    return values_
 
 
 def compute_histogram_data(a: np.ndarray,

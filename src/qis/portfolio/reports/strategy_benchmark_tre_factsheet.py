@@ -838,37 +838,6 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
     return figs, dfs
 
 
-def plot_exposures_long_short_groups(exposures_short: pd.DataFrame,
-                                     exposures_long: pd.DataFrame,
-                                     axs: List[plt.Subplot],
-                                     ylabel: str = 'weights',
-                                     var_format: str = '{:.1%}',
-                                     hue_var_name: str = 'asset class',
-                                     **kwargs
-                                     ) -> None:
-    qis.plot_stack(df=exposures_short,
-                   use_bar_plot=True,
-                   legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                   var_format=var_format,
-                   colors=get_n_sns_colors(n=len(exposures_short.columns)),
-                   ax=axs[0],
-                   **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.01), ncols=1,
-                                                    framealpha=0.9)))
-
-    qis.df_boxplot_by_columns(df=exposures_long,
-                              hue_var_name=hue_var_name,
-                              y_var_name=ylabel,
-                              ylabel=ylabel,
-                              showmedians=True,
-                              add_y_median_labels=False,
-                              yvar_format=var_format,
-                              x_rotation=90,
-                              colors=get_n_sns_colors(n=len(exposures_long.columns)),
-                              y_limits=(0.0, None),
-                              ax=axs[1],
-                              **kwargs)
-
-
 def plot_exposures_strategy_vs_benchmark_stack(strategy_exposures: pd.DataFrame,
                                                benchmark_exposures: pd.DataFrame,
                                                axs: List[plt.Subplot],

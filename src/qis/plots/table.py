@@ -290,7 +290,6 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
     if columns_edge_lines is not None:
         for columns_edge_line in columns_edge_lines:
             ax.axvline(x=columns_edge_line[0], color=columns_edge_line[1], alpha=0.5*alpha, lw=0.75)
-            # set_column_edge_color(mpl_table, column=columns_edge_line[0], color=columns_edge_line[1])
 
     if title is not None:
         put.set_title(ax=ax, title=title, fontsize=fontsize, **kwargs)
@@ -334,19 +333,6 @@ def set_row_edge_color(table: Table,
         else:
             if k[0] == row:
                 cell.set_edgecolor(color)
-
-
-def set_column_edge_color(table: Table,
-                          column: int = None,
-                          color: str = 'slategray'
-                          ) -> None:
-    for k, cell in table._cells.items():
-        if column is None:
-            cell.set_edgecolor(color)
-        else:
-            if k[1] == column:
-                cell.set_edgecolor(color)
-                cell.visible_edges = "L"
 
 
 def set_cells_facecolor(table: Table,

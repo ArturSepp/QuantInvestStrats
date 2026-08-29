@@ -9,7 +9,7 @@ asset from that date's denominator rather than counting it as a zero weight.
 
 ``df_to_top_bottom_n_indicators`` returns +1 for the ``num_top_assets`` largest values in a row,
 -1 for the smallest and 0 between - indicators, not weights summing to one, so they need
-normalising before use as an allocation. ``compute_long_short_ind_by_row`` also lives here.
+normalising before use as an allocation.
 
 ``generate_static_weights_schedule`` is the one function here that takes prices rather than
 scores: it turns a fixed allocation into the rebalancing weight frame the backtester consumes,
@@ -22,35 +22,11 @@ Turning a weight frame into a portfolio is ``qis.backtest_model_portfolio``, not
 import numpy as np
 import pandas as pd
 from typing import Union, Optional, Dict, List
-from enum import Enum
 
 # qis
 import qis.utils.df_groups as dfg
 from qis.utils.dates import generate_rebalancing_indicators
 from qis.utils.struct_ops import assert_list_subset
-
-
-class WeightMethod(str, Enum):
-    EQUAL_WEIGHT = 'EqualWight'
-    PROPORTIONAL = 'Proportional'
-    SQRT_PROPORTIONAL = 'Sqrt '
-
-
-def compute_long_only_portfolio_weights(data: pd.DataFrame,
-                                        weight_method: WeightMethod = WeightMethod.EQUAL_WEIGHT
-                                        ) -> pd.DataFrame:
-    """
-    compute [0, 1] weights data
-    """
-    if weight_method == WeightMethod.EQUAL_WEIGHT:
-        weights = df_to_equal_weight_allocation(df=data)
-    elif weight_method == WeightMethod.PROPORTIONAL:
-        weights = df_to_weight_allocation_sum1(df=data)
-    elif weight_method == WeightMethod.SQRT_PROPORTIONAL:
-        weights = df_to_weight_allocation_sum1(df=np.sqrt(data))
-    else:
-        raise TypeError(f"not implemented method {weight_method}")
-    return weights
 
 
 def align_weights_to_columns(weights: Union[Dict[str, float], List[float], np.ndarray,
@@ -369,69 +345,3 @@ def df_to_top_bottom_n_indicators(df: Union[pd.Series, pd.DataFrame],
             ranked_rows[idx] = series_to_top_n_indicators(data=row)
         ranked_data = pd.DataFrame.from_dict(ranked_rows, orient='index')[columns]
     return ranked_data
-
-
-def fill_long_short_signal(rank_data: np.ndarray,
-                           leg_size: int
-                           ) -> np.ndarray:
-    """
-    place +1 for top, -1 for bottom
-    """
-    signal0 = np.zeros_like(rank_data)
-    signal1 = np.ones_like(rank_data)
-    bottom_quantile = leg_size
-    upper_quantile = rank_data.shape[0] - leg_size - 1
-    signal = np.where(rank_data > upper_quantile, signal1, signal0)  # +1 top ranks
-    signal = np.where(rank_data < bottom_quantile, -signal1, signal)  # -1 smallest quantile
-    return signal
-
-
-def compute_long_short_ind_by_row(data: pd.DataFrame,
-                                  cut_off_quantile: float = 0.1,
-                                  min_leg_size: int = 2,
-                                  leg_size: Optional[int] = None
-                                  ) -> pd.DataFrame:
-    """
-    get cross sectional indicators
-    """
-    if len(data.columns) == 1:
-        raise ValueError(f"one column is not supported for ranking")
-    elif len(data.columns) == 2:
-        leg_size = 0
-    else:
-        pass
-
-    # compute quantiles
-    if leg_size is None:
-        leg_size = np.maximum(np.floor(cut_off_quantile * len(data.columns)),
-                              min_leg_size)
-
-    rank_data = data.rank(axis=1, method='first', na_option='keep', ascending=False)
-
-    signal = fill_long_short_signal(rank_data=rank_data.to_numpy(), leg_size=leg_size)
-    cross_sectional_indicators = pd.DataFrame(data=signal, columns=data.columns, index=data.index)
-
-    return cross_sectional_indicators
-
-
-def compute_long_short_ind(data: np.ndarray,
-                           cut_off_quantile: float = 0.1,
-                           min_leg_size: int = 2,
-                           leg_size: Optional[int] = None
-                           ) -> np.ndarray:
-    """
-    row wise operator to assing -/+1 for ranked data in df
-    """
-    if not data.ndim == 1:
-        raise ValueError(f"ndim must be 1")
-
-    n = data.shape[0]
-    # compute quantiles
-    if leg_size is None:
-        leg_size = np.maximum(np.floor(cut_off_quantile * n), min_leg_size)
-
-    rank_data = pd.DataFrame(data).rank(axis=1, method='first', na_option='keep', ascending=False)
-
-    signal = fill_long_short_signal(rank_data=rank_data.to_numpy(), leg_size=leg_size)
-
-    return signal

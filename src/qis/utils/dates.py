@@ -452,16 +452,6 @@ def get_time_period(df: Union[pd.Series, pd.DataFrame] = None,
     return output
 
 
-def shift_time_period_by_days(time_period: TimePeriod, is_increase_by_one_day: bool = True) -> TimePeriod:
-    if is_increase_by_one_day:
-        start_date = shift_date_by_day(time_period.start, backward=False)
-    else:
-        start_date = time_period.start
-    end_date = time_period.end
-
-    return TimePeriod(start=start_date, end=end_date)
-
-
 def get_time_period_label(data: pd.DataFrame,
                           date_separator: str = ':',
                           is_increase_by_one_day: bool = False,
@@ -808,25 +798,6 @@ def get_year_quarter(dates: list, date_format: str = 'Q%d-%d') -> List[str]:
     return year_quarter
 
 
-def get_month_days(month: int, year: int) -> int:
-    """
-    Inputs -> month, year Booth integers
-    Return the number of days of the given month
-    """
-    thirty_days_months: List = [4, 6, 9, 11]
-    thirtyone_days_months: List = [1, 3, 5, 7, 8, 10, 12]
-
-    if month in thirty_days_months:   # April, June, September, November
-        return 30
-    elif month in thirtyone_days_months:   # January, March, May, July, August, October, December
-        return 31
-    else:   # February
-        if is_leap_year(year):
-            return 29
-        else:
-            return 28
-
-
 def shift_date_by_day(date: pd.Timestamp, backward: bool = True, num_days: int = 1) -> pd.Timestamp:
     if backward:
         date1 = date - pd.offsets.Day(num_days)
@@ -874,26 +845,6 @@ def shift_dates_by_n_years(dates: Union[pd.Timestamp, pd.DatetimeIndex],
     for n in range(1, n_years+1):
         shifted_dates = shift_dates_by_year(shifted_dates, backward=backward)
     return shifted_dates
-
-
-def months_between(date1: dt.datetime,
-                   date2: dt.datetime
-                   ) -> int:
-    if date1 > date2:
-        date1, date2 = date2, date1
-    m1 = date1.year*12+date1.month
-    m2 = date2.year*12+date2.month
-    months = m2 - m1
-    if date1.day > date2.day:
-        # months- = 1#need to account for leap
-        pass
-    elif date1.day == date2.day:
-        seconds1 = date1.hour*3600+date1.minute+date1.second
-        seconds2 = date2.hour*3600+date2.minute+date2.second
-        if seconds1 > seconds2:
-            months -= 1
-
-    return months
 
 
 def tz_localize_dates(start_date: pd.Timestamp,
@@ -1007,21 +958,6 @@ def generate_fixed_maturity_rolls(time_period: TimePeriod,
             roll_schedule[observed_time] = next_roll
         roll_schedule = pd.Series(roll_schedule)
     return roll_schedule
-
-
-def min_timestamp(timestamp1: Union[str, pd.Timestamp],
-                  timestamp2: Union[str, pd.Timestamp],
-                  tz: str = 'UTC'
-                  ) -> pd.Timestamp:
-    """
-    find min timespamp
-    """
-    if isinstance(timestamp1, str):
-        timestamp1 = pd.Timestamp(timestamp1, tz=tz)
-    if isinstance(timestamp2, str):
-        timestamp2 = pd.Timestamp(timestamp2, tz=tz)
-    min_date = timestamp1 if timestamp1 < timestamp2 else timestamp2
-    return min_date
 
 
 def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Timestamp]],
