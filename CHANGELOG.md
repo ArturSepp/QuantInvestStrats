@@ -49,6 +49,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   the Sphinx site; the frequency convention note previously rendered them as literal text.
 - Trimmed model-layer NAVs to their common valid range before resampling, so a layer that ends
   early no longer contributes forward-filled zero returns to the common sample.
+- Defined empty-provider behavior for `bfill_timeseries()`, processing the available provider
+  under the newer schema and rejecting newer DataFrames that cannot define any output columns.
 - Preserved finite newer and single-observation older price anchors when
   `bfill_timeseries()` reconstructs joined price histories.
 - Supported pandas nullable floating price panels in `to_returns()` without changing return
