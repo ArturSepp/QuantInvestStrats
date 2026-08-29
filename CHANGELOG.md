@@ -59,6 +59,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   rejected custom regime mappings that do not contain exactly two entries.
 - Unified the historical `qis.plots.derived.desc_table` path with the canonical descriptive-table
   enum and implementation while preserving deep-import compatibility.
+- Rejected zero-row descriptive-table inputs consistently and returned warning-free missing
+  statistics for columns below each statistic's sample minimum, including normality below 20
+  observations.
 
 ## [5.19.0] - 2026-08-28
 
