@@ -115,6 +115,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   reduced schemas instead of raising while removing the volatility column.
 - Made `compute_desc_table()` support nullable `Float64` / `pd.NA` inputs and return formatted
   missing statistics for all-missing dated columns without reduction warnings or score-mode errors.
+- Rejected invalid volatility-quantile bucket counts and classifications whose requested regimes
+  cannot all be populated.
 
 ## [5.15.0] - 2026-08-24
 
