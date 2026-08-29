@@ -2,14 +2,21 @@
 myst:
   html_meta:
     description: >-
-      Decompose the return of a layered portfolio model into systematic return, risk-layer alpha,
-      standalone signal alpha, and integration alpha, each with a HAC confidence interval, using qis.
+      Decompose the return of a layered quantitative portfolio model into systematic return,
+      risk-layer alpha, standalone signal alpha, and integration alpha, each with a
+      heteroskedasticity and autocorrelation consistent (HAC) confidence interval, using qis.
 ---
 
 # Model-layer attribution: risk, signal, and integration alpha
 
-A layered allocation model has a risk model, a signal layer, and an optimiser that combines them
-under constraints. The question this page answers is what each layer added to the realised return
+A layered portfolio allocation model has three components:
+
+1. A risk model (an estimated covariance matrix).
+1. A signal layer (estimated expected returns or alphas).
+1. An optimiser that combines them by maximising portfolio alpha subject to tracking error,
+   turnover, and allocation constraints.
+
+The question this note and the `qis` analytics answer is what each layer added to the realised return
 of the full model, with a confidence interval on each addition. The difficulty is that the full
 model is not the sum of its layers. The optimiser combines risk and signals under constraints, so
 the standalone effects do not add up to the integrated effect. `qis` resolves the non-additivity
