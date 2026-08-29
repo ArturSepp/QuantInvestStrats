@@ -125,9 +125,6 @@ jobs:
             if "/__pycache__/" in name or name.endswith((".pyc", ".pyo"))
         ]
         expected_docs = {
-            "qis/docs/REMOVED_5_0.md",
-            "qis/docs/factsheets.md",
-            "qis/docs/frequency_convention_note.md",
             "qis/docs/plotting_kwargs.md",
             "qis/docs/reporting_frequencies.md",
             "qis/docs/sharpe_conventions.md",

@@ -59,5 +59,5 @@ qis.factsheet(multi_portfolio, reporting_frequency='monthly', file_name='strateg
 
 All four pages were produced with the defaults; pass `time_period=...` to restrict the window, or
 swap `reporting_frequency` to `'daily'`, `'weekly'` or `'quarterly'` to re-render the same book at a
-different cadence with every statistic recalibrated. See [factsheets.md](_included/factsheets.md) for the
+different cadence with every statistic recalibrated. See [factsheets.md](factsheets.md) for the
 full-control API and [reporting_frequencies.md](_included/reporting_frequencies.md) for the convention.

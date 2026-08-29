@@ -64,10 +64,10 @@ package_comparison
 
 _included/sharpe_conventions
 _included/reporting_frequencies
-_included/frequency_convention_note
-_included/factsheets
 _included/plotting_kwargs
-_included/REMOVED_5_0
+frequency_convention_note
+factsheets
+REMOVED_5_0
 ```
 
 ```{toctree}

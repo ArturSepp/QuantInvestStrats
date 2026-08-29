@@ -95,6 +95,6 @@ and estimator are different.
 - {doc}`Generated RiskModel API <api/generated/qis.RiskModel>`
 - {doc}`Generated EWMA realised-TE API <api/generated/qis.compute_ewma_realised_tracking_error>`
 - {doc}`Generated whole-sample TE/IR API <api/generated/qis.compute_te_ir_errors>`
-- [Frequency convention note](_included/frequency_convention_note.md)
+- [Frequency convention note](frequency_convention_note.md)
 - [Canonical ex-ante example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/ex_anti_tracking_error_and_risk.py)
 - [Canonical ex-post example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/ex_post_tracking_error_and_risk.py)

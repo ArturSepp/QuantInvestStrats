@@ -100,5 +100,5 @@ mark or delisting event for you.
 
 - {doc}`Generated static-schedule API <api/generated/qis.generate_static_weights_schedule>`
 - {doc}`Generated return-conversion API <api/generated/qis.to_returns>`
-- [Frequency convention note](_included/frequency_convention_note.md)
+- [Frequency convention note](frequency_convention_note.md)
 - [Canonical late-start example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/static_weight_with_missing_prices.py)

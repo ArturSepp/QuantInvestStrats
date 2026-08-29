@@ -9,7 +9,7 @@ myst:
 
 # Model-layer attribution: risk, signal, and integration alpha
 
-A layered portfolio allocation model has three components:
+A layered quantitative portfolio allocation model has three components:
 
 1. A risk model (an estimated covariance matrix).
 1. A signal layer (estimated expected returns or alphas).
@@ -17,8 +17,10 @@ A layered portfolio allocation model has three components:
    turnover, and allocation constraints.
 
 The question this note and the `qis` analytics answer is what each layer added to the realised return
-of the full model, with a confidence interval on each addition. The difficulty is that the full
-model is not the sum of its layers. The optimiser combines risk and signals under constraints, so
+of the full model, with a confidence interval on each addition.
+
+The difficulty is that the full model is not the sum of its layers. The optimiser combines risk
+and signals under constraints, so
 the standalone effects do not add up to the integrated effect. `qis` resolves the non-additivity
 with an integration term defined as the exact log-return residual between the full model and the
 sum of the standalone effects. The four components reconstruct the full-model log return in every
@@ -26,7 +28,9 @@ period, their sample means reconstruct the annualised return, and each alpha com
 intercept with a standard error.
 
 The entry point is `qis.compute_model_layer_alpha_beta_attribution`, which returns a
-`qis.ModelLayerAlphaBetaAttribution`. The method is descriptive and ex post. Its full-sample
+`qis.ModelLayerAlphaBetaAttribution`.
+
+The method is descriptive and ex post. Its full-sample
 coefficients are not point-in-time estimates and are not inputs to a backtest.
 
 ## Choose the object that matches the question
@@ -43,11 +47,16 @@ measures how they combine, not how one of them tracks a benchmark.
 
 ## Inputs and the common sample
 
-The inputs are four NAV series and an optional fifth: the benchmark $B$, the risk-layer
-model $R$ (the full model run with every alpha signal set to zero), the standalone signal
-sleeve $A$ (a portfolio built from the signals alone, for example an equal-weight top-quantile
-portfolio), the full model $F$, and optionally the full model net of trading costs
-$F^{\mathrm{net}}$. Each layer $L$ is converted at frequency `freq` to log returns,
+The inputs are four NAV series and an optional fifth:
+
+1. The benchmark $B$.
+1. The risk-layer model $R$ (the full model run with every alpha signal set to zero).
+1. The standalone signal sleeve $A$ (a portfolio built from the signals alone, for example an
+   equal-weight top-quantile portfolio).
+1. The full model $F$.
+1. Optionally, the full model net of trading costs $F^{\mathrm{net}}$.
+
+Each layer $L$ is converted at frequency `freq` to log returns,
 
 $$
 r_L(t) = \log N_L(t) - \log N_L(t-1), \qquad L \in \{B, R, A, F, F^{\mathrm{net}}\},
@@ -156,6 +165,10 @@ are therefore one object: the bars of a bridge chart are the annualised alphas, 
 on them are the intervals of those same alphas.
 
 ### Invariance to the excess-return basis
+
+We do not add the adjustment by the risk-free rate in this layer. For funded long-only portfolios,
+we recommend using NAVs computed using total returns. For managed futures portfolios, we recommend
+using NAVs computed using excess returns.
 
 Replace the signal-sleeve return by its excess over the benchmark,
 $r_A'(t) = r_A(t) - r_B(t)$. Every alpha, every residual, every HAC standard error, every

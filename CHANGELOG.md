@@ -23,6 +23,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Replaced the by-construction reconstruction checks in model-layer attribution with a finiteness
   guard.
+- Moved `frequency_convention_note.md`, `factsheets.md` and `REMOVED_5_0.md` from the wheel-shipped
+  `src/qis/docs/` to the Sphinx site under `docs/`, since no docstring cites them;
+  `plotting_kwargs.md`, `reporting_frequencies.md` and `sharpe_conventions.md` stay in the package
+  because docstrings and tests cite them by package path. The wheel-contents check in CI now
+  expects those three notes only.
 - Documented and regression-tested the established calendar-boundary behavior of
   `split_to_samples()` for the `TrendFollowingSystems` consumer.
 

@@ -108,5 +108,5 @@ I/O dependency: install with `pip install "qis[io]"`, then run
 
 - {doc}`Generated rolling unsmoother API <api/generated/qis.compute_ar_unsmoothed_prices>`
 - {doc}`Generated de-levering API <api/generated/qis.delever_returns>`
-- [Frequency convention note](_included/frequency_convention_note.md)
+- [Frequency convention note](frequency_convention_note.md)
 - [Canonical unsmoothing and de-levering example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/unsmoothing_and_delevering.py)

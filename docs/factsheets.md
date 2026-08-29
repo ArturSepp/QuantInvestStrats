@@ -60,7 +60,7 @@ fig = qis.generate_multi_asset_factsheet(prices=prices, benchmark='SPY',
 The same book can be reported daily / weekly / monthly / quarterly with every statistic kept
 internally consistent, every panel labelled with the frequency it was computed at, and an
 up-sampling guard that refuses to report finer than the data supports. See
-[reporting_frequencies.md](reporting_frequencies.md) for the two axes, the window / grid / regime
+[reporting_frequencies.md](_included/reporting_frequencies.md) for the two axes, the window / grid / regime
 presets, the guard and the per-panel labelling discipline.
 
 ## Examples

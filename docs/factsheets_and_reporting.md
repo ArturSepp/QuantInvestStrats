@@ -91,7 +91,7 @@ different calculation.
 - **Multi-strategy:** compare several portfolio variants on shared tables and axes.
 
 The [factsheet gallery](gallery.md) shows the four rendered forms. The wheel-shipped
-[factsheet convention note](_included/factsheets.md) maps each facade input to its lower-level
+[factsheet convention note](factsheets.md) maps each facade input to its lower-level
 generator.
 
 ## Constraints and common failure modes
@@ -110,6 +110,6 @@ generator.
 
 - {doc}`Generated qis.factsheet API <api/generated/qis.factsheet>`
 - [Factsheet gallery](gallery.md)
-- [Wheel-shipped factsheet convention](_included/factsheets.md)
+- [Factsheet convention](factsheets.md)
 - [Reporting-frequency convention](_included/reporting_frequencies.md)
 - [Canonical multi-asset example (requires the `data` extra)](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/multi_assets.py)
