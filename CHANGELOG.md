@@ -14,6 +14,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `confidence_level` on `ModelLayerAlphaBetaAttribution`; added the opt-in
   `newey_west_lag_rule()` helper. Defaults unchanged.
 - Added the `Risk Layer Return` column to model-layer `component_returns`.
+- Documented model-layer attribution in `docs/model_layer_attribution.md`: the exact log-return
+  bridge, the linearity, bar-height and excess-basis identities, the Bartlett HAC inference and
+  the NAV-ratio protocol for feature impact, with the offline example
+  `examples/perfstats/model_layer_attribution_simulated.py` and its figure.
 
 ### Changed
 
@@ -30,6 +34,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Enabled the MyST `dollarmath` extension in `docs/conf.py`, so `$` and `$$` equations render in
+  the Sphinx site; the frequency convention note previously rendered them as literal text.
 - Trimmed model-layer NAVs to their common valid range before resampling, so a layer that ends
   early no longer contributes forward-filled zero returns to the common sample.
 - Preserved finite newer and single-observation older price anchors when

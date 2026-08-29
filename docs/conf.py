@@ -57,7 +57,8 @@ autodoc_typehints = 'description'  # signatures stay readable; types render in t
 autodoc_member_order = 'bysource'
 autodoc_default_options = {'members': True, 'undoc-members': True, 'show-inheritance': True}
 
-myst_enable_extensions = ['colon_fence', 'deflist']  # linkify needs an extra dependency
+# ``linkify`` is excluded because it needs an extra dependency.
+myst_enable_extensions = ['colon_fence', 'deflist', 'dollarmath']
 myst_heading_anchors = 3
 
 intersphinx_mapping = {
