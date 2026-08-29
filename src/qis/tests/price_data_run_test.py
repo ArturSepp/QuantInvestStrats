@@ -6,9 +6,13 @@ from types import ModuleType
 
 import numpy as np
 import pandas as pd
+import pytest
 
 # qis
-from qis.run_local import price_data_run
+price_data_run = pytest.importorskip(
+    "qis.run_local.price_data_run",
+    reason="development runners are intentionally excluded from installed wheels",
+)
 
 
 def test_fetch_etf_prices_replaces_placeholder_with_user_cache(tmp_path, monkeypatch) -> None:
