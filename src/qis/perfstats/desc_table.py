@@ -61,20 +61,35 @@ def _compute_positive_probability(data: np.ndarray) -> np.ndarray:
 def _reduce_observed(
         data: np.ndarray,
         reduction: Callable[[np.ndarray], np.ndarray],
-        minimum_observations: int = 1) -> np.ndarray:
-    """Apply a reduction only to columns meeting its sample-size requirement.
+        minimum_observations: int = 1,
+        require_variation: bool = False) -> np.ndarray:
+    """Apply a reduction only to columns meeting the selected eligibility requirements.
 
     Args:
         data: Two-dimensional numerical observations arranged by row and column.
         reduction: Column-wise reduction returning one value per supplied column.
         minimum_observations: Required number of non-missing values in each column.
+        require_variation: Whether finite zero-spread columns remain undefined.
 
     Returns:
-        Reduction values in input-column order, with NaN for undersized columns.
+        Reduction values in input-column order, with NaN for ineligible columns.
     """
     # Select columns per statistic so undersized samples never reach warning-producing reducers.
     observation_counts = np.sum(np.logical_not(np.isnan(data)), axis=0)
     eligible_columns = np.greater_equal(observation_counts, minimum_observations)
+    if require_variation and np.any(eligible_columns):
+        # Exact finite constants have undefined standardized moments; leave other input policies
+        # unchanged.
+        eligible_positions = np.flatnonzero(eligible_columns)
+        eligible_data = data[:, eligible_columns]
+        minimums = np.nanmin(eligible_data, axis=0)
+        maximums = np.nanmax(eligible_data, axis=0)
+        finite_zero_spread = (
+            np.isfinite(minimums)
+            & np.isfinite(maximums)
+            & np.equal(minimums, maximums)
+        )
+        eligible_columns[eligible_positions] = np.logical_not(finite_zero_spread)
     values = np.full(data.shape[1], np.nan, dtype=float)
     if np.any(eligible_columns):
         values[eligible_columns] = reduction(data[:, eligible_columns])
@@ -120,13 +135,13 @@ def _add_moment_columns(
         data: Two-dimensional numerical observations arranged by row and column.
         value_format: Display format applied to each moment.
     """
-    # Two observations define the displayed moments; smaller samples remain explicitly missing.
+    # Display moments only for samples that have both enough observations and finite variation.
     skews = _reduce_observed(
         data, lambda values: skew(values, axis=0, nan_policy='omit'),
-        minimum_observations=2)
+        minimum_observations=2, require_variation=True)
     kurts = _reduce_observed(
         data, lambda values: kurtosis(values, axis=0, nan_policy='omit'),
-        minimum_observations=2)
+        minimum_observations=2, require_variation=True)
     descriptive_table[PerfStat.SKEWNESS.value.short] = [
         value_format.format(x) for x in skews]
     descriptive_table[PerfStat.KURTOSIS.value.short_n] = [
@@ -162,7 +177,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             column named after it; repeated DataFrame column labels are retained and calculated
             independently
         desc_table_type: which set of statistics to report; positive-probability modes use each
-            column's non-missing observation count as the denominator
+            column's non-missing observation count as the denominator; moment modes retain
+            defined level statistics but report finite zero-spread moments as missing
         var_format: format applied to the statistics
         annualize_vol: report volatility per annum rather than per period; reduced modes omit
             the volatility column selected by this convention
@@ -238,22 +254,22 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_KURTOSIS:
-        # Evaluate moments only for observed columns so SciPy does not warn for empty samples.
+        # Evaluate moments only for eligible varying columns so undefined samples do not warn.
         _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
 
     elif desc_table_type == desc_table_type.WITH_NORMAL_PVAL:
-        # Apply moments and normality only where a sample exists, retaining NaN elsewhere.
+        # Apply moments and normality only to eligible varying samples, retaining NaN elsewhere.
         _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
         # Require SciPy's warning-free accuracy threshold, not only its eight-value hard minimum.
         ps = _reduce_observed(
             data_np,
             lambda values: normaltest(a=values, axis=0, nan_policy=nan_policy)[1],
-            minimum_observations=20)
+            minimum_observations=20, require_variation=True)
         descriptive_table[PerfStat.NORMTEST.value.short_n] = [
             '{:.2f}'.format(x) for x in ps]
 
     elif desc_table_type == desc_table_type.SKEW_KURTOSIS:
-        # Remove setup columns and leave unobserved moments undefined in the reduced schema.
+        # Remove setup columns and leave ineligible moments undefined in the reduced schema.
         descriptive_table = descriptive_table.drop(
             [PerfStat.AVG.value.name, volatility_column], axis=1)
         _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
@@ -270,7 +286,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         descriptive_table[PerfStat.RANK.to_str()] = ['{:.0%}'.format(0.01*x) for x in percentiles]
 
     elif desc_table_type == desc_table_type.EXTENSIVE:
-        # Apply each extended reduction only to columns containing observations.
+        # Apply moments only to varying samples and level reductions to observed samples.
         _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
         minimums = _reduce_observed(data_np, lambda values: np.nanmin(values, axis=0))
         lower_quantiles = _reduce_observed(
@@ -291,7 +307,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             = [var_format.format(x) for x in maximums]
 
     elif desc_table_type == desc_table_type.WITH_MEDIAN:
-        # Leave unobserved medians and moments as NaN without invoking warning-producing reducers.
+        # Keep medians for observed samples while leaving ineligible moments warning-free.
         medians = _reduce_observed(data_np, lambda values: np.nanmedian(values, axis=0))
         descriptive_table[PerfStat.MEDIAN.to_str(short=True)] \
             = [var_format.format(x) for x in medians]

@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Preserved defined descriptive statistics for finite constant columns while returning undefined
+  skewness, kurtosis, and normality without precision-loss warnings.
 - Preserved unavailable realized-volatility windows without reduction warnings and added a
   descriptive error for volatility-regime benchmarks with no finite observations.
 
