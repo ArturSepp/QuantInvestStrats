@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Aligned descriptive-table and legend t-statistics with the signed sample mean divided by its
+  standard error, independently of volatility annualization, and made undefined legend samples
+  warning-free.
+
 ## [5.20.0] - 2026-08-29
 
 ### Added

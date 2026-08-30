@@ -395,11 +395,12 @@ def test_compute_desc_table_preserves_custom_formats_at_sample_boundaries() -> N
 
 
 def test_compute_desc_table_preserves_monthly_annualization_and_tstat_formula() -> None:
-    """Keep existing annualization and optional t-statistics for eligible samples.
+    """Annualize volatility without changing sample-mean t-statistics.
 
     Monthly frequency multiplies each mean by 12 and each sample standard deviation by
-    ``sqrt(12)``. The displayed t-statistic remains the accepted ``12 * mean / annualized std``;
-    this regression establishes sample eligibility without changing that separate convention.
+    ``sqrt(12)``. The t-statistic instead divides each mean by ``sample std / sqrt(n)`` and is
+    independent of that display choice. The eligible sample sizes two, seven, eight, nineteen,
+    and twenty therefore produce rounded statistics 1.0, 1.2, 1.0, 0.8, and 0.7.
     """
     returns = _mixed_returns(nullable=False)
 
@@ -414,7 +415,7 @@ def test_compute_desc_table_preserves_monthly_annualization_and_tstat_formula() 
         {
             "Avg": ("1.00", "1.00", "1.00", "1.00", "1.00", "1.00", "nan"),
             "Std An": ("nan", "4.90", "7.48", "10.14", "19.49", "22.05", "nan"),
-            "T-stat": ("nan", "2.4", "1.6", "1.2", "0.6", "0.5", "nan"),
+            "T-stat": ("nan", "1.0", "1.2", "1.0", "0.8", "0.7", "nan"),
         },
         index=pd.Index(_ASSETS),
     )

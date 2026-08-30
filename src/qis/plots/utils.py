@@ -52,6 +52,7 @@ import qis.utils.df_ops as dfo
 import qis.utils.df_str as dfs
 import qis.utils.df_freq as dff
 import qis.utils.struct_ops as sop
+from qis.perfstats.desc_table import compute_sample_mean_tstat
 from qis.plots.table import ROW_HIGHT, COLUMN_WIDTH, FIRST_COLUMN_WIDTH
 
 # public API of this module: everything else is internal plotting machinery and is
@@ -793,6 +794,36 @@ class LegendStats(Enum):
     FIRST_MIN_MAX_LAST = 27
 
 
+def _compute_legend_tstat_components(
+        data_column: pd.Series,
+        nan_display: float) -> Tuple[float, float, float]:
+    """Compute warning-free legend summaries for t-statistic modes.
+
+    Args:
+        data_column: One plotted series, possibly containing missing values.
+        nan_display: Configured display value for an undefined statistic.
+
+    Returns:
+        Sample mean, sample standard deviation, and signed t-statistic.
+    """
+    observed = data_column.dropna().to_numpy(dtype=float)
+    if observed.size == 0:
+        return nan_display, nan_display, nan_display
+
+    avg = float(np.mean(observed))
+    # Guard ddof=1 before reduction so undersized legends remain warning-free.
+    if observed.size < 2:
+        return avg, nan_display, nan_display
+
+    std = float(np.std(observed, ddof=1))
+    tstat = compute_sample_mean_tstat(
+        mean=np.asarray([avg]),
+        sample_std=np.asarray([std]),
+        observation_counts=np.asarray([observed.size]),
+    )[0]
+    return avg, std, float(tstat)
+
+
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                      legend_stats: LegendStats = LegendStats.NONE,
                      var_format: str = '{:.0f}',
@@ -916,26 +947,16 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.TSTAT:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column]
-            if np.all(np.isnan(data_column)):
-                tstat = nan_display
-            else:
-                avg = np.nanmean(data_column)
-                std = np.nanstd(data_column, ddof=1)
-                tstat = avg / std
+        for column, data_column in data.items():
+            # Use the same signed sample-mean convention as descriptive tables.
+            _, _, tstat = _compute_legend_tstat_components(data_column, nan_display)
             legend_lines.append(f"{column}: t-stat={tstat_format.format(tstat)}")
 
     elif legend_stats == LegendStats.AVG_STD_TSTAT:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column]
-            if np.all(np.isnan(data_column)):
-                avg, std, tstat = nan_display, nan_display, nan_display
-            else:
-                avg = np.nanmean(data_column)
-                std = np.nanstd(data_column, ddof=1)
-                tstat = avg / std
+        for column, data_column in data.items():
+            # Keep the composite legend's three summaries on one guarded sample.
+            avg, std, tstat = _compute_legend_tstat_components(data_column, nan_display)
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, "
                                 f"std={var_format.format(std)}, "
                                 f"t-stat={tstat_format.format(tstat)}")

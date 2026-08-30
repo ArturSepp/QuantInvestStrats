@@ -361,9 +361,9 @@ def test_compute_desc_table_all_missing_column_preserves_custom_formats_and_tsta
     """Format defined neighboring statistics while retaining undefined missing statistics.
 
     The finite control ``1, ..., 8`` has mean 4.5, sample standard deviation ``sqrt(6)``, and
-    t-statistic ``4.5 / sqrt(6) = 1.837117...`` under the established non-annualized convention.
-    The all-missing asset has none of those statistics, and custom formatting must not turn its
-    missing representations into values or warnings.
+    standard error ``sqrt(6) / sqrt(8)``. Its t-statistic is therefore
+    ``4.5 * sqrt(8) / sqrt(6) = 5.196152...``. The all-missing asset has none of those statistics,
+    and custom formatting must not turn its missing representations into values or warnings.
     """
     returns = pd.DataFrame(
         {
@@ -377,7 +377,7 @@ def test_compute_desc_table_all_missing_column_preserves_custom_formats_and_tsta
         {
             'Avg': ('4.500', 'nan'),
             'Std': ('2.449', 'nan'),
-            'T-stat': ('1.837', 'nan'),
+            'T-stat': ('5.196', 'nan'),
         },
         index=[_FINITE_ASSET, _ALL_MISSING_ASSET],
     )

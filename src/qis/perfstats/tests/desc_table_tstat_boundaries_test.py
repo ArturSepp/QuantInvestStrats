@@ -1,11 +1,12 @@
-"""Regression coverage for zero-volatility descriptive t-statistic boundaries.
+"""Regression coverage for descriptive-table t-statistic conventions and boundaries.
 
-``compute_desc_table`` conditionally adds a display statistic based on adjusted mean and
-volatility. A constant history has no usable volatility denominator, so its statistic should use
-the established ``nan`` display without emitting a divide-by-zero warning. The deterministic
-panel below covers positive, zero, negative, and ragged constants alongside a finite positive
-control in periodic and monthly annualized modes. Named Series/DataFrame consistency and caller
-ownership are checked separately.
+``compute_desc_table`` labels its optional statistic as a t-statistic of the sample mean. It must
+therefore divide the mean by its standard error, retain the sign, and depend on the non-missing
+sample count rather than the displayed volatility's annualization. A constant or undersized
+history has no usable standard error and should use the established ``nan`` display without a
+warning. The mixed panel below exercises all of those states simultaneously under periodic and
+monthly annualized display conventions. Named Series/DataFrame consistency and caller ownership
+are checked separately.
 """
 
 import warnings
@@ -48,6 +49,9 @@ _ASSETS = pd.Index(
         'Zero Constant',
         'Negative Constant',
         'Positive Variable',
+        'Negative Variable',
+        'Zero Mean Variable',
+        'Ragged Positive Variable',
         'Ragged Positive Constant',
     ],
     name='Asset',
@@ -67,6 +71,9 @@ def _tstat_boundary_returns() -> pd.DataFrame:
             'Zero Constant': [0.0, 0.0, 0.0, 0.0],
             'Negative Constant': [-2.0, -2.0, -2.0, -2.0],
             'Positive Variable': [1.0, 2.0, 3.0, 4.0],
+            'Negative Variable': [-1.0, -2.0, -3.0, -4.0],
+            'Zero Mean Variable': [-1.0, 1.0, -1.0, 1.0],
+            'Ragged Positive Variable': [1.0, np.nan, 2.0, 3.0],
             'Ragged Positive Constant': [2.0, np.nan, 2.0, 2.0],
         },
         index=_DATES,
@@ -75,23 +82,37 @@ def _tstat_boundary_returns() -> pd.DataFrame:
 
 def _expected_table(
         volatility_label: str,
-        variable_volatility: str,
-        variable_tstat: str) -> pd.DataFrame:
+        variable_volatilities: tuple[str, str, str, str]) -> pd.DataFrame:
     """Build the exact display table from independently calculated strings.
 
     Args:
         volatility_label: Periodic or annualized output-column label.
-        variable_volatility: Displayed volatility for the finite control.
-        variable_tstat: Displayed statistic for the finite control.
+        variable_volatilities: Displayed volatility for the positive, negative, zero-mean, and
+            ragged variable histories.
 
     Returns:
         Complete expected table for all constant boundaries and the finite control.
     """
     return pd.DataFrame(
         {
-            'Avg': ['2.00', '0.00', '-2.00', '2.50', '2.00'],
-            volatility_label: ['0.00', '0.00', '0.00', variable_volatility, '0.00'],
-            'T-stat': ['nan', 'nan', 'nan', variable_tstat, 'nan'],
+            'Avg': ['2.00', '0.00', '-2.00', '2.50', '-2.50', '0.00', '2.00', '2.00'],
+            volatility_label: [
+                '0.00',
+                '0.00',
+                '0.00',
+                *variable_volatilities,
+                '0.00',
+            ],
+            'T-stat': [
+                'nan',
+                'nan',
+                'nan',
+                '3.873',
+                '-3.873',
+                '0.000',
+                '3.464',
+                'nan',
+            ],
         },
         index=_ASSETS,
     )
@@ -125,10 +146,10 @@ def _compute_without_warnings(
 # =============================================================================
 
 @pytest.mark.parametrize(
-    ('annualize_vol', 'volatility_label', 'variable_volatility', 'variable_tstat'),
+    ('annualize_vol', 'volatility_label', 'variable_volatilities'),
     [
-        (False, 'Std', '1.29', '1.936'),
-        (True, 'Std An', '4.47', '6.708'),
+        (False, 'Std', ('1.29', '1.29', '1.15', '1.00')),
+        (True, 'Std An', ('4.47', '4.47', '4.00', '3.46')),
     ],
 )
 @pytest.mark.parametrize(
@@ -139,22 +160,21 @@ def _compute_without_warnings(
 def test_compute_desc_table_returns_undefined_tstat_for_zero_volatility(
         annualize_vol: bool,
         volatility_label: str,
-        variable_volatility: str,
-        variable_tstat: str,
+        variable_volatilities: tuple[str, str, str, str],
         use_nullable_dtype: bool) -> None:
-    """Return undefined constant statistics while preserving the finite ratio exactly.
+    """Apply the signed sample-mean statistic independently to every column state.
 
     For the control ``[1, 2, 3, 4]``, the mean is 2.5 and sample volatility is
-    ``sqrt(5 / 3)``. The periodic ratio is therefore 1.936491.... Monthly annualization gives
-    volatility ``sqrt(12) * sqrt(5 / 3) = sqrt(20)`` and adjusted mean 30, producing
-    ``30 / sqrt(20) = 6.708204...``. Every constant has zero volatility and an undefined
-    displayed statistic, including the ragged positive constant.
+    ``sqrt(5 / 3)``. Its standard error is ``sqrt(5 / 3) / sqrt(4)``, so its t-statistic is
+    ``sqrt(15) = 3.872983...``; the negative mirror keeps the opposite sign. The zero-mean
+    variable has statistic zero, and the three-point variable has statistic
+    ``2 * sqrt(3) = 3.464101...``. Annualization changes only the displayed volatility. Every
+    constant has zero volatility and an undefined statistic, including the ragged constant.
 
     Args:
         annualize_vol: Whether to test the periodic or monthly annualized calculation.
         volatility_label: Expected output label for the selected volatility convention.
-        variable_volatility: Expected formatted finite-control volatility.
-        variable_tstat: Expected formatted finite-control statistic.
+        variable_volatilities: Expected formatted variable-column volatilities.
         use_nullable_dtype: Whether to exercise pandas ``Float64`` and ``pd.NA`` inputs.
     """
     returns = _tstat_boundary_returns()
@@ -164,7 +184,7 @@ def test_compute_desc_table_returns_undefined_tstat_for_zero_volatility(
 
     actual = _compute_without_warnings(returns, annualize_vol)
 
-    expected = _expected_table(volatility_label, variable_volatility, variable_tstat)
+    expected = _expected_table(volatility_label, variable_volatilities)
     pd.testing.assert_frame_equal(actual, expected)
     pd.testing.assert_frame_equal(returns, original_returns)
 
