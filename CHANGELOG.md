@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserved unavailable realized-volatility windows without reduction warnings and added a
+  descriptive error for volatility-regime benchmarks with no finite observations.
+
 ## [5.21.1] - 2026-08-30
 
 ### Added

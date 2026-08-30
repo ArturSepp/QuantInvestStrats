@@ -486,7 +486,8 @@ def compute_pa_excess_compounded_returns(returns: Union[pd.Series, pd.DataFrame]
     return compounded_return_pa
 
 
-def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]) -> np.ndarray:
+def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]
+                 ) -> Union[np.ndarray, float]:
     """Estimate volatility from return samples.
 
     For samples >=20, uses standard deviation with ddof=1.
@@ -496,20 +497,28 @@ def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]) ->
         sampled_returns: Return time series
 
     Returns:
-        Array of volatility estimates
+        Volatility estimate for a one-dimensional input or one estimate per DataFrame column.
+        A column is missing when it cannot supply the observations required by its selected
+        estimator
     """
-    if isinstance(sampled_returns, np.ndarray):
-        n = sampled_returns.shape[0]
+    if isinstance(sampled_returns, (pd.Series, pd.DataFrame)):
+        sampled_values = sampled_returns.to_numpy(dtype=float, na_value=np.nan)
     else:
-        n = len(sampled_returns.index)
+        sampled_values = np.asarray(sampled_returns, dtype=float)
+    n = sampled_values.shape[0]
 
-    if n >= 20:
-        # Use sample standard deviation for larger samples
-        vol = np.nanstd(sampled_returns, axis=0, ddof=1)
-    else:
-        # Use RMS for small samples to avoid mean adjustment
-        vol = np.sqrt(np.nanmean(np.power(sampled_returns, 2), axis=0))
-    return vol
+    def estimate_column(values: np.ndarray) -> float:
+        """Apply the existing window-size estimator to one return column."""
+        num_observations = int(np.count_nonzero(~np.isnan(values)))
+        if n >= 20:
+            # Sample standard deviation needs two observations; unavailable columns stay missing.
+            return float(np.nanstd(values, ddof=1)) if num_observations >= 2 else np.nan
+        # The small-window RMS convention is defined as soon as one return is observed.
+        return float(np.sqrt(np.nanmean(np.power(values, 2)))) if num_observations >= 1 else np.nan
+
+    if sampled_values.ndim == 1:
+        return estimate_column(sampled_values)
+    return np.asarray([estimate_column(values) for values in sampled_values.T])
 
 
 def compute_sampled_vols(prices: Union[pd.DataFrame, pd.Series],
@@ -528,7 +537,8 @@ def compute_sampled_vols(prices: Union[pd.DataFrame, pd.Series],
         include_end_date: Include period end in resampling
 
     Returns:
-        Annualized volatility time series
+        Annualized volatility time series. Windows without enough observed returns remain missing
+        without affecting eligible Series or DataFrame columns
     """
     # Compute returns at specified frequency
     sampled_returns = to_returns(prices=prices, freq=freq_return,
@@ -544,7 +554,9 @@ def compute_sampled_vols(prices: Union[pd.DataFrame, pd.Series],
     # Compute volatility for each window
     vol_samples = {}
     for key, df in sampled_returns_at_vol_freq.items():
-        vol_samples[key] = estimate_vol(sampled_returns=df.to_numpy())
+        # Normalize nullable pandas values before applying NumPy reducers column by column.
+        sampled_values = df.to_numpy(dtype=float, na_value=np.nan)
+        vol_samples[key] = estimate_vol(sampled_returns=sampled_values)
 
     # Convert to time series and annualize
     if isinstance(prices, pd.Series):

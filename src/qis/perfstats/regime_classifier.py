@@ -743,7 +743,8 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             color per ID are also available through ``get_regime_ids_colors()``.
 
         Raises:
-            ValueError: If fewer than ``q`` volatility quantile bands contain observations.
+            ValueError: If the benchmark has no finite volatility observations or fewer than
+                ``q`` volatility quantile bands contain observations.
         """
         vols = ret.compute_sampled_vols(
             prices=prices[benchmark],
@@ -753,6 +754,12 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
         )
 
         valid_vols = vols.dropna()
+        if valid_vols.empty:
+            # Reject an unusable benchmark before the quantile helper derives all-NaN bin edges.
+            raise ValueError(
+                f"Volatility regime benchmark '{benchmark}' has no finite volatility "
+                f"observations for q={self.q}."
+            )
         if self.q > 0 and not valid_vols.empty:
             # Require every requested band to contain data before publishing its ID and color.
             quantile_classification, quantile_edges = cast(
