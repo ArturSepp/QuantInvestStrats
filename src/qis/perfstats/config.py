@@ -32,12 +32,14 @@ class ReturnTypes(Enum):
     ``is_log_returns`` map onto LOG and RELATIVE.
 
     Attributes:
-        RELATIVE: arithmetic return, S1 / S0 - 1; additive across assets within a period
-        LOG: log return, ln(S1 / S0); additive across periods for one asset
-        DIFFERENCE: absolute change, S1 - S0; for series already in rate or spread space,
-            where a ratio is meaningless
-        LEVEL: the end-of-period level itself, S1
-        LEVEL0: the start-of-period level, S0
+        RELATIVE: arithmetic return, S1 / S0 - 1, for finite positive endpoints; additive across
+            assets within a period
+        LOG: log return, ln(S1 / S0), for finite positive endpoints; additive across periods for
+            one asset
+        DIFFERENCE: absolute change, S1 - S0, for finite signed series already in rate or spread
+            space, where a ratio is meaningless
+        LEVEL: the finite signed end-of-period level itself, S1
+        LEVEL0: the finite signed start-of-period level, S0
     """
     RELATIVE = 'Relative'  # =S1/S0-1
     LOG = 'Log'  # =ln(S1/S0)

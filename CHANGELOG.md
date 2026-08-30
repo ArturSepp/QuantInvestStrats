@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Applied return-mode-specific endpoint validity in `to_returns()`: ratio and log returns now
+  require finite positive endpoints, while difference and level modes accept finite signed levels.
 - Made `append_time_series()` preserve the newer provider's names, column order, axis metadata,
   and declared empty schema while aligning compatible older history and handling unavailable
   providers deterministically.
