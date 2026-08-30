@@ -743,7 +743,8 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             color per ID are also available through ``get_regime_ids_colors()``.
 
         Raises:
-            ValueError: If fewer than ``q`` volatility quantile bands contain observations.
+            ValueError: If the benchmark has no finite volatility observations or fewer than
+                ``q`` volatility quantile bands contain observations.
         """
         vols = ret.compute_sampled_vols(
             prices=prices[benchmark],
@@ -752,7 +753,17 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             include_end_date=include_end_date
         )
 
-        valid_vols = vols.dropna()
+        finite_vol_mask = pd.Series(
+            np.isfinite(vols.to_numpy(dtype=float, na_value=np.nan)),
+            index=vols.index,
+        )
+        valid_vols = vols.loc[finite_vol_mask]
+        if valid_vols.empty:
+            # Reject an unusable benchmark before the quantile helper derives all-NaN bin edges.
+            raise ValueError(
+                f"Volatility regime benchmark '{benchmark}' has no finite volatility "
+                f"observations for q={self.q}."
+            )
         if self.q > 0 and not valid_vols.empty:
             # Require every requested band to contain data before publishing its ID and color.
             quantile_classification, quantile_edges = cast(
@@ -795,7 +806,10 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             include_end_date=include_end_date
         )
 
-        sampled_returns_with_regime_id[self.REGIME_COLUMN] = classificator[hue_name]
+        # Pandas 2.x can stringify a missing categorical as ``"nan"``. Reapply the numerical
+        # validity mask so unavailable windows remain missing on every supported pandas version.
+        regime_ids = classificator[hue_name].where(finite_vol_mask, other=np.nan)
+        sampled_returns_with_regime_id[self.REGIME_COLUMN] = regime_ids
 
         # Publish data-derived labels through the shared metadata contract while preserving the
         # existing RGBA output returned by get_regime_colors().
