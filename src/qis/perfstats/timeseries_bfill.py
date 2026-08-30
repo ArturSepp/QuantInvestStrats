@@ -19,7 +19,6 @@ from typing import Optional, Union, List, Tuple, cast
 # qis
 import qis.utils.df_ops as dfo
 import qis.utils.np_ops as npo
-import qis.utils.struct_ops as sop
 import qis.perfstats.returns as ret
 import qis.models.linear.ewm as ewm
 from qis.utils.df_ops import df_ffill_negatives
@@ -347,31 +346,54 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
     """Append older history before newer data with newer values winning overlaps.
 
     Args:
-        df_newer: Newer Series or DataFrame. Rows are interpreted in increasing index order
-            without modifying the caller's object.
-        df_older: Older object of the same pandas type. Its DataFrame columns must be a subset of
-            the newer columns, and its rows are also interpreted in increasing index order.
+        df_newer: Newer Series or DataFrame. Its Series name or DataFrame columns, axis names,
+            column order, and declared dtypes define the result. Rows are interpreted in
+            increasing index order without modifying the caller's object. A zero-row object may
+            still declare the result, but a DataFrame must contain at least one column.
+        df_older: Older object of the same pandas type. A Series is interpreted under the newer
+            Series name. Nonempty DataFrame columns must be unique and a subset of the newer
+            columns; missing newer columns remain missing in the historical prefix. A zero-row or
+            zero-column older DataFrame is treated as unavailable. Rows are interpreted in
+            increasing index order without modifying the caller's object.
         numerical_check_columns: Columns for which to return mean absolute differences over the
-            aligned overlap. ``None`` skips the diagnostic.
+            aligned overlap. Labels must belong to the newer schema and their requested order is
+            preserved. ``None`` skips the diagnostic.
 
     Returns:
         A chronologically ordered appended object matching the input pandas type, plus the
         optional overlap-difference Series. Newer values take precedence on shared dates;
-        duplicate dates within a provider retain the last supplied observation.
+        duplicate dates within a provider retain the last supplied observation. An unavailable
+        provider returns an independently owned result under the newer declaration and no overlap
+        diagnostic.
 
     Raises:
-        ValueError: If the inputs have different pandas types or their converted columns cannot
-            be aligned.
+        ValueError: If the inputs have different pandas types, the newer DataFrame has no columns,
+            either DataFrame has duplicate columns, older columns fall outside the newer schema,
+            or a diagnostic label falls outside the newer schema.
     """
     is_series = False
+    series_name = None
     if isinstance(df_newer, pd.Series) and isinstance(df_older, pd.Series):
         is_series = True
+        series_name = df_newer.name
         df_newer = df_newer.to_frame()
+        # Series values are structurally compatible regardless of their provider-specific names.
         df_older = df_older.to_frame()
+        df_older.columns = df_newer.columns.copy()
     elif isinstance(df_newer, pd.DataFrame) and isinstance(df_older, pd.DataFrame):
         pass
     else:
         raise ValueError(f"{type(df_older)} not aligned with {type(df_newer)}")
+
+    # Validate provider declarations before endpoint access or pandas alignment can fail indirectly.
+    newer_index_name = df_newer.index.name
+    newer_columns_name = df_newer.columns.name
+    if len(df_newer.columns) == 0:
+        raise ValueError("df_newer must contain at least one column")
+    if not df_newer.columns.is_unique:
+        raise ValueError("df_newer columns must be unique")
+    if not df_older.columns.is_unique:
+        raise ValueError("df_older columns must be unique")
 
     # Row storage order carries no information; boundaries and overlap checks are chronological.
     if not df_newer.index.is_monotonic_increasing:
@@ -379,11 +401,35 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
     if not df_older.index.is_monotonic_increasing:
         df_older = df_older.sort_index(kind='stable')
 
-    sop.assert_list_subset(large_list=df_newer.columns.to_list(),
-                           list_sample=df_older.columns.to_list())
+    older_has_no_data = len(df_older.index) == 0 or len(df_older.columns) == 0
+    if not older_has_no_data:
+        missing_older_columns = [column for column in df_older.columns
+                                 if column not in df_newer.columns]
+        if missing_older_columns:
+            raise ValueError(f"df_older columns not found in df_newer: {missing_older_columns}")
+    if numerical_check_columns is not None:
+        missing_numerical_columns = [column for column in numerical_check_columns
+                                     if column not in df_newer.columns]
+        if missing_numerical_columns:
+            raise ValueError("numerical_check_columns not found in df_newer: "
+                             f"{missing_numerical_columns}")
 
-    if df_older.index[0] >= df_newer.index[0]:  # old index is older than new, no need to do anything
-        new_df = df_newer
+    # Start from an owned newer result, then align any usable older provider before splicing.
+    new_df = df_newer.copy()
+    diff = None
+    if not older_has_no_data:
+        df_older = df_older.reindex(columns=df_newer.columns)
+
+    if older_has_no_data:
+        pass
+    elif len(df_newer.index) == 0:
+        # Preserve newer-declared dtypes while filling them from the available older history.
+        new_df = df_newer.reindex(index=df_older.index)
+        new_df.update(df_older)
+        diff = None
+    # No append is needed when the older provider cannot extend the newer history backwards.
+    elif df_older.index[0] >= df_newer.index[0]:
+        new_df = df_newer.copy()
         diff = None
 
     elif df_older.index[-1] >= df_newer.index[0]:  # append
@@ -407,7 +453,11 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
     if new_df.index.is_unique is False:  # check if index is unique
         new_df = new_df.iloc[new_df.index.duplicated(keep='last')==False]
 
+    # Restore the newer provider's public metadata after concatenation and duplicate removal.
+    new_df.index.name = newer_index_name
+    new_df.columns.name = newer_columns_name
     if is_series:
-        new_df = new_df.iloc[:, 0]
+        new_df = new_df.iloc[:, 0].copy()
+        new_df.name = series_name
 
     return new_df, diff
