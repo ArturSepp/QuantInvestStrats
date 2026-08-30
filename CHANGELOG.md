@@ -7,11 +7,24 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.21.0] - 2026-08-30
+
+### Changed
+
+- Breaking: renamed the model-layer input `alpha_layer_nav` to `signal_layer_nav` on
+  `compute_model_layer_alpha_beta_attribution` and `ModelLayerNavs`, the regression row
+  `Alpha Layer` to `Signal Layer`, the components `Alpha Layer Return` and `Alpha Layer Alpha` to
+  `Signal Layer Return` and `Signal Layer Alpha`, and the feature-summary columns
+  `Alpha Layer Alpha*` to `Signal Layer Alpha*`. "Alpha" now names only the regression intercept
+  and its components. Docs page and example updated; numbers unchanged.
+
 ### Fixed
 
 - Aligned descriptive-table and legend t-statistics with the signed sample mean divided by its
   standard error, independently of volatility annualization, and made undefined legend samples
   warning-free.
+- Reordered the bottom row of the Brinson strategy-versus-benchmark factsheet so the
+  exposure-difference panel appears on the left and the selection-effect panel on the right.
 
 ## [5.20.0] - 2026-08-29
 
@@ -86,7 +99,7 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
-- Extended model-layer attribution with the standalone signal-layer return and an optional net
+- Extended model-layer attribution with the signal-layer return and an optional net
   full-model NAV whose exact log-return trading-cost drag reconciles gross and net performance.
 
 ### Fixed

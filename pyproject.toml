@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qis"
-version = "5.20.0"
+version = "5.21.0"
 description = "qis - performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python."
 readme = "README.md"
 license = "MIT"

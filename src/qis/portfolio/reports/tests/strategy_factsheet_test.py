@@ -288,7 +288,7 @@ def test_brinson_page_uses_requested_layout_titles_and_regime_backgrounds() -> N
         assert active_by_group.get_position().x0 > active_total.get_position().x0
         assert active_by_group.get_position().y0 > active_total.get_position().y0
         assert active_total.get_position().x0 < allocation.get_position().x0
-        assert selection.get_position().x0 < exposure.get_position().x0
+        assert exposure.get_position().x0 < selection.get_position().x0
         for ax in axes_by_title.values():
             assert ax.patches
     finally:

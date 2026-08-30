@@ -50,19 +50,23 @@ def test_model_layer_attribution_recovers_log_alpha_beta_and_reconstructs() -> N
         -0.12, 0.08, 0.03, -0.04, 0.11, -0.02, 0.05, 0.01,
     ])
     risk_returns = 0.002 + 0.80 * benchmark_returns
-    alpha_returns = 0.003 + 0.20 * benchmark_returns
+    signal_returns = 0.003 + 0.20 * benchmark_returns
     integration_returns = 0.001 - 0.10 * benchmark_returns
-    full_returns = risk_returns + alpha_returns + integration_returns
+    full_returns = risk_returns + signal_returns + integration_returns
     index = pd.date_range('2019-12-31', periods=9, freq='QE')
 
     result = compute_model_layer_alpha_beta_attribution(
         benchmark_nav=_nav_from_log_returns(benchmark_returns, index),
         risk_layer_nav=_nav_from_log_returns(risk_returns, index),
-        alpha_layer_nav=_nav_from_log_returns(alpha_returns, index),
+        signal_layer_nav=_nav_from_log_returns(signal_returns, index),
         full_model_nav=_nav_from_log_returns(full_returns, index),
     )
 
     assert isinstance(result, ModelLayerAlphaBetaAttribution)
+    assert (
+        'Alpha Layer' not in result.regression_table.index
+        and 'Alpha Layer Alpha' not in result.component_returns.columns
+    )
     np.testing.assert_allclose(
         result.periodic_returns['Full Model'].to_numpy(),
         full_returns,
@@ -82,7 +86,7 @@ def test_model_layer_attribution_recovers_log_alpha_beta_and_reconstructs() -> N
     bridge_columns = [
         'Systematic Return',
         'Risk Layer Alpha',
-        'Alpha Layer Alpha',
+        'Signal Layer Alpha',
         'Integration Alpha',
     ]
     pd.testing.assert_series_equal(
@@ -98,21 +102,21 @@ def test_model_layer_component_means_equal_ols_intercepts() -> None:
     """Residual component means match OLS intercepts without a production assertion."""
     benchmark_returns = np.array([-0.05, 0.02, 0.06, -0.01, 0.04, 0.03])
     risk_returns = 0.004 + 0.70 * benchmark_returns
-    alpha_returns = 0.002 + 0.30 * benchmark_returns
+    signal_returns = 0.002 + 0.30 * benchmark_returns
     integration_returns = -0.001 + 0.05 * benchmark_returns
-    full_returns = risk_returns + alpha_returns + integration_returns
+    full_returns = risk_returns + signal_returns + integration_returns
     index = pd.date_range('2020-12-31', periods=7, freq='QE')
 
     result = compute_model_layer_alpha_beta_attribution(
         benchmark_nav=_nav_from_log_returns(benchmark_returns, index),
         risk_layer_nav=_nav_from_log_returns(risk_returns, index),
-        alpha_layer_nav=_nav_from_log_returns(alpha_returns, index),
+        signal_layer_nav=_nav_from_log_returns(signal_returns, index),
         full_model_nav=_nav_from_log_returns(full_returns, index),
     )
 
     mapping = {
         'Risk Layer Alpha': 'Risk Layer',
-        'Alpha Layer Alpha': 'Alpha Layer',
+        'Signal Layer Alpha': 'Signal Layer',
         'Integration Alpha': 'Integration',
     }
     for component, regression_layer in mapping.items():
@@ -127,9 +131,9 @@ def test_optional_net_nav_adds_exact_cost_drag_and_net_reconstruction() -> None:
     """An optional net NAV extends the gross bridge by its realised trading-cost drag."""
     benchmark_returns = np.array([-0.05, 0.03, 0.06, -0.02, 0.04, 0.01])
     risk_returns = 0.003 + 0.75 * benchmark_returns
-    alpha_returns = 0.004 + 0.20 * benchmark_returns
+    signal_returns = 0.004 + 0.20 * benchmark_returns
     integration_returns = 0.001 - 0.05 * benchmark_returns
-    full_returns = risk_returns + alpha_returns + integration_returns
+    full_returns = risk_returns + signal_returns + integration_returns
     cost_drag = np.array([0.0002, 0.0004, 0.0001, 0.0003, 0.0005, 0.0002])
     net_returns = full_returns - cost_drag
     index = pd.date_range('2021-12-31', periods=7, freq='QE')
@@ -137,7 +141,7 @@ def test_optional_net_nav_adds_exact_cost_drag_and_net_reconstruction() -> None:
     result = compute_model_layer_alpha_beta_attribution(
         benchmark_nav=_nav_from_log_returns(benchmark_returns, index),
         risk_layer_nav=_nav_from_log_returns(risk_returns, index),
-        alpha_layer_nav=_nav_from_log_returns(alpha_returns, index),
+        signal_layer_nav=_nav_from_log_returns(signal_returns, index),
         full_model_nav=_nav_from_log_returns(full_returns, index),
         full_model_net_nav=_nav_from_log_returns(net_returns, index),
     )
@@ -150,7 +154,7 @@ def test_optional_net_nav_adds_exact_cost_drag_and_net_reconstruction() -> None:
     bridge_columns = [
         'Systematic Return',
         'Risk Layer Alpha',
-        'Alpha Layer Alpha',
+        'Signal Layer Alpha',
         'Integration Alpha',
         'Trading Cost Drag',
     ]
@@ -184,15 +188,15 @@ def test_monthly_alpha_intervals_use_hac3_and_annualise_the_bounds() -> None:
         0.0015, -0.0020, 0.0005, 0.0010, -0.0015, 0.0020,
     ])
     risk_returns = 0.002 + 0.82 * benchmark_returns + risk_noise
-    alpha_returns = 0.003 + 0.18 * benchmark_returns - 0.5 * risk_noise
+    signal_returns = 0.003 + 0.18 * benchmark_returns - 0.5 * risk_noise
     integration_returns = 0.001 - 0.07 * benchmark_returns + 0.25 * risk_noise
-    full_returns = risk_returns + alpha_returns + integration_returns
+    full_returns = risk_returns + signal_returns + integration_returns
     index = pd.date_range('2020-12-31', periods=25, freq='ME')
 
     result = compute_model_layer_alpha_beta_attribution(
         benchmark_nav=_nav_from_log_returns(benchmark_returns, index),
         risk_layer_nav=_nav_from_log_returns(risk_returns, index),
-        alpha_layer_nav=_nav_from_log_returns(alpha_returns, index),
+        signal_layer_nav=_nav_from_log_returns(signal_returns, index),
         full_model_nav=_nav_from_log_returns(full_returns, index),
         freq='ME',
     )
@@ -220,15 +224,15 @@ def test_common_sample_trims_to_latest_start_and_earliest_end() -> None:
     navs = pd.DataFrame(
         np.vstack((np.ones(4), np.exp(np.cumsum(log_returns, axis=0)))),
         index=index,
-        columns=['Benchmark', 'Risk Layer', 'Alpha Layer', 'Full Model'],
+        columns=['Benchmark', 'Risk Layer', 'Signal Layer', 'Full Model'],
     )
     risk_nav = navs['Risk Layer'].where(navs.index >= pd.Timestamp('2005-03-15'))
-    alpha_nav = navs['Alpha Layer'].where(navs.index <= pd.Timestamp('2007-06-15'))
+    signal_nav = navs['Signal Layer'].where(navs.index <= pd.Timestamp('2007-06-15'))
 
     result = compute_model_layer_alpha_beta_attribution(
         benchmark_nav=navs['Benchmark'],
         risk_layer_nav=risk_nav,
-        alpha_layer_nav=alpha_nav,
+        signal_layer_nav=signal_nav,
         full_model_nav=navs['Full Model'],
         freq='ME',
     )
@@ -242,7 +246,7 @@ def test_common_sample_trims_to_latest_start_and_earliest_end() -> None:
         compute_model_layer_alpha_beta_attribution(
             benchmark_nav=navs['Benchmark'],
             risk_layer_nav=risk_nav,
-            alpha_layer_nav=pd.Series(np.nan, index=index),
+            signal_layer_nav=pd.Series(np.nan, index=index),
             full_model_nav=navs['Full Model'],
             freq='ME',
         )
@@ -263,14 +267,14 @@ def test_hac_lags_and_confidence_level_are_recorded_and_applied() -> None:
         0.0015, -0.0020, 0.0005, 0.0010, -0.0015, 0.0020,
     ])
     risk_returns = 0.002 + 0.82 * benchmark_returns + noise
-    alpha_returns = 0.003 + 0.18 * benchmark_returns - 0.5 * noise
+    signal_returns = 0.003 + 0.18 * benchmark_returns - 0.5 * noise
     integration_returns = 0.001 - 0.07 * benchmark_returns + 0.25 * noise
-    full_returns = risk_returns + alpha_returns + integration_returns
+    full_returns = risk_returns + signal_returns + integration_returns
     index = pd.date_range('2020-12-31', periods=25, freq='ME')
     kwargs = {
         'benchmark_nav': _nav_from_log_returns(benchmark_returns, index),
         'risk_layer_nav': _nav_from_log_returns(risk_returns, index),
-        'alpha_layer_nav': _nav_from_log_returns(alpha_returns, index),
+        'signal_layer_nav': _nav_from_log_returns(signal_returns, index),
         'full_model_nav': _nav_from_log_returns(full_returns, index),
         'freq': 'ME',
     }

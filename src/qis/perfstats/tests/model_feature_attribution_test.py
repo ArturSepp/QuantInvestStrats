@@ -28,22 +28,22 @@ def _two_feature_scenarios() -> dict[frozenset[str], ModelLayerNavs]:
     benchmark = _to_nav(benchmark_returns, index, 'Benchmark')
     base_returns = {
         'risk': 0.90 * benchmark_returns + 0.0005,
-        'alpha': 1.02 * benchmark_returns + 0.0010,
+        'signal': 1.02 * benchmark_returns + 0.0010,
         'full': 0.84 * benchmark_returns + 0.0018,
     }
     beta_effects = {
         'risk': 0.0002 + 0.0004 * np.cos(x / 9.0),
-        'alpha': 0.0001 + 0.0002 * np.sin(x / 7.0),
+        'signal': 0.0001 + 0.0002 * np.sin(x / 7.0),
         'full': 0.0003 + 0.0003 * np.cos(x / 10.0),
     }
     signal_effects = {
         'risk': np.zeros_like(x),
-        'alpha': 0.0004 + 0.0005 * np.cos(x / 6.0),
+        'signal': 0.0004 + 0.0005 * np.cos(x / 6.0),
         'full': 0.0005 + 0.0004 * np.sin(x / 11.0),
     }
     interaction_effects = {
         'risk': np.zeros_like(x),
-        'alpha': 0.0001 * np.sin(x / 5.0),
+        'signal': 0.0001 * np.sin(x / 5.0),
         'full': 0.0002 * np.cos(x / 12.0),
     }
 
@@ -55,7 +55,7 @@ def _two_feature_scenarios() -> dict[frozenset[str], ModelLayerNavs]:
             frozenset({'beta_span', 'signal_span'}),
     ):
         layer_returns = {}
-        for layer in ('risk', 'alpha', 'full'):
+        for layer in ('risk', 'signal', 'full'):
             values = base_returns[layer].copy()
             if 'beta_span' in coalition:
                 values = values + beta_effects[layer]
@@ -68,7 +68,7 @@ def _two_feature_scenarios() -> dict[frozenset[str], ModelLayerNavs]:
         scenarios[coalition] = ModelLayerNavs(
             benchmark_nav=benchmark,
             risk_layer_nav=_to_nav(layer_returns['risk'], index, f'{label} Risk'),
-            alpha_layer_nav=_to_nav(layer_returns['alpha'], index, f'{label} Alpha'),
+            signal_layer_nav=_to_nav(layer_returns['signal'], index, f'{label} Signal'),
             full_model_nav=_to_nav(layer_returns['full'], index, f'{label} Full'),
             full_model_net_nav=_to_nav(
                 layer_returns['full'] - 0.00005,
@@ -113,7 +113,7 @@ def test_two_feature_shapley_paths_and_factorial_effects_reconstruct_joint() -> 
     }
     for layer_field in (
             'risk_layer_nav',
-            'alpha_layer_nav',
+            'signal_layer_nav',
             'full_model_nav',
             'full_model_net_nav',
     ):
@@ -175,7 +175,7 @@ def test_feature_summary_exposes_midpoint_hac_intervals_and_layer_bridge() -> No
             'Annualised Full Model Return',
             'Annualised Full Model Net Return',
             'Risk Layer Alpha',
-            'Alpha Layer Alpha',
+            'Signal Layer Alpha',
             'Integration Alpha',
             'Full Model Alpha',
             'Full Model Net Alpha',
@@ -192,7 +192,7 @@ def test_feature_summary_exposes_midpoint_hac_intervals_and_layer_bridge() -> No
     np.testing.assert_allclose(
         shapley_summary['Full Model Alpha'],
         shapley_summary[
-            ['Risk Layer Alpha', 'Alpha Layer Alpha', 'Integration Alpha']
+            ['Risk Layer Alpha', 'Signal Layer Alpha', 'Integration Alpha']
         ].sum(axis=1),
         atol=1.0e-12,
         rtol=0.0,
@@ -218,13 +218,13 @@ def test_three_feature_shapley_engine_accepts_complete_power_set() -> None:
             triple_effect = 0.00005 if len(coalition) == 3 else 0.0
             effect = singleton_effect + pair_effect + triple_effect * np.cos(x / 5.0)
             risk_returns = 0.80 * benchmark_returns + 0.0004 + 0.3 * effect
-            alpha_returns = 0.25 * benchmark_returns + 0.0006 + 0.4 * effect
+            signal_returns = 0.25 * benchmark_returns + 0.0006 + 0.4 * effect
             full_returns = 0.92 * benchmark_returns + 0.0012 + effect
             label = '+'.join(enabled) or 'production'
             scenarios[coalition] = ModelLayerNavs(
                 benchmark_nav=benchmark,
                 risk_layer_nav=_to_nav(risk_returns, index, f'{label} Risk'),
-                alpha_layer_nav=_to_nav(alpha_returns, index, f'{label} Alpha'),
+                signal_layer_nav=_to_nav(signal_returns, index, f'{label} Signal'),
                 full_model_nav=_to_nav(full_returns, index, f'{label} Full'),
             )
 
@@ -252,7 +252,7 @@ def test_feature_experiment_validation_rejects_incomplete_and_changed_benchmark(
             * np.exp(np.linspace(0.0, 0.01, len(layer_navs.benchmark_nav.index)))
         ),
         risk_layer_nav=layer_navs.risk_layer_nav,
-        alpha_layer_nav=layer_navs.alpha_layer_nav,
+        signal_layer_nav=layer_navs.signal_layer_nav,
         full_model_nav=layer_navs.full_model_nav,
         full_model_net_nav=layer_navs.full_model_net_nav,
     )

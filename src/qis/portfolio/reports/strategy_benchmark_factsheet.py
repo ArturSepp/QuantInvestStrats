@@ -295,7 +295,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
             gs = fig1.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)
             axs = [fig1.add_subplot(gs[0, 0]), fig1.add_subplot(gs[1, 0]),
                    fig1.add_subplot(gs[0, 1]), fig1.add_subplot(gs[1, 1]),
-                   fig1.add_subplot(gs[2, 0])]
+                   fig1.add_subplot(gs[2, 1])]
             multi_portfolio_data.plot_brinson_attribution(strategy_idx=strategy_idx,
                                                           benchmark_idx=benchmark_idx,
                                                           freq=None,
@@ -311,7 +311,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                     index=brinson_index,
                     regime_classifier=regime_classifier)
         # add exposure diff
-        multi_portfolio_data.plot_exposures_diff(ax=fig1.add_subplot(gs[2, 1]),
+        multi_portfolio_data.plot_exposures_diff(ax=fig1.add_subplot(gs[2, 0]),
                                                  regime_benchmark=regime_benchmark,
                                                  regime_classifier=regime_classifier,
                                                  **kwargs)

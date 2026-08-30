@@ -2,7 +2,7 @@
 
 The caller supplies one :class:`ModelLayerNavs` bundle for every coalition of model features,
 including the empty production coalition. QIS aligns all scenarios on one common sample and
-requires their benchmark paths to be identical. For every risk, alpha, full-model and optional
+requires their benchmark paths to be identical. For every risk, signal, full-model and optional
 net-model layer, factorial effects are constructed as Harsanyi dividends and order-independent
 feature effects are constructed with the exact Shapley weights.
 
@@ -46,7 +46,7 @@ from qis.utils.regression import estimate_hac_mean
 MODEL_FEATURE_IDENTITY_TOLERANCE: float = 1.0e-10
 _LAYER_FIELDS: tuple[str, ...] = (
     'risk_layer_nav',
-    'alpha_layer_nav',
+    'signal_layer_nav',
     'full_model_nav',
 )
 
@@ -58,14 +58,14 @@ class ModelLayerNavs:
     Attributes:
         benchmark_nav: Benchmark NAV or price index, identical across feature coalitions.
         risk_layer_nav: NAV produced by the standalone risk layer.
-        alpha_layer_nav: NAV produced by the standalone alpha or signal layer.
+        signal_layer_nav: NAV produced by the signal layer.
         full_model_nav: NAV produced by the fully integrated model.
         full_model_net_nav: Optional fully integrated model NAV after trading costs.
     """
 
     benchmark_nav: pd.Series
     risk_layer_nav: pd.Series
-    alpha_layer_nav: pd.Series
+    signal_layer_nav: pd.Series
     full_model_nav: pd.Series
     full_model_net_nav: pd.Series | None = None
 
@@ -200,7 +200,7 @@ def _align_scenario_layer_navs(
         aligned[coalition] = ModelLayerNavs(
             benchmark_nav=benchmark.rename('Benchmark'),
             risk_layer_nav=common[(coalition, 'risk_layer_nav')].rename(f'{label} Risk'),
-            alpha_layer_nav=common[(coalition, 'alpha_layer_nav')].rename(f'{label} Alpha'),
+            signal_layer_nav=common[(coalition, 'signal_layer_nav')].rename(f'{label} Signal'),
             full_model_nav=common[(coalition, 'full_model_nav')].rename(f'{label} Full'),
             full_model_net_nav=(
                 common[(coalition, 'full_model_net_nav')].rename(f'{label} Full Net')
@@ -233,7 +233,7 @@ def _combine_layer_navs(
     return ModelLayerNavs(
         benchmark_nav=benchmark,
         risk_layer_nav=combine('risk_layer_nav'),
-        alpha_layer_nav=combine('alpha_layer_nav'),
+        signal_layer_nav=combine('signal_layer_nav'),
         full_model_nav=combine('full_model_nav'),
         full_model_net_nav=combine('full_model_net_nav'),
     )
@@ -284,7 +284,7 @@ def _compute_layer_attribution(
     return compute_model_layer_alpha_beta_attribution(
         benchmark_nav=layer_navs.benchmark_nav,
         risk_layer_nav=layer_navs.risk_layer_nav,
-        alpha_layer_nav=layer_navs.alpha_layer_nav,
+        signal_layer_nav=layer_navs.signal_layer_nav,
         full_model_nav=layer_navs.full_model_nav,
         full_model_net_nav=layer_navs.full_model_net_nav,
         freq=freq,
@@ -351,7 +351,7 @@ def _attribution_summary(
             row[f'{prefix} CI High'] = ci_high
         for layer in (
                 'Risk Layer',
-                'Alpha Layer',
+                'Signal Layer',
                 'Integration',
                 'Full Model',
                 'Full Model Net',
@@ -434,7 +434,7 @@ def _identity_errors(
         checks[f'{name} QIS alpha bridge'] = abs(
             float(table.loc['Full Model', annualised_alpha])
             - float(table.loc[
-                ['Risk Layer', 'Alpha Layer', 'Integration'], annualised_alpha
+                ['Risk Layer', 'Signal Layer', 'Integration'], annualised_alpha
             ].sum())
         )
 

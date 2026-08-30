@@ -1,16 +1,17 @@
 """Illustrate model-layer attribution on a simulated four-layer model, offline and seeded.
 
 The simulation builds monthly log returns for a benchmark ``B``, a risk layer ``R`` (beta 1.05,
-alpha 1% per year), a standalone signal sleeve ``A`` (beta 1.00, alpha 3% per year), and a full
-model ``F`` that runs at beta 0.85, keeps all of the risk-layer alpha and 60% of the signal alpha,
-and carries its own residual. A net NAV subtracts a proportional trading cost. Residuals are AR(1)
-so that the Bartlett HAC intervals differ from OLS intervals.
+alpha 1% per year), a signal layer ``S`` (beta 1.00, alpha 3% per year), and a full
+model ``F`` that runs at beta 0.85, keeps all of the risk-layer alpha and 60% of the signal-layer
+alpha, and carries its own residual. A net NAV subtracts a proportional trading cost. Residuals
+are AR(1) so that the Bartlett HAC intervals differ from OLS intervals.
 
 The example prints the regression table and the annualised components, checks the three
 identities of the method (linearity of the integration coefficients, bar heights equal to OLS
-alphas, invariance of alphas and intervals to an excess-return definition of the sleeve), reports
-how the interval half-widths move when the lag count follows the Newey-West rule instead of the
-default three, and draws the return bridge with 95% HAC(3) whiskers on the three alpha bars.
+alphas, invariance of alphas and intervals to an excess-return definition of the signal layer),
+reports how the interval half-widths move when the lag count follows the Newey-West rule
+instead of the default three, and draws the return bridge with 95% HAC(3) whiskers on the three
+alpha bars.
 
 Run from the repository root: ``python -m examples.perfstats.model_layer_attribution_simulated``.
 """
@@ -65,10 +66,10 @@ def simulate_layer_navs(seed: int = SEED) -> dict[str, pd.Series]:
     signal_residual = simulate_ar1(n_periods, RESIDUAL_AR1, SIGNAL_RESIDUAL_VOL * monthly_vol, rng)
     full_residual = simulate_ar1(n_periods, RESIDUAL_AR1, FULL_RESIDUAL_VOL * monthly_vol, rng)
     r_r = RISK_ALPHA / PERIODS_PER_YEAR + RISK_BETA * r_b + risk_residual
-    r_a = SIGNAL_ALPHA / PERIODS_PER_YEAR + SIGNAL_BETA * r_b + signal_residual
+    r_s = SIGNAL_ALPHA / PERIODS_PER_YEAR + SIGNAL_BETA * r_b + signal_residual
     r_f = (FULL_BETA * r_b
            + FULL_RISK_SHARE * (r_r - RISK_BETA * r_b)
-           + FULL_SIGNAL_SHARE * (r_a - SIGNAL_BETA * r_b)
+           + FULL_SIGNAL_SHARE * (r_s - SIGNAL_BETA * r_b)
            + full_residual)
     r_f_net = r_f - TRADING_COST / PERIODS_PER_YEAR
 
@@ -81,7 +82,7 @@ def simulate_layer_navs(seed: int = SEED) -> dict[str, pd.Series]:
 
     return dict(benchmark_nav=to_nav(r_b, 'Benchmark'),
                 risk_layer_nav=to_nav(r_r, 'Risk Layer'),
-                alpha_layer_nav=to_nav(r_a, 'Alpha Layer'),
+                signal_layer_nav=to_nav(r_s, 'Signal Layer'),
                 full_model_nav=to_nav(r_f, 'Full Model'),
                 full_model_net_nav=to_nav(r_f_net, 'Full Model Net'))
 
@@ -96,22 +97,22 @@ def check_identities(attribution: qis.ModelLayerAlphaBetaAttribution,
     linearity_beta = table.loc['Integration', beta] - (
         table.loc['Full Model', beta]
         - table.loc['Risk Layer', beta]
-        - table.loc['Alpha Layer', beta]
+        - table.loc['Signal Layer', beta]
     )
     linearity_alpha = table.loc['Integration', alpha] - (
         table.loc['Full Model', alpha]
         - table.loc['Risk Layer', alpha]
-        - table.loc['Alpha Layer', alpha]
+        - table.loc['Signal Layer', alpha]
     )
     bars = attribution.annualised_components
     bar_heights = max(abs(bars['Risk Layer Alpha'] - table.loc['Risk Layer', an_alpha]),
-                      abs(bars['Alpha Layer Alpha'] - table.loc['Alpha Layer', an_alpha]),
+                      abs(bars['Signal Layer Alpha'] - table.loc['Signal Layer', an_alpha]),
                       abs(bars['Integration Alpha'] - table.loc['Integration', an_alpha]))
-    # excess basis: the sleeve NAV divided by the benchmark NAV has log return r_A - r_B
+    # excess basis: the signal-layer NAV divided by the benchmark NAV has log return r_S - r_B
     excess_navs = dict(navs)
-    excess_navs['alpha_layer_nav'] = (
-        navs['alpha_layer_nav'] / navs['benchmark_nav']
-    ).rename('Alpha Layer')
+    excess_navs['signal_layer_nav'] = (
+        navs['signal_layer_nav'] / navs['benchmark_nav']
+    ).rename('Signal Layer')
     excess = qis.compute_model_layer_alpha_beta_attribution(
         freq=FREQ, **excess_navs
     ).regression_table
@@ -124,16 +125,19 @@ def check_identities(attribution: qis.ModelLayerAlphaBetaAttribution,
         qis.PerfStat.ALPHA_PVALUE.to_str(),
     ]
     invariance = np.abs(excess[invariant_columns] - table[invariant_columns]).max().max()
-    beta_shift_sleeve = excess.loc['Alpha Layer', beta] - table.loc['Alpha Layer', beta]
+    beta_shift_signal_layer = excess.loc['Signal Layer', beta] - table.loc['Signal Layer', beta]
     beta_shift_integration = excess.loc['Integration', beta] - table.loc['Integration', beta]
     print(f'linearity: beta residual {linearity_beta:.1e}, alpha residual {linearity_alpha:.1e}')
     print(f'bar heights minus annualised OLS alphas: {bar_heights:.1e}')
-    print(f'excess basis: max change in alphas, SEs, CIs, p-values {invariance:.1e}; '
-          f'beta shifts sleeve {beta_shift_sleeve:+.6f}, integration {beta_shift_integration:+.6f}')
+    print(
+        f'excess basis: max change in alphas, SEs, CIs, p-values {invariance:.1e}; '
+        f'beta shifts signal layer {beta_shift_signal_layer:+.6f}, '
+        f'integration {beta_shift_integration:+.6f}'
+    )
     assert abs(linearity_beta) < 1e-12 and abs(linearity_alpha) < 1e-12
     assert bar_heights < 1e-12
     assert invariance < 1e-10
-    assert abs(beta_shift_sleeve + 1.0) < 1e-10
+    assert abs(beta_shift_signal_layer + 1.0) < 1e-10
     assert abs(beta_shift_integration - 1.0) < 1e-10
 
 
@@ -144,7 +148,7 @@ def report_lag_rule_half_widths(attribution: qis.ModelLayerAlphaBetaAttribution,
     n_obs = len(attribution.periodic_returns)
     rule_lags = newey_west_lag_rule(nobs=n_obs)
     rule = qis.compute_model_layer_alpha_beta_attribution(freq=FREQ, hac_lags=rule_lags, **navs)
-    layers = ['Risk Layer', 'Alpha Layer', 'Integration', 'Full Model']
+    layers = ['Risk Layer', 'Signal Layer', 'Integration', 'Full Model']
     default_table = attribution.regression_table.loc[layers]
     rule_table = rule.regression_table.loc[layers]
     half_widths = pd.DataFrame(
@@ -192,9 +196,9 @@ def plot_return_bridge(attribution: qis.ModelLayerAlphaBetaAttribution,
             True,
         ),
         (
-            f'+ Signal\nalpha\nbeta = {table.loc["Alpha Layer", beta]:.2f}',
-            values['Alpha Layer Alpha'],
-            'Alpha Layer',
+            f'+ Signal-layer\nalpha\nbeta = {table.loc["Signal Layer", beta]:.2f}',
+            values['Signal Layer Alpha'],
+            'Signal Layer',
             True,
         ),
         (

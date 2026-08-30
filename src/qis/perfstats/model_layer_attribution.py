@@ -1,7 +1,7 @@
 """Full-sample alpha/beta attribution for layered portfolio models.
 
-The methodology starts from benchmark, standalone risk-layer, standalone alpha-layer and fully
-integrated model NAVs. An optional net full-model NAV may be supplied to measure realised trading
+The methodology starts from benchmark, risk-layer, signal-layer and fully integrated model NAVs.
+An optional net full-model NAV may be supplied to measure realised trading
 cost drag. All NAVs are trimmed to the range between the latest first valid observation and the
 earliest last valid observation, forward-filled inside that range, and converted at ``freq`` to
 log returns, ``r[t] = log(NAV[t] / NAV[t-1])``. Log returns are required because their additive
@@ -18,11 +18,11 @@ calculation lives in ``qis.utils.regression``; this module only assigns ``PerfSt
 The result records the return frequency, HAC lag count and confidence level used in estimation.
 
 The gross full-model return is separated into four exact periodic components: systematic return is
-``beta_F * r_B``; risk-layer alpha is ``r_R - beta_R * r_B``; standalone signal alpha is
-``r_A - beta_A * r_B``; and integration alpha is the residual required to reconcile these three
+``beta_F * r_B``; risk-layer alpha is ``r_R - beta_R * r_B``; signal-layer alpha is
+``r_S - beta_S * r_B``; and integration alpha is the residual required to reconcile these three
 terms to ``r_F``. Thus integration measures what the constrained full model adds beyond simply
-combining the standalone risk and signal effects. If a net NAV is supplied, trading-cost drag is
-the exact log-return difference ``r_F_net - r_F`` and extends the same identity to net performance.
+combining the risk- and signal-layer effects. If a net NAV is supplied, trading-cost drag is the
+exact log-return difference ``r_F_net - r_F`` and extends the same identity to net performance.
 All generated component returns are checked for finiteness before the result is returned.
 
 This is an ex-post explanatory analysis, not a point-in-time estimator and not an input to the
@@ -57,9 +57,9 @@ class ModelLayerAlphaBetaAttribution:
         regression_table: Full-sample OLS statistics for each layer, integration, and optional net
             model, including annualised Bartlett HAC alpha confidence bounds.
         component_returns: Exact periodic log-return decomposition in this order: Benchmark Return,
-            Risk Layer Return, Alpha Layer Return, Systematic Return, Risk Layer Alpha, Alpha Layer
-            Alpha, Integration Alpha, Full Model Return, then Trading Cost Drag and Full Model Net
-            Return when a net NAV is supplied.
+            Risk Layer Return, Signal Layer Return, Systematic Return, Risk Layer Alpha, Signal
+            Layer Alpha, Integration Alpha, Full Model Return, then Trading Cost Drag and Full
+            Model Net Return when a net NAV is supplied.
         annualised_components: Annualised mean log-return contributions.
         freq: Regression and return frequency.
         hac_lags: Bartlett-kernel lag count used for alpha inference.
@@ -78,7 +78,7 @@ class ModelLayerAlphaBetaAttribution:
 def compute_model_layer_alpha_beta_attribution(
         benchmark_nav: pd.Series,
         risk_layer_nav: pd.Series,
-        alpha_layer_nav: pd.Series,
+        signal_layer_nav: pd.Series,
         full_model_nav: pd.Series,
         freq: str = 'QE',
         full_model_net_nav: Optional[pd.Series] = None,
@@ -88,8 +88,8 @@ def compute_model_layer_alpha_beta_attribution(
     """Compute a full-sample OLS decomposition of model-layer log returns.
 
     Each observed layer is regressed on the benchmark. The full-model log return is then
-    decomposed into its systematic return, risk-layer alpha, alpha-layer alpha and integration
-    alpha. The integration term captures the non-additivity of the two standalone layers relative
+    decomposed into its systematic return, risk-layer alpha, signal-layer alpha and integration
+    alpha. The integration term captures the non-additivity of the risk and signal layers relative
     to the fully constrained model. The four gross contributions reconstruct the full-model log
     return in every observation. When ``full_model_net_nav`` is supplied, trading-cost drag is the
     exact log-return difference between the net and gross full models and extends the bridge to the
@@ -103,7 +103,7 @@ def compute_model_layer_alpha_beta_attribution(
     Args:
         benchmark_nav: Benchmark NAV or price index.
         risk_layer_nav: NAV produced using the risk layer without alpha signals.
-        alpha_layer_nav: NAV of the standalone alpha or signal portfolio.
+        signal_layer_nav: NAV of the portfolio built from the signals alone.
         full_model_nav: NAV of the fully integrated model.
         freq: Regression and return frequency. Defaults to quarter-end.
         full_model_net_nav: Optional NAV of the same fully integrated model after trading costs.
@@ -128,7 +128,7 @@ def compute_model_layer_alpha_beta_attribution(
     nav_series = {
         'Benchmark': benchmark_nav,
         'Risk Layer': risk_layer_nav,
-        'Alpha Layer': alpha_layer_nav,
+        'Signal Layer': signal_layer_nav,
         'Full Model': full_model_nav,
     }
     if full_model_net_nav is not None:
@@ -169,7 +169,7 @@ def compute_model_layer_alpha_beta_attribution(
         (
             periodic_returns['Full Model']
             - periodic_returns['Risk Layer']
-            - periodic_returns['Alpha Layer']
+            - periodic_returns['Signal Layer']
         ),
     )
 
@@ -192,7 +192,7 @@ def compute_model_layer_alpha_beta_attribution(
         }
     }
     benchmark_returns = layer_returns['Benchmark']
-    regression_layers = ['Risk Layer', 'Alpha Layer', 'Integration', 'Full Model']
+    regression_layers = ['Risk Layer', 'Signal Layer', 'Integration', 'Full Model']
     if full_model_net_nav is not None:
         regression_layers.append('Full Model Net')
     for layer in regression_layers:
@@ -225,19 +225,19 @@ def compute_model_layer_alpha_beta_attribution(
     component_returns = pd.DataFrame({
         'Benchmark Return': benchmark_returns,
         'Risk Layer Return': layer_returns['Risk Layer'],
-        'Alpha Layer Return': layer_returns['Alpha Layer'],
+        'Signal Layer Return': layer_returns['Signal Layer'],
         'Systematic Return': betas['Full Model'] * benchmark_returns,
         'Risk Layer Alpha': (
             layer_returns['Risk Layer'] - betas['Risk Layer'] * benchmark_returns
         ),
-        'Alpha Layer Alpha': (
-            layer_returns['Alpha Layer'] - betas['Alpha Layer'] * benchmark_returns
+        'Signal Layer Alpha': (
+            layer_returns['Signal Layer'] - betas['Signal Layer'] * benchmark_returns
         ),
     })
     initial_bridge_columns = [
         'Systematic Return',
         'Risk Layer Alpha',
-        'Alpha Layer Alpha',
+        'Signal Layer Alpha',
     ]
     component_returns['Integration Alpha'] = (
         layer_returns['Full Model']
