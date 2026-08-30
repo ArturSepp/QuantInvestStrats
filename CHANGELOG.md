@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.21.2] - 2026-08-31
+
+### Added
+
+- Added point-in-time model-layer attribution with lagged EWMA betas, an explicit beta prior,
+  expanding annualised realised alpha, and post-warm-up additive cumulative-alpha paths.
+
 ### Fixed
 
 - Preserved defined descriptive statistics for finite constant columns while returning undefined

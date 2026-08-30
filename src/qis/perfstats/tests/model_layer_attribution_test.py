@@ -1,12 +1,22 @@
-"""Tests for full-sample model-layer log-return attribution."""
+"""Tests for full-sample and rolling model-layer log-return attribution."""
+
+from dataclasses import replace
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 from scipy.stats import norm
 
+import qis.perfstats.model_layer_attribution as model_layer
+from qis.models.linear.ewm import MeanAdjType
 from qis.perfstats.model_layer_attribution import (
     ModelLayerAlphaBetaAttribution,
+    ModelLayerCumulativeAlphaAttribution,
+    ModelLayerEwmaAlphaAttribution,
     compute_model_layer_alpha_beta_attribution,
+    compute_model_layer_cumulative_alpha_after_warmup,
+    compute_model_layer_ewma_alpha_attribution,
 )
 
 
@@ -305,3 +315,385 @@ def test_hac_lags_and_confidence_level_are_recorded_and_applied() -> None:
     assert custom_result.freq == 'ME'
     assert custom_result.hac_lags == 5
     assert custom_result.confidence_level == 0.90
+
+
+def _rolling_layer_returns() -> pd.DataFrame:
+    """Return a non-degenerate synthetic monthly model-layer panel."""
+    index = pd.date_range('2024-01-31', periods=16, freq='ME')
+    benchmark = pd.Series(
+        [
+            0.020, -0.010, 0.030, -0.020, 0.010, 0.025, -0.015, 0.018,
+            0.006, -0.012, 0.021, 0.014, -0.009, 0.017, 0.004, -0.006,
+        ],
+        index=index,
+    )
+    return pd.DataFrame({
+        'Benchmark': benchmark,
+        'Risk Layer': 0.90 * benchmark + pd.Series(
+            [
+                0.002, 0.001, -0.001, 0.002, 0.001, 0.003, -0.001, 0.002,
+                0.000, 0.002, 0.001, -0.001, 0.003, 0.001, 0.002, -0.001,
+            ],
+            index=index,
+        ),
+        'Signal Layer': 1.10 * benchmark + pd.Series(
+            [
+                0.004, -0.002, 0.003, 0.001, -0.001, 0.004, 0.002, 0.003,
+                -0.002, 0.001, 0.003, 0.002, -0.001, 0.004, 0.001, 0.002,
+            ],
+            index=index,
+        ),
+        'Full Model': 0.95 * benchmark + pd.Series(
+            [
+                0.006, -0.001, 0.005, 0.002, -0.002, 0.007, 0.001, 0.005,
+                -0.001, 0.003, 0.004, 0.001, -0.002, 0.006, 0.002, 0.003,
+            ],
+            index=index,
+        ),
+    })
+
+
+def _rolling_navs(returns: pd.DataFrame) -> dict[str, pd.Series]:
+    """Convert the synthetic rolling return panel to named NAV inputs."""
+    nav_index = pd.date_range(
+        returns.index[0] - pd.offsets.MonthEnd(1),
+        periods=len(returns.index) + 1,
+        freq='ME',
+    )
+    return {
+        'benchmark_nav': _nav_from_log_returns(returns['Benchmark'].to_numpy(), nav_index),
+        'risk_layer_nav': _nav_from_log_returns(returns['Risk Layer'].to_numpy(), nav_index),
+        'signal_layer_nav': _nav_from_log_returns(
+            returns['Signal Layer'].to_numpy(), nav_index
+        ),
+        'full_model_nav': _nav_from_log_returns(returns['Full Model'].to_numpy(), nav_index),
+    }
+
+
+def _manual_ewma_beta(
+        benchmark: np.ndarray,
+        layer: np.ndarray,
+        span: int,
+        beta_init_value: float,
+) -> np.ndarray:
+    """Compute the EWMA-mean-adjusted seeded beta by scalar recursion."""
+    decay = 1.0 - 2.0 / (span + 1.0)
+    benchmark_mean = np.empty_like(benchmark, dtype=float)
+    layer_mean = np.empty_like(layer, dtype=float)
+    benchmark_mean[0] = benchmark[0]
+    layer_mean[0] = layer[0]
+    for index in range(1, len(benchmark)):
+        benchmark_mean[index] = (
+            decay * benchmark_mean[index - 1] + (1.0 - decay) * benchmark[index]
+        )
+        layer_mean[index] = decay * layer_mean[index - 1] + (1.0 - decay) * layer[index]
+    benchmark_centered = benchmark - benchmark_mean
+    layer_centered = layer - layer_mean
+    first = int(np.flatnonzero(~np.isclose(benchmark_centered, 0.0))[0])
+    beta = np.full_like(benchmark, np.nan, dtype=float)
+    variance = benchmark_centered[first] ** 2
+    covariance = beta_init_value * variance
+    beta[first] = beta_init_value
+    for index in range(first + 1, len(benchmark)):
+        variance = (
+            decay * variance + (1.0 - decay) * benchmark_centered[index] ** 2
+        )
+        covariance = decay * covariance + (
+            (1.0 - decay) * benchmark_centered[index] * layer_centered[index]
+        )
+        beta[index] = covariance / variance
+    return beta
+
+
+def test_rolling_ewma_betas_match_independent_recursion_and_are_lagged() -> None:
+    """EWMA-mean-adjusted betas use X0 seeding, a prior, and point-in-time application."""
+    returns = _rolling_layer_returns()
+    span = 4
+    prior = 1.0
+    result = compute_model_layer_ewma_alpha_attribution(
+        **_rolling_navs(returns),
+        freq='ME',
+        beta_span=span,
+        beta_lag=1,
+        beta_init_value=prior,
+    )
+
+    expected_estimated = pd.DataFrame(
+        {
+            layer: _manual_ewma_beta(
+                benchmark=returns['Benchmark'].to_numpy(),
+                layer=returns[layer].to_numpy(),
+                span=span,
+                beta_init_value=prior,
+            )
+            for layer in ('Risk Layer', 'Signal Layer', 'Full Model')
+        },
+        index=returns.index,
+    )
+    expected_applied = expected_estimated.shift(1).fillna(prior)
+
+    assert isinstance(result, ModelLayerEwmaAlphaAttribution)
+    assert result.mean_adj_type is MeanAdjType.EWMA
+    assert result.beta_span == span
+    assert result.beta_lag == 1
+    assert result.beta_init_value == prior
+    pd.testing.assert_frame_equal(result.estimated_betas, expected_estimated, check_freq=False)
+    pd.testing.assert_frame_equal(result.applied_betas, expected_applied, check_freq=False)
+    assert result.estimated_betas.iloc[0].isna().all()
+    assert np.isfinite(result.applied_betas.to_numpy()).all()
+
+
+def test_rolling_alpha_is_step_ahead_and_reconstructs_every_return() -> None:
+    """A return updates only the next applied beta and all alpha identities hold exactly."""
+    returns = _rolling_layer_returns()
+    shocked = returns.copy()
+    shocked.iloc[-1, shocked.columns.get_loc('Full Model')] += 0.20
+    baseline = compute_model_layer_ewma_alpha_attribution(
+        **_rolling_navs(returns), freq='ME', beta_span=4
+    )
+    changed = compute_model_layer_ewma_alpha_attribution(
+        **_rolling_navs(shocked), freq='ME', beta_span=4
+    )
+
+    pd.testing.assert_series_equal(
+        baseline.applied_betas.iloc[-1], changed.applied_betas.iloc[-1]
+    )
+    assert not np.isclose(
+        baseline.estimated_betas.iloc[-1]['Full Model'],
+        changed.estimated_betas.iloc[-1]['Full Model'],
+    )
+    components = baseline.component_returns
+    np.testing.assert_allclose(
+        components['Full Model Return'],
+        components['Systematic Return']
+        + components['Risk Layer Alpha']
+        + components['Signal Layer Alpha']
+        + components['Integration Alpha'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(
+        components['Total Model Alpha'],
+        components['Risk Layer Alpha']
+        + components['Signal Layer Alpha']
+        + components['Integration Alpha'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    expected_expanding = (
+        components[[
+            'Total Model Alpha',
+            'Risk Layer Alpha',
+            'Signal Layer Alpha',
+            'Integration Alpha',
+        ]]
+        .expanding(min_periods=1)
+        .mean()
+        .multiply(12.0)
+    )
+    pd.testing.assert_frame_equal(baseline.expanding_annualised_alpha, expected_expanding)
+
+
+def test_rolling_attribution_honours_a_two_period_beta_lag() -> None:
+    """A longer positive lag delays every estimated beta by the requested periods."""
+    result = compute_model_layer_ewma_alpha_attribution(
+        **_rolling_navs(_rolling_layer_returns()),
+        freq='ME',
+        beta_span=4,
+        beta_lag=2,
+        beta_init_value=0.8,
+    )
+
+    pd.testing.assert_frame_equal(
+        result.applied_betas,
+        result.estimated_betas.shift(2).fillna(0.8),
+    )
+    assert result.beta_lag == 2
+
+
+def test_cumulative_rolling_alpha_starts_after_warmup_with_base_date_beta() -> None:
+    """Post-warm-up cumulative alpha starts at zero and first uses the base-date estimate."""
+    attribution = compute_model_layer_ewma_alpha_attribution(
+        **_rolling_navs(_rolling_layer_returns()), freq='ME', beta_span=4
+    )
+    base_date = attribution.periodic_returns.index[11]
+    result = compute_model_layer_cumulative_alpha_after_warmup(
+        attribution=attribution,
+        base_date=base_date,
+        warmup_periods=12,
+    )
+    first_alpha_date = attribution.periodic_returns.index[12]
+    alpha_columns = [
+        'Total Model Alpha',
+        'Risk Layer Alpha',
+        'Signal Layer Alpha',
+        'Integration Alpha',
+    ]
+    expected_returns = attribution.component_returns.loc[first_alpha_date:, alpha_columns]
+    expected_cumulative = pd.concat([
+        pd.DataFrame(0.0, index=pd.DatetimeIndex([base_date]), columns=alpha_columns),
+        expected_returns.cumsum(),
+    ])
+
+    assert isinstance(result, ModelLayerCumulativeAlphaAttribution)
+    assert result.base_date == base_date
+    assert result.first_alpha_date == first_alpha_date
+    assert result.warmup_periods == 12
+    assert result.mean_adj_type is MeanAdjType.EWMA
+    pd.testing.assert_series_equal(
+        attribution.applied_betas.loc[first_alpha_date],
+        attribution.estimated_betas.loc[base_date],
+        check_names=False,
+    )
+    pd.testing.assert_frame_equal(result.alpha_returns, expected_returns)
+    pd.testing.assert_frame_equal(result.cumulative_alpha, expected_cumulative)
+
+
+def test_rolling_attribution_rejects_forward_looking_mean_adjustment() -> None:
+    """The point-in-time API rejects the full-sample mean convention."""
+    with np.testing.assert_raises_regex(ValueError, 'INSAMPLE'):
+        compute_model_layer_ewma_alpha_attribution(
+            **_rolling_navs(_rolling_layer_returns()),
+            freq='ME',
+            mean_adj_type=MeanAdjType.INSAMPLE,
+        )
+
+
+@pytest.mark.parametrize(
+    ('overrides', 'error_type', 'message'),
+    [
+        ({'beta_span': 0}, ValueError, 'beta_span'),
+        ({'beta_lag': True}, ValueError, 'beta_lag'),
+        ({'beta_init_value': np.inf}, ValueError, 'beta_init_value'),
+        ({'mean_adj_type': 'EWMA'}, TypeError, 'MeanAdjType'),
+    ],
+)
+def test_rolling_attribution_validates_estimator_settings(
+        overrides: dict[str, object],
+        error_type: type[Exception],
+        message: str,
+) -> None:
+    """Invalid spans, lags, priors and mean conventions fail before estimation."""
+    kwargs = {**_rolling_navs(_rolling_layer_returns()), 'freq': 'ME', **overrides}
+    with pytest.raises(error_type, match=message):
+        compute_model_layer_ewma_alpha_attribution(**kwargs)
+
+
+def test_rolling_attribution_validates_nav_samples() -> None:
+    """The rolling API rejects invalid indices, coverage, sample length and benchmark variance."""
+    returns = _rolling_layer_returns()
+    navs = _rolling_navs(returns)
+    invalid_index_navs = {
+        name: series.set_axis(pd.RangeIndex(len(series.index)))
+        for name, series in navs.items()
+    }
+    with pytest.raises(TypeError, match='DatetimeIndex'):
+        compute_model_layer_ewma_alpha_attribution(**invalid_index_navs)
+
+    all_missing_navs = navs.copy()
+    all_missing_navs['signal_layer_nav'] = pd.Series(np.nan, index=navs['signal_layer_nav'].index)
+    with pytest.raises(ValueError, match='all-missing'):
+        compute_model_layer_ewma_alpha_attribution(**all_missing_navs)
+
+    no_overlap_navs = navs.copy()
+    no_overlap_navs['full_model_nav'] = navs['full_model_nav'].set_axis(
+        navs['full_model_nav'].index + pd.DateOffset(years=10)
+    )
+    with pytest.raises(ValueError, match='no common valid sample'):
+        compute_model_layer_ewma_alpha_attribution(**no_overlap_navs)
+
+    short_navs = {name: series.iloc[:3] for name, series in navs.items()}
+    with pytest.raises(ValueError, match='at least three returns'):
+        compute_model_layer_ewma_alpha_attribution(**short_navs)
+
+    constant_returns = returns.copy()
+    constant_returns['Benchmark'] = 0.01
+    with pytest.raises(ValueError, match='varying benchmark'):
+        compute_model_layer_ewma_alpha_attribution(**_rolling_navs(constant_returns))
+
+
+def test_estimated_beta_validation_rejects_missing_and_broken_paths() -> None:
+    """Only leading NaNs before a finite beta path are accepted."""
+    with pytest.raises(RuntimeError, match='no finite value'):
+        model_layer._validate_estimated_betas(
+            pd.DataFrame({'Risk Layer': [np.nan, np.nan]})
+        )
+    with pytest.raises(RuntimeError, match='non-leading non-finite'):
+        model_layer._validate_estimated_betas(
+            pd.DataFrame({'Risk Layer': [np.inf, 1.0, np.nan]})
+        )
+
+
+def test_rolling_attribution_rejects_non_finite_components() -> None:
+    """Finite beta estimates that overflow the return bridge are rejected."""
+    returns = _rolling_layer_returns()
+    returns.iloc[2, returns.columns.get_loc('Benchmark')] = 2.0
+    index = returns.index
+    huge_betas = pd.DataFrame(
+        {
+            'Risk Layer': [np.nan] + [np.finfo(float).max] * (len(index) - 1),
+            'Signal Layer': [np.nan] + [np.finfo(float).max] * (len(index) - 1),
+            'Full Model': [np.nan] + [np.finfo(float).max] * (len(index) - 1),
+        },
+        index=index,
+    )
+    forecast = (huge_betas, None, None, None, None, None)
+    with (
+        patch.object(model_layer, 'compute_ewm_beta_alpha_forecast', return_value=forecast),
+        pytest.raises(RuntimeError, match='components contain non-finite'),
+        np.errstate(over='ignore', invalid='ignore'),
+    ):
+        compute_model_layer_ewma_alpha_attribution(
+            **_rolling_navs(returns), freq='ME', beta_span=4
+        )
+
+
+def test_cumulative_rolling_alpha_validates_dates_and_warmup() -> None:
+    """Cumulative alpha rejects duplicate, absent, premature and terminal base dates."""
+    attribution = compute_model_layer_ewma_alpha_attribution(
+        **_rolling_navs(_rolling_layer_returns()), freq='ME', beta_span=4
+    )
+    index = attribution.component_returns.index
+    duplicate_index = index.to_list()
+    duplicate_index[-1] = duplicate_index[-2]
+    duplicate_attribution = replace(
+        attribution,
+        component_returns=attribution.component_returns.set_axis(duplicate_index),
+    )
+    with pytest.raises(ValueError, match='unique'):
+        compute_model_layer_cumulative_alpha_after_warmup(
+            duplicate_attribution, base_date=index[11], warmup_periods=12
+        )
+    with pytest.raises(ValueError, match='not in the periodic return index'):
+        compute_model_layer_cumulative_alpha_after_warmup(
+            attribution, base_date='1999-12-31', warmup_periods=12
+        )
+    with pytest.raises(ValueError, match='found 2'):
+        compute_model_layer_cumulative_alpha_after_warmup(
+            attribution, base_date=index[1], warmup_periods=12
+        )
+    with pytest.raises(ValueError, match='no subsequent attribution return'):
+        compute_model_layer_cumulative_alpha_after_warmup(
+            attribution, base_date=index[-1], warmup_periods=12
+        )
+    with pytest.raises(ValueError, match='warmup_periods'):
+        compute_model_layer_cumulative_alpha_after_warmup(
+            attribution, base_date=index[11], warmup_periods=0
+        )
+
+
+def test_cumulative_rolling_alpha_checks_the_first_applied_beta() -> None:
+    """The one-period-lag audit rejects a changed first post-warm-up applied beta."""
+    attribution = compute_model_layer_ewma_alpha_attribution(
+        **_rolling_navs(_rolling_layer_returns()), freq='ME', beta_span=4
+    )
+    base_date = attribution.periodic_returns.index[11]
+    first_alpha_date = attribution.periodic_returns.index[12]
+    changed_applied_betas = attribution.applied_betas.copy()
+    changed_applied_betas.loc[first_alpha_date, 'Full Model'] += 0.1
+    changed = replace(attribution, applied_betas=changed_applied_betas)
+
+    with pytest.raises(RuntimeError, match='base-date beta'):
+        compute_model_layer_cumulative_alpha_after_warmup(
+            changed, base_date=base_date, warmup_periods=12
+        )

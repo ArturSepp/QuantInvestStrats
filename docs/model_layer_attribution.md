@@ -5,7 +5,8 @@ myst:
       Decompose the return of a layered quantitative portfolio model into systematic return,
       risk-layer alpha, signal-layer alpha, and integration alpha, each with a
       heteroskedasticity and autocorrelation consistent (HAC) confidence interval; attribute
-      changes to multiple model features; and construct additive cumulative-alpha paths using qis.
+      changes to multiple model features; and construct fixed-beta or point-in-time rolling
+      cumulative-alpha paths using qis.
 ---
 
 # Model-layer attribution: risk-layer, signal-layer, and integration alpha
@@ -28,27 +29,28 @@ The four components reconstruct the full-model log return in every period, their
 reconstruct the annualised return, and each alpha component is an OLS intercept with a standard
 error.
 
-The entry point for one model is `qis.compute_model_layer_alpha_beta_attribution`, which returns a
-`qis.ModelLayerAlphaBetaAttribution`. For a complete experiment over several model features,
+For a descriptive full-sample analysis, use
+`qis.compute_model_layer_alpha_beta_attribution`, which returns a
+`qis.ModelLayerAlphaBetaAttribution`. For realised point-in-time alpha, use
+`qis.compute_model_layer_ewma_alpha_attribution`, which estimates EWMA betas and applies them only
+after the configured lag. For a complete experiment over several model features,
 `qis.compute_model_feature_alpha_beta_attribution` returns factorial interactions,
-order-independent Shapley effects, and a model-layer alpha/beta attribution for every effect.
-
-The method is descriptive and ex post. Its full-sample
-coefficients are not point-in-time estimates and are not inputs to a backtest.
+order-independent Shapley effects, and a full-sample model-layer attribution for every effect.
 
 ## Choose the object that matches the question
 
 | Question | qis object | Required input | Output |
 |---|---|---|---|
 | What did the risk layer, the signal layer, and their integration each add to the full model's return, and with what uncertainty? | `compute_model_layer_alpha_beta_attribution` | benchmark, risk-layer, signal-layer and full-model NAVs, optional net NAV | regression table with HAC intervals, exact periodic components, annualised components |
+| How did realised alpha accumulate using only the beta information available before each return? | `compute_model_layer_ewma_alpha_attribution` and `compute_model_layer_cumulative_alpha_after_warmup` | benchmark, risk-layer, signal-layer and full-model NAVs; beta span, lag, prior and warm-up base date | estimated and applied betas, exact alpha components, expanding annualised alpha and post-warm-up cumulative alpha |
 | Which model features changed risk-layer, signal-layer, integration and total full-model alpha or beta? | `compute_model_feature_alpha_beta_attribution` | complete $2^n$ coalition map of `ModelLayerNavs` bundles | factorial and Shapley effect paths, one layer attribution per effect, summary table and identity checks |
 | What were whole-sample TE and IR against a benchmark? | `compute_te_ir_errors` | periodic strategy-minus-benchmark returns | annualised TE and IR |
 | How did benchmark beta and alpha evolve through time? | `compute_ewm_beta_alpha_forecast` | periodic returns | EWMA beta and alpha series |
 | What active risk do current weights carry under a covariance model? | `RiskModel` | dated covariances and weights | ex-ante tracking error and contributions |
 
-The two attribution objects are the only entries in this table that compare several model layers
-or variants at once. They measure how layers and model changes combine, not how one portfolio
-tracks a benchmark through time.
+The model-layer and feature-attribution entries compare several model layers or variants at once.
+They measure how layers and model changes combine, not how one portfolio tracks a benchmark
+through time.
 
 ## Inputs and the common sample
 
@@ -197,7 +199,7 @@ $0.85 - 1.05 - 1.00 = -1.20$. On the excess basis for the signal layer the same 
 has beta near $-0.20$, with identical alphas and intervals. The integration term is a
 log-return residual, not a tradeable portfolio, and its beta should be read on the excess basis.
 
-## Additive cumulative alpha through time
+## Additive cumulative alpha with fixed full-sample betas
 
 The annualised alpha table answers how much each component contributed on average. The same
 `component_returns` output also shows when the contribution accumulated. For return date $t_k$,
@@ -256,6 +258,88 @@ chart. That construction is a compounded pseudo-NAV: its components reconcile mu
 whereas the alpha bridge is defined and interpreted additively. The cumulative paths are
 descriptive because their betas are full-sample estimates; they are not point-in-time alpha
 forecasts.
+
+## Rolling point-in-time alpha
+
+Use the rolling estimator when the question is how alpha accumulated under betas that were
+available before each realised return. For the default span $h=36$, QIS uses
+$\lambda=1-2/(h+1)$ and removes a same-span point-in-time EWMA mean from the benchmark and each
+layer. For a generic return $x_t$, the mean recursion is
+
+$$
+m_t^x=\lambda m_{t-1}^x+(1-\lambda)x_t, \qquad \tilde x_t=x_t-m_t^x.
+$$
+
+The beta estimate after observing date $t$ is the ratio of EWMA cross moment to EWMA benchmark
+variance,
+
+$$
+q_t^{BL}=\lambda q_{t-1}^{BL}+(1-\lambda)\tilde r_B(t)\tilde r_L(t),
+\qquad
+q_t^{BB}=\lambda q_{t-1}^{BB}+(1-\lambda)\tilde r_B(t)^2,
+\qquad
+\hat\beta_L(t)=\frac{q_t^{BL}}{q_t^{BB}}.
+$$
+
+The estimator uses `MeanAdjType.EWMA`, the point-in-time `InitType.X0` initial condition, and an
+explicit beta prior (one by default). `MeanAdjType.INSAMPLE` is rejected because subtracting a
+full-sample mean would introduce look-ahead. Under EWMA mean adjustment and `InitType.X0`, the
+first centered observation is zero, so the first estimated beta is deliberately retained as
+missing. The applied beta remains finite: QIS uses the prior until a lagged estimate is available.
+
+With the default one-period lag, the beta estimated at $t-1$ is applied to return $t$,
+
+$$
+\tilde\beta_L(t)=\hat\beta_L(t-1), \qquad
+a_L(t)=r_L(t)-\tilde\beta_L(t)r_B(t),
+$$
+
+with the prior substituted before the first lagged finite estimate. Thus return $t$ may update
+$\hat\beta_L(t)$, but it cannot change the beta applied to itself. Total and integration alpha are
+
+$$
+a_F(t)=r_F(t)-\tilde\beta_F(t)r_B(t), \qquad
+a_I(t)=a_F(t)-a_R(t)-a_S(t),
+$$
+
+so $a_F(t)=a_R(t)+a_S(t)+a_I(t)$ at every date. The expanding annualised estimate through $t_k$
+is $A k^{-1}\sum_{t=1}^{k}a_L(t)$. The post-warm-up exhibit is different: it is the unannualised
+cumulative sum $\sum a_L(t)$ after a chosen base date, with an explicit zero row on that date.
+
+The following example uses a 36-month EWMA beta, lags it by one month, allows 12 monthly returns
+for estimator warm-up, and then accumulates realised alpha from the next month:
+
+```python
+import qis
+
+rolling = qis.compute_model_layer_ewma_alpha_attribution(
+    benchmark_nav=benchmark_nav,
+    risk_layer_nav=risk_layer_nav,
+    signal_layer_nav=signal_layer_nav,
+    full_model_nav=full_model_nav,
+    freq='ME',
+    beta_span=36,
+    beta_lag=1,
+    beta_init_value=1.0,
+    mean_adj_type=qis.MeanAdjType.EWMA,
+)
+
+base_date = rolling.periodic_returns.index[11]
+post_warmup = qis.compute_model_layer_cumulative_alpha_after_warmup(
+    attribution=rolling,
+    base_date=base_date,
+    warmup_periods=12,
+)
+
+expanding_annualised_alpha = rolling.expanding_annualised_alpha
+cumulative_alpha = post_warmup.cumulative_alpha
+```
+
+`estimated_betas` records estimates after each return; `applied_betas` records the betas actually
+used for each return. That distinction is the audit for the one-period lag. The result also exposes
+the exact periodic `component_returns`, cumulative alpha from inception, the estimator settings,
+and `mean_adj_type`. The post-warm-up result records the base date, first accrued alpha date and the
+same settings.
 
 ## Inference: HAC standard errors and intervals
 
@@ -337,6 +421,14 @@ $A\hat\alpha_F$ is the `Full Model` row of the table.
 
 `freq`, `hac_lags`, `confidence_level`
 : The return frequency, Bartlett lag count and interval level used in the estimation.
+
+`ModelLayerEwmaAlphaAttribution` contains `periodic_returns`, `estimated_betas`, `applied_betas`,
+`component_returns`, `cumulative_alpha`, `expanding_annualised_alpha`, and the settings `freq`,
+`beta_span`, `beta_lag`, `beta_init_value`, and `mean_adj_type`.
+
+`ModelLayerCumulativeAlphaAttribution` contains the post-warm-up `alpha_returns` and
+`cumulative_alpha`, the `base_date`, `first_alpha_date`, `warmup_periods`, and the inherited beta
+estimator settings.
 
 ## Simulated example
 
@@ -571,8 +663,10 @@ paths are additive log-return percentage points, not compounded feature NAVs.
 
 - Returns are log returns at `freq`, and alphas are annualised linearly by the periods per year
   of `freq`. State the frequency when quoting the numbers.
-- The regressions are full-sample and descriptive. The betas are not point-in-time estimates,
-  and the components must not be used as backtest inputs or read as forecasts.
+- The OLS/HAC regressions are full-sample and descriptive. Their betas are not point-in-time
+  estimates and their components must not be used as backtest inputs or read as forecasts.
+- The rolling estimator is point-in-time only when `mean_adj_type` is `EWMA`, `EXPANDING`, or
+  `NONE` and the estimated beta is applied after a positive lag. The API rejects `INSAMPLE`.
 - The default lag count of three applies at any frequency. At the default quarterly frequency
   three lags span nine months, and `newey_west_lag_rule` gives the sample-size rule instead. The
   normal reference distribution is exact only asymptotically; at 84 quarterly returns the
@@ -592,6 +686,10 @@ paths are additive log-return percentage points, not compounded feature NAVs.
 
 - {doc}`Generated attribution API <api/generated/qis.compute_model_layer_alpha_beta_attribution>`
 - {doc}`Generated result API <api/generated/qis.ModelLayerAlphaBetaAttribution>`
+- {doc}`Generated rolling attribution API <api/generated/qis.compute_model_layer_ewma_alpha_attribution>`
+- {doc}`Generated rolling result API <api/generated/qis.ModelLayerEwmaAlphaAttribution>`
+- {doc}`Generated warm-up cumulative API <api/generated/qis.compute_model_layer_cumulative_alpha_after_warmup>`
+- {doc}`Generated cumulative result API <api/generated/qis.ModelLayerCumulativeAlphaAttribution>`
 - {doc}`Generated feature API <api/generated/qis.compute_model_feature_alpha_beta_attribution>`
 - {doc}`Generated feature result API <api/generated/qis.ModelFeatureAlphaBetaAttribution>`
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)

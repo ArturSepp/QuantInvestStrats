@@ -16,7 +16,11 @@ from qis.perfstats.desc_table import DescTableType, compute_desc_table
 
 from qis.perfstats.model_layer_attribution import (
     ModelLayerAlphaBetaAttribution,
+    ModelLayerCumulativeAlphaAttribution,
+    ModelLayerEwmaAlphaAttribution,
     compute_model_layer_alpha_beta_attribution,
+    compute_model_layer_cumulative_alpha_after_warmup,
+    compute_model_layer_ewma_alpha_attribution,
 )
 
 from qis.perfstats.model_feature_attribution import (
