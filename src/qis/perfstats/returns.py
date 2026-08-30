@@ -1153,16 +1153,54 @@ def _get_periodic_financing_rate(financing_rate: Union[float, pd.Series],
         Constant periodic rate or a Series aligned to returns_index.
 
     Raises:
-        ValueError: If a financing Series contains duplicate dates.
+        ValueError: If a scalar rate is not finite and real, or if a Series contains an
+            invalid observed value, an incompatible date axis, ``NaT``, or duplicate dates.
     """
-    # Enforce unique chronology so forward-fill uses one observable prior rate.
     if isinstance(financing_rate, pd.Series):
+        # Reject undefined or incompatible chronology before point-in-time alignment.
+        financing_index = financing_rate.index
+        if (not isinstance(returns_index, pd.DatetimeIndex)
+                or not isinstance(financing_index, pd.DatetimeIndex)):
+            raise ValueError(
+                "returns and financing_rate must use DatetimeIndex "
+                "when financing_rate is a Series"
+            )
+        if returns_index.hasnans or financing_index.hasnans:
+            raise ValueError("returns and financing_rate indexes must not contain NaT")
         if not financing_rate.index.is_unique:
             raise ValueError("financing_rate index must not contain duplicate dates")
+        if ((returns_index.tz is None)
+                != (financing_index.tz is None)):
+            raise ValueError(
+                "returns and financing_rate indexes must both be "
+                "timezone-naive or timezone-aware"
+            )
+
+        # Missing values remain unavailable; every observed rate must be finite and real.
+        observed_financing = financing_rate.dropna()
+        if any(
+            isinstance(value, (bool, np.bool_))
+            or not isinstance(value, Real)
+            or not isfinite(value)
+            for value in observed_financing.array
+        ):
+            raise ValueError(
+                "financing_rate Series must contain only finite real values "
+                "or missing values"
+            )
 
         financing_rate = financing_rate.sort_index()
+        if financing_index.tz is not None:
+            financing_rate = financing_rate.tz_convert(returns_index.tz)
         return financing_rate.reindex(returns_index, method='ffill') / periods_per_year
 
+    # Reject invalid constants before they can silently produce non-finite returns.
+    if (isinstance(financing_rate, (bool, np.bool_))
+            or not isinstance(financing_rate, Real)
+            or not isfinite(financing_rate)):
+        raise ValueError(
+            f"financing_rate must be a finite real number or a Series, got {financing_rate!r}"
+        )
     return float(financing_rate) / periods_per_year
 
 
@@ -1189,13 +1227,16 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
         leverage: Finite, nonnegative leverage ratio L (debt / equity). Booleans are invalid.
             For a 1.5x levered fund pass 0.5; for a 3x ETF pass 2.0; for the typical BDC at
             1.0x debt-to-equity pass 1.0.
-        financing_rate: Annualised financing rate. Pass a float for constant cost
+        financing_rate: Annualised financing rate. Pass a finite real scalar for constant cost
             (e.g. risk-free rate as a crude proxy), or a Series indexed by date for
-            time-varying financing (recommended for accuracy). Series observations are
-            sorted chronologically, aligned to return dates, and forward-filled from prior
-            observations only. Duplicate Series dates are invalid for nonzero leverage. Default
-            0.0 ignores financing — only correct if the portfolio earns the financing rate on its
-            borrowed capital, which is rarely the case.
+            time-varying financing (recommended for accuracy). Observed Series values must be
+            finite and real; ordinary or nullable missing values remain unavailable. For nonzero
+            leverage, both date axes must be ``DatetimeIndex`` objects without ``NaT`` and must
+            both be timezone-naive or timezone-aware. Different aware zones align by absolute
+            instant. Series observations are sorted chronologically, aligned to return dates, and
+            forward-filled from prior observations only; duplicate funding dates are invalid.
+            Default 0.0 ignores financing — only correct if the portfolio earns the financing
+            rate on its borrowed capital, which is rarely the case.
         periods_per_year: Strictly positive integer annualisation factor used to convert the
             financing rate to per-period. If None, inferred from the index frequency.
 
@@ -1204,9 +1245,9 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
         returns an independent copy, even when financing data is unavailable.
 
     Raises:
-        ValueError: If leverage is not a finite nonnegative real scalar, or if an explicit
-            periods_per_year is not a positive integer, or if nonzero leverage is used with a
-            financing Series containing duplicate dates.
+        ValueError: If leverage is not a finite nonnegative real scalar; if an explicit
+            periods_per_year is not a positive integer; or, for nonzero leverage, if financing
+            values or date axes violate the contract described above.
 
     Note:
         This assumes constant leverage and a single-tier financing structure. Real
@@ -1265,9 +1306,13 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
     Args:
         returns: Period returns of the unlevered asset (Series or DataFrame).
         leverage: Finite, nonnegative leverage ratio L (debt / equity). Booleans are invalid.
-        financing_rate: Annualised financing rate (float or Series). Series observations
-            are sorted chronologically, aligned to return dates, and forward-filled from prior
-            observations only. Duplicate Series dates are invalid for nonzero leverage.
+        financing_rate: Annualised financing rate. A scalar must be finite and real. Observed
+            Series values must be finite and real; ordinary or nullable missing values remain
+            unavailable. For nonzero leverage, both date axes must be ``DatetimeIndex`` objects
+            without ``NaT`` and must both be timezone-naive or timezone-aware. Different aware
+            zones align by absolute instant. Series observations are sorted chronologically,
+            aligned to return dates, and forward-filled from prior observations only; duplicate
+            funding dates are invalid.
         periods_per_year: Strictly positive integer annualisation factor. If None, inferred from
             the index.
 
@@ -1276,9 +1321,9 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
         returns an independent copy, even when financing data is unavailable.
 
     Raises:
-        ValueError: If leverage is not a finite nonnegative real scalar, or if an explicit
-            periods_per_year is not a positive integer, or if nonzero leverage is used with a
-            financing Series containing duplicate dates.
+        ValueError: If leverage is not a finite nonnegative real scalar; if an explicit
+            periods_per_year is not a positive integer; or, for nonzero leverage, if financing
+            values or date axes violate the contract described above.
 
     Example:
         >>> # Show what GCF would look like at 1x leverage with BDC-like financing

@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Validated nonzero-leverage financing values and date-axis compatibility before alignment,
+  preserving explicit missing observations and compatible timezone-aware funding.
+
 ## [5.21.0] - 2026-08-30
 
 ### Changed
