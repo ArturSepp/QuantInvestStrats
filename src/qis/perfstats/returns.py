@@ -13,8 +13,8 @@ The conversion is stated, never implied. ``to_returns`` takes ``is_log_returns``
 ``returns_to_nav`` and ``log_returns_to_nav`` invert them on the matching convention; passing
 log returns to the arithmetic inverse compounds the wrong quantity and raises nothing. Prices
 are resampled by ``prices_at_freq`` before differencing, so ``freq`` selects the return
-frequency rather than resampling returns after the fact, and non-positive prices are masked to
-NaN rather than producing a spurious return.
+frequency rather than resampling returns after the fact. Ratio and log returns require finite
+positive levels at both endpoints; difference and level modes also accept finite signed values.
 
 Annualisation is geometric and driven by elapsed calendar time, not by observation count:
 ``compute_pa_return`` raises the total return to 1/num_years, where num_years counts calendar
@@ -36,7 +36,7 @@ from math import isfinite
 from numbers import Integral, Real
 import numpy as np
 import pandas as pd
-from typing import Union, Dict, Optional
+from typing import Union, Dict, Optional, cast
 
 # qis
 import qis.utils.dates as da
@@ -97,7 +97,8 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
     Args:
         prices: Numeric price time series. Pandas nullable floating values are supported
         is_log_returns: If True, compute log returns (overrides return_type)
-        return_type: Type of return calculation (LOG, RELATIVE, DIFFERENCE, LEVEL, LEVEL0)
+        return_type: Type of return calculation. LOG and RELATIVE require finite positive
+            endpoints; DIFFERENCE, LEVEL, and LEVEL0 accept finite signed levels
         freq: Resampling frequency (e.g., 'D', 'W', 'M')
         include_start_date: Include period start date when resampling
         include_end_date: Include period end date when resampling
@@ -107,9 +108,10 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
         **kwargs: Additional arguments
 
     Returns:
-        Return time series matching the input's pandas shape and labels. A missing or non-positive
-        normalized current price produces a missing observation, and nullable floating inputs
-        retain a nullable output dtype
+        Return time series matching the input's pandas shape and labels. LOG and RELATIVE are
+        missing unless both endpoints are finite and positive. DIFFERENCE is missing unless both
+        signed endpoints are finite; LEVEL and LEVEL0 are missing unless their returned level is
+        finite. Nullable floating inputs retain a nullable output dtype
     """
     # Resample prices to specified frequency
     prices = prices_at_freq(prices=prices, freq=freq,
@@ -117,25 +119,40 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
                             include_end_date=include_end_date,
                             ffill_nans=ffill_nans)
 
-    # Keep validation label-aligned and compatible with pandas nullable floating dtypes.
-    ind_good = prices.notna() & prices.gt(0.0)
-
-    # Compute returns based on type
+    # Validate the endpoints consumed by each convention, and neutralize invalid inputs before
+    # arithmetic so masked observations cannot leak divide or log warnings.
+    finite_prices: Union[pd.Series, pd.DataFrame] = prices.notna() & prices.abs().lt(np.inf)
     if return_type == ReturnTypes.LOG or is_log_returns:
-        returns = np.log(prices).diff(1)
+        # Log returns require positive levels at both endpoints of the period.
+        valid_prices: Union[pd.Series, pd.DataFrame] = finite_prices & prices.gt(0.0)
+        calculation_prices: Union[pd.Series, pd.DataFrame] = prices.where(valid_prices, other=1.0)
+        log_prices = cast(Union[pd.Series, pd.DataFrame], np.log(calculation_prices))
+        returns = log_prices.diff(1)
+        valid_returns = valid_prices & valid_prices.shift(1, fill_value=False)
     elif return_type == ReturnTypes.RELATIVE:
-        returns = np.divide(prices, prices.shift(1)).add(-1.0)
+        # Ratio returns share the log convention's positive two-endpoint domain.
+        valid_prices = finite_prices & prices.gt(0.0)
+        calculation_prices = prices.where(valid_prices, other=1.0)
+        returns = calculation_prices.div(calculation_prices.shift(1)).sub(1.0)
+        valid_returns = valid_prices & valid_prices.shift(1, fill_value=False)
     elif return_type == ReturnTypes.DIFFERENCE:
-        returns = prices - prices.shift(1)
+        # Signed rates and spreads may cross zero, so differences require only finite endpoints.
+        calculation_prices = prices.where(finite_prices, other=0.0)
+        returns = calculation_prices - calculation_prices.shift(1)
+        valid_returns = finite_prices & finite_prices.shift(1, fill_value=False)
     elif return_type == ReturnTypes.LEVEL:
+        # LEVEL reports the current observation and therefore validates only that returned value.
         returns = prices
+        valid_returns = finite_prices
     elif return_type == ReturnTypes.LEVEL0:
+        # LEVEL0 reports the predecessor, so its validity mask shifts with the returned value.
         returns = prices.shift(1)
+        valid_returns = finite_prices.shift(1, fill_value=False)
     else:
         raise NotImplementedError(f"{return_type}")
 
-    # Mask invalid observations
-    returns = returns.where(ind_good, other=np.nan)
+    # Remove neutral calculation values after applying the selected convention's endpoint rule.
+    returns = returns.where(valid_returns, other=np.nan)
 
     # Handle first observation
     if is_first_zero:
