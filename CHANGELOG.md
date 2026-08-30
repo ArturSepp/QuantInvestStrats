@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.21.1] - 2026-08-30
+
+### Added
+
+- Expanded the seeded model-attribution example and documentation with additive cumulative-alpha
+  paths and a two-feature Shapley sensitivity exhibit with Bartlett HAC intervals.
+
 ### Fixed
 
 - Made `append_time_series()` preserve the newer provider's names, column order, axis metadata,

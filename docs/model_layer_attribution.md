@@ -56,8 +56,9 @@ The inputs are four NAV series and an optional fifth:
 
 1. The benchmark $B$.
 1. The risk-layer model $R$ (the full model run with every alpha signal set to zero).
-1. The signal layer $S$ (the portfolio built from the signals alone; in ROSAA the equal-weight
-   top-quartile portfolio of the aggregate alpha).
+1. The signal layer $S$ (the portfolio built from the signals alone; in the ROSAA production
+   exhibit, the top-quartile portfolio of mapped aggregate alpha with weights proportional to
+   positive alpha).
 1. The full model $F$.
 1. Optionally, the full model net of trading costs $F^{\mathrm{net}}$.
 
@@ -238,6 +239,16 @@ alpha_paths = pd.concat([
     alpha_paths,
 ])
 ```
+
+![Additive cumulative model-layer alpha on simulated layers](images/model_layer_attribution_cumulative_alpha_simulated.png)
+
+The seeded example accumulates 62.5 log-return percentage points of total model alpha over the
+20-year sample: approximately 24.6 points from the risk layer and 54.9 from the signal layer,
+offset by 17.0 points of negative integration. The terminal identity is only one reading of the
+chart. The paths also
+show when each source added or detracted and whether the total was diversified across sources.
+At every intermediate date, not just at the end, the dark-green total is the exact sum of the
+teal, amber and brown paths.
 
 The vertical axis is cumulative log-return contribution in percentage points. It is not a wealth
 index. In particular, do not use `100 * exp(cumsum(alpha))` for an additive alpha-attribution
@@ -491,6 +502,31 @@ When net full-model NAVs are supplied, they must be present in every coalition. 
 includes both gross and net total-return intervals and the net-model regression. Scenario
 construction remains outside QIS: the caller decides what enabling a feature means and supplies
 the resulting NAVs.
+
+### Two-feature sensitivity exhibit
+
+The simulated example represents a controlled $2 \times 2$ experiment: production, a doubled
+beta-estimation span, a doubled signal horizon, and both changes together. In a production study,
+the caller reruns the complete model under the same data, constraints and cost assumptions for
+all four coalitions. The example supplies seeded illustrative NAVs for those four completed runs;
+QIS performs the factorial, Shapley and layer attribution, not the model reruns themselves.
+
+![Two-feature Shapley model sensitivity with HAC intervals](images/model_feature_attribution_simulated.png)
+
+Read each colour across the five groups. The first group is the feature's annualised net-return
+change, estimated as a HAC mean. The remaining groups are benchmark-OLS alphas. The doubled
+beta-estimation span has a +0.31% total-alpha effect: +0.17% through the risk layer, -0.02%
+through the signal layer and +0.16% through integration. The doubled signal horizon has a +0.26%
+total-alpha effect: +0.02% risk, +0.48% signal and -0.24% integration. The component bars sum to
+the total-alpha bar for each feature; the net-return bar additionally reflects the simulated
+implementation-cost change.
+
+The black whiskers are 95% Bartlett HAC(3) intervals from one regression on each Shapley effect
+path, and the black point marks the estimate at the interval midpoint. All intervals cross zero
+in this illustration: the chart communicates both the estimated direction and the uncertainty,
+not a tuning recommendation. One colour is retained for every bar belonging to the same feature,
+so the viewer follows a feature across layers rather than mistaking the layers for independent
+experiments.
 
 ### Reading the feature-attribution result
 
