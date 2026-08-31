@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrected missing and near-zero percentages in legend diagnostics and defined all-missing
+  histories without an index error.
+
 ## [5.21.2] - 2026-08-31
 
 ### Added
