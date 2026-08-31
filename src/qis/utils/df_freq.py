@@ -19,6 +19,31 @@ import qis.utils.dates as da
 FillnaOptions = Literal["bfill", "ffill", "pad"]
 
 
+def validate_calendar_index(data: Union[pd.DataFrame, pd.Series],
+                            argument_name: str
+                            ) -> None:
+    """Validate the date axis required by calendar operations.
+
+    Empty objects remain valid schema declarations because they contribute no observations to a
+    schedule. The validator deliberately leaves sorting and duplicate-date policy to the calling
+    operation.
+
+    Args:
+        data: Series or DataFrame about to undergo calendar scheduling or timestamp arithmetic.
+        argument_name: Public parameter name used in deterministic error messages.
+
+    Raises:
+        TypeError: If a nonempty object does not use a ``DatetimeIndex``.
+        ValueError: If a nonempty object's index contains ``NaT``.
+    """
+    if data.empty:
+        return
+    if not isinstance(data.index, pd.DatetimeIndex):
+        raise TypeError(f"{argument_name} must use a DatetimeIndex for calendar operations")
+    if data.index.hasnans:
+        raise ValueError(f"{argument_name} index must not contain NaT")
+
+
 def _apply_fill(df: Union[pd.DataFrame, pd.Series],
                 fill_na_method: Optional[FillnaOptions]
                 ) -> Union[pd.DataFrame, pd.Series]:
@@ -49,7 +74,8 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     with optional inclusion of the original start/end dates.
 
     Args:
-        df: input time series
+        df: Input time series. Calendar resampling requires a nonempty object to use a
+            ``DatetimeIndex`` without ``NaT``; arbitrary indexes remain valid when ``freq=None``.
         freq: pandas frequency string; None returns df unchanged
         method: fill method passed to pd.DataFrame.reindex()
         fill_na_method: residual fill applied after reindex (handles leading/trailing NaNs)
@@ -58,12 +84,21 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
         include_end_date: if True, ensures df's last date is in the output index
         tz: timezone string passed to date schedule generation
 
+    Raises:
+        TypeError: If calendar resampling is requested for a nonempty object without a
+            ``DatetimeIndex``.
+        ValueError: If calendar resampling is requested for a nonempty object whose index contains
+            ``NaT``.
+
     Note:
         Using include_start_date / include_end_date may produce an irregular index.
         A df whose index is not in chronological order is sorted before resampling.
     """
     if freq is None or df.empty:
         return df
+
+    # Validate the structural requirement only when a calendar schedule will be constructed.
+    validate_calendar_index(df, argument_name="df")
 
     # Everything below assumes the panel is in chronological order: the pre-reindex ffill
     # carries values forward in ROW order, and reindex(method='ffill') raises
