@@ -13,6 +13,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   histories without an index error.
 - Made standard-deviation legend modes consistently use warning-free sample spreads after their
   documented observation selection.
+- Made `append_time_series()` apply its stable keep-last duplicate-date rule before overlap
+  diagnostics and empty-newer initialization.
 
 ## [5.21.2] - 2026-08-31
 
