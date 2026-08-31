@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Made realized-volatility estimator selection depend on each column's finite observation count
+  so missing-row padding cannot change the estimator or suppress a sparse-window result.
 - Corrected missing and near-zero percentages in legend diagnostics and defined all-missing
   histories without an index error.
 - Made standard-deviation legend modes consistently use warning-free sample spreads after their
