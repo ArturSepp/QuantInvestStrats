@@ -193,6 +193,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     renderer directly — use the underlying statistic functions if the numbers are wanted.
     Columns may contain nans or ``pd.NA`` in nullable numeric dtypes; both are treated as missing,
     and statistics are computed on the available observations.
+    Observed positive or negative infinity is invalid and raises before statistics are computed.
     Dated columns without observations remain in the table with formatted missing statistics
     and do not emit reduction warnings.
     Statistics whose columns do not meet their minimum sample sizes also remain formatted as
@@ -206,7 +207,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     Args:
         df: returns panel, index is time and columns are tickers; a Series is treated as one
             column named after it; repeated DataFrame column labels are retained and calculated
-            independently
+            independently; observations may be finite or missing but not infinite
         desc_table_type: which set of statistics to report; positive-probability modes use each
             column's non-missing observation count as the denominator; moment modes retain
             defined level statistics, report finite zero-spread moments as missing, and stabilize
@@ -223,7 +224,7 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
 
     Raises:
         TypeError: if ``df`` is neither pd.DataFrame nor pd.Series
-        ValueError: if ``df`` contains no observations
+        ValueError: if ``df`` contains no observations or contains positive or negative infinity
     """
     if isinstance(df, pd.DataFrame):
         descriptive_table = pd.DataFrame(index=df.columns)
@@ -239,6 +240,9 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
 
     # Normalize nullable pandas values so numerical reducers receive np.nan rather than pd.NA.
     data_np = df.to_numpy(dtype=float, na_value=np.nan)
+    # Infinity is invalid observed data, not a missing value; reject it before any reducer runs.
+    if np.isinf(data_np).any():
+        raise ValueError("data contains infinite values")
     observation_counts = np.sum(np.logical_not(np.isnan(data_np)), axis=0)
     # Skip all-missing dated columns so undefined base statistics remain NaN without warnings.
     mean = _reduce_observed(data_np, lambda values: np.nanmean(values, axis=0))
