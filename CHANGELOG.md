@@ -11,6 +11,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Defaulted legend text to normal weight so fonts without a light face no longer emit Matplotlib
   fallback warnings.
+- Normalized missing indexed legend endpoints so ordinary and nullable floating dtypes use the
+  same configured numeric display.
 - Stabilized exact-constant and finite near-degenerate statistic-legend moments without emitting
   precision-loss warnings.
 - Made statistic legends use native scalar text when their public plotting format is `None`.
