@@ -18,6 +18,7 @@ import pandas as pd
 from typing import Optional, Union, List, Tuple, cast
 # qis
 import qis.utils.df_ops as dfo
+import qis.utils.df_freq as dfr
 import qis.utils.np_ops as npo
 import qis.perfstats.returns as ret
 import qis.models.linear.ewm as ewm
@@ -56,7 +57,16 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
 
     Returns:
         the interpolated returns on the index of ``pivot_returns``, in the shape of the input
+
+    Raises:
+        TypeError: If a nonempty input does not use a ``DatetimeIndex``.
+        ValueError: If a nonempty input index contains ``NaT``, or if ``infrequent_returns``
+            contains missing values.
     """
+    # Both paths perform timestamp slicing and subtraction, so validate their grids up front.
+    dfr.validate_calendar_index(infrequent_returns, argument_name="infrequent_returns")
+    dfr.validate_calendar_index(pivot_returns, argument_name="pivot_returns")
+
     # call recursion here
     if isinstance(infrequent_returns, pd.DataFrame):
         infrequent_return_backfills = {}
@@ -158,10 +168,12 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
     Args:
         df_newer: Newer Series or DataFrame whose labels and columns define the output. Its rows
             are interpreted in increasing date order without modifying the caller's object. A
-            zero-row object retains its declared schema; a zero-column DataFrame is invalid.
+            nonempty provider requires a ``DatetimeIndex`` without ``NaT``. A zero-row object
+            retains its declared schema; a zero-column DataFrame is invalid.
         df_older: Older object of the same pandas type, used before each newer history begins. Its
             rows are also interpreted in increasing date order without modifying the caller. A
-            zero-row object or zero-column DataFrame is treated as an unavailable provider.
+            nonempty provider requires a ``DatetimeIndex`` without ``NaT``. A zero-row object or
+            zero-column DataFrame is treated as an unavailable provider.
         freq: Frequency of the returned date grid.
         fill_method: Return-gap policy. ``None`` preserves missing returns, ``'to_zero'`` fills
             missing returns with zero after each column begins, and ``'ffill'`` carries its last
@@ -178,8 +190,9 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         empty object with that schema is returned.
 
     Raises:
-        ValueError: If the newer DataFrame has no columns, or if ``fill_method`` is not ``None``,
-            ``'to_zero'``, or ``'ffill'``.
+        TypeError: If a nonempty provider does not use a ``DatetimeIndex``.
+        ValueError: If a nonempty provider index contains ``NaT``, the newer DataFrame has no
+            columns, or ``fill_method`` is not ``None``, ``'to_zero'``, or ``'ffill'``.
         NotImplementedError: If the newer and older inputs are not both Series or both
             DataFrames.
     """
@@ -200,6 +213,10 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
         pass
     else:
         raise NotImplementedError(f"type1={type(df_newer)}, type2={type(df_older)}") 
+
+    # Only providers contributing observations need a valid calendar axis; empty schemas remain.
+    dfr.validate_calendar_index(df_newer, argument_name="df_newer")
+    dfr.validate_calendar_index(df_older, argument_name="df_older")
 
     # Provider row order carries no information; boundaries and fills must run chronologically.
     if not df_newer.index.is_monotonic_increasing:

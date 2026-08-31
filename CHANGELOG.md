@@ -15,6 +15,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   documented observation selection.
 - Made `append_time_series()` apply its stable keep-last duplicate-date rule before overlap
   diagnostics and empty-newer initialization.
+- Added deterministic calendar-index validation before resampling, backfilling, and infrequent
+  return interpolation can expose incidental pandas errors or discard invalidly labelled data.
 
 ## [5.21.2] - 2026-08-31
 
