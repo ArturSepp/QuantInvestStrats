@@ -761,7 +761,8 @@ class LegendStats(Enum):
     of the last value within its own history.
 
     ``NONE`` prints the column name alone. Formatting of every value follows the ``var_format``
-    argument of the plotting function, so the enum chooses the statistics and not their display.
+    argument of the plotting function; when it is ``None``, values use their native scalar text.
+    The enum therefore chooses the statistics and not their display.
 
     A member documented here is computed in ``get_legend_lines``, which is the single place the
     legend text is built for every plot in the package.
@@ -847,11 +848,15 @@ def _compute_legend_tstat_components(
 
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                      legend_stats: LegendStats = LegendStats.NONE,
-                     var_format: str = '{:.0f}',
+                     var_format: Optional[str] = '{:.0f}',
                      tstat_format: str = '{:,.2f}',
                      nan_display: float = np.nan,  # or zero
                      **kwargs
                      ) -> List[str]:
+
+    # Keep plot-level None semantics while giving statistic legends displayable scalar text.
+    if var_format is None:
+        var_format = '{}'
 
     data = data.copy()
     data = data.replace([np.inf, -np.inf], np.nan)

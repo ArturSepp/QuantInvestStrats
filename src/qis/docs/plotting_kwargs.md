@@ -39,9 +39,10 @@ entirely, which is what you want when several panels share one.
 
 ## Number formatting
 
-`var_format: str = '{:,.2f}'` — a Python format string applied to the values in the legend, the
-tick labels and any data labels. This is where percent, ratio and price displays are chosen:
-`'{:.0%}'` for a percentage, `'{:,.2f}'` for a ratio, `'{:,.0f}'` for a level.
+`var_format: Optional[str] = '{:,.2f}'` — a Python format string applied to the values in the
+legend, the tick labels and any data labels. This is where percent, ratio and price displays are
+chosen: `'{:.0%}'` for a percentage, `'{:,.2f}'` for a ratio, `'{:,.0f}'` for a level. `None`
+leaves axis ticks to Matplotlib and uses native scalar text for ordinary statistic legends.
 
 `xvar_format`, `yvar_format` — the same, per axis, on plots where the two axes carry different
 units. A scatter of return against volatility wants `xvar_format='{:.0%}'` and

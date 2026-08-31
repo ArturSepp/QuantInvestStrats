@@ -9,6 +9,7 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Made statistic legends use native scalar text when their public plotting format is `None`.
 - Stabilized descriptive-table skewness, kurtosis, and normality results for finite samples whose
   spread is very small relative to their level.
 - Made realized-volatility estimator selection depend on each column's finite observation count
