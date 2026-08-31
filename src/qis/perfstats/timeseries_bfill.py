@@ -356,7 +356,8 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
             zero-column older DataFrame is treated as unavailable. Rows are interpreted in
             increasing index order without modifying the caller's object.
         numerical_check_columns: Columns for which to return mean absolute differences over the
-            aligned overlap. Labels must belong to the newer schema and their requested order is
+            aligned overlap after duplicate dates use the same stable keep-last selection as the
+            returned splice. Labels must belong to the newer schema and their requested order is
             preserved. ``None`` skips the diagnostic.
 
     Returns:
@@ -400,6 +401,12 @@ def append_time_series(df_newer: Union[pd.DataFrame, pd.Series],  # more recent 
         df_newer = df_newer.sort_index(kind='stable')
     if not df_older.index.is_monotonic_increasing:
         df_older = df_older.sort_index(kind='stable')
+
+    # Resolve each provider's date mapping before boundary checks and overlap diagnostics.
+    if not df_newer.index.is_unique:
+        df_newer = df_newer.iloc[~df_newer.index.duplicated(keep='last')]
+    if not df_older.index.is_unique:
+        df_older = df_older.iloc[~df_older.index.duplicated(keep='last')]
 
     older_has_no_data = len(df_older.index) == 0 or len(df_older.columns) == 0
     if not older_has_no_data:
