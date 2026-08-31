@@ -119,26 +119,43 @@ def get_nonnan_index(df: Union[pd.Series, pd.DataFrame],
 def compute_nans_zeros_ratio_after_first_non_nan(df: Union[pd.Series, pd.DataFrame],
                                                  zero_cutoff: float = 1e-12
                                                  ) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute missing and near-zero ratios after each series begins.
+
+    Leading missing values before the first observation are outside the denominator. An
+    all-missing series has complete missing coverage and an undefined near-zero ratio because no
+    observed window exists.
+
+    Args:
+        df: Series or time-by-variable DataFrame whose columns are evaluated independently.
+        zero_cutoff: Strict absolute-value threshold used to classify a finite value as near zero.
+
+    Returns:
+        Missing ratios and near-zero ratios aligned to the input column order.
     """
-   compute ratio  of missing data
-    """
-    if isinstance(df, pd.Series):
-        df = df.to_frame()
+    data = df.to_frame() if isinstance(df, pd.Series) else df
 
-    missing = []
-    zeros = []
-    for column in df:
-        column_data = df[column]
-        nonnan_cond = column_data.isnull() == False
-        fist_nonnan_index = column_data.loc[nonnan_cond].index[0]
-        after_data = column_data.loc[fist_nonnan_index:]
-        missing.append(after_data.isnull().sum() / len(after_data))
-        zeros.append(after_data.abs().lt(zero_cutoff).sum() / len(after_data))
+    missing: List[float] = []
+    zeros: List[float] = []
+    for _, column_data in data.items():
+        assert isinstance(column_data, pd.Series)
+        column_values: np.ndarray = column_data.to_numpy(dtype=float, na_value=np.nan)
+        nonnan_cond = ~np.isnan(column_values)
+        if not bool(nonnan_cond.any()):
+            # No observation defines a zero-ratio window, but coverage is entirely missing.
+            missing.append(1.0)
+            zeros.append(np.nan)
+            continue
 
-    missing_ratio = np.array(missing)
-    zeros_ratio = np.array(zeros)
+        # Begin both diagnostic denominators at this column's first observed position.
+        first_nonnan_position = int(np.flatnonzero(nonnan_cond)[0])
+        after_values = column_values[first_nonnan_position:]
+        after_count = len(after_values)
+        missing_count = np.count_nonzero(np.isnan(after_values))
+        zero_count = np.count_nonzero(np.abs(after_values) < zero_cutoff)
+        missing.append(float(missing_count / after_count))
+        zeros.append(float(zero_count / after_count))
 
-    return missing_ratio, zeros_ratio
+    return np.asarray(missing, dtype=float), np.asarray(zeros, dtype=float)
 
 
 def get_first_nonnan_values(df: Union[np.ndarray, pd.Series, pd.DataFrame]) -> Union[np.ndarray, float]:

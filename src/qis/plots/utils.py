@@ -749,13 +749,15 @@ class LegendStats(Enum):
     the third and fourth moments, ``TSTAT`` mean over standard error, ``TOTAL`` the sum,
     ``FIRST`` and ``LAST`` the endpoints, ``MIN`` and ``MAX`` the extremes.
 
-    Three modifiers change what the statistics are computed on:
+    Five modifiers change what the statistics are computed on or displayed beside them:
 
     ``NONNAN`` takes the last observed value rather than the value at the last index, which
     differs when a series ends with gaps. ``NONZERO`` excludes zeros, for a series where zero
-    means "no position" rather than "a return of zero". ``MISSING`` prefixes the count of NaN
-    observations, which is how a ragged panel shows its own coverage in the legend. ``SCORE``
-    appends the percentile rank of the last value within its own history.
+    means "no position" rather than "a return of zero". ``MISSING`` reports the percentage of
+    NaN observations after the first observed value, while ``ZERO`` reports the percentage whose
+    absolute value is below the near-zero cutoff over the same window. An all-missing history has
+    100% missing coverage and an undefined zero percentage. ``SCORE`` appends the percentile rank
+    of the last value within its own history.
 
     ``NONE`` prints the column name alone. Formatting of every value follows the ``var_format``
     argument of the plotting function, so the enum chooses the statistics and not their display.
@@ -1135,37 +1137,36 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
         missing_ratio, zeros_ratio = dfo.compute_nans_zeros_ratio_after_first_non_nan(df=data)
         for idx, column in enumerate(data.columns):
             column_data = data[column]
+            # Keep the two diagnostic labels tied to their independently computed ratios.
+            missing = missing_ratio[idx]
+            zeros = zeros_ratio[idx]
             if np.all(np.isnan(column_data)):
                 avg = nan_display
                 std = nan_display
-                # missing = 1.0
-                zeros = nan_display
             else:
                 avg = np.nanmean(column_data)
                 std = np.nanstd(column_data, ddof=1)
-                # missing = missing_ratio[idx]
-                zeros = zeros_ratio[idx]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, "
                                 f"std={var_format.format(std)}, "
-                                # f"missing%={'{:0.2%}'.format(missing)}, "
-                                f"missing%={'{:0.2%}'.format(zeros)}")
+                                f"missing%={'{:0.2%}'.format(missing)}, "
+                                f"zeros%={'{:0.2%}'.format(zeros)}")
 
     elif legend_stats == LegendStats.MISSING_AVG_LAST:
         legend_lines = []
-        missing_ratio, zeros_ratio = dfo.compute_nans_zeros_ratio_after_first_non_nan(df=data)
+        missing_ratio, _ = dfo.compute_nans_zeros_ratio_after_first_non_nan(df=data)
         for idx, column in enumerate(data.columns):
             column_data = data[column]
+            # Report missing coverage rather than the helper's separate near-zero ratio.
+            missing = missing_ratio[idx]
             if np.all(np.isnan(column_data)):
                 avg = nan_display
                 last = nan_display
-                zeros = nan_display
             else:
                 nonnan_data = column_data.dropna()
                 avg = np.nanmean(nonnan_data)
                 last = nonnan_data.iloc[-1]
-                zeros = zeros_ratio[idx]
             legend_lines.append(f"{column}: "
-                                f"missing%={'{:0.2%}'.format(zeros)}, "
+                                f"missing%={'{:0.2%}'.format(missing)}, "
                                 f"avg={var_format.format(avg)}, "
                                 f"last={var_format.format(last)}")
 
