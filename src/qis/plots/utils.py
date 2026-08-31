@@ -745,10 +745,13 @@ class LegendStats(Enum):
     final value in that order. Rather than restate twenty-nine names, the vocabulary:
 
     ``AVG`` mean, ``STD`` standard deviation with ``ddof=1``, ``MEDIAN`` median, ``MAD`` median
-    absolute deviation scaled to be comparable with a standard deviation, ``SKEW`` and ``KURT``
-    the third and fourth moments, ``TSTAT`` mean over standard error, ``TOTAL`` the sum,
-    ``FIRST`` and ``LAST`` the endpoints, ``MIN`` and ``MAX`` the extremes. After any modifier's
-    sample selection, ``STD`` is undefined when fewer than two observations remain.
+    absolute deviation scaled to be comparable with a standard deviation, ``SKEW`` the biased
+    standardized third moment, ``KURT`` biased excess kurtosis, ``TSTAT`` mean over standard
+    error, ``TOTAL`` the sum, ``FIRST`` and ``LAST`` the endpoints, ``MIN`` and ``MAX`` the
+    extremes. After any modifier's sample selection, ``STD`` is undefined when fewer than two
+    observations remain; ``SKEW`` and ``KURT`` are undefined for an exact finite constant.
+    Eligible finite varying samples are translated before standardized moments are evaluated,
+    preserving their results when the spread is very small relative to the level.
 
     Five modifiers change what the statistics are computed on or displayed beside them:
 
@@ -943,16 +946,23 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.AVG_STD_SKEW_KURT:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column]
+        for column, data_column in data.items():
             if np.all(np.isnan(data_column)):
                 avg, std, skw, krt = np.nan, np.nan, np.nan, np.nan
             else:
                 data_column = data_column.dropna()
                 avg = np.mean(data_column)
-                std = np.std(data_column, ddof=1)
-                skw = skew(data_column, nan_policy='omit')
-                krt = kurtosis(data_column, nan_policy='omit')
+                std = _compute_legend_sample_std(data_column, nan_display)
+                # Exact constants have undefined moments; skip SciPy's warning-producing reducers.
+                if data_column.nunique(dropna=False) == 1:
+                    skw, krt = np.nan, np.nan
+                else:
+                    # Standardized moments are translation invariant; zero-base finite varying
+                    # samples so SciPy does not lose their narrow represented spread.
+                    moment_values = data_column.to_numpy(dtype=float)
+                    moment_values = moment_values - np.min(moment_values)
+                    skw = skew(moment_values, nan_policy='omit')
+                    krt = kurtosis(moment_values, nan_policy='omit')
 
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, std={var_format.format(std)}, "
                                 f"skew={'{:.2f}'.format(skw)}, kurtosis={'{:.2f}'.format(krt)}")
