@@ -74,8 +74,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 source_suffix = {'.rst': 'restructuredtext', '.md': 'markdown'}
 
 html_theme = 'furo'
-html_title = ('qis - performance analytics, portfolio backtesting, risk analysis, and '
-              'factsheet reporting in Python')
+html_title = 'qis - performance analytics, backtesting, and factsheet reporting'
 html_baseurl = os.environ.get('READTHEDOCS_CANONICAL_URL', '/')
 html_static_path = []
 
