@@ -96,6 +96,35 @@ def _reduce_observed(
     return values
 
 
+def _reduce_standardized_moment(
+        data: np.ndarray,
+        reduction: Callable[[np.ndarray], np.ndarray],
+        minimum_observations: int) -> np.ndarray:
+    """Apply a translation-stable standardized-moment reduction.
+
+    Args:
+        data: Two-dimensional numerical observations arranged by row and column.
+        reduction: Column-wise standardized-moment reduction.
+        minimum_observations: Required number of non-missing values in each column.
+
+    Returns:
+        Reduction values in input-column order, with NaN for ineligible columns.
+    """
+    def translate_finite_columns(values: np.ndarray) -> np.ndarray:
+        # Standardized moments are translation invariant; zero-base only finite columns so the
+        # separate observed-infinity policy remains unchanged.
+        finite_columns = np.all(np.isnan(values) | np.isfinite(values), axis=0)
+        origins = np.where(finite_columns, np.nanmin(values, axis=0), 0.0)
+        return values - origins
+
+    return _reduce_observed(
+        data,
+        lambda values: reduction(translate_finite_columns(values)),
+        minimum_observations=minimum_observations,
+        require_variation=True,
+    )
+
+
 def compute_sample_mean_tstat(
         mean: np.ndarray,
         sample_std: np.ndarray,
@@ -135,13 +164,13 @@ def _add_moment_columns(
         data: Two-dimensional numerical observations arranged by row and column.
         value_format: Display format applied to each moment.
     """
-    # Display moments only for samples that have both enough observations and finite variation.
-    skews = _reduce_observed(
+    # Stabilize eligible varying samples without changing any original level statistic.
+    skews = _reduce_standardized_moment(
         data, lambda values: skew(values, axis=0, nan_policy='omit'),
-        minimum_observations=2, require_variation=True)
-    kurts = _reduce_observed(
+        minimum_observations=2)
+    kurts = _reduce_standardized_moment(
         data, lambda values: kurtosis(values, axis=0, nan_policy='omit'),
-        minimum_observations=2, require_variation=True)
+        minimum_observations=2)
     descriptive_table[PerfStat.SKEWNESS.value.short] = [
         value_format.format(x) for x in skews]
     descriptive_table[PerfStat.KURTOSIS.value.short_n] = [
@@ -169,6 +198,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     Statistics whose columns do not meet their minimum sample sizes also remain formatted as
     missing: sample standard deviation, skewness, and kurtosis require two observations, while
     the normality p-value requires 20 observations.
+    Finite varying samples are translated before standardized moments are evaluated, preserving
+    their translation-invariant results when the spread is very small relative to the level.
     Positive probabilities divide positive returns by non-missing observations in each column;
     zero returns are observed and non-positive.
 
@@ -178,7 +209,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             independently
         desc_table_type: which set of statistics to report; positive-probability modes use each
             column's non-missing observation count as the denominator; moment modes retain
-            defined level statistics but report finite zero-spread moments as missing
+            defined level statistics, report finite zero-spread moments as missing, and stabilize
+            varying finite samples through translation before standardized-moment calculations
         var_format: format applied to the statistics
         annualize_vol: report volatility per annum rather than per period; reduced modes omit
             the volatility column selected by this convention
@@ -258,13 +290,14 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
 
     elif desc_table_type == desc_table_type.WITH_NORMAL_PVAL:
-        # Apply moments and normality only to eligible varying samples, retaining NaN elsewhere.
+        # Apply translation-stable moments only to eligible varying samples, retaining NaN
+        # elsewhere.
         _add_moment_columns(descriptive_table, data_np, norm_variable_display_type)
         # Require SciPy's warning-free accuracy threshold, not only its eight-value hard minimum.
-        ps = _reduce_observed(
+        ps = _reduce_standardized_moment(
             data_np,
             lambda values: normaltest(a=values, axis=0, nan_policy=nan_policy)[1],
-            minimum_observations=20, require_variation=True)
+            minimum_observations=20)
         descriptive_table[PerfStat.NORMTEST.value.short_n] = [
             '{:.2f}'.format(x) for x in ps]
 
