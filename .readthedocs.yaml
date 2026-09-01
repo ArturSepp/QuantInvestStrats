@@ -1,4 +1,4 @@
-# SHARED CI CORE v1.0 — synced 2026-08-22
+# SHARED CI CORE v1.1 — synced 2026-09-01
 version: 2
 build:
   os: ubuntu-24.04
