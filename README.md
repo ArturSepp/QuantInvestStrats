@@ -131,7 +131,7 @@ description; examples that need a Bloomberg terminal are flagged inline.
 ## Table of contents
 
 1. [Why qis](#why-qis)
-2. [When to use it — and when not](#when-to-use-it--and-when-not)
+2. [When to use it — and when not](#when-to-use-it-and-when-not)
 3. [Overview](#analytics)
 4. [Installation](#installation)
 5. [Offline quickstart](#offline-quickstart)
