@@ -13,6 +13,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   spread is very small relative to their level.
 - Made realized-volatility estimator selection depend on each column's finite observation count
   so missing-row padding cannot change the estimator or suppress a sparse-window result.
+- Rejected positive and negative infinity in `compute_desc_table()` with a descriptive error
+  before numerical reducers can emit warnings or return inconsistent partial statistics.
 - Corrected missing and near-zero percentages in legend diagnostics and defined all-missing
   histories without an index error.
 - Made standard-deviation legend modes consistently use warning-free sample spreads after their
