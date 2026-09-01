@@ -1,3 +1,13 @@
+## Python environment (mandatory)
+
+- Never create, use, or install packages into a Python virtual environment anywhere under `C:\Users\artur\OneDrive`.
+- Keep this repository's environment outside OneDrive at `C:\Python\QuantInvestStrats312`.
+- Use `C:\Python\QuantInvestStrats312\Scripts\python.exe` for Python, tests, linters, and package installation.
+- If it is missing, create it with `py -3.12 -m venv C:\Python\QuantInvestStrats312`.
+- Never run plain `uv sync` or plain `uv run` from this checkout: uv otherwise creates `<repo>\.venv` even when uv was launched through a Python executable under `C:\Python`.
+- If a uv project operation is required, first set `UV_PROJECT_ENVIRONMENT=C:\Python\QuantInvestStrats312`; for pip-style operations prefer `uv pip ... --python C:\Python\QuantInvestStrats312\Scripts\python.exe`.
+- If any OneDrive-local environment already exists, do not use it; report it for removal.
+
 # AGENTS.md
 
 Guidance for AI coding agents working in the **QuantInvestStrats** repository.
@@ -292,19 +302,6 @@ provider-neutral panels.
 `@pytest.mark.mpl_image_compare` tests in `src/qis/tests/test_reporting_goldens.py` run their bodies
 and compare nothing.
 
-## Python environment
-
-- Keep this repository's Python environment outside OneDrive at `C:\Python\QuantInvestStrats312`.
-- Never create, use, or install packages into a repository-local `.venv`.
-- Use `C:\Python\QuantInvestStrats312\Scripts\python.exe` for all Python commands.
-- Run tools through that interpreter, for example `C:\Python\QuantInvestStrats312\Scripts\python.exe -m pytest` and `C:\Python\QuantInvestStrats312\Scripts\python.exe -m pip`.
-- Treat the pinned environment as durable machine-local infrastructure; do not delete, recreate,
-  install into or upgrade it unless the task explicitly requires that change.
-- If it is missing, report it. Put any agent-created disposable environment below
-  `$env:AGENT_LOCAL_ROOT\envs\QuantInvestStrats\<machine-task>`; never create `.venv` under the
-  repository.
-
-<!-- BEGIN ONEDRIVE GIT / C-LOCAL AGENT POLICY -->
 ## OneDrive Git durability and C-local execution
 
 - The primary checkout and its complete `.git` directory are the authoritative durable
