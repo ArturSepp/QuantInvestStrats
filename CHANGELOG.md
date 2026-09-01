@@ -7,6 +7,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Rejected zero-dimensional and higher-dimensional NumPy arrays in `estimate_vol()` with a
+  descriptive error instead of incidental exceptions or flattened estimates.
+
 ## [5.22.0] - 2026-09-05
 
 ### Added
