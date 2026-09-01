@@ -46,7 +46,7 @@ whole-sample TE/IR, and EWMA beta/alpha. The same conventions serve the wider pa
 checked for public symbols and introspectable keyword arguments; and examples without a data
 vendor are run. Network-backed examples remain subject to their providers.
 
-### Use it when — choose another package when
+## When to use it — and when not
 
 Use `qis` for performance and risk statistics on price panels, backtests of supplied weight
 schedules with costs, ex-ante and ex-post tracking error, regime-conditional analytics, and
@@ -131,22 +131,23 @@ description; examples that need a Bloomberg terminal are flagged inline.
 ## Table of contents
 
 1. [Why qis](#why-qis)
-2. [Overview](#analytics)
-3. [Installation](#installation)
-4. [Offline quickstart](#offline-quickstart)
-5. [Examples](#examples)
+2. [When to use it — and when not](#when-to-use-it--and-when-not)
+3. [Overview](#analytics)
+4. [Installation](#installation)
+5. [Offline quickstart](#offline-quickstart)
+6. [Examples](#examples)
    1. [Visualisation of price data](#price)
    2. [Multi assets factsheet](#multiassets)
    3. [Strategy factsheet](#strategy)
    4. [Strategy benchmark factsheet](#strategybenchmark)
    5. [Multi strategy factsheet](#multistrategy)
    6. [Runnable examples](#runnable-examples)
-6. [Ecosystem](#ecosystem)
-7. [Feedback & contributing](#feedback-contributing)
-8. [Changelog](#changelog)
-9. [License](#license)
-10. [Disclaimer](#disclaimer)
-11. [Citation](#citation)
+7. [Ecosystem](#ecosystem)
+8. [Feedback & contributing](#feedback-contributing)
+9. [Changelog](#changelog)
+10. [License](#license)
+11. [Disclaimer](#disclaimer)
+12. [Citation](#citation)
 
 
 ## Installation <a name="installation"></a>
