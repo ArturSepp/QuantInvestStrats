@@ -200,6 +200,19 @@ def _annualized_sample_std(values: np.ndarray) -> float:
     return float(np.sqrt(sample_variance * _BUSINESS_PERIODS_PER_YEAR))
 
 
+def _annualized_rms(values: np.ndarray) -> float:
+    """Calculate annualized RMS independently from QIS.
+
+    Args:
+        values: Finite daily simple returns in one monthly window.
+
+    Returns:
+        Root mean square multiplied by ``sqrt(252)``.
+    """
+    mean_square = float(np.sum(np.square(values)) / len(values))
+    return float(np.sqrt(mean_square * _BUSINESS_PERIODS_PER_YEAR))
+
+
 def _expected_mixed_vols() -> pd.DataFrame:
     """Construct the mixed-panel volatility reference from literal returns.
 
@@ -222,9 +235,14 @@ def _expected_mixed_vols() -> pd.DataFrame:
         in_window = (_MIXED_DATES >= start) & (_MIXED_DATES <= end)
         window_values = late_start_returns[in_window]
         finite_values = window_values[np.isfinite(window_values)]
-        expected_late_start.append(
-            _annualized_sample_std(finite_values) if len(finite_values) >= 2 else np.nan
-        )
+        # Select from observed returns so ragged-window padding cannot change the reference.
+        if len(finite_values) >= 20:
+            expected_vol = _annualized_sample_std(finite_values)
+        elif len(finite_values) >= 1:
+            expected_vol = _annualized_rms(finite_values)
+        else:
+            expected_vol = np.nan
+        expected_late_start.append(expected_vol)
     return pd.DataFrame(
         {
             _HEALTHY: expected_healthy,
@@ -255,7 +273,8 @@ def test_estimate_vol_uses_only_finite_values_and_preserves_scalar_type() -> Non
     assert isinstance(short_vol, np.float64)
     assert isinstance(long_vol, np.float64)
     assert np.isclose(short_vol, np.sqrt(12.5))
-    assert np.isclose(long_vol, np.sqrt(2.0))
+    # Missing and infinite padding leaves the two finite observations in the RMS regime.
+    assert np.isclose(long_vol, np.sqrt(5.0))
     np.testing.assert_allclose(panel_vol, np.array([np.sqrt(12.5), np.nan]), equal_nan=True)
 
 
@@ -303,7 +322,7 @@ def test_compute_sampled_vols_preserves_mixed_window_states(
     """Estimate eligible columns while unavailable neighbors remain missing and quiet.
 
     Healthy expected values use the independent sample-variance formula above. The all-missing
-    column remains missing in every month; the one-return January window is also missing. The
+    column remains missing in every month; the one-return January window uses annualized RMS. The
     overlapping February window includes that boundary return, while the sufficiently observed
     all-zero March control equals zero.
 

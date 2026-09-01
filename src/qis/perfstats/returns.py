@@ -489,11 +489,12 @@ def compute_pa_excess_compounded_returns(returns: Union[pd.Series, pd.DataFrame]
 def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]) -> np.ndarray:
     """Estimate volatility from return samples.
 
-    For samples >=20, uses standard deviation with ddof=1.
-    For smaller samples, uses RMS to avoid mean adjustment bias.
+    For columns with 20 or more finite observations, uses standard deviation with ddof=1.
+    For smaller finite samples, uses RMS to avoid mean adjustment bias.
 
     Args:
-        sampled_returns: Return time series
+        sampled_returns: Return time series. Each column selects its estimator from its own finite
+            observation count; missing rows do not count toward the threshold
 
     Returns:
         Volatility estimate for a one-dimensional input or one estimate per DataFrame column.
@@ -504,17 +505,14 @@ def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]) ->
         sampled_values = sampled_returns.to_numpy(dtype=float, na_value=np.nan)
     else:
         sampled_values = np.asarray(sampled_returns, dtype=float)
-    n = sampled_values.shape[0]
 
     def estimate_column(values: np.ndarray) -> np.float64:
-        """Apply the existing window-size estimator to one return column."""
+        """Apply the finite-sample estimator to one return column."""
         finite_values = values[np.isfinite(values)]
         num_observations = finite_values.size
-        if n >= 20:
-            # Sample standard deviation needs two observations; unavailable columns stay missing.
-            if num_observations >= 2:
-                return np.float64(np.std(finite_values, ddof=1))
-            return np.float64(np.nan)
+        # Missing rows carry no sample information, so each column selects independently.
+        if num_observations >= 20:
+            return np.float64(np.std(finite_values, ddof=1))
         # The small-window RMS convention is defined as soon as one return is observed.
         if num_observations >= 1:
             return np.float64(np.sqrt(np.mean(np.square(finite_values))))

@@ -7,6 +7,21 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Stabilized descriptive-table skewness, kurtosis, and normality results for finite samples whose
+  spread is very small relative to their level.
+- Made realized-volatility estimator selection depend on each column's finite observation count
+  so missing-row padding cannot change the estimator or suppress a sparse-window result.
+- Corrected missing and near-zero percentages in legend diagnostics and defined all-missing
+  histories without an index error.
+- Made standard-deviation legend modes consistently use warning-free sample spreads after their
+  documented observation selection.
+- Made `append_time_series()` apply its stable keep-last duplicate-date rule before overlap
+  diagnostics and empty-newer initialization.
+- Added deterministic calendar-index validation before resampling, backfilling, and infrequent
+  return interpolation can expose incidental pandas errors or discard invalidly labelled data.
+
 ## [5.21.2] - 2026-08-31
 
 ### Added

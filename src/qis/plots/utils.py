@@ -747,15 +747,18 @@ class LegendStats(Enum):
     ``AVG`` mean, ``STD`` standard deviation with ``ddof=1``, ``MEDIAN`` median, ``MAD`` median
     absolute deviation scaled to be comparable with a standard deviation, ``SKEW`` and ``KURT``
     the third and fourth moments, ``TSTAT`` mean over standard error, ``TOTAL`` the sum,
-    ``FIRST`` and ``LAST`` the endpoints, ``MIN`` and ``MAX`` the extremes.
+    ``FIRST`` and ``LAST`` the endpoints, ``MIN`` and ``MAX`` the extremes. After any modifier's
+    sample selection, ``STD`` is undefined when fewer than two observations remain.
 
-    Three modifiers change what the statistics are computed on:
+    Five modifiers change what the statistics are computed on or displayed beside them:
 
     ``NONNAN`` takes the last observed value rather than the value at the last index, which
     differs when a series ends with gaps. ``NONZERO`` excludes zeros, for a series where zero
-    means "no position" rather than "a return of zero". ``MISSING`` prefixes the count of NaN
-    observations, which is how a ragged panel shows its own coverage in the legend. ``SCORE``
-    appends the percentile rank of the last value within its own history.
+    means "no position" rather than "a return of zero". ``MISSING`` reports the percentage of
+    NaN observations after the first observed value, while ``ZERO`` reports the percentage whose
+    absolute value is below the near-zero cutoff over the same window. An all-missing history has
+    100% missing coverage and an undefined zero percentage. ``SCORE`` appends the percentile rank
+    of the last value within its own history.
 
     ``NONE`` prints the column name alone. Formatting of every value follows the ``var_format``
     argument of the plotting function, so the enum chooses the statistics and not their display.
@@ -792,6 +795,24 @@ class LegendStats(Enum):
     LAST_NONNAN = 25
     AVG_MIN_MAX_LAST = 26
     FIRST_MIN_MAX_LAST = 27
+
+
+def _compute_legend_sample_std(data_column: pd.Series, nan_display: float) -> float:
+    """Compute a warning-free sample standard deviation for a legend entry.
+
+    Args:
+        data_column: Selected observations for one plotted series, possibly containing missing
+            values.
+        nan_display: Configured display value for an undefined statistic.
+
+    Returns:
+        Sample standard deviation, or ``nan_display`` when fewer than two observations remain.
+    """
+    observed = data_column.dropna().to_numpy(dtype=float)
+    # NumPy warns for ddof=1 on undersized samples, whose spread is undefined by contract.
+    if observed.size < 2:
+        return nan_display
+    return float(np.std(observed, ddof=1))
 
 
 def _compute_legend_tstat_components(
@@ -905,14 +926,14 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.AVG_STD:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column]
+        for column, data_column in data.items():
             if np.all(np.isnan(data_column)):
                 avg = np.nan
                 std = np.nan
             else:
                 avg = np.nanmean(data_column)
-                std = np.nanstd(data_column, ddof=1)
+                # Guard singleton samples before the sample-spread reduction.
+                std = _compute_legend_sample_std(data_column, nan_display)
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, std={var_format.format(std)}")
 
     elif legend_stats == LegendStats.AVG_STD_SKEW_KURT:
@@ -933,13 +954,13 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.AVG_STD_LAST:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column]
+        for column, data_column in data.items():
             if np.all(np.isnan(data_column)):
                 avg, std, last = nan_display, nan_display, nan_display
             else:
                 avg = np.nanmean(data_column)
-                std = np.nanstd(data_column, ddof=1)
+                # Preserve endpoint selection while guarding its companion sample spread.
+                std = _compute_legend_sample_std(data_column, nan_display)
                 last = data_column.iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, "
                                 f"std={var_format.format(std)}, "
@@ -987,13 +1008,14 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.NONZERO_AVG_STD_LAST:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column].replace({0.0: np.nan})
+        for column, data_column in data.items():
+            data_column = data_column.replace({0.0: np.nan})
             if np.all(np.isnan(data_column)):
                 avg, std, last = nan_display, nan_display, nan_display
             else:
                 avg = np.nanmean(data_column)
-                std = np.nanstd(data_column)
+                # Apply the sample rule after zero-as-no-position observations are removed.
+                std = _compute_legend_sample_std(data_column, nan_display)
                 last = data_column.dropna().iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, std={var_format.format(std)}, last={var_format.format(last)}")
 
@@ -1011,8 +1033,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.AVG_MEDIAN_STD_NONNAN_LAST:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column]
+        for column, data_column in data.items():
             if np.all(np.isnan(data_column)):
                 avg = nan_display
                 med = nan_display
@@ -1021,7 +1042,8 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             else:
                 avg = np.nanmean(data_column)
                 med = np.nanmedian(data_column)
-                std = np.nanstd(data_column)
+                # Use observed values for the warning-free sample-spread boundary.
+                std = _compute_legend_sample_std(data_column, nan_display)
                 last = data_column.dropna().iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, median={var_format.format(med)}, std={var_format.format(std)}, last={var_format.format(last)}")
 
@@ -1045,8 +1067,7 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.AVG_STD_LAST_SCORE:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column]
+        for column, data_column in data.items():
             if np.all(np.isnan(data_column)):
                 avg = nan_display
                 std = nan_display
@@ -1055,7 +1076,8 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             else:
                 data_np = data_column.dropna()
                 avg = np.nanmean(data_np)
-                std = np.nanstd(data_np)
+                # Keep score sampling intact while aligning its spread estimator.
+                std = _compute_legend_sample_std(data_np, nan_display)
                 last = data_np.iloc[-1]
                 score = 0.01 * stats.percentileofscore(a=data_np, score=last, kind='rank')
 
@@ -1133,39 +1155,38 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
     elif legend_stats == LegendStats.AVG_STD_MISSING_ZERO:
         legend_lines = []
         missing_ratio, zeros_ratio = dfo.compute_nans_zeros_ratio_after_first_non_nan(df=data)
-        for idx, column in enumerate(data.columns):
-            column_data = data[column]
+        for idx, (column, column_data) in enumerate(data.items()):
+            # Keep the two diagnostic labels tied to their independently computed ratios.
+            missing = missing_ratio[idx]
+            zeros = zeros_ratio[idx]
             if np.all(np.isnan(column_data)):
                 avg = nan_display
                 std = nan_display
-                # missing = 1.0
-                zeros = nan_display
             else:
                 avg = np.nanmean(column_data)
-                std = np.nanstd(column_data, ddof=1)
-                # missing = missing_ratio[idx]
-                zeros = zeros_ratio[idx]
+                # Preserve the independent missing/zero ratios while guarding only sample spread.
+                std = _compute_legend_sample_std(column_data, nan_display)
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, "
                                 f"std={var_format.format(std)}, "
-                                # f"missing%={'{:0.2%}'.format(missing)}, "
-                                f"missing%={'{:0.2%}'.format(zeros)}")
+                                f"missing%={'{:0.2%}'.format(missing)}, "
+                                f"zeros%={'{:0.2%}'.format(zeros)}")
 
     elif legend_stats == LegendStats.MISSING_AVG_LAST:
         legend_lines = []
-        missing_ratio, zeros_ratio = dfo.compute_nans_zeros_ratio_after_first_non_nan(df=data)
+        missing_ratio, _ = dfo.compute_nans_zeros_ratio_after_first_non_nan(df=data)
         for idx, column in enumerate(data.columns):
             column_data = data[column]
+            # Report missing coverage rather than the helper's separate near-zero ratio.
+            missing = missing_ratio[idx]
             if np.all(np.isnan(column_data)):
                 avg = nan_display
                 last = nan_display
-                zeros = nan_display
             else:
                 nonnan_data = column_data.dropna()
                 avg = np.nanmean(nonnan_data)
                 last = nonnan_data.iloc[-1]
-                zeros = zeros_ratio[idx]
             legend_lines.append(f"{column}: "
-                                f"missing%={'{:0.2%}'.format(zeros)}, "
+                                f"missing%={'{:0.2%}'.format(missing)}, "
                                 f"avg={var_format.format(avg)}, "
                                 f"last={var_format.format(last)}")
 
