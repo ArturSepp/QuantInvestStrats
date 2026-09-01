@@ -96,6 +96,22 @@ def _reduce_observed(
     return values
 
 
+def _translate_finite_columns(data: np.ndarray) -> np.ndarray:
+    """Translate finite columns to a zero origin without changing other input policies.
+
+    Args:
+        data: Two-dimensional numerical observations arranged by row and column.
+
+    Returns:
+        Observations with each finite column's minimum subtracted.
+    """
+    # Translation-invariant reductions can avoid cancellation without pre-empting the separate
+    # observed-infinity policy.
+    finite_columns = np.all(np.isnan(data) | np.isfinite(data), axis=0)
+    origins = np.where(finite_columns, np.nanmin(data, axis=0), 0.0)
+    return data - origins
+
+
 def _reduce_standardized_moment(
         data: np.ndarray,
         reduction: Callable[[np.ndarray], np.ndarray],
@@ -110,16 +126,9 @@ def _reduce_standardized_moment(
     Returns:
         Reduction values in input-column order, with NaN for ineligible columns.
     """
-    def translate_finite_columns(values: np.ndarray) -> np.ndarray:
-        # Standardized moments are translation invariant; zero-base only finite columns so the
-        # separate observed-infinity policy remains unchanged.
-        finite_columns = np.all(np.isnan(values) | np.isfinite(values), axis=0)
-        origins = np.where(finite_columns, np.nanmin(values, axis=0), 0.0)
-        return values - origins
-
     return _reduce_observed(
         data,
-        lambda values: reduction(translate_finite_columns(values)),
+        lambda values: reduction(_translate_finite_columns(values)),
         minimum_observations=minimum_observations,
         require_variation=True,
     )
@@ -199,8 +208,10 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     Statistics whose columns do not meet their minimum sample sizes also remain formatted as
     missing: sample standard deviation, skewness, and kurtosis require two observations, while
     the normality p-value requires 20 observations.
-    Finite varying samples are translated before standardized moments are evaluated, preserving
-    their translation-invariant results when the spread is very small relative to the level.
+    Finite samples are translated before sample standard deviation and standardized moments are
+    evaluated, preserving their translation-invariant results when the spread is very small
+    relative to the level. Annualized volatility and the optional t-statistic use that stabilized
+    sample spread without changing the sample mean.
     Positive probabilities divide positive returns by non-missing observations in each column;
     zero returns are observed and non-positive.
 
@@ -246,9 +257,10 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     observation_counts = np.sum(np.logical_not(np.isnan(data_np)), axis=0)
     # Skip all-missing dated columns so undefined base statistics remain NaN without warnings.
     mean = _reduce_observed(data_np, lambda values: np.nanmean(values, axis=0))
+    # Sample spread is translation invariant; zero-base finite columns to avoid cancellation.
     std = _reduce_observed(
         data_np,
-        lambda values: np.nanstd(values, ddof=1, axis=0),
+        lambda values: np.nanstd(_translate_finite_columns(values), ddof=1, axis=0),
         minimum_observations=2)
 
     descriptive_table[PerfStat.AVG.to_str()] = [var_format.format(x) for x in mean]
