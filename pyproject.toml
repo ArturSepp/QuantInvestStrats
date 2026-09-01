@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "qis"
 version = "5.21.2"
-description = "qis - performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python."
+description = "Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE.txt"]
@@ -122,8 +122,9 @@ audit = [
 [project.urls]
 Homepage = "https://github.com/ArturSepp/QuantInvestStrats"
 Documentation = "https://quantinveststrats.readthedocs.io"
-Repository = "https://github.com/ArturSepp/QuantInvestStrats.git"
+Repository = "https://github.com/ArturSepp/QuantInvestStrats"
 Issues = "https://github.com/ArturSepp/QuantInvestStrats/issues"
+Changelog = "https://github.com/ArturSepp/QuantInvestStrats/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
