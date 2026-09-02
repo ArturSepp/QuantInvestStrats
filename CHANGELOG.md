@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Defaulted legend text to normal weight so fonts without a light face no longer emit Matplotlib
+  fallback warnings.
 - Stabilized descriptive-table skewness, kurtosis, and normality results for finite samples whose
   spread is very small relative to their level.
 - Made realized-volatility estimator selection depend on each column's finite observation count
