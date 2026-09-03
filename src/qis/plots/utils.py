@@ -765,6 +765,8 @@ class LegendStats(Enum):
 
     ``NONE`` prints the column name alone. Formatting of every value follows the ``var_format``
     argument of the plotting function; when it is ``None``, values use their native scalar text.
+    A missing indexed endpoint uses the configured numeric missing display regardless of whether
+    the input stores it as ``np.nan`` or ``pd.NA``.
     The enum therefore chooses the statistics and not their display.
 
     A member documented here is computed in ``get_legend_lines``, which is the single place the
@@ -849,6 +851,22 @@ def _compute_legend_tstat_components(
     return avg, std, float(tstat)
 
 
+def _get_indexed_legend_endpoint(data_column: pd.Series, nan_display: float) -> object:
+    """Return the final indexed value with a dtype-independent missing representation.
+
+    Args:
+        data_column: One plotted series whose final indexed value is displayed.
+        nan_display: Configured numeric display value for a missing endpoint.
+
+    Returns:
+        Final indexed value, or ``nan_display`` when that scalar is missing.
+    """
+    last: object = data_column.iloc[-1]
+    missing_mask: np.ndarray = data_column.tail(1).isna().to_numpy(dtype=bool)
+    # Keep indexed selection intact while preventing pd.NA from bypassing numeric formatting.
+    return nan_display if bool(missing_mask[-1]) else last
+
+
 def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
                      legend_stats: LegendStats = LegendStats.NONE,
                      var_format: Optional[str] = '{:.0f}',
@@ -875,8 +893,9 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.LAST:
         legend_lines = []
-        for column in data.columns:
-            legend_lines.append(f"{column}: last={var_format.format(data[column].iloc[-1])}")
+        for column, data_column in data.items():
+            last = _get_indexed_legend_endpoint(data_column, nan_display)
+            legend_lines.append(f"{column}: last={var_format.format(last)}")
 
     elif legend_stats == LegendStats.LAST_NONNAN:
         legend_lines = []
@@ -922,14 +941,12 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
 
     elif legend_stats == LegendStats.AVG_LAST:
         legend_lines = []
-        for column in data.columns:
-            data_column = data[column]
+        for column, data_column in data.items():
+            last = _get_indexed_legend_endpoint(data_column, nan_display)
             if np.all(np.isnan(data_column)):
                 avg = nan_display
-                last = np.nan
             else:
                 avg = np.nanmean(data_column)
-                last = data_column.iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, last={var_format.format(last)}")
 
     elif legend_stats == LegendStats.AVG_STD:
@@ -970,13 +987,13 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
     elif legend_stats == LegendStats.AVG_STD_LAST:
         legend_lines = []
         for column, data_column in data.items():
+            last = _get_indexed_legend_endpoint(data_column, nan_display)
             if np.all(np.isnan(data_column)):
-                avg, std, last = nan_display, nan_display, nan_display
+                avg, std = nan_display, nan_display
             else:
                 avg = np.nanmean(data_column)
                 # Preserve endpoint selection while guarding its companion sample spread.
                 std = _compute_legend_sample_std(data_column, nan_display)
-                last = data_column.iloc[-1]
             legend_lines.append(f"{column}: avg={var_format.format(avg)}, "
                                 f"std={var_format.format(std)}, "
                                 f"last={var_format.format(last)}")
