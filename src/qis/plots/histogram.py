@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 from scipy import stats as stats
 from scipy.stats import norm
 from statsmodels import api as sm
-from typing import Union, List, Optional, Tuple
+from typing import Union, List, Optional, Tuple, Any
 from enum import Enum
 
 # qis
@@ -71,13 +71,27 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
                    ax: plt.Subplot = None,
                    **kwargs
                    ) -> Optional[plt.Figure]:
+    """Plot each input series as a density or histogram.
 
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = None
+    Args:
+        df: Observations, with one plotted sample per column.
+        pdf_type: Density or histogram representation to draw.
+        desc_table_type: Optional descriptive table displayed as the legend. Observed infinity
+            is rejected before drawing when this is enabled.
+        ax: Existing axis to draw on, or ``None`` to allocate a figure.
+
+    Returns:
+        The allocated figure, or ``None`` when ``ax`` was supplied.
+
+    Raises:
+        ValueError: If descriptive statistics are enabled and ``df`` contains infinity.
+    """
 
     if df.empty:
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = None
         warnings.warn('df is empty: no data to plot')
         return fig
 
@@ -99,6 +113,21 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
         df = pd.concat([universe_data,
                         df.reset_index(drop=True)
                         ], axis=1, sort=False)
+
+    stats_table: Optional[pd.DataFrame] = None
+    if desc_table_type is not None and desc_table_type != dsc.DescTableType.NONE:
+        # Validate descriptive inputs before plotting can mutate or allocate a figure.
+        typed_kwargs: dict[Any, Any] = kwargs
+        stats_table = dsc.compute_desc_table(df=df,
+                                             annualize_vol=annualize_vol,
+                                             desc_table_type=desc_table_type,
+                                             **update_kwargs(typed_kwargs,
+                                                             dict(var_format=xvar_format)))
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
 
     if colors is None:
         colors = put.get_n_colors(n=n,
@@ -199,11 +228,7 @@ def plot_histogram(df: Union[pd.DataFrame, pd.Series],
     if x_limits is not None:
         put.set_x_limits(ax=ax, x_limits=x_limits)
 
-    if desc_table_type is not None and desc_table_type != dsc.DescTableType.NONE:
-        stats_table = dsc.compute_desc_table(df=df,
-                                             annualize_vol=annualize_vol,
-                                             desc_table_type=desc_table_type,
-                                             **update_kwargs(kwargs, dict(var_format=xvar_format)))
+    if stats_table is not None:
         put.set_legend_with_stats_table(stats_table=stats_table,
                                         ax=ax,
                                         colors=colors,

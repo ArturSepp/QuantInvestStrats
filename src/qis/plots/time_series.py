@@ -79,7 +79,8 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
         trend_line: trend line drawn through each series
         trend_line_colors: colours for those trend lines, defaulting to the series colours
         legend_stats: which statistics each legend entry reports; see :class:`LegendStats`
-        desc_table_type: descriptive statistics table drawn beside the plot
+        desc_table_type: descriptive statistics table drawn beside the plot. Observed infinity
+            is rejected before drawing when this table is displayed
         legend_labels: replace the column names in the legend. Statistics from
             ``legend_stats`` are appended to these
         indices_for_shaded_areas: name to (start, end) positional index pairs, shaded to mark
@@ -90,13 +91,15 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
 
     Returns:
         the figure drawn on, or None when ``ax`` was supplied or ``df`` is empty
-    """
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = None
 
+    Raises:
+        ValueError: If a descriptive table is displayed and ``df`` contains infinity.
+    """
     if df.empty:
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = None
         warnings.warn('df is empty: no data to plot')
         return fig
 
@@ -108,6 +111,20 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     else:
         raise TypeError(f"unsuported data type {type(data1)}")
     columns = data1.columns
+
+    stats_table: Optional[pd.DataFrame] = None
+    if (legend_loc is not None
+            and legend_labels is None
+            and desc_table_type != DescTableType.NONE):
+        # Validate descriptive inputs before plotting can mutate or allocate a figure.
+        stats_table = compute_desc_table(df=data1,
+                                         desc_table_type=desc_table_type,
+                                         var_format=var_format)
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
 
     if colors is None:
         colors = put.get_n_colors(n=len(columns), **kwargs)
@@ -287,10 +304,7 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
 
     if legend_loc is not None:
         if legend_labels is None:
-            if desc_table_type != DescTableType.NONE:  # use get_legend_with_stats_table
-                stats_table = compute_desc_table(df=data1,
-                                                 desc_table_type=desc_table_type,
-                                                 var_format=var_format)
+            if stats_table is not None:  # use get_legend_with_stats_table
                 put.set_legend_with_stats_table(stats_table=stats_table,
                                                 ax=ax,
                                                 colors=colors,

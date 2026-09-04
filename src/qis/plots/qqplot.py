@@ -62,19 +62,21 @@ def plot_qq(df: Union[pd.DataFrame, pd.Series],
         is_drop_na: drop missing observations before ranking. False leaves them in and shifts
             the empirical quantiles, so leave this True unless the gaps are meaningful
         desc_table_type: descriptive statistics table drawn beside the plot; see
-            :class:`DescTableType`
+            :class:`DescTableType`. Observed infinity is rejected before drawing when this is
+            enabled
         legend_stats: summary statistics appended to each legend entry
 
     Returns:
         the figure drawn on
+
+    Raises:
+        ValueError: If descriptive statistics are enabled and ``df`` contains infinity.
     """
-
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = None
-
     if df.empty:
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = None
         warnings.warn('df is empty: no data to plot')
         return fig
 
@@ -83,6 +85,18 @@ def plot_qq(df: Union[pd.DataFrame, pd.Series],
         line = 'q'
     else:
         line= None
+
+    stats_table: Optional[pd.DataFrame] = None
+    if desc_table_type != dsc.DescTableType.NONE:
+        # Validate descriptive inputs before plotting can mutate or allocate a figure.
+        stats_table = dsc.compute_desc_table(df=df,
+                                             desc_table_type=desc_table_type,
+                                             var_format=var_format)
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
 
     if colors is None:
          colors = put.get_n_colors(n=len(df.columns), **kwargs)
@@ -100,10 +114,7 @@ def plot_qq(df: Union[pd.DataFrame, pd.Series],
     if line is None:
         sm.qqline(ax, line='45', fmt='-', color='red')
 
-    if desc_table_type != dsc.DescTableType.NONE:
-        stats_table = dsc.compute_desc_table(df=df,
-                                         desc_table_type=desc_table_type,
-                                         var_format=var_format)
+    if stats_table is not None:
         put.set_legend_with_stats_table(stats_table=stats_table,
                                         ax=ax,
                                         colors=colors,
