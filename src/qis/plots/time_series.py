@@ -80,7 +80,8 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
         trend_line_colors: colours for those trend lines, defaulting to the series colours
         legend_stats: which statistics each legend entry reports; see :class:`LegendStats`
         desc_table_type: descriptive statistics table drawn beside the plot. Observed infinity
-            is rejected before drawing when this table is displayed
+            is rejected before drawing when this table is displayed; when ``var_format`` is
+            None, table values use native scalar text
         legend_labels: replace the column names in the legend. Statistics from
             ``legend_stats`` are appended to these
         indices_for_shaded_areas: name to (start, end) positional index pairs, shaded to mark
@@ -117,9 +118,11 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
             and legend_labels is None
             and desc_table_type != DescTableType.NONE):
         # Validate descriptive inputs before plotting can mutate or allocate a figure.
+        # Preserve automatic axis ticks while giving descriptive values a text format.
+        table_var_format = '{}' if var_format is None else var_format
         stats_table = compute_desc_table(df=data1,
                                          desc_table_type=desc_table_type,
-                                         var_format=var_format)
+                                         var_format=table_var_format)
 
     if ax is None:
         fig, ax = plt.subplots()

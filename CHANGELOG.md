@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Made time-series descriptive legends use native scalar text when their public plotting format
+  is `None`.
+
 ## [5.22.1] - 2026-09-05
 
 ### Changed
