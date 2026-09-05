@@ -42,7 +42,6 @@ from qis.portfolio.reports.config import (
     PERF_PARAMS,
     _get_recent_ra_perf_table_time_period,
     infer_data_frequency_label,
-    regime_classifier,
     validate_reporting_frequency,
 )
 from qis.plots.utils import TrendLine, align_y_limits_axs, set_spines

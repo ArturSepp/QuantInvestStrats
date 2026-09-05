@@ -90,7 +90,7 @@ def test_strategy_and_multi_asset_factsheets_use_recent_ra_start_date(monkeypatc
         return kwargs['ax']
 
     monkeypatch.setattr(portfolio, 'plot_ra_perf_table', capture_strategy_period)
-    figs = generate_strategy_factsheet(
+    generate_strategy_factsheet(
         portfolio_data=portfolio,
         benchmark_prices=benchmark_prices,
         recent_ra_perf_table_start_date=pd.Timestamp('2022-06-30'),
