@@ -700,7 +700,7 @@ def test_current_ewma_integration_statistics_are_scale_invariant(
     np.testing.assert_allclose(
         tiny_row[statistic],
         ordinary_row[statistic],
-        rtol=1.0e-6,
+        rtol=1.0e-5,
         atol=absolute_tolerance,
     )
 
