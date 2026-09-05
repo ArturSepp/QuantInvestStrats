@@ -28,7 +28,8 @@ All generated component returns are checked for finiteness before the result is 
 The full-sample estimator is an ex-post explanatory analysis, not an input to a portfolio
 backtest. Its coefficients must not be interpreted as implementable forecasts. The rolling
 estimator instead uses QIS EWMA betas, applies each estimate only after ``beta_lag`` periods, and
-supports expanding annualised alpha and an unannualised cumulative-alpha view after a warm-up.
+supports expanding annualised alpha, same-span EWMA current estimates, and an unannualised
+cumulative-alpha view after a warm-up.
 """
 
 from dataclasses import dataclass
@@ -42,7 +43,9 @@ import qis.utils.regression as ols
 from qis.models.linear.ewm import (
     InitType,
     MeanAdjType,
+    compute_ewm,
     compute_ewm_beta_alpha_forecast,
+    compute_ewm_sharpe,
 )
 from qis.perfstats.config import PerfStat
 from qis.utils.annualisation import get_annualization_factor
@@ -98,6 +101,10 @@ class ModelLayerEwmaAlphaAttribution:
         beta_lag: Number of periods between beta estimation and application.
         beta_init_value: Point-in-time beta prior used before an estimate is available.
         mean_adj_type: Point-in-time mean adjustment used in beta estimation.
+
+    The ``ewma_annualised_components`` and ``ewma_annualised_alpha`` properties apply the same
+    span as the beta estimator to the exact realised, lagged-beta component returns. Their
+    ``current_*`` counterparts return the final point-in-time row.
     """
 
     periodic_returns: pd.DataFrame
@@ -111,6 +118,81 @@ class ModelLayerEwmaAlphaAttribution:
     beta_lag: int
     beta_init_value: float
     mean_adj_type: MeanAdjType
+
+    @property
+    def ewma_annualised_components(self) -> pd.DataFrame:
+        """Return same-span EWMA annualised estimates of every realised component."""
+        return compute_ewm(
+            data=self.component_returns,
+            span=self.beta_span,
+            init_type=InitType.X0,
+        ).multiply(get_annualization_factor(freq=self.freq))
+
+    @property
+    def ewma_annualised_alpha(self) -> pd.DataFrame:
+        """Return same-span EWMA annualised estimates of the additive alpha components."""
+        alpha_columns = [
+            'Total Model Alpha',
+            'Risk Layer Alpha',
+            'Signal Layer Alpha',
+            'Integration Alpha',
+        ]
+        return self.ewma_annualised_components[alpha_columns]
+
+    @property
+    def current_ewma_annualised_components(self) -> pd.Series:
+        """Return the latest same-span EWMA annualised component estimates."""
+        return self.ewma_annualised_components.iloc[-1].copy()
+
+    @property
+    def current_ewma_annualised_alpha(self) -> pd.Series:
+        """Return the latest same-span EWMA annualised additive alpha estimates."""
+        return self.ewma_annualised_alpha.iloc[-1].copy()
+
+
+@dataclass(frozen=True)
+class ModelLayerEwmaRegressionAttribution:
+    """Current exponentially weighted model-layer regression attribution.
+
+    Unlike :class:`ModelLayerEwmaAlphaAttribution`, this is a descriptive endpoint regression,
+    not a sequence of lagged out-of-sample beta estimates. One common set of geometric weights is
+    used to estimate risk-, signal-, integration- and full-model alpha and beta. Bartlett HAC
+    inference is based on the corresponding weighted regression scores, so each displayed alpha
+    is the midpoint of its own confidence interval. The three component-alpha covariances are
+    estimated jointly.
+
+    Attributes:
+        periodic_returns: Common-sample periodic model-layer log returns.
+        weights: Geometric regression weights, with the latest observation assigned weight one.
+        regression_table: EWMA-WLS alpha, beta, fit and HAC inference by model layer.
+        component_returns: Exact constant-beta log-return decomposition over the common sample.
+        annualised_components: Geometrically weighted annualised component means.
+        annualised_alpha_covariance: Joint covariance of annualised risk, signal and integration
+            alpha, including their cross-equation covariances.
+        parameter_covariance: Joint periodic alpha/beta covariance for the observed layers.
+        freq: Return and regression frequency.
+        span: EWMA span in return periods.
+        ewm_lambda: Geometric decay implied by ``span``.
+        nobs: Number of observations retained by the weighted regression.
+        effective_nobs: Kish effective sample size of the geometric weights.
+        hac_lags: Bartlett-kernel lag count used for inference.
+        confidence_level: Two-sided normal-reference confidence level.
+    """
+
+    periodic_returns: pd.DataFrame
+    weights: pd.Series
+    regression_table: pd.DataFrame
+    component_returns: pd.DataFrame
+    annualised_components: pd.Series
+    annualised_alpha_covariance: pd.DataFrame
+    parameter_covariance: pd.DataFrame
+    freq: str
+    span: int
+    ewm_lambda: float
+    nobs: int
+    effective_nobs: float
+    hac_lags: int
+    confidence_level: float
 
 
 @dataclass(frozen=True)
@@ -343,15 +425,19 @@ def _to_common_model_layer_returns(
         signal_layer_nav: pd.Series,
         full_model_nav: pd.Series,
         freq: str,
+        full_model_net_nav: Optional[pd.Series] = None,
 ) -> pd.DataFrame:
-    """Convert four model-layer NAVs to finite common-sample log returns."""
+    """Convert gross and optional net model-layer NAVs to common-sample log returns."""
+    nav_series = {
+        'Benchmark': benchmark_nav,
+        'Risk Layer': risk_layer_nav,
+        'Signal Layer': signal_layer_nav,
+        'Full Model': full_model_nav,
+    }
+    if full_model_net_nav is not None:
+        nav_series['Full Model Net'] = full_model_net_nav
     navs = pd.concat(
-        {
-            'Benchmark': benchmark_nav,
-            'Risk Layer': risk_layer_nav,
-            'Signal Layer': signal_layer_nav,
-            'Full Model': full_model_nav,
-        },
+        nav_series,
         axis=1,
         sort=True,
     ).sort_index()
@@ -393,6 +479,242 @@ def _validate_estimated_betas(estimated_betas: pd.DataFrame) -> None:
             raise RuntimeError(
                 f'EWMA beta estimates contain non-leading non-finite values for {column}'
             )
+
+
+def compute_model_layer_ewma_regression_attribution(
+        benchmark_nav: pd.Series,
+        risk_layer_nav: pd.Series,
+        signal_layer_nav: pd.Series,
+        full_model_nav: pd.Series,
+        freq: str = 'ME',
+        full_model_net_nav: Optional[pd.Series] = None,
+        span: int = 36,
+        hac_lags: int = ALPHA_HAC_LAGS,
+        confidence_level: float = ALPHA_CONFIDENCE_LEVEL,
+) -> ModelLayerEwmaRegressionAttribution:
+    """Estimate a current model-layer decomposition by EWMA-WLS with joint HAC inference.
+
+    This endpoint estimator assigns geometrically decaying weights to the common log-return
+    sample, with decay ``1 - 2 / (span + 1)`` and latest weight one. Risk-layer, signal-layer,
+    integration and full-model returns are fitted jointly to the benchmark, where integration is
+    first constructed exactly as full minus risk minus signal. Including that constructed response
+    directly is algebraically equivalent to a coefficient contrast while avoiding cancellation in
+    its weighted-score HAC covariance. This is a descriptive current estimate; use
+    :func:`compute_model_layer_ewma_alpha_attribution` for lagged, no-look-ahead residual paths.
+
+    Args:
+        benchmark_nav: Benchmark NAV or price index.
+        risk_layer_nav: NAV produced using the risk layer without alpha signals.
+        signal_layer_nav: NAV of the portfolio built from the signals alone.
+        full_model_nav: NAV of the fully integrated gross model.
+        freq: Regression and return frequency. Defaults to month-end.
+        full_model_net_nav: Optional fully integrated model NAV after trading costs.
+        span: Geometric EWMA regression span in return periods. Defaults to 36.
+        hac_lags: Bartlett-kernel lag count for weighted-score HAC covariance. Defaults to three.
+        confidence_level: Two-sided normal-reference alpha interval level. Defaults to 0.95.
+
+    Returns:
+        Current EWMA alpha/beta estimates, joint inference and exact return components.
+
+    Raises:
+        TypeError: If NAV inputs do not have a DatetimeIndex.
+        ValueError: If settings, NAV coverage or weighted regression inputs are invalid.
+        RuntimeError: If a generated component or inference output is non-finite.
+    """
+    _validate_positive_integer(value=span, name='span')
+    periodic_returns = _to_common_model_layer_returns(
+        benchmark_nav=benchmark_nav,
+        risk_layer_nav=risk_layer_nav,
+        signal_layer_nav=signal_layer_nav,
+        full_model_nav=full_model_nav,
+        full_model_net_nav=full_model_net_nav,
+        freq=freq,
+    )
+    direct_layers = ['Risk Layer', 'Signal Layer', 'Full Model']
+    if full_model_net_nav is not None:
+        direct_layers.append('Full Model Net')
+    integration_returns = (
+        periodic_returns['Full Model']
+        - periodic_returns['Risk Layer']
+        - periodic_returns['Signal Layer']
+    )
+    regression_layers = ['Risk Layer', 'Signal Layer', 'Integration', 'Full Model']
+    if full_model_net_nav is not None:
+        regression_layers.append('Full Model Net')
+    regression_returns = periodic_returns[direct_layers].copy()
+    regression_returns.insert(2, 'Integration', integration_returns)
+    try:
+        regression = ols.estimate_ewma_alpha_beta_hac(
+            x=periodic_returns['Benchmark'],
+            y=regression_returns[regression_layers],
+            span=span,
+            hac_lags=hac_lags,
+            confidence_level=confidence_level,
+        )
+    except Exception as exception:
+        raise ValueError('EWMA model-layer regression failed') from exception
+
+    alpha_column = PerfStat.ALPHA.to_str()
+    annualised_alpha_column = PerfStat.ALPHA_AN.to_str()
+    beta_column = PerfStat.BETA.to_str()
+    r2_column = PerfStat.R2.to_str()
+    pvalue_column = PerfStat.ALPHA_PVALUE.to_str()
+    annualisation = get_annualization_factor(freq=freq)
+    regression_rows: dict[str, dict[str, float]] = {
+        'Benchmark': {
+            alpha_column: 0.0,
+            annualised_alpha_column: 0.0,
+            beta_column: 1.0,
+            r2_column: 1.0,
+            pvalue_column: 1.0,
+            ALPHA_HAC_SE_COLUMN: 0.0,
+            ALPHA_AN_CI_LOW_COLUMN: 0.0,
+            ALPHA_AN_CI_HIGH_COLUMN: 0.0,
+        }
+    }
+    for layer in regression_layers:
+        regression_rows[layer] = {
+            alpha_column: float(regression.alpha[layer]),
+            annualised_alpha_column: annualisation * float(regression.alpha[layer]),
+            beta_column: float(regression.beta[layer]),
+            r2_column: float(regression.r_squared[layer]),
+            pvalue_column: float(regression.alpha_pvalue[layer]),
+            ALPHA_HAC_SE_COLUMN: float(regression.alpha_hac_se[layer]),
+            ALPHA_AN_CI_LOW_COLUMN: (
+                annualisation
+                * float(regression.alpha_confidence_interval.loc[layer, 'Lower'])
+            ),
+            ALPHA_AN_CI_HIGH_COLUMN: (
+                annualisation
+                * float(regression.alpha_confidence_interval.loc[layer, 'Upper'])
+            ),
+        }
+
+    component_layers = ['Risk Layer', 'Signal Layer', 'Integration']
+    component_parameter_index = pd.MultiIndex.from_tuples(
+        [(layer, 'Intercept') for layer in component_layers],
+        names=['equation', 'parameter'],
+    )
+    component_alpha_covariance = regression.parameter_covariance.loc[
+        component_parameter_index,
+        component_parameter_index,
+    ].to_numpy(dtype=float)
+    row_order = ['Benchmark', 'Risk Layer', 'Signal Layer', 'Integration', 'Full Model']
+    if full_model_net_nav is not None:
+        row_order.append('Full Model Net')
+    regression_table = pd.DataFrame.from_dict(regression_rows, orient='index').loc[row_order]
+
+    benchmark_returns = periodic_returns['Benchmark']
+    systematic_returns = float(regression.beta['Full Model']) * benchmark_returns
+    risk_alpha = (
+        periodic_returns['Risk Layer']
+        - float(regression.beta['Risk Layer']) * benchmark_returns
+    )
+    signal_alpha = (
+        periodic_returns['Signal Layer']
+        - float(regression.beta['Signal Layer']) * benchmark_returns
+    )
+    total_alpha = periodic_returns['Full Model'] - systematic_returns
+    integration_alpha_returns = total_alpha - risk_alpha - signal_alpha
+    component_returns = pd.DataFrame({
+        'Benchmark Return': benchmark_returns,
+        'Risk Layer Return': periodic_returns['Risk Layer'],
+        'Signal Layer Return': periodic_returns['Signal Layer'],
+        'Systematic Return': systematic_returns,
+        'Total Model Alpha': total_alpha,
+        'Risk Layer Alpha': risk_alpha,
+        'Signal Layer Alpha': signal_alpha,
+        'Integration Alpha': integration_alpha_returns,
+        'Full Model Return': periodic_returns['Full Model'],
+    })
+    if full_model_net_nav is not None:
+        component_returns['Trading Cost Drag'] = (
+            periodic_returns['Full Model Net'] - periodic_returns['Full Model']
+        )
+        component_returns['Full Model Net Return'] = periodic_returns['Full Model Net']
+    if not np.isfinite(component_returns.to_numpy(dtype=float)).all():
+        raise RuntimeError('EWMA model-layer components contain non-finite values')
+    weighted_means = component_returns.multiply(regression.weights, axis=0).sum(axis=0)
+    weighted_means = weighted_means.divide(float(regression.weights.sum()))
+    annualised_components = annualisation * weighted_means
+    annualised_alpha_covariance = pd.DataFrame(
+        annualisation ** 2 * component_alpha_covariance,
+        index=['Risk Layer', 'Signal Layer', 'Integration'],
+        columns=['Risk Layer', 'Signal Layer', 'Integration'],
+    )
+    if not np.isfinite(regression_table.to_numpy(dtype=float)).all():
+        raise RuntimeError('EWMA model-layer inference contains non-finite values')
+    direct_parameter_index = pd.MultiIndex.from_product(
+        [direct_layers, ['Intercept', 'Beta']],
+        names=['equation', 'parameter'],
+    )
+    direct_parameter_covariance = regression.parameter_covariance.loc[
+        direct_parameter_index,
+        direct_parameter_index,
+    ]
+    return ModelLayerEwmaRegressionAttribution(
+        periodic_returns=periodic_returns,
+        weights=regression.weights.copy(),
+        regression_table=regression_table,
+        component_returns=component_returns,
+        annualised_components=annualised_components,
+        annualised_alpha_covariance=annualised_alpha_covariance,
+        parameter_covariance=direct_parameter_covariance.copy(),
+        freq=freq,
+        span=int(span),
+        ewm_lambda=float(regression.ewm_lambda),
+        nobs=int(regression.nobs),
+        effective_nobs=float(regression.effective_nobs),
+        hac_lags=int(regression.hac_lags),
+        confidence_level=float(regression.confidence_level),
+    )
+
+
+def compute_model_layer_ewma_stage_sharpes(
+        attribution: ModelLayerEwmaRegressionAttribution,
+        span: Optional[int] = None,
+        norm_type: int = 2,
+) -> pd.DataFrame:
+    """Compute EWMA Sharpe paths after adding model-layer components sequentially.
+
+    The default ``norm_type=2`` divides the EWMA mean log return by volatility around that EWMA
+    mean. Contributions shown in a bridge are arithmetic differences between adjacent stage
+    Sharpes and are therefore order-dependent; they are not standalone component Sharpe ratios.
+
+    Args:
+        attribution: Current EWMA-regression attribution and its exact component returns.
+        span: Optional Sharpe EWMA span. The regression span is used when omitted.
+        norm_type: QIS EWMA Sharpe normalisation. Values one and two are supported; defaults to two.
+
+    Returns:
+        Point-in-time EWMA Sharpe paths for benchmark, systematic, risk, signal and full stages.
+
+    Raises:
+        ValueError: If ``span`` is invalid or ``norm_type`` is not one or two.
+    """
+    sharpe_span = attribution.span if span is None else span
+    _validate_positive_integer(value=sharpe_span, name='span')
+    if norm_type not in (1, 2):
+        raise ValueError(f'norm_type must be one or two, got {norm_type}')
+    components = attribution.component_returns
+    stage_returns = pd.DataFrame({
+        'Benchmark': components['Benchmark Return'],
+        'Systematic': components['Systematic Return'],
+        'Risk Layer': components['Systematic Return'] + components['Risk Layer Alpha'],
+        'Signal Layer': (
+            components['Systematic Return']
+            + components['Risk Layer Alpha']
+            + components['Signal Layer Alpha']
+        ),
+        'Full Model Gross': components['Full Model Return'],
+    })
+    if 'Full Model Net Return' in components.columns:
+        stage_returns['Full Model Net'] = components['Full Model Net Return']
+    return compute_ewm_sharpe(
+        returns=stage_returns,
+        span=int(sharpe_span),
+        norm_type=norm_type,
+    )
 
 
 def compute_model_layer_ewma_alpha_attribution(

@@ -7,12 +7,22 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.22.2] - 2026-09-05
+
+### Added
+
+- Added current model-layer geometric EWMA-WLS attribution with joint weighted-score Bartlett
+  HAC inference, effective-sample diagnostics, exact return and sequential Sharpe bridges, and an
+  optional net-of-cost step.
+
 ### Fixed
 
 - Made time-series descriptive legends use native scalar text when their public plotting format
   is `None`.
 - Made all-zero `FIRST_LAST_NON_ZERO` legends display undefined endpoints instead of raising an
   incidental indexing error.
+- Stabilized statistic-legend sample standard deviation and dependent t-statistics for finite
+  samples whose spread is very small relative to their level.
 
 ## [5.22.1] - 2026-09-05
 
@@ -29,8 +39,6 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   descriptive error instead of incidental exceptions or flattened estimates.
 - Stabilized descriptive-table sample standard deviation, annualized volatility, and sample-mean
   t-statistics for finite samples whose spread is very small relative to their level.
-- Stabilized statistic-legend sample standard deviation and dependent t-statistics for finite
-  samples whose spread is very small relative to their level.
 
 ## [5.22.0] - 2026-09-05
 

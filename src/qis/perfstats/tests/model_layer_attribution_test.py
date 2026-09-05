@@ -14,9 +14,12 @@ from qis.perfstats.model_layer_attribution import (
     ModelLayerAlphaBetaAttribution,
     ModelLayerCumulativeAlphaAttribution,
     ModelLayerEwmaAlphaAttribution,
+    ModelLayerEwmaRegressionAttribution,
     compute_model_layer_alpha_beta_attribution,
     compute_model_layer_cumulative_alpha_after_warmup,
     compute_model_layer_ewma_alpha_attribution,
+    compute_model_layer_ewma_regression_attribution,
+    compute_model_layer_ewma_stage_sharpes,
 )
 
 
@@ -492,6 +495,304 @@ def test_rolling_alpha_is_step_ahead_and_reconstructs_every_return() -> None:
         .multiply(12.0)
     )
     pd.testing.assert_frame_equal(baseline.expanding_annualised_alpha, expected_expanding)
+
+
+def test_rolling_ewma_alpha_summary_matches_independent_pandas_recursion() -> None:
+    """Current EWMA estimates smooth the exact lagged-beta components with the beta span."""
+    span = 4
+    result = compute_model_layer_ewma_alpha_attribution(
+        **_rolling_navs(_rolling_layer_returns()),
+        freq='ME',
+        beta_span=span,
+    )
+    alpha_columns = [
+        'Total Model Alpha',
+        'Risk Layer Alpha',
+        'Signal Layer Alpha',
+        'Integration Alpha',
+    ]
+    expected_components = (
+        result.component_returns.ewm(span=span, adjust=False).mean().multiply(12.0)
+    )
+    expected_alpha = expected_components[alpha_columns]
+
+    pd.testing.assert_frame_equal(
+        result.ewma_annualised_components,
+        expected_components,
+    )
+    pd.testing.assert_frame_equal(result.ewma_annualised_alpha, expected_alpha)
+    pd.testing.assert_series_equal(
+        result.current_ewma_annualised_components,
+        expected_components.iloc[-1],
+    )
+    pd.testing.assert_series_equal(
+        result.current_ewma_annualised_alpha,
+        expected_alpha.iloc[-1],
+    )
+    np.testing.assert_allclose(
+        result.ewma_annualised_alpha['Total Model Alpha'],
+        result.ewma_annualised_alpha[[
+            'Risk Layer Alpha',
+            'Signal Layer Alpha',
+            'Integration Alpha',
+        ]].sum(axis=1),
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(
+        result.ewma_annualised_components['Full Model Return'],
+        result.ewma_annualised_components[[
+            'Systematic Return',
+            'Risk Layer Alpha',
+            'Signal Layer Alpha',
+            'Integration Alpha',
+        ]].sum(axis=1),
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+
+
+def test_current_ewma_regression_attribution_is_additive_and_ci_centred() -> None:
+    """EWMA-WLS bars reconstruct the model and match their joint HAC intervals."""
+    result = compute_model_layer_ewma_regression_attribution(
+        **_rolling_navs(_rolling_layer_returns()),
+        freq='ME',
+        span=8,
+        hac_lags=3,
+        confidence_level=0.95,
+    )
+
+    assert isinstance(result, ModelLayerEwmaRegressionAttribution)
+    assert result.span == 8
+    assert result.hac_lags == 3
+    assert 0.0 < result.effective_nobs <= result.nobs
+    bridge_columns = [
+        'Systematic Return',
+        'Risk Layer Alpha',
+        'Signal Layer Alpha',
+        'Integration Alpha',
+    ]
+    np.testing.assert_allclose(
+        result.component_returns[bridge_columns].sum(axis=1),
+        result.component_returns['Full Model Return'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(
+        result.annualised_components[bridge_columns].sum(),
+        result.annualised_components['Full Model Return'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    for layer, component in (
+        ('Risk Layer', 'Risk Layer Alpha'),
+        ('Signal Layer', 'Signal Layer Alpha'),
+        ('Integration', 'Integration Alpha'),
+    ):
+        row = result.regression_table.loc[layer]
+        midpoint = 0.5 * (row['An Alpha CI Low'] + row['An Alpha CI High'])
+        np.testing.assert_allclose(
+            result.annualised_components[component],
+            row['An Alpha'],
+            atol=1.0e-12,
+            rtol=0.0,
+        )
+        np.testing.assert_allclose(midpoint, row['An Alpha'], atol=1.0e-12, rtol=0.0)
+
+
+def test_current_ewma_regression_integration_covariance_matches_full_alpha() -> None:
+    """Joint risk, signal and integration covariance reconstructs full-model uncertainty."""
+    result = compute_model_layer_ewma_regression_attribution(
+        **_rolling_navs(_rolling_layer_returns()),
+        freq='ME',
+        span=8,
+    )
+    ones = np.ones(3)
+    reconstructed_variance = float(
+        ones @ result.annualised_alpha_covariance.to_numpy() @ ones
+    )
+    full_se = float(result.regression_table.loc['Full Model', 'Alpha HAC SE']) * 12.0
+    np.testing.assert_allclose(
+        reconstructed_variance,
+        full_se ** 2,
+        atol=1.0e-14,
+        rtol=1.0e-10,
+    )
+
+
+def test_current_ewma_integration_matches_a_direct_weighted_hac_regression() -> None:
+    """The joint covariance contrast agrees with fitting the integration return directly."""
+    result = compute_model_layer_ewma_regression_attribution(
+        **_rolling_navs(_rolling_layer_returns()),
+        freq='ME',
+        span=8,
+        hac_lags=3,
+    )
+    integration_returns = (
+        result.periodic_returns['Full Model']
+        - result.periodic_returns['Risk Layer']
+        - result.periodic_returns['Signal Layer']
+    ).to_frame('Integration')
+    direct = model_layer.ols.estimate_ewma_alpha_beta_hac(
+        x=result.periodic_returns['Benchmark'],
+        y=integration_returns,
+        span=result.span,
+        hac_lags=result.hac_lags,
+        confidence_level=result.confidence_level,
+    )
+    row = result.regression_table.loc['Integration']
+    np.testing.assert_allclose(row['Alpha'], direct.alpha['Integration'], atol=1.0e-12)
+    np.testing.assert_allclose(row['Beta'], direct.beta['Integration'], atol=1.0e-12)
+    np.testing.assert_allclose(
+        row['Alpha HAC SE'],
+        direct.alpha_hac_se['Integration'],
+        atol=1.0e-12,
+    )
+    np.testing.assert_allclose(
+        row[['An Alpha CI Low', 'An Alpha CI High']].to_numpy(dtype=float),
+        12.0 * direct.alpha_confidence_interval.loc['Integration'].to_numpy(dtype=float),
+        atol=1.0e-12,
+    )
+
+
+def _near_additive_ewma_navs(integration_scale: float) -> dict[str, pd.Series]:
+    """Return layers whose integration return is tiny relative to the observed layers."""
+    nobs = 96
+    time = np.arange(nobs, dtype=float)
+    benchmark_returns = 0.01 * np.sin(time / 4.0) + 0.005 * np.cos(time / 9.0)
+    risk_returns = 0.001 + 0.8 * benchmark_returns + 0.003 * np.sin(time / 3.0)
+    signal_returns = 0.002 + 1.1 * benchmark_returns + 0.004 * np.cos(time / 5.0)
+    integration_returns = integration_scale * (0.005 + 0.0001 * np.sin(time))
+    full_returns = risk_returns + signal_returns + integration_returns
+    index = pd.date_range('2017-12-31', periods=nobs + 1, freq='ME')
+    return {
+        'benchmark_nav': _nav_from_log_returns(benchmark_returns, index),
+        'risk_layer_nav': _nav_from_log_returns(risk_returns, index),
+        'signal_layer_nav': _nav_from_log_returns(signal_returns, index),
+        'full_model_nav': _nav_from_log_returns(full_returns, index),
+    }
+
+
+@pytest.mark.parametrize(('statistic', 'absolute_tolerance'), [
+    ('R2', 1.0e-12),
+    ('p-Alpha', 1.0e-15),
+])
+def test_current_ewma_integration_statistics_are_scale_invariant(
+        statistic: str,
+        absolute_tolerance: float,
+) -> None:
+    """Small return units do not trigger zero shortcuts in an integration fit statistic."""
+    ordinary = compute_model_layer_ewma_regression_attribution(
+        **_near_additive_ewma_navs(integration_scale=1.0),
+        freq='ME',
+        span=36,
+        hac_lags=3,
+    )
+    tiny = compute_model_layer_ewma_regression_attribution(
+        **_near_additive_ewma_navs(integration_scale=1.0e-6),
+        freq='ME',
+        span=36,
+        hac_lags=3,
+    )
+    ordinary_row = ordinary.regression_table.loc['Integration']
+    tiny_row = tiny.regression_table.loc['Integration']
+
+    np.testing.assert_allclose(
+        tiny_row[statistic],
+        ordinary_row[statistic],
+        rtol=1.0e-6,
+        atol=absolute_tolerance,
+    )
+
+
+def test_current_ewma_tiny_integration_covariance_matches_direct_fit() -> None:
+    """Joint integration inference avoids cancellation between large layer covariances."""
+    result = compute_model_layer_ewma_regression_attribution(
+        **_near_additive_ewma_navs(integration_scale=1.0e-6),
+        freq='ME',
+        span=36,
+        hac_lags=3,
+    )
+    integration_returns = (
+        result.periodic_returns['Full Model']
+        - result.periodic_returns['Risk Layer']
+        - result.periodic_returns['Signal Layer']
+    ).to_frame('Integration')
+    direct = model_layer.ols.estimate_ewma_alpha_beta_hac(
+        x=result.periodic_returns['Benchmark'],
+        y=integration_returns,
+        span=result.span,
+        hac_lags=result.hac_lags,
+        confidence_level=result.confidence_level,
+    )
+    row = result.regression_table.loc['Integration']
+
+    np.testing.assert_allclose(
+        row['Alpha HAC SE'],
+        direct.alpha_hac_se['Integration'],
+        rtol=1.0e-10,
+        atol=1.0e-20,
+    )
+    np.testing.assert_allclose(
+        result.annualised_alpha_covariance.loc['Integration', 'Integration'],
+        (12.0 * direct.alpha_hac_se['Integration']) ** 2,
+        rtol=1.0e-10,
+        atol=1.0e-30,
+    )
+
+
+def test_current_ewma_stage_sharpes_match_existing_qis_ewma_engine() -> None:
+    """Sequential stage Sharpes reuse the QIS norm-type-two EWMA estimator."""
+    result = compute_model_layer_ewma_regression_attribution(
+        **_rolling_navs(_rolling_layer_returns()),
+        freq='ME',
+        span=8,
+    )
+    actual = compute_model_layer_ewma_stage_sharpes(result, norm_type=2)
+    components = result.component_returns
+    expected_returns = pd.DataFrame({
+        'Benchmark': components['Benchmark Return'],
+        'Systematic': components['Systematic Return'],
+        'Risk Layer': components['Systematic Return'] + components['Risk Layer Alpha'],
+        'Signal Layer': (
+            components['Systematic Return']
+            + components['Risk Layer Alpha']
+            + components['Signal Layer Alpha']
+        ),
+        'Full Model Gross': components['Full Model Return'],
+    })
+    expected = model_layer.compute_ewm_sharpe(
+        returns=expected_returns,
+        span=result.span,
+        norm_type=2,
+    )
+    pd.testing.assert_frame_equal(actual, expected)
+
+
+def test_current_ewma_regression_optional_net_extends_both_bridges() -> None:
+    """An optional net NAV contributes an exact cost step to return and Sharpe stages."""
+    returns = _rolling_layer_returns()
+    net_returns = returns['Full Model'] - np.linspace(0.0001, 0.0004, len(returns.index))
+    navs = _rolling_navs(returns)
+    navs['full_model_net_nav'] = _nav_from_log_returns(
+        net_returns.to_numpy(),
+        navs['full_model_nav'].index,
+    )
+    result = compute_model_layer_ewma_regression_attribution(
+        **navs,
+        freq='ME',
+        span=8,
+    )
+
+    np.testing.assert_allclose(
+        result.component_returns['Full Model Return']
+        + result.component_returns['Trading Cost Drag'],
+        result.component_returns['Full Model Net Return'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    sharpes = compute_model_layer_ewma_stage_sharpes(result)
+    assert sharpes.columns[-1] == 'Full Model Net'
 
 
 def test_rolling_attribution_honours_a_two_period_beta_lag() -> None:

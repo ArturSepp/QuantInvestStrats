@@ -62,6 +62,17 @@ class Fixtures:
         self.regime_classifier = qis.BenchmarkReturnsQuantilesRegime()
         self.perf_params = qis.PerfParams(freq='ME')
 
+        model_layers = self.prices.iloc[:, :4]
+        self.model_layer_attribution = qis.compute_model_layer_ewma_regression_attribution(
+            benchmark_nav=model_layers.iloc[:, 0],
+            risk_layer_nav=model_layers.iloc[:, 1],
+            signal_layer_nav=model_layers.iloc[:, 2],
+            full_model_nav=model_layers.iloc[:, 3],
+            freq='ME',
+            span=12,
+            hac_lags=1,
+        )
+
         # signal diagnostics: one horizon dictionary and a signal on the same grid
         self.asset_returns_dict = {'ME': self.returns[self.group_data.index]}
         self.signal = self.returns[self.group_data.index].rolling(3).mean().dropna()
@@ -157,6 +168,14 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
         'plot_multivariate_scatter_with_prediction': dict(
             df=fx.returns, x=list(fx.returns.columns[1:3]), y=fx.returns.columns[0],
             x_axis_column=fx.returns.columns[1]),  # no hue: exercises the no-legend path
+        'plot_model_layer_ewma_return_bridge': dict(
+            attribution=fx.model_layer_attribution,
+            detailed_mode=False,
+        ),
+        'plot_model_layer_ewma_sharpe_bridge': dict(
+            attribution=fx.model_layer_attribution,
+            detailed_mode=False,
+        ),
         'plot_pie': dict(df=fx.positive_table),
         'plot_prices_2ax': dict(prices_ax1=fx.prices.iloc[:, [0]],
                                 prices_ax2=fx.prices.iloc[:, [1]]),

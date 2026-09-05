@@ -9,6 +9,8 @@ p-value, returning zeros with a warning rather than raising when the fit fails.
 HAC standard error, p-value and confidence interval for alpha. ``estimate_hac_mean`` is the
 constant-only case: a sample mean with the same Bartlett HAC inference and the one-parameter
 small-sample correction, for a return series that has no regressor.
+``estimate_ewma_alpha_beta_hac`` fits several dependent series on one common regressor using
+exponentially weighted least squares and returns their joint Bartlett-HAC covariance.
 ``reg_model_params_to_str`` formats the fitted equation for a chart legend, and annualises the
 intercept as expm1(a α) when
 ``alpha_an_factor`` is passed. ``newey_west_lag_rule`` supplies the opt-in Newey-West rule of thumb
@@ -24,6 +26,7 @@ from dataclasses import dataclass
 import warnings
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 from statsmodels import api as sm
 from statsmodels.regression.linear_model import RegressionResults as RegModel
 from typing import Tuple, Union
@@ -48,6 +51,41 @@ class OlsAlphaBetaHacResult:
     alpha_pvalue: float
     alpha_hac_se: float
     alpha_confidence_interval: tuple[float, float]
+
+
+@dataclass(frozen=True)
+class EwmaAlphaBetaHacResult:
+    """Joint EWMA-WLS alpha/beta estimates with Bartlett-HAC inference.
+
+    Attributes:
+        alpha: Weighted intercepts indexed by dependent-series name.
+        beta: Weighted slopes indexed by dependent-series name.
+        r_squared: Weighted coefficients of determination.
+        alpha_pvalue: Normal-reference two-sided p-values for the intercepts.
+        alpha_hac_se: Bartlett-HAC standard errors for the intercepts.
+        alpha_confidence_interval: Intercept confidence bounds in ``Lower`` and ``Upper`` columns.
+        parameter_covariance: Joint HAC covariance with ``(equation, parameter)`` axes.
+        weights: Unnormalised EWMA objective weights aligned with the retained rows.
+        ewm_lambda: Per-row EWMA decay, equal to ``1 - 2 / (span + 1)``.
+        nobs: Number of rows retained in the common finite sample.
+        effective_nobs: Kish effective sample size of ``weights``.
+        hac_lags: Actual Bartlett lag count used after the sample-length cap.
+        confidence_level: Two-sided confidence level used for the intercept intervals.
+    """
+
+    alpha: pd.Series
+    beta: pd.Series
+    r_squared: pd.Series
+    alpha_pvalue: pd.Series
+    alpha_hac_se: pd.Series
+    alpha_confidence_interval: pd.DataFrame
+    parameter_covariance: pd.DataFrame
+    weights: pd.Series
+    ewm_lambda: float
+    nobs: int
+    effective_nobs: float
+    hac_lags: int
+    confidence_level: float
 
 
 @dataclass(frozen=True)
@@ -233,6 +271,218 @@ def estimate_ols_alpha_beta_hac(
         alpha_pvalue=alpha_pvalue,
         alpha_hac_se=alpha_hac_se,
         alpha_confidence_interval=alpha_confidence_interval,
+    )
+
+
+def estimate_ewma_alpha_beta_hac(
+        x: Union[np.ndarray, pd.Series, pd.DataFrame],
+        y: pd.DataFrame,
+        span: float = 36.0,
+        hac_lags: int = 3,
+        confidence_level: float = 0.95,
+) -> EwmaAlphaBetaHacResult:
+    """Fit joint EWMA-weighted alpha/beta regressions with Bartlett-HAC inference.
+
+    For retained row ``t`` in a sample of length ``T``, the WLS objective weight is
+    ``lambda ** (T - 1 - t)``, where ``lambda = 1 - 2 / (span + 1)``. The last retained row
+    therefore has weight one. All equations share the same design, weights and common finite
+    sample. Their HAC score vectors are stacked before covariance estimation, preserving the
+    cross-equation covariance needed for exact linear attribution contrasts.
+
+    The Bartlett covariance uses the same ``T / (T - k)`` small-sample correction as
+    ``statsmodels.WLS(...).get_robustcov_results(cov_type='HAC', use_correction=True)`` with
+    ``k=2``. P-values and confidence intervals use a normal reference distribution. This
+    low-level estimator attaches no calendar meaning to rows and does not sort them: the caller
+    controls their order and frequency.
+
+    Args:
+        x: One common explanatory series. A pandas index must exactly equal the index of ``y``.
+        y: Dependent series, one uniquely named equation per column.
+        span: EWMA span, strictly greater than one and with Kish effective size above two.
+        hac_lags: Maximum number of Bartlett-kernel autocovariance lags.
+        confidence_level: Two-sided confidence level for the alpha intervals.
+
+    Returns:
+        Joint EWMA-WLS point estimates, alpha inference, covariance and sample metadata.
+
+    Raises:
+        TypeError: If ``y`` is not a DataFrame or ``hac_lags`` is not an integer.
+        ValueError: If inputs are misaligned or invalid, the common sample is too short, the
+            weighted design is singular, or estimation produces non-finite outputs.
+    """
+    if not isinstance(y, pd.DataFrame):
+        raise TypeError(f'y must be a pandas DataFrame, got {type(y).__name__}')
+    if y.shape[1] == 0:
+        raise ValueError('y must contain at least one dependent series')
+    if not y.columns.is_unique:
+        raise ValueError('y columns must be unique')
+    if isinstance(hac_lags, (bool, np.bool_)) or not isinstance(
+            hac_lags, (int, np.integer)
+    ):
+        raise TypeError(f'hac_lags must be an integer, got {hac_lags!r}')
+    if hac_lags < 0:
+        raise ValueError(f'hac_lags must be non-negative, got {hac_lags}')
+    if not 0.0 < confidence_level < 1.0:
+        raise ValueError(
+            f'confidence_level must be between zero and one, got {confidence_level}'
+        )
+    if isinstance(span, (bool, np.bool_)) or not isinstance(
+            span, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f'span must be a finite number greater than one, got {span!r}')
+    span_value = float(span)
+    if not np.isfinite(span_value) or span_value <= 1.0:
+        raise ValueError(f'span must be a finite number greater than one, got {span!r}')
+
+    if isinstance(x, (pd.Series, pd.DataFrame)) and not x.index.equals(y.index):
+        raise ValueError('x and y pandas indexes must be identical')
+    try:
+        x_values = np.asarray(x, dtype=float)
+        y_values = y.to_numpy(dtype=float)
+    except (TypeError, ValueError) as exception:
+        raise ValueError('x and y must contain numeric values') from exception
+    if x_values.ndim == 2 and x_values.shape[1] == 1:
+        x_values = x_values[:, 0]
+    if x_values.ndim != 1:
+        raise ValueError(f'x must be one-dimensional, got shape {x_values.shape}')
+    if x_values.shape[0] != y_values.shape[0]:
+        raise ValueError(
+            f'x and y must have the same number of rows, got {x_values.shape[0]} and '
+            f'{y_values.shape[0]}'
+        )
+
+    finite_rows = np.isfinite(x_values) & np.isfinite(y_values).all(axis=1)
+    x_values = x_values[finite_rows]
+    y_values = y_values[finite_rows]
+    retained_index = y.index[finite_rows]
+    nobs = int(x_values.shape[0])
+    n_parameters = 2
+    if nobs <= n_parameters:
+        raise ValueError(
+            f'EWMA-WLS HAC estimation requires at least three common finite rows, got {nobs}'
+        )
+
+    ewm_lambda = 1.0 - 2.0 / (span_value + 1.0)
+    weights_array = np.power(
+        ewm_lambda,
+        np.arange(nobs - 1, -1, -1, dtype=float),
+    )
+    weight_sum = float(weights_array.sum())
+    effective_nobs = float(np.square(weight_sum) / np.square(weights_array).sum())
+    if not np.isfinite(effective_nobs) or effective_nobs <= n_parameters:
+        raise ValueError(
+            'EWMA weights must have Kish effective sample size above two, '
+            f'got {effective_nobs:.6g}'
+        )
+
+    design = np.column_stack((np.ones(nobs, dtype=float), x_values))
+    weighted_design = np.sqrt(weights_array)[:, None] * design
+    if np.linalg.matrix_rank(weighted_design) < n_parameters:
+        raise ValueError('EWMA-WLS design is singular; x must vary in the retained sample')
+    try:
+        bread = np.linalg.inv(design.T @ (weights_array[:, None] * design))
+        parameters = bread @ design.T @ (weights_array[:, None] * y_values)
+    except np.linalg.LinAlgError as exception:
+        raise ValueError('EWMA-WLS estimation failed') from exception
+
+    residuals = y_values - design @ parameters
+    scores = np.einsum(
+        'ti,tj->tji',
+        weights_array[:, None] * design,
+        residuals,
+    ).reshape(nobs, -1)
+    meat = scores.T @ scores
+    effective_hac_lags = min(int(hac_lags), nobs - 1)
+    for lag in range(1, effective_hac_lags + 1):
+        kernel_weight = 1.0 - lag / (effective_hac_lags + 1.0)
+        lagged_cross_product = scores[lag:].T @ scores[:-lag]
+        meat += kernel_weight * (lagged_cross_product + lagged_cross_product.T)
+    joint_bread = np.kron(np.eye(y.shape[1]), bread)
+    parameter_covariance_array = (
+        nobs
+        / (nobs - n_parameters)
+        * joint_bread
+        @ meat
+        @ joint_bread
+    )
+    parameter_covariance_array = 0.5 * (
+        parameter_covariance_array + parameter_covariance_array.T
+    )
+
+    weighted_mean = np.sum(weights_array[:, None] * y_values, axis=0) / weight_sum
+    weighted_tss = np.sum(
+        weights_array[:, None] * np.square(y_values - weighted_mean),
+        axis=0,
+    )
+    if np.any(weighted_tss <= 0.0):
+        constant_columns = y.columns[weighted_tss <= 0.0].tolist()
+        raise ValueError(f'y series must vary in the retained sample, got {constant_columns}')
+    r_squared_array = 1.0 - np.sum(
+        weights_array[:, None] * np.square(residuals),
+        axis=0,
+    ) / weighted_tss
+
+    alpha_array = parameters[0]
+    beta_array = parameters[1]
+    alpha_positions = np.arange(0, 2 * y.shape[1], 2)
+    alpha_variances = np.diag(parameter_covariance_array)[alpha_positions]
+    variance_tolerance = 100.0 * np.finfo(float).eps * max(
+        1.0,
+        float(np.max(np.abs(np.diag(parameter_covariance_array)))),
+    )
+    if np.any(alpha_variances < -variance_tolerance):
+        raise ValueError('EWMA-WLS HAC estimation produced negative alpha variances')
+    alpha_hac_se_array = np.sqrt(np.maximum(alpha_variances, 0.0))
+    alpha_z_scores = np.divide(
+        np.abs(alpha_array),
+        alpha_hac_se_array,
+        out=np.full_like(alpha_array, np.inf),
+        where=alpha_hac_se_array > 0.0,
+    )
+    alpha_z_scores[(alpha_hac_se_array == 0.0) & (alpha_array == 0.0)] = 0.0
+    alpha_pvalue_array = 2.0 * norm.sf(alpha_z_scores)
+    critical_value = float(norm.ppf(0.5 + 0.5 * confidence_level))
+    lower = alpha_array - critical_value * alpha_hac_se_array
+    upper = alpha_array + critical_value * alpha_hac_se_array
+
+    numeric_outputs = np.concatenate((
+        parameters.ravel(),
+        r_squared_array,
+        alpha_pvalue_array,
+        alpha_hac_se_array,
+        lower,
+        upper,
+        parameter_covariance_array.ravel(),
+    ))
+    if not np.isfinite(numeric_outputs).all():
+        raise ValueError('EWMA-WLS HAC estimation produced non-finite outputs')
+
+    equation_index = pd.Index(y.columns, name='equation')
+    parameter_index = pd.MultiIndex.from_product(
+        [equation_index, ['Intercept', 'Beta']],
+        names=['equation', 'parameter'],
+    )
+    return EwmaAlphaBetaHacResult(
+        alpha=pd.Series(alpha_array, index=equation_index, name='Alpha'),
+        beta=pd.Series(beta_array, index=equation_index, name='Beta'),
+        r_squared=pd.Series(r_squared_array, index=equation_index, name='R-squared'),
+        alpha_pvalue=pd.Series(alpha_pvalue_array, index=equation_index, name='Alpha p-value'),
+        alpha_hac_se=pd.Series(alpha_hac_se_array, index=equation_index, name='Alpha HAC SE'),
+        alpha_confidence_interval=pd.DataFrame(
+            {'Lower': lower, 'Upper': upper},
+            index=equation_index,
+        ),
+        parameter_covariance=pd.DataFrame(
+            parameter_covariance_array,
+            index=parameter_index,
+            columns=parameter_index,
+        ),
+        weights=pd.Series(weights_array, index=retained_index, name='EWMA weight'),
+        ewm_lambda=ewm_lambda,
+        nobs=nobs,
+        effective_nobs=effective_nobs,
+        hac_lags=effective_hac_lags,
+        confidence_level=confidence_level,
     )
 
 

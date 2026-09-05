@@ -18,9 +18,12 @@ from qis.perfstats.model_layer_attribution import (
     ModelLayerAlphaBetaAttribution,
     ModelLayerCumulativeAlphaAttribution,
     ModelLayerEwmaAlphaAttribution,
+    ModelLayerEwmaRegressionAttribution,
     compute_model_layer_alpha_beta_attribution,
     compute_model_layer_cumulative_alpha_after_warmup,
     compute_model_layer_ewma_alpha_attribution,
+    compute_model_layer_ewma_regression_attribution,
+    compute_model_layer_ewma_stage_sharpes,
 )
 
 from qis.perfstats.model_feature_attribution import (

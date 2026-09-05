@@ -132,6 +132,11 @@ from qis.plots.derived.price_history import (
     generate_price_history_report
 )
 
+from qis.plots.derived.model_layer_attribution import (
+    plot_model_layer_ewma_return_bridge,
+    plot_model_layer_ewma_sharpe_bridge,
+)
+
 from qis.plots.derived.signal_diagnostics_plot import (
     plot_signal_diagnostics,
     plot_signal_diagnostics_boxplot,

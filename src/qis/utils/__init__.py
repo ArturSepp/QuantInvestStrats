@@ -90,7 +90,11 @@ from qis.utils.np_ops import (
     to_finite_reciprocal
 )
 
-from qis.utils.regression import fit_multivariate_ols
+from qis.utils.regression import (
+    EwmaAlphaBetaHacResult,
+    estimate_ewma_alpha_beta_hac,
+    fit_multivariate_ols,
+)
 
 from qis.utils.struct_ops import (
     assert_list_subset,
