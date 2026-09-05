@@ -13,6 +13,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   exposure sampling for quarterly reports.
 - Rejected zero-dimensional and higher-dimensional NumPy arrays in `estimate_vol()` with a
   descriptive error instead of incidental exceptions or flattened estimates.
+- Stabilized descriptive-table sample standard deviation, annualized volatility, and sample-mean
+  t-statistics for finite samples whose spread is very small relative to their level.
 
 ## [5.22.0] - 2026-09-05
 
