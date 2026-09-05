@@ -879,10 +879,12 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
 
     Args:
         prices: Asset price series
-        benchmark: Benchmark column name in prices, or explicit name for ``benchmark_price``
+        benchmark: Non-empty benchmark column name in prices, or explicit name for
+            ``benchmark_price``. The resolved name must occur at most once in prices.
         benchmark_price: Alternative benchmark price series to add to prices. When ``benchmark``
             is supplied, that explicit name takes precedence over the Series name. An existing
-            price column with the resolved name takes precedence over the Series values.
+            price column with the resolved name takes precedence over the Series values. When
+            ``benchmark`` is omitted, the Series name must be a non-empty string.
         freq: Sampling frequency
         return_type: Type of returns to compute
         q: Quantile boundaries or number of quantiles
@@ -897,8 +899,8 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
         Regime-conditional performance table
 
     Raises:
-        ValueError: If neither benchmark source is provided, a name-only source is absent from
-            prices, or benchmark_price is not a Series.
+        ValueError: If neither benchmark source is provided, the resolved label is invalid or
+            duplicated in prices, a name-only source is absent, or benchmark_price is not a Series.
     """
     # Share source precedence with the benchmark-aware performance table before classification.
     prices, benchmark = pt.resolve_benchmark_source(

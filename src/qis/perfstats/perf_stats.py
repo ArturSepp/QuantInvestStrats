@@ -191,49 +191,54 @@ def resolve_benchmark_source(prices: pd.DataFrame,
 
     Args:
         prices: Asset price DataFrame.
-        benchmark: Optional benchmark column name.
-        benchmark_price: Optional benchmark price Series.
+        benchmark: Optional non-empty benchmark column name.
+        benchmark_price: Optional benchmark price Series. Its name must be a non-empty string
+            when ``benchmark`` is omitted.
 
     Returns:
         Tuple of (prices DataFrame possibly augmented with benchmark column, benchmark name).
 
     Raises:
-        ValueError: If neither benchmark nor benchmark_price is supplied, or if benchmark
-            is given as a name but is not in prices and benchmark_price is None, or if
-            benchmark_price is supplied but is not a pd.Series.
+        ValueError: If neither benchmark source is supplied, the resolved name is not a non-empty
+            string, the selected name occurs more than once in prices, a name-only source is
+            absent from prices, or benchmark_price is not a Series.
     """
-    # Case 0: nothing supplied
-    if benchmark is None and benchmark_price is None:
-        raise ValueError("provide either benchmark name in prices or benchmark_price")
-
-    # Case 1: benchmark name only — must already be in prices
-    if benchmark_price is None:
-        if benchmark not in prices.columns:
-            raise ValueError(f"{benchmark} is not in {prices.columns.to_list()}")
-        return prices, benchmark
+    # Require one usable logical label before selecting or adding a physical benchmark column.
+    if benchmark is not None and (not isinstance(benchmark, str) or not benchmark):
+        raise ValueError("benchmark must be a non-empty string")
 
     # benchmark_price was supplied — type check
-    if not isinstance(benchmark_price, pd.Series):
+    if benchmark_price is not None and not isinstance(benchmark_price, pd.Series):
         raise ValueError(f"benchmark_price must be pd.Series not {type(benchmark_price)}")
 
-    # Case 2: benchmark_price only — use its .name as the column name
     if benchmark is None:
-        name = benchmark_price.name
-        if name in prices.columns:
-            # column already present — trust the existing data
-            return prices, name
-        # reindex to prices' calendar with forward-fill for missing observations
-        aligned = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
-        prices_out = pd.concat([aligned.rename(name), prices], axis=1, sort=True)
-        return prices_out, name
+        if benchmark_price is None:
+            raise ValueError("provide either benchmark name in prices or benchmark_price")
+        series_name = benchmark_price.name
+        if not isinstance(series_name, str) or not series_name:
+            raise ValueError(
+                "benchmark_price must have a non-empty string name when benchmark is not supplied"
+            )
+        name = series_name
+    else:
+        name = benchmark
 
-    # Case 3: both supplied — explicit name overrides Series.name
-    if benchmark in prices.columns:
-        # column already present — trust the existing data, ignore benchmark_price
-        return prices, benchmark
+    # A logical benchmark must never select an ambiguous two-dimensional price source.
+    matches = int(np.count_nonzero(prices.columns == name))
+    if matches > 1:
+        raise ValueError(
+            f"benchmark {name!r} must identify one unique prices column; found {matches}"
+        )
+    if matches == 1:
+        # Existing in-panel data remains authoritative over a supplied Series.
+        return prices, name
+    if benchmark_price is None:
+        raise ValueError(f"{name} is not in {prices.columns.to_list()}")
+
+    # Add a zero-match Series only after label and source cardinality are unambiguous.
     aligned = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
-    prices_out = pd.concat([aligned.rename(benchmark), prices], axis=1, sort=True)
-    return prices_out, benchmark
+    prices_out = pd.concat([aligned.rename(name), prices], axis=1, sort=True)
+    return prices_out, name
 
 
 # =============================================================================
@@ -517,10 +522,11 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
 
     Args:
         prices: DataFrame of asset price levels.
-        benchmark: Column name of the benchmark in ``prices``. Optional if
-            ``benchmark_price`` is supplied.
+        benchmark: Non-empty benchmark column name. Optional if a named ``benchmark_price`` is
+            supplied. The resolved name must occur at most once in ``prices``.
         benchmark_price: Stand-alone benchmark price Series. Optional if ``benchmark``
-            is in ``prices``. See ``resolve_benchmark_source`` for the three-way branching.
+            is in ``prices``. Its name must be a non-empty string when ``benchmark`` is omitted.
+            See ``resolve_benchmark_source`` for the three-way branching.
         perf_params: Performance parameter object. If None, frequency is inferred.
         is_log_returns: If True, compute log returns instead of arithmetic returns
             for the regression.
@@ -530,6 +536,10 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     Returns:
         DataFrame indexed by asset with all base RA metrics plus ALPHA, ALPHA_AN,
         BETA, R2 and ALPHA_PVALUE columns.
+
+    Raises:
+        ValueError: If the benchmark source has no non-empty string label, the selected label is
+            duplicated in prices, or no usable benchmark source is available.
     """
     # Resolve the three input modes (name only / price only / both) into a
     # consistent (prices_with_benchmark, benchmark_name) pair.
