@@ -4,7 +4,8 @@ one strategy against one benchmark: a ``MultiPortfolioData`` in, a list of A4 pa
 ``generate_strategy_benchmark_factsheet_plt`` picks the pair by position, ``strategy_idx``
 against ``benchmark_idx``, and returns one ``plt.Figure`` per page. Page one always renders the
 joint performance, exposure and cost panels beside the risk-adjusted tables, regime Sharpes and
-the per-instrument P&L difference. ``add_brinson_attribution`` is the one flag on by default,
+rolling annualised alpha computed from the adjacent panel's lagged EWMA betas.
+``add_brinson_attribution`` is the one flag on by default,
 appending the allocation / selection page - the call assigns the interaction term to instrument
 selection. The other page flags are off; ``add_benchmarks_to_navs`` adds benchmark
 lines to the page-one panels rather than a page, and ``add_grouped_exposures`` /
@@ -204,10 +205,13 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                            regime_classifier=regime_classifier,
                                            **kwargs)
 
+    exposure_kwargs = kwargs
+    if perf_params.freq == 'QE':
+        exposure_kwargs = qis.update_kwargs(kwargs, dict(weights_freq='ME'))
     multi_portfolio_data.plot_exposures(ax=fig.add_subplot(gs[8:10, :2]),
                                         regime_benchmark=regime_benchmark,
                                         regime_classifier=regime_classifier,
-                                        **kwargs)
+                                        **exposure_kwargs)
 
     multi_portfolio_data.plot_turnover(ax=fig.add_subplot(gs[10:12, :2]),
                                        regime_benchmark=regime_benchmark,
@@ -283,10 +287,13 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                              regime_classifier=regime_classifier,
                                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
     """
-    multi_portfolio_data.plot_instrument_pnl_diff(ax=fig.add_subplot(gs[8:10, 2:]),
-                                                  regime_benchmark=regime_benchmark,
-                                                  regime_classifier=regime_classifier,
-                                                  **kwargs)
+    multi_portfolio_data.plot_rolling_benchmark_alpha(
+        ax=fig.add_subplot(gs[8:10, 2:]),
+        benchmark_price=benchmark_price,
+        regime_benchmark=regime_benchmark,
+        regime_classifier=regime_classifier,
+        **kwargs,
+    )
 
     # plot beta to the regime_benchmark
     multi_portfolio_data.plot_factor_betas(axs=[fig.add_subplot(gs[10:12, 2:])],

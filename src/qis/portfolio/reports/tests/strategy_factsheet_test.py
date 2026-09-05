@@ -325,6 +325,74 @@ def test_brinson_assigns_interaction_to_selection_and_preserves_active_return() 
     )
 
 
+def test_rolling_benchmark_alpha_uses_lagged_displayed_betas_and_matching_span() -> None:
+    strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=10)
+    benchmark_portfolio, _ = _make_portfolio_data(n_assets=3, n_years=10)
+    benchmark_portfolio.set_ticker('Benchmark Portfolio')
+    multi_portfolio = qis.MultiPortfolioData(
+        portfolio_datas=[strategy, benchmark_portfolio],
+        benchmark_prices=benchmark_prices,
+    )
+    benchmark_price = benchmark_prices['Benchmark']
+
+    actual = multi_portfolio.compute_rolling_benchmark_alpha(
+        benchmark_price=benchmark_price,
+        freq_beta='QE',
+        factor_beta_span=12,
+    )
+
+    benchmark_returns = qis.to_returns(
+        prices=benchmark_price,
+        freq='QE',
+        is_log_returns=True,
+    )
+    expected = {}
+    for portfolio in multi_portfolio.portfolio_datas:
+        displayed_beta = portfolio.compute_portfolio_benchmark_betas(
+            benchmark_prices=benchmark_price.to_frame(),
+            freq_beta='QE',
+            factor_beta_span=12,
+        )['Benchmark']
+        strategy_returns = qis.to_returns(
+            prices=portfolio.get_portfolio_nav(),
+            freq='QE',
+            is_log_returns=True,
+        )
+        realised_alpha = strategy_returns - displayed_beta.shift(1) * benchmark_returns
+        expected[portfolio.nav.name] = (
+            realised_alpha.ewm(span=12, adjust=False).mean() * 4.0
+        )
+    expected = pd.DataFrame(expected)
+
+    pd.testing.assert_frame_equal(actual, expected)
+
+
+def test_quarterly_strategy_benchmark_report_uses_monthly_exposures_and_linked_alpha() -> None:
+    strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=6)
+    benchmark_portfolio, _ = _make_portfolio_data(n_assets=3, n_years=6)
+    benchmark_portfolio.set_ticker('Benchmark Portfolio')
+    multi_portfolio = qis.MultiPortfolioData(
+        portfolio_datas=[strategy, benchmark_portfolio],
+        benchmark_prices=benchmark_prices,
+    )
+
+    figs = generate_strategy_benchmark_factsheet_plt(
+        multi_portfolio_data=multi_portfolio,
+        perf_params=qis.PerfParams(freq='QE', freq_reg='QE'),
+        add_brinson_attribution=False,
+        freq_beta='QE',
+        factor_beta_span=12,
+        weights_freq='W-WED',
+    )
+    try:
+        titles = {ax.get_title() for ax in figs[0].axes}
+        assert 'Portfolio net exposures (ME-freq)' in titles
+        assert '12-span rolling annualised Alpha of QE-freq returns to Benchmark' in titles
+        assert not any(title.startswith('Cumulative p&l diff') for title in titles)
+    finally:
+        plt.close('all')
+
+
 def test_brinson_page_uses_requested_layout_titles_and_regime_backgrounds() -> None:
     strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=3)
     benchmark, _ = _make_portfolio_data(n_assets=3, n_years=3)

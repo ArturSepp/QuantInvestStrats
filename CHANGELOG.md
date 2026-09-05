@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Made benchmark-beta history warn and return `NaN` on nonpositive benchmark-variance dates,
   while preserving strict point-in-time validation and filtering report dates before calculation.
+- Linked strategy-benchmark factsheet alpha to the displayed lagged EWMA betas and used monthly
+  exposure sampling for quarterly reports.
 - Rejected zero-dimensional and higher-dimensional NumPy arrays in `estimate_vol()` with a
   descriptive error instead of incidental exceptions or flattened estimates.
 

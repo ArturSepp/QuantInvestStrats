@@ -626,10 +626,13 @@ class MultiPortfolioData:
                        ax: plt.Subplot = None,
                        **kwargs
                        ) -> None:
+        weights_freq = kwargs.pop('weights_freq', None)
         exposures = []
         for portfolio in self.portfolio_datas:
             exposures.append(portfolio.get_weights(time_period=time_period).sum(axis=1).rename(portfolio.nav.name))
         exposures = pd.concat(exposures, axis=1, sort=True)
+        if weights_freq is not None:
+            exposures = exposures.resample(weights_freq).last()
         freq = infer_data_frequency_label(exposures)
         pts.plot_time_series(df=exposures,
                              var_format=var_format,
@@ -639,6 +642,105 @@ class MultiPortfolioData:
                              **kwargs)
         if regime_benchmark is not None:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=exposures.index, regime_classifier=regime_classifier)
+
+    def compute_rolling_benchmark_alpha(self,
+                                        benchmark_price: pd.Series,
+                                        freq_beta: str = 'B',
+                                        factor_beta_span: int = 260,
+                                        time_period: TimePeriod = None
+                                        ) -> pd.DataFrame:
+        """Compute annualised rolling alpha using the displayed lagged portfolio betas.
+
+        Args:
+            benchmark_price: Benchmark price index used by the adjacent beta panel.
+            freq_beta: Return frequency used to estimate beta and realised alpha.
+            factor_beta_span: Shared EWMA span for the beta and rolling-alpha estimates.
+            time_period: Optional display period applied after full-history estimation.
+
+        Returns:
+            Annualised rolling alpha for every portfolio in report order.
+        """
+        if benchmark_price.name is None:
+            raise ValueError('benchmark_price must have a name')
+        benchmark_prices = benchmark_price.to_frame()
+        benchmark_returns = ret.to_returns(
+            prices=benchmark_price,
+            freq=freq_beta,
+            is_log_returns=True,
+        )
+        annualisation = qis.get_annualization_factor(freq=freq_beta)
+        rolling_alphas = {}
+        for portfolio in self.portfolio_datas:
+            displayed_beta = portfolio.compute_portfolio_benchmark_betas(
+                benchmark_prices=benchmark_prices,
+                freq_beta=freq_beta,
+                factor_beta_span=factor_beta_span,
+                time_period=None,
+            )[benchmark_price.name]
+            strategy_returns = ret.to_returns(
+                prices=portfolio.get_portfolio_nav(),
+                freq=freq_beta,
+                is_log_returns=True,
+            )
+            realised_alpha = strategy_returns.subtract(
+                displayed_beta.shift(1).multiply(benchmark_returns)
+            )
+            first_alpha_date = realised_alpha.first_valid_index()
+            if first_alpha_date is None:
+                raise ValueError(
+                    f'no finite lagged-beta alpha returns for {portfolio.nav.name}'
+                )
+            rolling_alpha = qis.compute_ewm(
+                data=realised_alpha.loc[first_alpha_date:],
+                span=factor_beta_span,
+            )
+            rolling_alphas[portfolio.nav.name] = annualisation * rolling_alpha.reindex(
+                realised_alpha.index
+            )
+        rolling_alphas = pd.DataFrame(rolling_alphas)
+        if time_period is not None:
+            rolling_alphas = time_period.locate(rolling_alphas)
+        return rolling_alphas
+
+    def plot_rolling_benchmark_alpha(self,
+                                     benchmark_price: pd.Series,
+                                     regime_benchmark: str = None,
+                                     regime_classifier: BenchmarkReturnsQuantilesRegime = (
+                                         BenchmarkReturnsQuantilesRegime()
+                                     ),
+                                     time_period: TimePeriod = None,
+                                     freq_beta: str = 'B',
+                                     factor_beta_span: int = 260,
+                                     var_format: str = '{:.1%}',
+                                     ax: plt.Subplot = None,
+                                     **kwargs
+                                     ) -> None:
+        """Plot annualised rolling alpha using the adjacent panel's lagged betas."""
+        rolling_alphas = self.compute_rolling_benchmark_alpha(
+            benchmark_price=benchmark_price,
+            freq_beta=freq_beta,
+            factor_beta_span=factor_beta_span,
+            time_period=time_period,
+        )
+        title = (
+            f'{factor_beta_span}-span rolling annualised Alpha of {freq_beta}-freq returns '
+            f'to {benchmark_price.name}'
+        )
+        pts.plot_time_series(
+            df=rolling_alphas,
+            var_format=var_format,
+            legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
+            title=title,
+            ax=ax,
+            **sop.update_kwargs(kwargs, dict(legend_loc='lower left')),
+        )
+        if regime_benchmark is not None:
+            self.add_regime_shadows(
+                ax=ax,
+                regime_benchmark=regime_benchmark,
+                index=rolling_alphas.index,
+                regime_classifier=regime_classifier,
+            )
 
     def plot_instrument_pnl_diff(self,
                                  portfolio_idx1: int = 0,
