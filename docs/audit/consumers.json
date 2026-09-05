@@ -4,7 +4,7 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "a61bf773e0b2d706c513b5280c91f25bc6fce951",
+      "commit": "0f5a649174bbe062e5959866d80313687bd44fda",
       "distinct_symbols": 96,
       "call_sites": 764,
       "files_scanned": 225,
