@@ -29,6 +29,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   descriptive error instead of incidental exceptions or flattened estimates.
 - Stabilized descriptive-table sample standard deviation, annualized volatility, and sample-mean
   t-statistics for finite samples whose spread is very small relative to their level.
+- Stabilized statistic-legend sample standard deviation and dependent t-statistics for finite
+  samples whose spread is very small relative to their level.
 
 ## [5.22.0] - 2026-09-05
 

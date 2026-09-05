@@ -750,8 +750,9 @@ class LegendStats(Enum):
     error, ``TOTAL`` the sum, ``FIRST`` and ``LAST`` the endpoints, ``MIN`` and ``MAX`` the
     extremes. After any modifier's sample selection, ``STD`` is undefined when fewer than two
     observations remain; ``SKEW`` and ``KURT`` are undefined for an exact finite constant.
-    Eligible finite varying samples are translated before standardized moments are evaluated,
-    preserving their results when the spread is very small relative to the level.
+    Finite samples are translated before sample standard deviation is evaluated, and eligible
+    finite varying samples are translated before standardized moments are evaluated, preserving
+    their results when the spread is very small relative to the level.
 
     Five modifiers change what the statistics are computed on or displayed beside them:
 
@@ -819,7 +820,8 @@ def _compute_legend_sample_std(data_column: pd.Series, nan_display: float) -> fl
     # NumPy warns for ddof=1 on undersized samples, whose spread is undefined by contract.
     if observed.size < 2:
         return nan_display
-    return float(np.std(observed, ddof=1))
+    # Sample spread is translation invariant; zero-base finite levels to avoid cancellation.
+    return float(np.std(observed - np.min(observed), ddof=1))
 
 
 def _compute_legend_tstat_components(
@@ -843,7 +845,8 @@ def _compute_legend_tstat_components(
     if observed.size < 2:
         return avg, nan_display, nan_display
 
-    std = float(np.std(observed, ddof=1))
+    # Reuse the translation-stable denominator without changing the sample-mean numerator.
+    std = _compute_legend_sample_std(data_column, nan_display)
     tstat = compute_sample_mean_tstat(
         mean=np.asarray([avg]),
         sample_std=np.asarray([std]),
