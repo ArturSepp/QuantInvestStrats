@@ -757,11 +757,12 @@ class LegendStats(Enum):
 
     ``NONNAN`` takes the last observed value rather than the value at the last index, which
     differs when a series ends with gaps. ``NONZERO`` excludes zeros, for a series where zero
-    means "no position" rather than "a return of zero". ``MISSING`` reports the percentage of
-    NaN observations after the first observed value, while ``ZERO`` reports the percentage whose
-    absolute value is below the near-zero cutoff over the same window. An all-missing history has
-    100% missing coverage and an undefined zero percentage. ``SCORE`` appends the percentile rank
-    of the last value within its own history.
+    means "no position" rather than "a return of zero"; its statistics are undefined when no
+    observations remain. ``MISSING`` reports the percentage of NaN observations after the first
+    observed value, while ``ZERO`` reports the percentage whose absolute value is below the
+    near-zero cutoff over the same window. An all-missing history has 100% missing coverage and an
+    undefined zero percentage. ``SCORE`` appends the percentile rank of the last value within its
+    own history.
 
     ``NONE`` prints the column name alone. Formatting of every value follows the ``var_format``
     argument of the plotting function; when it is ``None``, values use their native scalar text.
@@ -1141,8 +1142,13 @@ def get_legend_lines(data: Union[pd.DataFrame, pd.Series],
             else:
                 data_column = data_column.replace({0.0: np.nan})
                 nonnan_data = data_column.dropna()
-                first = nonnan_data.iloc[0]
-                last = nonnan_data.iloc[-1]
+                # A fully filtered history has the same undefined endpoints as an all-missing one.
+                if nonnan_data.empty:
+                    first = nan_display
+                    last = nan_display
+                else:
+                    first = nonnan_data.iloc[0]
+                    last = nonnan_data.iloc[-1]
             legend_lines.append(f"{column}: first={var_format.format(first)}, last={var_format.format(last)}")
 
     elif legend_stats in [LegendStats.FIRST_AVG_LAST, LegendStats.FIRST_AVG_LAST_SHORT]:
