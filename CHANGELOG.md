@@ -32,6 +32,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Validated infinity before rendering plots that request descriptive tables, preventing warnings,
+  partial artists, and leaked figures.
 - Defaulted legend text to normal weight so fonts without a light face no longer emit Matplotlib
   fallback warnings.
 - Normalized missing indexed legend endpoints so ordinary and nullable floating dtypes use the
