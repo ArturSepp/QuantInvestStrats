@@ -21,10 +21,12 @@ Ex-post tracking error from NAVs and return differences lives in the adjacent
 covariance estimation, or plotting.
 """
 
-import numpy as np
-import pandas as pd
+import warnings
 from dataclasses import dataclass
 from typing import Dict, Optional, Union
+
+import numpy as np
+import pandas as pd
 
 
 WEIGHT_TOL: float = 1e-10
@@ -671,11 +673,14 @@ class RiskModel:
             strict: If True, reject material weights outside the covariance universe.
 
         Returns:
-            Series named ``'Benchmark beta'`` on the covariance date grid.
+            Series named ``'Benchmark beta'`` on the covariance date grid. Dates with
+            nonpositive benchmark variance contain NaN.
 
         Raises:
-            ValueError: If weights violate the alignment policy or benchmark
-                variance is nonpositive.
+            ValueError: If weights violate the alignment policy.
+
+        Warns:
+            UserWarning: If benchmark variance is nonpositive on one or more dates.
         """
         benchmark_history = self._aligned_weight_history(
             weights=benchmark_weights,
@@ -688,14 +693,32 @@ class RiskModel:
             weights=portfolio_weights,
             role='portfolio_weights',
             strict=strict)
-        results = {
-            date: self.compute_benchmark_beta_at_date(
-                benchmark_weights=benchmark_history.loc[date],
-                portfolio_weights=portfolio_history.loc[date],
-                date=date,
-                strict=strict)
-            for date in self.dates
-        }
+        results = {}
+        invalid_dates = []
+        for date in self.dates:
+            covar = self._covar_at_date(date)
+            benchmark = benchmark_history.loc[date]
+            portfolio = portfolio_history.loc[date]
+            benchmark_variance = float(benchmark @ covar @ benchmark)
+            if benchmark_variance <= 0.0:
+                results[date] = np.nan
+                invalid_dates.append(date)
+                continue
+            results[date] = float(portfolio @ covar @ benchmark) / benchmark_variance
+
+        if invalid_dates:
+            count = len(invalid_dates)
+            date_word = 'date' if count == 1 else 'dates'
+            if count == 1:
+                date_summary = str(invalid_dates[0].date())
+            else:
+                date_summary = f"{invalid_dates[0].date()} to {invalid_dates[-1].date()}"
+            warnings.warn(
+                f"benchmark variance is nonpositive on {count} covariance {date_word} "
+                f"({date_summary}); setting benchmark beta to NaN for those dates",
+                UserWarning,
+                stacklevel=2,
+            )
         return pd.Series(results, name='Benchmark beta', dtype=float)
 
     def compute_benchmark_beta_loadings_at_date(self,

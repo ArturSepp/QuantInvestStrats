@@ -1,4 +1,6 @@
 """Smoke tests for covariance RiskModel panels in the tracking-error report."""
+import warnings
+
 import matplotlib
 
 matplotlib.use('Agg')
@@ -13,6 +15,7 @@ from qis.datasets.synthetic import generate_synthetic_universe
 from qis.portfolio.backtester import backtest_model_portfolio
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.reports.strategy_benchmark_tre_factsheet import (
+    _compute_ex_ante_benchmark_beta,
     _compute_ex_post_benchmark_series,
     weights_tracking_error_report_by_ac_subac,
 )
@@ -130,6 +133,30 @@ def _run_report(multi_portfolio_data, universe, covar_risk_model=None):
 def _close_figures(figures) -> None:
     for figure in figures.values():
         plt.close(figure)
+
+
+def test_ex_ante_beta_applies_report_period_before_history_calculation() -> None:
+    assets = pd.Index(['A', 'B'])
+    dates = pd.DatetimeIndex(['2024-01-02', '2024-01-04', '2024-01-08'])
+    covar = pd.DataFrame(np.eye(2), index=assets, columns=assets)
+    risk_model = RiskModel(covar={date: covar for date in dates})
+    benchmark_weights = pd.DataFrame(
+        [[0.6, 0.4]], index=dates[[1]], columns=assets)
+    portfolio_weights = pd.DataFrame(
+        [[0.6, 0.4]], index=dates[[0]], columns=assets)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        actual = _compute_ex_ante_benchmark_beta(
+            risk_model=risk_model,
+            benchmark_weights=benchmark_weights,
+            portfolio_weights=portfolio_weights,
+            time_period=qis.TimePeriod(start=dates[1], end=dates[2]),
+        )
+
+    expected = pd.Series(
+        [1.0, 1.0], index=dates[1:], name='Benchmark beta')
+    pd.testing.assert_series_equal(actual, expected)
 
 
 def test_ra_performance_table_is_rendered_once(report_inputs) -> None:

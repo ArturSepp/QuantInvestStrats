@@ -65,6 +65,28 @@ def _compute_ex_post_benchmark_series(
     return realised_tre, ex_post_beta, ex_post_alpha
 
 
+def _compute_ex_ante_benchmark_beta(
+        risk_model: RiskModel,
+        benchmark_weights: pd.DataFrame,
+        portfolio_weights: pd.DataFrame,
+        time_period: Optional[TimePeriod],
+) -> pd.Series:
+    """Compute beta only on covariance dates included in the report period."""
+    if time_period is not None:
+        date_marker = pd.Series(index=risk_model.dates, dtype=float)
+        selected_dates = time_period.locate(date_marker).index
+        if len(selected_dates) == 0:
+            return pd.Series(index=selected_dates, name='Benchmark beta', dtype=float)
+        risk_model = RiskModel(
+            covar={date: risk_model.covar[date] for date in selected_dates},
+        )
+    return risk_model.compute_benchmark_beta_history(
+        benchmark_weights=benchmark_weights,
+        portfolio_weights=portfolio_weights,
+        strict=False,
+    )
+
+
 def _add_ex_post_benchmark_panels(
         figs: Dict[str, plt.Figure],
         dfs: Dict[str, pd.DataFrame],
@@ -582,13 +604,12 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         )
         strategy_input_weights = strategy_data.get_weights(freq=None, is_input_weights=True)
         benchmark_input_weights = benchmark_data.get_weights(freq=None, is_input_weights=True)
-        ex_ante_beta = benchmark_beta_risk_model.compute_benchmark_beta_history(
+        ex_ante_beta = _compute_ex_ante_benchmark_beta(
+            risk_model=benchmark_beta_risk_model,
             benchmark_weights=benchmark_input_weights,
             portfolio_weights=strategy_input_weights,
-            strict=False,
+            time_period=time_period,
         )
-        if time_period is not None:
-            ex_ante_beta = time_period.locate(ex_ante_beta)
         _add_ex_post_benchmark_panels(
             figs=figs,
             dfs=dfs,

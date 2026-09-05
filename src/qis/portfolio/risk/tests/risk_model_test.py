@@ -673,6 +673,35 @@ def test_benchmark_beta_history_uses_asof_portfolio_weights() -> None:
     pd.testing.assert_series_equal(actual, expected, rtol=1e-12, atol=0.0)
 
 
+def test_benchmark_beta_history_warns_and_sets_nan_for_zero_variance_dates() -> None:
+    benchmark_history = pd.DataFrame(
+        [[0.6, 0.4, 0.0]],
+        index=[DATE_2],
+        columns=ASSETS,
+    )
+    portfolio = pd.Series([0.5, 0.4, 0.1], index=ASSETS)
+    model = _model()
+
+    with pytest.warns(
+            UserWarning,
+            match=r"benchmark variance is nonpositive on 1 covariance date.*2024-01-02.*NaN",
+    ) as warnings_:
+        actual = model.compute_benchmark_beta_history(
+            benchmark_weights=benchmark_history,
+            portfolio_weights=portfolio,
+        )
+
+    assert len(warnings_) == 1
+    assert np.isnan(actual.loc[DATE_1])
+    for date in (DATE_2, DATE_3):
+        expected = model.compute_benchmark_beta_at_date(
+            benchmark_weights=benchmark_history.iloc[0],
+            portfolio_weights=portfolio,
+            date=date,
+        )
+        assert actual.loc[date] == pytest.approx(expected)
+
+
 def test_benchmark_beta_rejects_degenerate_benchmark_with_value() -> None:
     zero_benchmark = pd.Series(0.0, index=ASSETS)
     with pytest.raises(ValueError, match=r"benchmark variance.*0.0"):
