@@ -493,14 +493,22 @@ def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]) ->
     For smaller finite samples, uses RMS to avoid mean adjustment bias.
 
     Args:
-        sampled_returns: Return time series. Each column selects its estimator from its own finite
+        sampled_returns: Return time series. NumPy arrays must have shape `(observations,)` or
+            `(observations, columns)`. Each column selects its estimator from its own finite
             observation count; missing rows do not count toward the threshold
 
     Returns:
-        Volatility estimate for a one-dimensional input or one estimate per DataFrame column.
-        A column is missing when it cannot supply the observations required by its selected
-        estimator
+        Volatility estimate for a one-dimensional input or one estimate per two-dimensional input
+        column. A column is missing when it cannot supply the observations required by its
+        selected estimator
+
+    Raises:
+        ValueError: If a NumPy array is not one- or two-dimensional
     """
+    if isinstance(sampled_returns, np.ndarray) and sampled_returns.ndim not in (1, 2):
+        # Higher ranks have no unambiguous observation/column mapping for this estimator.
+        raise ValueError("sampled_returns must be a 1- or 2-dimensional NumPy array")
+
     if isinstance(sampled_returns, (pd.Series, pd.DataFrame)):
         sampled_values = sampled_returns.to_numpy(dtype=float, na_value=np.nan)
     else:
