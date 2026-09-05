@@ -31,9 +31,17 @@ from qis.portfolio.reports.strategy_factsheet import (
     _use_grouped_summary_tables,
     generate_strategy_factsheet,
 )
-from qis.portfolio.reports.config import (PERF_PARAMS, validate_reporting_frequency,
-                                          validate_legend_capacity, infer_data_frequency_label)
+from qis.portfolio.reports.config import (
+    DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
+    PERF_PARAMS,
+    _get_recent_ra_perf_table_time_period,
+    infer_data_frequency_label,
+    validate_legend_capacity,
+    validate_reporting_frequency,
+)
 from qis.plots.utils import get_df_table_size, set_spines, set_y_limits
+
+_RecentStart = Optional[pd.Timestamp]
 
 
 def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfolioData,
@@ -55,6 +63,9 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                               figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
                                               fontsize: int = 5,
                                               add_joint_instrument_history_report: bool = False,
+                                              recent_ra_perf_table_start_date: _RecentStart = (
+                                                  DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
+                                              ),
                                               **kwargs
                                               ) -> List[plt.Figure]:
     """
@@ -71,6 +82,8 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         strategy_idx: position of the strategy within ``multi_portfolio_data``
         benchmark_idx: position of the benchmark within ``multi_portfolio_data``
         time_period: reporting window. None uses the full common history
+        recent_ra_perf_table_start_date: start of the second risk-adjusted performance table.
+            Defaults to 31 December 2020; None uses the trailing year
         perf_params: annualisation, frequency and rate conventions for the statistics
         regime_classifier: how benchmark returns are mapped to regimes
         backtest_name: title of the report
@@ -213,7 +226,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                is_grouped=is_grouped_for_summary_tables,
                                                **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
-    time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period, n_years=1)
+    time_period1 = _get_recent_ra_perf_table_time_period(
+        time_period=time_period,
+        recent_ra_perf_table_start_date=recent_ra_perf_table_start_date,
+    )
     # change regression to weekly
     if pd.infer_freq(benchmark_price.index) in ['B', 'D']:
         local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
@@ -432,6 +448,9 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                     add_grouped_exposures=add_grouped_exposures,
                                                     add_grouped_cum_pnl=add_grouped_cum_pnl,
                                                     is_grouped=is_grouped,
+                                                    recent_ra_perf_table_start_date=(
+                                                        recent_ra_perf_table_start_date
+                                                    ),
                                                     **kwargs  # time period will be in kwargs
                                                     ))
         figs = qis.to_flat_list(figs)

@@ -38,10 +38,25 @@ import pandas as pd
 from qis import PerfParams, BenchmarkReturnsQuantilesRegime, TimePeriod, PerfStat, update_kwargs
 from qis.utils.annualisation import (get_annualization_factor,
                                      infer_data_periods_per_year, infer_data_frequency_label)
+from qis.utils.dates import get_time_period_shifted_by_years
 
 # default params have no risk-free rate
 PERF_PARAMS = PerfParams(freq='W-WED', freq_reg='W-WED', rates_data=None)
 regime_classifier = BenchmarkReturnsQuantilesRegime(freq='QE')
+DEFAULT_RECENT_RA_PERF_TABLE_START_DATE = pd.Timestamp('2020-12-31')
+
+
+def _get_recent_ra_perf_table_time_period(
+        time_period: TimePeriod,
+        recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
+            DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
+        ),
+) -> TimePeriod:
+    """Return the configured recent-table window ending with the report period."""
+    if recent_ra_perf_table_start_date is None:
+        return get_time_period_shifted_by_years(time_period=time_period, n_years=1)
+    return TimePeriod(start=recent_ra_perf_table_start_date, end=time_period.end)
+
 
 PERF_COLUMNS_RF0 = (PerfStat.TOTAL_RETURN,
                     PerfStat.PA_RETURN,

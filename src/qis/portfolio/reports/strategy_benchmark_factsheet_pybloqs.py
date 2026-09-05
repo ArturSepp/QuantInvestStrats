@@ -9,6 +9,7 @@ neither is exported; requires the optional ``pybloqs`` dependency.
 # packages
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pybloqs as p
 import pybloqs.block.table_formatters as tf
 from typing import Tuple, Optional
@@ -17,9 +18,20 @@ from typing import Tuple, Optional
 import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier, KWARGS_SUPTITLE, KWARGS_TITLE,
-                                          KWARGS_TEXT, KWARGS_FOOTNOTE, KWARGS_FIG)
+from qis.portfolio.reports.config import (
+    DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
+    KWARGS_FIG,
+    KWARGS_FOOTNOTE,
+    KWARGS_SUPTITLE,
+    KWARGS_TEXT,
+    KWARGS_TITLE,
+    PERF_PARAMS,
+    _get_recent_ra_perf_table_time_period,
+    regime_classifier,
+)
 from qis.plots.utils import compute_heatmap_colors, get_df_table_size
+
+_Date = Optional[pd.Timestamp]
 
 
 def generate_multi_portfolio_factsheet_with_pybloqs(multi_portfolio_data: MultiPortfolioData,
@@ -32,6 +44,9 @@ def generate_multi_portfolio_factsheet_with_pybloqs(multi_portfolio_data: MultiP
                                                     heatmap_freq: str = 'YE',
                                                     param_name: Optional[str] = 'gamma',
                                                     fontsize: int = 4,
+                                                    recent_ra_perf_table_start_date: _Date = (
+                                                        DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
+                                                    ),
                                                     **kwargs
                                                     ) -> p.VStack:
     """
@@ -40,7 +55,10 @@ def generate_multi_portfolio_factsheet_with_pybloqs(multi_portfolio_data: MultiP
     if time_period is None:
         raise ValueError(f"pass non none time_period")
     if time_period_last is None:
-        time_period_last = qis.get_time_period_shifted_by_years(time_period=time_period, n_years=1)
+        time_period_last = _get_recent_ra_perf_table_time_period(
+            time_period=time_period,
+            recent_ra_perf_table_start_date=recent_ra_perf_table_start_date,
+        )
 
 
     if benchmark is None:

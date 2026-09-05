@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.22.0] - 2026-09-05
+
+### Added
+
+- Added a configurable start date for the second risk-adjusted performance table in factsheets,
+  defaulting to 31 December 2020; passing `None` retains the trailing-one-year window.
+
 ### Fixed
 
 - Defaulted legend text to normal weight so fonts without a light face no longer emit Matplotlib

@@ -20,9 +20,15 @@ import seaborn as sns
 from typing import Union, List, Optional, Tuple
 import qis as qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData, RollingPerfStat, LegendStats, BenchmarkReturnsQuantilesRegime
-from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
-                                          validate_reporting_frequency, validate_legend_capacity,
-                                          infer_data_frequency_label)
+from qis.portfolio.reports.config import (
+    DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
+    PERF_PARAMS,
+    _get_recent_ra_perf_table_time_period,
+    infer_data_frequency_label,
+    regime_classifier,
+    validate_legend_capacity,
+    validate_reporting_frequency,
+)
 from qis.plots.utils import set_title
 from qis.utils.df_str import series_to_str
 
@@ -444,6 +450,9 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                    performance_bars: Tuple[PerfStat, PerfStat] = (PerfStat.SHARPE_RF0, PerfStat.MAX_DD),
                                    drop_1y_ra_perf_table: bool = True,
                                    min_trailing_obs: int = 12,
+                                   recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
+                                       DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
+                                   ),
                                    **kwargs
                                    ) -> plt.Figure:
     """
@@ -465,13 +474,14 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
             panels
         heatmap_freq: aggregation of the periodic-returns heatmap, 'YE' for calendar years
         time_period: reporting span; defaults to the full history
+        recent_ra_perf_table_start_date: start of the second risk-adjusted performance table.
+            Defaults to 31 December 2020; None uses the trailing year
         figsize: figure size in inches; the default is A4 portrait
         fontsize: base font size for the tables
         factsheet_name: report title
         performance_bars: the two statistics drawn as bar panels
-        drop_1y_ra_perf_table: omit the trailing one-year table, which is noise on a long
-            history
-        min_trailing_obs: minimum observations before a trailing statistic is reported
+        drop_1y_ra_perf_table: omit the second, recent-period performance table
+        min_trailing_obs: minimum observations in the recent correlation table
         **kwargs: forwarded to the underlying plot functions
 
     Returns:
@@ -533,20 +543,25 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     # 7 figures, *6 palce holders
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
 
-    # trailing comparison window (recent correlation table and, for small universes, the trailing
-    # RA table): widen the lookback so coarse reporting frequencies still yield enough observations -
-    # e.g. 1y of quarterly returns is only ~4 points, which makes the correlation matrix degenerate
+    # Widen the recent correlation window so coarse frequencies still yield enough observations;
+    # e.g. 1y of quarterly returns is only ~4 points, which makes the matrix degenerate.
     corr_ppy = qis.get_annualization_factor(perf_params.freq)
     trailing_n_years = max(1, math.ceil(min_trailing_obs / corr_ppy))
 
     if time_period is not None:
         report_period = time_period.to_str()
-        time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=time_period.locate(prices)),
-                                                            n_years=trailing_n_years)
+        resolved_time_period = qis.get_time_period(df=time_period.locate(prices))
     else:
-        report_period = qis.get_time_period(df=prices).to_str()
-        time_period1 = qis.get_time_period_shifted_by_years(time_period=qis.get_time_period(df=prices),
-                                                            n_years=trailing_n_years)
+        resolved_time_period = qis.get_time_period(df=prices)
+        report_period = resolved_time_period.to_str()
+    recent_ra_time_period = _get_recent_ra_perf_table_time_period(
+        time_period=resolved_time_period,
+        recent_ra_perf_table_start_date=recent_ra_perf_table_start_date,
+    )
+    recent_corr_time_period = qis.get_time_period_shifted_by_years(
+        time_period=resolved_time_period,
+        n_years=trailing_n_years,
+    )
 
     factsheet_name = factsheet_name or f"Multi-asset report: {report_period}"
     qis.set_suptitle(fig=fig, title=factsheet_name, fontsize=8)
@@ -612,9 +627,10 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
 
         # change regression to weekly
         if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
-            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED'))
+            local_kwargs = qis.update_kwargs(
+                kwargs, dict(time_period=recent_ra_time_period, freq_reg='W-WED'))
         else:
-            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1))
+            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=recent_ra_time_period))
         report.plot_ra_perf_table(benchmark=benchmark,
                                   ax=fig.add_subplot(gs[3, 2:]),
                                   **local_kwargs)
@@ -631,7 +647,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
     report.plot_corr_table(freq=perf_params.freq,
                            ax=fig.add_subplot(gs[6:8, 3]),
                            add_benchmarks_to_navs=add_benchmarks_to_navs,
-                           **qis.update_kwargs(kwargs, dict(time_period=time_period1)))
+                           **qis.update_kwargs(kwargs, dict(time_period=recent_corr_time_period)))
 
     report.plot_regime_data(benchmark=benchmark,
                             ax=fig.add_subplot(gs[8:10, 2:]),

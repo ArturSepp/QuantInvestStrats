@@ -37,8 +37,14 @@ from typing import Tuple, Optional, List, Union
 import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
-from qis.portfolio.reports.config import (PERF_PARAMS, regime_classifier,
-                                          validate_reporting_frequency, infer_data_frequency_label)
+from qis.portfolio.reports.config import (
+    DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
+    PERF_PARAMS,
+    _get_recent_ra_perf_table_time_period,
+    infer_data_frequency_label,
+    regime_classifier,
+    validate_reporting_frequency,
+)
 from qis.plots.utils import TrendLine, align_y_limits_axs, set_spines
 
 
@@ -131,6 +137,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 df_to_add: pd.DataFrame = None,
                                 factsheet_name: str = None,
                                 monthly_returns_heatmap_max_years: Optional[int] = 10,
+                                recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
+                                    DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
+                                ),
                                 **kwargs
                                 ) -> List[plt.Figure]:
     """
@@ -152,6 +161,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             panels, and ``covar_dict`` for the risk panels
         benchmark_prices: benchmark panel for the regressions and regime classification
         time_period: reporting span; defaults to the full nav history
+        recent_ra_perf_table_start_date: start of the second risk-adjusted performance table.
+            Defaults to 31 December 2020; None uses the trailing year
         ytd_attribution_time_period: span of the year-to-date attribution panel
         weight_report_time_period: span of the weights panel, when it should differ from the
             report span
@@ -401,7 +412,10 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                           **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
         ax = fig.add_subplot(gs[1, 2:])
         # change regression to weekly
-        time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
+        time_period1 = _get_recent_ra_perf_table_time_period(
+            time_period=time_period,
+            recent_ra_perf_table_start_date=recent_ra_perf_table_start_date,
+        )
         if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
             local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
         else:

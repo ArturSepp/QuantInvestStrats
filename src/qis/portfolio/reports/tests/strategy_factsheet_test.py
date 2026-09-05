@@ -11,8 +11,13 @@ import pytest
 
 import qis
 from qis.plots.derived.returns_heatmap import plot_returns_heatmap
+from qis.portfolio.reports.config import _get_recent_ra_perf_table_time_period
 from qis.portfolio.reports.strategy_benchmark_factsheet import (
     generate_strategy_benchmark_factsheet_plt,
+)
+from qis.portfolio.reports.multi_assets_factsheet import (
+    MultiAssetsReport,
+    generate_multi_asset_factsheet,
 )
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 from qis.portfolio.reports import strategy_factsheet
@@ -45,6 +50,75 @@ def test_monthly_returns_summary_defaults() -> None:
     assert heatmap_parameters['fontsize'].default == 5
     assert 'heatmap_fontsize' not in strategy_parameters
     assert 'heatmap_fontsize' not in benchmark_parameters
+
+
+def test_recent_ra_perf_table_start_date_public_defaults() -> None:
+    expected = pd.Timestamp('2020-12-31')
+    generators = (
+        generate_strategy_factsheet,
+        generate_strategy_benchmark_factsheet_plt,
+        generate_multi_portfolio_factsheet,
+        generate_multi_asset_factsheet,
+    )
+
+    for generator in generators:
+        parameter = inspect.signature(generator).parameters['recent_ra_perf_table_start_date']
+        assert parameter.default == expected
+
+
+def test_recent_ra_perf_table_time_period_default_and_trailing_year() -> None:
+    report_period = qis.TimePeriod(start='2005-01-01', end='2026-08-31')
+
+    recent_period = _get_recent_ra_perf_table_time_period(time_period=report_period)
+    trailing_period = _get_recent_ra_perf_table_time_period(
+        time_period=report_period,
+        recent_ra_perf_table_start_date=None,
+    )
+
+    assert recent_period.start == pd.Timestamp('2020-12-31')
+    assert recent_period.end == pd.Timestamp('2026-08-31')
+    assert trailing_period.start == pd.Timestamp('2025-08-31')
+    assert trailing_period.end == pd.Timestamp('2026-08-31')
+
+
+def test_strategy_and_multi_asset_factsheets_use_recent_ra_start_date(monkeypatch) -> None:
+    portfolio, benchmark_prices = _make_portfolio_data()
+    strategy_periods = []
+
+    def capture_strategy_period(*args, **kwargs):
+        strategy_periods.append(kwargs['time_period'])
+        return kwargs['ax']
+
+    monkeypatch.setattr(portfolio, 'plot_ra_perf_table', capture_strategy_period)
+    figs = generate_strategy_factsheet(
+        portfolio_data=portfolio,
+        benchmark_prices=benchmark_prices,
+        recent_ra_perf_table_start_date=pd.Timestamp('2022-06-30'),
+    )
+    try:
+        assert strategy_periods[1].start == pd.Timestamp('2022-06-30')
+        assert strategy_periods[1].end == pd.Timestamp('2025-12-31')
+    finally:
+        plt.close('all')
+
+    multi_asset_periods = []
+
+    def capture_multi_asset_period(self, *args, **kwargs):
+        multi_asset_periods.append(kwargs['time_period'])
+        return kwargs['ax']
+
+    monkeypatch.setattr(MultiAssetsReport, 'plot_ra_perf_table', capture_multi_asset_period)
+    generate_multi_asset_factsheet(
+        prices=portfolio.prices,
+        benchmark=portfolio.prices.columns[0],
+        drop_1y_ra_perf_table=False,
+        recent_ra_perf_table_start_date=pd.Timestamp('2021-03-31'),
+    )
+    try:
+        assert multi_asset_periods[1].start == pd.Timestamp('2021-03-31')
+        assert multi_asset_periods[1].end == pd.Timestamp('2025-12-31')
+    finally:
+        plt.close('all')
 
 
 def test_long_history_warns_limits_summary_and_appends_full_heatmap() -> None:
@@ -132,10 +206,12 @@ def test_strategy_benchmark_factsheet_limits_grouped_ra_tables(monkeypatch) -> N
         benchmark_prices=benchmark_prices,
     )
     grouped_arguments = []
+    recent_periods = []
     original_plot = multi_portfolio.plot_ac_ra_perf_table
 
     def capture_grouping(*args, **kwargs):
         grouped_arguments.append(kwargs['is_grouped'])
+        recent_periods.append(kwargs.get('time_period'))
         return original_plot(*args, **kwargs)
 
     monkeypatch.setattr(multi_portfolio, 'plot_ac_ra_perf_table', capture_grouping)
@@ -148,6 +224,8 @@ def test_strategy_benchmark_factsheet_limits_grouped_ra_tables(monkeypatch) -> N
     try:
         assert sum('portfolio groups' in str(warning.message) for warning in warnings_) == 1
         assert grouped_arguments == [False, False]
+        assert recent_periods[1].start == pd.Timestamp('2020-12-31')
+        assert recent_periods[1].end == pd.Timestamp('2025-12-31')
     finally:
         plt.close('all')
 

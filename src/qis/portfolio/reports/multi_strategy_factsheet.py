@@ -17,13 +17,18 @@ the same page rendered as HTML is ``multi_strategy_factsheet_pybloqs.py``.
 # packages
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Tuple, List
+from typing import List, Optional, Tuple
 # qis
 import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
-from qis.portfolio.reports.config import (PERF_PARAMS, validate_reporting_frequency,
-                                          validate_legend_capacity, infer_data_frequency_label)
+from qis.portfolio.reports.config import (
+    DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
+    PERF_PARAMS,
+    infer_data_frequency_label,
+    validate_legend_capacity,
+    validate_reporting_frequency,
+)
 from qis.portfolio.reports.strategy_factsheet import (
     _use_grouped_summary_tables,
     generate_strategy_factsheet,
@@ -43,6 +48,9 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                        add_group_exposures_and_pnl: bool = False,
                                        add_strategy_factsheets: bool = False,
                                        fontsize: int = 5,
+                                       recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
+                                           DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
+                                       ),
                                        **kwargs
                                        ) -> List[plt.Figure]:
     """
@@ -57,6 +65,8 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     Args:
         multi_portfolio_data: the portfolios to compare
         time_period: reporting window. None uses the full common history
+        recent_ra_perf_table_start_date: start of the second risk-adjusted performance table in
+            appended strategy factsheets. Defaults to 31 December 2020; None uses the trailing year
         perf_params: annualisation, frequency and rate conventions for the statistics
         regime_classifier: how benchmark returns are mapped to regimes for the conditional panels
         regime_benchmark: column driving the regime classification. None uses the first benchmark
@@ -279,6 +289,9 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                                     regime_classifier=regime_classifier,
                                                     add_grouped_exposures=is_grouped,
                                                     time_period=time_period,
+                                                    recent_ra_perf_table_start_date=(
+                                                        recent_ra_perf_table_start_date
+                                                    ),
                                                     **kwargs
                                                     ))
     figs = qis.to_flat_list(figs)
