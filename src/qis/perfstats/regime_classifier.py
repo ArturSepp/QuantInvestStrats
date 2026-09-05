@@ -879,8 +879,10 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
 
     Args:
         prices: Asset price series
-        benchmark: Benchmark column name in prices
-        benchmark_price: Alternative benchmark price series to add to prices
+        benchmark: Benchmark column name in prices, or explicit name for ``benchmark_price``
+        benchmark_price: Alternative benchmark price series to add to prices. When ``benchmark``
+            is supplied, that explicit name takes precedence over the Series name. An existing
+            price column with the resolved name takes precedence over the Series values.
         freq: Sampling frequency
         return_type: Type of returns to compute
         q: Quantile boundaries or number of quantiles
@@ -892,21 +894,15 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
         Regime-conditional performance table
 
     Raises:
-        ValueError: If neither benchmark nor benchmark_price provided
+        ValueError: If neither benchmark source is provided, a name-only source is absent from
+            prices, or benchmark_price is not a Series.
     """
-    if benchmark is None and benchmark_price is None:
-        raise ValueError("Provide either benchmark name in prices or benchmark_price")
-
-    if benchmark is not None and benchmark_price is None:
-        if benchmark not in prices.columns:
-            raise ValueError(f"{benchmark} is not in {prices.columns.to_list()}")
-    elif benchmark_price is not None:
-        if benchmark not in prices.columns:
-            if not isinstance(benchmark_price, pd.Series):
-                raise ValueError(f"benchmark_price must be pd.Series not {type(benchmark_price)}")
-            benchmark_price = benchmark_price.reindex(index=prices.index, method='ffill').ffill()
-            prices = pd.concat([benchmark_price, prices], axis=1, sort=True)
-            benchmark = benchmark_price.name
+    # Share source precedence with the benchmark-aware performance table before classification.
+    prices, benchmark = pt.resolve_benchmark_source(
+        prices=prices,
+        benchmark=benchmark,
+        benchmark_price=benchmark_price,
+    )
 
     regime_classifier = BenchmarkReturnsQuantilesRegime(
         freq=freq,

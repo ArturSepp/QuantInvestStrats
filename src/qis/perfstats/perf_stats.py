@@ -175,10 +175,10 @@ def _safe_downside_vol(returns_array: np.ndarray, vol_dt: float) -> float:
     return vol_dt * float(np.std(neg_returns, ddof=1))
 
 
-def _resolve_benchmark(prices: pd.DataFrame,
-                       benchmark: Optional[str],
-                       benchmark_price: Optional[pd.Series]
-                       ) -> Tuple[pd.DataFrame, str]:
+def resolve_benchmark_source(prices: pd.DataFrame,
+                             benchmark: Optional[str],
+                             benchmark_price: Optional[pd.Series]
+                             ) -> Tuple[pd.DataFrame, str]:
     """Normalise the three input modes for benchmark specification.
 
     The benchmark can be supplied in three ways:
@@ -199,8 +199,8 @@ def _resolve_benchmark(prices: pd.DataFrame,
 
     Raises:
         ValueError: If neither benchmark nor benchmark_price is supplied, or if benchmark
-            is given as a name but is not in prices and benchmark_price is None.
-        TypeError: If benchmark_price is supplied but is not a pd.Series.
+            is given as a name but is not in prices and benchmark_price is None, or if
+            benchmark_price is supplied but is not a pd.Series.
     """
     # Case 0: nothing supplied
     if benchmark is None and benchmark_price is None:
@@ -520,7 +520,7 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
         benchmark: Column name of the benchmark in ``prices``. Optional if
             ``benchmark_price`` is supplied.
         benchmark_price: Stand-alone benchmark price Series. Optional if ``benchmark``
-            is in ``prices``. See ``_resolve_benchmark`` for the three-way branching.
+            is in ``prices``. See ``resolve_benchmark_source`` for the three-way branching.
         perf_params: Performance parameter object. If None, frequency is inferred.
         is_log_returns: If True, compute log returns instead of arithmetic returns
             for the regression.
@@ -533,9 +533,9 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     """
     # Resolve the three input modes (name only / price only / both) into a
     # consistent (prices_with_benchmark, benchmark_name) pair.
-    prices, benchmark = _resolve_benchmark(prices=prices,
-                                           benchmark=benchmark,
-                                           benchmark_price=benchmark_price)
+    prices, benchmark = resolve_benchmark_source(prices=prices,
+                                                 benchmark=benchmark,
+                                                 benchmark_price=benchmark_price)
 
     if perf_params is None:
         perf_params = PerfParams(freq=pd.infer_freq(prices.index))

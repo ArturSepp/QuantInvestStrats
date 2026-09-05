@@ -18,6 +18,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Made statistic legends use native scalar text when their public plotting format is `None`.
 - Stabilized descriptive-table skewness, kurtosis, and normality results for finite samples whose
   spread is very small relative to their level.
+- Made benchmark-aware performance and regime tables share explicit-name and existing-column
+  precedence when resolving a standalone benchmark Series.
 - Made realized-volatility estimator selection depend on each column's finite observation count
   so missing-row padding cannot change the estimator or suppress a sparse-window result.
 - Rejected positive and negative infinity in `compute_desc_table()` with a descriptive error
