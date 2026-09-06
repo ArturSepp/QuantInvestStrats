@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.22.3] - 2026-09-06
+
 ### Added
 
 - Added point-in-time portfolio breadth analytics for investable and invested counts, independent
