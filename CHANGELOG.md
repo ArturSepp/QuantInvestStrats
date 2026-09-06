@@ -18,6 +18,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   common-denominator contributions, and made the net return endpoint show gross systematic
   return, realised costs and gross total alpha with its regression interval.
 
+### Fixed
+
+- Honored caller-supplied regime classifiers in the benchmark-regime performance-table wrapper
+  instead of silently rebuilding the default quantile policy.
+
 ## [5.22.2] - 2026-09-05
 
 ### Added

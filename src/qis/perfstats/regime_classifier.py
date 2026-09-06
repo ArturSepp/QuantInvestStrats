@@ -874,8 +874,8 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
                                       **kwargs) -> pd.DataFrame:
     """Compute benchmark regime performance attribution table.
 
-    Convenience function for computing regime-conditional performance using
-    benchmark return quantiles classification.
+    Convenience function for computing regime-conditional performance using the default
+    benchmark-return quantile classifier or a caller-supplied classifier.
 
     Args:
         prices: Asset price series
@@ -889,6 +889,9 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
         regime_ids_colors: Mapping of regime names to colors
         perf_params: Performance parameters
         drop_benchmark: Exclude benchmark from results
+        **kwargs: Compatibility options. A non-``None`` ``regime_classifier`` supplies the
+            complete classification policy and takes precedence over ``freq``, ``return_type``,
+            ``q``, and ``regime_ids_colors``. Other options remain ignored.
 
     Returns:
         Regime-conditional performance table
@@ -904,12 +907,17 @@ def compute_bnb_regimes_pa_perf_table(prices: pd.DataFrame,
         benchmark_price=benchmark_price,
     )
 
-    regime_classifier = BenchmarkReturnsQuantilesRegime(
-        freq=freq,
-        return_type=return_type,
-        q=q,
-        regime_ids_colors=regime_ids_colors
-    )
+    supplied_regime_classifier = kwargs.pop('regime_classifier', None)
+    if supplied_regime_classifier is None:
+        regime_classifier = BenchmarkReturnsQuantilesRegime(
+            freq=freq,
+            return_type=return_type,
+            q=q,
+            regime_ids_colors=regime_ids_colors
+        )
+    else:
+        # Honor the caller's complete classification policy instead of rebuilding its settings.
+        regime_classifier = cast(RegimeClassifier, supplied_regime_classifier)
 
     regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(
         prices=prices,
