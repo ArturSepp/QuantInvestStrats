@@ -25,7 +25,9 @@ keywords = [
     "risk analysis",
     "financial statistics",
     "trading strategies",
-    "portfolio optimization",
+    "portfolio backtesting",
+    "factsheet reporting",
+    "tracking error",
     "systematic strategies",
     "volatility",
 ]

@@ -7,6 +7,18 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Added a core-only, mechanically executed first-chart example using the shipped synthetic
+  universe and the held-unit portfolio backtester.
+
+### Changed
+
+- Expanded the evidence-linked package-choice guide with the distinct `bt` strategy-framework
+  workflow and refreshed its reviewed QIS version.
+- Aligned the README, package keywords, citation keywords, and software BibTeX title around
+  performance analytics, portfolio backtesting, risk analysis, and factsheet reporting.
+
 ## [5.22.4] - 2026-09-06
 
 ### Fixed

@@ -210,6 +210,34 @@ commands.
 
 ## Offline quickstart <a name="offline-quickstart"></a>
 
+### First chart
+
+For the shortest core-only path from installation to a portfolio-backtest chart, run
+[`examples/getting_started/first_chart.py`](examples/getting_started/first_chart.py). It uses the
+seeded synthetic universe, applies 10 basis points of transaction costs at quarterly rebalances,
+and writes no files. The first backtest in a new Python environment may pause for several seconds
+while Numba compiles the portfolio kernel; subsequent calls in that process are warm.
+
+```python
+import matplotlib.pyplot as plt
+import qis
+from qis.datasets import generate_synthetic_universe
+
+universe = generate_synthetic_universe(start='2018-01-02', end='2025-12-31')
+prices = universe.prices[['SEQ_US', 'SBD_TSY']]
+portfolio = qis.backtest_model_portfolio(
+    prices=prices,
+    weights={'SEQ_US': 0.60, 'SBD_TSY': 0.40},
+    rebalancing_freq='QE',
+    rebalancing_costs=0.0010,
+    ticker='Quarterly 60/40',
+)
+qis.plot_prices(prices=portfolio.get_portfolio_nav(), perf_stats_labels=None)
+plt.show()
+```
+
+### Complete checked workflow
+
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArturSepp/QuantInvestStrats/blob/main/notebooks/offline_quickstart_colab.ipynb)
 
 The authoritative first-success workflow is
@@ -381,7 +409,7 @@ This package is part of an open-source Python stack for quantitative finance. Th
 
 | Package | Purpose |
 |---|---|
-| [`qis`](https://github.com/ArturSepp/QuantInvestStrats) *(this package)* | Performance and risk analytics, factsheets, and visualisation |
+| [`qis`](https://github.com/ArturSepp/QuantInvestStrats) *(this package)* | Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting |
 | [`optimalportfolios`](https://github.com/ArturSepp/OptimalPortfolios) | Portfolio construction and backtesting |
 | [`factorlasso`](https://github.com/ArturSepp/factorlasso) | Sparse factor models and factor covariance estimation |
 | [`bbg-fetch`](https://github.com/ArturSepp/BloombergFetch) | Bloomberg data fetching |
@@ -453,7 +481,7 @@ If you use QIS in your research, please cite it as:
 
 ```bibtex
 @software{sepp2026qis,
-  title={qis: Implementation of visualisation and reporting analytics for Quantitative Investment Strategies},
+  title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
   version={5.22.4},

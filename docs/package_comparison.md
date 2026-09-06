@@ -2,23 +2,48 @@
 myst:
   html_meta:
     description: >-
-      A neutral, evidence-linked comparison of qis, QuantStats, pyfolio-reloaded, and vectorbt
-      for performance analytics, portfolio simulation, risk, and reporting workflows.
+      A neutral, evidence-linked comparison of qis, bt, QuantStats, pyfolio-reloaded, and
+      vectorbt for strategy backtesting, performance analytics, risk, and reporting workflows.
 ---
 
-# Choosing between qis, QuantStats, pyfolio-reloaded, and vectorbt
+# Choosing between qis, bt, QuantStats, pyfolio-reloaded, and vectorbt
 
-These libraries overlap, but their primary workflows differ. `qis` combines portfolio analytics,
-target-weight backtesting, risk analysis, and factsheet reporting. QuantStats turns return series
-into metrics, plots, and HTML reports. pyfolio-reloaded diagnoses an existing backtest from
+These libraries overlap, but their primary workflows differ. `bt` expresses strategy logic as
+composable framework objects. `qis` turns prices and externally computed target weights into
+held-unit portfolio histories, analytics, risk, and factsheet reporting. QuantStats turns return
+series into metrics, plots, and HTML reports. pyfolio-reloaded diagnoses an existing backtest from
 returns, positions, and transactions. vectorbt builds and explores portfolio simulations from
 holdings, signals, or orders at scale.
 
-This comparison was reviewed on **15 August 2026**. It is a guide to documented workflows, not a
+This comparison was reviewed on **6 September 2026**. It is a guide to documented workflows, not a
 performance benchmark or a claim that an unlisted function cannot exist. “Not assessed” means a
 dedicated workflow was not identified in the official material reviewed for this page.
 
-## Capability matrix
+## qis and bt: adjacent, not interchangeable
+
+[`bt`](https://github.com/pmorissette/bt) is a strategy framework. A user defines selection,
+weighting, timing, and rebalancing inside an ordered stack of `Algo` objects, then runs that
+strategy over data. The framework owns the strategy vocabulary and supports composing strategies
+from reusable rules.
+
+[`qis`](portfolio_backtesting.md) begins at a different boundary. Strategy logic remains outside
+the package; the input is a price panel plus target weights. QIS converts those targets into units,
+holds the units between rebalances, applies explicit costs, and connects the resulting portfolio
+to performance, attribution, benchmark risk, and factsheet reporting.
+
+| Starting point or required output | Better fit |
+|---|---|
+| Express selection, weighting, and rebalance rules inside a strategy framework | `bt` |
+| Turn an externally generated target-weight schedule into a held-unit portfolio history | `qis` |
+| Compose reusable strategy rules and nested strategies | `bt` |
+| Produce calibrated performance tables, ex-ante or ex-post risk, and factsheets | `qis` |
+
+Both can turn weights into a portfolio NAV. That overlap does not make their wider workflows
+interchangeable: choose according to where strategy logic lives and what must happen after the
+simulation. Align rebalance dates, execution lag, costs, return convention, and annualisation
+before comparing numerical output across engines.
+
+## Analytics and reporting capability matrix
 
 Every positive cell links to the relevant official documentation or source. A qualified cell
 states what is documented without extending it to a broader claim.
@@ -44,6 +69,9 @@ states what is documented without extending it to a broader claim.
 
 Choose based on the object you already have and the next decision you need to make:
 
+- **Choose [`bt`](https://pmorissette.github.io/bt/)** when you want to write the strategy inside a
+  compact framework vocabulary of timing, selection, weighting, and rebalance rules, including
+  compositions of reusable strategy nodes.
 - **Choose [QuantStats](https://github.com/ranaroussi/quantstats)** when you
   already have a clean periodic return Series and want a concise
   collection of statistics, plots, or an HTML report. Its documented period-based scope is also
@@ -75,8 +103,10 @@ package; reusable performance statistics, drawdowns, risk reporting, and factshe
 See the [repository ecosystem map](https://github.com/ArturSepp/QuantInvestStrats/blob/main/AGENTS.md) for
 the current package relationships.
 
-Use a dedicated simulator such as [vectorbt](https://vectorbt.dev/api/portfolio/base/) when order
-mechanics are the problem. Use a compact reporting layer such as
+Use a strategy framework such as [`bt`](https://pmorissette.github.io/bt/) when the research logic
+should be expressed as reusable selection, weighting, and rebalance rules. Use a dedicated
+simulator such as [vectorbt](https://vectorbt.dev/api/portfolio/base/) when order mechanics are the
+problem. Use a compact reporting layer such as
 [QuantStats](https://github.com/ranaroussi/quantstats) when a return Series is
 the complete input. Use
 [pyfolio-reloaded](https://pyfolio.ml4trading.io/api-reference.html#pyfolio.tears.create_full_tear_sheet)
@@ -85,13 +115,14 @@ does not attempt to erase those distinctions.
 
 ## How this comparison was made
 
-Stable package versions were read from PyPI on 15 August 2026; technical claims were then checked
-against the linked official documentation or repositories. No competitor package was installed,
-and no timing or numerical benchmark was run.
+Stable package versions were read from PyPI on 6 September 2026; technical claims were checked
+against the linked official documentation or repositories. This page makes no speed ranking and
+uses no unpublished numerical benchmark.
 
 | Package | Stable version reviewed | Official technical surface | Qualification |
 |---|---:|---|---|
-| [`qis`](https://pypi.org/project/qis/) | 5.9.4 (11 Aug 2026) | [Current documentation](https://quantinveststrats.readthedocs.io/en/latest/) | The `latest` site follows the repository's documentation branch and can contain unreleased documentation changes. |
+| [`qis`](https://pypi.org/project/qis/) | 5.22.4 (6 Sep 2026) | [Current documentation](https://quantinveststrats.readthedocs.io/en/latest/) | The `latest` site follows the repository's documentation branch and can contain unreleased documentation changes. |
+| [`bt`](https://pypi.org/project/bt/) | 1.2.0 (25 Apr 2026) | [Official documentation](https://pmorissette.github.io/bt/) and [repository](https://github.com/pmorissette/bt) | The hosted documentation header identifies version 0.2.10, so current package status comes from PyPI and technical claims are limited to the documented framework. |
 | [QuantStats](https://pypi.org/project/quantstats/) | 0.0.81 (13 Jan 2026) | [Official repository README and source](https://github.com/ranaroussi/quantstats) | The README states that fuller documentation is forthcoming, so unlisted workflows are marked not assessed. |
 | [pyfolio-reloaded](https://pypi.org/project/pyfolio-reloaded/) | 0.9.9 (2 Jun 2025) | [Hosted API](https://pyfolio.ml4trading.io/api-reference.html) and [current repository](https://github.com/stefan-jansen/pyfolio-reloaded) | The hosted API header identifies an older documentation build; version status comes from PyPI, and claims are limited to documented APIs. |
 | [vectorbt](https://pypi.org/project/vectorbt/) | 1.1.0 (5 Jul 2026) | [Official documentation](https://vectorbt.dev/) | This page compares the open-source package, not VectorBT PRO. |

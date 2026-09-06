@@ -8,6 +8,23 @@ myst:
 
 # Offline quickstart
 
+## First chart
+
+For the shortest visual check, run the core-only example below. It draws the NAV of a quarterly
+rebalanced 60/40 portfolio from the seeded synthetic universe, applies 10 basis points of
+transaction costs, and writes no files. It deliberately suppresses performance labels so no
+return or Sharpe convention is implied by this first price-level chart.
+
+The first backtest in a new Python environment may pause for several seconds while Numba compiles
+the portfolio kernel. The example prints a notice before that first-use compilation begins.
+
+```{literalinclude} ../examples/getting_started/first_chart.py
+:language: python
+:linenos:
+```
+
+## Complete checked workflow
+
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArturSepp/QuantInvestStrats/blob/main/notebooks/offline_quickstart_colab.ipynb)
 
 This workflow needs only `pip install qis`: no network access, credentials, optional extras,
