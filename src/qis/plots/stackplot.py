@@ -44,6 +44,16 @@ def plot_stack(df: pd.DataFrame,
                ax: plt.Subplot = None,
                **kwargs
                ) -> plt.Figure:
+    """Plot DataFrame columns as stacked areas or stacked bars.
+
+    Args:
+        df: Numeric values to stack. Nullable floating columns are supported; stacked-area
+            rendering represents their missing values as NumPy ``nan``.
+        use_bar_plot: Use pandas stacked bars instead of Matplotlib stacked areas.
+
+    Returns:
+        The created figure, or None when the caller supplies ``ax``.
+    """
 
     if ax is None:
         fig, ax = plt.subplots()
@@ -70,7 +80,9 @@ def plot_stack(df: pd.DataFrame,
                                  color=colors, width=1.0, alpha=1.0, edgecolor='none',
                                  linewidth=0, ax=ax)
     else:
-        ax.stackplot(re_indexed_data.index, re_indexed_data.T,
+        # Translate extension scalars only at the renderer boundary and leave caller data intact.
+        stack_values = re_indexed_data.to_numpy(dtype=float, na_value=np.nan).T
+        ax.stackplot(re_indexed_data.index, stack_values,
                      labels=re_indexed_data.columns, step=step, colors=colors,
                      baseline=baseline, edgecolor='none')
 
