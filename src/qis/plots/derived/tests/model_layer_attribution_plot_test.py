@@ -16,6 +16,7 @@ from qis.perfstats.model_layer_attribution import (  # noqa: E402
     ALPHA_AN_CI_HIGH_COLUMN,
     ALPHA_AN_CI_LOW_COLUMN,
     ModelLayerEwmaRegressionAttribution,
+    compute_model_layer_alpha_beta_attribution,
     compute_model_layer_ewma_regression_attribution,
 )
 
@@ -69,7 +70,9 @@ def test_return_bridge_draws_current_hac_inference_and_net_only_endpoint() -> No
     try:
         assert isinstance(fig, plt.Figure)
         ax = fig.axes[0]
-        assert ax.get_title(loc='left') == 'MAC current 24-month EWMA attribution'
+        assert ax.get_title(loc='left') == (
+            'MAC current model-layer alpha attribution using rolling\n24-month EWMA'
+        )
         tick_labels = [tick.get_text() for tick in ax.get_xticklabels()]
         assert len(ax.patches) == 9
         assert any('Trading-cost' in label for label in tick_labels)
@@ -79,7 +82,11 @@ def test_return_bridge_draws_current_hac_inference_and_net_only_endpoint() -> No
         assert len(beta_labels) == 5
         assert all(len(label.splitlines()) >= 3 for label in beta_labels)
         r2_labels = [label for label in tick_labels if r'$R^2$' in label]
-        assert len(r2_labels) == 4
+        assert len(r2_labels) == 5
+        systematic_label = next(label for label in tick_labels if 'Systematic' in label)
+        full_model_r2 = float(attribution.regression_table.loc['Full Model', 'R2'])
+        assert not np.isclose(full_model_r2, 1.0)
+        assert f'$R^2$ = {full_model_r2:.2f}' in systematic_label
 
         midpoint_markers = [
             collection for collection in ax.collections
@@ -147,11 +154,19 @@ def test_return_bridge_draws_current_hac_inference_and_net_only_endpoint() -> No
         assert fig.get_facecolor()[:3] == (1.0, 1.0, 1.0)
         assert ax.get_facecolor()[:3] == (1.0, 1.0, 1.0)
         detail_text = '\n'.join(text.get_text() for text in ax.texts)
-        assert 'Black whiskers show 95%' in detail_text
+        assert 'All 96 returns are used' in detail_text
+        assert 'weighted least squares with Bartlett HAC(2)' in detail_text
         assert '\n' in next(
             text.get_text() for text in ax.texts
-            if 'Black whiskers show 95%' in text.get_text()
+            if 'All 96 returns are used' in text.get_text()
         )
+        expected_colors = {4: 'DarkSlateBlue', 5: '#D97A9A'}
+        for patch_index, color in expected_colors.items():
+            np.testing.assert_allclose(
+                ax.patches[patch_index].get_facecolor()[:3],
+                matplotlib.colors.to_rgb(color),
+                atol=1.0e-12,
+            )
     finally:
         plt.close(fig)
 
@@ -241,9 +256,9 @@ def test_sharpe_bridge_uses_common_denominator_contributions(monkeypatch) -> Non
         assert captured == {'attribution': attribution}
         ax = fig.axes[0]
         assert ax.get_title(loc='left') == (
-            'Risk and signal contributions explain MAC Sharpe beyond the\nbenchmark'
+            'MAC current Sharpe attribution using rolling 24-month EWMA'
         )
-        assert len(ax.patches) == 7
+        assert len(ax.patches) == 9
         tick_labels = [tick.get_text() for tick in ax.get_xticklabels()]
         assert any('Trading-cost' in label for label in tick_labels)
         assert any('Mac\nnet' in label for label in tick_labels)
@@ -254,6 +269,17 @@ def test_sharpe_bridge_uses_common_denominator_contributions(monkeypatch) -> Non
         assert '+0.12' in annotations
         assert '-0.04' in annotations
         assert '0.78' in annotations
+        assert 'Alpha contributions\n+0.37' in annotations
+        np.testing.assert_allclose(
+            ax.patches[4].get_facecolor()[:3],
+            matplotlib.colors.to_rgb('DarkSlateBlue'),
+            atol=1.0e-12,
+        )
+        np.testing.assert_allclose(
+            ax.patches[-2].get_facecolor()[:3],
+            matplotlib.colors.to_rgb('#D97A9A'),
+            atol=1.0e-12,
+        )
     finally:
         plt.close(fig)
 
@@ -268,20 +294,102 @@ def test_rolling_ewma_regression_alpha_plot_ends_at_current_attribution() -> Non
     try:
         assert isinstance(fig, plt.Figure)
         ax = fig.axes[0]
-        assert ax.get_title(loc='left') == (
-            'ROSAA rolling 24-month EWMA-WLS annualised alpha'
+        assert ax.get_title(loc='left').replace('\n', ' ') == (
+            'ROSAA annualised model-layer alpha using rolling 24-month EWMA'
         )
-        assert len(ax.lines) == 5
-        plotted = {line.get_label(): line.get_ydata()[-1] for line in ax.lines[1:]}
+        paths = plots._compute_rolling_ewma_regression_alpha(attribution)
+        data_lines = [
+            line for line in ax.lines if len(line.get_xdata()) == len(paths.index)
+        ]
+        assert len(data_lines) == 4
+        np.testing.assert_allclose(
+            [line.get_linewidth() for line in data_lines],
+            [2.6, 1.8, 1.8, 1.8],
+            atol=0.0,
+            rtol=0.0,
+        )
+        plotted = dict(zip(
+            ['Total ROSAA alpha', 'Risk-layer alpha', 'Signal-layer alpha', 'Integration alpha'],
+            [line.get_ydata()[-1] for line in data_lines],
+        ))
         expected = attribution.regression_table['An Alpha']
-        np.testing.assert_allclose(plotted['Total model alpha'], expected['Full Model'])
+        np.testing.assert_allclose(plotted['Total ROSAA alpha'], expected['Full Model'])
         np.testing.assert_allclose(plotted['Risk-layer alpha'], expected['Risk Layer'])
         np.testing.assert_allclose(plotted['Signal-layer alpha'], expected['Signal Layer'])
         np.testing.assert_allclose(plotted['Integration alpha'], expected['Integration'])
+        legend_text = [text.get_text() for text in ax.get_legend().get_texts()]
+        assert len(legend_text) == 4
+        assert all(': avg=' in label and ', last=' in label for label in legend_text)
+        legend = ax.get_legend()
+        assert legend._loc == 2
+        assert legend.get_frame().get_alpha() == 1.0
+        np.testing.assert_allclose(
+            legend.get_frame().get_facecolor()[:3],
+            matplotlib.colors.to_rgb('white'),
+            atol=1.0e-12,
+        )
+        assert legend.get_zorder() > max(line.get_zorder() for line in data_lines)
+        np.testing.assert_allclose(
+            matplotlib.colors.to_rgb(data_lines[-1].get_color()),
+            matplotlib.colors.to_rgb('DarkSlateBlue'),
+            atol=1.0e-12,
+        )
+        displayed_years = [
+            int(tick.get_text()) for tick in ax.get_xticklabels() if tick.get_text()
+        ]
+        assert len(displayed_years) >= 2
+        assert np.all(np.diff(displayed_years) == 4)
+        assert all(tick.get_rotation() == 0.0 for tick in ax.get_xticklabels())
         assert fig.get_facecolor()[:3] == (1.0, 1.0, 1.0)
         assert ax.get_facecolor()[:3] == (1.0, 1.0, 1.0)
     finally:
         plt.close(fig)
+
+
+def test_rolling_ewma_regression_alpha_display_start_slices_after_estimation() -> None:
+    """Display start slices the completed estimator path and its AVG/LAST legend window."""
+    attribution = _attribution(with_net=True)
+    complete = plots._compute_rolling_ewma_regression_alpha(attribution)
+    start_date = complete.index[-12]
+    expected = complete.loc[start_date:]
+
+    fig = plots.plot_model_layer_rolling_ewma_regression_alpha(
+        attribution=attribution,
+        model_name='Rosaa',
+        start_date=start_date,
+    )
+    try:
+        ax = fig.axes[0]
+        data_lines = [
+            line for line in ax.lines if len(line.get_xdata()) == len(expected.index)
+        ]
+        assert len(data_lines) == 4
+        np.testing.assert_allclose(
+            data_lines[0].get_ydata(),
+            expected['Total Model Alpha'].to_numpy(dtype=float),
+            atol=1.0e-12,
+            rtol=0.0,
+        )
+        expected_legend = (
+            f'Total ROSAA alpha: avg={expected["Total Model Alpha"].mean():.1%}, '
+            f'last={expected["Total Model Alpha"].iloc[-1]:.1%}'
+        )
+        assert ax.get_legend().get_texts()[0].get_text() == expected_legend
+        displayed_date_ticks = [
+            tick for tick in ax.get_xticklabels() if tick.get_text()
+        ]
+        assert displayed_date_ticks
+        assert all(tick.get_text().isdigit() for tick in displayed_date_ticks)
+        assert all(len(tick.get_text()) == 4 for tick in displayed_date_ticks)
+        assert all(tick.get_rotation() == 0.0 for tick in displayed_date_ticks)
+    finally:
+        plt.close(fig)
+
+    with pytest.raises(ValueError, match='start_date is after the final'):
+        plots.plot_model_layer_rolling_ewma_regression_alpha(
+            attribution=attribution,
+            start_date=complete.index[-1] + pd.offsets.MonthEnd(1),
+        )
 
 
 def test_bridge_functions_draw_on_supplied_axes_without_creating_a_figure() -> None:
@@ -302,7 +410,62 @@ def test_bridge_functions_draw_on_supplied_axes_without_creating_a_figure() -> N
         assert return_output is None
         assert sharpe_output is None
         assert len(axes[0].patches) == 7
-        assert len(axes[1].patches) == 6
+        assert len(axes[1].patches) == 7
+    finally:
+        plt.close(fig)
+
+
+def test_in_sample_sharpe_bridge_uses_full_sample_risk_and_split_endpoint() -> None:
+    """The in-sample Sharpe plot uses full-sample returns and a split net endpoint."""
+    current = _attribution(with_net=True)
+    returns = current.periodic_returns
+    dates = pd.date_range('2017-12-31', periods=len(returns.index) + 1, freq='ME')
+    attribution = compute_model_layer_alpha_beta_attribution(
+        benchmark_nav=_nav(returns['Benchmark'].to_numpy(), dates, 'Benchmark'),
+        risk_layer_nav=_nav(returns['Risk Layer'].to_numpy(), dates, 'Risk Layer'),
+        signal_layer_nav=_nav(returns['Signal Layer'].to_numpy(), dates, 'Signal Layer'),
+        full_model_nav=_nav(returns['Full Model'].to_numpy(), dates, 'Full Model'),
+        full_model_net_nav=_nav(
+            returns['Full Model Net'].to_numpy(), dates, 'Full Model Net'
+        ),
+        freq='ME',
+    )
+
+    fig = plots.plot_model_layer_in_sample_sharpe_bridge(
+        attribution=attribution,
+        model_name='Rosaa',
+    )
+    try:
+        ax = fig.axes[0]
+        assert ax.get_title(loc='left').replace('\n', ' ') == (
+            'ROSAA in-sample Sharpe attribution'
+        )
+        assert len(ax.patches) == 9
+        tick_labels = [tick.get_text() for tick in ax.get_xticklabels()]
+        assert sum(r'$R^2$' in label for label in tick_labels) == 5
+        assert any('Rosaa\nnet' in label for label in tick_labels)
+        assert any('Systematic\nβ × benchmark' in label for label in tick_labels)
+        assert any('+ Risk-layer\nalpha' in label for label in tick_labels)
+        assert any('+ Signal-layer\nalpha' in label for label in tick_labels)
+        assert any('+ Integration\nalpha' in label for label in tick_labels)
+        assert all('EWMA alpha' not in label for label in tick_labels)
+        assert any(
+            text.get_text().startswith('Alpha contributions\n') for text in ax.texts
+        )
+        details = '\n'.join(text.get_text() for text in ax.texts)
+        assert 'full-sample endpoint-model volatility' in details
+        assert 'EWMA' not in details
+        np.testing.assert_allclose(
+            ax.patches[4].get_facecolor()[:3],
+            matplotlib.colors.to_rgb('DarkSlateBlue'),
+            atol=1.0e-12,
+        )
+        np.testing.assert_allclose(
+            ax.patches[-2].get_facecolor()[:3],
+            matplotlib.colors.to_rgb('#D97A9A'),
+            atol=1.0e-12,
+        )
+        assert ax.get_facecolor()[:3] == (1.0, 1.0, 1.0)
     finally:
         plt.close(fig)
 

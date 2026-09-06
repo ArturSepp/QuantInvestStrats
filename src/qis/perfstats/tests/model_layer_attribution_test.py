@@ -21,6 +21,7 @@ from qis.perfstats.model_layer_attribution import (
     compute_model_layer_ewma_regression_attribution,
     compute_model_layer_ewma_sharpe_contributions,
     compute_model_layer_ewma_stage_sharpes,
+    compute_model_layer_in_sample_sharpe_contributions,
     compute_model_layer_rolling_ewma_regression_alpha,
 )
 
@@ -930,6 +931,49 @@ def test_ewma_sharpe_contributions_use_two_common_denominators_and_reconcile() -
     np.testing.assert_allclose(
         contributions['Signal Layer'],
         result.annualised_components['Signal Layer Alpha'] / volatility['Full Model Net'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+
+
+def test_in_sample_sharpe_contributions_use_full_sample_returns_and_risk() -> None:
+    """Full-sample numerators use benchmark and endpoint sample log-return volatility."""
+    returns = _rolling_layer_returns()
+    navs = _rolling_navs(returns)
+    net_returns = returns['Full Model'] - np.linspace(0.0001, 0.0004, len(returns.index))
+    navs['full_model_net_nav'] = _nav_from_log_returns(
+        net_returns.to_numpy(),
+        navs['full_model_nav'].index,
+    )
+    attribution = compute_model_layer_alpha_beta_attribution(**navs, freq='ME')
+
+    contributions = compute_model_layer_in_sample_sharpe_contributions(attribution=attribution)
+
+    volatility = (
+        np.sqrt(12.0)
+        * attribution.periodic_returns[['Benchmark', 'Full Model Net']].std(ddof=1)
+    )
+    np.testing.assert_allclose(
+        contributions['Benchmark'],
+        attribution.annualised_components['Benchmark Return'] / volatility['Benchmark'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(
+        contributions['Signal Layer'],
+        attribution.annualised_components['Signal Layer Alpha'] / volatility['Full Model Net'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(
+        contributions[[
+            'Systematic',
+            'Risk Layer',
+            'Signal Layer',
+            'Integration',
+            'Trading Cost Drag',
+        ]].sum(),
+        contributions['Full Model Net'],
         atol=1.0e-12,
         rtol=0.0,
     )

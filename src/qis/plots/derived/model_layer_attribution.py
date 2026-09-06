@@ -1,10 +1,10 @@
-"""Plots for current and rolling EWMA model-layer attribution.
+"""Plots for full-sample and current/rolling EWMA model-layer attribution.
 
 The numerical work is deliberately outside this module.  Return components, current EWMA
 regressions, Bartlett-HAC intervals and effective sample sizes come from
-``ModelLayerEwmaRegressionAttribution``. Common-denominator Sharpe contributions come from
-``compute_model_layer_ewma_sharpe_contributions``. The functions here only validate those
-labelled outputs and render them.
+``ModelLayerEwmaRegressionAttribution``. Common-denominator Sharpe contributions come from the
+current-EWMA and full-sample numerical helpers in ``qis.perfstats.model_layer_attribution``. The
+functions here only validate those labelled outputs and render them.
 
 Both bridges use the same ordered layers: benchmark is shown as a reference, systematic return
 is the first model stage, and risk-layer, signal-layer and integration effects are added in that
@@ -24,21 +24,26 @@ import pandas as pd
 from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
 
+from qis.plots.time_series import plot_time_series
+from qis.plots.utils import LegendStats
+
 if TYPE_CHECKING:
-    from qis.perfstats.model_layer_attribution import ModelLayerEwmaRegressionAttribution
+    from qis.perfstats.model_layer_attribution import (
+        ModelLayerAlphaBetaAttribution,
+        ModelLayerEwmaRegressionAttribution,
+    )
 
 
 _DEFAULT_COLORS = {
-    'Benchmark': '#8E9A9E',
+    'Benchmark': '#687684',
     'Systematic': '#3B5F7A',
     'Risk Layer': '#5B9A91',
     'Signal Layer': '#D99D1E',
-    'Integration': '#8A6F3D',
-    'Trading Cost Drag': '#B45B5B',
+    'Integration': 'DarkSlateBlue',
+    'Trading Cost Drag': '#D97A9A',
     'Full Model Gross': '#126B52',
-    'Full Model Net': '#126B52',
+    'Full Model Net': '#0E4F3E',
 }
-_NEGATIVE_COLOR = '#B45B5B'
 _TEXT_COLOR = '#23313B'
 _GRID_COLOR = '#D8D4CB'
 _BRIDGE_WIDTH = 0.62
@@ -158,9 +163,9 @@ def _regression_label(label: str, beta: float, r_squared: float) -> str:
     return f'{_beta_label(label=label, beta=beta)}\n$R^2$ = {r_squared:.2f}'
 
 
-def _ewma_span_label(attribution: ModelLayerEwmaRegressionAttribution) -> str:
+def _span_label(freq: str, span: int) -> str:
     """Return a frequency-aware adjective such as ``36-month`` or ``12-quarter``."""
-    frequency = str(attribution.freq).upper().split('-', maxsplit=1)[0]
+    frequency = str(freq).upper().split('-', maxsplit=1)[0]
     if frequency in {'M', 'ME', 'MS', 'BM', 'BME', 'BMS', 'CBM', 'CBME', 'CBMS'}:
         unit = 'month'
     elif frequency in {'Q', 'QE', 'QS', 'BQ', 'BQE', 'BQS'}:
@@ -173,7 +178,12 @@ def _ewma_span_label(attribution: ModelLayerEwmaRegressionAttribution) -> str:
         unit = 'day'
     else:
         unit = 'period'
-    return f'{attribution.span}-{unit}'
+    return f'{span}-{unit}'
+
+
+def _ewma_span_label(attribution: ModelLayerEwmaRegressionAttribution) -> str:
+    """Return the frequency-aware span label for a current EWMA attribution."""
+    return _span_label(freq=attribution.freq, span=attribution.span)
 
 
 def _new_axes(
@@ -274,7 +284,7 @@ def _draw_bar(
         abs(contribution),
         bottom=min(start, end),
         width=_BRIDGE_WIDTH,
-        color=color if contribution >= 0.0 else _NEGATIVE_COLOR,
+        color=color,
     )
     annotation_level = end
     if confidence_interval is not None:
@@ -363,13 +373,12 @@ def _draw_split_endpoint(
             abs(contribution),
             bottom=min(start, end),
             width=_BRIDGE_WIDTH,
-            color=color if contribution >= 0.0 else _NEGATIVE_COLOR,
+            color=color,
             zorder=zorder,
         )
     alpha_label = f'{total_alpha:.1%}'
     if not alpha_label.startswith('-'):
         alpha_label = f'+{alpha_label}'
-    alpha_fill_color = alpha_color if total_alpha >= 0.0 else _NEGATIVE_COLOR
     ax.text(
         position,
         0.5 * systematic_return,
@@ -407,7 +416,7 @@ def _draw_split_endpoint(
         fontweight='bold',
         bbox={
             'boxstyle': 'square,pad=0.1',
-            'facecolor': alpha_fill_color,
+            'facecolor': alpha_color,
             'edgecolor': 'none',
         },
         zorder=7,
@@ -434,6 +443,100 @@ def _draw_split_endpoint(
         textcoords='offset points',
         ha='center',
         va='bottom' if total_alpha >= 0.0 else 'top',
+        color=_TEXT_COLOR,
+        fontsize=10.5,
+        fontweight='bold',
+    )
+
+
+def _draw_split_sharpe_endpoint(
+        ax: plt.Axes,
+        position: int,
+        systematic: float,
+        cost: Optional[float],
+        alpha_contributions: float,
+        total: float,
+        systematic_color: str,
+        cost_color: str,
+        alpha_color: str,
+) -> None:
+    """Draw the additive systematic, cost and total-alpha Sharpe endpoint."""
+    cost_value = 0.0 if cost is None else float(cost)
+    if not np.isclose(
+            systematic + cost_value + alpha_contributions,
+            total,
+            atol=1.0e-12,
+            rtol=0.0,
+    ):
+        raise RuntimeError('split Sharpe endpoint does not reconstruct the full model')
+    alpha_start = systematic + cost_value
+    segments = [(0.0, systematic, systematic_color, 3)]
+    if cost is not None:
+        segments.append((systematic, cost_value, cost_color, 8))
+    segments.append((alpha_start, alpha_contributions, alpha_color, 4))
+    for start, contribution, color, zorder in segments:
+        end = start + contribution
+        ax.bar(
+            position,
+            abs(contribution),
+            bottom=min(start, end),
+            width=_BRIDGE_WIDTH,
+            color=color,
+            zorder=zorder,
+        )
+
+    ax.text(
+        position,
+        0.5 * systematic,
+        f'Systematic\n{systematic:.2f}',
+        ha='center',
+        va='center',
+        color='white',
+        fontsize=8.5,
+        fontweight='bold',
+        zorder=4,
+    )
+    if cost is not None:
+        ax.annotate(
+            f'Cost\n{cost_value:.2f}',
+            xy=(position, systematic + 0.5 * cost_value),
+            xytext=(28, -2),
+            textcoords='offset points',
+            ha='left',
+            va='center',
+            color=cost_color,
+            fontsize=8.0,
+            fontweight='bold',
+            arrowprops={'arrowstyle': '-', 'color': cost_color, 'linewidth': 0.9},
+            annotation_clip=False,
+            zorder=8,
+        )
+    alpha_label = f'{alpha_contributions:.2f}'
+    if not alpha_label.startswith('-'):
+        alpha_label = f'+{alpha_label}'
+    ax.text(
+        position,
+        alpha_start + 0.5 * alpha_contributions,
+        f'Alpha contributions\n{alpha_label}',
+        ha='center',
+        va='center',
+        color='white',
+        fontsize=8.5,
+        fontweight='bold',
+        bbox={
+            'boxstyle': 'square,pad=0.1',
+            'facecolor': alpha_color,
+            'edgecolor': 'none',
+        },
+        zorder=7,
+    )
+    ax.annotate(
+        f'{total:.2f}',
+        xy=(position, total),
+        xytext=(0, 5 if total >= 0.0 else -14),
+        textcoords='offset points',
+        ha='center',
+        va='bottom' if total >= 0.0 else 'top',
         color=_TEXT_COLOR,
         fontsize=10.5,
         fontweight='bold',
@@ -513,6 +616,17 @@ def _compute_ewma_sharpe_contributions(
     )
 
     return compute_model_layer_ewma_sharpe_contributions(attribution=attribution)
+
+
+def _compute_in_sample_sharpe_contributions(
+        attribution: ModelLayerAlphaBetaAttribution,
+) -> pd.Series:
+    """Call the full-sample return-and-risk Sharpe API lazily."""
+    from qis.perfstats.model_layer_attribution import (
+        compute_model_layer_in_sample_sharpe_contributions,
+    )
+
+    return compute_model_layer_in_sample_sharpe_contributions(attribution=attribution)
 
 
 def _compute_rolling_ewma_regression_alpha(
@@ -682,7 +796,7 @@ def plot_model_layer_ewma_return_bridge(
     ]
     tick_labels = [
         display_labels['Benchmark'],
-        _beta_label(display_labels['Systematic'], beta_full),
+        _regression_label(display_labels['Systematic'], beta_full, r_squared_full),
         _regression_label(display_labels['Risk Layer'], beta_risk, r_squared_risk),
         _regression_label(display_labels['Signal Layer'], beta_signal, r_squared_signal),
         _regression_label(
@@ -774,22 +888,29 @@ def plot_model_layer_ewma_return_bridge(
 
     final_date = pd.Timestamp(attribution.periodic_returns.index[-1])
     span_label = _ewma_span_label(attribution=attribution)
-    plot_title = title or f'{model_name.upper()} current {span_label} EWMA attribution'
+    plot_title = title or (
+        f'{model_name.upper()} current model-layer alpha attribution using rolling '
+        f'{span_label} EWMA'
+    )
     _add_details(
         ax=ax,
         title=plot_title,
         subtitle=(
             f'Annualised EWMA log-return contributions through {final_date:%d %b %Y} | '
-            f'{attribution.confidence_level:.0%} Bartlett HAC({attribution.hac_lags})'
+            f'error bars using {attribution.confidence_level:.0%} Bartlett '
+            f'HAC({attribution.hac_lags})'
         ),
         note=(
-            f'Black whiskers show {attribution.confidence_level:.0%} EWMA Bartlett '
-            f'HAC({attribution.hac_lags}) intervals; Kish effective sample size '
-            f'{attribution.effective_nobs:.1f} from {attribution.nobs} returns. '
-            'Beta and R-squared labels are current EWMA regression estimates. Integration is '
-            'the exact residual after systematic, risk-layer and signal-layer contributions. '
+            f'All {attribution.nobs} returns are used; span {attribution.span} gives recent '
+            f'returns more weight, equivalent to about {attribution.effective_nobs:.0f} equally '
+            'weighted observations. Black whiskers show '
+            f'{attribution.confidence_level:.0%} intervals from EWMA weighted least squares '
+            f'with Bartlett HAC({attribution.hac_lags}), allowing changing volatility and '
+            f'autocorrelation through {attribution.hac_lags} lags. Beta and R-squared labels '
+            'are current EWMA regression estimates. Integration is the exact residual after '
+            'systematic, risk-layer and signal-layer contributions. '
             'The final bar shows gross-model systematic return, realised cost drag and gross '
-            'total alpha; its fourth whisker is the gross total-alpha interval.'
+            'total alpha; its final whisker is the gross total-alpha interval.'
         ),
         detailed_mode=detailed_mode,
     )
@@ -803,6 +924,7 @@ def plot_model_layer_rolling_ewma_regression_alpha(
         detailed_mode: bool = True,
         title: Optional[str] = None,
         ax: Optional[plt.Axes] = None,
+        start_date: Optional[pd.Timestamp] = None,
 ) -> Optional[Figure]:
     """Plot expanding-prefix EWMA-WLS annualised alpha paths.
 
@@ -815,6 +937,8 @@ def plot_model_layer_rolling_ewma_regression_alpha(
         model_name: Model name used in the title.
         colors: Optional semantic colour overrides; supported keys are documented by the return
             bridge.
+        start_date: Optional first displayed date. Estimation always uses the complete history;
+            slicing occurs only after every expanding-prefix estimate has been computed.
         detailed_mode: Whether to draw the title, subtitle and methodology note.
         title: Detailed-mode title. None uses a frequency-aware rolling EWMA-WLS title.
         ax: Existing axis. None creates a new report-sized figure.
@@ -824,7 +948,8 @@ def plot_model_layer_rolling_ewma_regression_alpha(
 
     Raises:
         TypeError: If ``attribution`` is not a model-layer EWMA regression result.
-        ValueError: If the rolling alpha output is missing a required series.
+        ValueError: If the rolling alpha output is missing a required series or ``start_date``
+            leaves no observations to display.
     """
     _validate_attribution(attribution=attribution)
     display_colors = _updated_mapping(
@@ -834,7 +959,12 @@ def plot_model_layer_rolling_ewma_regression_alpha(
     )
     paths = _compute_rolling_ewma_regression_alpha(attribution=attribution)
     series_specs = (
-        ('Total model alpha', 'Total Model Alpha', display_colors['Full Model Gross'], 2.6),
+        (
+            f'Total {model_name.upper()} alpha',
+            'Total Model Alpha',
+            display_colors['Full Model Gross'],
+            2.6,
+        ),
         ('Risk-layer alpha', 'Risk Layer Alpha', display_colors['Risk Layer'], 1.8),
         ('Signal-layer alpha', 'Signal Layer Alpha', display_colors['Signal Layer'], 1.8),
         ('Integration alpha', 'Integration Alpha', display_colors['Integration'], 1.8),
@@ -842,42 +972,216 @@ def plot_model_layer_rolling_ewma_regression_alpha(
     missing = [column for _, column, _, _ in series_specs if column not in paths.columns]
     if missing:
         raise ValueError(f'rolling EWMA-WLS alpha paths are missing {missing!r}')
+    if start_date is not None:
+        try:
+            display_start = pd.Timestamp(start_date)
+        except (TypeError, ValueError) as exception:
+            raise ValueError(f'start_date must be datetime-like, got {start_date!r}') from exception
+        if pd.isna(display_start):
+            raise ValueError('start_date must not be NaT')
+        if (paths.index.tz is None) != (display_start.tzinfo is None):
+            raise ValueError('start_date and the rolling-alpha index must use matching timezones')
+        if display_start > paths.index[-1]:
+            raise ValueError(
+                f'start_date is after the final rolling-alpha date {paths.index[-1]!s}'
+            )
+        paths = paths.loc[paths.index >= display_start]
+        if paths.empty:
+            raise ValueError('start_date leaves no rolling-alpha observations to display')
 
     fig, ax = _new_axes(ax=ax, detailed_mode=detailed_mode)
+    plot_paths = paths[[column for _, column, _, _ in series_specs]].rename(
+        columns={column: label for label, column, _, _ in series_specs}
+    )
+    four_year_ticks = pd.date_range(start=paths.index[0], end=paths.index[-1], freq='4YE')
+    x_date_freq = '4YE' if len(four_year_ticks) >= 2 else 'YE'
+    plot_time_series(
+        df=plot_paths,
+        linewidth=1.9,
+        x_date_freq=x_date_freq,
+        date_format='%Y',
+        x_date_rotation=0,
+        x_rotation=0,
+        legend_stats=LegendStats.AVG_LAST,
+        legend_loc='upper left',
+        framealpha=1.0,
+        facecolor='white',
+        ylabel='Rolling annualised EWMA-WLS alpha',
+        var_format='{:.1%}',
+        colors=[color for _, _, color, _ in series_specs],
+        title=None,
+        ax=ax,
+    )
+    for line, (_, _, _, linewidth) in zip(ax.lines, series_specs):
+        line.set_linewidth(linewidth)
+    ax.get_legend().set_zorder(10)
     ax.axhline(0.0, color=_TEXT_COLOR, linewidth=0.8)
-    for label, column, color, linewidth in series_specs:
-        ax.plot(
-            paths.index,
-            paths[column],
-            label=label,
-            color=color,
-            linewidth=linewidth,
-        )
-    ax.set_ylabel('Rolling annualised EWMA-WLS alpha', color=_TEXT_COLOR)
-    ax.yaxis.set_major_formatter(PercentFormatter(1.0))
-    ax.legend(frameon=False, loc='best')
     ax.margins(x=0.0, y=0.10)
     _style_axes(ax=ax)
 
     final_date = pd.Timestamp(paths.index[-1])
     span_label = _ewma_span_label(attribution=attribution)
     plot_title = title or (
-        f'{model_name.upper()} rolling {span_label} EWMA-WLS annualised alpha'
+        f'{model_name.upper()} annualised model-layer alpha using rolling {span_label} EWMA'
     )
     _add_details(
         ax=ax,
         title=plot_title,
         subtitle=(
-            f'Expanding-prefix {span_label} geometric regressions through '
-            f'{final_date:%d %b %Y}'
+            f'Expanding-prefix {span_label} EWMA-WLS log-return regressions | displayed '
+            f'{paths.index[0]:%d %b %Y} to {final_date:%d %b %Y}'
         ),
         note=(
-            'Each date refits the same descriptive EWMA-WLS regression on history available '
-            'through that date. Total model alpha equals risk-layer alpha + signal-layer alpha '
-            '+ integration alpha at every point. The final values equal the gross alpha bars in '
-            'the current EWMA attribution; these are contemporaneous estimates, not lagged '
-            'out-of-sample residuals.'
+            'The plotted model returns are out of sample, while each date refits the '
+            'contemporaneous EWMA-WLS attribution using only returns available through that '
+            'date. Total model alpha equals risk-layer alpha + signal-layer alpha + integration '
+            'alpha at every point. The final values equal the gross alpha bars in the current '
+            'EWMA attribution; they are endpoint regression estimates, not one-period-ahead '
+            'alpha forecasts.'
         ),
+        detailed_mode=detailed_mode,
+    )
+    return fig
+
+
+def _plot_sharpe_contribution_bridge(
+        attribution: ModelLayerAlphaBetaAttribution | ModelLayerEwmaRegressionAttribution,
+        contributions: pd.Series,
+        model_name: str,
+        benchmark_label: str,
+        labels: Optional[Mapping[str, str]],
+        colors: Optional[Mapping[str, str]],
+        detailed_mode: bool,
+        title: str,
+        subtitle: str,
+        note: str,
+        ax: Optional[plt.Axes],
+) -> Optional[Figure]:
+    """Render additive Sharpe contributions from a validated attribution result."""
+    display_labels = _display_labels(
+        model_name=model_name,
+        benchmark_label=benchmark_label,
+        labels=labels,
+    )
+    display_colors = _updated_mapping(
+        defaults=_DEFAULT_COLORS,
+        updates=colors,
+        name='colors',
+    )
+    benchmark_sharpe = float(contributions['Benchmark'])
+    systematic_sharpe = float(contributions['Systematic'])
+    risk_contribution = float(contributions['Risk Layer'])
+    signal_contribution = float(contributions['Signal Layer'])
+    integration_contribution = float(contributions['Integration'])
+    has_net = 'Full Model Net' in contributions.index
+    cost_contribution = (
+        float(contributions['Trading Cost Drag']) if has_net else None
+    )
+    endpoint_sharpe = float(
+        contributions['Full Model Net' if has_net else 'Full Model Gross']
+    )
+    alpha_contributions = risk_contribution + signal_contribution + integration_contribution
+    bridge_total = systematic_sharpe + alpha_contributions
+    if has_net:
+        bridge_total += cost_contribution
+    if not np.isclose(bridge_total, endpoint_sharpe, atol=1.0e-12, rtol=0.0):
+        raise RuntimeError('common-denominator Sharpe bridge does not reconcile')
+
+    beta_full = _get_beta(attribution=attribution, layer='Full Model')
+    beta_risk = _get_beta(attribution=attribution, layer='Risk Layer')
+    beta_signal = _get_beta(attribution=attribution, layer='Signal Layer')
+    beta_integration = _get_beta(attribution=attribution, layer='Integration')
+    r_squared_full = _get_r_squared(attribution=attribution, layer='Full Model')
+    r_squared_risk = _get_r_squared(attribution=attribution, layer='Risk Layer')
+    r_squared_signal = _get_r_squared(attribution=attribution, layer='Signal Layer')
+    r_squared_integration = _get_r_squared(attribution=attribution, layer='Integration')
+    fig, ax = _new_axes(ax=ax, detailed_mode=detailed_mode)
+    bars = [
+        (0, 0.0, benchmark_sharpe, 'Benchmark', False),
+        (2, 0.0, systematic_sharpe, 'Systematic', False),
+        (3, systematic_sharpe, risk_contribution, 'Risk Layer', True),
+        (
+            4,
+            systematic_sharpe + risk_contribution,
+            signal_contribution,
+            'Signal Layer',
+            True,
+        ),
+        (
+            5,
+            systematic_sharpe + risk_contribution + signal_contribution,
+            integration_contribution,
+            'Integration',
+            True,
+        ),
+    ]
+    tick_labels = [
+        display_labels['Benchmark'],
+        _regression_label(display_labels['Systematic'], beta_full, r_squared_full),
+        _regression_label(display_labels['Risk Layer'], beta_risk, r_squared_risk),
+        _regression_label(display_labels['Signal Layer'], beta_signal, r_squared_signal),
+        _regression_label(
+            display_labels['Integration'], beta_integration, r_squared_integration
+        ),
+    ]
+    if has_net:
+        endpoint_position = 7
+        gross_sharpe = systematic_sharpe + alpha_contributions
+        bars.append((6, gross_sharpe, cost_contribution, 'Trading Cost Drag', True))
+        tick_labels.extend([
+            display_labels['Trading Cost Drag'],
+            _regression_label(display_labels['Full Model Net'], beta_full, r_squared_full),
+        ])
+    else:
+        endpoint_position = 6
+        gross_sharpe = endpoint_sharpe
+        tick_labels.append(
+            _regression_label(display_labels['Full Model Gross'], beta_full, r_squared_full)
+        )
+
+    for position, start, contribution, key, is_contribution in bars:
+        _draw_bar(
+            ax=ax,
+            position=position,
+            start=start,
+            contribution=contribution,
+            color=display_colors[key],
+            is_contribution=is_contribution,
+            value_format='{:.2f}',
+        )
+    _draw_split_sharpe_endpoint(
+        ax=ax,
+        position=endpoint_position,
+        systematic=systematic_sharpe,
+        cost=cost_contribution,
+        alpha_contributions=alpha_contributions,
+        total=endpoint_sharpe,
+        systematic_color=display_colors['Systematic'],
+        cost_color=display_colors['Trading Cost Drag'],
+        alpha_color=display_colors['Full Model Gross'],
+    )
+    connectors = [
+        (2, 3, systematic_sharpe),
+        (3, 4, systematic_sharpe + risk_contribution),
+        (4, 5, systematic_sharpe + risk_contribution + signal_contribution),
+    ]
+    if has_net:
+        connectors.extend([(5, 6, gross_sharpe), (6, 7, endpoint_sharpe)])
+    else:
+        connectors.append((5, 6, endpoint_sharpe))
+    _draw_connectors(ax=ax, connectors=connectors)
+
+    ax.axvline(1.0, color=_GRID_COLOR, linewidth=1.0, linestyle=':')
+    ax.axhline(0.0, color=_TEXT_COLOR, linewidth=0.8)
+    ax.set_xticks([bar[0] for bar in bars] + [endpoint_position], tick_labels)
+    ax.set_ylabel('Log-return Sharpe (rf=0)', color=_TEXT_COLOR)
+    ax.margins(x=0.04, y=0.18)
+    _style_axes(ax=ax)
+    _add_details(
+        ax=ax,
+        title=title,
+        subtitle=subtitle,
+        note=note,
         detailed_mode=detailed_mode,
     )
     return fig
@@ -914,136 +1218,112 @@ def plot_model_layer_ewma_sharpe_bridge(
         RuntimeError: If the common-denominator Sharpe bridge does not reconcile.
     """
     _validate_attribution(attribution=attribution)
-    display_labels = _display_labels(
+    contributions = _compute_ewma_sharpe_contributions(attribution=attribution)
+    final_date = pd.Timestamp(attribution.periodic_returns.index[-1])
+    span_label = _ewma_span_label(attribution=attribution)
+    return _plot_sharpe_contribution_bridge(
+        attribution=attribution,
+        contributions=contributions,
         model_name=model_name,
         benchmark_label=benchmark_label,
         labels=labels,
-    )
-    display_colors = _updated_mapping(
-        defaults=_DEFAULT_COLORS,
-        updates=colors,
-        name='colors',
-    )
-    contributions = _compute_ewma_sharpe_contributions(attribution=attribution)
-    benchmark_sharpe = float(contributions['Benchmark'])
-    systematic_sharpe = float(contributions['Systematic'])
-    risk_contribution = float(contributions['Risk Layer'])
-    signal_contribution = float(contributions['Signal Layer'])
-    integration_contribution = float(contributions['Integration'])
-    has_net = 'Full Model Net' in contributions.index
-    cost_contribution = (
-        float(contributions['Trading Cost Drag']) if has_net else None
-    )
-    endpoint_sharpe = float(
-        contributions['Full Model Net' if has_net else 'Full Model Gross']
-    )
-    bridge_total = (
-        systematic_sharpe
-        + risk_contribution
-        + signal_contribution
-        + integration_contribution
-    )
-    if has_net:
-        bridge_total += cost_contribution
-    if not np.isclose(bridge_total, endpoint_sharpe, atol=1.0e-12, rtol=0.0):
-        raise RuntimeError('common-denominator EWMA Sharpe bridge does not reconcile')
-
-    beta_full = _get_beta(attribution=attribution, layer='Full Model')
-    beta_risk = _get_beta(attribution=attribution, layer='Risk Layer')
-    beta_signal = _get_beta(attribution=attribution, layer='Signal Layer')
-    beta_integration = _get_beta(attribution=attribution, layer='Integration')
-    fig, ax = _new_axes(ax=ax, detailed_mode=detailed_mode)
-    bars = [
-        (0, 0.0, benchmark_sharpe, 'Benchmark', False),
-        (2, 0.0, systematic_sharpe, 'Systematic', False),
-        (3, systematic_sharpe, risk_contribution, 'Risk Layer', True),
-        (
-            4,
-            systematic_sharpe + risk_contribution,
-            signal_contribution,
-            'Signal Layer',
-            True,
+        colors=colors,
+        detailed_mode=detailed_mode,
+        title=(
+            title
+            or f'{model_name.upper()} current Sharpe attribution using rolling '
+            f'{span_label} EWMA'
         ),
-        (
-            5,
-            systematic_sharpe + risk_contribution + signal_contribution,
-            integration_contribution,
-            'Integration',
-            True,
-        ),
-    ]
-    tick_labels = [
-        display_labels['Benchmark'],
-        _beta_label(display_labels['Systematic'], beta_full),
-        _beta_label(display_labels['Risk Layer'], beta_risk),
-        _beta_label(display_labels['Signal Layer'], beta_signal),
-        _beta_label(display_labels['Integration'], beta_integration),
-    ]
-    if has_net:
-        gross_sharpe = (
-            systematic_sharpe
-            + risk_contribution
-            + signal_contribution
-            + integration_contribution
-        )
-        bars.extend([
-            (6, gross_sharpe, cost_contribution, 'Trading Cost Drag', True),
-            (7, 0.0, endpoint_sharpe, 'Full Model Net', False),
-        ])
-        tick_labels.extend([
-            display_labels['Trading Cost Drag'],
-            _beta_label(display_labels['Full Model Net'], beta_full),
-        ])
-    else:
-        bars.append((6, 0.0, endpoint_sharpe, 'Full Model Gross', False))
-        tick_labels.append(_beta_label(display_labels['Full Model Gross'], beta_full))
-
-    for position, start, contribution, key, is_contribution in bars:
-        _draw_bar(
-            ax=ax,
-            position=position,
-            start=start,
-            contribution=contribution,
-            color=display_colors[key],
-            is_contribution=is_contribution,
-            value_format='{:.2f}',
-        )
-    connectors = [
-        (2, 3, systematic_sharpe),
-        (3, 4, systematic_sharpe + risk_contribution),
-        (4, 5, systematic_sharpe + risk_contribution + signal_contribution),
-    ]
-    if has_net:
-        connectors.extend([(5, 6, gross_sharpe), (6, 7, endpoint_sharpe)])
-    else:
-        connectors.append((5, 6, endpoint_sharpe))
-    _draw_connectors(ax=ax, connectors=connectors)
-
-    ax.axvline(1.0, color=_GRID_COLOR, linewidth=1.0, linestyle=':')
-    ax.axhline(0.0, color=_TEXT_COLOR, linewidth=0.8)
-    ax.set_xticks([bar[0] for bar in bars], tick_labels)
-    ax.set_ylabel('Current EWMA log-return Sharpe (rf=0)', color=_TEXT_COLOR)
-    ax.margins(x=0.04, y=0.18)
-    _style_axes(ax=ax)
-
-    final_date = pd.Timestamp(attribution.periodic_returns.index[-1])
-    span_label = _ewma_span_label(attribution=attribution)
-    plot_title = title or (
-        f'Risk and signal contributions explain {model_name.upper()} Sharpe beyond the benchmark'
-    )
-    _add_details(
-        ax=ax,
-        title=plot_title,
         subtitle=(
             f'{span_label} EWMA log-return/volatility contributions through '
             f'{final_date:%d %b %Y} | zero risk-free rate'
         ),
         note=(
-            'Static Benchmark return is divided by benchmark EWMA volatility. Systematic, risk, '
+            'Benchmark return is divided by benchmark EWMA volatility. Systematic, risk, '
             'signal, integration and realised cost returns are each divided by one common '
             'full-model endpoint EWMA volatility, so their contributions add exactly to the '
-            'displayed model Sharpe and retain the signs of their return components.'
+            'displayed model Sharpe and retain the signs of their return components. The final '
+            'bar repeats the same identity as systematic, cost and combined alpha contributions.'
         ),
-        detailed_mode=detailed_mode,
+        ax=ax,
     )
-    return fig
+
+
+def plot_model_layer_in_sample_sharpe_bridge(
+        attribution: ModelLayerAlphaBetaAttribution,
+        model_name: str = 'Model',
+        benchmark_label: str = 'Benchmark',
+        labels: Optional[Mapping[str, str]] = None,
+        colors: Optional[Mapping[str, str]] = None,
+        detailed_mode: bool = True,
+        title: Optional[str] = None,
+        ax: Optional[plt.Axes] = None,
+) -> Optional[Figure]:
+    """Plot full-sample return contributions over full-sample volatility.
+
+    The plotted numerators come from the exact full-sample attribution. Benchmark return is
+    divided by full-sample benchmark log-return volatility; every model contribution is divided
+    by one common full-sample endpoint-model log-return volatility, preserving signs and exact
+    additivity.
+
+    Args:
+        attribution: Full-sample model-layer alpha/beta attribution computed by QIS.
+        model_name: Model name used in the title and endpoint labels.
+        benchmark_label: Display label for the benchmark reference bar.
+        labels: Optional semantic label overrides. Full-sample defaults label systematic return
+            as beta times benchmark and the three remaining contributions as alpha.
+        colors: Optional semantic colour overrides; keys are documented by the return bridge.
+        detailed_mode: Whether to draw the title, subtitle and methodology note.
+        title: Detailed-mode title. None uses the standard in-sample title.
+        ax: Existing axis. None creates a new report-sized figure.
+
+    Returns:
+        The created figure, or None when drawing on a supplied axis.
+
+    Raises:
+        TypeError: If ``attribution`` is not a full-sample model-layer attribution.
+        ValueError: If required labelled inputs or full-sample volatilities are invalid.
+        RuntimeError: If the common-denominator Sharpe bridge does not reconcile.
+    """
+    contributions = _compute_in_sample_sharpe_contributions(attribution=attribution)
+    final_date = pd.Timestamp(attribution.periodic_returns.index[-1])
+    in_sample_labels = {
+        'Benchmark': benchmark_label,
+        'Systematic': 'Systematic\nβ × benchmark',
+        'Risk Layer': '+ Risk-layer\nalpha',
+        'Signal Layer': '+ Signal-layer\nalpha',
+        'Integration': '+ Integration\nalpha',
+        'Trading Cost Drag': 'Trading-cost\ndrag',
+        'Full Model Gross': f'{model_name}\ngross',
+        'Full Model Net': f'{model_name}\nnet',
+    }
+    if labels is not None:
+        unknown = sorted(set(labels).difference(in_sample_labels))
+        if unknown:
+            raise ValueError(f'labels contains unsupported keys {unknown!r}')
+        in_sample_labels.update(labels)
+    return _plot_sharpe_contribution_bridge(
+        attribution=attribution,
+        contributions=contributions,
+        model_name=model_name,
+        benchmark_label=benchmark_label,
+        labels=in_sample_labels,
+        colors=colors,
+        detailed_mode=detailed_mode,
+        title=(
+            title
+            or f'{model_name.upper()} in-sample Sharpe attribution'
+        ),
+        subtitle=(
+            f'Full-sample annualised mean log returns and log-return volatility through '
+            f'{final_date:%d %b %Y} | zero risk-free rate'
+        ),
+        note=(
+            'Full-sample benchmark return is divided by full-sample benchmark volatility. '
+            'Full-sample systematic, risk, signal, integration and realised cost returns are '
+            'each divided by one common full-sample endpoint-model volatility, so the model '
+            'contributions add exactly and retain the signs of their return components. The '
+            'final bar shows systematic, cost and combined alpha contributions.'
+        ),
+        ax=ax,
+    )

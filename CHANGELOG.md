@@ -9,14 +9,22 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
-- Added expanding-prefix EWMA-WLS model-layer alpha paths and additive current EWMA Sharpe
-  contributions with benchmark and full-model volatility denominators.
+- Added expanding-prefix EWMA-WLS model-layer alpha paths, additive current EWMA Sharpe
+  contributions, and full-sample Sharpe contributions with full-sample benchmark and model
+  volatility denominators.
 
 ### Changed
 
 - Changed the EWMA model-layer Sharpe bridge from order-dependent stage differences to additive
   common-denominator contributions, and made the net return endpoint show gross systematic
   return, realised costs and gross total alpha with its regression interval.
+- Standardised model-layer bridge colours, added systematic R-squared labels, split Sharpe
+  endpoints into systematic, cost and combined-alpha contributions, and routed the rolling-alpha
+  chart through the QIS time-series plot with average and latest legend statistics. Cost drag uses
+  a consistent muted-pink semantic colour across return and Sharpe bridges, integration uses
+  DarkSlateBlue, and the rolling-alpha legend is opaque at the upper left.
+- Added display-only `start_date` clipping to the rolling EWMA-WLS alpha plot; estimation continues
+  to use the complete expanding history while legend statistics use the displayed range.
 
 ### Fixed
 

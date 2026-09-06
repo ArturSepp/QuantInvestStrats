@@ -817,6 +817,127 @@ def compute_model_layer_rolling_ewma_regression_alpha(
     return alpha_path
 
 
+def _compute_model_layer_sharpe_contributions(
+        annualised_components: pd.Series,
+        periodic_returns: pd.DataFrame,
+        freq: str,
+        span: Optional[int],
+) -> pd.Series:
+    """Divide an additive return bridge by full-sample or current EWMA risk."""
+    values = annualised_components
+    required_components = [
+        'Benchmark Return',
+        'Systematic Return',
+        'Risk Layer Alpha',
+        'Signal Layer Alpha',
+        'Integration Alpha',
+        'Full Model Return',
+    ]
+    missing = [name for name in required_components if name not in values.index]
+    if missing:
+        raise ValueError(f'annualised components are missing {missing!r}')
+
+    has_net = 'Full Model Net Return' in values.index
+    endpoint_layer = 'Full Model Net' if has_net else 'Full Model'
+    endpoint_return = 'Full Model Net Return' if has_net else 'Full Model Return'
+    required_returns = ['Benchmark', endpoint_layer]
+    missing_returns = [
+        name for name in required_returns if name not in periodic_returns.columns
+    ]
+    if missing_returns:
+        raise ValueError(f'periodic returns are missing {missing_returns!r}')
+    if span is None:
+        volatility = periodic_returns[required_returns].std(ddof=1).multiply(
+            np.sqrt(get_annualization_factor(freq=freq))
+        )
+        volatility_description = 'full-sample'
+    else:
+        volatility = compute_ewm_vol(
+            data=periodic_returns[required_returns],
+            span=span,
+            mean_adj_type=MeanAdjType.EWMA,
+            init_type=InitType.ZERO,
+            annualize=True,
+            annualization_factor=get_annualization_factor(freq=freq),
+            nan_backfill=NanBackfill.ZERO_FILL,
+        ).iloc[-1]
+        volatility_description = 'current EWMA'
+    benchmark_volatility = float(volatility['Benchmark'])
+    model_volatility = float(volatility[endpoint_layer])
+    if not np.isfinite([benchmark_volatility, model_volatility]).all() or (
+            benchmark_volatility <= 0.0 or model_volatility <= 0.0
+    ):
+        raise ValueError(
+            f'{volatility_description} benchmark and endpoint-model volatilities must be '
+            'finite and positive'
+        )
+
+    contributions = pd.Series({
+        'Benchmark': float(values['Benchmark Return']) / benchmark_volatility,
+        'Systematic': float(values['Systematic Return']) / model_volatility,
+        'Risk Layer': float(values['Risk Layer Alpha']) / model_volatility,
+        'Signal Layer': float(values['Signal Layer Alpha']) / model_volatility,
+        'Integration': float(values['Integration Alpha']) / model_volatility,
+    }, dtype=float)
+    if has_net:
+        if 'Trading Cost Drag' not in values.index:
+            raise ValueError('annualised components are missing Trading Cost Drag')
+        contributions['Trading Cost Drag'] = (
+            float(values['Trading Cost Drag']) / model_volatility
+        )
+    contributions['Full Model Net' if has_net else 'Full Model Gross'] = (
+        float(values[endpoint_return]) / model_volatility
+    )
+    model_components = ['Systematic', 'Risk Layer', 'Signal Layer', 'Integration']
+    if has_net:
+        model_components.append('Trading Cost Drag')
+    if not np.isclose(
+            contributions.loc[model_components].sum(),
+            contributions.iloc[-1],
+            atol=1.0e-12,
+            rtol=0.0,
+    ):
+        raise RuntimeError('Sharpe contributions do not reconstruct the full model')
+    if not np.isfinite(contributions.to_numpy(dtype=float)).all():
+        raise RuntimeError('Sharpe contributions contain non-finite values')
+    return contributions
+
+
+def compute_model_layer_in_sample_sharpe_contributions(
+        attribution: ModelLayerAlphaBetaAttribution,
+) -> pd.Series:
+    """Compute additive full-sample return contributions over full-sample volatility.
+
+    The numerators are the exact full-sample annualised log-return components in
+    ``attribution``. The benchmark reference uses benchmark volatility, while every model
+    component uses one common gross- or net-model full-sample annualised log-return volatility.
+    Volatility is the sample standard deviation (``ddof=1``) multiplied by the square root of the
+    annualisation factor implied by ``attribution.freq``. Contributions remain signed and additive.
+
+    Args:
+        attribution: Full-sample model-layer alpha/beta attribution computed by QIS.
+
+    Returns:
+        Benchmark reference, additive model contributions and the full-model endpoint ratio.
+
+    Raises:
+        TypeError: If ``attribution`` is not a full-sample model-layer attribution.
+        ValueError: If required return inputs or full-sample volatilities are invalid.
+        RuntimeError: If the additive contributions do not reconstruct the endpoint ratio.
+    """
+    if not isinstance(attribution, ModelLayerAlphaBetaAttribution):
+        raise TypeError(
+            'attribution must be ModelLayerAlphaBetaAttribution, got '
+            f'{type(attribution)!r}'
+        )
+    return _compute_model_layer_sharpe_contributions(
+        annualised_components=attribution.annualised_components,
+        periodic_returns=attribution.periodic_returns,
+        freq=attribution.freq,
+        span=None,
+    )
+
+
 def compute_model_layer_ewma_sharpe_contributions(
         attribution: ModelLayerEwmaRegressionAttribution,
 ) -> pd.Series:
@@ -847,75 +968,12 @@ def compute_model_layer_ewma_sharpe_contributions(
             'attribution must be ModelLayerEwmaRegressionAttribution, got '
             f'{type(attribution)!r}'
         )
-    values = attribution.annualised_components
-    required_components = [
-        'Benchmark Return',
-        'Systematic Return',
-        'Risk Layer Alpha',
-        'Signal Layer Alpha',
-        'Integration Alpha',
-        'Full Model Return',
-    ]
-    missing = [name for name in required_components if name not in values.index]
-    if missing:
-        raise ValueError(f'annualised components are missing {missing!r}')
-
-    has_net = 'Full Model Net Return' in values.index
-    endpoint_layer = 'Full Model Net' if has_net else 'Full Model'
-    endpoint_return = 'Full Model Net Return' if has_net else 'Full Model Return'
-    required_returns = ['Benchmark', endpoint_layer]
-    missing_returns = [
-        name for name in required_returns if name not in attribution.periodic_returns.columns
-    ]
-    if missing_returns:
-        raise ValueError(f'periodic returns are missing {missing_returns!r}')
-    volatility = compute_ewm_vol(
-        data=attribution.periodic_returns[required_returns],
+    return _compute_model_layer_sharpe_contributions(
+        annualised_components=attribution.annualised_components,
+        periodic_returns=attribution.periodic_returns,
+        freq=attribution.freq,
         span=attribution.span,
-        mean_adj_type=MeanAdjType.EWMA,
-        init_type=InitType.ZERO,
-        annualize=True,
-        annualization_factor=get_annualization_factor(freq=attribution.freq),
-        nan_backfill=NanBackfill.ZERO_FILL,
-    ).iloc[-1]
-    benchmark_volatility = float(volatility['Benchmark'])
-    model_volatility = float(volatility[endpoint_layer])
-    if not np.isfinite([benchmark_volatility, model_volatility]).all() or (
-            benchmark_volatility <= 0.0 or model_volatility <= 0.0
-    ):
-        raise ValueError(
-            'current benchmark and endpoint-model EWMA volatilities must be finite and positive'
-        )
-
-    contributions = pd.Series({
-        'Benchmark': float(values['Benchmark Return']) / benchmark_volatility,
-        'Systematic': float(values['Systematic Return']) / model_volatility,
-        'Risk Layer': float(values['Risk Layer Alpha']) / model_volatility,
-        'Signal Layer': float(values['Signal Layer Alpha']) / model_volatility,
-        'Integration': float(values['Integration Alpha']) / model_volatility,
-    }, dtype=float)
-    if has_net:
-        if 'Trading Cost Drag' not in values.index:
-            raise ValueError('annualised components are missing Trading Cost Drag')
-        contributions['Trading Cost Drag'] = (
-            float(values['Trading Cost Drag']) / model_volatility
-        )
-    contributions['Full Model Net' if has_net else 'Full Model Gross'] = (
-        float(values[endpoint_return]) / model_volatility
     )
-    model_components = ['Systematic', 'Risk Layer', 'Signal Layer', 'Integration']
-    if has_net:
-        model_components.append('Trading Cost Drag')
-    if not np.isclose(
-            contributions.loc[model_components].sum(),
-            contributions.iloc[-1],
-            atol=1.0e-12,
-            rtol=0.0,
-    ):
-        raise RuntimeError('EWMA Sharpe contributions do not reconstruct the full model')
-    if not np.isfinite(contributions.to_numpy(dtype=float)).all():
-        raise RuntimeError('EWMA Sharpe contributions contain non-finite values')
-    return contributions
 
 
 def compute_model_layer_ewma_alpha_attribution(

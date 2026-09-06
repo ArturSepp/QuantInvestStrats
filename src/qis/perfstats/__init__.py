@@ -25,6 +25,7 @@ from qis.perfstats.model_layer_attribution import (
     compute_model_layer_ewma_regression_attribution,
     compute_model_layer_ewma_sharpe_contributions,
     compute_model_layer_ewma_stage_sharpes,
+    compute_model_layer_in_sample_sharpe_contributions,
     compute_model_layer_rolling_ewma_regression_alpha,
 )
 

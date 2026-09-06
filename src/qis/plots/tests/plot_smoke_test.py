@@ -72,6 +72,14 @@ class Fixtures:
             span=12,
             hac_lags=1,
         )
+        self.model_layer_full_attribution = qis.compute_model_layer_alpha_beta_attribution(
+            benchmark_nav=model_layers.iloc[:, 0],
+            risk_layer_nav=model_layers.iloc[:, 1],
+            signal_layer_nav=model_layers.iloc[:, 2],
+            full_model_nav=model_layers.iloc[:, 3],
+            freq='ME',
+            hac_lags=1,
+        )
 
         # signal diagnostics: one horizon dictionary and a signal on the same grid
         self.asset_returns_dict = {'ME': self.returns[self.group_data.index]}
@@ -174,6 +182,10 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
         ),
         'plot_model_layer_ewma_sharpe_bridge': dict(
             attribution=fx.model_layer_attribution,
+            detailed_mode=False,
+        ),
+        'plot_model_layer_in_sample_sharpe_bridge': dict(
+            attribution=fx.model_layer_full_attribution,
             detailed_mode=False,
         ),
         'plot_model_layer_rolling_ewma_regression_alpha': dict(
