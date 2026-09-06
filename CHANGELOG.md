@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Stabilized descriptive-table sample spread across extreme finite scales without intermediate
+  underflow or overflow.
+
 ## [5.36.0] - 2026-10-09
 
 ### Changed
