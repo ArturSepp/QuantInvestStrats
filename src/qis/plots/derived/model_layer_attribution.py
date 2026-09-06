@@ -3,7 +3,7 @@
 The numerical work is deliberately outside this module.  Return components, current EWMA
 regressions, Bartlett-HAC intervals and effective sample sizes come from
 ``ModelLayerEwmaRegressionAttribution``. Common-denominator Sharpe contributions come from the
-current-EWMA and full-sample numerical helpers in ``qis.perfstats.model_layer_attribution``. The
+current-EWMA and full-sample numerical helpers in ``qis.portfolio.attribution.model_layer``. The
 functions here only validate those labelled outputs and render them.
 
 Both bridges use the same ordered layers: benchmark is shown as a reference, systematic return
@@ -28,7 +28,7 @@ from qis.plots.time_series import plot_time_series
 from qis.plots.utils import LegendStats
 
 if TYPE_CHECKING:
-    from qis.perfstats.model_layer_attribution import (
+    from qis.portfolio.attribution.model_layer import (
         ModelLayerAlphaBetaAttribution,
         ModelLayerEwmaRegressionAttribution,
     )
@@ -88,7 +88,7 @@ def _validate_attribution(
         attribution: ModelLayerEwmaRegressionAttribution,
 ) -> None:
     """Validate the public attribution object and the labelled values used by both plots."""
-    from qis.perfstats.model_layer_attribution import ModelLayerEwmaRegressionAttribution
+    from qis.portfolio.attribution.model_layer import ModelLayerEwmaRegressionAttribution
 
     if not isinstance(attribution, ModelLayerEwmaRegressionAttribution):
         raise TypeError(
@@ -602,7 +602,7 @@ def _compute_ewma_stage_sharpes(
         norm_type: int,
 ) -> pd.DataFrame:
     """Import and call the numerical Sharpe API lazily to avoid package import cycles."""
-    from qis.perfstats.model_layer_attribution import compute_model_layer_ewma_stage_sharpes
+    from qis.portfolio.attribution.model_layer import compute_model_layer_ewma_stage_sharpes
 
     return compute_model_layer_ewma_stage_sharpes(attribution, norm_type=norm_type)
 
@@ -611,7 +611,7 @@ def _compute_ewma_sharpe_contributions(
         attribution: ModelLayerEwmaRegressionAttribution,
 ) -> pd.Series:
     """Call the numerical common-denominator Sharpe API without creating an import cycle."""
-    from qis.perfstats.model_layer_attribution import (
+    from qis.portfolio.attribution.model_layer import (
         compute_model_layer_ewma_sharpe_contributions,
     )
 
@@ -622,7 +622,7 @@ def _compute_in_sample_sharpe_contributions(
         attribution: ModelLayerAlphaBetaAttribution,
 ) -> pd.Series:
     """Call the full-sample return-and-risk Sharpe API lazily."""
-    from qis.perfstats.model_layer_attribution import (
+    from qis.portfolio.attribution.model_layer import (
         compute_model_layer_in_sample_sharpe_contributions,
     )
 
@@ -633,7 +633,7 @@ def _compute_rolling_ewma_regression_alpha(
         attribution: ModelLayerEwmaRegressionAttribution,
 ) -> pd.DataFrame:
     """Call the numerical rolling EWMA-WLS alpha API without creating an import cycle."""
-    from qis.perfstats.model_layer_attribution import (
+    from qis.portfolio.attribution.model_layer import (
         compute_model_layer_rolling_ewma_regression_alpha,
     )
 
@@ -677,7 +677,7 @@ def plot_model_layer_ewma_return_bridge(
         RuntimeError: If the return bridge, net-cost identity, or HAC midpoint does not reconcile.
     """
     from qis.perfstats.config import PerfStat
-    from qis.perfstats.model_layer_attribution import (
+    from qis.portfolio.attribution.model_layer import (
         ALPHA_AN_CI_HIGH_COLUMN,
         ALPHA_AN_CI_LOW_COLUMN,
     )

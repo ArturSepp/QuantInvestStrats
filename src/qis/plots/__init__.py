@@ -139,6 +139,12 @@ from qis.plots.derived.model_layer_attribution import (
     plot_model_layer_rolling_ewma_regression_alpha,
 )
 
+from qis.plots.derived.portfolio_breadth import (
+    plot_portfolio_breadth_concentration,
+    plot_portfolio_breadth_current_comparison,
+    plot_portfolio_breadth_history,
+)
+
 from qis.plots.derived.signal_diagnostics_plot import (
     plot_signal_diagnostics,
     plot_signal_diagnostics_boxplot,

@@ -51,6 +51,7 @@ software_design
 factsheets_and_reporting
 tracking_error_and_risk
 model_layer_attribution
+portfolio_breadth
 portfolio_backtesting
 incomplete_and_mixed_frequency_data
 private_asset_unsmoothing

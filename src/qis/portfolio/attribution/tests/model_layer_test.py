@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 from scipy.stats import norm
 
-import qis.perfstats.model_layer_attribution as model_layer
+import qis.portfolio.attribution.model_layer as model_layer
 from qis.models.linear.ewm import MeanAdjType
-from qis.perfstats.model_layer_attribution import (
+from qis.portfolio.attribution.model_layer import (
     ModelLayerAlphaBetaAttribution,
     ModelLayerCumulativeAlphaAttribution,
     ModelLayerEwmaAlphaAttribution,

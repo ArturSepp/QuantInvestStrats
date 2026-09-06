@@ -25,6 +25,26 @@ from qis.portfolio.signal_data import StrategySignalData
 
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 
+from qis.portfolio.attribution import (
+    ModelLayerAlphaBetaAttribution,
+    ModelLayerCumulativeAlphaAttribution,
+    ModelLayerEwmaAlphaAttribution,
+    ModelLayerEwmaRegressionAttribution,
+    compute_model_layer_alpha_beta_attribution,
+    compute_model_layer_cumulative_alpha_after_warmup,
+    compute_model_layer_ewma_alpha_attribution,
+    compute_model_layer_ewma_regression_attribution,
+    compute_model_layer_ewma_sharpe_contributions,
+    compute_model_layer_ewma_stage_sharpes,
+    compute_model_layer_in_sample_sharpe_contributions,
+    compute_model_layer_rolling_ewma_regression_alpha,
+    ModelFeatureAlphaBetaAttribution,
+    ModelLayerNavs,
+    compute_model_feature_alpha_beta_attribution,
+    PortfolioBreadthResult,
+    compute_portfolio_breadth,
+)
+
 from qis.portfolio.risk.ewm_covar_risk import (limit_weights_to_max_var_limit,
                                                compute_portfolio_var_np,
                                                compute_portfolio_vol,

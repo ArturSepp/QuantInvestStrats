@@ -46,10 +46,16 @@ aligned and audited without reconstructing instrument order from an array.
 - `qis.market_data` contains vendor-neutral transformations. Optional fetchers are integrations,
   not a prerequisite for the analytics core.
 
+Model-layer attribution, model-feature attribution, and portfolio breadth live together in the
+`qis.portfolio.attribution` subpackage, not in `qis.perfstats` or directly in the portfolio package
+root. They compose portfolio NAV and allocation semantics with regression, EWMA, and covariance
+estimators from `qis.models`; placing that portfolio-level orchestration in the lower statistics
+layer would blur the ownership boundary. Their presentation functions remain in `qis.plots`.
+
 The focused guides describe the user-facing contracts in more detail: [performance and Sharpe
 conventions](performance_analytics_and_sharpe.md), [portfolio
-backtesting](portfolio_backtesting.md), [tracking error and risk](tracking_error_and_risk.md), and
-[factsheets and reporting](factsheets_and_reporting.md).
+backtesting](portfolio_backtesting.md), [tracking error and risk](tracking_error_and_risk.md),
+[portfolio breadth](portfolio_breadth.md), and [factsheets and reporting](factsheets_and_reporting.md).
 
 ## Public API boundary
 

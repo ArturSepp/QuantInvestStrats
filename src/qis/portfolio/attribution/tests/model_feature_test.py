@@ -6,7 +6,7 @@ from itertools import combinations
 import numpy as np
 import pandas as pd
 
-from qis.perfstats.model_feature_attribution import (
+from qis.portfolio.attribution.model_feature import (
     ModelFeatureAlphaBetaAttribution,
     ModelLayerNavs,
     _harsanyi_powers,

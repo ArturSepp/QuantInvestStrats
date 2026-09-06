@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 
 from qis.perfstats.config import PerfStat
-from qis.perfstats.model_layer_attribution import (
+from qis.portfolio.attribution.model_layer import (
     ALPHA_AN_CI_HIGH_COLUMN,
     ALPHA_AN_CI_LOW_COLUMN,
     ALPHA_CONFIDENCE_LEVEL,

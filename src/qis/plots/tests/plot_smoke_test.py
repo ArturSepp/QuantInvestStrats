@@ -81,6 +81,19 @@ class Fixtures:
             hac_lags=1,
         )
 
+        breadth_returns = self.returns.iloc[:, :4]
+        breadth_dates = breadth_returns.index[-4:]
+        breadth_weights = pd.DataFrame(
+            0.25,
+            index=breadth_dates,
+            columns=breadth_returns.columns,
+        )
+        self.portfolio_breadth = qis.compute_portfolio_breadth(
+            returns=breadth_returns,
+            weights=breadth_weights,
+            span=12,
+        )
+
         # signal diagnostics: one horizon dictionary and a signal on the same grid
         self.asset_returns_dict = {'ME': self.returns[self.group_data.index]}
         self.signal = self.returns[self.group_data.index].rolling(3).mean().dropna()
@@ -193,6 +206,18 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
             detailed_mode=False,
         ),
         'plot_pie': dict(df=fx.positive_table),
+        'plot_portfolio_breadth_concentration': dict(
+            result=fx.portfolio_breadth,
+            detailed_mode=False,
+        ),
+        'plot_portfolio_breadth_current_comparison': dict(
+            results={'Portfolio': fx.portfolio_breadth},
+            detailed_mode=False,
+        ),
+        'plot_portfolio_breadth_history': dict(
+            result=fx.portfolio_breadth,
+            detailed_mode=False,
+        ),
         'plot_prices_2ax': dict(prices_ax1=fx.prices.iloc[:, [0]],
                                 prices_ax2=fx.prices.iloc[:, [1]]),
         'plot_prices_with_fundamentals': dict(prices=fx.prices, volumes=fx.prices.abs(),

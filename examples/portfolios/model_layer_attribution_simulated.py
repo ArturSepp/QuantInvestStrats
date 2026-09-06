@@ -13,7 +13,7 @@ reports how the interval half-widths move when the lag count follows the Newey-W
 instead of the default three, and draws three exhibits: the return bridge, additive cumulative
 alpha, and a controlled two-feature Shapley sensitivity analysis with 95% HAC(3) intervals.
 
-Run from the repository root: ``python -m examples.perfstats.model_layer_attribution_simulated``.
+Run from the repository root: ``python -m examples.portfolios.model_layer_attribution_simulated``.
 """
 # packages
 import numpy as np
@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional
 # qis
 import qis
-from qis.perfstats.model_layer_attribution import (
+from qis.portfolio.attribution.model_layer import (
     ALPHA_AN_CI_LOW_COLUMN,
     ALPHA_AN_CI_HIGH_COLUMN,
     ALPHA_HAC_SE_COLUMN,

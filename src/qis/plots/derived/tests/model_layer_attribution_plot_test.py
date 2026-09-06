@@ -12,7 +12,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402
 
 import qis.plots.derived.model_layer_attribution as plots  # noqa: E402
-from qis.perfstats.model_layer_attribution import (  # noqa: E402
+from qis.portfolio.attribution.model_layer import (  # noqa: E402
     ALPHA_AN_CI_HIGH_COLUMN,
     ALPHA_AN_CI_LOW_COLUMN,
     ModelLayerEwmaRegressionAttribution,

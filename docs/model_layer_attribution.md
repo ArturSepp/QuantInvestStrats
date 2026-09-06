@@ -620,7 +620,7 @@ $A\hat\alpha_F$ is the `Full Model` row of the table.
   `Full Model Net` when a net NAV is supplied). Columns are the `PerfStat` labels for alpha,
   annualised alpha, beta, $R^2$ and the alpha p-value, then `Alpha HAC SE` (periodic),
   `An Alpha CI Low` and `An Alpha CI High` (annualised). The column-label constants are exported
-  from `qis.perfstats.model_layer_attribution`.
+  from `qis.portfolio.attribution.model_layer`.
 
 `component_returns`
 : The exact periodic components: `Benchmark Return`, `Risk Layer Return`, `Signal Layer Return`,
@@ -670,10 +670,10 @@ The script needs only `pip install qis` and no data.
 From a repository checkout, run:
 
 ```console
-python -m examples.perfstats.model_layer_attribution_simulated
+python -m examples.portfolios.model_layer_attribution_simulated
 ```
 
-```{literalinclude} ../examples/perfstats/model_layer_attribution_simulated.py
+```{literalinclude} ../examples/portfolios/model_layer_attribution_simulated.py
 :language: python
 :linenos:
 ```
@@ -931,4 +931,4 @@ paths are additive log-return percentage points, not compounded feature NAVs.
 - {doc}`Generated feature API <api/generated/qis.compute_model_feature_alpha_beta_attribution>`
 - {doc}`Generated feature result API <api/generated/qis.ModelFeatureAlphaBetaAttribution>`
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)
-- [Simulated example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/model_layer_attribution_simulated.py)
+- [Simulated example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/model_layer_attribution_simulated.py)
