@@ -754,16 +754,22 @@ class LegendStats(Enum):
     finite varying samples are translated before standardized moments are evaluated, preserving
     their results when the spread is very small relative to the level.
 
+    Endpoint selection is mode-specific. The direct endpoint modes ``LAST``, ``AVG_LAST``, and
+    ``AVG_STD_LAST`` use the value at the final index. Explicit ``NONNAN`` modes use the final
+    observed value. Other composite ``FIRST``/``LAST`` modes first drop missing observations and
+    select both endpoints from that same sample, so ``FIRST`` means the first selected
+    observation. ``NONZERO`` composites additionally remove exact zeros before selecting their
+    endpoints.
+
     Five modifiers change what the statistics are computed on or displayed beside them:
 
-    ``NONNAN`` takes the last observed value rather than the value at the last index, which
-    differs when a series ends with gaps. ``NONZERO`` excludes zeros, for a series where zero
-    means "no position" rather than "a return of zero"; its statistics are undefined when no
-    observations remain. ``MISSING`` reports the percentage of NaN observations after the first
-    observed value, while ``ZERO`` reports the percentage whose absolute value is below the
+    ``NONNAN`` names final-observed selection explicitly. ``NONZERO`` excludes zeros, for a series
+    where zero means "no position" rather than "a return of zero"; its statistics are undefined
+    when no observations remain. ``MISSING`` reports the percentage of NaN observations after the
+    first observed value, while ``ZERO`` reports the percentage whose absolute value is below the
     near-zero cutoff over the same window. An all-missing history has 100% missing coverage and an
     undefined zero percentage. ``SCORE`` appends the percentile rank of the last value within its
-    own history.
+    own selected history.
 
     ``NONE`` prints the column name alone. Formatting of every value follows the ``var_format``
     argument of the plotting function; when it is ``None``, values use their native scalar text.
