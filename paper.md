@@ -142,8 +142,8 @@ smoothing.
 
 # Research impact statement
 
-We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 96 of its symbols
-at 764 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
+We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 101 of its symbols
+at 832 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
 at 441 sites. Both counts are taken at the commits recorded in
 `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
 

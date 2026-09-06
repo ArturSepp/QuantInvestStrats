@@ -33,6 +33,7 @@ from qis.plots.bars import plot_bars, plot_vbars
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime, compute_bnb_regimes_pa_perf_table
 
 RA_TABLE_SHORT_N_THRESHOLD = 10
+RA_TABLE_HEADER_HEIGHT_MULTIPLIER = 1.15
 
 
 def _get_ra_table_label_kwargs(number_of_columns: int,
@@ -45,12 +46,23 @@ def _get_ra_table_label_kwargs(number_of_columns: int,
     return kwargs
 
 
-def _get_ra_table_plot_kwargs(number_of_columns: int, kwargs: Dict) -> Dict:
-    """Make room for multiline headers without overriding an explicit header height."""
-    if number_of_columns <= RA_TABLE_SHORT_N_THRESHOLD or 'first_row_height' in kwargs:
-        return kwargs
-    row_height = kwargs.get('row_height', ptb.ROW_HIGHT)
-    return sop.update_kwargs(kwargs, dict(first_row_height=1.5 * row_height))
+def _resize_ra_table_header(number_of_columns: int,
+                            fig: Optional[plt.Figure],
+                            ax: Optional[plt.Subplot]
+                            ) -> None:
+    """Make a wide table's multiline header modestly taller than its data rows."""
+    if number_of_columns <= RA_TABLE_SHORT_N_THRESHOLD:
+        return
+    if fig is None and ax is None:
+        return
+    table_ax = ax if ax is not None else fig.axes[0]
+    if not table_ax.tables:
+        return
+    cells = table_ax.tables[-1].get_celld()
+    data_height = next(cell.get_height() for (row, _), cell in cells.items() if row > 0)
+    for (row, _), cell in cells.items():
+        if row == 0:
+            cell.set_height(RA_TABLE_HEADER_HEIGHT_MULTIPLIER * data_height)
 
 
 def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
@@ -135,7 +147,6 @@ def plot_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
         perf_column.to_str(): perf_column.to_str(**label_kwargs)
         for perf_column in perf_columns
     })
-    plot_kwargs = _get_ra_table_plot_kwargs(number_of_columns=len(df.columns), kwargs=kwargs)
     fig = ptb.plot_df_table(df=df,
                             add_index_as_column=True,
                             transpose=transpose,
@@ -144,7 +155,9 @@ def plot_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
                             rows_edge_lines=rows_edge_lines,
                             fontsize=fontsize,
                             ax=ax,
-                            **plot_kwargs)
+                            **kwargs)
+    if 'first_row_height' not in kwargs:
+        _resize_ra_table_header(number_of_columns=len(df.columns), fig=fig, ax=ax)
     return fig
 
 
@@ -230,10 +243,6 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
     if not drop_benchmark and special_rows_colors is None:
         special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
     kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
-    kwargs = _get_ra_table_plot_kwargs(
-        number_of_columns=len(ra_perf_table.columns),
-        kwargs=kwargs,
-    )
 
     fig = ptb.plot_df_table(df=ra_perf_table,
                             transpose=transpose,
@@ -241,6 +250,12 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                             fontsize=fontsize,
                             ax=ax,
                             **kwargs)
+    if 'first_row_height' not in kwargs:
+        _resize_ra_table_header(
+            number_of_columns=len(ra_perf_table.columns),
+            fig=fig,
+            ax=ax,
+        )
     return fig, ra_perf_table
 
 

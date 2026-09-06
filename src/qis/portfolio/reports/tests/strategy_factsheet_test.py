@@ -448,6 +448,13 @@ def test_wide_ra_table_uses_multiline_short_names() -> None:
         expected_columns = [column.to_str(short=False, short_n=True) for column in PERF_COLUMNS]
         assert table.columns.to_list() == expected_columns
         assert any('\n' in column for column in table.columns)
+        cells = fig.axes[0].tables[0].get_celld()
+        header_cells = [cell for (row, _), cell in cells.items() if row == 0]
+        data_height = next(cell.get_height() for (row, _), cell in cells.items() if row > 0)
+        assert all(
+            cell.get_height() == pytest.approx(1.15 * data_height)
+            for cell in header_cells
+        )
     finally:
         plt.close(fig)
 
