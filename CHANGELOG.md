@@ -47,6 +47,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Rejected invalid or duplicate resolved benchmark labels before benchmark-aware performance and
+  regime calculations can expose incidental downstream errors.
 - Made time-series descriptive legends use native scalar text when their public plotting format
   is `None`.
 - Made all-zero `FIRST_LAST_NON_ZERO` legends display undefined endpoints instead of raising an
