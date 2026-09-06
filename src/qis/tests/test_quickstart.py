@@ -43,12 +43,16 @@ LITERALINCLUDE = re.compile(r'^```\{literalinclude\}\s+([^\n]+)$', flags=re.MULT
 
 
 def _included_example() -> Path:
-    """Resolve the quickstart's one literalinclude, or skip outside a checkout."""
+    """Resolve the authoritative quickstart inclusion, or skip outside a checkout."""
     if not QUICKSTART_PATH.is_file():
         pytest.skip(f'{QUICKSTART_PATH} is absent; this test runs from a repository checkout')
     matches = LITERALINCLUDE.findall(QUICKSTART_PATH.read_text(encoding='utf-8'))
-    assert len(matches) == 1, f'expected one authoritative literalinclude, got {matches}'
-    return QUICKSTART_PATH.parent.joinpath(matches[0]).resolve()
+    included_paths = [QUICKSTART_PATH.parent.joinpath(match).resolve() for match in matches]
+    authoritative_matches = [path for path in included_paths if path == EXAMPLE_PATH.resolve()]
+    assert len(authoritative_matches) == 1, (
+        f'expected one inclusion of the authoritative example, got {matches}'
+    )
+    return authoritative_matches[0]
 
 
 def test_quickstart_references_one_authoritative_example() -> None:
