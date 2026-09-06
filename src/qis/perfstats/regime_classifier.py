@@ -824,6 +824,7 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
                                       prices: pd.DataFrame,
                                       benchmark: str,
                                       perf_params: PerfParams,
+                                      drop_benchmark: bool = False,
                                       **kwargs) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
         """Compute regime performance attribution table.
 
@@ -831,6 +832,7 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             prices: Asset prices
             benchmark: Benchmark asset name
             perf_params: Performance parameters
+            drop_benchmark: Exclude benchmark from results
 
         Returns:
             Tuple of (performance table, regime data dictionary)
@@ -850,7 +852,9 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             perf_params=perf_params,
             freq=self.freq,
             is_report_pa_returns=True,
-            is_use_benchmark_means=False
+            is_use_benchmark_means=False,
+            # Match the shared table contract while leaving component regime data intact.
+            drop_benchmark=drop_benchmark
         )
 
     def get_regime_colors(self) -> List[Tuple[float, ...]]:
