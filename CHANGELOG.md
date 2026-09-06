@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Normalized nullable floating data before stacked-area rendering, representing missing values as
+  Matplotlib-compatible `NaN` while leaving stacked-bar behavior unchanged.
+
 ## [5.22.3] - 2026-09-06
 
 ### Added
