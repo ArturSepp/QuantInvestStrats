@@ -19,7 +19,9 @@ from qis.perfstats.model_layer_attribution import (
     compute_model_layer_cumulative_alpha_after_warmup,
     compute_model_layer_ewma_alpha_attribution,
     compute_model_layer_ewma_regression_attribution,
+    compute_model_layer_ewma_sharpe_contributions,
     compute_model_layer_ewma_stage_sharpes,
+    compute_model_layer_rolling_ewma_regression_alpha,
 )
 
 
@@ -767,6 +769,170 @@ def test_current_ewma_stage_sharpes_match_existing_qis_ewma_engine() -> None:
         norm_type=2,
     )
     pd.testing.assert_frame_equal(actual, expected)
+
+
+def test_rolling_ewma_regression_alpha_matches_prefix_wls_and_current_endpoint() -> None:
+    """Every rolling alpha is a prefix WLS fit and the last row is the current estimate."""
+    result = compute_model_layer_ewma_regression_attribution(
+        **_rolling_navs(_rolling_layer_returns()),
+        freq='ME',
+        span=8,
+    )
+
+    actual = compute_model_layer_rolling_ewma_regression_alpha(result)
+    np.testing.assert_allclose(
+        actual['Total Model Alpha'],
+        actual[['Risk Layer Alpha', 'Signal Layer Alpha', 'Integration Alpha']].sum(axis=1),
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    endpoint_expected = result.regression_table.loc[
+        ['Full Model', 'Risk Layer', 'Signal Layer', 'Integration'],
+        'An Alpha',
+    ].set_axis(actual.columns)
+    pd.testing.assert_series_equal(
+        actual.iloc[-1],
+        endpoint_expected,
+        check_names=False,
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+
+    prefix_end = 9
+    prefix_returns = result.periodic_returns.iloc[:prefix_end]
+    integration = (
+        prefix_returns['Full Model']
+        - prefix_returns['Risk Layer']
+        - prefix_returns['Signal Layer']
+    )
+    responses = pd.DataFrame({
+        'Full Model': prefix_returns['Full Model'],
+        'Risk Layer': prefix_returns['Risk Layer'],
+        'Signal Layer': prefix_returns['Signal Layer'],
+        'Integration': integration,
+    })
+    decay = 1.0 - 2.0 / (result.span + 1.0)
+    weights = np.power(decay, np.arange(prefix_end - 1, -1, -1, dtype=float))
+    design = np.column_stack((np.ones(prefix_end), prefix_returns['Benchmark'].to_numpy()))
+    parameters = np.linalg.solve(
+        design.T @ (weights[:, None] * design),
+        design.T @ (weights[:, None] * responses.to_numpy()),
+    )
+    expected_prefix = pd.Series(
+        12.0 * parameters[0],
+        index=[
+            'Total Model Alpha',
+            'Risk Layer Alpha',
+            'Signal Layer Alpha',
+            'Integration Alpha',
+        ],
+    )
+    pd.testing.assert_series_equal(
+        actual.loc[prefix_returns.index[-1]],
+        expected_prefix,
+        check_names=False,
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+
+
+def test_rolling_ewma_regression_alpha_does_not_revise_earlier_prefixes() -> None:
+    """Changing the final return changes only the final expanding-prefix estimate."""
+    returns = _rolling_layer_returns()
+    baseline_attribution = compute_model_layer_ewma_regression_attribution(
+        **_rolling_navs(returns),
+        freq='ME',
+        span=8,
+    )
+    changed_returns = returns.copy()
+    changed_returns.loc[changed_returns.index[-1], 'Full Model'] += 0.04
+    changed_attribution = compute_model_layer_ewma_regression_attribution(
+        **_rolling_navs(changed_returns),
+        freq='ME',
+        span=8,
+    )
+
+    baseline = compute_model_layer_rolling_ewma_regression_alpha(baseline_attribution)
+    changed = compute_model_layer_rolling_ewma_regression_alpha(changed_attribution)
+    pd.testing.assert_frame_equal(baseline.iloc[:-1], changed.iloc[:-1])
+    assert not np.allclose(
+        baseline.iloc[-1].to_numpy(dtype=float),
+        changed.iloc[-1].to_numpy(dtype=float),
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+
+
+def test_ewma_sharpe_contributions_use_two_common_denominators_and_reconcile() -> None:
+    """Benchmark has its own volatility while every model contribution shares model risk."""
+    returns = _rolling_layer_returns()
+    navs = _rolling_navs(returns)
+    net_returns = returns['Full Model'] - np.linspace(0.0001, 0.0004, len(returns.index))
+    navs['full_model_net_nav'] = _nav_from_log_returns(
+        net_returns.to_numpy(),
+        navs['full_model_nav'].index,
+    )
+    result = compute_model_layer_ewma_regression_attribution(
+        **navs,
+        freq='ME',
+        span=8,
+    )
+
+    contributions = compute_model_layer_ewma_sharpe_contributions(result)
+    model_sum = contributions[[
+        'Systematic',
+        'Risk Layer',
+        'Signal Layer',
+        'Integration',
+        'Trading Cost Drag',
+    ]].sum()
+    np.testing.assert_allclose(
+        model_sum,
+        contributions['Full Model Net'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    assert np.sign(contributions['Signal Layer']) == np.sign(
+        result.annualised_components['Signal Layer Alpha']
+    )
+
+    volatility = model_layer.compute_ewm_vol(
+        data=result.periodic_returns[['Benchmark', 'Full Model Net']],
+        span=result.span,
+        mean_adj_type=model_layer.MeanAdjType.EWMA,
+        init_type=model_layer.InitType.ZERO,
+        annualize=True,
+        annualization_factor=model_layer.get_annualization_factor(freq=result.freq),
+        nan_backfill=model_layer.NanBackfill.ZERO_FILL,
+    ).iloc[-1]
+    values = result.periodic_returns[['Benchmark', 'Full Model Net']].to_numpy(dtype=float)
+    decay = 1.0 - 2.0 / (result.span + 1.0)
+    manual_mean = np.zeros(values.shape[1])
+    manual_variance = np.zeros(values.shape[1])
+    for row in values[1:]:
+        manual_mean = decay * manual_mean + (1.0 - decay) * row
+        manual_variance = (
+            decay * manual_variance
+            + (1.0 - decay) * np.square(row - manual_mean)
+        )
+    np.testing.assert_allclose(
+        volatility.to_numpy(dtype=float),
+        np.sqrt(12.0 * manual_variance),
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(
+        contributions['Benchmark'],
+        result.annualised_components['Benchmark Return'] / volatility['Benchmark'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
+    np.testing.assert_allclose(
+        contributions['Signal Layer'],
+        result.annualised_components['Signal Layer Alpha'] / volatility['Full Model Net'],
+        atol=1.0e-12,
+        rtol=0.0,
+    )
 
 
 def test_current_ewma_regression_optional_net_extends_both_bridges() -> None:

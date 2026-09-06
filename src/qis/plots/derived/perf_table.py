@@ -32,6 +32,26 @@ import qis.plots.utils as put
 from qis.plots.bars import plot_bars, plot_vbars
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime, compute_bnb_regimes_pa_perf_table
 
+RA_TABLE_SHORT_N_THRESHOLD = 10
+
+
+def _get_ra_table_label_kwargs(number_of_columns: int,
+                               is_string_table: bool,
+                               kwargs: Dict
+                               ) -> Dict:
+    """Use multiline performance labels when a rendered RA table is wide."""
+    if is_string_table and number_of_columns > RA_TABLE_SHORT_N_THRESHOLD:
+        return sop.update_kwargs(kwargs, dict(short=False, short_n=True))
+    return kwargs
+
+
+def _get_ra_table_plot_kwargs(number_of_columns: int, kwargs: Dict) -> Dict:
+    """Make room for multiline headers without overriding an explicit header height."""
+    if number_of_columns <= RA_TABLE_SHORT_N_THRESHOLD or 'first_row_height' in kwargs:
+        return kwargs
+    row_height = kwargs.get('row_height', ptb.ROW_HIGHT)
+    return sop.update_kwargs(kwargs, dict(first_row_height=1.5 * row_height))
+
 
 def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                         perf_params: PerfParams = None,
@@ -67,8 +87,10 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
     for perf_column in perf_columns:
         if perf_column.to_str() in ra_perf_table.columns:
             if is_to_str:
-                data[perf_column.to_str()] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
-                                                               var_format=perf_column.to_format(**kwargs))
+                data[perf_column.to_str()] = dfs.series_to_str(
+                    ds=ra_perf_table[perf_column.to_str()],
+                    var_format=perf_column.to_format(**kwargs),
+                )
             else:
                 data[perf_column.to_str()] = ra_perf_table[perf_column.to_str()]
 
@@ -95,12 +117,25 @@ def plot_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     """
     plot ra perf table columns
     """
+    number_of_columns = len(perf_columns) + (
+        0 if df_to_add is None else len(df_to_add.columns)
+    )
+    label_kwargs = _get_ra_table_label_kwargs(
+        number_of_columns=number_of_columns,
+        is_string_table=True,
+        kwargs=kwargs,
+    )
     df = get_ra_perf_columns(prices=prices,
                              perf_params=perf_params,
                              perf_columns=perf_columns,
                              column_header=column_header,
                              df_to_add=df_to_add,
                              **kwargs)
+    df = df.rename(columns={
+        perf_column.to_str(): perf_column.to_str(**label_kwargs)
+        for perf_column in perf_columns
+    })
+    plot_kwargs = _get_ra_table_plot_kwargs(number_of_columns=len(df.columns), kwargs=kwargs)
     fig = ptb.plot_df_table(df=df,
                             add_index_as_column=True,
                             transpose=transpose,
@@ -109,7 +144,7 @@ def plot_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
                             rows_edge_lines=rows_edge_lines,
                             fontsize=fontsize,
                             ax=ax,
-                            **kwargs)
+                            **plot_kwargs)
     return fig
 
 
@@ -136,8 +171,10 @@ def get_ra_perf_benchmark_columns(prices: pd.DataFrame,
     for perf_column in perf_columns:
         if is_convert_to_str:
             # here we can shorten the performance var for outputs
-            df[perf_column.to_str(**kwargs)] = dfs.series_to_str(ds=ra_perf_table[perf_column.to_str()],
-                                                                 var_format=perf_column.to_format(**kwargs))
+            df[perf_column.to_str(**kwargs)] = dfs.series_to_str(
+                ds=ra_perf_table[perf_column.to_str()],
+                var_format=perf_column.to_format(**kwargs),
+            )
         else:
             df[perf_column.to_str()] = ra_perf_table[perf_column.to_str()]
 
@@ -172,6 +209,15 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
     """
     plot ra perf table and get ra performance columns with data as string for tables
     """
+    df_to_add = kwargs.get('df_to_add')
+    number_of_columns = len(perf_columns) + (
+        0 if df_to_add is None else len(df_to_add.columns)
+    )
+    label_kwargs = _get_ra_table_label_kwargs(
+        number_of_columns=number_of_columns,
+        is_string_table=is_convert_to_str,
+        kwargs=kwargs,
+    )
     ra_perf_table = get_ra_perf_benchmark_columns(prices=prices,
                                                   benchmark=benchmark,
                                                   benchmark_price=benchmark_price,
@@ -180,10 +226,14 @@ def plot_ra_perf_table_benchmark(prices: pd.DataFrame,
                                                   perf_columns=perf_columns,
                                                   column_header=column_header,
                                                   is_convert_to_str=is_convert_to_str,
-                                                  **kwargs)
+                                                  **label_kwargs)
     if not drop_benchmark and special_rows_colors is None:
         special_rows_colors = [(1, 'skyblue')]  # for benchmarl separation
     kwargs = sop.update_kwargs(kwargs, dict(special_rows_colors=special_rows_colors))
+    kwargs = _get_ra_table_plot_kwargs(
+        number_of_columns=len(ra_perf_table.columns),
+        kwargs=kwargs,
+    )
 
     fig = ptb.plot_df_table(df=ra_perf_table,
                             transpose=transpose,

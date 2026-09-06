@@ -60,6 +60,11 @@ from qis.utils.struct_ops import merge_lists_unique
 PERF_PARAMS = PerfParams(freq='W-WED')
 
 
+def _to_compact_date(date: pd.Timestamp) -> str:
+    """Format a report boundary without spaces, for compact panel titles."""
+    return pd.Timestamp(date).strftime('%d%b%Y')
+
+
 @dataclass
 class MultiPortfolioData:
     """
@@ -655,7 +660,8 @@ class MultiPortfolioData:
             benchmark_price: Benchmark price index used by the adjacent beta panel.
             freq_beta: Return frequency used to estimate beta and realised alpha.
             factor_beta_span: Shared EWMA span for the beta and rolling-alpha estimates.
-            time_period: Optional display period applied after full-history estimation.
+            time_period: Performance measurement period. Alpha is zero through its start date;
+                earlier observations are used only to estimate beta.
 
         Returns:
             Annualised rolling alpha for every portfolio in report order.
@@ -668,6 +674,16 @@ class MultiPortfolioData:
             freq=freq_beta,
             is_log_returns=True,
         )
+        if time_period is not None and time_period.start is not None:
+            performance_start = pd.Timestamp(time_period.start)
+        else:
+            nav_start_dates = [
+                portfolio.get_portfolio_nav().first_valid_index()
+                for portfolio in self.portfolio_datas
+            ]
+            if any(date is None for date in nav_start_dates):
+                raise ValueError('portfolio NAVs must contain finite observations')
+            performance_start = max(pd.Timestamp(date) for date in nav_start_dates)
         annualisation = qis.get_annualization_factor(freq=freq_beta)
         rolling_alphas = {}
         for portfolio in self.portfolio_datas:
@@ -685,18 +701,24 @@ class MultiPortfolioData:
             realised_alpha = strategy_returns.subtract(
                 displayed_beta.shift(1).multiply(benchmark_returns)
             )
-            first_alpha_date = realised_alpha.first_valid_index()
+            post_start_alpha = realised_alpha.loc[realised_alpha.index > performance_start]
+            first_alpha_date = post_start_alpha.first_valid_index()
             if first_alpha_date is None:
                 raise ValueError(
-                    f'no finite lagged-beta alpha returns for {portfolio.nav.name}'
+                    f'no finite lagged-beta alpha returns after {performance_start:%d%b%Y} '
+                    f'for {portfolio.nav.name}'
                 )
             rolling_alpha = qis.compute_ewm(
-                data=realised_alpha.loc[first_alpha_date:],
+                data=post_start_alpha.loc[first_alpha_date:],
                 span=factor_beta_span,
             )
-            rolling_alphas[portfolio.nav.name] = annualisation * rolling_alpha.reindex(
-                realised_alpha.index
+            zero_index = realised_alpha.index[realised_alpha.index <= performance_start].union(
+                pd.DatetimeIndex([performance_start])
             )
+            zero_alpha = pd.Series(0.0, index=zero_index)
+            rolling_alphas[portfolio.nav.name] = pd.concat(
+                [zero_alpha, annualisation * rolling_alpha]
+            ).sort_index()
         rolling_alphas = pd.DataFrame(rolling_alphas)
         if time_period is not None:
             rolling_alphas = time_period.locate(rolling_alphas)
@@ -724,7 +746,8 @@ class MultiPortfolioData:
         )
         title = (
             f'{factor_beta_span}-span rolling annualised Alpha of {freq_beta}-freq returns '
-            f'to {benchmark_price.name}'
+            f'to {benchmark_price.name},\n'
+            f'starting from {_to_compact_date(rolling_alphas.index.min())}'
         )
         pts.plot_time_series(
             df=rolling_alphas,
@@ -888,20 +911,34 @@ class MultiPortfolioData:
         plot benchmarks betas by factor exposures
         """
         factor_exposures = {factor: [] for factor in benchmark_prices.columns}
+        estimation_starts = {factor: [] for factor in benchmark_prices.columns}
         for portfolio in self.portfolio_datas:
-            factor_exposure = portfolio.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                          freq_beta=freq_beta,
-                                                                          factor_beta_span=factor_beta_span,
-                                                                          time_period=time_period)
+            factor_exposure = portfolio.compute_portfolio_benchmark_betas(
+                benchmark_prices=benchmark_prices,
+                freq_beta=freq_beta,
+                factor_beta_span=factor_beta_span,
+                time_period=None,
+            )
             for factor in factor_exposure.columns:
                 factor_exposures[factor].append(factor_exposure[factor].rename(portfolio.nav.name))
+                if factor_exposure[factor].first_valid_index() is None:
+                    raise ValueError(
+                        f'no finite {factor} beta estimates for {portfolio.nav.name}'
+                    )
+                estimation_starts[factor].append(factor_exposure.index.min())
 
         if axs is None:
             fig, axs = plt.subplots(len(benchmark_prices.columns), 1, figsize=(12, 12), tight_layout=True)
 
         for idx, factor in enumerate(benchmark_prices.columns):
             factor_exposure = pd.concat(factor_exposures[factor], axis=1, sort=True)
-            factor_beta_title = f"{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {factor}"
+            estimation_start = max(estimation_starts[factor])
+            if time_period is not None:
+                factor_exposure = time_period.locate(factor_exposure)
+            factor_beta_title = (
+                f'{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {factor},\n'
+                f'estimation starting from {_to_compact_date(estimation_start)}'
+            )
             pts.plot_time_series(df=factor_exposure,
                                  var_format=var_format,
                                  legend_stats=pts.LegendStats.AVG_NONNAN_LAST,

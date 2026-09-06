@@ -7,6 +7,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Added expanding-prefix EWMA-WLS model-layer alpha paths and additive current EWMA Sharpe
+  contributions with benchmark and full-model volatility denominators.
+
+### Changed
+
+- Changed the EWMA model-layer Sharpe bridge from order-dependent stage differences to additive
+  common-denominator contributions, and made the net return endpoint show gross systematic
+  return, realised costs and gross total alpha with its regression interval.
+
 ## [5.22.2] - 2026-09-05
 
 ### Added

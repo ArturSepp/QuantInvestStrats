@@ -135,6 +135,7 @@ from qis.plots.derived.price_history import (
 from qis.plots.derived.model_layer_attribution import (
     plot_model_layer_ewma_return_bridge,
     plot_model_layer_ewma_sharpe_bridge,
+    plot_model_layer_rolling_ewma_regression_alpha,
 )
 
 from qis.plots.derived.signal_diagnostics_plot import (

@@ -10,8 +10,10 @@ import pandas as pd
 import pytest
 
 import qis
+from qis.plots.derived.perf_table import plot_ra_perf_table_benchmark
 from qis.plots.derived.returns_heatmap import plot_returns_heatmap
-from qis.portfolio.reports.config import _get_recent_ra_perf_table_time_period
+from qis.portfolio.reports.config import PERF_COLUMNS, _get_recent_ra_perf_table_time_period
+from qis.portfolio.risk import ewm_factor_model
 from qis.portfolio.reports.strategy_benchmark_factsheet import (
     generate_strategy_benchmark_factsheet_plt,
 )
@@ -334,11 +336,14 @@ def test_rolling_benchmark_alpha_uses_lagged_displayed_betas_and_matching_span()
         benchmark_prices=benchmark_prices,
     )
     benchmark_price = benchmark_prices['Benchmark']
+    performance_start = pd.Timestamp('2020-12-31')
+    time_period = qis.TimePeriod(start=performance_start, end=pd.Timestamp('2025-12-31'))
 
     actual = multi_portfolio.compute_rolling_benchmark_alpha(
         benchmark_price=benchmark_price,
         freq_beta='QE',
         factor_beta_span=12,
+        time_period=time_period,
     )
 
     benchmark_returns = qis.to_returns(
@@ -359,25 +364,126 @@ def test_rolling_benchmark_alpha_uses_lagged_displayed_betas_and_matching_span()
             is_log_returns=True,
         )
         realised_alpha = strategy_returns - displayed_beta.shift(1) * benchmark_returns
-        expected[portfolio.nav.name] = (
-            realised_alpha.ewm(span=12, adjust=False).mean() * 4.0
+        post_start_alpha = realised_alpha.loc[realised_alpha.index > performance_start]
+        first_alpha_date = post_start_alpha.first_valid_index()
+        expected[portfolio.nav.name] = pd.concat(
+            [
+                pd.Series(0.0, index=pd.DatetimeIndex([performance_start])),
+                post_start_alpha.loc[first_alpha_date:].ewm(span=12, adjust=False).mean() * 4.0,
+            ]
         )
     expected = pd.DataFrame(expected)
+    expected = time_period.locate(expected)
 
     pd.testing.assert_frame_equal(actual, expected)
+    assert (actual.loc[performance_start] == 0.0).all()
+
+
+def test_portfolio_betas_use_point_in_time_ewma_mean_adjustment(monkeypatch) -> None:
+    strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=6)
+    fit_arguments = []
+    original_fit = ewm_factor_model.EwmLinearModel.fit
+
+    def capture_fit(self, *args, **kwargs):
+        fit_arguments.append(kwargs.copy())
+        return original_fit(self, *args, **kwargs)
+
+    monkeypatch.setattr(ewm_factor_model.EwmLinearModel, 'fit', capture_fit)
+    strategy.compute_portfolio_benchmark_betas(
+        benchmark_prices=benchmark_prices,
+        freq_beta='QE',
+        factor_beta_span=12,
+    )
+
+    assert fit_arguments[-1]['mean_adj_type'] is qis.MeanAdjType.EWMA
+    assert fit_arguments[-1]['init_type'] is qis.InitType.X0
+
+
+def test_wide_ra_table_uses_multiline_short_names() -> None:
+    strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=6)
+    prices = pd.concat([strategy.get_portfolio_nav(), benchmark_prices], axis=1)
+    rates_data = pd.Series(0.0, index=prices.index)
+
+    fig, table = plot_ra_perf_table_benchmark(
+        prices=prices,
+        benchmark='Benchmark',
+        perf_params=qis.PerfParams(freq='QE', freq_reg='QE', rates_data=rates_data),
+        perf_columns=PERF_COLUMNS,
+        short=True,
+    )
+
+    try:
+        expected_columns = [column.to_str(short=False, short_n=True) for column in PERF_COLUMNS]
+        assert table.columns.to_list() == expected_columns
+        assert any('\n' in column for column in table.columns)
+    finally:
+        plt.close(fig)
+
+
+def test_multi_asset_beta_dates_and_cumulative_alpha_measurement_start() -> None:
+    strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=10)
+    report = MultiAssetsReport(
+        prices=strategy.prices,
+        benchmark_prices=benchmark_prices,
+        perf_params=qis.PerfParams(freq='QE', freq_reg='QE'),
+    )
+    performance_start = pd.Timestamp('2020-12-31')
+    time_period = qis.TimePeriod(start=performance_start, end=pd.Timestamp('2025-12-31'))
+    returns = qis.to_returns(
+        prices=report.get_prices(benchmark='Benchmark'),
+        freq='QE',
+        is_log_returns=True,
+    )
+    estimation_start = returns.index.min()
+    assert estimation_start < performance_start
+    fig, axs = plt.subplots(2, 1)
+
+    report.plot_benchmark_beta(
+        benchmark='Benchmark',
+        freq_beta='QE',
+        factor_beta_span=12,
+        time_period=time_period,
+        ax=axs[0],
+    )
+    report.plot_benchmark_alpha_attribution(
+        benchmark='Benchmark',
+        freq_beta='QE',
+        factor_beta_span=12,
+        time_period=time_period,
+        ax=axs[1],
+    )
+    try:
+        assert axs[0].get_title().endswith(
+            f'estimation starting from {estimation_start:%d%b%Y}'
+        )
+        assert axs[1].get_title().endswith('starting from 31Dec2020')
+        plotted_ydata = [line.get_ydata() for line in axs[1].lines if len(line.get_ydata()) > 0]
+        assert plotted_ydata
+        assert all(ydata[0] == 0.0 for ydata in plotted_ydata)
+    finally:
+        plt.close(fig)
 
 
 def test_quarterly_strategy_benchmark_report_uses_monthly_exposures_and_linked_alpha() -> None:
-    strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=6)
-    benchmark_portfolio, _ = _make_portfolio_data(n_assets=3, n_years=6)
+    strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=10)
+    benchmark_portfolio, _ = _make_portfolio_data(n_assets=3, n_years=10)
     benchmark_portfolio.set_ticker('Benchmark Portfolio')
     multi_portfolio = qis.MultiPortfolioData(
         portfolio_datas=[strategy, benchmark_portfolio],
         benchmark_prices=benchmark_prices,
     )
+    performance_start = pd.Timestamp('2020-12-31')
+    time_period = qis.TimePeriod(start=performance_start, end=pd.Timestamp('2025-12-31'))
+    beta_estimation_start = strategy.compute_portfolio_benchmark_betas(
+        benchmark_prices=benchmark_prices,
+        freq_beta='QE',
+        factor_beta_span=12,
+    ).index.min()
+    assert beta_estimation_start < performance_start
 
     figs = generate_strategy_benchmark_factsheet_plt(
         multi_portfolio_data=multi_portfolio,
+        time_period=time_period,
         perf_params=qis.PerfParams(freq='QE', freq_reg='QE'),
         add_brinson_attribution=False,
         freq_beta='QE',
@@ -387,7 +493,14 @@ def test_quarterly_strategy_benchmark_report_uses_monthly_exposures_and_linked_a
     try:
         titles = {ax.get_title() for ax in figs[0].axes}
         assert 'Portfolio net exposures (ME-freq)' in titles
-        assert '12-span rolling annualised Alpha of QE-freq returns to Benchmark' in titles
+        assert (
+            '12-span rolling annualised Alpha of QE-freq returns to Benchmark,\n'
+            'starting from 31Dec2020'
+        ) in titles
+        assert (
+            '12-span rolling Beta of QE-freq returns to Benchmark,\n'
+            f'estimation starting from {beta_estimation_start:%d%b%Y}'
+        ) in titles
         assert not any(title.startswith('Cumulative p&l diff') for title in titles)
     finally:
         plt.close('all')

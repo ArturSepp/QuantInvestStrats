@@ -71,21 +71,81 @@ def test_return_bridge_draws_current_hac_inference_and_net_only_endpoint() -> No
         ax = fig.axes[0]
         assert ax.get_title(loc='left') == 'MAC current 24-month EWMA attribution'
         tick_labels = [tick.get_text() for tick in ax.get_xticklabels()]
-        assert len(ax.patches) == 7
+        assert len(ax.patches) == 9
         assert any('Trading-cost' in label for label in tick_labels)
         assert any('Mac\nnet' in label for label in tick_labels)
         assert all('gross' not in label.lower() for label in tick_labels)
         beta_labels = [label for label in tick_labels if r'$\hat{\beta}$' in label]
         assert len(beta_labels) == 5
         assert all(len(label.splitlines()) >= 3 for label in beta_labels)
+        r2_labels = [label for label in tick_labels if r'$R^2$' in label]
+        assert len(r2_labels) == 4
 
         midpoint_markers = [
             collection for collection in ax.collections
             if isinstance(collection, PathCollection)
         ]
-        assert len(midpoint_markers) == 3
+        assert len(midpoint_markers) == 4
         for marker in midpoint_markers:
             np.testing.assert_allclose(marker.get_facecolor()[0, :3], np.zeros(3), atol=0.0)
+        endpoint_beta = float(attribution.regression_table.loc['Full Model', 'Beta'])
+        endpoint_systematic = (
+            endpoint_beta * float(attribution.annualised_components['Benchmark Return'])
+        )
+        endpoint_alpha = float(attribution.regression_table.loc['Full Model', 'An Alpha'])
+        cost_drag = float(attribution.annualised_components['Trading Cost Drag'])
+        endpoint_total = float(
+            attribution.annualised_components['Full Model Net Return']
+        )
+        np.testing.assert_allclose(
+            [ax.patches[-3].get_y(), ax.patches[-3].get_height()],
+            [min(0.0, endpoint_systematic), abs(endpoint_systematic)],
+            atol=1.0e-12,
+            rtol=0.0,
+        )
+        np.testing.assert_allclose(
+            [ax.patches[-2].get_y(), ax.patches[-2].get_height()],
+            [
+                min(endpoint_systematic, endpoint_systematic + cost_drag),
+                abs(cost_drag),
+            ],
+            atol=1.0e-12,
+            rtol=0.0,
+        )
+        np.testing.assert_allclose(
+            [ax.patches[-1].get_y(), ax.patches[-1].get_height()],
+            [
+                min(
+                    endpoint_systematic + cost_drag,
+                    endpoint_systematic + cost_drag + endpoint_alpha,
+                ),
+                abs(endpoint_alpha),
+            ],
+            atol=1.0e-12,
+            rtol=0.0,
+        )
+        annotations = [text.get_text() for text in ax.texts]
+        assert f'Systematic\n{endpoint_systematic:.1%}' in annotations
+        assert f'Cost\n{cost_drag:.1%}' in annotations
+        assert f'Total alpha (gross)\n{endpoint_alpha:+.1%}' in annotations
+        assert f'{endpoint_total:.1%}' in annotations
+        assert ax.patches[-2].get_zorder() > ax.patches[-1].get_zorder()
+        alpha_text = next(
+            text for text in ax.texts
+            if text.get_text().startswith('Total alpha (gross)')
+        )
+        assert max(collection.get_zorder() for collection in ax.collections) > (
+            alpha_text.get_zorder()
+        )
+        for layer in ('Risk Layer', 'Signal Layer', 'Integration', 'Full Model'):
+            expected_r2 = float(attribution.regression_table.loc[layer, 'R2'])
+            candidate = next(
+                label for label in tick_labels
+                if f'$R^2$ = {expected_r2:.2f}' in label
+            )
+            assert r'$\hat{\beta}$' in candidate
+        assert fig.get_facecolor()[:3] == (1.0, 1.0, 1.0)
+        assert ax.get_facecolor()[:3] == (1.0, 1.0, 1.0)
         detail_text = '\n'.join(text.get_text() for text in ax.texts)
         assert 'Black whiskers show 95%' in detail_text
         assert '\n' in next(
@@ -110,7 +170,7 @@ def test_return_bridge_simple_mode_and_display_overrides() -> None:
     try:
         ax = fig.axes[0]
         assert ax.get_title(loc='left') == ''
-        assert len(ax.patches) == 6
+        assert len(ax.patches) == 7
         tick_labels = [tick.get_text() for tick in ax.get_xticklabels()]
         assert tick_labels[0] == 'Policy'
         assert any('+ Risk budget\nalpha' in label for label in tick_labels)
@@ -151,38 +211,34 @@ def test_return_bridge_rejects_alpha_that_is_not_the_hac_midpoint() -> None:
     plt.close('all')
 
 
-def test_sharpe_bridge_uses_norm_type_two_and_sequential_net_deltas(monkeypatch) -> None:
-    """The Sharpe plot delegates its statistic and shows cost followed by the net endpoint."""
+def test_sharpe_bridge_uses_common_denominator_contributions(monkeypatch) -> None:
+    """The Sharpe plot delegates to additive contributions and keeps the net identity."""
     attribution = _attribution(with_net=True)
     captured: dict[str, object] = {}
-    stage_sharpes = pd.DataFrame(
-        {
-            'Benchmark': [0.50],
-            'Systematic': [0.45],
-            'Risk Layer': [0.60],
-            'Signal Layer': [0.70],
-            'Full Model Gross': [0.82],
-            'Full Model Net': [0.78],
-        },
-        index=[attribution.periodic_returns.index[-1]],
-    )
+    contributions = pd.Series({
+        'Benchmark': 0.50,
+        'Systematic': 0.45,
+        'Risk Layer': 0.15,
+        'Signal Layer': 0.10,
+        'Integration': 0.12,
+        'Trading Cost Drag': -0.04,
+        'Full Model Net': 0.78,
+    })
 
-    def fake_stage_sharpes(
-            supplied: ModelLayerEwmaRegressionAttribution,
-            norm_type: int,
-    ) -> pd.DataFrame:
+    def fake_contributions(
+            attribution: ModelLayerEwmaRegressionAttribution,
+    ) -> pd.Series:
         """Capture the numerical delegation and return deterministic stage levels."""
-        captured['attribution'] = supplied
-        captured['norm_type'] = norm_type
-        return stage_sharpes
+        captured['attribution'] = attribution
+        return contributions
 
-    monkeypatch.setattr(plots, '_compute_ewma_stage_sharpes', fake_stage_sharpes)
+    monkeypatch.setattr(plots, '_compute_ewma_sharpe_contributions', fake_contributions)
     fig = plots.plot_model_layer_ewma_sharpe_bridge(
         attribution=attribution,
         model_name='Mac',
     )
     try:
-        assert captured == {'attribution': attribution, 'norm_type': 2}
+        assert captured == {'attribution': attribution}
         ax = fig.axes[0]
         assert ax.get_title(loc='left') == (
             'Risk and signal contributions explain MAC Sharpe beyond the\nbenchmark'
@@ -198,6 +254,32 @@ def test_sharpe_bridge_uses_norm_type_two_and_sequential_net_deltas(monkeypatch)
         assert '+0.12' in annotations
         assert '-0.04' in annotations
         assert '0.78' in annotations
+    finally:
+        plt.close(fig)
+
+
+def test_rolling_ewma_regression_alpha_plot_ends_at_current_attribution() -> None:
+    """The public rolling-alpha plot shows additive paths ending at the current WLS bars."""
+    attribution = _attribution(with_net=True)
+    fig = plots.plot_model_layer_rolling_ewma_regression_alpha(
+        attribution=attribution,
+        model_name='Rosaa',
+    )
+    try:
+        assert isinstance(fig, plt.Figure)
+        ax = fig.axes[0]
+        assert ax.get_title(loc='left') == (
+            'ROSAA rolling 24-month EWMA-WLS annualised alpha'
+        )
+        assert len(ax.lines) == 5
+        plotted = {line.get_label(): line.get_ydata()[-1] for line in ax.lines[1:]}
+        expected = attribution.regression_table['An Alpha']
+        np.testing.assert_allclose(plotted['Total model alpha'], expected['Full Model'])
+        np.testing.assert_allclose(plotted['Risk-layer alpha'], expected['Risk Layer'])
+        np.testing.assert_allclose(plotted['Signal-layer alpha'], expected['Signal Layer'])
+        np.testing.assert_allclose(plotted['Integration alpha'], expected['Integration'])
+        assert fig.get_facecolor()[:3] == (1.0, 1.0, 1.0)
+        assert ax.get_facecolor()[:3] == (1.0, 1.0, 1.0)
     finally:
         plt.close(fig)
 
@@ -219,7 +301,7 @@ def test_bridge_functions_draw_on_supplied_axes_without_creating_a_figure() -> N
         )
         assert return_output is None
         assert sharpe_output is None
-        assert len(axes[0].patches) == 6
+        assert len(axes[0].patches) == 7
         assert len(axes[1].patches) == 6
     finally:
         plt.close(fig)

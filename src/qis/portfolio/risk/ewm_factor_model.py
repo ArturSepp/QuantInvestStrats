@@ -116,7 +116,12 @@ def compute_portfolio_ewm_benchmark_betas(instrument_prices: pd.DataFrame,
     benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
     ewm_linear_model = EwmLinearModel(x=ret.to_returns(prices=benchmark_prices, freq=freq_beta, is_log_returns=True),
                                       y=ret.to_returns(prices=instrument_prices, freq=freq_beta, is_log_returns=True))
-    ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True, mean_adj_type=mean_adj_type)
+    ewm_linear_model.fit(
+        span=factor_beta_span,
+        is_x_correlated=True,
+        mean_adj_type=mean_adj_type,
+        init_type=InitType.X0,
+    )
     weights = weights.reindex(index=instrument_prices.index, method='ffill')
     benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(weights=weights)
     benchmark_betas = benchmark_betas.replace({0.0: np.nan}).ffill()  # fillholidays

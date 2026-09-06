@@ -43,9 +43,11 @@ import qis.utils.regression as ols
 from qis.models.linear.ewm import (
     InitType,
     MeanAdjType,
+    NanBackfill,
     compute_ewm,
     compute_ewm_beta_alpha_forecast,
     compute_ewm_sharpe,
+    compute_ewm_vol,
 )
 from qis.perfstats.config import PerfStat
 from qis.utils.annualisation import get_annualization_factor
@@ -715,6 +717,205 @@ def compute_model_layer_ewma_stage_sharpes(
         span=int(sharpe_span),
         norm_type=norm_type,
     )
+
+
+def compute_model_layer_rolling_ewma_regression_alpha(
+        attribution: ModelLayerEwmaRegressionAttribution,
+) -> pd.DataFrame:
+    """Compute expanding-prefix EWMA-WLS annualised alpha paths.
+
+    Each row refits the same geometric weighted regression used by
+    :func:`compute_model_layer_ewma_regression_attribution` on data available through that row.
+    This is a descriptive contemporaneous path, not the lagged-beta realised attribution in
+    :func:`compute_model_layer_ewma_alpha_attribution`. The final row therefore reproduces the
+    current attribution's annualised alpha estimates exactly.
+
+    Args:
+        attribution: Current EWMA-regression attribution whose return sample and settings define
+            every expanding-prefix fit.
+
+    Returns:
+        Annualised EWMA-WLS alpha paths for the full model, risk layer, signal layer and
+        integration, plus the optional net full model. Dates before a nonsingular joint fit can
+        be estimated are omitted.
+
+    Raises:
+        TypeError: If ``attribution`` is not a model-layer EWMA regression result.
+        RuntimeError: If estimation fails after the first valid prefix, no prefix is estimable,
+            the path is non-finite, or its endpoint does not match the current attribution.
+    """
+    if not isinstance(attribution, ModelLayerEwmaRegressionAttribution):
+        raise TypeError(
+            'attribution must be ModelLayerEwmaRegressionAttribution, got '
+            f'{type(attribution)!r}'
+        )
+    periodic_returns = attribution.periodic_returns
+    regression_returns = pd.DataFrame({
+        'Risk Layer': periodic_returns['Risk Layer'],
+        'Signal Layer': periodic_returns['Signal Layer'],
+        'Integration': (
+            periodic_returns['Full Model']
+            - periodic_returns['Risk Layer']
+            - periodic_returns['Signal Layer']
+        ),
+        'Full Model': periodic_returns['Full Model'],
+    })
+    if 'Full Model Net' in periodic_returns.columns:
+        regression_returns['Full Model Net'] = periodic_returns['Full Model Net']
+
+    annualisation = get_annualization_factor(freq=attribution.freq)
+    output_names = {
+        'Full Model': 'Total Model Alpha',
+        'Risk Layer': 'Risk Layer Alpha',
+        'Signal Layer': 'Signal Layer Alpha',
+        'Integration': 'Integration Alpha',
+        'Full Model Net': 'Total Model Net Alpha',
+    }
+    source_order = ['Full Model', 'Risk Layer', 'Signal Layer', 'Integration']
+    if 'Full Model Net' in regression_returns.columns:
+        source_order.append('Full Model Net')
+    rows: list[pd.Series] = []
+    first_valid_fit_found = False
+    for end in range(3, len(periodic_returns.index) + 1):
+        try:
+            regression = ols.estimate_ewma_alpha_beta_hac(
+                x=periodic_returns['Benchmark'].iloc[:end],
+                y=regression_returns.iloc[:end],
+                span=attribution.span,
+                hac_lags=attribution.hac_lags,
+                confidence_level=attribution.confidence_level,
+            )
+        except ValueError as exception:
+            if first_valid_fit_found:
+                raise RuntimeError(
+                    f'EWMA-WLS rolling alpha failed at {periodic_returns.index[end - 1]!s}'
+                ) from exception
+            continue
+        first_valid_fit_found = True
+        row = annualisation * regression.alpha.loc[source_order]
+        row.index = [output_names[name] for name in source_order]
+        row.name = periodic_returns.index[end - 1]
+        rows.append(row)
+    if not rows:
+        raise RuntimeError('EWMA-WLS rolling alpha has no estimable prefix')
+    alpha_path = pd.DataFrame(rows)
+    if not np.isfinite(alpha_path.to_numpy(dtype=float)).all():
+        raise RuntimeError('EWMA-WLS rolling alpha contains non-finite values')
+
+    annualised_alpha_column = PerfStat.ALPHA_AN.to_str()
+    expected_endpoint = attribution.regression_table.loc[
+        source_order,
+        annualised_alpha_column,
+    ].to_numpy(dtype=float)
+    if not np.allclose(
+            alpha_path.iloc[-1].to_numpy(dtype=float),
+            expected_endpoint,
+            atol=1.0e-12,
+            rtol=0.0,
+    ):
+        raise RuntimeError('EWMA-WLS rolling alpha endpoint does not match current attribution')
+    return alpha_path
+
+
+def compute_model_layer_ewma_sharpe_contributions(
+        attribution: ModelLayerEwmaRegressionAttribution,
+) -> pd.Series:
+    """Compute additive current EWMA return-to-volatility contributions.
+
+    The benchmark reference divides its annualised EWMA log return by benchmark EWMA volatility.
+    Every model contribution divides the corresponding return-bridge numerator by one common
+    endpoint-model EWMA volatility, so systematic, risk, signal, integration and optional cost
+    contributions add exactly to the endpoint model's log-return Sharpe ratio. This common-risk
+    bridge is distinct from the order-dependent stage Sharpes returned by
+    :func:`compute_model_layer_ewma_stage_sharpes`.
+
+    Args:
+        attribution: Current EWMA regression attribution containing return contributions and the
+            common periodic return sample.
+
+    Returns:
+        Current benchmark reference, additive model contributions and full-model endpoint ratio.
+
+    Raises:
+        TypeError: If ``attribution`` is not a model-layer EWMA regression result.
+        ValueError: If required returns or annualised components are missing or volatility is not
+            finite and positive.
+        RuntimeError: If the common-denominator model contributions do not reconstruct the total.
+    """
+    if not isinstance(attribution, ModelLayerEwmaRegressionAttribution):
+        raise TypeError(
+            'attribution must be ModelLayerEwmaRegressionAttribution, got '
+            f'{type(attribution)!r}'
+        )
+    values = attribution.annualised_components
+    required_components = [
+        'Benchmark Return',
+        'Systematic Return',
+        'Risk Layer Alpha',
+        'Signal Layer Alpha',
+        'Integration Alpha',
+        'Full Model Return',
+    ]
+    missing = [name for name in required_components if name not in values.index]
+    if missing:
+        raise ValueError(f'annualised components are missing {missing!r}')
+
+    has_net = 'Full Model Net Return' in values.index
+    endpoint_layer = 'Full Model Net' if has_net else 'Full Model'
+    endpoint_return = 'Full Model Net Return' if has_net else 'Full Model Return'
+    required_returns = ['Benchmark', endpoint_layer]
+    missing_returns = [
+        name for name in required_returns if name not in attribution.periodic_returns.columns
+    ]
+    if missing_returns:
+        raise ValueError(f'periodic returns are missing {missing_returns!r}')
+    volatility = compute_ewm_vol(
+        data=attribution.periodic_returns[required_returns],
+        span=attribution.span,
+        mean_adj_type=MeanAdjType.EWMA,
+        init_type=InitType.ZERO,
+        annualize=True,
+        annualization_factor=get_annualization_factor(freq=attribution.freq),
+        nan_backfill=NanBackfill.ZERO_FILL,
+    ).iloc[-1]
+    benchmark_volatility = float(volatility['Benchmark'])
+    model_volatility = float(volatility[endpoint_layer])
+    if not np.isfinite([benchmark_volatility, model_volatility]).all() or (
+            benchmark_volatility <= 0.0 or model_volatility <= 0.0
+    ):
+        raise ValueError(
+            'current benchmark and endpoint-model EWMA volatilities must be finite and positive'
+        )
+
+    contributions = pd.Series({
+        'Benchmark': float(values['Benchmark Return']) / benchmark_volatility,
+        'Systematic': float(values['Systematic Return']) / model_volatility,
+        'Risk Layer': float(values['Risk Layer Alpha']) / model_volatility,
+        'Signal Layer': float(values['Signal Layer Alpha']) / model_volatility,
+        'Integration': float(values['Integration Alpha']) / model_volatility,
+    }, dtype=float)
+    if has_net:
+        if 'Trading Cost Drag' not in values.index:
+            raise ValueError('annualised components are missing Trading Cost Drag')
+        contributions['Trading Cost Drag'] = (
+            float(values['Trading Cost Drag']) / model_volatility
+        )
+    contributions['Full Model Net' if has_net else 'Full Model Gross'] = (
+        float(values[endpoint_return]) / model_volatility
+    )
+    model_components = ['Systematic', 'Risk Layer', 'Signal Layer', 'Integration']
+    if has_net:
+        model_components.append('Trading Cost Drag')
+    if not np.isclose(
+            contributions.loc[model_components].sum(),
+            contributions.iloc[-1],
+            atol=1.0e-12,
+            rtol=0.0,
+    ):
+        raise RuntimeError('EWMA Sharpe contributions do not reconstruct the full model')
+    if not np.isfinite(contributions.to_numpy(dtype=float)).all():
+        raise RuntimeError('EWMA Sharpe contributions contain non-finite values')
+    return contributions
 
 
 def compute_model_layer_ewma_alpha_attribution(

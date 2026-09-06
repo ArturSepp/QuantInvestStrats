@@ -176,6 +176,10 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
             attribution=fx.model_layer_attribution,
             detailed_mode=False,
         ),
+        'plot_model_layer_rolling_ewma_regression_alpha': dict(
+            attribution=fx.model_layer_attribution,
+            detailed_mode=False,
+        ),
         'plot_pie': dict(df=fx.positive_table),
         'plot_prices_2ax': dict(prices_ax1=fx.prices.iloc[:, [0]],
                                 prices_ax2=fx.prices.iloc[:, [1]]),

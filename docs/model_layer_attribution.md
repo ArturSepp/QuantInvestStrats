@@ -38,6 +38,10 @@ intervals, use `qis.compute_model_layer_ewma_regression_attribution`. For a comp
 over several model features,
 `qis.compute_model_feature_alpha_beta_attribution` returns factorial interactions,
 order-independent Shapley effects, and a full-sample model-layer attribution for every effect.
+`qis.compute_model_layer_rolling_ewma_regression_alpha` extends the descriptive endpoint fit into
+an expanding-prefix history whose last row is exactly the current estimate, while
+`qis.compute_model_layer_ewma_sharpe_contributions` expresses the return bridge over common EWMA
+risk denominators.
 
 ## Choose the object that matches the question
 
@@ -46,6 +50,8 @@ order-independent Shapley effects, and a full-sample model-layer attribution for
 | What did the risk layer, the signal layer, and their integration each add over the full sample, and with what uncertainty? | `compute_model_layer_alpha_beta_attribution` | benchmark, risk-layer, signal-layer and full-model NAVs, optional net NAV | regression table with HAC intervals, exact periodic components, annualised components |
 | How did realised alpha accumulate using only the beta information available before each return? | `compute_model_layer_ewma_alpha_attribution` and `compute_model_layer_cumulative_alpha_after_warmup` | benchmark, risk-layer, signal-layer and full-model NAVs; beta span, lag, prior and warm-up base date | estimated and applied betas, exact alpha components, expanding annualised alpha and post-warm-up cumulative alpha |
 | What is the current recency-weighted alpha/beta decomposition, with uncertainty? | `compute_model_layer_ewma_regression_attribution` | benchmark, risk-layer, signal-layer and full-model NAVs, optional net NAV; EWMA span and HAC settings | endpoint EWMA-WLS estimates, joint HAC intervals, weighted return components and effective sample size |
+| How did the descriptive current EWMA-WLS alpha estimate evolve as history arrived? | `compute_model_layer_rolling_ewma_regression_alpha` | a current EWMA regression attribution | expanding-prefix annualised total, risk, signal and integration alpha paths whose endpoint matches the current fit |
+| How much return-to-risk did each current model component contribute? | `compute_model_layer_ewma_sharpe_contributions` | a current EWMA regression attribution | benchmark return over benchmark EWMA volatility and additive model components over one full-model EWMA volatility |
 | Which model features changed risk-layer, signal-layer, integration and total full-model alpha or beta? | `compute_model_feature_alpha_beta_attribution` | complete $2^n$ coalition map of `ModelLayerNavs` bundles | factorial and Shapley effect paths, one layer attribution per effect, summary table and identity checks |
 | What were whole-sample TE and IR against a benchmark? | `compute_te_ir_errors` | periodic strategy-minus-benchmark returns | annualised TE and IR |
 | How did benchmark beta and alpha evolve through time? | `compute_ewm_beta_alpha_forecast` | periodic returns | EWMA beta and alpha series |
@@ -387,9 +393,17 @@ $$
 T_{\mathrm{eff}}=\frac{\left(\sum_t w_t\right)^2}{\sum_t w_t^2}.
 $$
 
-For a long history it approaches 36; for a finite history it is smaller. The value is an
-information-size diagnostic, not the degrees of freedom used in the statsmodels-compatible HAC
-correction.
+Equivalently,
+
+$$
+T_{\mathrm{eff}}=h\frac{1-\lambda^T}{1+\lambda^T}.
+$$
+
+For a long history it approaches 36; for a finite history it is smaller. Thus “effective sample
+size 36.0” does not mean that QIS discards older observations or fits a 36-month hard window. All
+$T$ returns enter with geometric weights; for example, $T=260$ and $h=36$ give
+$T_{\mathrm{eff}}=35.999962$, which displays as 36.0. The value is an information-concentration
+diagnostic, not the degrees of freedom used in the statsmodels-compatible HAC correction.
 
 Let $X=[\mathbf 1,r_B]$, $W=\operatorname{diag}(w_0,\ldots,w_{T-1})$, and first construct
 $r_I=r_F-r_R-r_S$. The columns of $Y=[r_R,r_S,r_I,r_F]$ contain the observed layer returns plus
@@ -424,30 +438,59 @@ is the residual required to reconstruct $r_F$. Its displayed annualised bars are
 weighted means of those periodic log-return components. Supplying `full_model_net_nav` adds the
 realised trading-cost drag and a net endpoint; it does not estimate a fee inside QIS.
 
+The final endpoint bar makes that regression identity visible. It starts with gross-model
+systematic return $\hat\beta_F\bar r_B$, applies realised trading-cost drag when a net NAV is
+present, and then adds gross total alpha $\hat\alpha_F$. The label above the bar is gross return
+without a net NAV and net return with one. The black gross-alpha interval is translated by the
+systematic and cost segments, so its midpoint is the displayed endpoint. The beta and $R^2$ rows
+under this bar therefore come from the gross `Full Model` regression, as do its alpha and interval.
+The risk, signal and integration alpha bars also show their own regression $R^2$ below beta.
+
 An EWMA interval is not guaranteed to be narrower than its full-sample OLS/HAC counterpart.
 Recency weighting usually reduces effective information, and the weighted residual variance,
 serial dependence and cross-equation covariance can all change. EWMA answers a different question
 more responsively; it is not a mechanical confidence-band shrinkage method.
 
-### Sequential EWMA Sharpe stages and bridge plots
+### Rolling descriptive EWMA-WLS alpha
 
-`compute_model_layer_ewma_stage_sharpes` applies the attribution span by default and returns a
-time series for the ordered stages `Benchmark`, `Systematic`, `Risk Layer`, `Signal Layer` and
-`Full Model Gross`, plus `Full Model Net` when a net NAV was supplied. With the default
-`norm_type=2`, the annualised point-in-time statistic is
+`compute_model_layer_rolling_ewma_regression_alpha` repeats the same geometric EWMA-WLS fit on
+every expanding prefix for which the joint regression is nonsingular. At date $t$, it uses only
+returns through $t$, with weights $w_{j,t}=\lambda^{t-j}$. It returns annualised `Total Model
+Alpha`, `Risk Layer Alpha`, `Signal Layer Alpha`, and `Integration Alpha`, plus `Total Model Net
+Alpha` when the supplied attribution has a net NAV. Linearity gives
 
 $$
-\operatorname{Sharpe}_t=\sqrt{A}\,
-\frac{m_t}{\sqrt{v_t}}, \qquad
-m_t=\operatorname{EWMA}(r_t), \qquad
-v_t=\operatorname{EWMA}\big((r_t-m_t)^2\big),
+\hat\alpha_F(t)=\hat\alpha_R(t)+\hat\alpha_S(t)+\hat\alpha_I(t)
 $$
 
-with zero risk-free rate. The plotted risk step is the difference between the risk-stage and
-systematic Sharpes; the signal step is the next difference; and integration is the difference
-between the gross full-model Sharpe and the signal-stage Sharpe. These are sequential,
-order-dependent deltas, not standalone component Sharpes and not quantities with the alpha HAC
-intervals. If a net NAV is present, the final optional step is net Sharpe minus gross Sharpe.
+at every plotted date. Its final gross row is checked directly against the `Full Model`, `Risk
+Layer`, `Signal Layer`, and `Integration` rows of the current regression table. This path is
+descriptive and contemporaneous: unlike lagged-beta realised attribution, return $t$ participates
+in the regression displayed at $t$.
+
+### Common-denominator EWMA Sharpe contributions
+
+`compute_model_layer_ewma_sharpe_contributions` uses the annualised return and alpha estimates from
+the current EWMA return bridge. The benchmark reference uses benchmark EWMA volatility, while all
+model contributions use one common endpoint-model EWMA volatility:
+
+$$
+S_B=\frac{\bar r_B^{\mathrm{ann}}}{\sigma_B^{\mathrm{EWMA}}}, \qquad
+C_j=\frac{\bar r_j^{\mathrm{ann}}}{\sigma_{F^*}^{\mathrm{EWMA}}}, \qquad
+S_{F^*}=\sum_j C_j,
+$$
+
+where $j$ runs over systematic return, risk alpha, signal alpha, integration alpha and optional
+realised cost drag, and $F^*$ is the net model when supplied and gross otherwise. Both volatility
+series use the attribution span and the QIS centred EWMA-volatility recursion. Because every model
+term has the same positive denominator, the bridge is additive and each alpha contribution retains
+the sign of its alpha. These are contribution ratios, not standalone sleeve Sharpes.
+
+The older `compute_model_layer_ewma_stage_sharpes` remains available as a separate diagnostic. It
+computes the EWMA Sharpe path after adding risk, signal and integration returns sequentially. Its
+deltas are order-dependent: a positive signal alpha can produce a negative stage-Sharpe increment
+when it adds enough volatility or covariance. The public bridge plot uses the additive
+common-denominator measure instead.
 
 ```python
 import qis
@@ -468,7 +511,13 @@ stage_sharpes = qis.compute_model_layer_ewma_stage_sharpes(
     attribution=current,
     norm_type=2,
 )
+rolling_alpha = qis.compute_model_layer_rolling_ewma_regression_alpha(current)
+sharpe_contributions = qis.compute_model_layer_ewma_sharpe_contributions(current)
 return_figure = qis.plot_model_layer_ewma_return_bridge(
+    attribution=current,
+    model_name='MAC',
+)
+rolling_alpha_figure = qis.plot_model_layer_rolling_ewma_regression_alpha(
     attribution=current,
     model_name='MAC',
 )
@@ -478,8 +527,9 @@ sharpe_figure = qis.plot_model_layer_ewma_sharpe_bridge(
 )
 ```
 
-The two plot functions use the final endpoint, show beta estimates on contributing stages and
-accept `detailed_mode=False` for a clean export without title, subtitle or methodology footnote.
+The return and Sharpe bridges use the final endpoint, while the rolling-alpha figure shows every
+estimable prefix. All three accept `detailed_mode=False` for a clean export without title,
+subtitle or methodology footnote.
 
 ## Full-sample OLS/HAC inference
 
@@ -575,8 +625,8 @@ the latest return.
 `freq='ME'`), geometric `weights`, `regression_table`, exact `component_returns`, weighted
 `annualised_components`, joint `annualised_alpha_covariance`, direct-equation
 `parameter_covariance`, and the settings `freq`, `span`, `ewm_lambda`, `nobs`, `effective_nobs`,
-`hac_lags`, and `confidence_level`. This result is the input to both EWMA bridge plots and to
-`compute_model_layer_ewma_stage_sharpes`.
+`hac_lags`, and `confidence_level`. This result is the input to both EWMA bridge plots, the rolling
+EWMA-WLS alpha path, the additive Sharpe contributions, and the legacy sequential stage Sharpes.
 
 `ModelLayerCumulativeAlphaAttribution` contains the post-warm-up `alpha_returns` and
 `cumulative_alpha`, the `base_date`, `first_alpha_date`, `warmup_periods`, and the inherited beta
@@ -832,9 +882,9 @@ paths are additive log-return percentage points, not compounded feature NAVs.
   excess basis for the signal layer.
 - Cumulative alpha paths are arithmetic sums of the periodic log-return components. Compounding
   them into NAV indices changes the question from additive alpha attribution to wealth impact.
-- The EWMA Sharpe bridge uses `norm_type=2` and sequential stage differences. It depends on the
-  risk-then-signal-then-integration order because the volatility of a sum is not the sum of the
-  volatilities. Only the return bridge is order-free; an optional net NAV adds a final cost step.
+- The EWMA Sharpe bridge divides all model components by the same full-model EWMA volatility, so
+  it is additive and order-free. The benchmark reference uses benchmark volatility. The legacy
+  `compute_model_layer_ewma_stage_sharpes` diagnostic remains order-dependent.
 
 ## See also
 
@@ -844,6 +894,9 @@ paths are additive log-return percentage points, not compounded feature NAVs.
 - {doc}`Generated rolling result API <api/generated/qis.ModelLayerEwmaAlphaAttribution>`
 - {doc}`Generated endpoint EWMA API <api/generated/qis.compute_model_layer_ewma_regression_attribution>`
 - {doc}`Generated endpoint EWMA result API <api/generated/qis.ModelLayerEwmaRegressionAttribution>`
+- {doc}`Generated rolling EWMA-WLS alpha API <api/generated/qis.compute_model_layer_rolling_ewma_regression_alpha>`
+- {doc}`Generated rolling EWMA-WLS alpha plot API <api/generated/qis.plot_model_layer_rolling_ewma_regression_alpha>`
+- {doc}`Generated EWMA Sharpe-contribution API <api/generated/qis.compute_model_layer_ewma_sharpe_contributions>`
 - {doc}`Generated EWMA Sharpe-stage API <api/generated/qis.compute_model_layer_ewma_stage_sharpes>`
 - {doc}`Generated EWMA return bridge API <api/generated/qis.plot_model_layer_ewma_return_bridge>`
 - {doc}`Generated EWMA Sharpe bridge API <api/generated/qis.plot_model_layer_ewma_sharpe_bridge>`

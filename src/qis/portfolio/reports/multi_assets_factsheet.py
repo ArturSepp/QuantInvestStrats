@@ -300,16 +300,39 @@ class MultiAssetsReport:
         """
         plot rolling beta to one benchmark
         """
-        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=freq_beta)
-        factor_beta_title = f"{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {benchmark}"
-        ewm_linear_model = qis.EwmLinearModel(x=returns[benchmark].to_frame(), y=returns.drop(benchmark, axis=1))
-        ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
+        returns = qis.to_returns(
+            prices=self.get_prices(benchmark=benchmark),
+            freq=freq_beta,
+            is_log_returns=True,
+        )
+        ewm_linear_model = qis.EwmLinearModel(
+            x=returns[benchmark].to_frame(),
+            y=returns.drop(benchmark, axis=1),
+        )
+        ewm_linear_model.fit(
+            span=factor_beta_span,
+            is_x_correlated=True,
+            mean_adj_type=qis.MeanAdjType.EWMA,
+            init_type=qis.InitType.X0,
+        )
+        if ewm_linear_model.get_factor_loadings(benchmark).first_valid_index() is None:
+            raise ValueError(f'no finite {benchmark} beta estimates')
+        estimation_start = returns.index.min()
+        factor_beta_title = (
+            f'{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {benchmark},\n'
+            f'estimation starting from {estimation_start:%d%b%Y}'
+        )
         ewm_linear_model.plot_factor_loadings(factor=benchmark,
                                               time_period=time_period,
                                               title=factor_beta_title,
                                               ax=ax,
                                               **kwargs)
-        self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, time_period=time_period, data_df=self.prices)
+        self.add_regime_shadows(
+            ax=ax,
+            regime_benchmark=benchmark,
+            time_period=time_period,
+            data_df=self.prices,
+        )
 
     def plot_benchmark_alpha_attribution(self,
                                          benchmark: str,
@@ -319,24 +342,67 @@ class MultiAssetsReport:
                                          time_period: TimePeriod = None,
                                          ax: plt.Subplot = None,
                                          **kwargs) -> None:
-        returns = qis.to_returns(prices=self.get_prices(benchmark=benchmark), freq=freq_beta)
-        ewm_linear_model = qis.EwmLinearModel(x=returns[benchmark].to_frame(), y=returns.drop(benchmark, axis=1))
-        ewm_linear_model.fit(span=factor_beta_span, is_x_correlated=True)
-        factor_alpha, explained_returns = ewm_linear_model.get_factor_alpha()
-        if time_period is not None:
-            factor_alpha = time_period.locate(factor_alpha)
+        returns = qis.to_returns(
+            prices=self.get_prices(benchmark=benchmark),
+            freq=freq_beta,
+            is_log_returns=True,
+        )
+        ewm_linear_model = qis.EwmLinearModel(
+            x=returns[benchmark].to_frame(),
+            y=returns.drop(benchmark, axis=1),
+        )
+        ewm_linear_model.fit(
+            span=factor_beta_span,
+            is_x_correlated=True,
+            mean_adj_type=qis.MeanAdjType.EWMA,
+            init_type=qis.InitType.X0,
+        )
+        displayed_beta = ewm_linear_model.get_factor_loadings(benchmark)
+        factor_alpha = returns.drop(benchmark, axis=1).subtract(
+            displayed_beta.shift(1).multiply(returns[benchmark], axis=0)
+        )
+        performance_start = None
+        if time_period is not None and time_period.start is not None:
+            performance_start = pd.Timestamp(time_period.start)
+            factor_alpha = factor_alpha.loc[factor_alpha.index > performance_start]
+        cumulative_alpha = factor_alpha.cumsum(axis=0)
+        if performance_start is not None:
+            baseline = pd.DataFrame(
+                0.0,
+                index=pd.DatetimeIndex([performance_start]),
+                columns=cumulative_alpha.columns,
+            )
+            cumulative_alpha = pd.concat([baseline, cumulative_alpha], axis=0)
+            cumulative_alpha = time_period.locate(cumulative_alpha)
 
         if factor_alpha_title is not None:
             factor_alpha_title = f"{factor_alpha_title} to {benchmark}"
         else:
-            factor_alpha_title = factor_alpha_title or f"Cumulative alpha using {factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {benchmark}"
+            factor_alpha_title = (
+                f'Cumulative alpha using {factor_beta_span}-span rolling Beta of '
+                f'{freq_beta}-freq returns to {benchmark}'
+            )
+        if performance_start is not None:
+            factor_alpha_title = f'{factor_alpha_title},\nstarting from {performance_start:%d%b%Y}'
 
-        qis.plot_time_series(df=factor_alpha.cumsum(axis=0),
-                             title=factor_alpha_title,
-                             ax=ax,
-                             **qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(var_format='{:,.0%}',
-                                                                                legend_stats=qis.LegendStats.LAST_NONNAN)))
-        self.add_regime_shadows(ax=ax, regime_benchmark=benchmark, time_period=time_period, data_df=self.prices)
+        qis.plot_time_series(
+            df=cumulative_alpha,
+            title=factor_alpha_title,
+            ax=ax,
+            **qis.update_kwargs(
+                kwargs=kwargs,
+                new_kwargs=dict(
+                    var_format='{:,.0%}',
+                    legend_stats=qis.LegendStats.LAST_NONNAN,
+                ),
+            ),
+        )
+        self.add_regime_shadows(
+            ax=ax,
+            regime_benchmark=benchmark,
+            time_period=time_period,
+            data_df=self.prices,
+        )
 
     def plot_rolling_perf(self,
                           rolling_perf_stat: RollingPerfStat = RollingPerfStat.SHARPE,

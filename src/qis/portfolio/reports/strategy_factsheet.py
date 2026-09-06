@@ -613,11 +613,20 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
         # benchmark betas
         ax = fig.add_subplot(gs[5, :2])
-        factor_exposures = portfolio_data.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                            time_period=time_period,
-                                                                            freq_beta=freq_beta,
-                                                                            factor_beta_span=factor_beta_span)
-        factor_beta_title = f"Rolling {factor_beta_span}-span beta of {freq_beta}-freq returns"
+        factor_exposures = portfolio_data.compute_portfolio_benchmark_betas(
+            benchmark_prices=benchmark_prices,
+            time_period=None,
+            freq_beta=freq_beta,
+            factor_beta_span=factor_beta_span,
+        )
+        if factor_exposures.first_valid_index() is None:
+            raise ValueError('no finite portfolio benchmark beta estimates')
+        estimation_start = factor_exposures.index.min()
+        factor_exposures = time_period.locate(factor_exposures)
+        factor_beta_title = (
+            f'Rolling {factor_beta_span}-span beta of {freq_beta}-freq returns,\n'
+            f'estimation starting from {estimation_start:%d%b%Y}'
+        )
         qis.plot_time_series(df=factor_exposures,
                              var_format='{:,.2f}',
                              legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
