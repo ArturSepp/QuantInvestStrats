@@ -36,6 +36,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Honored caller-supplied regime classifiers in the benchmark-regime performance-table wrapper
   instead of silently rebuilding the default quantile policy.
+- Rejected invalid or duplicate resolved benchmark labels before benchmark-aware performance and
+  regime calculations can expose incidental downstream errors.
+- Restricted `estimate_vol()` to its documented pandas and NumPy containers with real numeric
+  dtypes, rejected lossy or categorical coercions, and corrected its scalar return annotation.
 
 ## [5.22.2] - 2026-09-05
 
@@ -47,8 +51,6 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
-- Rejected invalid or duplicate resolved benchmark labels before benchmark-aware performance and
-  regime calculations can expose incidental downstream errors.
 - Made time-series descriptive legends use native scalar text when their public plotting format
   is `None`.
 - Made all-zero `FIRST_LAST_NON_ZERO` legends display undefined endpoints instead of raising an

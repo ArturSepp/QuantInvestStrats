@@ -475,6 +475,7 @@ def plot_portfolio_breadth_concentration(
     curves = pd.concat(
         [capital_curve.rename(capital_label), risk_curve.rename(risk_label)],
         axis=1,
+        sort=False,
     )
     palette = _updated_colors(colors=colors)
 

@@ -486,16 +486,19 @@ def compute_pa_excess_compounded_returns(returns: Union[pd.Series, pd.DataFrame]
     return compounded_return_pa
 
 
-def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]) -> np.ndarray:
+def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]
+                 ) -> Union[np.ndarray, np.float64]:
     """Estimate volatility from return samples.
 
     For columns with 20 or more finite observations, uses standard deviation with ddof=1.
     For smaller finite samples, uses RMS to avoid mean adjustment bias.
 
     Args:
-        sampled_returns: Return time series. NumPy arrays must have shape `(observations,)` or
-            `(observations, columns)`. Each column selects its estimator from its own finite
-            observation count; missing rows do not count toward the threshold
+        sampled_returns: Real numeric return time series supplied as a pandas Series, pandas
+            DataFrame, or NumPy array. Nullable integer and floating pandas dtypes are supported.
+            NumPy arrays must have shape `(observations,)` or `(observations, columns)`. Each
+            column selects its estimator from its own finite observation count; missing rows do
+            not count toward the threshold
 
     Returns:
         Volatility estimate for a one-dimensional input or one estimate per two-dimensional input
@@ -503,16 +506,35 @@ def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]) ->
         selected estimator
 
     Raises:
+        TypeError: If the input is not a supported container or contains a non-real-numeric dtype
         ValueError: If a NumPy array is not one- or two-dimensional
     """
+    # Keep runtime acceptance aligned with the three public container families.
+    if not isinstance(sampled_returns, (pd.Series, pd.DataFrame, np.ndarray)):
+        raise TypeError(
+            "sampled_returns must be a pandas Series, pandas DataFrame, or NumPy array"
+        )
+
     if isinstance(sampled_returns, np.ndarray) and sampled_returns.ndim not in (1, 2):
         # Higher ranks have no unambiguous observation/column mapping for this estimator.
         raise ValueError("sampled_returns must be a 1- or 2-dimensional NumPy array")
 
+    if isinstance(sampled_returns, pd.DataFrame):
+        sampled_dtypes = sampled_returns.dtypes
+    else:
+        sampled_dtypes = (sampled_returns.dtype,)
+    # Validate before float coercion can reinterpret booleans, text, dates, or complex values.
+    if any(
+        not pd.api.types.is_any_real_numeric_dtype(dtype) for dtype in sampled_dtypes
+    ):
+        raise TypeError(
+            "sampled_returns must contain only real numeric values or missing values"
+        )
+
     if isinstance(sampled_returns, (pd.Series, pd.DataFrame)):
         sampled_values = sampled_returns.to_numpy(dtype=float, na_value=np.nan)
     else:
-        sampled_values = np.asarray(sampled_returns, dtype=float)
+        sampled_values = sampled_returns.astype(float, copy=False)
 
     def estimate_column(values: np.ndarray) -> np.float64:
         """Apply the finite-sample estimator to one return column."""

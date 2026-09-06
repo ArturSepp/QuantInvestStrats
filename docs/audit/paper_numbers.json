@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "1913e16f28c9881beb19913f6e934fdfe362f02d",
+  "measured_at_commit": "7b6c8c78cacbb532451df10feb4ae66594db5f37",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,13 +46,13 @@
       "paper_phrase": "12 capability groups"
     },
     "collected_tests": {
-      "value": 2695,
+      "value": 2766,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 581,
+      "value": 585,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
