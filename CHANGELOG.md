@@ -30,6 +30,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Honored caller-supplied regime classifiers in the benchmark-regime performance-table wrapper
   instead of silently rebuilding the default quantile policy.
+- Restricted `estimate_vol()` to its documented pandas and NumPy containers with real numeric
+  dtypes, rejected lossy or categorical coercions, and corrected its scalar return annotation.
 
 ## [5.22.2] - 2026-09-05
 
