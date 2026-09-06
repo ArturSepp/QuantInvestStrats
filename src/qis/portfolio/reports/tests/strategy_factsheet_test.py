@@ -29,9 +29,10 @@ from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 def _make_portfolio_data(
         n_assets: int = 3,
         n_years: int = 6,
+        end: str = '2025-12-31',
 ) -> tuple[qis.PortfolioData, pd.DataFrame]:
     rng = np.random.default_rng(17)
-    index = pd.bdate_range(end='2025-12-31', periods=n_years * 260)
+    index = pd.bdate_range(end=end, periods=n_years * 260)
     returns = 0.0002 + 0.008 * rng.standard_normal((len(index), n_assets))
     prices = pd.DataFrame(100.0 * np.exp(np.cumsum(returns, axis=0)),
                           index=index,
@@ -81,6 +82,37 @@ def test_recent_ra_perf_table_time_period_default_and_trailing_year() -> None:
     assert recent_period.end == pd.Timestamp('2026-08-31')
     assert trailing_period.start == pd.Timestamp('2025-08-31')
     assert trailing_period.end == pd.Timestamp('2026-08-31')
+
+
+def test_recent_ra_perf_table_uses_available_history_before_default_start() -> None:
+    """An older report must not produce an inverted, empty recent-table window."""
+    report_period = qis.TimePeriod(start='2015-01-01', end='2019-12-31')
+
+    recent_period = _get_recent_ra_perf_table_time_period(time_period=report_period)
+
+    assert recent_period.start == pd.Timestamp('2015-01-01')
+    assert recent_period.end == pd.Timestamp('2019-12-31')
+
+
+def test_strategy_benchmark_factsheet_renders_history_before_recent_default() -> None:
+    """The fixed recent-table default must not break factsheets for older histories."""
+    strategy, benchmark_prices = _make_portfolio_data(end='2019-12-31')
+    benchmark, _ = _make_portfolio_data(end='2019-12-31')
+    benchmark.set_ticker('Benchmark Portfolio')
+    multi_portfolio = qis.MultiPortfolioData(
+        portfolio_datas=[strategy, benchmark],
+        benchmark_prices=benchmark_prices,
+    )
+
+    figs = generate_strategy_benchmark_factsheet_plt(
+        multi_portfolio_data=multi_portfolio,
+        time_period=qis.TimePeriod(start='2015-01-01', end='2019-12-31'),
+        add_brinson_attribution=False,
+    )
+    try:
+        assert figs
+    finally:
+        plt.close('all')
 
 
 def test_strategy_and_multi_asset_factsheets_use_recent_ra_start_date(monkeypatch) -> None:

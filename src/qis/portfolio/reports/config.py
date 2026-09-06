@@ -52,9 +52,11 @@ def _get_recent_ra_perf_table_time_period(
             DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
         ),
 ) -> TimePeriod:
-    """Return the configured recent-table window ending with the report period."""
+    """Return the recent-table window, falling back when its start follows the report."""
     if recent_ra_perf_table_start_date is None:
         return get_time_period_shifted_by_years(time_period=time_period, n_years=1)
+    if time_period.end is not None and recent_ra_perf_table_start_date > time_period.end:
+        recent_ra_perf_table_start_date = time_period.start
     return TimePeriod(start=recent_ra_perf_table_start_date, end=time_period.end)
 
 
