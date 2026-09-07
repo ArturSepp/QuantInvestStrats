@@ -19,6 +19,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Aligned the README, package keywords, citation keywords, and software BibTeX title around
   performance analytics, portfolio backtesting, risk analysis, and factsheet reporting.
 
+### Fixed
+
+- Honored `drop_benchmark` in volatility-regime performance tables while retaining the benchmark
+  in their component regime data.
+
 ## [5.22.4] - 2026-09-06
 
 ### Fixed
