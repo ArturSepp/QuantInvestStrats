@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Charged and reported transaction costs when the opening portfolio target is traded, so initial
+  net NAV includes the cost of its executed instrument notionals.
+
 ## [5.22.5] - 2026-09-07
 
 ### Added

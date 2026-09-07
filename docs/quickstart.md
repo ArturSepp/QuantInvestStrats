@@ -58,7 +58,7 @@ the runnable file; it is not maintained as a second copy.
 The output records the 2,087-row business-day input, the 33-by-3 quarterly target schedule,
 final target and realised weights, a compact performance table, terminal NAV, and monthly
 tracking error/information ratio against the synthetic 60/40 benchmark. The current deterministic
-terminal NAV is `120.1104`; the repository test checks it and the benchmark-relative output.
+terminal NAV is `119.9866`; the repository test checks it and the benchmark-relative output.
 
 The weight schedule is point-in-time and live-universe-aware: `SEQ_EM` receives no allocation
 before it has a price. A target decided at *t* sets the units held over *[t, t+1]*. Between

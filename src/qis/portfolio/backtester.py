@@ -16,6 +16,7 @@ Costs are proportional to traded notional, in fractional units:
 
     cost_t = c_t p_t |Δu_t|,   c in fractional units: c = 0.0010 is 10 bp
 
+The same formula applies when the opening target is traded on the first price date.
 ``rebalancing_costs`` takes a float applying everywhere, a Series indexed by ticker for a
 per-instrument cost constant in time, or a (t, n) DataFrame of dates x tickers, forward filled
 onto the price dates so a schedule stated on era boundaries applies from each boundary onward.
@@ -92,8 +93,8 @@ def backtest_model_portfolio(prices: pd.DataFrame,
             is per-instrument and constant in time; a DataFrame of dates x tickers is
             reindexed to ``prices`` dates taking the last schedule row at or before each
             date, so a cost schedule stated on era boundaries applies from each boundary
-            onward. Costs are read at the trade date; dates before the first schedule row
-            are costless
+            onward. Costs are read at every trade date, including an opening trade on the
+            first price date; dates before the first schedule row are costless
         weight_implementation_lag: observations of the price index between a weight being
             observed and traded, so 1 on a business-day panel trades the next business day. It
             selects the entry price for the units only and leaves prices and instrument returns
@@ -108,7 +109,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
 
     Returns:
         PortfolioData holding the nav, realised weights, units, instrument pnl and realised
-        costs
+        costs, including costs charged on an opening trade
 
     Raises:
         ValueError: if ``prices`` is not a pd.DataFrame, if a weight vector does not match the
@@ -294,10 +295,12 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
         initial_nav: starting nav
         constant_trade_level: size trades off this notional instead of current nav
         rebalancing_costs: proportional costs on traded notional, shape (t, n); the wrapper
-            broadcasts the scalar and per-instrument forms to this shape. None trades costless
+            broadcasts the scalar and per-instrument forms to this shape. Costs apply to an
+            opening trade as well as later trades; None trades costless
 
     Returns:
-        (nav, units, effective_weights, realized_costs)
+        (nav, units, effective_weights, realized_costs), with opening-trade costs recorded at
+        index zero
 
     Raises:
         ValueError: if ``prices`` and ``is_rebalancing`` disagree on length, or if ``weights``
@@ -331,12 +334,18 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
 
         current_units[np.isnan(current_units)] = 0
         current_cash_balance = initial_nav - np.nansum(current_units * current_prices)
+        if rebalancing_costs is not None:
+            # Opening targets are real trades; charge their executable absolute notionals.
+            realized_costs_t = rebalancing_costs[0, :] * current_prices * np.abs(current_units)
+            realized_costs_t[np.isnan(current_prices)] = 0.0
+            realized_costs[0, :] = realized_costs_t
+            current_cash_balance -= np.nansum(realized_costs_t)
         current_rebalancing_idx += 1
     else:
         current_units = np.zeros(prices.shape[1])
         current_cash_balance = initial_nav
     units[0, :] = current_units
-    nav[0] = np.nansum(current_units * current_prices) + current_cash_balance  # need to be adjusted when cost are present for is_rebalancing[0] = True
+    nav[0] = np.nansum(current_units * current_prices) + current_cash_balance
     cash_balances[0] = current_cash_balance
 
     # loop over t

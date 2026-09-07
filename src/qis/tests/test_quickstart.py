@@ -115,7 +115,7 @@ def test_quickstart_executes_and_reports_sane_results(
     portfolio_data = namespace['portfolio_data']
     nav = portfolio_data.get_portfolio_nav()
     assert bool(nav.notna().all()), 'quickstart nav contains nans'
-    assert float(nav.iloc[-1]) == pytest.approx(120.1104, abs=0.00005)
+    assert float(nav.iloc[-1]) == pytest.approx(119.9866, abs=0.00005)
 
     schedule = namespace['weight_schedule']
     prices = namespace['prices']
@@ -125,6 +125,6 @@ def test_quickstart_executes_and_reports_sane_results(
 
     output = capsys.readouterr().out
     assert 'Prices: business-day frequency, shape=(2087, 3)' in output
-    assert 'Final NAV: 120.1104' in output
-    assert 'TE=0.0299, IR=-0.2898' in output
+    assert 'Final NAV: 119.9866' in output
+    assert 'TE=0.0299, IR=-0.2899' in output
     assert 'no file is written here' in output

@@ -120,7 +120,7 @@ draw across several aligned panels, so a factor and a residual panel resample to
 
 We organise the package into 12 capability groups, which `src/qis/api.py` names.
 
-The backtester is 376 lines, and that follows from the design assumption rather than from
+The backtester is 385 lines, and that follows from the design assumption rather than from
 compression. Because a strategy is a rule for producing weights, the backtester holds no strategy
 logic: it converts target weights to units at each rebalancing, holds those units until the next
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,

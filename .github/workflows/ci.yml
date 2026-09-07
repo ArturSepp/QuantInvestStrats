@@ -153,8 +153,8 @@ jobs:
         cd "$RUNNER_TEMP/qis-quickstart-check"
         "$RUNNER_TEMP/qis-wheel-venv/bin/python" \
           "$GITHUB_WORKSPACE/examples/getting_started/offline_quickstart.py" | tee quickstart.txt
-        grep -F "Final NAV: 120.1104" quickstart.txt
-        grep -F "TE=0.0299, IR=-0.2898" quickstart.txt
+        grep -F "Final NAV: 119.9866" quickstart.txt
+        grep -F "TE=0.0299, IR=-0.2899" quickstart.txt
 
     - name: Run the shipped suite against the installed wheel
       run: |
