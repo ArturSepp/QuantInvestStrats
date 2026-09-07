@@ -9,6 +9,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Corrected FX log performance by calculating asset and forward payoffs in simple returns and
+  converting the combined result with `log1p`; ordinary missing observations remain missing and
+  nonpositive terminal wealth is rejected for log output.
+- Corrected the FX hedge and optimal-hedge carry cost to `f/(1+f)` for the existing
+  local-over-reference cash-growth premium. The getter's public quote convention is unchanged;
+  hedged simple performance and optimal hedge ratios now reflect the exact forward settlement.
+- Corrected reference- and native-currency excess returns to accrue the starting-period cash
+  quote on the actual asset return grid and subtract `log1p(cash)` for log-relative excess.
+  Simple excess remains asset return minus simple cash, with the timing corrected in both modes.
+- Added deterministic terminal-wealth, covered-interest-parity and return-convention regression
+  checks for FX hedges and cash adjustments; clarified the distinction between hedging opening
+  principal and a known terminal cash amount.
+
 - Charged and reported transaction costs when the opening portfolio target is traded, so initial
   net NAV includes the cost of its executed instrument notionals.
 

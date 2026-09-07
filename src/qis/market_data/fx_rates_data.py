@@ -71,7 +71,8 @@ class FxRatesData:
             domestic_rates = time_period.locate(domestic_rates)
         return FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
 
-    def get_local_to_reference_fx_rate(self, local_ccy: str = 'USD', reference_ccy: str = 'CHF') -> pd.Series:
+    def get_local_to_reference_fx_rate(
+            self, local_ccy: str = 'USD', reference_ccy: str = 'CHF') -> pd.Series:
         """Cross FX rate between two currencies.
 
         Computed as ``fx_spots[local_ccy] / fx_spots[reference_ccy]``. Because each
@@ -89,7 +90,8 @@ class FxRatesData:
         local_per_reference = np.divide(self.fx_spots[local_ccy], self.fx_spots[reference_ccy])
         return local_per_reference.rename(f"{local_ccy}-{reference_ccy}")
 
-    def get_local_rate(self, freq: str = 'ME', local_ccy: str = 'USD', annualise: bool = False) -> pd.Series:
+    def get_local_rate(self, freq: str = 'ME', local_ccy: str = 'USD',
+                       annualise: bool = False) -> pd.Series:
         """Domestic short rate for ``local_ccy`` sampled at ``freq``.
 
         ``domestic_rates`` are stored as annualised decimals. With
@@ -123,10 +125,15 @@ class FxRatesData:
 
         Let r_loc, r_ref be the annualised local and reference short rates and
         ``dt = 1 / annualisation_factor(freq)``. Under CIP, the forward
-        premium earned on the local currency over one period is
+        local/reference cash-growth premium over one period is
 
             simple:  (1 + dt * r_loc) / (1 + dt * r_ref) - 1
             log:     log( (1 + dt * r_loc) / (1 + dt * r_ref) )
+
+        This public quote convention is retained: for an FX rate S quoted as
+        reference per local, the actual forward satisfies F/S = 1/(1+premium).
+        A principal hedge therefore pays premium/(1+premium), not premium.
+        Nonpositive local or reference cash gross factors raise ValueError.
 
         The previous implementation used ``np.log(a, b)``, where the second
         argument is silently treated by numpy as an ``out`` buffer rather
@@ -138,6 +145,8 @@ class FxRatesData:
                               axis=1, sort=True)
         numer = 1.0 + dt * rate_data.iloc[:, 0]
         denom = 1.0 + dt * rate_data.iloc[:, 1]
+        if ((numer <= 0.0) | (denom <= 0.0)).any():
+            raise ValueError("CIP cash gross factors must be strictly positive")
         if is_log_returns:
             forward_rate = np.log(numer / denom)
         else:
@@ -166,10 +175,13 @@ class FxRatesData:
             Tuple ``(spot_return, carry_return)`` of daily Series; the carry leg is
             lagged one day with its first observation set to 0.
         """
-        local_return = qis.to_returns(prices=self.get_local_to_reference_fx_rate(local_ccy=local_ccy, reference_ccy=reference_ccy),
-                                      is_log_returns=is_log_returns)
-        forward_rate_dt = self.get_forward_rate_for_local_ccy(local_ccy=local_ccy, reference_ccy=reference_ccy,
-                                                              freq='B', is_log_returns=is_log_returns)
+        local_return = qis.to_returns(
+            prices=self.get_local_to_reference_fx_rate(
+                local_ccy=local_ccy, reference_ccy=reference_ccy),
+            is_log_returns=is_log_returns)
+        forward_rate_dt = self.get_forward_rate_for_local_ccy(
+            local_ccy=local_ccy, reference_ccy=reference_ccy,
+            freq='B', is_log_returns=is_log_returns)
         carry_return = forward_rate_dt.shift(1)
         carry_return.iloc[0] = 0.0
         return local_return, carry_return
@@ -195,8 +207,8 @@ class FxRatesData:
         Returns:
             Series of NAV levels (starting at 1.0), at daily or ``freq`` cadence.
         """
-        local_return, carry_return = self.get_daily_carry_local_return(local_ccy=local_ccy, reference_ccy=reference_ccy,
-                                                                       is_log_returns=False)
+        local_return, carry_return = self.get_daily_carry_local_return(
+            local_ccy=local_ccy, reference_ccy=reference_ccy, is_log_returns=False)
         total_return = np.add(local_return, carry_return).rename(f"{local_ccy}-{reference_ccy}")
         if time_period is not None:
             total_return = time_period.locate(total_return)
@@ -244,8 +256,8 @@ class FxRatesData:
         Returns:
             Series of NAV levels indexed by date.
         """
-        local_return, carry_return = self.get_daily_carry_local_return(local_ccy=local_ccy, reference_ccy=reference_ccy,
-                                                                       is_log_returns=False)
+        local_return, carry_return = self.get_daily_carry_local_return(
+            local_ccy=local_ccy, reference_ccy=reference_ccy, is_log_returns=False)
 
         if time_period is not None:
             local_return = time_period.locate(local_return)
@@ -262,7 +274,8 @@ class FxRatesData:
             else:
                 # Full-sample statistics — look-ahead. Retained for
                 # reporting / analytics parity with prior behaviour.
-                local_return = local_return - np.nanmean(local_return) + 0.5 * float(np.nanvar(local_return))
+                local_return = (local_return - np.nanmean(local_return)
+                                + 0.5 * float(np.nanvar(local_return)))
             carry_return = carry_return + local_return
 
         nav = qis.returns_to_nav(carry_return, is_log_returns=False)
@@ -350,47 +363,43 @@ class FxRatesData:
         nav_ref.name = f'cash_{local_ccy}_in_{reference_ccy}'
         return nav_ref
 
-    def compute_performance_of_local_ccy_asset_in_reference_ccy(self,
-                                                                 asset_price_local_ccy: pd.Series,
-                                                                 hedge_ratio: Union[float, pd.Series],
-                                                                 local_ccy: str,
-                                                                 reference_ccy: str,
-                                                                 freq: str = 'ME',
-                                                                 is_log_returns: bool = False,
-                                                                 is_excess_returns: bool = False
-                                                                 ) -> Tuple[pd.Series, pd.Series]:
+    def _get_period_cash_returns(self, return_index: pd.DatetimeIndex, local_ccy: str,
+                                 freq: str, is_log_returns: bool) -> pd.Series:
+        """Accrue starting-date simple cash rates on the actual asset return grid."""
+        cash = self.domestic_rates[local_ccy].reindex(return_index, method='ffill')
+        cash = (cash / qis.get_annualization_factor(freq)).shift(1)
+        if (cash <= -1.0).any():
+            raise ValueError("Cash gross factors must be strictly positive")
+        return np.log1p(cash) if is_log_returns else cash
+
+    def compute_performance_of_local_ccy_asset_in_reference_ccy(
+            self, asset_price_local_ccy: pd.Series,
+            hedge_ratio: Union[float, pd.Series], local_ccy: str, reference_ccy: str,
+            freq: str = 'ME', is_log_returns: bool = False,
+            is_excess_returns: bool = False) -> Tuple[pd.Series, pd.Series]:
         """
         Calculate hedged asset performance in reference currency.
 
         Returns NAV and returns adjusted for hedge ratio and forward costs.
 
-        When ``is_excess_returns=True`` the returned series is the excess over
-        the REFERENCE currency risk-free rate. The forward premium already
-        embedded in the hedged leg (via ``compute_performance_of_local_ccy_asset_in_reference_ccy``)
-        converts the fund's local-currency short rate into the reference
-        short rate under CIP, so the correct rate to subtract for excess
-        is the reference-currency rf, not the local one. Subtracting the
-        local rf here is a bug: for a USD-denom fund viewed in CHF, that
-        double-counts the USD short rate and produces a (r_USD - r_ref)
-        downward bias in the reported excess return.
+        When ``is_excess_returns=True``, arithmetic excess is ``R - cash``;
+        log excess is ``log1p(R) - log1p(cash)``, the log return relative to cash.
+        Cash uses the reference-currency short rate observed at the start of
+        each actual asset-return period, scaled by the frequency's year fraction.
+        The two excess conventions are not expm1 equivalents. A principal-only
+        FX hedge leaves the local investment gain exposed to terminal FX.
         """
-        if is_excess_returns:
-            # Excess is relative to the REFERENCE currency rf; CIP has already
-            # converted the fund's native-rf leg via the forward premium.
-            ref_rate = self.get_local_rate(freq=freq, local_ccy=reference_ccy, annualise=False)
-        else:
-            ref_rate = 0.0
-
         if local_ccy == reference_ccy:
-            local_return = qis.to_returns(prices=asset_price_local_ccy, freq=freq, is_log_returns=is_log_returns,
-                                           is_first_zero=True)
+            local_return = qis.to_returns(
+                prices=asset_price_local_ccy, freq=freq,
+                is_log_returns=is_log_returns, is_first_zero=True)
 
         else:
-            local_to_reference_fx_rate = self.get_local_to_reference_fx_rate(local_ccy=local_ccy,
-                                                                                      reference_ccy=reference_ccy)
-            forward_rate_for_local_ccy = self.get_forward_rate_for_local_ccy(local_ccy=local_ccy,
-                                                                             reference_ccy=reference_ccy, freq=freq,
-                                                                             is_log_returns=is_log_returns)
+            local_to_reference_fx_rate = self.get_local_to_reference_fx_rate(
+                local_ccy=local_ccy, reference_ccy=reference_ccy)
+            forward_rate_for_local_ccy = self.get_forward_rate_for_local_ccy(
+                local_ccy=local_ccy, reference_ccy=reference_ccy,
+                freq=freq, is_log_returns=is_log_returns)
 
             _, local_return = compute_performance_of_local_ccy_asset_in_reference_ccy(
                 hedge_ratio=hedge_ratio,
@@ -403,7 +412,7 @@ class FxRatesData:
         # The first valid period(s) are a SYNTHETIC zero — both branches force
         # the inception return to 0 (same-ccy via is_first_zero=True; cross-ccy
         # via hedged_return.iloc[0] = 0.0) to anchor the NAV at 1.0. There is
-        # no real price observation there. In the total path (ref_rate == 0)
+        # no real price observation there. In the total-return path
         # this synthetic 0 is harmless and is dropped downstream. In the
         # excess path, ``0 - rf = -rf`` turns the synthetic head into a
         # genuine non-zero value that then survives every NaN-dropping step,
@@ -425,19 +434,11 @@ class FxRatesData:
         while k < len(nz) and nz[k] == 0.0:             # leading run of synthetic zeros
             k += 1
 
-        # Align the reference rf onto the asset's own return grid before
-        # subtracting. Multi-week resample grids (e.g. '2W-WED') are
-        # phase-dependent on the series start date: a benchmark/asset whose
-        # inception falls on the opposite bi-weekly parity from the rf series
-        # produces a return index that shares ZERO dates with
-        # get_local_rate(freq)'s index, so a raw `local_return - ref_rate`
-        # aligns on nothing and nukes the entire excess panel to NaN. As-of
-        # (ffill) reindex makes the subtraction phase-invariant; the rf is a
-        # smooth per-period rate so carrying the nearest prior value is exact
-        # to within a sub-period of rate drift.
-        if isinstance(ref_rate, pd.Series):
-            ref_rate = ref_rate.reindex(local_return.index, method='ffill')
-        local_return = local_return - ref_rate
+        if is_excess_returns:
+            ref_rate = self._get_period_cash_returns(
+                return_index=local_return.index, local_ccy=reference_ccy,
+                freq=freq, is_log_returns=is_log_returns)
+            local_return = local_return - ref_rate
         if k > start:
             local_return.iloc[start:k] = np.nan
         local_nav = qis.returns_to_nav(returns=local_return, is_log_returns=is_log_returns)
@@ -475,9 +476,9 @@ class FxRatesData:
                 hedge rebalance happens at this cadence and returns
                 are computed at the same cadence.
             is_log_returns: If True, returns are log; otherwise simple.
-            is_excess_returns: If True, subtract reference-ccy rf per
-                period. See ``compute_fx_adjusted_returns`` for the CIP
-                rationale.
+            is_excess_returns: If True, subtract starting-period reference-currency
+                cash in the selected return convention. See
+                ``compute_fx_adjusted_returns`` for the excess-return definition.
 
         Returns:
             Tuple of (NAV DataFrame, Returns DataFrame). The NAV frame
@@ -498,14 +499,16 @@ class FxRatesData:
             else:
                 local_ccy = local_ccys
 
-            fx_adjusted_navs[asset], fx_adjusted_returns[asset] = self.compute_performance_of_local_ccy_asset_in_reference_ccy(
-                asset_price_local_ccy=asset_prices[asset],
-                hedge_ratio = hedge_ratio,
-                local_ccy=local_ccy,
-                reference_ccy=reference_ccy,
-                freq=freq,
-                is_log_returns=is_log_returns,
-            is_excess_returns=is_excess_returns)
+            fx_adjusted_navs[asset], fx_adjusted_returns[asset] = (
+                self.compute_performance_of_local_ccy_asset_in_reference_ccy(
+                    asset_price_local_ccy=asset_prices[asset],
+                    hedge_ratio=hedge_ratio,
+                    local_ccy=local_ccy,
+                    reference_ccy=reference_ccy,
+                    freq=freq,
+                    is_log_returns=is_log_returns,
+                    is_excess_returns=is_excess_returns)
+            )
         fx_adjusted_navs = pd.DataFrame.from_dict(fx_adjusted_navs, orient='columns')
         fx_adjusted_returns = pd.DataFrame.from_dict(fx_adjusted_returns, orient='columns')
         return fx_adjusted_navs, fx_adjusted_returns
@@ -514,7 +517,8 @@ class FxRatesData:
                                     prices: pd.DataFrame,
                                     hedge_ratios: pd.Series,
                                     local_ccys: pd.Series,
-                                    reference_ccy: Union[str, Literal['CHF', 'EUR', 'GBP', 'USD']] = 'USD',
+                                    reference_ccy: Union[
+                                        str, Literal['CHF', 'EUR', 'GBP', 'USD']] = 'USD',
                                     freq: Union[str, pd.Series] = 'ME',
                                     is_log_returns: bool = True,
                                     is_excess_returns: bool = False
@@ -552,11 +556,10 @@ class FxRatesData:
             freq: Single frequency string or per-asset Series. A Series
                 dispatches the panel into asset-frequency buckets.
             is_log_returns: If True, returns are log; otherwise simple.
-            is_excess_returns: If True, subtract reference-ccy rf per
-                period. Under CIP the hedged forward premium already
-                converts the asset's native rf into the reference rf,
-                so this subtraction gives the correct reference-ccy
-                excess return.
+            is_excess_returns: If True, subtract starting-period reference-currency
+                cash in the selected return convention: simple cash from simple
+                returns, or log1p(cash) from log returns. A principal-only FX hedge
+                leaves local investment gains exposed to terminal FX.
 
         Returns:
             Mapping ``{freq_string: returns_dataframe}``. Single-freq
@@ -617,8 +620,14 @@ class FxRatesData:
             DataFrame of short rates, columns are the assets in ``local_ccys``.
         """
         local_rate_ids = local_ccys.unique()
-        local_rates_dict = {local_rate_id: self.get_local_rate(freq=freq, local_ccy=local_rate_id, annualise=annualise) for local_rate_id in local_rate_ids}
-        local_rates = pd.DataFrame.from_dict({asset: local_rates_dict[local_ccys.loc[asset]] for asset in local_ccys.index}, orient='columns')
+        local_rates_dict = {
+            local_rate_id: self.get_local_rate(
+                freq=freq, local_ccy=local_rate_id, annualise=annualise)
+            for local_rate_id in local_rate_ids
+        }
+        local_rates = pd.DataFrame.from_dict(
+            {asset: local_rates_dict[local_ccys.loc[asset]] for asset in local_ccys.index},
+            orient='columns')
         return local_rates
 
     def compute_returns_adjusted_by_local_rate(self,
@@ -631,8 +640,10 @@ class FxRatesData:
 
         Computes each asset's return in its own local currency (no FX conversion)
         and the corresponding excess return over that currency's domestic short
-        rate. The per-period rate grid is as-of (ffill) aligned to the return grid
-        before subtracting, so multi-week resample phases cannot null the panel.
+        rate. Cash quotes are as-of aligned to the actual return grid and lagged
+        one period. Arithmetic excess subtracts simple cash; log excess subtracts
+        log1p(cash). The returned annual rate panel remains a quote/reporting panel,
+        not the lagged cash return deducted in the calculation.
 
         Args:
             asset_prices: Native-currency price panel (columns are assets).
@@ -644,15 +655,16 @@ class FxRatesData:
             Tuple ``(local_returns, excess_returns, local_rates)`` of DataFrames;
             ``local_rates`` holds the annualised per-asset short rates.
         """
-        local_returns = qis.to_returns(prices=asset_prices, freq=freq, is_log_returns=is_log_returns)
-        # Build DataFrame with local rates aligned to assets
-        local_rates_dt = self.fetch_local_rates(local_ccys=local_ccys, freq=freq, annualise=False)
+        local_returns = qis.to_returns(
+            prices=asset_prices, freq=freq, is_log_returns=is_log_returns)
         local_rates = self.fetch_local_rates(local_ccys=local_ccys, freq=freq, annualise=True)
-        # Align the rate grid onto the return grid before subtracting. Multi-week
-        # resample grids (e.g. '2W-WED') are phase-dependent on the series start
-        # date, so a raw subtraction can align on zero shared dates and null the
-        # whole excess panel (same class of bug as the reference-ccy excess path).
-        local_rates_dt = local_rates_dt.reindex(index=local_returns.index, method='ffill')
+        cash_by_currency = {
+            ccy: self._get_period_cash_returns(local_returns.index, ccy, freq, is_log_returns)
+            for ccy in local_ccys.unique()
+        }
+        local_rates_dt = pd.DataFrame({
+            asset: cash_by_currency[local_ccys.loc[asset]] for asset in local_returns.columns
+        })
         excess_returns = local_returns - local_rates_dt
         return local_returns, excess_returns, local_rates
 

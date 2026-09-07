@@ -1,260 +1,345 @@
+"""Exact FX-forward wealth and cash-relative return regression tests.
+
+A hedge of beginning-of-period principal does not remove FX exposure on the
+asset's return. Covered interest parity is tested exactly by hedging the
+known terminal local-cash amount, rather than asserting currency invariance
+for an arbitrary risky asset with a principal hedge of one.
 """
-Invariance test for ``fx_rates_data.compute_fx_adjusted_returns``.
-
-The key invariant this module must satisfy is covered interest-rate parity
-(CIP): if a USD-denominated asset is hedged at h=1 to CHF, its realised
-return in CHF terms minus CHF rf must equal its USD return minus USD rf,
-to within numerical precision (FX-spot sampling + forward-rate discretisation).
-
-If this invariance is violated, the excess-return path has a rate-accounting
-bug: it is either subtracting the wrong reference rate, mis-applying the
-forward premium, or double-counting one of the two legs.
-
-This module contains a single integration test, ``test_cip_identity``, that
-builds a synthetic USD price series plus synthetic USD/CHF rate and FX
-series, runs them through the same ``compute_fx_adjusted_returns`` entry
-point that the CMA pipeline uses, and asserts the identity holds on every
-date and on the annualised mean.
-
-Run directly:
-    python -m rosaa.market_data.tests.fx_cip_identity_test
-or via pytest:
-    pytest rosaa/market_data/tests/fx_cip_identity_test.py
-"""
-
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import qis as qis
+import pytest
 
+import qis
 from qis.market_data import FxRatesData
+from qis.market_data import fx_hedging
 
 
-# Tolerance for CIP identity on the annualised mean. The residual comes from
-# finite-sample Monte Carlo noise in the fixture's cross-term
-# E[r_L × fx_return] — under independence the true expectation is zero, but
-# over ~300 months with fund vol ~12% and FX vol ~10% per annum the sample
-# cross-term has a std of roughly 7 bp p.a. A 25 bp tolerance catches real
-# logical errors (which produce gaps of 150+ bp, the rate differential scale)
-# with ~3.5σ headroom over fixture noise. If this threshold trips, the
-# problem is structural, not statistical.
-CIP_TOLERANCE_BP_PA = 25.0
+def _market() -> tuple[FxRatesData, pd.Series]:
+    """Return deterministic monthly prices, unequal rates and a moving cross."""
+    dates = pd.date_range('2024-01-31', periods=6, freq='ME')
+    spots = pd.DataFrame({'USD': 1.0, 'CHF': [1.1, 1.2, 0.95, 1.25, 1.0, 1.3]},
+                         index=dates)
+    rates = pd.DataFrame({'USD': [0.24, -0.12, 0.48, 0.06, 0.36, 0.18],
+                         'CHF': [0.6, 0.12, -0.24, 0.36, 0.48, 0.06]}, index=dates)
+    prices = pd.Series([100.0, 110.0, 97.0, 120.0, 108.0, 115.0],
+                       index=dates, name='ASSET')
+    return FxRatesData(fx_spots=spots, domestic_rates=rates), prices
 
 
-def _build_synthetic_fx_rates_data(
-    start: str = '2000-01-31',
-    end:   str = '2025-12-31',
-    freq:  str = 'ME',
-    seed:  int = 20260422,
-) -> FxRatesData:
-    """Construct a small ``FxRatesData`` with plausible USD/CHF rates and FX.
+def _terminal_wealth_returns(prices: pd.Series,
+                            spots: pd.Series,
+                            local_cash: pd.Series,
+                            reference_cash: pd.Series,
+                            hedge: float | pd.Series) -> pd.Series:
+    """Price an asset and sold local-currency forward from terminal cash flows.
 
-    Rates: USD averages ~3% p.a., CHF averages ~0.5% p.a., each with slow
-    AR(1) drift and a small innovation. FX: USD/CHF starts at 1.50 and drifts
-    mildly with autoregressive shocks on top. The exact paths are not
-    important for the test — what matters is that rates and FX evolve
-    independently so that CIP must do real work to collapse the two
-    reference frames.
+    Args:
+        prices: Local asset prices on consecutive contract dates.
+        spots: Reference currency per local currency on those dates.
+        local_cash: Simple local deposit return contracted on each date.
+        reference_cash: Simple reference deposit return contracted on each date.
+        hedge: Sold local units divided by beginning asset units' local value.
+
+    Returns:
+        Exact simple returns with the package's synthetic inception zero.
     """
-    rng = np.random.default_rng(seed)
-    dates = pd.date_range(start=start, end=end, freq=freq)
-    n = len(dates)
-
-    usd_rate = np.clip(0.03 + 0.015 * np.cumsum(rng.normal(0, 0.015, n)) / np.sqrt(n), -0.01, 0.08)
-    chf_rate = np.clip(0.005 + 0.01 * np.cumsum(rng.normal(0, 0.012, n)) / np.sqrt(n), -0.015, 0.04)
-
-    domestic_rates = pd.DataFrame(
-        {'USD': usd_rate, 'CHF': chf_rate},
-        index=dates,
-    )
-
-    # fx_spots convention per the module: units of USD per 1 local ccy.
-    # So CHF column is USD per 1 CHF (inverse of USD/CHF quote).
-    # Start USD/CHF at 1.50 → CHFUSD = 1/1.50 ≈ 0.667; USD column = 1 by definition.
-    fx_innov = rng.normal(0, 0.03, n)
-    log_chf_usd = np.log(1.0 / 1.50) + np.cumsum(fx_innov)
-    chf_usd = np.exp(log_chf_usd)
-
-    fx_spots = pd.DataFrame(
-        {'USD': 1.0, 'CHF': chf_usd},
-        index=dates,
-    )
-    return FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
+    initial_reference_wealth = prices.shift(1) * spots.shift(1)
+    local_units_sold = prices.shift(1) * (
+        hedge.shift(1) if isinstance(hedge, pd.Series) else hedge)
+    contracted_forward = spots.shift(1) * (
+        (1.0 + reference_cash.shift(1)) / (1.0 + local_cash.shift(1)))
+    final_reference_wealth = prices * spots + local_units_sold * (contracted_forward - spots)
+    result = (final_reference_wealth / initial_reference_wealth - 1.0).rename(prices.name)
+    result.iloc[0] = 0.0
+    return result
 
 
-def _build_synthetic_usd_asset(
-    fx_rates_data: FxRatesData,
-    mean_ret_pa: float = 0.06,
-    vol_pa:      float = 0.12,
-    seed:        int   = 20260423,
-) -> pd.Series:
-    """Create a USD-denominated asset price series aligned to the fx index."""
-    rng = np.random.default_rng(seed)
-    dates = fx_rates_data.fx_spots.index
-    n = len(dates)
-    dt = 1.0 / 12.0  # test runs at monthly freq
-    innov = rng.normal(0, 1, n) * vol_pa * np.sqrt(dt) + mean_ret_pa * dt
-    price = 100.0 * np.exp(np.cumsum(innov))
-    return pd.Series(price, index=dates, name='USD_ASSET')
+def _cash_at_period_start(data: FxRatesData, dates: pd.DatetimeIndex,
+                          currency: str, annualization: float) -> pd.Series:
+    """Read only cash quotes known at each preceding asset observation date."""
+    result = [np.nan]
+    for date in dates[:-1]:
+        observed = data.domestic_rates.loc[:date, currency].dropna()
+        result.append(np.nan if observed.empty else float(observed.iloc[-1]) / annualization)
+    return pd.Series(result, index=dates)
 
 
-def test_cip_identity() -> None:
-    """USD-denom asset, h=1, excess returns: CHF leg must equal USD leg.
-
-    Steps:
-      1. Build synthetic FxRatesData with independent USD/CHF rates and FX.
-      2. Build a USD-denom asset price.
-      3. Run ``compute_fx_adjusted_returns`` twice:
-           (a) reference_ccy='USD', h=0  → USD excess = r_fund - r_USD
-           (b) reference_ccy='CHF', h=1  → CHF-hedged excess
-      4. Assert the two series match within ``CIP_TOLERANCE_BP_PA``, both on
-         the annualised mean and on the full joint path.
-    """
-    fx_rates_data = _build_synthetic_fx_rates_data()
-    asset_name = 'USD_ASSET'
-    price = _build_synthetic_usd_asset(fx_rates_data)
-    prices = price.to_frame()
-
-    # Hedge ratios: 0 for USD leg (no hedge needed in native ccy),
-    # 1 for CHF leg (full hedge back to USD for a USD-denom asset).
-    hedge_0 = pd.Series({asset_name: 0.0})
-    hedge_1 = pd.Series({asset_name: 1.0})
-    local_ccys = pd.Series({asset_name: 'USD'})
-
-    res_usd = fx_rates_data.compute_fx_adjusted_returns(
-        prices=prices,
-        hedge_ratios=hedge_0,
-        local_ccys=local_ccys,
-        reference_ccy='USD',
-        freq='ME',
-        is_log_returns=False,
-        is_excess_returns=True,
-    )
-    res_chf = fx_rates_data.compute_fx_adjusted_returns(
-        prices=prices,
-        hedge_ratios=hedge_1,
-        local_ccys=local_ccys,
-        reference_ccy='CHF',
-        freq='ME',
-        is_log_returns=False,
-        is_excess_returns=True,
-    )
-
-    usd_excess = res_usd['ME'][asset_name].dropna()
-    chf_excess = res_chf['ME'][asset_name].dropna()
-    common = usd_excess.index.intersection(chf_excess.index)
-
-    usd_mean_pa = usd_excess.loc[common].mean() * 12 * 1e4  # bp p.a.
-    chf_mean_pa = chf_excess.loc[common].mean() * 12 * 1e4
-    mean_diff_bp = abs(usd_mean_pa - chf_mean_pa)
-
-    # Per-date tolerance is looser than the mean tolerance because individual
-    # months pick up full cross-term (r_fund * fx) noise; but on annual
-    # summation this averages out. Use a 15 bp per-month envelope.
-    diff = (usd_excess.loc[common] - chf_excess.loc[common]) * 1e4  # bp per month
-    max_abs_monthly_bp = diff.abs().max()
-    rmse_monthly_bp = float(np.sqrt((diff ** 2).mean()))
-
-    # Diagnostic: if the mean gap is ~(r_USD - r_CHF) or ~(r_CHF - r_USD), that
-    # pinpoints which rate is (wrongly) being subtracted from the hedged leg.
-    # The forward-premium hedge accounting should make hedged CHF excess = USD
-    # excess. A persistent mean gap equal to +/- the rate differential means
-    # the excess adjustment is still subtracting the wrong currency's rf.
-    usd_rate_avg_pa = fx_rates_data.domestic_rates['USD'].mean() * 1e4
-    chf_rate_avg_pa = fx_rates_data.domestic_rates['CHF'].mean() * 1e4
-    rate_diff_pa = usd_rate_avg_pa - chf_rate_avg_pa
-    signed_gap = usd_mean_pa - chf_mean_pa
-
-    if abs(signed_gap - rate_diff_pa) < 30:
-        hint = (
-            "\n  Diagnosis: the CHF leg is subtracting r_USD instead of r_CHF. "
-            "The 'excess' adjustment in compute_performance_of_local_ccy_asset_in_reference_ccy "
-            "must use the REFERENCE currency rate, not the fund's local-currency rate. "
-            "Verify you are running the fixed fx_rates_data.py and clear stale __pycache__."
-        )
-    elif abs(signed_gap + rate_diff_pa) < 30:
-        hint = (
-            "\n  Diagnosis: gap has opposite sign of rate differential. The CHF leg may be "
-            "adding r_USD where it should subtract r_CHF, or the forward-rate sign has "
-            "been flipped. Inspect compute_performance_of_local_ccy_asset_in_reference_ccy."
-        )
-    elif abs(signed_gap) >= CIP_TOLERANCE_BP_PA:
-        hint = (
-            "\n  Diagnosis: gap does not match the plain rate differential — the issue is "
-            "elsewhere in the FX/hedge path (cross-term handling, forward-rate shift, "
-            "or rate alignment). Inspect compute_performance_of_local_ccy_asset_in_reference_ccy."
-        )
-    else:
-        hint = ""
-
-    report = (
-        "\nCIP IDENTITY CHECK (USD-denom asset, h=1 hedge to CHF, is_excess=True)"
-        f"\n  USD excess mean:       {usd_mean_pa:+8.2f} bp p.a."
-        f"\n  CHF-hedged excess mean:{chf_mean_pa:+8.2f} bp p.a."
-        f"\n  Mean difference:       {mean_diff_bp:8.2f} bp p.a. (tolerance {CIP_TOLERANCE_BP_PA})"
-        f"\n  Max monthly |diff|:    {max_abs_monthly_bp:8.2f} bp"
-        f"\n  RMSE monthly:          {rmse_monthly_bp:8.2f} bp"
-        f"\n  Sample USD rate avg:   {usd_rate_avg_pa:8.2f} bp p.a."
-        f"\n  Sample CHF rate avg:   {chf_rate_avg_pa:8.2f} bp p.a."
-        f"\n  Sample rate diff:      {rate_diff_pa:+8.2f} bp p.a."
-        + hint
-    )
-    print(report)
-
-    assert mean_diff_bp < CIP_TOLERANCE_BP_PA, (
-        f"CIP identity violated in annualised mean: "
-        f"{mean_diff_bp:.2f} bp p.a. exceeds {CIP_TOLERANCE_BP_PA} bp tolerance.\n"
-        f"Under CIP hedging, CHF-reference excess must equal USD-reference\n"
-        f"excess for a USD-denom asset at h=1, up to finite-sample noise in the\n"
-        f"cross-term E[r_L * fx_return] (typically <20 bp on this fixture). A\n"
-        f"gap comparable to the USD-CHF rate differential ({rate_diff_pa:+.0f} bp p.a.\n"
-        f"on this sample) would indicate a rate-accounting bug — most likely\n"
-        f"the reference rf used in the 'excess' adjustment does not match the\n"
-        f"currencies used in the forward premium.\n"
-        f"{report}"
-    )
+@pytest.mark.parametrize('is_log', [False, True])
+@pytest.mark.parametrize('hedge_kind', ['none', 'half', 'principal', 'changing'])
+def test_hedged_return_matches_terminal_forward_wealth(is_log: bool, hedge_kind: str) -> None:
+    """All hedge choices reproduce independently valued asset-plus-forward wealth."""
+    data, prices = _market()
+    hedge = {'none': 0.0, 'half': 0.5, 'principal': 1.0,
+             'changing': pd.Series([0.0, 0.8, 0.2, 1.0, 0.5, 0.1], index=prices.index)}[hedge_kind]
+    spots = data.fx_spots['CHF']
+    premium = data.get_forward_rate_for_local_ccy('CHF', 'USD', is_log_returns=is_log)
+    nav, actual = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, spots, premium, hedge, is_log_returns=is_log)
+    expected_simple = _terminal_wealth_returns(
+        prices, spots, data.domestic_rates['CHF'] / 12.0,
+        data.domestic_rates['USD'] / 12.0, hedge)
+    expected = np.log1p(expected_simple) if is_log else expected_simple
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14)
+    np.testing.assert_allclose(nav, (1.0 + expected_simple).cumprod(), rtol=1e-13, atol=1e-14)
 
 
-def test_cip_identity_unhedged_drift() -> None:
-    """Sanity companion: unhedged CHF excess should differ from USD excess.
+@pytest.mark.parametrize('frequency', ['ME', 'QE', '2W-WED'])
+def test_unhedged_log_return_matches_price_product(frequency: str) -> None:
+    """An unhedged log return equals the return of the reference-currency price."""
+    dates = pd.date_range('2024-01-03', periods=210, freq='D')
+    t = np.arange(len(dates), dtype=float)
+    prices = pd.Series(np.exp(0.005 * t + 0.1 * np.sin(t / 11)), index=dates, name='A')
+    spots = pd.Series(np.exp(-0.003 * t + 0.1 * np.cos(t / 7)), index=dates)
+    _, actual = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, spots, pd.Series(0.0, index=dates), 0.0,
+        freq=frequency, is_log_returns=True)
+    expected = qis.to_returns(prices * spots, freq=frequency, is_log_returns=True)
+    expected.iloc[0] = 0.0
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14, equal_nan=True)
 
-    With h=0, the CHF investor fully absorbs spot-FX drift on the USD asset.
-    The CHF-reference excess therefore equals USD-native return minus CHF rf,
-    which differs from USD-native excess by the realised ``USD/CHF spot drift
-    minus (r_USD - r_CHF)``. On any non-trivial sample this is NOT zero — so
-    this test catches the inverse failure mode where the fix accidentally
-    makes the excess returns currency-invariant even without hedging.
-    """
-    fx_rates_data = _build_synthetic_fx_rates_data()
-    asset_name = 'USD_ASSET'
-    price = _build_synthetic_usd_asset(fx_rates_data)
-    prices = price.to_frame()
 
-    hedge_0 = pd.Series({asset_name: 0.0})
-    local_ccys = pd.Series({asset_name: 'USD'})
+@pytest.mark.parametrize('is_log', [False, True])
+@pytest.mark.parametrize('frequency', ['ME', 'QE'])
+def test_forward_getter_preserves_reciprocal_quote(is_log: bool, frequency: str) -> None:
+    """The public premium getter keeps its existing quote and return convention."""
+    data, _ = _market()
+    annualization = 12.0 if frequency == 'ME' else 4.0
+    expected = ((1.0 + data.domestic_rates['CHF'] / annualization)
+                / (1.0 + data.domestic_rates['USD'] / annualization) - 1.0)
+    if is_log:
+        expected = np.log1p(expected)
+    actual = data.get_forward_rate_for_local_ccy(
+        'CHF', 'USD', freq=frequency, is_log_returns=is_log)
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14)
+    missing = data.domestic_rates.copy()
+    missing.iloc[0, :] = np.nan
+    data = FxRatesData(data.fx_spots, missing)
+    assert pd.isna(data.get_forward_rate_for_local_ccy(
+        'CHF', 'USD', freq=frequency, is_log_returns=is_log).iloc[0])
 
-    res_usd = fx_rates_data.compute_fx_adjusted_returns(
-        prices=prices, hedge_ratios=hedge_0, local_ccys=local_ccys,
-        reference_ccy='USD', freq='ME',
-        is_log_returns=False, is_excess_returns=True,
-    )
-    res_chf = fx_rates_data.compute_fx_adjusted_returns(
-        prices=prices, hedge_ratios=hedge_0, local_ccys=local_ccys,
-        reference_ccy='CHF', freq='ME',
-        is_log_returns=False, is_excess_returns=True,
-    )
 
-    usd_ex = res_usd['ME'][asset_name].dropna()
-    chf_ex = res_chf['ME'][asset_name].dropna()
-    common = usd_ex.index.intersection(chf_ex.index)
-    diff_std_pa = (usd_ex.loc[common] - chf_ex.loc[common]).std() * np.sqrt(12) * 1e4  # bp p.a.
+@pytest.mark.parametrize('is_log', [False, True])
+@pytest.mark.parametrize('currency', ['CHF', 'USD'])
+@pytest.mark.parametrize('bad_annual_rate', [-12.0, -13.0])
+def test_forward_getter_rejects_nonpositive_rate_gross(
+        is_log: bool, currency: str, bad_annual_rate: float) -> None:
+    """Neither side of a CIP deposit can have nonpositive terminal wealth."""
+    data, _ = _market()
+    data.domestic_rates.loc[data.domestic_rates.index[1], currency] = bad_annual_rate
+    with pytest.raises(ValueError):
+        data.get_forward_rate_for_local_ccy('CHF', 'USD', is_log_returns=is_log)
 
-    # Unhedged, we should see diff std of order of annual FX vol — far above
-    # the monthly-bp CIP residual. Use a loose floor: 500 bp p.a. std.
-    assert diff_std_pa > 500.0, (
-        f"Unhedged CHF-vs-USD excess std is only {diff_std_pa:.1f} bp p.a.; "
-        "expected the full FX translation vol. This suggests the excess path "
-        "may be reducing to the hedged identity even when h=0 — verify that "
-        "the hedge ratio is actually being consumed by the forward-cost term."
-    )
+
+@pytest.mark.parametrize('is_log', [False, True])
+def test_terminal_cash_hedge_satisfies_exact_covered_interest_parity(is_log: bool) -> None:
+    """Hedging terminal local cash exactly reproduces a reference-currency deposit."""
+    data, prices = _market()
+    local_cash = data.domestic_rates['CHF'] / 12.0
+    reference_cash = data.domestic_rates['USD'] / 12.0
+    prices = 100.0 * (1.0 + local_cash.shift(1).fillna(0.0)).cumprod()
+    prices.name = 'CASH'
+    premium = data.get_forward_rate_for_local_ccy('CHF', 'USD', is_log_returns=is_log)
+    _, actual = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, data.fx_spots['CHF'], premium, 1.0 + local_cash, is_log_returns=is_log)
+    expected = reference_cash.shift(1).fillna(0.0)
+    if is_log:
+        expected = np.log1p(expected)
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14)
+    _, principal_only = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, data.fx_spots['CHF'], premium, 1.0, is_log_returns=is_log)
+    assert float((principal_only - expected).abs().max()) > 0.001
+
+
+@pytest.mark.parametrize('local_currency', ['USD', 'CHF'])
+@pytest.mark.parametrize('is_log', [False, True])
+def test_excess_return_uses_previous_reference_cash_quote(
+        local_currency: str, is_log: bool) -> None:
+    """Same- and cross-currency excess returns subtract correctly timed reference cash."""
+    data, prices = _market()
+    _, total = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 0.5, local_currency, 'USD', is_log_returns=is_log)
+    nav, actual = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 0.5, local_currency, 'USD', is_log_returns=is_log, is_excess_returns=True)
+    cash = _cash_at_period_start(data, total.index, 'USD', 12.0)
+    expected = total - (np.log1p(cash) if is_log else cash)
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14, equal_nan=True)
+    assert actual.isna().equals(total.isna())
+    if is_log:
+        relative_nav = np.exp(total.fillna(0.0).cumsum()) / (1.0 + cash.fillna(0.0)).cumprod()
+        np.testing.assert_allclose(nav, relative_nav, rtol=1e-13, atol=1e-14)
+
+
+@pytest.mark.parametrize('is_log', [False, True])
+@pytest.mark.parametrize('frequency', ['ME', '2W-WED'])
+def test_panel_excess_cash_uses_actual_return_grid(is_log: bool, frequency: str) -> None:
+    """Panel and local excess paths use prior asset dates, including alternate biweekly phases."""
+    dates = pd.date_range('2024-01-03', periods=100, freq='D')
+    t = np.arange(len(dates), dtype=float)
+    data = FxRatesData(
+        pd.DataFrame({'USD': 1.0, 'CHF': np.exp(0.002 * t)}, index=dates),
+        pd.DataFrame({'USD': 0.12 + 0.004 * t, 'CHF': -0.10 + 0.002 * t}, index=dates))
+    asset_dates = dates[7:]
+    prices = pd.DataFrame({'A': np.exp(0.003 * t[7:]),
+                           'B': np.exp(0.005 * t[7:])}, index=asset_dates)
+    currencies = pd.Series({'A': 'USD', 'B': 'CHF'})
+    hedges = pd.Series({'A': 0.0, 'B': 0.0})
+    total = data.compute_fx_adjusted_returns(
+        prices, hedges, currencies, freq=frequency, is_log_returns=is_log)[frequency]
+    actual = data.compute_fx_adjusted_returns(
+        prices, hedges, currencies, freq=frequency, is_log_returns=is_log,
+        is_excess_returns=True)[frequency]
+    annualization = 12.0 if frequency == 'ME' else 26.0
+    for asset in prices.columns:
+        # Each dispatch can have a different grid before the panel outer join.
+        _, asset_total = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+            prices[asset], 0.0, currencies[asset], 'USD', freq=frequency,
+            is_log_returns=is_log)
+        cash = _cash_at_period_start(data, asset_total.index, 'USD', annualization)
+        expected = asset_total - (np.log1p(cash) if is_log else cash)
+        expected = expected.reindex(total.index)
+        np.testing.assert_allclose(actual[asset], expected, rtol=1e-13, atol=1e-14, equal_nan=True)
+    local, excess, reported_rates = data.compute_returns_adjusted_by_local_rate(
+        prices, currencies, freq=frequency, is_log_returns=is_log)
+    for asset, currency in currencies.items():
+        cash = _cash_at_period_start(data, local.index, currency, annualization)
+        expected = local[asset] - (np.log1p(cash) if is_log else cash)
+        np.testing.assert_allclose(excess[asset], expected, rtol=1e-13, atol=1e-14, equal_nan=True)
+    pd.testing.assert_frame_equal(
+        reported_rates, data.fetch_local_rates(currencies, freq=frequency, annualise=True))
+
+
+@pytest.mark.parametrize('is_log', [False, True])
+def test_hedge_and_forward_shocks_are_lagged_once(is_log: bool) -> None:
+    """Changing a contract-date hedge or rate first affects the following return."""
+    data, prices = _market()
+    hedge = pd.Series(0.5, index=prices.index)
+    premium = data.get_forward_rate_for_local_ccy('CHF', 'USD', is_log_returns=is_log)
+    _, baseline = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, data.fx_spots['CHF'], premium, hedge, is_log_returns=is_log)
+    hedge.iloc[2] = 0.9
+    premium.iloc[2] = np.log1p(0.3) if is_log else 0.3
+    _, shocked = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, data.fx_spots['CHF'], premium, hedge, is_log_returns=is_log)
+    np.testing.assert_allclose(shocked.iloc[:3], baseline.iloc[:3], rtol=0, atol=0)
+    assert abs(shocked.iloc[3] - baseline.iloc[3]) > 0.01
+    np.testing.assert_allclose(shocked.iloc[4:], baseline.iloc[4:], rtol=0, atol=0)
+
+
+@pytest.mark.parametrize('is_log', [False, True])
+@pytest.mark.parametrize('currency', ['USD', 'CHF'])
+def test_leading_missing_prices_preserve_return_support(is_log: bool, currency: str) -> None:
+    """Missing asset inception dates stay missing in both total and excess output."""
+    data, prices = _market()
+    prices.iloc[:2] = np.nan
+    _, total = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 0.0, currency, 'USD', is_log_returns=is_log)
+    _, excess = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 0.0, currency, 'USD', is_log_returns=is_log, is_excess_returns=True)
+    assert total.iloc[:3].isna().all()
+    assert total.iloc[3:].notna().all()
+    assert excess.isna().equals(total.isna())
+
+
+@pytest.mark.parametrize('hedge', [1.0, 1.5])
+def test_nonpositive_hedged_wealth_is_rejected_only_for_log_output(hedge: float) -> None:
+    """Simple output retains total loss or negative wealth; log output rejects both."""
+    dates = pd.date_range('2024-01-31', periods=2, freq='ME')
+    prices = pd.Series([100.0, 50.0], index=dates, name='A')
+    spots = pd.Series([1.0, 2.0], index=dates)
+    premium = pd.Series(0.0, index=dates)
+    _, simple = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, spots, premium, hedge, is_log_returns=False)
+    assert simple.iloc[1] == -hedge
+    with pytest.raises(ValueError):
+        fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+            prices, spots, premium, hedge, is_log_returns=True)
+
+
+@pytest.mark.parametrize('bad_annual_rate', [-12.0, -13.0])
+def test_log_excess_rejects_nonpositive_cash_wealth(bad_annual_rate: float) -> None:
+    """Both excess-return entry points reject cash denominators without a real logarithm."""
+    data, prices = _market()
+    data.domestic_rates.loc[prices.index[1], 'USD'] = bad_annual_rate
+    with pytest.raises(ValueError):
+        data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+            prices, 0.0, 'USD', 'USD', is_log_returns=True, is_excess_returns=True)
+    with pytest.raises(ValueError):
+        data.compute_returns_adjusted_by_local_rate(
+            prices.to_frame(), pd.Series({'ASSET': 'USD'}), is_log_returns=True)
+
+
+def test_optimal_hedge_uses_forward_execution_cost(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The optimizer's carry tilt uses the same contracted forward payoff as performance."""
+    data, prices = _market()
+    vol = pd.Series(0.2, index=prices.index)
+    beta = pd.Series(0.3, index=prices.index)
+
+    def fixed_vol_beta(**kwargs: object) -> tuple[pd.Series, pd.Series]:
+        """Return known risk inputs to isolate the optimizer's carry convention."""
+        return vol, beta
+
+    monkeypatch.setattr(fx_hedging, 'compute_fx_vol_beta', fixed_vol_beta)
+    premium = data.get_forward_rate_for_local_ccy('CHF', 'USD', is_log_returns=False)
+    optimal, carry, beta_hedge = fx_hedging.compute_fx_optimal_hedge(
+        prices, data.fx_spots['CHF'], premium, risk_aversion_lambda=2.0, min_max_hedge=None)
+    forward_over_spot = ((1.0 + data.domestic_rates['USD'] / 12.0)
+                         / (1.0 + data.domestic_rates['CHF'] / 12.0))
+    lost_forward_value = 1.0 - forward_over_spot
+    expected_carry = 1.0 - lost_forward_value * 12.0 / (2.0 * 2.0 * 0.2 ** 2)
+    np.testing.assert_allclose(carry, expected_carry, rtol=1e-13, atol=1e-14)
+    np.testing.assert_allclose(optimal, expected_carry + 0.3, rtol=1e-13, atol=1e-14)
+    np.testing.assert_allclose(beta_hedge, 1.3, rtol=0, atol=0)
+
+
+def test_forward_and_hedge_history_fill_before_weekend_valuation() -> None:
+    """Weekend valuations use prior valid contracts, including gaps in business-day quotes."""
+    data, prices = _market()
+    quote_dates = pd.date_range('2024-01-02', '2024-06-28', freq='B')
+    premium = pd.Series(np.linspace(0.001, 0.06, len(quote_dates)), index=quote_dates)
+    hedge = pd.Series(np.linspace(0.2, 0.8, len(quote_dates)), index=quote_dates)
+    # Missing ordinary quotes retain the latest contract already known; they
+    # must be filled before discarding dates outside the monthly valuation grid.
+    premium.loc[['2024-03-29', '2024-05-31']] = np.nan
+    hedge.loc[['2024-03-29', '2024-05-31']] = np.nan
+    known_premium = pd.Series(
+        [premium.loc[:date].dropna().iloc[-1] for date in prices.index], index=prices.index)
+    known_hedge = pd.Series(
+        [hedge.loc[:date].dropna().iloc[-1] for date in prices.index], index=prices.index)
+    _, actual = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, data.fx_spots['CHF'], premium, hedge, is_log_returns=False)
+    # A zero reference deposit makes the getter's reciprocal premium equal to
+    # the local deposit return, so terminal cash flows provide a separate oracle.
+    expected = _terminal_wealth_returns(
+        prices, data.fx_spots['CHF'], known_premium,
+        pd.Series(0.0, index=prices.index), known_hedge)
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14)
+    assert prices.index[2].dayofweek == 6
+    assert known_premium.iloc[2] == premium.loc['2024-03-28']
+
+
+def test_optimal_hedge_uses_latest_business_day_forward_quote(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Sunday month-end hedge decision uses the most recent Friday forward quote."""
+    data, prices = _market()
+    vol = pd.Series(0.2, index=prices.index)
+    beta = pd.Series(0.3, index=prices.index)
+
+    def fixed_vol_beta(**kwargs: object) -> tuple[pd.Series, pd.Series]:
+        """Supply monthly risk estimates to isolate business-day quote alignment."""
+        return vol, beta
+
+    monkeypatch.setattr(fx_hedging, 'compute_fx_vol_beta', fixed_vol_beta)
+    quote_dates = pd.date_range('2024-01-02', '2024-06-28', freq='B')
+    premium = pd.Series(np.linspace(0.001, 0.06, len(quote_dates)), index=quote_dates)
+    optimal, carry, _ = fx_hedging.compute_fx_optimal_hedge(
+        prices, data.fx_spots['CHF'], premium, risk_aversion_lambda=2.0, min_max_hedge=None)
+    known_premium = pd.Series(
+        [premium.loc[:date].iloc[-1] for date in prices.index], index=prices.index)
+    forward_over_spot = 1.0 / (1.0 + known_premium)
+    expected_carry = 1.0 - (1.0 - forward_over_spot) * 12.0 / (2.0 * 2.0 * 0.2 ** 2)
+    np.testing.assert_allclose(carry, expected_carry, rtol=1e-13, atol=1e-14)
+    np.testing.assert_allclose(optimal, expected_carry + 0.3, rtol=1e-13, atol=1e-14)
+    assert prices.index[2].dayofweek == 6
+    assert known_premium.iloc[2] == premium.loc['2024-03-29']

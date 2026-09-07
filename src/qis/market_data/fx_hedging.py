@@ -9,18 +9,20 @@ report built on these numbers is ``qis/market_data/reports/fx_hedging_report.py`
 A holding in a foreign asset earns three things - the local return, the FX return on the cross,
 and the forward premium given up on whatever fraction is hedged:
 
-    r_hedged = r_local (1 + r_fx) + (1 - h) r_fx - h f
+    R_hedged = R_local (1 + R_fx) + (1 - h) R_fx - h f / (1 + f)
 
-with h the hedge ratio in [0, 1] and f the per-period CIP forward premium. Both h and f enter
+with h the opening-value hedge ratio and f the local-over-reference cash-growth ratio minus one.
+Both h and f enter
 lagged one period, so the return realised over [t-1, t] uses the hedge decided and the forward
 contracted at t-1 - the construction carries no look-ahead. The first period is set to zero so
 the nav starts at 1.0 rather than inheriting the lag's NaN. The cross-product term
-r_local * r_fx is kept rather than dropped, so the decomposition is exact in simple returns.
+R_local * R_fx is kept: a forward hedges opening principal, not subsequent asset gains.
+All payoff arithmetic uses simple returns; log output is log1p of the completed payoff.
 
 ``compute_fx_optimal_hedge`` is the mean-variance choice of h. From an EWMA FX variance and the
-beta of the local return on the FX return it builds
+beta of the local return on the FX return it builds (k = f / (1 + f))
 
-    carry ratio = (annualised f / var_fx) / (2 λ),  Optimal h = 1 - carry ratio + β_fx
+    carry ratio = (annualised k / var_fx) / (2 λ),  Optimal h = 1 - carry ratio + β_fx
 
 alongside the two reference ratios it is read against: ``Max Carry`` = 1 - carry ratio, the pure
 carry tilt, and ``Beta Hedge`` = 1 + β_fx, which removes only the exposure the beta implies. All
@@ -51,7 +53,8 @@ def compute_local_and_fx_return(asset_price_local_ccy: pd.Series,
     Resamples the local-currency asset price and the reference-per-local FX rate
     to ``freq``, takes returns of both, and returns them separately. The
     reference-currency total return of an unhedged position is recovered as
-    ``local_return * (1 + fx_return) + fx_return`` inside
+    ``local_return * (1 + fx_return) + fx_return`` for simple returns, or
+    ``local_return + fx_return`` for log returns, inside
     ``compute_performance_of_local_ccy_asset_in_reference_ccy``.
 
     Args:
@@ -72,6 +75,16 @@ def compute_local_and_fx_return(asset_price_local_ccy: pd.Series,
     return local_return, fx_return
 
 
+def _compute_forward_hedge_cost(forward_premium: pd.Series,
+                                is_log_returns: bool = False) -> pd.Series:
+    """Convert the inverse-quote cash premium into the short-forward simple cost."""
+    if is_log_returns:
+        return -np.expm1(-forward_premium)
+    if (forward_premium <= -1.0).any():
+        raise ValueError("Forward gross factors must be strictly positive")
+    return forward_premium / (1.0 + forward_premium)
+
+
 def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_ccy: pd.Series,
                                                             local_to_reference_fx_rate: pd.Series,
                                                             forward_rate_for_local_ccy: pd.Series,
@@ -85,10 +98,14 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
 
         hedged_return = local_return * (1 + fx_return)
                         + (1 - h) * fx_return
-                        - h * forward_premium
+                        - h * forward_premium / (1 + forward_premium)
 
-    where ``h`` is the hedge ratio applied to the FX exposure and
-    ``forward_premium`` is the CIP forward-rate return on the local currency.
+    This identity uses simple returns. ``h`` sells the opening local-currency
+    asset value forward; local gains remain exposed to terminal FX. The supplied
+    premium is the local/reference cash-growth ratio minus one, so the forward
+    quoted as reference per local has ``F/S = 1/(1 + forward_premium)``.
+    Payoffs are calculated in simple space and converted with ``log1p`` only
+    after aggregation when log output is requested.
     Both ``h`` and the forward premium are lagged one period (``shift(1)``) so the
     return realised over ``[t-1, t]`` uses the hedge decided and the forward
     contracted at ``t-1`` — i.e. the construction is free of look-ahead. The first
@@ -99,17 +116,24 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
         asset_price_local_ccy: Asset price quoted in its local currency.
         local_to_reference_fx_rate: Units of reference currency per 1 unit of the
             local currency.
-        forward_rate_for_local_ccy: Per-period CIP forward premium of the local vs
-            reference currency, at the same ``freq`` and return convention as the
+        forward_rate_for_local_ccy: Local/reference cash-growth ratio minus one
+            in simple mode, or its log in log mode, at the same ``freq`` as the
             asset (see ``FxRatesData.get_forward_rate_for_local_ccy``).
-        hedge_ratio: FX hedge ratio in ``[0, 1]`` (``0`` = unhedged, ``1`` = fully
-            hedged). Either a constant ``float`` or a time-varying ``pd.Series``.
+        hedge_ratio: Fraction of opening local-currency asset value sold forward:
+            ``0`` is unhedged, ``1`` hedges principal. A constant ``float`` or a
+            time-varying ``pd.Series``; ratios above one may hedge known income.
         freq: Resampling frequency for the returns (e.g. ``'ME'``).
-        is_log_returns: If True use log returns throughout, otherwise simple returns.
+        is_log_returns: If True return log performance and accept a log premium;
+            otherwise return simple performance and accept a simple premium.
 
     Returns:
         Tuple ``(hedged_nav, hedged_return)`` — NAV levels (starting at 1.0) and the
         per-period reference-currency returns, both sampled at ``freq``.
+
+    Raises:
+        ValueError: A supplied simple forward gross factor is nonpositive, or a
+            log-output payoff has nonpositive terminal wealth. NaNs remaining
+            after the alignment and forward-fill policy stay missing.
     """
     # Convert hedge_ratio to time series
     if isinstance(hedge_ratio, float):
@@ -120,20 +144,28 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
         raise NotImplementedError(f"type={type(hedge_ratio)}")
 
     # Calculate local and FX return components
-    local_return, fx_return = compute_local_and_fx_return(asset_price_local_ccy=asset_price_local_ccy,
-                                                          local_to_reference_fx_rate=local_to_reference_fx_rate,
-                                                          freq=freq,
-                                                          is_log_returns=is_log_returns)
+    local_return, fx_return = compute_local_and_fx_return(
+        asset_price_local_ccy=asset_price_local_ccy,
+        local_to_reference_fx_rate=local_to_reference_fx_rate,
+        freq=freq,
+        is_log_returns=False)
 
-    # Align series and apply lag to hedge ratio
-    h_ratio_1 = hedge_ratios.reindex(index=local_return.index).ffill().rename(asset_price_local_ccy.name).shift(1)
-    forward_rate_for_local_ccy = forward_rate_for_local_ccy.reindex(index=local_return.index).ffill().rename(
-        asset_price_local_ccy.name)
+    # Fill the original quote grid before sampling; never use a future quote.
+    h_ratio_1 = (
+        hedge_ratios.ffill().reindex(index=local_return.index, method='ffill')
+        .rename(asset_price_local_ccy.name).shift(1)
+    )
+    forward_rate_for_local_ccy = (
+        forward_rate_for_local_ccy.ffill()
+        .reindex(index=local_return.index, method='ffill')
+        .rename(asset_price_local_ccy.name)
+    )
     fx_return = fx_return.rename(asset_price_local_ccy.name)
 
-    # Calculate hedged return with forward cost adjustment
+    # F/S = 1/(1+f): the short-forward cost is f/(1+f), not f.
+    hedge_cost = _compute_forward_hedge_cost(forward_rate_for_local_ccy, is_log_returns)
     hedged_return = (local_return * (1.0 + fx_return) + (1.0 - h_ratio_1) * fx_return
-                     - h_ratio_1 * forward_rate_for_local_ccy.shift(1))
+                     - h_ratio_1 * hedge_cost.shift(1))
     # First period has NaN from the ``h_ratio_1.shift(1)`` lag (no
     # previous-period hedge to carry forward). Set to 0 for
     # consistency with ``qis.to_returns(..., is_first_zero=True)``
@@ -141,6 +173,10 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
     # 1.0 at the first index rather than from a NaN-propagated head.
     if len(hedged_return) > 0:
         hedged_return.iloc[0] = 0.0
+    if is_log_returns:
+        if (hedged_return <= -1.0).any():
+            raise ValueError("Log returns require strictly positive terminal wealth")
+        hedged_return = np.log1p(hedged_return)
     hedged_nav = qis.returns_to_nav(returns=hedged_return, is_log_returns=is_log_returns)
     return hedged_nav, hedged_return
 
@@ -168,10 +204,11 @@ def compute_fx_vol_beta(asset_price_local_ccy: pd.Series,
         Tuple ``(fx_vol, fx_beta)`` of Series at ``freq``: annualised FX volatility
         and the EWMA beta of the local return on the FX return.
     """
-    local_return, fx_return = compute_local_and_fx_return(asset_price_local_ccy=asset_price_local_ccy,
-                                                          local_to_reference_fx_rate=local_to_reference_fx_rate,
-                                                          freq=freq,
-                                                          is_log_returns=True)
+    local_return, fx_return = compute_local_and_fx_return(
+        asset_price_local_ccy=asset_price_local_ccy,
+        local_to_reference_fx_rate=local_to_reference_fx_rate,
+        freq=freq,
+        is_log_returns=True)
 
     fx_beta = qis.compute_ewm_cross_xy(x_data=fx_return.to_frame(),
                                        y_data=local_return.to_frame(),
@@ -196,10 +233,11 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
                              ) -> Tuple[pd.Series, pd.Series, pd.Series]:
     """Mean-variance optimal FX hedge ratios, plus the carry and beta references.
 
-    From the EWMA FX vol/beta and the annualised forward premium, builds three
+    From the EWMA FX vol/beta and the annualised forward hedge cost, builds three
     per-period hedge-ratio series:
 
-      * ``carry_ratio = (annualised_forward / fx_var) / (2 * risk_aversion_lambda)``
+      * ``hedge_cost = forward_premium / (1 + forward_premium)``
+      * ``carry_ratio = (annualised_hedge_cost / fx_var) / (2 * risk_aversion_lambda)``
       * ``Max Carry``    = ``1 - carry_ratio``  (pure carry tilt away from full hedge)
       * ``Beta Hedge``   = ``1 + fx_beta``      (removes the FX exposure implied by
         the local-return-on-FX beta)
@@ -211,8 +249,9 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
         asset_price_local_ccy: Asset price quoted in its local currency.
         local_to_reference_fx_rate: Units of reference currency per 1 unit of the
             local currency.
-        forward_rate_for_local_ccy: Per-period CIP forward premium; annualised
-            internally by dividing by ``dt = 1 / annualisation_factor(freq)``.
+        forward_rate_for_local_ccy: Simple local/reference cash-growth ratio minus
+            one. Its exact short-forward cost ``f/(1+f)`` is annualised internally
+            using ``dt = 1 / annualisation_factor(freq)``.
         freq: Resampling frequency (e.g. ``'ME'``); sets ``dt`` and the EWMA cadence.
         span: EWMA span in periods of ``freq`` for the vol/beta estimates.
         risk_aversion_lambda: Mean-variance risk-aversion coefficient (larger ⇒
@@ -230,12 +269,13 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
                               fx_beta.rename('beta'),
                               forward_rate_for_local_ccy.rename('forward')],
                              axis=1, sort=True)
-    aligned_data = aligned_data.asfreq(freq).ffill()
+    # Keep the latest known quote when the decision date is not a trading day.
+    aligned_data = aligned_data.ffill().asfreq(freq)
     fx_var = aligned_data['vol'] ** 2
 
     # Calculate carry ratio using mean-variance optimization
     dt = 1.0 / qis.get_annualization_factor(freq)
-    annualised_forward = aligned_data['forward'] / dt
+    annualised_forward = _compute_forward_hedge_cost(aligned_data['forward']) / dt
     carry_ratio = ( annualised_forward / fx_var) / (2.0 * risk_aversion_lambda)
     fx_beta = aligned_data['beta']
     beta_hedged = 1.0 + fx_beta
@@ -247,7 +287,8 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
         optimal_hedge = np.clip(optimal_hedge, a_min=min_max_hedge[0], a_max=min_max_hedge[1])
         max_carry = np.clip(max_carry, a_min=min_max_hedge[0], a_max=min_max_hedge[1])
         beta_hedged = np.clip(beta_hedged, a_min=min_max_hedge[0], a_max=min_max_hedge[1])
-    return optimal_hedge.rename('Optimal'), max_carry.rename('Max Carry'), beta_hedged.rename('Beta Hedge')
+    return (optimal_hedge.rename('Optimal'), max_carry.rename('Max Carry'),
+            beta_hedged.rename('Beta Hedge'))
 
 
 def get_aligned_fx_spots(prices: pd.DataFrame,
@@ -280,7 +321,7 @@ def get_aligned_fx_spots(prices: pd.DataFrame,
     for asset, ccy in asset_ccy_map.items():
         fx_spots[asset] = fx_prices[ccy]
     fx_spots = pd.DataFrame.from_dict(fx_spots, orient='columns')
-    fx_spots = fx_spots.where(pd.isna(prices) == False)
+    fx_spots = fx_spots.where(prices.notna())
     return fx_spots
 
 
