@@ -34,7 +34,7 @@ statistics belong in ``qis/perfstats/regime_classifier.py``.
 import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis, skew
-from typing import Callable, Union, Tuple, Optional, Literal
+from typing import Callable, Union, Tuple, Optional, Literal, cast
 
 # qis
 import qis.utils.regression as ols
@@ -269,9 +269,9 @@ def compute_performance_table(prices: Union[pd.DataFrame, pd.Series],
         TypeError: If ``prices`` is not a DataFrame.
 
     Note:
-        ``compute_ra_perf_table`` calls both this and ``compute_risk_table``, which
-        independently resample the same price data. This duplication is acceptable for
-        typical universes but could be optimised via a shared cache for large panels.
+        ``compute_ra_perf_table`` calls this once on the native history for its visible return
+        columns and once on ``freq_vol`` boundaries for ratio-only numerators. This duplication
+        keeps both public contracts explicit and could be cached for unusually large panels.
     """
     if not isinstance(prices, pd.DataFrame):
         raise TypeError(f"must be pd.Dataframe")
@@ -473,7 +473,9 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     Returns:
         DataFrame indexed by asset with all performance and risk columns merged.
         Overlapping columns (e.g. START_DATE, END_DATE) are present once, taken
-        from the performance table.
+        from the performance table. Visible return columns retain each asset's native observed
+        endpoints. The p.a., log, excess, and Sortino ratio numerators instead use complete
+        ``freq_vol`` boundaries so they describe the same sample as their risk denominators.
     """
     if perf_params is None:
         perf_params = PerfParams(freq=pd.infer_freq(prices.index))
@@ -482,21 +484,41 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
         prices = prices.to_frame()
 
     perf_table = compute_performance_table(prices=prices, perf_params=perf_params)
-
-    # is we only need sharpe we only comptute vol without higher order risk
     risk_table = compute_risk_table(prices=prices, perf_params=perf_params)
+
+    # Pair ratio-only returns with the sampled risk boundaries while preserving the visible
+    # performance columns above on their native observed endpoints.
+    sampled_prices_vol = cast(
+        pd.DataFrame,
+        ret.prices_at_freq(prices=prices, freq=perf_params.freq_vol),
+    )
+    ratio_perf_table = compute_performance_table(
+        prices=sampled_prices_vol,
+        perf_params=perf_params,
+    )
 
     # ── Derive ratio metrics from vol ──
     vol = risk_table[PerfStat.VOL.to_str()]
-    perf_table[PerfStat.SHARPE_RF0.to_str()] = perf_table[PerfStat.PA_RETURN.to_str()] / vol
-    perf_table[PerfStat.SHARPE_EXCESS.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / vol
-    perf_table[PerfStat.SHARPE_LOG_AN.to_str()] = perf_table[PerfStat.AN_LOG_RETURN.to_str()] / vol
-    perf_table[PerfStat.SHARPE_LOG_EXCESS.to_str()] = perf_table[PerfStat.AN_LOG_EXCESS_RETURN.to_str()] / vol
+    perf_table[PerfStat.SHARPE_RF0.to_str()] = (
+        ratio_perf_table[PerfStat.PA_RETURN.to_str()] / vol
+    )
+    perf_table[PerfStat.SHARPE_EXCESS.to_str()] = (
+        ratio_perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / vol
+    )
+    perf_table[PerfStat.SHARPE_LOG_AN.to_str()] = (
+        ratio_perf_table[PerfStat.AN_LOG_RETURN.to_str()] / vol
+    )
+    perf_table[PerfStat.SHARPE_LOG_EXCESS.to_str()] = (
+        ratio_perf_table[PerfStat.AN_LOG_EXCESS_RETURN.to_str()] / vol
+    )
     # SHARPE_ARITH / SHARPE_ARITH_EXCESS arrive via risk_table: they are computed in
     # compute_risk_table where numerator and denominator share the simple-return series
 
     if PerfStat.DOWNSIDE_VOL.to_str() in risk_table.columns:
-        perf_table[PerfStat.SORTINO_RATIO.to_str()] = perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.DOWNSIDE_VOL.to_str()]
+        perf_table[PerfStat.SORTINO_RATIO.to_str()] = (
+            ratio_perf_table[PerfStat.PA_EXCESS_RETURN.to_str()]
+            / risk_table[PerfStat.DOWNSIDE_VOL.to_str()]
+        )
     if PerfStat.MAX_DD.to_str() in risk_table.columns:
         perf_table[PerfStat.CALMAR_RATIO.to_str()] = -1.0*perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.MAX_DD.to_str()]
 

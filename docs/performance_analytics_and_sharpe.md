@@ -26,6 +26,9 @@ point-in-time safe for a backtest.
 - **Frequency and annualisation:** `freq_vol`, `freq_skewness`, `freq_drawdown`, and `freq_reg`
   are independent pandas frequencies. Annualised volatility multiplies the sampled standard
   deviation by the square root of the periods-per-year factor. The common monthly factor is 12.
+  Full-table return columns retain each asset's native observed endpoints, while p.a., log,
+  excess, and Sortino ratio numerators use the same complete `freq_vol` boundaries as their
+  volatility or downside-volatility denominators.
 - **NaNs:** table calculations respect heterogeneous start and end dates by evaluating each
   asset over its observed history. Price resampling and `qis.to_returns` forward-fill by default;
   direct callers can pass `ffill_nans=False` to `qis.to_returns` when a gap must remain missing.
