@@ -26,9 +26,10 @@ the financing identity. Applying one does not correct the other.
 - **Frequency and annualisation:** use the appraisal frequency. Pass `periods_per_year=12` for
   monthly or `4` for quarterly de-levering unless the index permits reliable inference. A
   per-asset `freq` Series can keep monthly and quarterly sleeves on distinct grids.
-- **NaNs:** rolling unsmoothing has a warm-up and returns NaN where parameters are unidentified.
-  Static GLM returns NaN when all required lags are not observed. It does not pass an
-  uncorrectable observation through as if it had been unsmoothed.
+- **NaNs:** rolling unsmoothing has a warm-up and returns NaN where parameters are unidentified;
+  it never fills those dates from a coefficient estimated later. Static GLM returns NaN when all
+  required lags are not observed. It does not pass an uncorrectable observation through as if it
+  had been unsmoothed.
 
 ## Minimal offline example
 
@@ -75,9 +76,10 @@ Series on the monthly grid. It is a financing adjustment only; it contains no AR
 ## Rolling versus full-sample unsmoothing
 
 `compute_ar_unsmoothed_prices` and `unsmooth_returns_ar1_ewma` estimate rolling EWMA AR states.
-For a backtest, keep the default `MeanAdjType.EWMA` or another explicitly point-in-time mean.
-`MeanAdjType.INSAMPLE` subtracts the full-sample mean and is forward-looking, so it is suitable
-for a fixed-sample exhibit but not for a trading path.
+For a backtest, keep the default `MeanAdjType.EWMA`, which uses the point-in-time `InitType.X0`
+seed, or another explicitly point-in-time mean. Extending the input does not revise an existing
+rolling prefix. `MeanAdjType.INSAMPLE` subtracts the full-sample mean and is forward-looking, so
+it is suitable for a fixed-sample exhibit but not for a trading path.
 
 `unsmooth_returns_glm` fits one static AR(q) model to the whole sample. That is useful for an
 academic full-sample estimate or a supplied fixed `theta`, but an estimated GLM result is

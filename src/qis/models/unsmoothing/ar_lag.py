@@ -31,19 +31,18 @@ that decays within ~span periods as the EWMA forgets its initial condition).
 The production-relevant parity gate is therefore the current-date max|delta-beta|,
 not the full-history unsmoothed vol.
 
-Guards (defaults reproduce the previous behaviour exactly; ``check_denominator`` and
-``validate_inputs`` are on and inert under the default arguments, ``insufficient_data``
-is the opt-in one):
+Guards (``check_denominator`` and ``validate_inputs`` are on and inert under the default
+arguments, while ``insufficient_data`` is the opt-in one):
 
     ``insufficient_data``  Controls what happens when a column comes out entirely
         NaN. ``set_nans_for_warmup_period`` discards the first ``warmup_period``
         FINITE beta values and blanks the whole column when fewer remain, and the
         rolling tensor already masks its own first ``warmup_period`` rows, so the
-        returns frame needs ``2 * warmup_period + 2`` ROWS before any beta
-        survives (see ``min_obs_for_ar_unsmoothing``). Individual columns can also
-        degenerate when they are entirely NaN. The default ``NAN`` keeps the
-        historical silent all-NaN column. ``RAISE`` reports the offending columns.
-        ``PASSTHROUGH`` returns those columns unsmoothed.
+        returns frame needs ``2 * warmup_period + 3`` ROWS before a retained beta
+        can be applied one period later (see ``min_obs_for_ar_unsmoothing``).
+        Individual columns can also degenerate when they are entirely NaN. The default
+        ``NAN`` keeps the historical silent all-NaN column. ``RAISE`` reports the
+        offending columns. ``PASSTHROUGH`` returns those columns unsmoothed.
 
     ``check_denominator``  The inversion ``r_true = numerator / (1 - theta_sum)``
         requires ``theta_sum < 1``. Above that the denominator is non-positive
@@ -108,8 +107,8 @@ def min_obs_for_ar_unsmoothing(ar_order: int,
     The bound does not depend on ``ar_order``.
 
     This is a bound on the row count, not on a column's finite observation count. A column
-    with few finite returns inside a long frame still receives betas, because the tensor
-    backfills across the full index.
+    with few finite returns inside a long frame can still receive betas because the tensor
+    carries its recursive state forward across missing observations.
 
     Args:
         ar_order: Lag order q, must be >= 1.
@@ -128,7 +127,7 @@ def min_obs_for_ar_unsmoothing(ar_order: int,
         return TENSOR_DEFAULT_WARMUP + WARMUP_NONE_MIN_OBS_OFFSET
     if warmup_period < 0:
         raise ValueError(f"warmup_period must be >= 0 or None, got {warmup_period!r}")
-    return 2 * warmup_period + 2
+    return 2 * warmup_period + 3
 
 
 def _validate_ar_inputs(returns: pd.DataFrame,
@@ -327,9 +326,8 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
     identical to clipping the single beta, so the bounds carry the same meaning
     as in the legacy AR(1) path.
 
-    With the default arguments the output is identical to the pre-guard
-    implementation, including the all-NaN column returned for a series shorter
-    than ``min_obs_for_ar_unsmoothing(ar_order, warmup_period)``.
+    Rolling mean adjustments use the point-in-time ``InitType.X0`` seed. Warmup coefficients
+    remain missing until they are identified and are applied only after the one-period lag.
 
     Args:
         returns: Observed period returns (rows = dates, columns = assets).
@@ -337,8 +335,10 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
         span: EWMA span for the rolling beta. Default 20. A q >= 2 fit needs
             more effective observations than AR(1) — for quarterly data use
             ~40 (10y); for monthly ~24-36.
-        mean_adj_type: How to demean returns/lags before beta estimation.
-        warmup_period: Initial periods masked before the first valid beta.
+        mean_adj_type: How to demean returns/lags before beta estimation. EWMA uses the
+            point-in-time ``InitType.X0`` seed; INSAMPLE intentionally uses the full sample.
+        warmup_period: Initial periods masked before the first valid beta. Masked coefficients
+            remain missing rather than being filled from the first later estimate.
             Default 10; raise to ~16 for q >= 2 (the q x q estimate is noisier
             early). The underlying tensor also self-guards via its own warmup.
         max_value_for_beta: Upper bound on theta_sum (sum of betas). Bounds the
@@ -411,12 +411,12 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
     cols = core.columns
     lags_raw = [core.shift(i + 1) for i in range(ar_order)]   # raw lags for the inversion
 
-    # Demean y and the lags consistently (single demean; the tensor does not demean).
+    # Use the point-in-time X0 seed so extending the sample cannot revise rolling means.
     if mean_adj_type != MeanAdjType.NONE:
         y_adj = compute_rolling_mean_adj(data=core, mean_adj_type=mean_adj_type,
-                                         span=span, init_type=InitType.MEAN)
+                                         span=span, init_type=InitType.X0)
         x_lags = [compute_rolling_mean_adj(data=lag, mean_adj_type=mean_adj_type,
-                                           span=span, init_type=InitType.MEAN)
+                                           span=span, init_type=InitType.X0)
                   for lag in lags_raw]
     else:
         y_adj, x_lags = core, lags_raw
@@ -458,8 +458,9 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
         betas = [compute_ewm(data=b, span=span) for b in betas]
 
     if warmup_period is not None:
+        # Preserve unidentified dates; backward fill would import the first future estimate.
         betas = [set_nans_for_warmup_period(a=b, warmup_period=warmup_period)
-                 .reindex(index=core.index).bfill() for b in betas]
+                 .reindex(index=core.index) for b in betas]
 
     # Invert the AR(q) smoothing using lagged betas (align with lagged returns).
     betas_l = [b.shift(1) for b in betas]
@@ -522,8 +523,10 @@ def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
     Args:
         returns: observed returns of the appraisal-based series, one column per fund
         span: EWM span of the rolling AR(1) beta estimate
-        mean_adj_type: mean subtracted before estimating the beta; see :class:`MeanAdjType`
-        warmup_period: leading periods blanked while the EWM state converges
+        mean_adj_type: Mean subtracted before estimating the beta. EWMA uses the point-in-time
+            ``InitType.X0`` seed; see :class:`MeanAdjType`.
+        warmup_period: Leading periods blanked while the EWM state converges. Blank coefficients
+            remain missing rather than being filled from the first later estimate.
         max_value_for_beta: cap on the estimated beta. The inversion divides by ``1 - beta``, so
             the cap is what keeps the denominator away from zero; the default 0.75 holds it at or
             above 0.25
@@ -576,8 +579,10 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
             assets, or a Series mapping asset name to frequency for
             mixed-frequency panels (e.g. monthly HFs alongside quarterly PE).
         span: EWMA span for the rolling beta.
-        mean_adj_type: Mean adjustment type for beta regression.
-        warmup_period: Initial warmup periods to mask.
+        mean_adj_type: Mean adjustment type for beta regression. EWMA uses the point-in-time
+            ``InitType.X0`` seed.
+        warmup_period: Initial warmup periods to mask. Masked coefficients remain missing rather
+            than being filled from the first later estimate.
         max_value_for_beta: Upper bound on theta_sum (default 0.75).
         min_value_for_beta: Lower bound on theta_sum (default -0.25). See
             ``adjust_returns_with_ar`` for the rationale behind clipping the sum.
