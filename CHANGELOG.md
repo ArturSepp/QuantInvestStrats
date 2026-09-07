@@ -24,6 +24,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Charged and reported transaction costs when the opening portfolio target is traded, so initial
   net NAV includes the cost of its executed instrument notionals.
+- Kept rolling AR unsmoothing point-in-time by leaving unidentified warmup coefficients missing
+  and using the causal `InitType.X0` EWMA mean seed instead of the full sample.
 
 ## [5.22.5] - 2026-09-07
 
