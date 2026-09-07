@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.23.0] - 2026-09-07
+
 ### Fixed
 
 - Corrected FX log performance by calculating asset and forward payoffs in simple returns and
