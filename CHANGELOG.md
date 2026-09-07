@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.22.5] - 2026-09-07
+
 ### Added
 
 - Added a core-only, mechanically executed first-chart example using the shipped synthetic
