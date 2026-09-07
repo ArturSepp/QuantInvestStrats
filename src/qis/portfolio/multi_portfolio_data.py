@@ -65,6 +65,23 @@ def _to_compact_date(date: pd.Timestamp) -> str:
     return pd.Timestamp(date).strftime('%d%b%Y')
 
 
+def _get_first_active_return_date(portfolio_nav: pd.Series, freq: str) -> pd.Timestamp:
+    """Return the first date with a finite, non-zero strategy return."""
+    strategy_returns = ret.to_returns(
+        prices=portfolio_nav,
+        freq=freq,
+        is_log_returns=True,
+    )
+    active_returns = strategy_returns.loc[
+        strategy_returns.notna() & strategy_returns.ne(0.0)
+    ]
+    if active_returns.empty:
+        raise ValueError(
+            f'no finite non-zero {freq}-freq returns for {portfolio_nav.name}'
+        )
+    return pd.Timestamp(active_returns.index[0])
+
+
 @dataclass
 class MultiPortfolioData:
     """
@@ -913,6 +930,10 @@ class MultiPortfolioData:
         factor_exposures = {factor: [] for factor in benchmark_prices.columns}
         estimation_starts = {factor: [] for factor in benchmark_prices.columns}
         for portfolio in self.portfolio_datas:
+            estimation_start = _get_first_active_return_date(
+                portfolio_nav=portfolio.get_portfolio_nav(),
+                freq=freq_beta,
+            )
             factor_exposure = portfolio.compute_portfolio_benchmark_betas(
                 benchmark_prices=benchmark_prices,
                 freq_beta=freq_beta,
@@ -925,14 +946,14 @@ class MultiPortfolioData:
                     raise ValueError(
                         f'no finite {factor} beta estimates for {portfolio.nav.name}'
                     )
-                estimation_starts[factor].append(factor_exposure.index.min())
+                estimation_starts[factor].append(estimation_start)
 
         if axs is None:
             fig, axs = plt.subplots(len(benchmark_prices.columns), 1, figsize=(12, 12), tight_layout=True)
 
         for idx, factor in enumerate(benchmark_prices.columns):
             factor_exposure = pd.concat(factor_exposures[factor], axis=1, sort=True)
-            estimation_start = max(estimation_starts[factor])
+            estimation_start = min(estimation_starts[factor])
             if time_period is not None:
                 factor_exposure = time_period.locate(factor_exposure)
             factor_beta_title = (

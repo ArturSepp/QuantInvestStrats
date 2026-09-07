@@ -12,6 +12,7 @@ import pytest
 import qis
 from qis.plots.derived.perf_table import plot_ra_perf_table_benchmark
 from qis.plots.derived.returns_heatmap import plot_returns_heatmap
+from qis.portfolio.multi_portfolio_data import _get_first_active_return_date
 from qis.portfolio.reports.config import PERF_COLUMNS, _get_recent_ra_perf_table_time_period
 from qis.portfolio.risk import ewm_factor_model
 from qis.portfolio.reports.strategy_benchmark_factsheet import (
@@ -431,6 +432,19 @@ def test_portfolio_betas_use_point_in_time_ewma_mean_adjustment(monkeypatch) -> 
     assert fit_arguments[-1]['init_type'] is qis.InitType.X0
 
 
+def test_beta_estimation_start_ignores_flat_strategy_history() -> None:
+    index = pd.date_range(start='1998-12-31', periods=26, freq='QE')
+    portfolio_nav = pd.Series(1.0, index=index, name='Strategy')
+    portfolio_nav.iloc[-1] = 1.05
+
+    estimation_start = _get_first_active_return_date(
+        portfolio_nav=portfolio_nav,
+        freq='QE',
+    )
+
+    assert estimation_start == index[-1]
+
+
 def test_wide_ra_table_uses_multiline_short_names() -> None:
     strategy, benchmark_prices = _make_portfolio_data(n_assets=3, n_years=6)
     prices = pd.concat([strategy.get_portfolio_nav(), benchmark_prices], axis=1)
@@ -513,11 +527,14 @@ def test_quarterly_strategy_benchmark_report_uses_monthly_exposures_and_linked_a
     )
     performance_start = pd.Timestamp('2020-12-31')
     time_period = qis.TimePeriod(start=performance_start, end=pd.Timestamp('2025-12-31'))
-    beta_estimation_start = strategy.compute_portfolio_benchmark_betas(
-        benchmark_prices=benchmark_prices,
-        freq_beta='QE',
-        factor_beta_span=12,
-    ).index.min()
+    beta_estimation_start = min(
+        qis.to_returns(
+            prices=portfolio.get_portfolio_nav(),
+            freq='QE',
+            is_log_returns=True,
+        ).loc[lambda x: x.notna() & x.ne(0.0)].index[0]
+        for portfolio in multi_portfolio.portfolio_datas
+    )
     assert beta_estimation_start < performance_start
 
     figs = generate_strategy_benchmark_factsheet_plt(

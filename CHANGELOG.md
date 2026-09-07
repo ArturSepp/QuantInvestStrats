@@ -23,6 +23,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Honored `drop_benchmark` in volatility-regime performance tables while retaining the benchmark
   in their component regime data.
+- Reported factor-beta estimation starts from the earliest finite, non-zero sampled portfolio
+  return, avoiding misleading pre-inception dates from flat NAV histories.
 
 ## [5.22.4] - 2026-09-06
 
