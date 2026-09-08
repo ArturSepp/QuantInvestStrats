@@ -25,6 +25,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Ordered dated portfolio-weight schedules chronologically before validation and execution,
   preventing input row order from assigning targets to the wrong trade dates.
 
+- Normalized minute-frequency annualization so explicit, inferred, case-varied, and
+  multiplier-parsed aliases use one clock-hour basis per selected active day.
+
 - Raised the statsmodels minimum to 0.14.2 after the fresh Python 3.10 CI environment
   reproduced a NumPy 2.0 binary incompatibility in the previously allowed 0.14.0 wheel.
 
