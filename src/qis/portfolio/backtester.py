@@ -5,7 +5,8 @@ portfolio.
 ``backtest_model_portfolio`` is the entry point and the only one most callers need. It accepts
 target weights as a Dict, Series or DataFrame - aligned to ``prices.columns`` by name - or as a
 list or array, which is positional. A fixed weight vector is applied on the calendar anchor in
-``rebalancing_freq``; a DataFrame of weights supplies its own dates and the anchor is ignored.
+``rebalancing_freq``; a DataFrame of weights supplies its own dates, is ordered chronologically,
+and ignores the anchor.
 
 The simulation holds units between rebalancings, not weights. Units are set at a rebalancing as
 u_t = nav_t w_t / p_t and held until the next one, so realised weights drift with prices and the
@@ -29,9 +30,10 @@ observed at t is traded at the price ``weight_implementation_lag`` observations 
 later. It does not shift, resample or otherwise touch prices, so instrument returns are the same
 under any lag.
 
-Weights are taken as given and never modified. An instrument with no price on a rebalancing date
-is not traded and its weight stays in the cash balance; allocating that weight over the priced
-instruments instead is ``qis.generate_static_weights_schedule``, before the backtest.
+Caller-owned weights are never modified; dated schedules are ordered chronologically on a local
+copy. An instrument with no price on a rebalancing date is not traded and its weight stays in the
+cash balance; allocating that weight over the priced instruments instead is
+``qis.generate_static_weights_schedule``, before the backtest.
 
 ``backtest_rebalanced_portfolio`` is the numba kernel underneath: a genuine recursion in nav and
 cash balance, which is why it is not vectorized. Rolling an optimisation through time is
@@ -80,8 +82,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         weights: target weights. A Dict or pd.DataFrame is safest, since both are aligned to
             ``prices.columns`` by name; a list or array is positional and must match the
             column count. A fixed weight vector is applied at every date in
-            ``rebalancing_freq``; a pd.DataFrame supplies its own rebalancing dates and
-            ``rebalancing_freq`` is then ignored
+            ``rebalancing_freq``; a pd.DataFrame supplies its own rebalancing dates, which are
+            ordered chronologically before validation and execution, and
+            ``rebalancing_freq`` is then ignored. The caller-owned object is not modified
         rebalancing_freq: calendar anchor for rebalancing when ``weights`` is a fixed vector,
             passed to :func:`generate_rebalancing_indicators`
         initial_nav: starting nav
@@ -142,6 +145,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         assert_list_subset(large_list=prices.columns.to_list(),
                               list_sample=weights.columns.to_list(),
                               message=f"weights columns must be aligned with price columns")
+        # Trade flags are chronological, so keep their consumed targets and reported input
+        # schedule in the same order without mutating the caller-owned DataFrame.
+        weights = weights.sort_index()
         if prices.index[0] > weights.index[0]:
             raise ValueError(f"price dates {prices.index[0]} are after weights start date {weights.index[0]}")
         portfolio_weights = weights[prices.columns]  # alighn
