@@ -82,7 +82,7 @@ corresponding annualised volatility. The three conventions answer different ques
 
 | Convention | Numerator and denominator | Full-table columns | Appropriate use |
 |---|---|---|---|
-| P.a. (`SharpeConvention.PA`) | compound annual return divided by annualised volatility | `SHARPE_RF0`, `SHARPE_EXCESS` | investor and factsheet reporting where the numerator should reconcile to CAGR |
+| P.a. (`SharpeConvention.PA`) | compound annual return on complete `freq_vol` boundaries divided by annualised volatility | `SHARPE_RF0`, `SHARPE_EXCESS` | investor and factsheet reporting; the ratio-only CAGR matches the denominator support while visible return columns retain native endpoints |
 | Arithmetic (`SharpeConvention.ARITHMETIC`) | `sqrt(a) * mean(r) / std(r)` | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS` | inference and additive return decompositions |
 | Log (`SharpeConvention.LOG`) | `sqrt(a) * mean(l) / std(l)` | `SHARPE_LOG_AN`, `SHARPE_LOG_EXCESS` | time-additive analysis in log-return space |
 

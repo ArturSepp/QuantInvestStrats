@@ -33,6 +33,14 @@ definitions are in institutional use:
     C_pa   = (P_M / P_0)^(1/T) - 1
     SR_pa  = C_pa / [sqrt(a) * std(r_m)]
 
+In a static risk-adjusted table, `P_0, ..., P_M` are the complete `freq_vol`
+boundaries used by the volatility denominator. The visible `PA_RETURN` and
+`PA_EXCESS_RETURN` columns retain the asset's native observed endpoints, so they
+need not equal the ratio-only CAGR numerators when the history starts or ends
+between reporting boundaries. They coincide when the input endpoints already
+fall on the `freq_vol` grid. The log and Sortino ratios follow the same
+same-support rule.
+
 Relations. `C_pa = exp(a * mean(l_m)) - 1`, so (P) is the exponential map of
 (L)'s numerator; empirically `SR_pa ≈ SR_log` to about 0.01 for the series in
 this project. The wedge to the arithmetic object is the volatility drag:
@@ -181,8 +189,11 @@ unchanged (Section 2), and Sepp (2020) provides the exact bridge.
 ## 7. Decision for qis: keep p.a. default, make the convention explicit
 
 qis is a reporting library in the BarclayHedge / PerformanceAnalytics
-tradition; its audience reconciles against tear sheets. Do not silently change
-the meaning of existing outputs. Instead:
+tradition; its audience reconciles against tear sheets. The p.a. convention
+remains the default, and corrections to its sampling support are documented
+explicitly. In particular, visible native-endpoint return columns remain
+unchanged while ratio-only numerators share the denominator's complete
+`freq_vol` boundaries.
 
 1. **`SharpeConvention` enum** (house style: enum-driven modes):
 
@@ -193,8 +204,8 @@ the meaning of existing outputs. Instead:
 
 2. **Touchpoints**: `PerfParams` gains `sharpe_convention: SharpeConvention =
    SharpeConvention.PA`; `PerfStat`-driven tables, `compute_ra_returns`, and
-   the factsheet layers read it. Default unchanged (PA), so all existing
-   factsheets are byte-stable.
+   the factsheet layers read it. The selected convention remains unchanged when
+   sampling support is normalised.
 3. **Self-documenting labels**: column and legend text carries the convention,
    e.g. `Sharpe (p.a.)` vs `Sharpe (arith)`, mirroring
    PerformanceAnalytics' explicit `geometric` flag and Morningstar Direct's
@@ -206,8 +217,9 @@ the meaning of existing outputs. Instead:
    regime bars tie to the headline CAGR.
 5. **Regression guard**: a unit test pinning one reference series to all three
    conventions with the identity `SR_pa ≈ SR_log` and the wedge
-   `SR_arith - SR_pa ≈ sigma/2` within tolerance, so future edits cannot
-   silently swap conventions.
+   `SR_arith - SR_pa ≈ sigma/2` within tolerance, plus an off-grid regression
+   that reconciles ratio-only numerators to the same boundaries as risk, so
+   future edits cannot silently swap conventions or sampling support.
 
 ## 8. Regime-conditional Sharpe ratios under each convention
 

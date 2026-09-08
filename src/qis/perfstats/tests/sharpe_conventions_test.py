@@ -14,9 +14,13 @@ return conventions (with excess variants under rates_data):
     VOL                 = sqrt(a) * std(returns at freq_vol per return_type)
 
 sharpe conventions (with excess variants under rates_data):
-    SHARPE_RF0          = PA_RETURN / VOL                               (p.a., qis default)
-    SHARPE_LOG_AN       = AN_LOG_RETURN / VOL = sqrt(a)*mean(l)/std(l)  (log)
+    SHARPE_RF0          = C_pa(freq_vol boundaries) / VOL                (p.a., qis default)
+    SHARPE_LOG_AN       = log1p(C_pa(freq_vol boundaries)) / VOL         (log)
     SHARPE_ARITH        = sqrt(a) * mean(r_m) / std(r_m)                (arithmetic)
+
+Visible PA_RETURN and AN_LOG_RETURN use native endpoints and may differ from the ratio-only
+numerators when those endpoints are off-grid. This reference fixture is already month-end aligned;
+ra_frequency_normalization_test.py owns the off-grid contract.
 
 identities checked:
     SR_log ~= SR_pa (exp-map twins), SR_arith - SR_pa ~= sigma_ann / 2 (volatility drag),
@@ -161,7 +165,7 @@ def test_return_conventions() -> None:
 
 
 def test_sharpe_conventions() -> None:
-    """pin the three sharpe conventions and their cross-convention identities at rf=0"""
+    """Pin the three Sharpe conventions on an already month-end-aligned history."""
     prices, table, _, simple_returns, log_returns, _ = _compute_tables()
 
     sr_pa = float(table[PerfStat.SHARPE_RF0.to_str()].iloc[0])
@@ -179,7 +183,8 @@ def test_sharpe_conventions() -> None:
                           / log_returns.std(ddof=1).iloc[0])
     _check_value('SHARPE_LOG_AN', sr_log, sr_log_manual, atol=1e-10)
 
-    # 3. SHARPE_RF0 is the p.a. (compound) sharpe: C_pa / sigma_ann
+    # 3. SHARPE_RF0 is C_pa / sigma_ann on complete freq_vol boundaries. This fixture's
+    # native endpoints are those boundaries, so its visible PA_RETURN is the same C_pa.
     _check_value('SHARPE_RF0', sr_pa, float(table[PerfStat.PA_RETURN.to_str()].iloc[0]) / vol)
 
     # 4. rf=0: every excess sharpe collapses to its plain counterpart
@@ -242,7 +247,7 @@ def test_excess_sharpe_conventions() -> None:
 
     vol = stat(PerfStat.VOL)
 
-    # compound excess: SHARPE_EXCESS = PA_EXCESS_RETURN / vol, numerator below plain
+    # The aligned fixture's visible PA_EXCESS_RETURN is also the ratio-only sampled numerator.
     pa_excess_manual = _compute_expected_pa_excess_return(prices=prices)
     _check_value('PA_EXCESS_RETURN', stat(PerfStat.PA_EXCESS_RETURN), pa_excess_manual)
     if not stat(PerfStat.PA_EXCESS_RETURN) < stat(PerfStat.PA_RETURN):

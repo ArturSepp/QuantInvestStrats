@@ -16,7 +16,9 @@ daily returns, not a rescaling of it. State the frequency wherever a number is q
 Sharpe is not one statistic. The table emits the conventions side by side as distinct columns,
 so the choice is made by picking a column rather than by a flag: ``SHARPE_RF0`` over p.a.
 return, ``SHARPE_EXCESS`` over p.a. excess return, ``SHARPE_LOG_AN`` and ``SHARPE_LOG_EXCESS``
-on annualised log returns, and the arithmetic pair from ``compute_sharpe_arithmetic``,
+on annualised log returns, with those ratio-only numerators sampled on the same complete
+``freq_vol`` boundaries as risk. Visible return columns retain native observed endpoints. The
+arithmetic pair is computed by ``compute_sharpe_arithmetic``,
 
     SR = sqrt(af) E[r] / sqrt(Var[r])
 
