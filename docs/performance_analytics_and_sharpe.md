@@ -26,6 +26,9 @@ point-in-time safe for a backtest.
 - **Frequency and annualisation:** `freq_vol`, `freq_skewness`, `freq_drawdown`, and `freq_reg`
   are independent pandas frequencies. Annualised volatility multiplies the sampled standard
   deviation by the square root of the periods-per-year factor. The common monthly factor is 12.
+  Full-table return columns retain each asset's native observed endpoints, while p.a., log,
+  excess, and Sortino ratio numerators use the same complete `freq_vol` boundaries as their
+  volatility or downside-volatility denominators.
 - **NaNs:** table calculations respect heterogeneous start and end dates by evaluating each
   asset over its observed history. Price resampling and `qis.to_returns` forward-fill by default;
   direct callers can pass `ffill_nans=False` to `qis.to_returns` when a gap must remain missing.
@@ -79,7 +82,7 @@ corresponding annualised volatility. The three conventions answer different ques
 
 | Convention | Numerator and denominator | Full-table columns | Appropriate use |
 |---|---|---|---|
-| P.a. (`SharpeConvention.PA`) | compound annual return divided by annualised volatility | `SHARPE_RF0`, `SHARPE_EXCESS` | investor and factsheet reporting where the numerator should reconcile to CAGR |
+| P.a. (`SharpeConvention.PA`) | compound annual return on complete `freq_vol` boundaries divided by annualised volatility | `SHARPE_RF0`, `SHARPE_EXCESS` | investor and factsheet reporting; the ratio-only CAGR matches the denominator support while visible return columns retain native endpoints |
 | Arithmetic (`SharpeConvention.ARITHMETIC`) | `sqrt(a) * mean(r) / std(r)` | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS` | inference and additive return decompositions |
 | Log (`SharpeConvention.LOG`) | `sqrt(a) * mean(l) / std(l)` | `SHARPE_LOG_AN`, `SHARPE_LOG_EXCESS` | time-additive analysis in log-return space |
 

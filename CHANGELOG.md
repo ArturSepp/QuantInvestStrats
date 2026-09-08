@@ -25,6 +25,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Raised the statsmodels minimum to 0.14.2 after the fresh Python 3.10 CI environment
   reproduced a NumPy 2.0 binary incompatibility in the previously allowed 0.14.0 wheel.
 
+- Aligned the p.a., log, excess, and Sortino ratio numerators in risk-adjusted performance tables
+  with the configured volatility-frequency boundaries while preserving visible return columns on
+  their native observed endpoints.
+
 ## [5.23.0] - 2026-09-07
 
 ### Fixed

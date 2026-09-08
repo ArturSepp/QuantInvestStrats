@@ -72,6 +72,10 @@ Every panel states the frequency its statistics were computed at, so native vers
 quantities are never conflated:
 
 - Cumulative performance is titled `... ({freq}-freq stats) ...` at the reporting frequency.
+- Static risk-adjusted tables keep their visible cumulative and annualised returns on native
+  observed endpoints. Their p.a., log, excess, and Sortino ratios sample numerator and denominator
+  on the same complete reporting-frequency boundaries, so an off-grid partial period does not
+  enter only one side of a ratio.
 - Running drawdowns and time-under-water are labelled with the **native** price-grid frequency
   (e.g. `(B-freq)`), because they are computed on the unresampled path. This is why the
   panel max-drawdown is frequency-invariant while the risk-table max-drawdown (computed on
