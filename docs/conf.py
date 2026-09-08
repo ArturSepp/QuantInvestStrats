@@ -12,7 +12,7 @@ Two things are generated at build time rather than checked in:
 """
 
 # packages
-import importlib.metadata
+import tomllib
 import inspect
 import os
 import shutil
@@ -32,7 +32,9 @@ sys.path.insert(0, str(REPO_ROOT.joinpath('src')))
 project = 'qis'
 author = 'Artur Sepp'
 copyright = '2026, Artur Sepp'
-release = importlib.metadata.version('qis')
+release = tomllib.loads(
+    (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+)["project"]["version"]
 version = '.'.join(release.split('.')[:2])
 
 extensions = [
@@ -76,7 +78,8 @@ source_suffix = {'.rst': 'restructuredtext', '.md': 'markdown'}
 
 html_theme = 'furo'
 html_title = 'qis - performance analytics, backtesting, and factsheet reporting'
-html_baseurl = os.environ.get('READTHEDOCS_CANONICAL_URL', '/')
+html_baseurl = (os.environ.get("READTHEDOCS_CANONICAL_URL")
+                or "https://quantinveststrats.readthedocs.io/en/latest/")
 html_static_path = []
 
 # suppress the warning autosummary emits for symbols that are re-exported under a short name

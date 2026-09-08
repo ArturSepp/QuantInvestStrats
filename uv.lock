@@ -3892,7 +3892,7 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.13.0" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=8.0" },
     { name = "sqlalchemy", marker = "extra == 'database'", specifier = ">=2.0.0" },
-    { name = "statsmodels", specifier = ">=0.14.0" },
+    { name = "statsmodels", specifier = ">=0.14.2" },
     { name = "yfinance", marker = "extra == 'data'", specifier = ">=0.2.40" },
 ]
 provides-extras = ["data", "reports", "visualization", "io", "database", "jupyter", "docs", "all"]

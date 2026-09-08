@@ -54,7 +54,7 @@ dependencies = [
     "numba>=0.63.0",
     "numpy>=2.0",
     "scipy>=1.12.0",
-    "statsmodels>=0.14.0",
+    "statsmodels>=0.14.2",
     "pandas>=2.2.0",
     "matplotlib>=3.8.0",
     "seaborn>=0.13.0",
@@ -189,6 +189,8 @@ extend-select = ["TID251", "TID253", "ICN"]
 "stochvolmodels".msg = "A1: the core never imports a subject package."
 "goal_based_allocation".msg = "A1: the core never imports a subject package."
 "vanilla_option_pricers".msg = "A1: the core never imports a subject package."
+"bbg_fetch".msg = "A1: qis has no declared dependency on bbg_fetch."
+"option_chain_analytics".msg = "A1: qis has no declared dependency on option_chain_analytics."
 
 [tool.ruff.lint.flake8-tidy-imports]
 # A3: an optional extra is imported inside a function and guarded, never at module level, so a
@@ -204,6 +206,9 @@ numpy = "np"
 pandas = "pd"
 
 [tool.ruff.lint.per-file-ignores]
+# Named source-only provider runner; the AST policy limits this waiver to bbg_fetch.
+"src/qis/market_data/run_local/fx_rates_data_run.py" = ["E501", "TID253", "TID251"]
+
 # an __init__.py re-exports: the public API is defined as what these files import, so every
 # one of the 398 imports across them is "unused" by F401's definition and none is a defect
 "**/__init__.py" = ["F401"]

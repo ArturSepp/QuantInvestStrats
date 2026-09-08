@@ -1,0 +1,134 @@
+# SHARED CI CORE v1.2 — T2 — synced 2026-09-08 — template release-v1
+name: Publish package
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing named tag to validate and publish
+        required: true
+        type: string
+      retry_existing:
+        description: Complete a partial existing upload only after matching its artifact hashes
+        default: false
+        type: boolean
+      github_release:
+        description: Also create an optional GitHub Release page
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+concurrency:
+  group: publish-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  MPLBACKEND: Agg
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      publish: ${{ steps.artifacts.outputs.publish }}
+      sha: ${{ steps.identity.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+      - name: Resolve the tag and validate release identity
+        id: identity
+        run: |
+          cp .github/scripts/release_guard.py "$RUNNER_TEMP/release_guard.py"
+          python "$RUNNER_TEMP/release_guard.py" checkout --tag "$RELEASE_TAG"
+      - name: Run the tagged source test suite
+        run: |
+          uv sync --locked --group test
+          uv run --no-sync pytest
+      - name: Build the tagged documentation with warnings as errors
+        run: |
+          uv sync --locked --extra docs
+          uv run --no-sync python -m sphinx -E -W --keep-going -b html docs "$RUNNER_TEMP/release-docs"
+      - name: Build one sdist and its wheel
+        run: |
+          uv build --sdist --out-dir "$RUNNER_TEMP/release-dist"
+          uv build --wheel "$RUNNER_TEMP/release-dist/"*.tar.gz --out-dir "$RUNNER_TEMP/release-dist"
+          uvx --from twine twine check "$RUNNER_TEMP/release-dist/"*
+      - name: Import the installed wheel outside the checkout
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/release-wheel-env"
+          uv pip install --python "$RUNNER_TEMP/release-wheel-env/bin/python" "$RUNNER_TEMP/release-dist/"*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/release-wheel-env/bin/python" -I -c "import qis; print(qis.__file__)"
+      - name: Verify artifact metadata and immutable PyPI digests
+        id: artifacts
+        env:
+          RETRY_EXISTING: ${{ inputs.retry_existing || false }}
+        shell: bash
+        run: |
+          args=()
+          if [ "$RETRY_EXISTING" = "true" ]; then args+=(--retry-existing); fi
+          python "$RUNNER_TEMP/release_guard.py" artifacts --tag "$RELEASE_TAG" \
+            --import-name qis --dist "$RUNNER_TEMP/release-dist" \
+            --pending "$RUNNER_TEMP/pending-upload" "${args[@]}"
+      - name: Retain verified distributions and their manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verified-distributions
+          path: ${{ runner.temp }}/release-dist/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Transfer only files approved for this upload
+        if: steps.artifacts.outputs.publish == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pending-upload
+          path: ${{ runner.temp }}/pending-upload/
+          if-no-files-found: error
+          retention-days: 30
+  publish:
+    needs: validate
+    if: needs.validate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/project/qis/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pending-upload
+          path: dist/
+      - name: Publish verified artifacts through Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          skip-existing: false
+  release-page:
+    needs: [validate, publish]
+    if: always() && inputs.github_release && needs.validate.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Create the optional page only if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub Release page already exists."
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes
+          fi

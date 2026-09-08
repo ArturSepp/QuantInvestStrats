@@ -24,27 +24,34 @@ Distribution name `qis`; import name `qis`. Licensed MIT (`LICENSE.txt`).
 
 ## Ecosystem position
 
-This package is one of eight open-source Python libraries maintained at
-[github.com/ArturSepp](https://github.com/ArturSepp). Before implementing anything
-non-trivial, check whether it already exists in one of these:
+This package is one of ten public Python libraries maintained at
+[github.com/ArturSepp](https://github.com/ArturSepp). Check the owning package before
+adding a capability or copying code between repositories.
 
 | Package | Repository | Purpose |
 |---|---|---|
-| `qis` | QuantInvestStrats | Performance analytics, factsheets, visualisation |
-| `optimalportfolios` | OptimalPortfolios | Portfolio construction and backtesting |
-| `factorlasso` | factorlasso | Sparse factor models and factor covariance estimation |
-| `bbg-fetch` | BloombergFetch | Bloomberg data fetching |
-| `trendfollowing` | TrendFollowingSystems | Trend-following systems: closed-form theory and replication |
-| `goal-based-allocation` | GoalBasedAllocation | Dynamic MV allocation under regime-switching jump-diffusions |
-| `stochvolmodels` | StochVolModels | Stochastic volatility pricing analytics |
-| `vanilla-option-pricers` | VanillaOptionPricers | Vanilla option pricers and implied volatility fitters |
+| `qis` | QuantInvestStrats | performance analytics, backtesting, and factsheet reporting |
+| `optimalportfolios` | OptimalPortfolios | portfolio construction and rolling backtesting |
+| `factorlasso` | FactorLasso | sparse factor-model estimation |
+| `bbg-fetch` | BloombergFetch | Bloomberg data in pandas DataFrames |
+| `stochvolmodels` | StochVolModels | stochastic-volatility pricing and calibration |
+| `trendfollowing` | TrendFollowingSystems | closed-form trend-following analytics |
+| `privateassets` | PrivateAssets | multi-factor PME for private assets |
+| `goal-based-allocation` | GoalBasedAllocation | goal-based allocation under regime-switching jump-diffusions |
+| `vanilla-option-pricers` | VanillaOptionPricers | Numba-vectorised BSM and Bachelier pricing |
+| `option-chain-analytics` | OptionChainAnalytics | point-in-time option-chain data and queries |
 
-Actual package dependencies within the stack: `optimalportfolios` depends on `qis`
-and `factorlasso`; `trendfollowing` depends on `qis`; `stochvolmodels` has an
-optional `research` extra that pulls in `qis`. The others are independent.
+Core dependency edges: `optimalportfolios` consumes `qis` and `factorlasso`;
+`trendfollowing` and `privateassets` consume `qis`; `stochvolmodels` consumes
+`vanilla-option-pricers`; `option-chain-analytics` consumes `qis` and
+`vanilla-option-pricers`. The remaining packages have no core stack dependencies.
 
-Do not vendor or copy code between these packages. If functionality belongs in a
-sibling package, say so rather than reimplementing it here.
+Optional edges: PrivateAssets' `factors` extra adds `factorlasso`; StochVolModels'
+`research` extra adds `qis` and `option-chain-analytics`; OCA's `bloomberg` and `all`
+extras add `bbg-fetch`. Core imports must work without optional dependencies.
+OCA never imports StochVolModels or the private SigmaStrats consumer. Exact
+maintainer-tool exceptions are recorded in `.github/stack-policy.json`; they do
+not authorise adding those dependencies to core or importing them at package root.
 
 ## Repository layout
 
@@ -155,7 +162,7 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
 <!-- ===== SHARED AGENT CORE (builder variant) — begin =====
      Generated from SHARED_AGENT_CORE.md in the maintainer's project knowledge. Do not hand-edit
      between these markers — propose the change to the maintainer instead. Variants: builder
-     (qis) / consumer / standalone. Last synced 2026-08-09, agent core v1.4. -->
+     (qis) / consumer / standalone. Last synced 2026-09-08, agent core v1.5 -->
 
 ## Domain invariants
 
@@ -187,8 +194,8 @@ Ex-ante tracking error, factor exposures, benchmark beta, TE decomposition and m
 in `qis.RiskModel` (`qis/portfolio/risk/risk_model.py`); the ex-post home is the adjacent
 `qis/portfolio/risk/ex_post_tracking_error.py` — `compute_ewma_realised_tracking_error` for the
 EWMA series, `compute_te_ir_errors` / `compute_info_ratio_table` for whole-sample TE/IR
-scalars. Inside qis, extend those modules — a second implementation of `d' Σ d` or of an EWMA of return differences
-anywhere in this repository is a defect.
+scalars. Inside qis, extend those modules — a second implementation of `d' Σ d` or of an EWMA
+of return differences anywhere in this repository is a defect.
 
 **Never invent a symbol.** If a function, class, or keyword argument is not in the export
 surface (`qis.__all__`), it does not exist. Check in one line —
@@ -276,9 +283,11 @@ A release touches three version locations. All three must agree:
 2. `version` and `date-released` in `CITATION.cff`
 3. the software BibTeX entry in `README.md` (if it pins a version)
 
-Then: commit, tag `v<version>`, build and publish to PyPI, and cut a GitHub Release
-with the same tag. Do not bump versions as part of an unrelated change, and do not
-publish without the maintainer explicitly asking for a release.
+For an authorized publication: commit, tag that exact main-reachable commit as
+`v<version>`, then build, verify and publish its artifacts. Frequent PyPI updates are
+supported. A GitHub Release page is optional and created only when requested; it is not
+required for a local build, pip installation or routine package publication. Development
+versions on main may be ahead of PyPI. Do not publish or bump a version for unrelated work.
 
 ## Known issues
 

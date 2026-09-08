@@ -6,10 +6,11 @@ myst:
       reporting for quantitative investment strategies in Python.
 ---
 
-# qis: performance analytics, portfolio backtesting, risk analysis, and factsheet reporting
+# qis
 
-qis - performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in
-Python.
+<a id="qis-performance-analytics-portfolio-backtesting-risk-analysis-and-factsheet-reporting"></a>
+
+Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python.
 
 Quantitative Investment Strategies covers time-series and cross-sectional performance,
 drift-aware portfolio histories, ex-ante and ex-post risk, and reproducible reports.

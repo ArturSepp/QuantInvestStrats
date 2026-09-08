@@ -170,7 +170,7 @@ Core dependencies:
     numba = ">=0.63.0",
     numpy = ">=2.0",
     scipy = ">=1.12.0",
-    statsmodels = ">=0.14.0",
+    statsmodels = ">=0.14.2",
     pandas = ">=2.2.0",
     matplotlib = ">=3.8.0",
     seaborn = ">=0.13.0",
@@ -208,7 +208,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the CI-equivalent lint, documentati
 commands.
 
 
-## Offline quickstart <a name="offline-quickstart"></a>
+## Five-minute quickstart <a name="offline-quickstart"></a>
 
 ### First chart
 
@@ -333,7 +333,7 @@ fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
                                           title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')} benchmarked with SPY",
                                           perf_params=perf_params)
 ```
-![image info](examples/figures/perf4.PNG)
+![Performance statistics and benchmark regression for a multi-asset price history](examples/figures/perf4.PNG)
 
 
 
@@ -344,7 +344,7 @@ of cross-sectional comparison
 
 Run [`examples/factsheets/multi_assets.py`](examples/factsheets/multi_assets.py).
 
-![image info](examples/figures/multiassets.PNG)
+![Multi-asset factsheet comparing returns, drawdowns, and risk statistics](examples/figures/multiassets.PNG)
 
 
 ### 3. Strategy factsheet <a name="strategy"></a>
@@ -354,9 +354,9 @@ for either backtested or actual strategy
 
 Run [`examples/factsheets/strategy.py`](examples/factsheets/strategy.py).
 
-![image info](examples/figures/strategy1.PNG)
-![image info](examples/figures/strategy2.PNG)
-![image info](examples/figures/strategy3.PNG)
+![Strategy factsheet with cumulative performance and drawdowns](examples/figures/strategy1.PNG)
+![Volatility-parity strategy: 99% value-at-risk, risk attribution, and rolling beta](examples/figures/strategy2.PNG)
+![Volatility-parity strategy: current positions, rebalancing changes, turnover, and costs](examples/figures/strategy3.PNG)
 
 ### 4. Strategy benchmark factsheet <a name="strategybenchmark"></a>
 This report is adapted for reporting performance and marginal comparison
@@ -365,10 +365,10 @@ This report is adapted for reporting performance and marginal comparison
 
 Run [`examples/factsheets/strategy_benchmark.py`](examples/factsheets/strategy_benchmark.py).
 
-![image info](examples/figures/strategy_benchmark.PNG)
+![Volatility-parity portfolio compared with an equal-weight benchmark](examples/figures/strategy_benchmark.PNG)
 
 Brinson-Fachler performance attribution (https://en.wikipedia.org/wiki/Performance_attribution)
-![image info](examples/figures/brinson_attribution.PNG)
+![Brinson attribution of allocation and selection effects](examples/figures/brinson_attribution.PNG)
 
 
 ### 5. Multi strategy factsheet <a name="multistrategy"></a>
@@ -377,7 +377,7 @@ backtested strategy to a parameter or set of parameters:
 
 Run [`examples/factsheets/multi_strategy.py`](examples/factsheets/multi_strategy.py).
 
-![image info](examples/figures/multi_strategy.PNG)
+![Multi-strategy factsheet comparing performance and risk](examples/figures/multi_strategy.PNG)
 
 
 ### 6. Runnable examples <a name="runnable-examples"></a>
@@ -401,6 +401,10 @@ for the covariance-based ex-ante view and
 [`ex_post_tracking_error_and_risk.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/ex_post_tracking_error_and_risk.py)
 for realised EWMA tracking error, whole-sample TE/IR, and EWMA beta/alpha.
 
+
+## Changelog <a name="changelog"></a>
+
+Release history is maintained in [CHANGELOG.md](CHANGELOG.md).
 
 ## Ecosystem
 
@@ -452,27 +456,6 @@ There are a number of requirements:
 
 - Avoid "super" pythonic constructions. Readability is the priority.
 
-
-
-## Changelog <a name="changelog"></a>
-
-Release history is maintained in [CHANGELOG.md](CHANGELOG.md).
-
-
-## License
-
-MIT — see [LICENSE.txt](LICENSE.txt).
-
-## Disclaimer <a name="disclaimer"></a>
-
-QIS package is distributed FREE & WITHOUT ANY WARRANTY under the MIT License.
-
-See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/main/LICENSE.txt) in the release for details.
-
-Use the dedicated routes in [Feedback & contributing](#feedback-contributing) for bugs, feature
-requests, and methodology questions.
-
-
 ## Citation
 
 A machine-readable citation is available in [`CITATION.cff`](CITATION.cff).
@@ -488,3 +471,16 @@ If you use QIS in your research, please cite it as:
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```
+
+## License
+
+MIT — see [LICENSE.txt](LICENSE.txt).
+
+## Disclaimer <a name="disclaimer"></a>
+
+QIS package is distributed FREE & WITHOUT ANY WARRANTY under the MIT License.
+
+See the [LICENSE.txt](https://github.com/ArturSepp/QuantInvestStrats/blob/main/LICENSE.txt) in the release for details.
+
+Use the dedicated routes in [Feedback & contributing](#feedback-contributing) for bugs, feature
+requests, and methodology questions.
