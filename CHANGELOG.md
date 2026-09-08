@@ -20,6 +20,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Aligned package summaries, software citations, README navigation, and documentation
   landing pages with the canonical package identity and Read the Docs documentation.
 
+### Fixed
+
+- Raised the statsmodels minimum to 0.14.2 after the fresh Python 3.10 CI environment
+  reproduced a NumPy 2.0 binary incompatibility in the previously allowed 0.14.0 wheel.
+
 ## [5.23.0] - 2026-09-07
 
 ### Fixed

@@ -4,6 +4,7 @@ Run after the release metadata commit is on origin/main. This does not build loc
 create an environment, upload a package, or create a GitHub Release page. The pushed
 tag triggers release.yml. Omitting --push is a read-only dry run.
 """
+
 import argparse
 import subprocess
 from pathlib import Path
@@ -26,13 +27,19 @@ def main() -> None:
     sha = run("git", "rev-parse", "HEAD", cwd=root)
     print(f"{project['name']} {project['version']}: {args.tag} -> {sha}")
     if not args.push:
-        print("Dry run. --push verifies remote main, creates the named tag if absent, and pushes it.")
+        print(
+            "Dry run. --push verifies remote main, creates the named tag if absent, and pushes it."
+        )
         return
     remote = run("git", "ls-remote", "origin", "refs/heads/main", cwd=root).split()
     if not remote or remote[0] != sha:
         raise SystemExit("Push the verified main commit before requesting its release tag")
-    existing = subprocess.run(["git", "rev-parse", "--verify", f"refs/tags/{args.tag}^{{commit}}"],
-                              cwd=root, capture_output=True, text=True)
+    existing = subprocess.run(
+        ["git", "rev-parse", "--verify", f"refs/tags/{args.tag}^{{commit}}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
     if existing.returncode == 0:
         if existing.stdout.strip() != sha:
             raise SystemExit("Existing tag points elsewhere; refusing to move it")

@@ -3,6 +3,7 @@
 This helper never publishes packages or creates GitHub Release pages. GitHub builds
 are isolated from the OIDC publishing job. All subprocess arguments are structured.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,8 +35,15 @@ def version_from_tag(tag: str) -> str:
 
 def run(*args: str, cwd: Path | None = None) -> str:
     """Run an explicit command and return stdout with a bounded runtime."""
-    return subprocess.run(list(args), cwd=cwd, check=True, text=True,
-                          encoding="utf-8", capture_output=True, timeout=1800).stdout.strip()
+    return subprocess.run(
+        list(args),
+        cwd=cwd,
+        check=True,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        timeout=1800,
+    ).stdout.strip()
 
 
 def cff_scalar(source: str, key: str) -> str:
@@ -119,7 +127,11 @@ def inspect_artifacts(dist: Path, project: dict, import_name: str) -> dict[str, 
         wheel_paths = set(wheel.namelist())
         wheel_metadata_root = metadata_names[0].rsplit("/", 1)[0]
     with tarfile.open(sdists[0], "r:gz") as archive:
-        candidates = [m for m in archive.getmembers() if m.name.count("/") == 1 and m.name.endswith("/PKG-INFO")]
+        candidates = [
+            m
+            for m in archive.getmembers()
+            if m.name.count("/") == 1 and m.name.endswith("/PKG-INFO")
+        ]
         if len(candidates) != 1:
             raise ValueError("Sdist lacks unique top-level PKG-INFO")
         sdist_metadata = archive.extractfile(candidates[0]).read().decode("utf-8")
@@ -128,17 +140,39 @@ def inspect_artifacts(dist: Path, project: dict, import_name: str) -> dict[str, 
     source_paths = {name.removeprefix(sdist_root + "/") for name in sdist_paths}
     if f"src/{import_name}/__init__.py" not in source_paths:
         raise ValueError("Sdist lacks the expected source package")
-    prohibited = {".idea", ".git", ".venv", "venv", "__pycache__", ".pytest_cache",
-                  ".ruff_cache", ".mypy_cache", "run_local"}
+    prohibited = {
+        ".idea",
+        ".git",
+        ".venv",
+        "venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "run_local",
+    }
     for archive_name, paths in (("Wheel", wheel_paths), ("Sdist", source_paths)):
         for name in paths:
             parts = PurePosixPath(name).parts
-            runner = import_name in {"privateassets", "goal_based_allocation"} and import_name in parts and "run" in parts
-            if prohibited.intersection(parts) or name.endswith((".pyc", ".pyo", ".nbc", ".nbi")) or runner:
-                raise ValueError(f"{archive_name} contains a development runner, environment or cache: {name}")
+            runner = (
+                import_name in {"privateassets", "goal_based_allocation"}
+                and import_name in parts
+                and "run" in parts
+            )
+            if (
+                prohibited.intersection(parts)
+                or name.endswith((".pyc", ".pyo", ".nbc", ".nbi"))
+                or runner
+            ):
+                raise ValueError(
+                    f"{archive_name} contains a development runner, environment or cache: {name}"
+                )
     for metadata in (wheel_metadata, sdist_metadata):
         parsed = email.parser.Parser().parsestr(metadata)
-        if normalized(parsed["Name"]) != normalized(project["name"]) or parsed["Version"] != project["version"]:
+        if (
+            normalized(parsed["Name"]) != normalized(project["name"])
+            or parsed["Version"] != project["version"]
+        ):
             raise ValueError("Built artifact identity differs from source/tag")
         if parsed["Summary"] != project["description"]:
             raise ValueError("Built artifact summary differs from source")
@@ -147,11 +181,16 @@ def inspect_artifacts(dist: Path, project: dict, import_name: str) -> dict[str, 
             raise ValueError("Built artifact project URLs differ from source")
         if parsed["Requires-Python"] != project.get("requires-python"):
             raise ValueError("Built artifact Requires-Python differs from source")
-        core = {requirement_key(value) for value in parsed.get_all("Requires-Dist", [])
-                if not re.search(r"\bextra\s*==", value)}
+        core = {
+            requirement_key(value)
+            for value in parsed.get_all("Requires-Dist", [])
+            if not re.search(r"\bextra\s*==", value)
+        }
         if core != {requirement_key(value) for value in project.get("dependencies", [])}:
             raise ValueError("Built artifact core dependency metadata differs from source")
-        if set(parsed.get_all("Provides-Extra", [])) != set(project.get("optional-dependencies", {})):
+        if set(parsed.get_all("Provides-Extra", [])) != set(
+            project.get("optional-dependencies", {})
+        ):
             raise ValueError("Built artifact extra names differ from source")
         if isinstance(project.get("license"), str):
             if parsed["License-Expression"] != project["license"]:
@@ -160,15 +199,22 @@ def inspect_artifacts(dist: Path, project: dict, import_name: str) -> dict[str, 
             if not licenses:
                 raise ValueError("Built artifact declares no shipped license file")
             for license_file in licenses:
-                if f"{wheel_metadata_root}/licenses/{license_file}" not in wheel_paths or f"{sdist_root}/{license_file}" not in sdist_paths:
-                    raise ValueError(f"Declared license file is missing from wheel or sdist: {license_file}")
+                if (
+                    f"{wheel_metadata_root}/licenses/{license_file}" not in wheel_paths
+                    or f"{sdist_root}/{license_file}" not in sdist_paths
+                ):
+                    raise ValueError(
+                        f"Declared license file is missing from wheel or sdist: {license_file}"
+                    )
     return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in wheels + sdists}
 
 
 def pypi_files(name: str, version: str) -> list[dict] | None:
     """A confirmed 404 means new version; every other API error blocks publication."""
-    request = urllib.request.Request(f"https://pypi.org/pypi/{name}/{version}/json",
-                                     headers={"User-Agent": "ArturSepp-release-v1"})
+    request = urllib.request.Request(
+        f"https://pypi.org/pypi/{name}/{version}/json",
+        headers={"User-Agent": "ArturSepp-release-v1"},
+    )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             data = json.load(response)
@@ -181,8 +227,9 @@ def pypi_files(name: str, version: str) -> list[dict] | None:
     return data["urls"]
 
 
-def pending_uploads(hashes: dict[str, str], existing: list[dict] | None,
-                    retry_existing: bool = False) -> list[str]:
+def pending_uploads(
+    hashes: dict[str, str], existing: list[dict] | None, retry_existing: bool = False
+) -> list[str]:
     """Require matching digests; backfill tag pushes never append historical files."""
     if existing is None:
         return sorted(hashes)
@@ -196,7 +243,10 @@ def pending_uploads(hashes: dict[str, str], existing: list[dict] | None,
             raise ValueError(f"Immutable PyPI artifact differs: {name}; never skip this mismatch")
     pending = sorted(hashes.keys() - remote.keys())
     if pending and not retry_existing:
-        raise ValueError("Existing version is incomplete: use explicit retry_existing dispatch after digest review")
+        raise ValueError(
+            "Existing version is incomplete: use explicit retry_existing dispatch "
+            "after digest review"
+        )
     return pending
 
 
@@ -223,9 +273,14 @@ def main() -> None:
     parser.add_argument("--retry-existing", action="store_true")
     args = parser.parse_args()
     if args.command == "checkout":
-        if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch" and os.environ.get("GITHUB_REF") != "refs/heads/main":
+        if (
+            os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+            and os.environ.get("GITHUB_REF") != "refs/heads/main"
+        ):
             raise ValueError("Dispatch publishing from the main workflow only")
-        expected = os.environ.get("GITHUB_SHA") if os.environ.get("GITHUB_EVENT_NAME") == "push" else None
+        expected = (
+            os.environ.get("GITHUB_SHA") if os.environ.get("GITHUB_EVENT_NAME") == "push" else None
+        )
         result = checkout_tag(args.root, args.tag, expected)
         if os.environ.get("GITHUB_ENV"):
             with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as stream:
@@ -239,11 +294,25 @@ def main() -> None:
             parser.error("artifacts requires --dist, --pending, --import-name")
         project = validate_metadata(args.root, args.tag)
         hashes = inspect_artifacts(args.dist, project, args.import_name)
-        pending = pending_uploads(hashes, pypi_files(project["name"], project["version"]), args.retry_existing)
+        pending = pending_uploads(
+            hashes, pypi_files(project["name"], project["version"]), args.retry_existing
+        )
         args.pending.mkdir(parents=True, exist_ok=False)
         for filename in pending:
             shutil.copy2(args.dist / filename, args.pending / filename)
-        (args.dist / "release-manifest.json").write_text(json.dumps({"tag": args.tag, "sha": run("git", "rev-parse", "HEAD", cwd=args.root), "sha256": hashes, "pending": pending}, indent=2) + "\n", encoding="utf-8")
+        (args.dist / "release-manifest.json").write_text(
+            json.dumps(
+                {
+                    "tag": args.tag,
+                    "sha": run("git", "rev-parse", "HEAD", cwd=args.root),
+                    "sha256": hashes,
+                    "pending": pending,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         output({"publish": "true" if pending else "false", "pending_count": len(pending)})
 
 

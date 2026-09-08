@@ -172,6 +172,7 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.12"
+          enable-cache: false
       - name: Exercise policy regressions
         run: python .github/scripts/check_stack_imports.py --self-test
       - name: Check stack imports and optional adapter isolation
