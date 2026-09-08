@@ -170,7 +170,7 @@ Core dependencies:
     numba = ">=0.63.0",
     numpy = ">=2.0",
     scipy = ">=1.12.0",
-    statsmodels = ">=0.14.0",
+    statsmodels = ">=0.14.2",
     pandas = ">=2.2.0",
     matplotlib = ">=3.8.0",
     seaborn = ">=0.13.0",
