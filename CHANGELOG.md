@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Added explicit stack dependency and optional-import boundary checks, including
+  isolated maintainer adapters, plus a fresh Python 3.10 lowest-direct dependency CI lane.
+
+- Added tag-driven PyPI Trusted Publishing with release-identity and distribution
+  validation; creating a GitHub Release remains optional.
+
+### Changed
+
+- Aligned package summaries, software citations, README navigation, and documentation
+  landing pages with the canonical package identity and Read the Docs documentation.
+
 ## [5.23.0] - 2026-09-07
 
 ### Fixed

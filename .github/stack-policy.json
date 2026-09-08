@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "source_registry": "ArturSepp/scripts/public_registry.json",
+  "import": "qis",
+  "core": [],
+  "optional": [],
+  "forbidden": [
+    "bbg_fetch",
+    "factorlasso",
+    "goal_based_allocation",
+    "optimalportfolios",
+    "option_chain_analytics",
+    "privateassets",
+    "stochvolmodels",
+    "trendfollowing",
+    "vanilla_option_pricers"
+  ],
+  "optional_adapters": [],
+  "development_imports": [
+    {
+      "path": "src/qis/market_data/run_local/fx_rates_data_run.py",
+      "modules": [
+        "bbg_fetch"
+      ],
+      "reason": "Existing source-only Bloomberg development runner; not a runtime dependency."
+    }
+  ]
+}
