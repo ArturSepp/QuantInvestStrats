@@ -55,10 +55,17 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
     on the sampled simple returns, so the regime bars sum to the total arithmetic
     Sharpe ratio exactly; LOG is the analog on log(1+r). The additive conventions
     are the natural choice for regime attribution.
+
+    Args:
+        drop_benchmark: Exclude the benchmark from the rendered regime bars while leaving the
+            classifier's component tables unchanged.
     """
     regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(drop_benchmark=drop_benchmark,
                                                                                           **kwargs)
     data = regime_datas[regime_data_to_plot]
+    if drop_benchmark:
+        # Apply final-table membership without reindexing possibly repeated asset labels.
+        data = data.loc[data.index.isin(regimes_pa_perf_table.index)]
     data = data.dropna(how='all', axis=0)  # remove data wit all rows nans
 
     if drop_sharpe_from_labels:

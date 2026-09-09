@@ -22,6 +22,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Honored `drop_benchmark` in rendered regime plots while retaining the benchmark in classifier
+  component tables used by other analytical callers.
+
 - Normalized nullable floating drawdowns before maximum and current reductions so ragged
   `Float64` price histories match ordinary floating inputs without ambiguous `pd.NA` failures;
   risk-table best and worst returns now preserve missing price gaps consistently across pandas
