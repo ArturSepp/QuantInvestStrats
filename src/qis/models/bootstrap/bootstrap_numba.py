@@ -35,10 +35,12 @@ import pandas as pd
 from enum import Enum
 from numba import njit
 from numba.typed import List
-from typing import Union, Tuple, Dict
+from typing import Union, Tuple, Dict, cast
 # qis
 import qis.utils.np_ops as npo
 import qis.perfstats.returns as ret
+
+FloatArray = np.ndarray[tuple[int, ...], np.dtype[np.float64]]
 
 
 class BootstrapType(Enum):
@@ -474,9 +476,10 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
     continuous price series with the return distribution of the original.
 
     Args:
-        prices: price levels, one column per asset
+        prices: Price levels. A Series represents one asset; a DataFrame has one column per asset.
         bootstrap_type: resampling scheme; see :class:`BootstrapType`
-        bootstrap_output: shape of the result; see :class:`BootstrapOutput`
+        bootstrap_output: Shape of the result; see :class:`BootstrapOutput`. Series input supports
+            either output mode; ``DF_TO_LIST_ARRAYS`` returns one-column arrays for that case.
         num_samples: number of independent draws
         index_length: length of each draw
         block_size: mean block length for STATIONARY, exact length for FIXED_BLOCK. 1 is IID
@@ -488,11 +491,15 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
             today. False starts them from the first price, so the draws are alternative histories
 
     Returns:
-        a DataFrame of paths for SERIES_TO_DF, or a list of arrays for DF_TO_LIST_ARRAYS
+        A DataFrame of paths for SERIES_TO_DF, or a list of arrays for DF_TO_LIST_ARRAYS.
     """
     returns = ret.to_returns(prices=prices, is_log_returns=is_log_returns, drop_first=True)
 
-    bootstrap_returns = bootstrap_data(data=returns,
+    # The list-output Numba kernel always consumes a rows-by-assets matrix, including one asset.
+    bootstrap_input = returns.to_frame() if (
+        bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS and isinstance(returns, pd.Series)
+    ) else returns
+    bootstrap_returns = bootstrap_data(data=bootstrap_input,
                                        bootstrap_type=bootstrap_type,
                                        bootstrap_output=bootstrap_output,
                                        num_samples=num_samples,
@@ -503,23 +510,43 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                                        bootstrapped_indices=bootstrapped_indices)
 
     if bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
-        if init_to_end:
-            init_value = prices.iloc[-1, :].to_numpy()
+        # Select by position and retain a one-dimensional asset vector for NumPy broadcasting.
+        init_position = -1 if init_to_end else 0
+        init_value: FloatArray
+        if isinstance(prices, pd.Series):
+            init_value = cast(
+                FloatArray,
+                prices.iloc[[init_position]].to_numpy(dtype=np.float64, na_value=np.nan),
+            )
         else:
-            init_value = prices.iloc[0, :].to_numpy()
+            init_value = cast(
+                FloatArray,
+                prices.iloc[[init_position], :]
+                .to_numpy(dtype=np.float64, na_value=np.nan)
+                .reshape(-1),
+            )
 
         bootstrap_sample = List()
-        for returns in bootstrap_returns:
+        for sampled_returns in bootstrap_returns:
+            assert isinstance(sampled_returns, np.ndarray)
+            sampled_returns_float: FloatArray = sampled_returns.astype(np.float64, copy=False)
+            # Unlike log_returns_to_nav(), this path supports NumPy arrays and pandas objects.
             if is_log_returns:
-                bootstrap_sample.append(ret.log_returns_to_nav(log_returns=returns, init_value=init_value))
+                bootstrap_sample.append(ret.returns_to_nav(returns=sampled_returns_float,
+                                                           init_value=init_value,
+                                                           is_log_returns=True))
             else:
-                bootstrap_sample.append(ret.returns_to_nav(returns=returns, init_value=init_value))
+                bootstrap_sample.append(ret.returns_to_nav(returns=sampled_returns_float,
+                                                           init_value=init_value))
 
     elif bootstrap_output == BootstrapOutput.SERIES_TO_DF:
-        if init_to_end:
-            init_value = prices[-1]*np.ones(num_samples)
-        else:
-            init_value = prices[0]*np.ones(num_samples)
+        assert isinstance(prices, pd.Series)
+        init_position = -1 if init_to_end else 0
+        price_anchor = cast(
+            FloatArray,
+            prices.iloc[[init_position]].to_numpy(dtype=np.float64, na_value=np.nan),
+        )
+        init_value = np.repeat(price_anchor, num_samples)
 
         if is_log_returns:
             bootstrap_sample = ret.log_returns_to_nav(log_returns=bootstrap_returns, init_value=init_value)

@@ -22,6 +22,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Supported Series price bootstrapping in both output modes and restored log-return reconstruction
+  for list outputs, with consistent first- or last-price anchoring across one-asset containers.
+
 - Honored `drop_benchmark` in rendered regime plots while retaining the benchmark in classifier
   component tables used by other analytical callers.
 
