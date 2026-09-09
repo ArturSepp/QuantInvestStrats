@@ -352,7 +352,8 @@ def compute_risk_table(prices: pd.DataFrame,
     returns_skew = ret.to_returns(prices=sampled_prices_skew,
                                   return_type=perf_params.return_type,
                                   drop_first=True)
-    pct_returns_dd = dd_sampled_prices.pct_change()
+    # Preserve missing price gaps rather than letting pandas choose an implicit fill policy.
+    pct_returns_dd = dd_sampled_prices.pct_change(fill_method=None)
 
     # ── Bulk vectorised metrics across all assets ──
     # std uses ddof=1 to match the original per-asset numpy call.

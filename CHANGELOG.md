@@ -23,7 +23,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 
 - Normalized nullable floating drawdowns before maximum and current reductions so ragged
-  `Float64` price histories match ordinary floating inputs without ambiguous `pd.NA` failures.
+  `Float64` price histories match ordinary floating inputs without ambiguous `pd.NA` failures;
+  risk-table best and worst returns now preserve missing price gaps consistently across pandas
+  versions.
 
 - Rejected negative and non-integral dated portfolio implementation lags before schedule mapping,
   preventing targets from trading before their observation date or wrapping to the history end.

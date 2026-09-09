@@ -19,6 +19,8 @@ from qis.perfstats.perf_stats import compute_max_current_drawdown, compute_risk_
 
 _DATES = pd.date_range("2023-01-31", periods=8, freq="ME")
 _COLUMNS = ("complete", "leading", "interior", "trailing", "missing")
+_EXPECTED_WORST = np.asarray((-1.0 / 9.0, -0.20, -0.10, -1.0 / 9.0, np.nan), dtype=float)
+_EXPECTED_BEST = np.asarray((0.25, 0.50, 0.50, 0.50, np.nan), dtype=float)
 _EXPECTED_MAXIMUM = np.asarray((-0.25, -0.20, -0.20, -0.20, np.nan), dtype=float)
 _EXPECTED_CURRENT = np.asarray((-0.25, -1.0 / 13.0, -1.0 / 6.0, 0.0, np.nan), dtype=float)
 
@@ -111,7 +113,7 @@ def test_compute_max_current_drawdown_normalizes_nullable_all_missing_series() -
 
 
 def test_compute_risk_table_reports_nullable_mixed_drawdowns() -> None:
-    """Carry normalized drawdowns through the public risk-table consumer."""
+    """Carry normalized drawdowns and two-endpoint returns through the risk table."""
     prices = _ordinary_mixed_prices().astype("Float64")
     original_prices = prices.copy(deep=True)
 
@@ -129,6 +131,16 @@ def test_compute_risk_table_reports_nullable_mixed_drawdowns() -> None:
         NDArray[np.float64],
         table[_column_name(PerfStat.CURRENT_DD)].to_numpy(dtype=float, na_value=np.nan),
     )
+    worst_values = cast(
+        NDArray[np.float64],
+        table[_column_name(PerfStat.WORST)].to_numpy(dtype=float, na_value=np.nan),
+    )
+    best_values = cast(
+        NDArray[np.float64],
+        table[_column_name(PerfStat.BEST)].to_numpy(dtype=float, na_value=np.nan),
+    )
+    np.testing.assert_allclose(worst_values, _EXPECTED_WORST, equal_nan=True)
+    np.testing.assert_allclose(best_values, _EXPECTED_BEST, equal_nan=True)
     np.testing.assert_allclose(
         maximum_values,
         _EXPECTED_MAXIMUM,
