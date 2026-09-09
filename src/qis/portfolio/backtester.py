@@ -25,10 +25,10 @@ Dates before the first schedule row are costless. A date-indexed Series is rejec
 ambiguous. ``funding_rate`` accrues on the cash balance, ``management_fee`` on nav and
 ``instruments_carry`` per instrument, all annualised and converted to the price grid.
 
-``weight_implementation_lag`` selects the entry price for the units and nothing else: the weight
-observed at t is traded at the price ``weight_implementation_lag`` observations of the price index
-later. It does not shift, resample or otherwise touch prices, so instrument returns are the same
-under any lag.
+``weight_implementation_lag`` is a non-negative integer selecting the entry price for the units and
+nothing else: the weight observed at t is traded at the price ``weight_implementation_lag``
+observations of the price index later. It does not shift, resample or otherwise touch prices, so
+instrument returns are the same under any lag.
 
 Caller-owned weights are never modified; dated schedules are ordered chronologically on a local
 copy. An instrument with no price on a rebalancing date is not traded and its weight stays in the
@@ -41,6 +41,7 @@ cash balance, which is why it is not vectorized. Rolling an optimisation through
 """
 
 # packages
+from numbers import Integral
 import warnings
 import numpy as np
 import pandas as pd
@@ -98,12 +99,12 @@ def backtest_model_portfolio(prices: pd.DataFrame,
             date, so a cost schedule stated on era boundaries applies from each boundary
             onward. Costs are read at every trade date, including an opening trade on the
             first price date; dates before the first schedule row are costless
-        weight_implementation_lag: observations of the price index between a weight being
-            observed and traded, so 1 on a business-day panel trades the next business day. It
-            selects the entry price for the units only and leaves prices and instrument returns
-            untouched. Applies only when ``weights`` is a pd.DataFrame, since a fixed vector has
-            no signal date. A weight whose traded date would fall past the end of the price
-            history is dropped with a warning
+        weight_implementation_lag: non-negative integer observations of the price index between a
+            weight being observed and traded, so 1 on a business-day panel trades the next
+            business day. None means zero. It selects the entry price for the units only and
+            leaves prices and instrument returns untouched. Applies only when ``weights`` is a
+            pd.DataFrame, since a fixed vector has no signal date. A weight whose traded date would
+            fall past the end of the price history is dropped with a warning
         constant_trade_level: size each rebalancing off this notional rather than off current
             nav, so trade size does not compound with performance
         is_rebalanced_at_first_date: rebalance on the first price date as well as on the
@@ -115,15 +116,27 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         costs, including costs charged on an opening trade
 
     Raises:
-        ValueError: if ``prices`` is not a pd.DataFrame, if a weight vector does not match the
-            number of price columns, if the price history starts after the weights do, if two
-            weight dates resolve to the same traded date on the price index, if no weight date
-            is traded at all, if a ``rebalancing_costs`` DataFrame is missing a price column, or
-            if a ``rebalancing_costs`` Series is indexed by dates rather than tickers
+        ValueError: if ``prices`` is not a pd.DataFrame, if the dated-weight implementation lag is
+            not None or a non-negative integer, if a weight vector does not match the number of
+            price columns, if the price history starts after the weights do, if two weight dates
+            resolve to the same traded date on the price index, if no weight date is traded at
+            all, if a ``rebalancing_costs`` DataFrame is missing a price column, or if a
+            ``rebalancing_costs`` Series is indexed by dates rather than tickers
         NotImplementedError: if ``weights`` is of an unsupported type
     """
     if not isinstance(prices, pd.DataFrame):
         raise ValueError(f"prices type={type(prices)} must be pd.Dataframe")
+
+    # The lag applies only to dated schedules; validate it before mapping decision dates
+    # onto the price index.
+    lag = 0
+    if isinstance(weights, pd.DataFrame) and weight_implementation_lag is not None:
+        if (isinstance(weight_implementation_lag, (bool, np.bool_))
+                or not isinstance(weight_implementation_lag, Integral)
+                or weight_implementation_lag < 0):
+            raise ValueError("weight_implementation_lag must be a non-negative integer or None, "
+                             f"got {weight_implementation_lag!r}")
+        lag = int(weight_implementation_lag)
 
     # a nan inside an instrument's own reported history is a data defect rather than a universe
     # change: units are held through it and np.nansum drops the leg from the nav on those dates.
@@ -158,7 +171,6 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         # observations on. Weights are consumed one row per rebalancing flag, so two weight dates
         # resolving to the same traded date would shift every later row and is an error, not a
         # collapse
-        lag = weight_implementation_lag if weight_implementation_lag is not None else 0
         traded_positions = prices.index.searchsorted(portfolio_weights.index) + lag
         is_traded = traded_positions <= len(prices.index) - 1
         if not np.any(is_traded):

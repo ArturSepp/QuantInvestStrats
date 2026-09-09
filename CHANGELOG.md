@@ -22,6 +22,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Rejected negative and non-integral dated portfolio implementation lags before schedule mapping,
+  preventing targets from trading before their observation date or wrapping to the history end.
+
 - Ordered dated portfolio-weight schedules chronologically before validation and execution,
   preventing input row order from assigning targets to the wrong trade dates.
 
