@@ -733,22 +733,24 @@ def compute_max_current_drawdown(prices: Union[pd.DataFrame, pd.Series]
     """Compute the realised maximum drawdown and the current drawdown.
 
     Args:
-        prices: Price level Series or DataFrame.
+        prices: Price level Series or DataFrame. Ordinary and nullable floating missing values
+            follow the same drawdown semantics.
 
     Returns:
         Tuple of (max_drawdowns, current_drawdowns). For a DataFrame input, both
-        elements are 1-D ndarrays indexed by column. For a Series input, both
-        elements are scalar floats.
+        elements are 1-D floating ndarrays indexed by column. For a Series input,
+        both elements are scalar floats.
     """
     max_dd_data = compute_rolling_drawdowns(prices=prices)
-    # fmin.reduce keeps nanmin's finite results but does not warn for an all-NaN slice.
+    # Normalize pd.NA before NumPy reduction while retaining warning-free all-NaN semantics.
+    max_dd_values = max_dd_data.to_numpy(dtype=float, na_value=np.nan)
     if isinstance(prices, pd.DataFrame):
-        max_dds = np.fmin.reduce(max_dd_data.to_numpy(), axis=0)
-        current_dds = max_dd_data.iloc[-1, :].to_numpy()
+        max_dds = np.fmin.reduce(max_dd_values, axis=0)
+        current_dds = max_dd_values[-1, :]
     else:
         # Series case: return scalars (not arrays) to match the actual return shape.
-        max_dds = float(np.fmin.reduce(max_dd_data.to_numpy()))
-        current_dds = float(max_dd_data.iloc[-1])
+        max_dds = float(np.fmin.reduce(max_dd_values))
+        current_dds = float(max_dd_values[-1])
     return max_dds, current_dds
 
 
