@@ -119,10 +119,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         ValueError: if ``prices`` is not a pd.DataFrame, if the dated-weight implementation lag
             is neither None nor a non-negative integer, if a weight vector does not match the
             number of price columns, if the price history starts after the weights do, if two
-            weight dates resolve to the same traded date on the price index, if no weight
-            date is traded at all, if a ``rebalancing_costs`` DataFrame is missing a price
-            column, or if a ``rebalancing_costs`` Series is indexed by dates rather than
-            tickers
+            weight dates resolve to the same traded date on the price index, if no weight date
+            is traded at all, if a ``rebalancing_costs`` DataFrame is missing a price column,
+            or if a ``rebalancing_costs`` Series is indexed by dates rather than tickers
         NotImplementedError: if ``weights`` is of an unsupported type
     """
     if not isinstance(prices, pd.DataFrame):
