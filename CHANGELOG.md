@@ -22,6 +22,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Filled every requested IID bootstrap position with a random source index instead of leaving the
+  terminal row deterministically mapped to source row zero.
+
 - Supported Series price bootstrapping in both output modes and restored log-return reconstruction
   for list outputs, with consistent first- or last-price anchoring across one-asset containers.
 
