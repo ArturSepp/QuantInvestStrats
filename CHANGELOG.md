@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+**Seeded `BootstrapType.IID` results produced by earlier qis versions may not reproduce exactly.**
+Every draw now samples its terminal row instead of leaving it mapped to source row zero. When
+`(index_length - 1)` is divisible by `num_data_index`, completing that row consumes another random
+batch and also shifts later sample columns.
+
 ### Added
 
 - Added explicit stack dependency and optional-import boundary checks, including
