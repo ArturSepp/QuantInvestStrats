@@ -90,16 +90,26 @@ def bootstrap_indices_iid(num_data_index: int,
                           seed: int = 1
                           ) -> np.ndarray:
     """
-    generate iid bootstrap indices
+    generate IID bootstrap indices for every requested output position.
+
+    Args:
+        num_data_index: number of observations in the source data
+        num_samples: number of independent bootstrap draws
+        index_length: number of positions in each draw
+        seed: seed for the numba random state
+
+    Returns:
+        integer indices of shape ``(index_length, num_samples)``
     """
     np.random.seed(seed)
     set_seed(seed)
     bootstrapped_indices = np.zeros((index_length, num_samples), dtype=np.int64)
     for idx in np.arange(num_samples):
         previous_index, next_index = 0, 0
-        while next_index < index_length-1:
+        while next_index < index_length:
             ran_indices = np.random.randint(low=0, high=num_data_index, size=num_data_index)
-            next_index = np.minimum(previous_index+num_data_index, index_length-1)
+            # Truncate only the final random batch, while still filling the complete output.
+            next_index = np.minimum(previous_index+num_data_index, index_length)
             required_fill = next_index - previous_index
             bootstrapped_indices[previous_index:next_index, idx] = ran_indices[:required_fill]
             previous_index = next_index
@@ -303,8 +313,9 @@ def generate_bootstrapped_indices(num_data_index: int,
         seed: seed for the numba random state
 
     Returns:
-        integer indices, shape ``(index_length, num_samples)``, every value in
-        ``[0, num_data_index)``
+        integer indices, shape ``(index_length, num_samples)``, with every requested position
+        populated from ``[0, num_data_index)``; dependence between positions follows
+        ``bootstrap_type``
 
     Raises:
         ValueError: if ``bootstrap_type`` is not one of the implemented schemes

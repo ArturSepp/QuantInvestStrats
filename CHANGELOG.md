@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+**Seeded `BootstrapType.IID` results produced by earlier qis versions may not reproduce exactly.**
+Every draw now samples its terminal row instead of leaving it mapped to source row zero. When
+`(index_length - 1)` is divisible by `num_data_index`, completing that row consumes another random
+batch and also shifts later sample columns.
+
 ### Added
 
 - Added explicit stack dependency and optional-import boundary checks, including
@@ -21,6 +26,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   landing pages with the canonical package identity and Read the Docs documentation.
 
 ### Fixed
+
+- Filled every requested IID bootstrap position with a random source index instead of leaving the
+  terminal row deterministically mapped to source row zero.
 
 - Supported Series price bootstrapping in both output modes and restored log-return reconstruction
   for list outputs, with consistent first- or last-price anchoring across one-asset containers.
