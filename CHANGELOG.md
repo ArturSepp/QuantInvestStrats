@@ -27,6 +27,10 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Added opt-in causal FX spot alignment that leaves leading gaps unavailable, while preserving
+  historical leading backfill by default. Both modes normalize source chronology and retain the
+  exact price-panel axes before cash or futures return conversion.
+
 - Filled every requested IID bootstrap position with a random source index instead of leaving the
   terminal row deterministically mapped to source row zero.
 

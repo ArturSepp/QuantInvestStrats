@@ -294,33 +294,43 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
 def get_aligned_fx_spots(prices: pd.DataFrame,
                          asset_ccy_map: Union[pd.Series, Dict],
                          fx_prices: pd.DataFrame,
-                         quote_currency: str = 'USD'
+                         quote_currency: str = 'USD',
+                         bfill_fx: bool = True
                          ) -> pd.DataFrame:
     """
-    the FX spot series belonging to each instrument, on the index of its prices.
+    The FX spot series belonging to each instrument, on the index of its prices.
 
     An instrument panel is quoted in mixed currencies, and converting it needs a spot series per
     instrument rather than per currency. This maps each column of ``prices`` through its currency to
-    the matching spot column, reindexes onto the price dates and masks where the price is missing,
-    so the spots are NaN exactly where the prices are.
+    the matching spot column, reindexes onto the price dates, and masks where the price is missing.
+    By default, leading gaps are filled from the first available FX observation to preserve the
+    historical behavior. Set ``bfill_fx=False`` for causal alignment, where a spot remains missing
+    until its first observation is available.
 
     Args:
         prices: instrument prices, one column per instrument
         asset_ccy_map: instrument to currency, as a Series indexed by instrument or a dict
         fx_prices: FX spots, one column per currency
         quote_currency: the numeraire, whose spot column is set to one
+        bfill_fx: if True, fill leading gaps from the first available FX observation
 
     Returns:
-        spots in the shape of ``prices``, one column per instrument
+        spots with the same index, columns, shape, and row order as ``prices``
     """
-    # first backfill and the bbfill so prices will have corresponding fx spots data
-    fx_prices = fx_prices.reindex(index=prices.index, method='ffill').ffill().bfill()
+    # Sort and pre-fill the source so row order cannot carry a later quote backward in time.
+    fx_prices = fx_prices.sort_index().ffill()
+    price_order = prices.index.argsort(kind='stable')
+    fx_prices = fx_prices.reindex(index=prices.index[price_order], method='ffill')
+    if bfill_fx:
+        fx_prices = fx_prices.bfill()
+    # Restore the caller's exact row order after performing all time-directed fills.
+    fx_prices = fx_prices.iloc[np.argsort(price_order, kind='stable')]
+    fx_prices.index = prices.index
     fx_prices[quote_currency] = 1.0
 
-    fx_spots = {}
-    for asset, ccy in asset_ccy_map.items():
-        fx_spots[asset] = fx_prices[ccy]
-    fx_spots = pd.DataFrame.from_dict(fx_spots, orient='columns')
+    mapped_currencies = [asset_ccy_map[asset] for asset in prices.columns]
+    fx_spots = fx_prices.loc[:, mapped_currencies].copy()
+    fx_spots.columns = prices.columns
     fx_spots = fx_spots.where(prices.notna())
     return fx_spots
 
