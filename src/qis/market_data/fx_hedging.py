@@ -297,12 +297,13 @@ def get_aligned_fx_spots(prices: pd.DataFrame,
                          quote_currency: str = 'USD'
                          ) -> pd.DataFrame:
     """
-    the FX spot series belonging to each instrument, on the index of its prices.
+    The FX spot series belonging to each instrument, on the index of its prices.
 
     An instrument panel is quoted in mixed currencies, and converting it needs a spot series per
     instrument rather than per currency. This maps each column of ``prices`` through its currency to
-    the matching spot column, reindexes onto the price dates and masks where the price is missing,
-    so the spots are NaN exactly where the prices are.
+    the matching spot column, reindexes onto the price dates using only current or earlier FX
+    observations, and masks where the price is missing. A spot remains missing until its first FX
+    observation is available.
 
     Args:
         prices: instrument prices, one column per instrument
@@ -313,8 +314,9 @@ def get_aligned_fx_spots(prices: pd.DataFrame,
     Returns:
         spots in the shape of ``prices``, one column per instrument
     """
-    # first backfill and the bbfill so prices will have corresponding fx spots data
-    fx_prices = fx_prices.reindex(index=prices.index, method='ffill').ffill().bfill()
+    # Sort and pre-fill the source so row order cannot carry a later quote backward in time.
+    fx_prices = fx_prices.sort_index().ffill()
+    fx_prices = fx_prices.reindex(index=prices.index, method='ffill')
     fx_prices[quote_currency] = 1.0
 
     fx_spots = {}

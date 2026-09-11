@@ -27,6 +27,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Kept FX spot alignment causal by leaving leading gaps unavailable instead of filling them with
+  future observations before cash or futures return conversion.
+
 - Filled every requested IID bootstrap position with a random source index instead of leaving the
   terminal row deterministically mapped to source row zero.
 
