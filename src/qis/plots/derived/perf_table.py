@@ -33,7 +33,7 @@ from qis.plots.bars import plot_bars, plot_vbars
 from qis.perfstats.regime_classifier import BenchmarkReturnsQuantilesRegime, compute_bnb_regimes_pa_perf_table
 
 RA_TABLE_SHORT_N_THRESHOLD = 10
-RA_TABLE_HEADER_HEIGHT_MULTIPLIER = 1.15
+RA_TABLE_HEADER_HEIGHT_MULTIPLIER = 1.5
 
 
 def _get_ra_table_label_kwargs(number_of_columns: int,

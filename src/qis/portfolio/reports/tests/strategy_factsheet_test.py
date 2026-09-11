@@ -466,7 +466,7 @@ def test_wide_ra_table_uses_multiline_short_names() -> None:
         header_cells = [cell for (row, _), cell in cells.items() if row == 0]
         data_height = next(cell.get_height() for (row, _), cell in cells.items() if row > 0)
         assert all(
-            cell.get_height() == pytest.approx(1.15 * data_height)
+            cell.get_height() == pytest.approx(1.5 * data_height)
             for cell in header_cells
         )
     finally:
