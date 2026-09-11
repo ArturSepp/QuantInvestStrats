@@ -27,6 +27,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Kept risk-adjusted-table returns, ratios, and benchmark regressions within each asset's sampled
+  observed history, so a longer neighboring column no longer adds post-termination flat returns.
+
 - Anchored continuation price bootstraps to each input series' own last positive finite level, so
   a trailing-ragged asset no longer produces an entirely missing path beside a longer history.
 

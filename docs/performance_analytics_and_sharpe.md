@@ -30,10 +30,13 @@ point-in-time safe for a backtest.
   excess, and Sortino ratio numerators use the same complete `freq_vol` boundaries as their
   volatility or downside-volatility denominators.
 - **NaNs:** table calculations respect heterogeneous start and end dates by evaluating each
-  asset over its observed history. Price resampling and `qis.to_returns` forward-fill by default;
-  direct callers can pass `ffill_nans=False` to `qis.to_returns` when a gap must remain missing.
-  Rolling statistics remain NaN until a complete window is available. Running drawdown starts at
-  the first valid price and forward-fills the drawdown state across later missing prices.
+  asset over its observed history. Static risk-adjusted tables retain their established interior
+  fill policy but do not extend an asset beyond its final sampled observed price merely because
+  another panel column continues; benchmark regressions use the asset and benchmark's joint
+  sampled support. Price resampling and `qis.to_returns` otherwise forward-fill by default; direct
+  callers can pass `ffill_nans=False` to `qis.to_returns` when a gap must remain missing. Rolling
+  statistics remain NaN until a complete window is available. Running drawdown starts at the first
+  valid price and forward-fills the drawdown state across later missing prices.
 
 Do not use silent forward-filling to turn stale or genuinely low-frequency observations into
 new information. Classify the data problem before choosing a sampling grid.

@@ -17,8 +17,9 @@ Sharpe is not one statistic. The table emits the conventions side by side as dis
 so the choice is made by picking a column rather than by a flag: ``SHARPE_RF0`` over p.a.
 return, ``SHARPE_EXCESS`` over p.a. excess return, ``SHARPE_LOG_AN`` and ``SHARPE_LOG_EXCESS``
 on annualised log returns, with those ratio-only numerators sampled on the same complete
-``freq_vol`` boundaries as risk. Visible return columns retain native observed endpoints. The
-arithmetic pair is computed by ``compute_sharpe_arithmetic``,
+``freq_vol`` boundaries as risk and bounded by each asset's final sampled observation. Visible
+return columns retain native observed endpoints. The arithmetic pair is computed by
+``compute_sharpe_arithmetic``,
 
     SR = sqrt(af) E[r] / sqrt(Var[r])
 
@@ -177,6 +178,36 @@ def _safe_downside_vol(returns_array: np.ndarray, vol_dt: float) -> float:
     return vol_dt * float(np.std(neg_returns, ddof=1))
 
 
+def _prices_at_freq_with_terminal_support(prices: pd.DataFrame,
+                                          freq: Optional[str]
+                                          ) -> pd.DataFrame:
+    """Sample prices without extending a column beyond its final observation.
+
+    Args:
+        prices: Price panel whose columns may have different observed endpoints.
+        freq: Target sampling frequency, or None to retain the input grid.
+
+    Returns:
+        Sampled price panel preserving the existing leading/interior fill behavior while leaving
+        every column missing after its own final observed timestamp.
+    """
+    sampled_prices = cast(
+        pd.DataFrame,
+        ret.prices_at_freq(prices=prices, freq=freq),
+    ).copy()
+
+    # A shared sampling grid may continue after one asset terminates. Restore each column's own
+    # endpoint so later panel dates cannot manufacture flat returns or observations for that asset.
+    for position in range(prices.shape[1]):
+        observed_prices = prices.iloc[:, position].dropna()
+        if observed_prices.empty:
+            sampled_prices.iloc[:, position] = np.nan
+        else:
+            terminal_date = observed_prices.index.max()
+            sampled_prices.iloc[sampled_prices.index > terminal_date, position] = np.nan
+    return sampled_prices
+
+
 def resolve_benchmark_source(prices: pd.DataFrame,
                              benchmark: Optional[str],
                              benchmark_price: Optional[pd.Series]
@@ -304,7 +335,8 @@ def compute_risk_table(prices: pd.DataFrame,
 
     Resamples prices at the configured frequencies for vol, drawdown and skewness, then
     computes all risk metrics column-wise on the full DataFrame rather than per-asset.
-    Per-asset NaN handling is preserved by dropna inside each metric computation.
+    Interior gaps retain the established fill policy, while every reduction stops at the
+    corresponding asset's final sampled observed price.
 
     Args:
         prices: DataFrame of asset price levels (dates × assets).
@@ -327,30 +359,42 @@ def compute_risk_table(prices: pd.DataFrame,
         perf_params = PerfParams()
 
     # ── Resample to the three configured frequencies (vol, drawdown, skewness) ──
-    sampled_prices_vol = ret.prices_at_freq(prices=prices, freq=perf_params.freq_vol)
+    sampled_prices_vol = _prices_at_freq_with_terminal_support(
+        prices=prices,
+        freq=perf_params.freq_vol,
+    )
 
     # drawdowns are computed using its own freq
     if perf_params.freq_vol == perf_params.freq_drawdown:
         dd_sampled_prices = sampled_prices_vol
     else:
-        dd_sampled_prices = ret.prices_at_freq(prices=prices, freq=perf_params.freq_drawdown)
+        dd_sampled_prices = _prices_at_freq_with_terminal_support(
+            prices=prices,
+            freq=perf_params.freq_drawdown,
+        )
 
     # skeweness computed at own frequency
     if perf_params.freq_vol == perf_params.freq_skewness:
         sampled_prices_skew = sampled_prices_vol
     else:
-        sampled_prices_skew = ret.prices_at_freq(prices=prices, freq=perf_params.freq_skewness)
+        sampled_prices_skew = _prices_at_freq_with_terminal_support(
+            prices=prices,
+            freq=perf_params.freq_skewness,
+        )
 
     an_factor = infer_annualisation_factor_from_df(data=sampled_prices_vol)
     vol_dt = np.sqrt(an_factor)
 
     # ── Compute returns once at the vol and skewness frequencies ──
-    # to_returns is bulk-vectorised; per-asset dropna is applied inside metric loops.
+    # Sampling above has already retained the established interior fill. Disable the second,
+    # unbounded fill so to_returns cannot recreate the terminal tail that sampling restored.
     returns_vol = ret.to_returns(prices=sampled_prices_vol,
                                  return_type=perf_params.return_type,
+                                 ffill_nans=False,
                                  drop_first=True)
     returns_skew = ret.to_returns(prices=sampled_prices_skew,
                                   return_type=perf_params.return_type,
+                                  ffill_nans=False,
                                   drop_first=True)
     # Preserve missing price gaps rather than letting pandas choose an implicit fill policy.
     pct_returns_dd = dd_sampled_prices.pct_change(fill_method=None)
@@ -369,7 +413,12 @@ def compute_risk_table(prices: pd.DataFrame,
     if perf_params.return_type == ReturnTypes.RELATIVE:
         returns_arith = returns_vol
     else:
-        returns_arith = ret.to_returns(prices=sampled_prices_vol, return_type=ReturnTypes.RELATIVE, drop_first=True)
+        returns_arith = ret.to_returns(
+            prices=sampled_prices_vol,
+            return_type=ReturnTypes.RELATIVE,
+            ffill_nans=False,
+            drop_first=True,
+        )
     avg_arith_return = returns_arith.mean()  # periodic mean of simple returns
     sharpe_arith = vol_dt * avg_arith_return.divide(returns_arith.std(ddof=1))
     if perf_params.rates_data is not None:
@@ -478,7 +527,8 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
         Overlapping columns (e.g. START_DATE, END_DATE) are present once, taken
         from the performance table. Visible return columns retain each asset's native observed
         endpoints. The p.a., log, excess, and Sortino ratio numerators instead use complete
-        ``freq_vol`` boundaries so they describe the same sample as their risk denominators.
+        ``freq_vol`` boundaries within each asset's observed support, so they describe the same
+        sample as their risk denominators without extending terminated histories.
     """
     if perf_params is None:
         perf_params = PerfParams(freq=pd.infer_freq(prices.index))
@@ -493,7 +543,7 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     # performance columns above on their native observed endpoints.
     sampled_prices_vol = cast(
         pd.DataFrame,
-        ret.prices_at_freq(prices=prices, freq=perf_params.freq_vol),
+        _prices_at_freq_with_terminal_support(prices=prices, freq=perf_params.freq_vol),
     )
     ratio_perf_table = compute_performance_table(
         prices=sampled_prices_vol,
@@ -563,7 +613,8 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
 
     Returns:
         DataFrame indexed by asset with all base RA metrics plus ALPHA, ALPHA_AN,
-        BETA, R2 and ALPHA_PVALUE columns.
+        BETA, R2 and ALPHA_PVALUE columns. Each regression uses only the asset and benchmark's
+        joint sampled observed support; another column's later dates do not extend that sample.
 
     Raises:
         ValueError: If the benchmark source has no non-empty string label, the selected label is
@@ -581,7 +632,15 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
     ra_perf_table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
 
     # ── Run benchmark regression at the configured regression frequency ──
-    returns = ret.to_returns(prices=prices, freq=perf_params.freq_reg, is_log_returns=is_log_returns)
+    sampled_prices_reg = _prices_at_freq_with_terminal_support(
+        prices=prices,
+        freq=perf_params.freq_reg,
+    )
+    returns = ret.to_returns(
+        prices=sampled_prices_reg,
+        is_log_returns=is_log_returns,
+        ffill_nans=False,
+    )
 
     # use excess returns if rates data is given
     if perf_params.rates_data is not None:
