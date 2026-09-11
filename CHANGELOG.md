@@ -33,6 +33,10 @@ batch and also shifts later sample columns.
 - Supported Series price bootstrapping in both output modes and restored log-return reconstruction
   for list outputs, with consistent first- or last-price anchoring across one-asset containers.
 
+- Made stack-plot mean and cumulative annotations work for area and bar renderers, use consistent
+  observed-value means for ordinary and nullable missing data, and preserve caller-owned colors
+  when adding a total line.
+
 - Honored `drop_benchmark` in rendered regime plots while retaining the benchmark in classifier
   component tables used by other analytical callers.
 

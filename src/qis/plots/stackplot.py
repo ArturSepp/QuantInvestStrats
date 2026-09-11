@@ -7,10 +7,11 @@ point: ``use_bar_plot`` switches from ``ax.stackplot`` to a stacked bar chart, a
 import warnings
 import numpy as np
 import pandas as pd
-import matplotlib as mpl
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
+from numpy.typing import NDArray
 # qis
 import qis.plots.utils as put
 from qis.plots.utils import LegendStats
@@ -50,6 +51,10 @@ def plot_stack(df: pd.DataFrame,
         df: Numeric values to stack. Nullable floating columns are supported; stacked-area
             rendering represents their missing values as NumPy ``nan``.
         use_bar_plot: Use pandas stacked bars instead of Matplotlib stacked areas.
+        add_mean_levels: Annotate each column's mean over its observed values.
+        add_cum_levels: Annotate cumulative observed-value column means.
+        add_total_line: Draw the per-row total as a black line.
+        colors: One color per column. The caller-owned list is not modified.
 
     Returns:
         The created figure, or None when the caller supplies ``ax``.
@@ -74,6 +79,9 @@ def plot_stack(df: pd.DataFrame,
 
     if colors is None:
         colors = put.get_n_colors(n=len(re_indexed_data.columns))
+    else:
+        # Work on a local palette because the total-line path appends its display color.
+        colors = colors.copy()
 
     if use_bar_plot:  # plot bar apperas to look better for unconstraint plots
         re_indexed_data.plot.bar(stacked=True,
@@ -109,10 +117,16 @@ def plot_stack(df: pd.DataFrame,
         ymin, ymax = ax.get_ylim()
         cum_mean = 0.0
         cum_mean0 = 0.0
-        handles, labels = ax.get_legend_handles_labels()
+        _, labels = ax.get_legend_handles_labels()
 
-        for (idx, column), handle, label in zip(enumerate(re_indexed_data.columns), handles, labels):
-            mean = np.mean(re_indexed_data[column].values)
+        for (idx, column), label in zip(enumerate(re_indexed_data.columns), labels):
+            # Normalize ordinary and nullable missing values, then average observed samples only.
+            column_values = cast(
+                NDArray[np.float64],
+                re_indexed_data.iloc[:, idx].to_numpy(dtype=float, na_value=np.nan),
+            )
+            observed_values = column_values[~np.isnan(column_values)]
+            mean = np.nan if observed_values.size == 0 else float(np.mean(observed_values))
             cum_mean = cum_mean + mean
 
             if add_mean_levels:
@@ -131,7 +145,8 @@ def plot_stack(df: pd.DataFrame,
 
             ax.axhline(y_loc, color='black', linestyle='--', linewidth=linewidth)
 
-            color = mpl.colors.to_rgb(handle.get_facecolors()[0])
+            # The resolved column palette is common to area and bar artists.
+            color = mcolors.to_rgb(colors[idx])
             ax.annotate(text=f"{label}={vlabel}", xy=(xmax, y_loc), fontsize=fontsize, weight='normal', color=color)
 
         y_annotation = 'Avg' if add_mean_levels else 'Total'
@@ -168,4 +183,3 @@ def plot_stack(df: pd.DataFrame,
     put.set_spines(ax=ax, **kwargs)
 
     return fig
-
