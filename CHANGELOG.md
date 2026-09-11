@@ -27,6 +27,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Anchored continuation price bootstraps to each input series' own last positive finite level, so
+  a trailing-ragged asset no longer produces an entirely missing path beside a longer history.
+
 - Added opt-in causal FX spot alignment that leaves leading gaps unavailable, while preserving
   historical leading backfill by default. Both modes normalize source chronology and retain the
   exact price-panel axes before cash or futures return conversion.

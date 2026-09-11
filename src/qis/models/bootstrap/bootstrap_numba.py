@@ -467,6 +467,38 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
     return bootstrap_sample
 
 
+def _get_price_anchor(prices: Union[pd.Series, pd.DataFrame], init_to_end: bool) -> FloatArray:
+    """Return one reconstruction anchor per input series.
+
+    Args:
+        prices: Price levels, with one input series per DataFrame column.
+        init_to_end: Whether to continue from each series' last valid price. False preserves the
+            established physical-first-row alternative-history anchor.
+
+    Returns:
+        One-dimensional float array of anchors in input column order.
+    """
+    price_frame = prices.to_frame() if isinstance(prices, pd.Series) else prices
+    price_values = cast(FloatArray, price_frame.to_numpy(dtype=np.float64, na_value=np.nan))
+    if not init_to_end:
+        return price_values[0, :]
+
+    terminal_values = price_values[-1, :]
+    if np.all(np.isfinite(terminal_values) & (terminal_values > 0.0)):
+        return terminal_values
+
+    # Continuation anchors share the positive-finite domain of relative and log returns.
+    valid_prices = np.isfinite(price_values) & (price_values > 0.0)
+    row_positions = np.arange(price_values.shape[0])[:, np.newaxis]
+    last_positions = np.where(valid_prices, row_positions, -1).max(axis=0)
+    anchors = np.full(price_values.shape[1], np.nan, dtype=np.float64)
+    has_anchor = last_positions >= 0
+    # Select by position so duplicate column labels remain independent series.
+    column_positions = np.flatnonzero(has_anchor)
+    anchors[has_anchor] = price_values[last_positions[has_anchor], column_positions]
+    return anchors
+
+
 def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                          bootstrap_type: BootstrapType = BootstrapType.STATIONARY,
                          bootstrap_output: BootstrapOutput = BootstrapOutput.DF_TO_LIST_ARRAYS,
@@ -498,8 +530,9 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
         is_log_returns: resample log returns rather than arithmetic ones
         seed: seed for the numba random state
         bootstrapped_indices: precomputed indices, which override the sampling arguments
-        init_to_end: start every path from the last observed price, so the draws continue from
-            today. False starts them from the first price, so the draws are alternative histories
+        init_to_end: Start each path from its input series' last positive finite price, so ragged
+            columns continue from their own terminal observation. False starts every path from the
+            physical first row, so the draws are alternative histories
 
     Returns:
         A DataFrame of paths for SERIES_TO_DF, or a list of arrays for DF_TO_LIST_ARRAYS.
@@ -521,21 +554,7 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
                                        bootstrapped_indices=bootstrapped_indices)
 
     if bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
-        # Select by position and retain a one-dimensional asset vector for NumPy broadcasting.
-        init_position = -1 if init_to_end else 0
-        init_value: FloatArray
-        if isinstance(prices, pd.Series):
-            init_value = cast(
-                FloatArray,
-                prices.iloc[[init_position]].to_numpy(dtype=np.float64, na_value=np.nan),
-            )
-        else:
-            init_value = cast(
-                FloatArray,
-                prices.iloc[[init_position], :]
-                .to_numpy(dtype=np.float64, na_value=np.nan)
-                .reshape(-1),
-            )
+        init_value = _get_price_anchor(prices=prices, init_to_end=init_to_end)
 
         bootstrap_sample = List()
         for sampled_returns in bootstrap_returns:
@@ -552,11 +571,7 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
 
     elif bootstrap_output == BootstrapOutput.SERIES_TO_DF:
         assert isinstance(prices, pd.Series)
-        init_position = -1 if init_to_end else 0
-        price_anchor = cast(
-            FloatArray,
-            prices.iloc[[init_position]].to_numpy(dtype=np.float64, na_value=np.nan),
-        )
+        price_anchor = _get_price_anchor(prices=prices, init_to_end=init_to_end)
         init_value = np.repeat(price_anchor, num_samples)
 
         if is_log_returns:
