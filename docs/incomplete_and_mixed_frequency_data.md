@@ -83,6 +83,11 @@ heal it. FX mixed-frequency returns replace exact structural zeros with NaN for 
 that intentionally also removes the rare organic zero. None of these policies identifies a stale
 mark or delisting event for you.
 
+For multi-asset periodic tables, `qis.compute_periodic_returns` preserves a leading missing region
+until an asset supplies two observed price boundaries. A column with fewer than two observations
+has neither periodic nor total returns. The table calculation continues to forward-fill internal
+and trailing gaps; that display-oriented convention is not a liquidation or delisting policy.
+
 ## Constraints and failure modes
 
 - Forward-filling a low-frequency NAV then estimating daily volatility treats “no new report” as

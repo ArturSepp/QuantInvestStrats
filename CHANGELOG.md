@@ -43,6 +43,9 @@ batch and also shifts later sample columns.
 - Kept risk-adjusted-table returns, ratios, and benchmark regressions within each asset's sampled
   observed history, so a longer neighboring column no longer adds post-termination flat returns.
 
+- Preserved missing pre-inception cells in multi-asset periodic-return tables and left periodic
+  and total returns undefined for columns with fewer than two observed price boundaries.
+
 - Anchored continuation price bootstraps to each input series' own last positive finite level, so
   a trailing-ragged asset no longer produces an entirely missing path beside a longer history.
 

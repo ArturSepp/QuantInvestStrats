@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from typing import Union, List, Optional, Tuple, Dict
+from typing import Union, List, Optional, Tuple, Dict, cast
 # qis
 import qis.utils.dates as da
 import qis.perfstats.returns as ret
@@ -303,9 +303,23 @@ def compute_periodic_returns(prices: pd.DataFrame,
                              date_format: str = None,
                              **kwargs
                              ) -> pd.DataFrame:
-    """
-    compute returns at specified frequency for datadrfame
-    index are periods, columns are prices.columns
+    """Compute simple periodic returns for a price panel.
+
+    Args:
+        prices: Price levels with dates on the index and assets in columns.
+        freq: Frequency used to sample return boundaries.
+        time_period: Optional date interval applied before return calculation.
+        total_name: Label for the optional whole-period return row.
+        add_total: Whether to append a whole-period return row.
+        date_format: Optional ``strftime`` format for periodic row labels.
+        **kwargs: Reserved for compatibility with plotting callers.
+
+    Returns:
+        Periods by assets. A column remains missing until it supplies two observed price
+        boundaries; internal and trailing gaps retain the established forward-fill behavior.
+
+    Raises:
+        ValueError: If ``prices`` is not a DataFrame.
     """
     if not isinstance(prices, pd.DataFrame):
         raise ValueError("prices must be dataframe")
@@ -319,9 +333,13 @@ def compute_periodic_returns(prices: pd.DataFrame,
     if not prices.index.is_monotonic_increasing:
         prices = prices.sort_index()
 
-    # make sure there are no gaps for heterogeneous price data
-    prices = prices.ffill().bfill()
-    data = ret.to_returns(prices=prices, freq=freq, include_start_date=True, include_end_date=True, drop_first=True)
+    has_return_support = prices.notna().sum(axis=0).to_numpy() >= 2
+
+    # Preserve established gap and tail handling without inventing a pre-inception price.
+    prices = prices.ffill()
+    data = ret.to_returns(prices=prices, freq=freq, include_start_date=True,
+                          include_end_date=True, ffill_nans=False, drop_first=True)
+    data.iloc[:, ~has_return_support] = np.nan
 
     if add_total:
         if freq == 'ME':
@@ -330,7 +348,17 @@ def compute_periodic_returns(prices: pd.DataFrame,
             total_name = total_name or 'Total'
         else:
             total_name = total_name or 'total'
-        total_return = ret.to_total_returns(prices=prices).rename(total_name).to_frame().T
+        # Compute totals only where two observed boundaries exist; the temporary backfill then
+        # avoids changing the ratio while keeping leading missing values out of the shared reducer.
+        total_values = np.full(prices.shape[1], fill_value=np.nan)
+        if np.any(has_return_support):
+            supported_prices = cast(
+                pd.DataFrame, prices.iloc[:, has_return_support]
+            ).bfill()
+            total_values[has_return_support] = ret.to_total_returns(
+                prices=supported_prices
+            ).to_numpy(dtype=float, na_value=np.nan)
+        total_return = pd.DataFrame([total_values], index=[total_name], columns=prices.columns)
         data = pd.concat([data, total_return], axis=0)
 
     if date_format is not None:  # index may include 'Total'
