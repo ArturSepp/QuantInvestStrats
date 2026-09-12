@@ -559,13 +559,50 @@ def filter_x_y(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np
     return x, y, cond
 
 
-def estimate_ols_alpha_beta(x: Union[np.ndarray, pd.Series, pd.DataFrame],
-                            y: Union[np.ndarray, pd.Series],
-                            order: int = 1,
-                            fit_intercept: bool = True
-                            ) -> Tuple[float, float, float, float]:
+def _to_ols_array(values: Union[np.ndarray, pd.Series, pd.DataFrame]) -> np.ndarray:
+    """Convert real-valued pandas containers without coercing other inputs."""
+    if isinstance(values, pd.DataFrame):
+        is_numeric = all(pd.api.types.is_any_real_numeric_dtype(dtype) for dtype in values.dtypes)
+    elif isinstance(values, pd.Series):
+        is_numeric = pd.api.types.is_any_real_numeric_dtype(values.dtype)
+    else:
+        return values
+
+    if is_numeric:
+        # Avoid object designs when statsmodels adds a constant to pandas extension dtypes.
+        return values.to_numpy(dtype=float, na_value=np.nan)
+    return values.to_numpy()
+
+
+def estimate_ols_alpha_beta(
+    x: Union[np.ndarray, pd.Series, pd.DataFrame],
+    y: Union[np.ndarray, pd.Series],
+    order: int = 1,
+    fit_intercept: bool = True,
+) -> Tuple[float, float, float, float]:
+    """Estimate scalar OLS statistics from numeric NumPy or pandas inputs.
+
+    Real-valued numeric pandas containers are normalized before fitting so ordinary and nullable
+    storage use the same statsmodels design. Nonnumeric or otherwise invalid inputs retain the
+    established warning and four-zero fallback.
+
+    Args:
+        x: One explanatory variable in an array, Series, or one-column DataFrame.
+        y: Dependent observations in an array or Series.
+        order: Polynomial degree passed to the OLS design builder.
+        fit_intercept: Whether to include and report an intercept.
+
+    Returns:
+        Alpha, beta, R-squared, and the conventional alpha p-value. Without an intercept, alpha
+        and its p-value are zero. A failed fit warns and returns four zeros.
+    """
     try:
-        reg_model = fit_ols(x=x, y=y, order=order, fit_intercept=fit_intercept)
+        reg_model = fit_ols(
+            x=_to_ols_array(x),
+            y=_to_ols_array(y),
+            order=order,
+            fit_intercept=fit_intercept,
+        )
     except Exception:
         warnings.warn(f"problem with x={x}, y={y}")
         return 0.0, 0.0, 0.0, 0.0
