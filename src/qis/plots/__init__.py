@@ -152,3 +152,6 @@ from qis.plots.derived.signal_diagnostics_plot import (
     plot_signal_diagnostics_for_returns,
     plot_signal_diagnostics_beta_boxplot
 )
+
+from qis.plots.dendrogram import plot_dendrogram
+from qis.plots.derived.clustering import plot_clusters

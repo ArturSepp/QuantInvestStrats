@@ -5,6 +5,15 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.26.0] - 2026-09-12
+
+### Added
+
+- Export plot_dendrogram for supplied linkage trees and plot_clusters for composite
+  tree/membership views. Caller-owned axes, display aliases, labelled groups and
+  arbitrary cadence counts are supported without importing any consumer package.
+- Add the offline examples/plots/cluster_dendrograms.py workflow.
+
 ## [Unreleased]
 
 **Seeded `BootstrapType.IID` results produced by earlier qis versions may not reproduce exactly.**

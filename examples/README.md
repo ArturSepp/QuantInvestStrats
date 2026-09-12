@@ -143,3 +143,11 @@ examples/
 Examples write generated PDFs / PNGs to `qis.local_path.get_output_path()`.
 Output figures committed to `examples/figures/` are gitignored — the path
 exists for README assets only and is regenerated on demand.
+
+
+### Cluster dendrograms (offline)
+
+Run python -m examples.plots.cluster_dendrograms --output-dir <local-output-directory>
+to generate a single-axis dendrogram and a composite cluster-membership page from
+the frozen synthetic universe. The example demonstrates supplied axes and titles;
+no FactorLasso, OptimalPortfolios or vendor data is required.

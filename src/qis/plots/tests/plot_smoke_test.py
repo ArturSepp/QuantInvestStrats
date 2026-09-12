@@ -206,6 +206,11 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
             detailed_mode=False,
         ),
         'plot_pie': dict(df=fx.positive_table),
+        'plot_dendrogram': dict(linkage=np.array([[0., 1., .5, 2.]]),
+                               labels=['A', 'B'], cutoff=.3),
+        'plot_clusters': dict(clusters={'ME': pd.Series([1, 2], index=['A', 'B'])},
+                              linkages={'ME': np.array([[0., 1., .5, 2.]])},
+                              cutoffs={'ME': .3}),
         'plot_portfolio_breadth_concentration': dict(
             result=fx.portfolio_breadth,
             detailed_mode=False,
