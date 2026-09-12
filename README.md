@@ -467,7 +467,7 @@ If you use QIS in your research, please cite it as:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.28.0},
+  version={5.29.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

@@ -309,18 +309,43 @@ an unavailable-band status and no quadratic fit.
 
 ## Report subjects and audit exports
 
-The ten pages cover requested scenarios, conditional scenarios, worst historical
+Nine core pages cover requested scenarios, conditional scenarios, worst historical
 months, current exposures/risk, holding factor contributors, sensitivity curves,
-response betas/R-squared, fitted clusters, correlation/methodology, and
-coverage/reconciliation.
+response loadings/R-squared, fitted cluster dendrograms and correlation/methodology.
+The layout preserves the original stress-report titles and explanatory notes;
+`model_name="MATF"` gives the MATF titles without a private model dependency.
 
-All table exports retain every scenario, holding and grid. The fixed PDF uses
-explicit display limits: 12 scenario rows, ten contributors, six factor panels,
-four grid panels, 20 response rows and twelve displayed beta factors. Missing
-R-squared and fitted trees are labelled unavailable. Optional response diagnostics
-may include name, annual_systematic_vol, annual_residual_vol and annual_factor_model_vol;
-these describe a unit response, not a portfolio holding weight. The caller supplies labels,
-notes, diagnostics and existing tree topology; the renderer does not fit them.
+Page four contains an annualised factor-model risk table and **family Euler
+volatility contributions**. Each family sums its signed constituent contributions;
+scenario split weights are not used. Ungrouped factors remain separate. Overlapping
+scenario groups have no unique additive partition and display atomic factor terms.
+The supplied asset-covariance risk remains a separate exported view if it differs
+from the factor-model total. Derivative risk uses current shared-response Jacobians.
+
+Page six calls QIS scatter plots and `fit_multivariate_ols` for through-zero
+quadratic fits on funded-asset scenario grids. Existing conditional bands stay
+centred on exact scenario valuations. Neither bands nor quadratic fits are inferred
+for derivative portfolios. Credit grids retain the caller's total-family split.
+Page seven includes signed beta colours, fitted R-squared, annual systematic and
+residual volatility, Rest of assets, and Portfolio rows. Rest uses full-denominator
+weights, not a renormalised sleeve. Portfolio R-squared is an absolute-response-
+exposure-weighted average of available fitted R-squared, not a portfolio regression.
+
+The parser can add a tenth page with `StressReportConfig(appendix_table=...,
+appendix_title=..., appendix_subtitle=..., appendix_notes=(...))`. QIS displays the
+supplied preformatted DataFrame and footnotes; it invents no source-quality,
+collateral or coverage rules. The table supports up to 24 rows and ten data columns.
+Use `None` to omit the page. The complete source audit can remain a separate export.
+
+All table exports retain every scenario, holding and grid. PDF limits are 12
+scenario rows, ten contributors, six factor panels, four grid panels and 20 unit
+response rows plus aggregate rows. All fitted factors appear in model order.
+Missing R-squared and fitted trees are labelled unavailable. The caller supplies
+names, diagnostics and original topology; the renderer never estimates them.
+`PortfolioStressResult.report_diagnostics` retains numerical Euler tables, unit
+response risk, loading aggregates and quadratic coefficients before rendering.
+Those exhibits, the displayed loading table and optional parser appendix are also
+exported to Excel and CSV.
 
 The workbook is a numerical result export, not an editable payoff calculator.
 The CSV-to-table mapping, conventions, snapshot dates and SHA-256 artifact hashes

@@ -5,12 +5,14 @@ import textwrap
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import PercentFormatter, MaxNLocator, FuncFormatter
+from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 from qis.plots.bars import plot_bars
 from qis.plots.table import plot_df_table
 from qis.plots.derived.clustering import plot_clusters
-from qis.utils.np_ops import covar_to_corr
+from qis.plots.scatter import plot_scatter
+from qis.models.linear.plot_correlations import plot_corr_matrix_from_covar
+from qis.portfolio.stress.reporting import _loading_table
 
 
 INK = "#18354B"
@@ -22,7 +24,7 @@ def _page(result, config, number, title, subtitle):
     """Create a consistent landscape canvas with dated currency/denominator footers."""
     fig = plt.figure(figsize=(16.54, 11.69), facecolor="white")
     fig.text(0.04, 0.955, title, fontsize=21, weight="bold", color=INK)
-    fig.text(0.04, 0.917, textwrap.fill(subtitle, 160), fontsize=10, color=BLUE)
+    fig.text(0.04, 0.923, textwrap.fill(subtitle, 160), fontsize=10, color=BLUE)
     meta = result.metadata
     footer = (
         f"{config.title} | {config.model_label} | Positions {meta['valuation_date'][:10]} | "
@@ -45,7 +47,7 @@ def _empty(ax, message):
     ax.text(0.5, 0.5, textwrap.fill(message, 75), ha="center", va="center", fontsize=12, color=BLUE)
 
 
-def _table(ax, data, title="", first=0.25, fontsize=9):
+def _table(ax, data, title="", first=0.25, fontsize=9, widths=None):
     """Render an already-formatted table through the existing QIS table implementation."""
     if data.empty:
         _empty(ax, "No applicable observations supplied.")
@@ -61,7 +63,7 @@ def _table(ax, data, title="", first=0.25, fontsize=9):
         edge_color="white",
         linewidth=0.5,
         left_aligned_first_col=True,
-        col_widths=[first] + [(1 - first) / len(data.columns)] * len(data.columns),
+        col_widths=widths or [first] + [(1 - first) / len(data.columns)] * len(data.columns),
     )
     for table in ax.tables:
         for (row, col), cell in table.get_celld().items():
@@ -107,7 +109,7 @@ def _bars(ax, values, title, percent=False):
     ax.grid(axis="x", color="#E4EAF0", linewidth=0.5)
     ax.margins(x=0.3)
     ax.xaxis.set_major_locator(MaxNLocator(nbins=5))
-    axis_format = "{:+.1%}" if percent else "{:+,.1f}"
+    axis_format = "{:+.2%}" if percent else "{:+,.2f}"
     ax.xaxis.set_major_formatter(FuncFormatter(lambda value, position: axis_format.format(value)))
 
 
@@ -128,18 +130,13 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
         rows = result.historical_ranking.index[:12]
     pnl = valuation.portfolio_pnl.loc[rows]
     labels = result.metadata.get("scenario_descriptions", {}) if number != 3 else {}
-    overrides = result.metadata.get("scenario_completion_overrides", {}) if number != 3 else {}
-    display_labels = {
-        key: (str(labels.get(str(key), key)) + (" *" if str(key) in overrides else ""))
-        if number != 3 else key
-        for key in rows
-    }
+    display_labels = {key: (str(labels.get(str(key), key))) if number != 3 else key for key in rows}
     pnl = pnl.rename(index=display_labels)
-    _bars(fig.add_axes([0.16, 0.57, 0.32, 0.28]), pnl / scale, f"Portfolio P&L ({unit})")
+    _bars(fig.add_axes([0.16, 0.57, 0.32, 0.28]), pnl / scale, f"Total P&L ({unit})")
     _bars(
         fig.add_axes([0.63, 0.57, 0.30, 0.28]),
         pnl / denominator,
-        f"P&L / {result.metadata['denominator_label']}",
+        "Portfolio P&L (% of NAV)",
         percent=True,
     )
     cells = []
@@ -163,21 +160,38 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
         for item in frame.index
     ]
     _table(
-        fig.add_axes([0.04, 0.14, 0.92, 0.37]),
+        fig.add_axes([0.04, 0.125, 0.92, 0.32]),
         frame,
-        "Ten largest absolute holding contributions; signed percentage points of denominator",
+        "Top 10 asset contributions by absolute size; signed percentage points of portfolio NAV",
         first=0.18,
         fontsize=8,
     )
-    _note(
-        fig,
-        "P&L = stressed value minus observed value. Percentages use the stated reporting "
-        "denominator. Current holdings and fitted betas are held fixed in every scenario. "
-        "Contributor rank uses absolute holding P&L; gains remain positive. "
-        "At most 12 scenarios are displayed; complete values and original IDs are exported. "
-        + ("* Caller-pinned completion is retained on both pages; modes are exported."
-           if overrides else ""),
-    )
+    for ax in fig.axes:
+        for table in ax.tables:
+            for (r, c), cell in table.get_celld().items():
+                if r > 0 and c > 0:
+                    value = cell.get_text().get_text().split("\n")[-1]
+                    cell.set_facecolor("#F9EDEF" if value.startswith("-") else "#EAF4F1")
+    notes = [
+        "Each row is ranked independently. Cells show asset name and contribution / full "
+        "portfolio NAV. The omitted remainder is retained in the CSV reconciliation."
+    ]
+    if number != 3:
+        for scenario, note in result.metadata.get("scenario_notes", {}).items():
+            if scenario not in valuation.factor_log_shocks.index:
+                continue
+            note = str(note).replace(
+                "{shock_kind}",
+                "correlated shock"
+                if number == 2
+                else "direct shock (correlated version on page 2)",
+            )
+            for factor, shock in valuation.factor_log_shocks.loc[scenario].items():
+                note = note.replace("{" + str(factor) + "}", f"{np.expm1(shock):+.2%}")
+            if note not in notes:
+                notes.append(note)
+        notes.append("Correlated-shock methodology and formulas: see Appendix, page 9.")
+    _footnotes(fig, notes, y=0.10, width=190, fontsize=7.6)
     return fig
 
 
@@ -188,366 +202,663 @@ def _currency_scale(result):
     return scale, f"{currency} millions" if scale == 1e6 else currency
 
 
+def _footnotes(fig, notes, y=0.115, width=190, fontsize=8):
+    """Place complete explanations within the reserved note band."""
+    lines = [line for note in notes for line in textwrap.wrap(str(note), width)]
+    available = max(y - 0.044, 0.02) * 11.69 * 72
+    fontsize = min(fontsize, available / max(1, len(lines)) / 1.3)
+    fig.text(0.04, y, "\n".join(lines), fontsize=fontsize, color=INK, va="top", linespacing=1.3)
+
+
+def _panel_note(fig, x, y, note):
+    """Wrap one panel's variable definitions without crossing the adjacent column."""
+    fig.text(x, y, textwrap.fill(note, 88), fontsize=8, color=INK, va="top")
+
+
 def _risk_page(result, config):
-    """Present betas, currency exposures and canonical current local risk."""
+    """Restore the annualised risk table and additive family Euler chart."""
     fig = _page(
         result,
         config,
         4,
-        "Current exposures and local risk",
-        "Dollar sensitivities come from the current payoff Jacobian; "
-        "zero or negative derivative marks do not remove their risk.",
+        f"Portfolio {config.model_name} exposures and risk",
+        "Exposure ratios refer to each factor definition. Annualised risk uses the "
+        "assigned factor covariance and residual variances.",
     )
-    order = result.factor_exposures.abs().sort_values(ascending=False).index
-    labels = {key: config.factor_labels.get(key, key) for key in order}
-    scale, unit = _currency_scale(result)
+    labels = config.factor_labels
+    currency = result.metadata["reference_currency"]
     _bars(
-        fig.add_axes([0.13, 0.45, 0.33, 0.39]),
-        result.factor_betas.loc[order].rename(index=labels),
-        "Portfolio factor betas",
+        fig.add_axes([0.16, 0.535, 0.32, 0.325]),
+        result.factor_betas.rename(index=labels),
+        "Weighted factor exposure (ratio)",
     )
     _bars(
-        fig.add_axes([0.63, 0.45, 0.30, 0.39]),
-        result.factor_exposures.loc[order].rename(index=labels) / scale,
-        f"Factor sensitivities ({unit})",
+        fig.add_axes([0.65, 0.535, 0.29, 0.325]),
+        result.factor_exposures.rename(index=labels) / 1e6,
+        f"Dollar factor exposure ({currency} m)",
     )
-    risk = (
-        result.risk.rename(
-            index={
-                "annual_total_vol": "Annual total vol (supplied covariance)",
-                "annual_systematic_vol": "Annual systematic vol",
-                "annual_residual_vol": "Annual residual vol",
-                "annual_factor_model_vol": "Annual factor-model total vol",
-                "local_vol_horizon": "Total local vol at stated horizon",
-            }
-        )
-        .map(lambda x: f"{x:.2%}")
-        .to_frame("Volatility")
-    )
-    _table(fig.add_axes([0.05, 0.16, 0.48, 0.22]), risk, first=0.78)
-    groups = result.factor_group_exposures.map(lambda x: f"{x:,.2f}")
-    groups = groups.rename(
-        columns={"exposure_sum": "Exposure sum", "split_bump_exposure": "Split-bump sensitivity"}
-    )
-    _table(fig.add_axes([0.61, 0.20, 0.34, 0.13]), groups, first=0.32)
-    _note(
+    _panel_note(
         fig,
-        "Factor beta = current factor currency sensitivity / reporting denominator. "
-        "Exposure sum adds member-factor sensitivities; split-bump sensitivity weights them "
-        "by the declared family allocation. These are local derivatives. Volatility uses "
-        "annualized log covariance and aggregated shared residual exposures, without "
-        "renormalizing signed holdings. Covariance and factor-model risk remain separate views.",
+        0.055,
+        0.478,
+        "e_f = sum_i w_i beta_if, where w_i = MTM_i / NAV. This is the portfolio sensitivity "
+        "to factor f: a small +1% factor move contributes approximately e_f% of NAV."
+        if result.metadata["all_funded"]
+        else "e_f = factor dollar sensitivity / reporting denominator. Sensitivities use the "
+        "current payoff Jacobian, including zero-mark futures and shared underlying responses.",
     )
+    _panel_note(
+        fig,
+        0.565,
+        0.478,
+        "Dollar exposure = NAV x e_f. A small +1% factor move contributes approximately "
+        "1% of this amount to portfolio P&L; it is not invested cash.",
+    )
+    risk = result.report_diagnostics["Annualised portfolio risk"]
+    formatted = pd.DataFrame(
+        {
+            "Annual vol": risk.annual_vol.map("{:.2%}".format),
+            "Dollar vol (m)": (risk.dollar_vol / 1e6).map("{:.2f}".format),
+            "Variance share": risk.variance_share.map("{:.1%}".format),
+            "Euler vol (%)": risk.euler_vol.map("{:+.2%}".format),
+        }
+    )
+    _table(
+        fig.add_axes([0.045, 0.205, 0.50, 0.17]),
+        formatted,
+        "Annualised portfolio risk",
+        first=0.24,
+        fontsize=9.5,
+    )
+    family = result.report_diagnostics["Family Euler volatility"]
+    values = family.euler_vol.copy()
+    values.index = family.label
+    _bars(
+        fig.add_axes([0.65, 0.205, 0.29, 0.19]),
+        values,
+        "Factor Euler volatility contributions (by family)",
+        percent=True,
+    )
+    _panel_note(
+        fig,
+        0.055,
+        0.146,
+        "Systematic variance = e.T Sigma e; idio variance = sum_i w_i^2 residual_var_i. "
+        "Total vol is the square root of their sum. Dollar vol = NAV x vol. Variance shares "
+        "and Euler vol contributions allocate total risk; standalone vols do not add.",
+    )
+    _panel_note(
+        fig,
+        0.565,
+        0.146,
+        "Factor RC_f = e_f (Sigma e)_f / total portfolio vol. A family sums its members' "
+        "signed RC_f, without shock-split weights. Negative values reduce risk. Families "
+        "sum to the systematic Euler contribution in the table.",
+    )
+    if not np.isclose(result.risk.annual_total_vol, result.risk.annual_factor_model_vol):
+        _footnotes(
+            fig,
+            [
+                "The table uses the factor-model total. Supplied asset-covariance "
+                "volatility differs and is retained separately in Current risk."
+            ],
+            y=0.075,
+        )
     return fig
 
 
 def _contributor_page(result, config):
-    """Show the most influential original holdings for the six largest factor exposures."""
+    """Allocate the largest factor Euler contributions to original holdings."""
     fig = _page(
         result,
         config,
         5,
-        "Holding contributions to factor exposures",
-        "Six largest absolute net portfolio factor sensitivities; "
-        "ten largest absolute holding sensitivities per factor.",
+        "Largest factor exposures: asset risk contributors",
+        "Factors ranked by absolute MTM factor exposure. Assets ranked by absolute Euler "
+        "contribution to total annual portfolio volatility.",
     )
-    factors = result.factor_exposures.abs().sort_values(ascending=False).head(6).index
-    scale, unit = _currency_scale(result)
+    factors = (
+        result.factor_exposures.loc[result.factor_exposures.ne(0)]
+        .abs()
+        .sort_values(ascending=False, kind="stable")
+        .head(6)
+        .index
+    )
     grid = fig.add_gridspec(
-        2, 3, left=0.13, right=0.95, top=0.84, bottom=0.15, hspace=0.5, wspace=0.75
+        2, 3, left=0.11, right=0.96, top=0.86, bottom=0.20, hspace=0.48, wspace=0.68
     )
+    rc = result.report_diagnostics["Factor Euler volatility"].euler_vol
     for i, factor in enumerate(factors):
-        values = result.holding_factor_exposures[factor]
-        selected = values.abs().sort_values(ascending=False).head(10).index
-        values = values.loc[selected]
-        values.index = result.positions.loc[selected, "name"]
+        values = result.report_diagnostics["Holding factor Euler volatility"][factor]
+        selected = values.abs().sort_values(ascending=False, kind="stable").head(10).index
+        values = values.loc[selected].copy()
+        name_col = "metadata:short_name" if "metadata:short_name" in result.positions else "name"
+        values.index = result.positions.loc[selected, name_col]
         _bars(
             fig.add_subplot(grid[i // 3, i % 3]),
-            values / scale,
-            f"{config.factor_labels.get(factor, factor)} ({unit})",
+            values,
+            f"{config.factor_labels.get(factor, factor)}\n"
+            f"Exposure {result.factor_betas[factor]:+.2f}; factor Euler {rc[factor]:+.2%}",
+            percent=True,
         )
-    _note(
+    _footnotes(
         fig,
-        "Each bar is the original holding's current currency sensitivity to one unit "
-        "of factor log return. Synthetic option legs remain grouped under the source holding. "
-        "Shared underlying response sensitivities are aggregated before portfolio risk.",
+        [
+            "All panels: w_i = MTM_i / NAV; e_f = sum_i w_i beta_if. Factor ranking "
+            "uses abs(NAV x e_f). Asset RC = (w_i beta_if / e_f) x factor RC; bars allocate each "
+            "factor Euler contribution to annual portfolio volatility (%), and negative values "
+            "reduce risk. Top 10 assets per factor are shown; complete tables are exported. "
+            "Exposure is a sensitivity ratio; zero net factor exposures are omitted."
+            if result.metadata["all_funded"]
+            else "Factor ranking uses absolute dollar sensitivity. "
+            "Bars allocate local factor Euler "
+            "risk to original holdings through their payoff Jacobians. Shared responses are "
+            "aggregated before portfolio risk; synthetic option legs remain under their source "
+            "holding. Negative contributions reduce local risk; complete tables are exported."
+        ],
+        y=0.13,
+        width=185,
+        fontsize=9,
     )
     return fig
 
 
 def _grid_page(result, config):
-    """Draw deterministic payoff curves and only analytically supported existing bands."""
-    fig = _page(
-        result,
-        config,
-        6,
-        "Factor sensitivity curves",
-        "Each grid point revalues the full holding payoff through the same scenario engine.",
-    )
+    """Use QIS scatter plots, through-zero regressions and exact-value-centred bands."""
+    funded = result.metadata["all_funded"]
+    confidence = result.metadata["confidence"]
+    months = result.metadata["horizon_years"] * 12
     keys = config.selected_grids or tuple(result.grids)[:4]
-    grid = fig.add_gridspec(
-        2, 2, left=0.09, right=0.95, top=0.85, bottom=0.16, hspace=0.55, wspace=0.24
-    )
-    for i in range(4):
-        ax = fig.add_subplot(grid[i // 2, i % 2])
+    ranges = []
+    for key in keys:
+        try:
+            x = np.asarray(result.grid_summaries[key].index, dtype=float)
+            ranges.append(f"{key} {x.min():+.0%} to {x.max():+.0%}")
+        except (TypeError, ValueError):
+            ranges.append(key)
+    subtitle = "Correlated shocks: " + "; ".join(ranges) + "."
+    standard = tuple(str(key).lower() for key in keys) == ("equity", "rates", "credit", "fx")
+    if standard:
+        expected = [np.arange(-30, 31) / 100] + [np.arange(-20, 21) / 100] * 3
+        standard = all(
+            len(result.grid_summaries[key]) == len(axis)
+            and np.allclose(np.asarray(result.grid_summaries[key].index, dtype=float), axis)
+            for key, axis in zip(keys, expected)
+        )
+    if standard:
+        subtitle = "Correlated shocks: equity +/-30%; rates, credit, FX +/-20%; step 1%."
+    if any("lower_bound" in result.grid_summaries[key] for key in keys):
+        subtitle += f" Shading: {confidence:.0%} conditional prediction band ({months:g} month)."
+    else:
+        subtitle += " Deterministic payoff curves; no prediction bands."
+    fig = _page(result, config, 6, "Sensitivity to equity, rates, credit and FX factors", subtitle)
+    boxes = [
+        [0.085, 0.575, 0.38, 0.265],
+        [0.575, 0.575, 0.38, 0.265],
+        [0.085, 0.215, 0.38, 0.265],
+        [0.575, 0.215, 0.38, 0.265],
+    ]
+    for i, box in enumerate(boxes):
+        ax = fig.add_axes(box)
         if i >= len(keys):
             _empty(ax, "No additional sensitivity grid supplied.")
             continue
         key = keys[i]
         summary = result.grid_summaries[key]
+        numeric = True
         try:
             x = np.asarray(summary.index, dtype=float)
         except (TypeError, ValueError):
-            x = np.arange(len(summary))
-            ax.set_xticks(x, [str(item) for item in summary.index], rotation=30)
-        ax.plot(x, summary.portfolio_return, color=BLUE, lw=2)
-        if "lower_bound" in summary:
-            ax.fill_between(x, summary.lower_bound, summary.upper_bound, alpha=0.14, color=BLUE)
-        ax.axhline(0, color="#888888", lw=0.6)
-        groups = result.metadata.get("factor_groups", {})
-        requested_key = result.grid_metadata.loc[key, "requested_keys"]
-        group = groups.get(requested_key)
-        title = key
-        axis_label = summary.index.name or "Requested bump (supplied grid index)"
+            numeric = False
+            x = np.arange(len(summary), dtype=float)
+        requested = result.grid_metadata.loc[key, "requested_keys"]
+        group = result.metadata.get("factor_groups", {}).get(requested)
+        title = requested
+        xlabel = requested + " factor return"
         if group is not None:
-            title = " + ".join(group["members"]) + " (split total bump)"
-            axis_label = f"Total {group['label'] or requested_key} family bump"
-        ax.set_title(title, fontsize=12, color=INK)
-        ax.set_xlabel(axis_label, fontsize=9)
-        ax.set_ylabel("P&L / reporting denominator", fontsize=9)
-        ax.yaxis.set_major_formatter(PercentFormatter(1))
-        ax.grid(alpha=0.2)
-        status = result.grid_metadata.loc[key, "band_status"]
-        ax.text(
-            0.02,
-            0.98,
-            "\n".join(textwrap.wrap(status, 66)),
-            transform=ax.transAxes,
-            va="top",
-            fontsize=8,
-            color=BLUE,
+            title = " + ".join(group["members"]) + " (split total family bump)"
+            xlabel = f"Total {group['label'] or requested} family bump"
+        points = pd.DataFrame({"factor_return": x, "portfolio_return": summary.portfolio_return})
+        plot_scatter(
+            points,
+            x="factor_return",
+            y="portfolio_return",
+            xlabel=xlabel,
+            ylabel="Portfolio return (% of NAV)",
+            full_sample_order=0,
+            add_universe_model_label=False,
+            add_universe_model_prediction=False,
+            add_universe_model_ci=False,
+            ci=None,
+            legend_loc=None,
+            full_sample_color=BLUE,
+            xvar_format="{:+.0%}" if numeric else "{:.0f}",
+            yvar_format="{:+.0%}",
+            markersize=17,
+            fontsize=9,
+            ax=ax,
         )
-    _note(
-        fig,
-        "Factor shocks are log returns. For a total simple family bump x with weights w, "
-        "each member receives log(1 + w*x); an equal n-member split is log(1 + x/n). "
-        "Conditional completion fixes all members jointly. Shading, when present, is a "
-        f"{result.metadata['confidence']:.0%} baseline Gaussian conditional-factor plus residual "
-        f"band over {result.metadata['horizon_years']:.6g} years. Derivative curves have no "
-        "Gaussian band or quadratic approximation.",
-    )
+        if "lower_bound" in summary:
+            ax.fill_between(
+                x, summary.lower_bound, summary.upper_bound, color=BLUE, alpha=0.18, zorder=0
+            )
+            ax.text(
+                0.98,
+                0.03,
+                f"{confidence:.0%} band: +/-{summary.band_half_width.iloc[0]:.2%} of NAV",
+                transform=ax.transAxes,
+                ha="right",
+                fontsize=8,
+                color=INK,
+            )
+        coefficients = result.report_diagnostics["Grid quadratic regressions"]
+        if key in coefficients.index:
+            b1, b2 = coefficients.loc[key, ["linear", "quadratic"]]
+            label = rf"$R_p(x)={b1:.2f}x{b2:+.2f}x^2$"
+            ax.plot(x, b1 * x + b2 * x * x, color="#C46B27", ls="--", lw=1.5, label=label)
+            ax.legend(
+                loc="upper right" if str(key).lower() == "fx" else "upper left",
+                fontsize=9,
+                frameon=False,
+            )
+        ax.set_title(title, fontsize=12, color=INK, fontweight="bold", pad=12)
+        ax.grid(True, color="#DFE7F0", linewidth=0.6)
+        ax.axhline(0, color="#7B8D9B", lw=0.6)
+        ax.axvline(0, color="#7B8D9B", lw=0.6)
+        if numeric and len(x):
+            ax.set_xlim(x.min() - 0.015, x.max() + 0.015)
+            ax.set_xticks(np.arange(np.ceil(x.min() * 10), np.floor(x.max() * 10) + 1) / 10)
+        elif len(x):
+            ax.set_xticks(x, [str(item) for item in summary.index], rotation=30)
+    if any("lower_bound" in result.grid_summaries[key] for key in keys):
+        fig.text(
+            0.085,
+            0.15,
+            f"{confidence:.0%} bands include conditional factor risk + "
+            f"idiosyncratic risk over {months:g} month. Baseline portfolio exposures; "
+            "analytical covariance method.",
+            fontsize=10,
+            fontweight="bold",
+            color=INK,
+        )
+    notes = [
+        "Credit: x is the total family bump; each of n Credit factors receives "
+        "log(1+x/n) for an equal split. Other panels anchor at log(1+x). Free factors "
+        "use one joint conditional solve. Appendix, page 9.",
+        "All x-axes are factor returns, not yield or spread changes.",
+    ]
+    if funded and any("lower_bound" in result.grid_summaries[key] for key in keys):
+        notes += [
+            "Shading includes remaining factor dispersion using conditional covariance "
+            "plus independent asset residuals. Gaussian, pointwise, additive NAV-return "
+            "approximation with baseline exposures and square-root-of-time scaling.",
+            "Constant width within each panel uses the same baseline exposures and covariance "
+            "for every anchor value; parameter uncertainty and non-normal tails are excluded.",
+            "Dashed: quadratic OLS through zero (decimal returns). Bands remain centred on "
+            "exact scenario valuations, not the polynomial fit. No Monte Carlo or regression "
+            "confidence interval.",
+        ]
+    elif funded:
+        notes += ["Dashed: quadratic OLS through zero on the supplied numerical grid. "
+                  "No conditional prediction band was computed for these grids."]
+    else:
+        notes += [
+            "Derivative portfolios show exact intrinsic-payoff scenarios. No Gaussian "
+            "band or quadratic regression is supplied for nonlinear derivative payoffs."
+        ]
+    if any(result.grid_metadata.loc[key, "bump_convention"] != "simple"
+           or result.grid_metadata.loc[key, "completion"] != "conditional" for key in keys):
+        notes[0] = ("Each panel uses the supplied grid index and exported Grid conventions. "
+                    "Simple family bumps split before log1p; log family bumps split in log units. "
+                    "Only conditional grids complete free factors by a joint covariance solve.")
+    _footnotes(fig, notes, y=0.115, width=190, fontsize=7.6)
     return fig
 
 
 def _beta_page(result, config):
-    """Render supplied estimation diagnostics beside the fitted response betas."""
+    """Show the v0 heatmap table with unit-risk and full-denominator summary rows."""
+    funded = result.metadata["all_funded"]
+    table = _loading_table(result, config)
+    count = min(20, len(result.response_exposures))
     fig = _page(
         result,
         config,
         7,
-        "Underlying response betas and fit diagnostics",
-        "Fit diagnostics belong to the caller's estimator; absent R-squared "
-        "is explicitly unavailable.",
+        f"Estimated {config.model_name} loadings and explanatory power",
+        f"{count} assets shown by largest absolute MTM; portfolio row uses all modelled "
+        "holdings, including assets outside this display."
+        if funded
+        else f"{count} fitted responses shown by absolute local dollar sensitivity; "
+        "portfolio row uses all shared responses and the full reporting denominator.",
     )
-    responses = result.response_exposures.abs().sort_values(ascending=False).head(20).index
-    factors = result.factor_exposures.abs().sort_values(ascending=False).head(12).index
-    frame = result.factor_loadings.loc[responses, factors].map(lambda x: f"{x:.2f}")
-    frame = frame.rename(columns=config.factor_labels)
-    if config.response_diagnostics is not None and "r2" in config.response_diagnostics:
-        frame["R-squared"] = config.response_diagnostics.r2.reindex(responses).map(
-            lambda x: "Unavailable" if pd.isna(x) else f"{x:.1%}"
+    names = (
+        config.response_diagnostics["name"].to_dict()
+        if config.response_diagnostics is not None and "name" in config.response_diagnostics
+        else {}
+    )
+    labels = []
+    for key, row in table.iterrows():
+        if key == "Portfolio":
+            label = (
+                "Modelled subtotal" if result.metadata.get("scope") == "modelled subtotal" else key
+            )
+        else:
+            label = f"{names.get(key, key)} | {row.response_exposure / 1e6:.1f}m"
+        labels.append(label)
+    table = table.drop(columns="response_exposure")
+    table.index = labels
+    factors = result.factor_loadings.columns
+    formatted = table.map(lambda x: "n/a" if pd.isna(x) else f"{x:+.2f}")
+    formatted["R-squared"] = table["R-squared"].map(lambda x: "n/a" if pd.isna(x) else f"{x:.1%}")
+    for column in ["Model total vol", "Systematic vol", "Idio vol"]:
+        formatted[column] = table[column].map(lambda x: "n/a" if pd.isna(x) else f"{x:.2%}")
+    formatted = formatted.rename(
+        columns={**config.factor_labels, "Model total vol": f"{config.model_name} total vol"}
+    )
+    formatted.columns = ["\n".join(textwrap.wrap(str(c), 10)) for c in formatted.columns]
+    widths = [0.225] + [0.5 / len(factors)] * len(factors) + [0.065, 0.07, 0.07, 0.07]
+    ax = fig.add_axes([0.035, 0.205, 0.93, 0.63])
+    _table(
+        ax,
+        formatted,
+        f"Factor loadings and R-squared; annualised {config.model_name}-implied volatility",
+        fontsize=8.5,
+        first=0.225,
+        widths=widths,
+    )
+    for t in ax.tables:
+        for (r, c), cell in t.get_celld().items():
+            if r > 0 and 1 <= c <= len(factors):
+                value = table.iloc[r - 1, c - 1]
+                if np.isfinite(value):
+                    color = plt.get_cmap("PiYG")((np.clip(value, -1.5, 1.5) + 1.5) / 3)
+                    cell.set_facecolor(color)
+                    luminance = 0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2]
+                    cell.get_text().set_color("white" if luminance < 0.5 else INK)
+            elif r > 0 and c == len(factors) + 1:
+                value = table.iloc[r - 1, c - 1]
+                if np.isfinite(value) and value < 0.3:
+                    cell.set_facecolor("#FFF1D8")
+            if r == len(table):
+                cell.get_text().set_fontweight("bold")
+                cell.set_edgecolor(INK)
+                cell.set_linewidth(0.7)
+    notes = [
+        f"Asset systematic vol = sqrt(beta_i.T Sigma beta_i); idio vol = sqrt(residual variance). "
+        f"{config.model_name} total vol = sqrt(systematic vol squared + idio vol squared).",
+        "Portfolio betas = sum_i (MTM_i / NAV) beta_i. Portfolio volatilities use the full "
+        "covariance and signed weights; they are not averages of asset volatilities.",
+        "Portfolio R-squared is the absolute-MTM-weighted average of available fitted asset "
+        "R-squared, not a portfolio regression R-squared. Asset R-squared measures fit quality.",
+        "All volatilities are annualised. Amber R-squared is below 30%. Beta colours: appendix "
+        "PiYG palette, capped at +/-1.5; printed values are uncapped. "
+        "Missing estimates remain n/a.",
+    ]
+    if "Rest of assets" in result.report_diagnostics["Loading aggregates"].index:
+        notes.append(
+            "Rest of assets: omitted modelled holdings aggregated with full-NAV weights; "
+            "not a normalised sleeve. R-squared uses their absolute MTM; sleeve vols "
+            "do not add to portfolio vol."
         )
-    else:
-        frame["R-squared"] = "Unavailable"
-    diagnostics = config.response_diagnostics
-    if diagnostics is not None:
-        for column, label in (
-            ("annual_systematic_vol", "Systematic vol"),
-            ("annual_residual_vol", "Residual vol"),
-            ("annual_factor_model_vol", "Model total vol"),
-        ):
-            if column in diagnostics:
-                frame[label] = diagnostics[column].reindex(responses).map(
-                    lambda x: "Unavailable" if pd.isna(x) else f"{x:.1%}"
-                )
-        if "name" in diagnostics:
-            frame.index = [
-                textwrap.shorten(str(diagnostics.loc[key, "name"]), 30)
-                if key in diagnostics.index and pd.notna(diagnostics.loc[key, "name"]) else key
-                for key in responses
-            ]
-    frame.columns = ["\n".join(textwrap.wrap(str(key), 11)) for key in frame.columns]
-    _table(fig.add_axes([0.04, 0.2, 0.92, 0.62]), frame, first=0.22, fontsize=8)
-    _note(
-        fig,
-        "Rows are fitted response/proxy identities, not option marks. Columns are "
-        "underlying log-return factor betas. R-squared is supplied regression explanatory "
-        "power; it is never inferred from volatility. Supplied annual systematic/residual "
-        "vols describe unit response exposure, not portfolio weights. Up to 20 responses "
-        "and twelve factors "
-        "are displayed, ranked by current exposure; complete matrices and diagnostics "
-        "are exported.",
-    )
+    if not funded:
+        notes = [
+            note.replace("MTM", "local response exposure").replace("holdings", "responses")
+            for note in notes
+        ]
+        notes.append(
+            "Response rows describe unit underlying risk, not derivative marks. "
+            "Portfolio rows use aggregated payoff sensitivities, including shared "
+            "residual risk. NAV means the explicit reporting denominator."
+        )
+    _footnotes(fig, notes, y=0.15, width=190, fontsize=8.5)
     return fig
 
 
 def _clusters_page(result, config):
-    """Render fitted tree topology using the existing QIS composite cluster plot."""
+    """Render original fitted cadence trees and the membership table through QIS."""
     fig = _page(
         result,
         config,
         8,
-        "Fitted cluster structure",
-        "Only caller-supplied fitted linkage and membership are displayed; no clustering "
-        "or covariance estimation occurs in this report.",
+        f"{config.model_name} asset cluster dendrograms",
+        "Clusters and merge distances from the assigned production fit; each observation "
+        "cadence is clustered separately.",
     )
     if not config.cluster_memberships:
         _empty(
-            fig.add_axes([0.08, 0.22, 0.84, 0.55]), "Fitted cluster diagnostics were not supplied."
+            fig.add_axes([0.08, 0.22, 0.84, 0.55]),
+            "Clustering topology is unavailable in the supplied model snapshot. "
+            "Supply the fitted clusters, linkages and cutoffs to display the original "
+            "estimator trees.",
         )
-    else:
-        keys = list(config.cluster_memberships)
-        grid = fig.add_gridspec(
-            len(keys), 3, left=0.08, right=0.96, top=0.83, bottom=0.16, hspace=0.35, wspace=0.4
+        return fig
+    clusters, linkages, cutoffs = (
+        config.cluster_memberships,
+        config.cluster_linkages,
+        config.cluster_cutoffs,
+    )
+    names = (
+        config.response_diagnostics["name"].copy()
+        if config.response_diagnostics is not None and "name" in config.response_diagnostics
+        else pd.Series(result.factor_loadings.index, index=result.factor_loadings.index)
+    )
+    names = names.fillna(pd.Series(names.index, index=names.index))
+    for i, asset in enumerate(names.index[names.duplicated(keep=False)], 1):
+        names.loc[asset] = f"{names.loc[asset][:15]} [{i}]"
+    order = list(reversed(linkages))
+    gap = 0.075
+    sizes = np.array([max(len(clusters[freq]), 3) for freq in order], dtype=float)
+    heights = (0.68 - gap * (len(order) - 1)) * sizes / sizes.sum()
+    top = 0.85
+    axes, titles = {}, {}
+    for freq, height in zip(order, heights):
+        axes[freq] = fig.add_axes([0.20, top - height, 0.42, height])
+        cadence = {"ME": "Monthly", "QE": "Quarterly"}.get(freq, str(freq))
+        titles[freq] = (
+            f"{cadence}: {len(clusters[freq])} assets; "
+            f"{clusters[freq].nunique()} clusters; cutoff {cutoffs[freq]:.2f}"
         )
-        axes = {key: fig.add_subplot(grid[i, :2]) for i, key in enumerate(keys)}
-        table_ax = fig.add_subplot(grid[:, 2])
-        plot_clusters(
-            config.cluster_memberships,
-            config.cluster_linkages,
-            config.cluster_cutoffs,
-            axes=axes,
-            table_ax=table_ax,
-            fontsize=8,
-            show_distance=True,
-        )
-    _note(
+        top -= height + gap
+    table_ax = fig.add_axes([0.69, 0.17, 0.27, 0.68])
+    plot_clusters(
+        clusters,
+        linkages,
+        cutoffs,
+        axes=axes,
+        table_ax=table_ax,
+        titles=titles,
+        display_names=names.to_dict(),
+        fontsize=9,
+        show_distance=True,
+        table_title="Fitted cluster membership",
+        table_kwargs={"fontsize": 10},
+    )
+    for ax in axes.values():
+        ax.set_title(ax.get_title(), fontsize=11, color=INK, pad=8)
+        ax.tick_params(axis="x", labelsize=8)
+        ax.set_xlabel("Merge distance", fontsize=8, color=INK)
+    table_ax.set_title("Fitted cluster membership", fontsize=11, color=INK, pad=10)
+    _footnotes(
         fig,
-        "Leaves preserve actual fitted response IDs and supplied linkage order. "
-        "Merge distances and cluster cutoffs are estimator diagnostics, not probabilities "
-        "of joint losses. Missing trees are reported as unavailable.",
+        [
+            "Leaves are assets in the fitted clustering universe. Branches show "
+            "hierarchical merges; the vertical black line is the fitted distance cutoff and "
+            "branch colours identify groups below that cut. Cluster IDs are local to each "
+            "cadence. These are return-dependence clusters used in factor estimation, not a "
+            "new clustering of the displayed betas. Original asset IDs, linkages and cutoffs "
+            "are exported."
+        ],
+        y=0.105,
+        width=185,
+        fontsize=8,
     )
     return fig
 
 
 def _methodology_page(result, config):
-    """Display fitted correlation and the valuation/conditional decision conventions."""
+    """Append the owning qis covariance display and the conditional-shock formula."""
     fig = _page(
         result,
         config,
         9,
-        "Correlation and scenario methodology",
-        "A scenario vector is an explicit hypothetical realization, not a probability forecast.",
+        f"{config.model_name} correlation and scenario construction",
+        f"Fitted covariance at {pd.Timestamp(result.metadata['risk_date']):%d %b %Y}; "
+        "lower triangle: correlations; diagonal: annualised factor volatilities.",
     )
-    cov = result.factor_covariance
-    positive = np.diag(cov) > 0
-    correlation = pd.DataFrame(np.nan, index=cov.index, columns=cov.columns)
-    if positive.any():
-        correlation.loc[positive, positive] = covar_to_corr(cov.loc[positive, positive])
-    ax = fig.add_axes([0.13, 0.3, 0.4, 0.48])
-    artist = ax.imshow(correlation, vmin=-1, vmax=1, cmap="RdBu_r")
-    labels = [config.factor_labels.get(key, key) for key in cov.index]
-    ax.set_xticks(range(len(labels)), labels, rotation=45, ha="right", fontsize=8)
-    ax.set_yticks(range(len(labels)), labels, fontsize=8)
-    fig.colorbar(artist, ax=ax, fraction=0.05)
+    ax = fig.add_axes([0.105, 0.235, 0.48, 0.60])
+    plot_corr_matrix_from_covar(
+        result.factor_covariance.rename(index=config.factor_labels, columns=config.factor_labels),
+        ax=ax,
+        title=None,
+        cmap="PiYG",
+        corr_format="{:.2f}",
+        vol_format="{:.1%}",
+        fontsize=9,
+        x_rotation=90,
+    )
+    fig.text(
+        0.105,
+        0.895,
+        str(
+            result.metadata.get("source_provenance", {}).get(
+                "covariance_method", "Covariance supplied by the assigned portfolio model."
+            )
+        ),
+        fontsize=11,
+        color=INK,
+    )
+    from fractions import Fraction
+
+    left = 0.62
+    fig.text(left, 0.835, "Conditional factor shocks", fontsize=15, fontweight="bold", color=INK)
+    fig.text(left, 0.791, r"$z_A=\log(P_A^{\mathrm{target}}/P_A^0)$", fontsize=16, color=INK)
+    fig.text(
+        left,
+        0.746,
+        r"$z_F=\Sigma_{FA}\Sigma_{AA}^{-1}z_A;\quad r_i=e^{z_i}-1$",
+        fontsize=15,
+        color=INK,
+    )
+    fig.text(
+        left,
+        0.704,
+        "A: anchored factors; F: free factors.\nSigma: annual factor log-return covariance.\n"
+        "Anchors stay fixed; no mean return is added.",
+        fontsize=10,
+        color=INK,
+        va="top",
+        linespacing=1.3,
+    )
+    fig.text(left, 0.625, "Conditional covariance", fontsize=15, fontweight="bold", color=INK)
+    fig.text(
+        left,
+        0.580,
+        r"$\Sigma_{F|A}=\Sigma_{FF}-\Sigma_{FA}\Sigma_{AA}^{-1}\Sigma_{AF}$",
+        fontsize=15,
+        color=INK,
+    )
+    fig.text(left, 0.530, "Analytical prediction band", fontsize=15, fontweight="bold", color=INK)
+    fig.text(
+        left,
+        0.486,
+        r"$v_{p|A}=e_F^\top\Sigma_{F|A}e_F+\sum_j w_j^2\sigma_{\epsilon,j}^2$",
+        fontsize=14,
+        color=INK,
+    )
+    fig.text(
+        left, 0.442, r"$R_p(x)\;\pm\;\Phi^{-1}((1+c)/2)\sqrt{T\,v_{p|A}}$", fontsize=14, color=INK
+    )
+    fig.text(
+        left,
+        0.403,
+        "w = MTM / NAV; e = beta.T w (baseline exposures).\n"
+        f"T = {Fraction(result.metadata['horizon_years']).limit_denominator(365)} year; "
+        f"c = {result.metadata['confidence']:.0%}. Independent residuals.\n"
+        "Gaussian conditional covariance; linearised NAV risk.\n"
+        "Same covariance and exposures at every grid point.",
+        fontsize=9.5,
+        color=INK,
+        va="top",
+        linespacing=1.35,
+    )
+    fig.text(left, 0.299, "Portfolio scenario valuation", fontsize=13, fontweight="bold", color=INK)
+    fig.text(left, 0.256, r"$R_p(x)=\sum_jw_j[\exp(\beta_j^\top z(x))-1]$", fontsize=15, color=INK)
+    fig.text(
+        0.105,
+        0.186,
+        r"Single anchor: $z_i=\rho_{ia}(\sigma_i/\sigma_a)z_a$",
+        fontsize=12,
+        color=INK,
+    )
+    fig.text(
+        0.105,
+        0.151,
+        "Yield mapping: z = log(1 - D x change in yield), or the declared external proxy.",
+        fontsize=9,
+        color=INK,
+    )
     notes = [
-        "Funded assets: P&L = observed value * expm1(beta dot factor log shock).",
-        "Calls/puts: signed intrinsic payoff at the shocked local quote; no time value.",
-        "Futures: signed units * multiplier * quote change; source MTM may be zero.",
-        "Derivatives: stressed value = observed MTM + model payoff change from zero shock.",
-        "FX: remove FX from a reference-currency fitted response before applying local strikes; "
-        "convert payoff once at stressed FX.",
-        "Conditional scenarios: fix all supplied factors jointly; use the fitted covariance "
-        "to complete the remaining factors. Explicit zero anchors remain zero.",
-        "Historical replay: apply each complete monthly factor vector to current holdings, "
-        "then rank exact portfolio P&L.",
-        "Nonlinear attribution: local factor components plus a separate payoff adjustment.",
+        "Level/price targets use correlated shocks on both requested pages. Explicit return shocks "
+        "use isolated factors on page 1 and conditional co-moves on page 2.",
+        "This is a conditional scenario under the fitted covariance, not a shock to the "
+        "correlation matrix or a forecast probability. The EWMA span is not a hard rolling window.",
     ]
-    y = 0.82
+    special = result.metadata.get("source_provenance", {}).get("external_target_method")
+    if special:
+        notes.append(str(special))
+    lines = []
     for note in notes:
-        wrapped = textwrap.fill(note, 69)
-        fig.text(0.6, y, wrapped, va="top", fontsize=10, color=INK)
-        y -= 0.028 * (wrapped.count("\n") + 1) + 0.028
-    _note(
-        fig,
-        "Correlation is annual covariance divided by the corresponding factor standard "
-        "deviations. Zero-variance pairs are unavailable. Deterministic scenarios have no "
-        "assigned probability; current local volatility does not capture payoff jumps or "
-        "unobserved contract path states.",
-    )
+        lines.extend(textwrap.wrap(note, 175))
+    fig.text(0.04, 0.115, "\n".join(lines), fontsize=9, color=INK, va="top", linespacing=1.4)
+    if not result.metadata["all_funded"]:
+        # The ordinary funded-asset formula does not value calls, puts or futures.
+        for text in fig.texts:
+            if text.get_text().startswith("$R_p(x)="):
+                text.set_text(r"$R_p(x)=\sum_h[V_h(z(x))-V_h(0)]/N$")
+            if text.get_text() == "Analytical prediction band":
+                text.set_text("Local risk (no derivative bands)")
+            if text.get_text().startswith("w = MTM"):
+                text.set_text(
+                    "w = shared response dollar sensitivity / N.\n"
+                    "N: explicit reporting denominator.\n"
+                    "Intrinsic payoff changes retain observed MTM anchors.\n"
+                    "No derivative prediction bands are displayed."
+                )
+            if text.get_text().startswith("$R_p(x)\\;"):
+                text.set_text("Band formula applies to funded assets only.")
     return fig
 
 
 def _coverage_page(result, config):
-    """Summarize explicit coverage and original-position reconciliation."""
-    fig = _page(
-        result,
-        config,
-        10,
-        "Coverage and valuation reconciliation",
-        "Every original holding remains in valuation and risk mapping. "
-        "Application-specific delivery, margin and collateral rules remain caller-owned.",
-    )
-    positions = result.positions
-    historical_count = 0 if result.historical is None else len(result.historical.pnl)
-    excluded_count = (
-        (result.historical_coverage.status != "eligible").sum()
-        if not result.historical_coverage.empty
-        else 0
-    )
-    values = pd.Series(
-        {
-            "Original holdings": f"{len(positions):,}",
-            "Vanilla legs": f"{len(result.leg_terms):,}",
-            "Fitted response identities": f"{len(result.factor_loadings):,}",
-            "Observed portfolio value": f"{positions.observed_mtm.sum():,.2f}",
-            "Model baseline value": f"{positions.model_baseline.sum():,.2f}",
-            "Constant reference-currency basis offset": f"{positions.basis_offset.sum():,.2f}",
-            "Eligible historical months": f"{historical_count:,}",
-            "Excluded historical rows": f"{excluded_count:,}",
-        }
-    ).to_frame("Value")
-    _table(fig.add_axes([0.05, 0.47, 0.54, 0.35]), values, first=0.76)
-    coverage = positions.groupby("coverage", sort=False).size().to_frame("Holdings")
-    coverage.index = ["\n".join(textwrap.wrap(item, 48)) for item in coverage.index]
-    coverage_height = min(0.35, 0.045 * (len(coverage) + 1))
-    _table(fig.add_axes([0.64, 0.82 - coverage_height, 0.31, coverage_height]),
-           coverage, first=0.82, fontsize=8)
-    notes = list(config.notes) or ["No additional application-specific notes supplied."]
-    notes += [
-        "Systematic/residual risk shares the underlying response across stock and derivative legs.",
-        "Zero-shock P&L is zero. The observed-minus-model basis offset is constant in reference "
-        "currency and is not a stressed option premium or available liquidation cash.",
-        "Option time value, volatility surfaces, barrier paths and delivery obligations are "
-        "outside primitive intrinsic valuation. Composite approximations declare their coverage.",
-        "Historical replay describes today's holdings under old factor returns, not realized "
-        "client performance. No lending value, credit limit or liquidation trigger is inferred.",
-    ]
-    note_text = "\n\n".join(textwrap.fill(note, 155) for note in notes)
-    # Fit caller notes inside the reserved region on the fixed ten-page template.
-    line_count = note_text.count("\n") + 1
-    note_fontsize = min(10.0, 0.265 * 11.69 * 72 / (1.2 * line_count))
-    fig.text(
-        0.05,
-        0.38,
-        note_text,
-        va="top",
-        fontsize=note_fontsize,
-        linespacing=1.2,
-        color=INK,
-    )
-    _note(
-        fig,
-        "The complete position audit, response Jacobian, synthetic leg terms, resolved "
-        "shocks, scenario values and historical exclusions are retained in the table exports. "
-        "The manifest records conventions, source snapshot dates and artifact hashes.",
-    )
+    """Render only the optional parser-supplied table and footnote explanations."""
+    fig = _page(result, config, 10, config.appendix_title, config.appendix_subtitle)
+    _table(fig.add_axes([0.04, 0.265, 0.92, 0.55]), config.appendix_table, first=0.23, fontsize=8.5)
+    _footnotes(fig, config.appendix_notes, y=0.215, width=175, fontsize=9)
     return fig
 
 
 def report_pages(result, config):
-    """Yield ten report subjects from completed numerical results, without model access."""
-    title = "Requested factor stress scenarios"
+    """Yield nine core exhibits and a tenth page only when supplied by the parser."""
+    model = config.model_name
+    meta = result.metadata
+    currency = meta["reference_currency"]
+    denominator = meta["reporting_denominator"]
+    date = pd.Timestamp(meta["risk_date"])
+    qualifier = " | Modelled subtotal only" if meta.get("scope") == "modelled subtotal" else ""
+    overrides = meta.get("scenario_completion_overrides", {})
+    subtitle = (
+        "Level/price targets: correlated shocks. Explicit return shocks: other factors "
+        "held at zero."
+        if overrides
+        else "Specified factor shocks; other factors held at zero. Instantaneous valuation."
+    )
+    if meta["requested_completion"] != "independent":
+        subtitle = f"Requested completion policy: {meta['requested_completion']}."
+    title = (
+        "Requested independent stress scenarios"
+        if meta["requested_completion"] == "independent"
+        else "Requested stress scenarios"
+    )
     yield (
         title,
         _scenario_page(
@@ -556,12 +867,10 @@ def report_pages(result, config):
             1,
             title,
             result.valuations["requested"],
-            f"Requested completion policy: "
-            f"{result.metadata['requested_completion']}. "
-            "Values include the full supplied holding payoff.",
+            subtitle + f" Using notional of {currency} {denominator:,.0f}." + qualifier,
         ),
     )
-    title = "Conditional factor stress scenarios"
+    title = f"Requested scenarios with latest {model} co-moves"
     yield (
         title,
         _scenario_page(
@@ -570,15 +879,12 @@ def report_pages(result, config):
             2,
             title,
             result.valuations.get("conditional"),
-            "Supplied anchors are fixed jointly; other factor moves follow "
-            "the fitted covariance conditional mean.",
+            f"Conditional shocks using the fitted covariance at {date:%d %b %Y}; explicit anchors "
+            "are preserved." + qualifier,
         ),
     )
-    title = (
-        f"Worst {len(result.historical_ranking)} historical months on current holdings"
-        if result.historical is not None
-        else "Historical stress on current holdings"
-    )
+    count = meta["historical_count"]
+    title = f"{'Ten' if count == 10 else count} worst {model} historical scenario months"
     yield (
         title,
         _scenario_page(
@@ -587,17 +893,18 @@ def report_pages(result, config):
             3,
             title,
             result.historical,
-            "All eligible complete monthly factor realizations are evaluated "
-            "first, then ranked by exact portfolio P&L.",
+            "Complete historical monthly factor vectors ranked by loss on today's holdings "
+            "and loadings; descriptive replay, not realised performance." + qualifier,
         ),
     )
     for title, builder in [
-        ("Current exposures and local risk", _risk_page),
-        ("Holding contributions to factor exposures", _contributor_page),
-        ("Factor sensitivity curves", _grid_page),
-        ("Underlying response betas and fit diagnostics", _beta_page),
-        ("Fitted cluster structure", _clusters_page),
-        ("Correlation and scenario methodology", _methodology_page),
-        ("Coverage and valuation reconciliation", _coverage_page),
+        (f"Portfolio {model} exposures and risk", _risk_page),
+        ("Largest factor exposures: asset risk contributors", _contributor_page),
+        ("Sensitivity to equity, rates, credit and FX factors", _grid_page),
+        (f"Estimated {model} loadings and explanatory power", _beta_page),
+        (f"{model} asset cluster dendrograms", _clusters_page),
+        (f"{model} correlation and scenario construction", _methodology_page),
     ]:
         yield title, builder(result, config)
+    if config.appendix_table is not None:
+        yield config.appendix_title, _coverage_page(result, config)

@@ -82,6 +82,7 @@ class PortfolioStressResult:
         positions: Observed marks, model anchors and declared payoff coverage.
         leg_terms: Auditable vanilla decomposition under original holding identities.
         metadata: Snapshot dates, currencies, denominator and analysis policies.
+        report_diagnostics: Detached Euler, unit-response risk and quadratic-fit exhibits.
     """
 
     valuations: Mapping[str, PortfolioValuationResult]
@@ -108,6 +109,7 @@ class PortfolioStressResult:
     positions: pd.DataFrame
     leg_terms: pd.DataFrame
     metadata: Mapping[str, object] = field(default_factory=dict)
+    report_diagnostics: Mapping[str, pd.DataFrame] = field(default_factory=dict)
 
 
 def _summary(valuation: PortfolioValuationResult, denominator: float) -> pd.DataFrame:
@@ -326,6 +328,7 @@ def run_portfolio_stress_test(
                 }
             )
     metadata = {
+        "all_funded": all_funded,
         "valuation_date": str(portfolio.valuation_date),
         "risk_date": str(date),
         "reference_currency": portfolio.reference_currency,
@@ -357,6 +360,11 @@ def run_portfolio_stress_test(
             for currency, q in portfolio.fx_rates.items()
         },
     }
+    from qis.portfolio.stress._diagnostics import report_diagnostics
+
+    diagnostics = report_diagnostics(
+        model, date, jacobian, denominator, risk, grid_summaries, all_funded
+    )
     return PortfolioStressResult(
         MappingProxyType(valuations),
         MappingProxyType(summaries),
@@ -382,4 +390,5 @@ def run_portfolio_stress_test(
         valuations["requested"].audit.copy(deep=True),
         pd.DataFrame(terms),
         MappingProxyType(metadata),
+        MappingProxyType(diagnostics),
     )

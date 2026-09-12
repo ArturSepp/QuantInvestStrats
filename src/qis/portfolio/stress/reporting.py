@@ -1,4 +1,4 @@
-"""Serialization and ten-page rendering of completed instrument stress results."""
+"""Render and serialize completed stress results, with an optional parser appendix."""
 
 from dataclasses import dataclass, field
 import hashlib
@@ -31,6 +31,11 @@ class StressReportConfig:
         notes: Plain methodology/coverage notes supplied by the application.
         write_workbook: Write a numerical workbook using the existing QIS serializer.
         write_previews: Also save PNG previews for inspection.
+        model_name: Short model name used in slide and figure titles.
+        appendix_table: Optional preformatted parser-owned table for page ten.
+        appendix_title: Parser-owned page title.
+        appendix_subtitle: Parser-owned description above the table.
+        appendix_notes: Parser-owned variable definitions and source explanations.
     """
 
     title: str = "Portfolio stress report"
@@ -44,11 +49,25 @@ class StressReportConfig:
     notes: tuple[str, ...] = ()
     write_workbook: bool = True
     write_previews: bool = False
+    model_name: str = "Factor model"
+    appendix_table: pd.DataFrame | None = None
+    appendix_title: str = "Coverage and estimation quality"
+    appendix_subtitle: str = ""
+    appendix_notes: tuple[str, ...] = ()
 
     def __post_init__(self):
         """Snapshot caller diagnostics and validate presentation choices."""
         if not self.title:
             raise ValueError("report title must be nonempty")
+        if not self.model_name or not self.appendix_title:
+            raise ValueError("model_name and appendix_title must be nonempty")
+        if self.appendix_table is not None:
+            if self.appendix_table.empty:
+                raise ValueError("appendix_table must be nonempty or None")
+            if len(self.appendix_table) > 24 or len(self.appendix_table.columns) > 10:
+                raise ValueError("appendix_table supports at most 24 rows and 10 columns")
+            object.__setattr__(self, "appendix_table", self.appendix_table.copy(deep=True))
+        object.__setattr__(self, "appendix_notes", tuple(self.appendix_notes))
         grids = tuple(self.selected_grids)
         if len(grids) > 4 or len(set(grids)) != len(grids):
             raise ValueError("selected_grids must contain at most four unique names")
@@ -89,7 +108,7 @@ class StressReportArtifacts:
     """Paths written by a report operation; the numerical result remains reusable.
 
     Attributes:
-        pdf_path: Ten-page PDF.
+        pdf_path: Nine core pages, plus page ten when a parser supplies a table.
         table_paths: Numerical table names mapped to CSV paths.
         workbook_path: Optional workbook path.
         manifest_path: JSON with conventions, table mapping and content hashes.
@@ -103,9 +122,44 @@ class StressReportArtifacts:
     preview_paths: tuple[Path, ...] = ()
 
 
+def _loading_table(result, config):
+    """Join copied model diagnostics and absolute-exposure-weighted fit summaries."""
+    order = result.response_exposures.abs().sort_values(ascending=False, kind="stable").index
+    table = result.factor_loadings.join(result.report_diagnostics["Unit response risk"])
+    r2 = (
+        config.response_diagnostics["r2"].reindex(order)
+        if config.response_diagnostics is not None and "r2" in config.response_diagnostics
+        else pd.Series(np.nan, index=order)
+    )
+    table["R-squared"] = r2
+    table = table.loc[order[:20]].copy()
+    aggregates = result.report_diagnostics["Loading aggregates"].copy()
+    for label in aggregates.index:
+        ids = order[20:] if label == "Rest of assets" else order
+        available = r2.loc[ids].dropna()
+        weights = result.response_exposures.reindex(available.index).abs()
+        aggregates.loc[label, "R-squared"] = (
+            available @ weights / weights.sum() if weights.sum() else np.nan
+        )
+    table["response_exposure"] = result.response_exposures
+    table = pd.concat([table, aggregates])
+    return table.loc[
+        :,
+        [
+            *result.factor_loadings.columns,
+            "R-squared",
+            "Model total vol",
+            "Systematic vol",
+            "Idio vol",
+            "response_exposure",
+        ],
+    ]
+
+
 def _report_tables(result, config):
     """Collect all numerical observations without the PDF's display row limits."""
-    tables = {}
+    tables = dict(result.report_diagnostics)
+    tables["Displayed loadings and fit"] = _loading_table(result, config)
     for key, summary in result.summaries.items():
         tables[f"{key} summary"] = summary
     tables["Historical worst months"] = result.historical_ranking
@@ -147,12 +201,15 @@ def _report_tables(result, config):
         tables[f"Cluster {key} linkage"] = pd.DataFrame(
             config.cluster_linkages[key], columns=["left", "right", "distance", "count"]
         )
+    if config.appendix_table is not None:
+        tables["Parser appendix"] = config.appendix_table
     metadata = dict(result.metadata)
     metadata.update(
         {
             "title": config.title,
             "model_label": config.model_label,
             "report_notes": list(config.notes),
+            "appendix_notes": list(config.appendix_notes),
         }
     )
     tables["Conventions"] = pd.DataFrame(
@@ -166,7 +223,7 @@ def generate_portfolio_stress_report(
 ) -> StressReportArtifacts:
     """Render a completed result without fitting or re-evaluating any payoff.
 
-    The PDF preserves the ordinary report's ten subjects. Display limits are
+    The PDF has nine core subjects and an optional parser-supplied tenth page. Display limits are
     explicitly labelled; CSV/workbook tables retain every holding/scenario/grid.
 
     Args:
@@ -267,7 +324,7 @@ def generate_portfolio_stress_report(
             "scenario_rows": 12,
             "contributors": 10,
             "response_rows": 20,
-            "response_factor_columns": 12,
+            "response_factor_columns": len(result.factor_loadings.columns),
             "factor_panels": 6,
             "grid_panels": 4,
         },

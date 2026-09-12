@@ -327,7 +327,7 @@ The acceptance paths below are implemented test modules. Follow the repository's
 
 **Status:** Complete on the implementation branch; see verification record above.
 
-**Deliver:** Generic ten-page template, public report/config/artifact interface, plain-data diagnostics, table exports and optional workbook serialization. Migrate the reusable renderer to QIS without copying private data or model-specific configuration. Complete public import registration, a shipped `src/qis/docs/portfolio_stress.md` guide linked from the existing low-level stress note, and executable synthetic ordinary/derivative examples. Downstream adapters consume the same public API.
+**Deliver:** Generic nine-page template with optional parser-supplied page ten, public report/config/artifact interface, plain-data diagnostics, table exports and optional workbook serialization. Migrate the reusable renderer to QIS without copying private data or model-specific configuration. Complete public import registration, a shipped `src/qis/docs/portfolio_stress.md` guide linked from the existing low-level stress note, and executable synthetic ordinary/derivative examples. Downstream adapters consume the same public API.
 
 **Verification:**
 
@@ -346,3 +346,19 @@ Stages are implemented in reviewable patches; this is not an instruction to modi
 An application with labelled matrices, quotes and contract terms can construct `qis.RiskModel`, construct `InstrumentPortfolio`, run stress analysis and generate a report using documented public imports. It needs no private estimator type, helper module or report renderer. A consumer can also use `PortfolioStressResult` directly in its own workbook or dashboard without rerunning valuation.
 
 Public documentation states the intrinsic/anchoring, FX, annualisation, date, exposure and unsupported-feature conventions. Tests cover signed and zero-MTM instruments, shared residual identity, quote proxies, nonlinear boundaries, attribution, explicit coverage and backward compatibility. Provider-specific parsing, model-specific default scenarios and specialized contract validation stay in their owning applications.
+
+
+## 10. v0 presentation restoration (12 September 2026)
+
+Implemented in QIS 5.29.0 on the existing machine-named feature branch.
+The original slide/figure titles and definitions are retained for MATF consumers.
+Risk is tabulated with additive family Euler bars; funded sensitivity grids use
+QIS scatter, through-zero OLS and the existing conditional bands. Loading tables
+include all factors, explanatory power, unit risk, Rest and Portfolio rows.
+Cluster trees use original fitted topology; the correlation page uses the QIS
+covariance heatmap and conditional-scenario formulas. Page ten is parser supplied.
+Credit bump splitting and intrinsic derivative valuation remain unchanged.
+
+Verification: stress tests include independent Euler matrix and least-squares
+references, optional appendix rendering and nonlinear exclusions. ROSAA/MAC and
+UAE cached replays check original valuation/risk parity before generating artifacts.

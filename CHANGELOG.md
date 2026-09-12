@@ -5,6 +5,26 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.29.0] - 2026-09-12
+
+### Added
+
+- Detached stress-report diagnostics for factor and family Euler volatility,
+  holding contributions, unit response risk, full-denominator loading summaries,
+  and through-zero quadratic OLS curves for funded portfolios.
+- `StressReportConfig.model_name` and optional parser-owned appendix table,
+  title, subtitle and footnotes. The core report has nine pages; supplying an
+  appendix adds page ten. All new exhibits are exported to CSV and Excel.
+
+### Changed
+
+- Restore the original stress-report presentation: annualised risk table, family
+  Euler bars, QIS scatter/regression/band grids, coloured loading table with Rest
+  and Portfolio rows, fitted cadence dendrograms and covariance/formula page.
+- Family Euler contributions sum constituent risk contributions; Credit scenario
+  bumps still split before log conversion. Derivative scenarios retain exact
+  intrinsic valuation and have no Gaussian prediction bands or quadratic fits.
+
 ## [5.28.0] - 2026-09-12
 
 ### Added
