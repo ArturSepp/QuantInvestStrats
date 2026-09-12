@@ -218,6 +218,82 @@ def _report_tables(result, config):
     return tables
 
 
+def _format_workbook(path):
+    """Format exported tables without changing their stored numerical values."""
+    from datetime import date, datetime
+    from math import ceil
+    from openpyxl import load_workbook
+    from openpyxl.cell.cell import MergedCell
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    book = load_workbook(path)
+    header_fill = PatternFill("solid", fgColor="183A50")
+    stripe_fill = PatternFill("solid", fgColor="EEF3F7")
+    percent_columns = {
+        "annual_vol", "euler_vol", "variance_share", "portfolio_return", "r2", "rsquared",
+        "r_squared", "R-squared", "annual_total_vol", "annual_systematic_vol",
+        "annual_residual_vol", "annual_factor_model_vol", "lower_bound", "upper_bound",
+        "band_half_width",
+    }
+    for sheet in book:
+        sheet.sheet_view.showGridLines = False
+        sheet.freeze_panes = "B2"
+        sheet.row_dimensions[1].height = 44
+        if not sheet.merged_cells.ranges:
+            sheet.auto_filter.ref = sheet.dimensions
+        headers = {cell.column: str(cell.value or "") for cell in sheet[1]}
+        for column in range(1, sheet.max_column + 1):
+            sample = [sheet.cell(row, column).value for row in range(2, min(sheet.max_row, 80) + 1)]
+            text_width = max((len(str(value)) for value in sample
+                              if isinstance(value, str)), default=0)
+            width = max(18, min(48, text_width + 2), min(28, len(headers[column]) + 2))
+            sheet.column_dimensions[get_column_letter(column)].width = (
+                max(32, width) if column == 1 else width
+            )
+        for row in sheet:
+            height = 18
+            for cell in row:
+                if isinstance(cell, MergedCell):
+                    continue
+                cell.font = Font(name="Calibri", size=11, color="183A50")
+                cell.alignment = Alignment(vertical="center")
+                if cell.row == 1:
+                    cell.fill = header_fill
+                    cell.font = Font(name="Calibri", size=11, color="FFFFFF", bold=True)
+                    cell.alignment = Alignment(wrap_text=True, vertical="center")
+                    continue
+                if cell.row % 2 == 0:
+                    cell.fill = stripe_fill
+                if isinstance(cell.value, (datetime, date)):
+                    cell.number_format = "yyyy-mm-dd"
+                elif isinstance(cell.value, float):
+                    cell.number_format = (
+                        "0.00%;[Red](0.00%);0.00%"
+                        if headers[cell.column] in percent_columns
+                        else "#,##0.0000;[Red](#,##0.0000);0.0000"
+                    )
+                elif isinstance(cell.value, int) and not isinstance(cell.value, bool):
+                    cell.number_format = (
+                        "0" if cell.column == 1 or headers[cell.column].endswith("_id")
+                        else "#,##0;[Red](#,##0);0"
+                    )
+                elif isinstance(cell.value, str):
+                    width = sheet.column_dimensions[cell.column_letter].width
+                    if len(cell.value) <= 400:
+                        cell.alignment = Alignment(wrap_text=True, vertical="center")
+                        height = max(height, 16 * ceil(len(cell.value) / max(width - 3, 1)))
+            if row[0].row > 1:
+                sheet.row_dimensions[row[0].row].height = min(height, 180)
+        if sheet.title == "Contents":
+            for row in range(2, sheet.max_row + 1):
+                cell = sheet.cell(row, 1)
+                if cell.value in book.sheetnames:
+                    cell.hyperlink = "#'" + str(cell.value).replace("'", "''") + "'!A1"
+                    cell.font = Font(name="Calibri", size=11, color="1264A3", underline="single")
+    book.save(path)
+
+
 def generate_portfolio_stress_report(
     result: PortfolioStressResult, output_dir: str | Path, config: StressReportConfig | None = None
 ) -> StressReportArtifacts:
@@ -290,6 +366,7 @@ def generate_portfolio_stress_report(
                 local_path=str(output_dir),
             )
         )
+        _format_workbook(workbook_path)
     previews, titles = [], []
     with PdfPages(
         pdf_path,

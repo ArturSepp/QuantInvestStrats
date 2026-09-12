@@ -24,6 +24,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Rank stress-report factor panels by absolute factor Euler volatility contribution,
   explain signed additivity and displayed-subset limits, and fit 20-character asset
   display labels in scenario contributor cells.
+- Format stress-workbook columns, headers, number displays and frozen panes; its
+  contents index links to every numerical exhibit without changing stored values.
 - Derivative report captions use the explicit reporting denominator instead of NAV,
   and define residual risk using aggregated shared-response sensitivities. Funded
   report captions retain their original NAV terminology.
