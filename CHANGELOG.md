@@ -49,6 +49,10 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Normalized real-valued pandas regression inputs before statsmodels design construction, so
+  nullable benchmark returns no longer fall through to all-zero alpha, beta, and R-squared
+  statistics.
+
 - Kept risk-adjusted-table returns, ratios, and benchmark regressions within each asset's sampled
   observed history, so a longer neighboring column no longer adds post-termination flat returns.
 
