@@ -122,6 +122,7 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
         )
         return fig
     denominator = result.metadata["reporting_denominator"]
+    denominator_name = "NAV" if result.metadata["all_funded"] else "reporting denominator"
     currency = result.metadata["reference_currency"]
     scale = 1e6 if denominator >= 1e6 else 1.0
     unit = f"{currency} millions" if scale == 1e6 else currency
@@ -136,7 +137,7 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
     _bars(
         fig.add_axes([0.63, 0.57, 0.30, 0.28]),
         pnl / denominator,
-        "Portfolio P&L (% of NAV)",
+        f"Portfolio P&L (% of {denominator_name})",
         percent=True,
     )
     cells = []
@@ -162,7 +163,8 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
     _table(
         fig.add_axes([0.04, 0.125, 0.92, 0.32]),
         frame,
-        "Top 10 asset contributions by absolute size; signed percentage points of portfolio NAV",
+        "Top 10 asset contributions by absolute size; signed percentage points of "
+        + ("portfolio NAV" if result.metadata["all_funded"] else "reporting denominator"),
         first=0.14,
         fontsize=7.5,
     )
@@ -174,7 +176,8 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
                     cell.set_facecolor("#F9EDEF" if value.startswith("-") else "#EAF4F1")
     notes = [
         "Each row is ranked independently. Cells show asset name and contribution / full "
-        "portfolio NAV. The omitted remainder is retained in the CSV reconciliation."
+        f"portfolio {denominator_name}. The omitted remainder is retained in the "
+        "CSV reconciliation."
     ]
     if number != 3:
         for scenario, note in result.metadata.get("scenario_notes", {}).items():
@@ -251,7 +254,9 @@ def _risk_page(result, config):
         fig,
         0.565,
         0.478,
-        "Dollar exposure = NAV x e_f. A small +1% factor move contributes approximately "
+        ("Dollar exposure = NAV x e_f. " if result.metadata["all_funded"]
+         else "Dollar exposure = reporting denominator x e_f. ")
+        + "A small +1% factor move contributes approximately "
         "1% of this amount to portfolio P&L; it is not invested cash.",
     )
     risk = result.report_diagnostics["Annualised portfolio risk"]
@@ -285,7 +290,12 @@ def _risk_page(result, config):
         0.146,
         "Systematic variance = e.T Sigma e; idio variance = sum_i w_i^2 residual_var_i. "
         "Total vol is the square root of their sum. Dollar vol = NAV x vol. Variance shares "
-        "and Euler vol contributions allocate total risk; standalone vols do not add.",
+        "and Euler vol contributions allocate total risk; standalone vols do not add."
+        if result.metadata["all_funded"]
+        else "w_j = shared response dollar sensitivity / N; N is the reporting denominator. "
+        "Systematic variance = e.T Sigma e; residual variance = sum_j w_j^2 residual_var_j. "
+        "Total vol = sqrt(their sum); dollar vol = N x vol. Euler contributions add; "
+        "standalone vols do not.",
     )
     _panel_note(
         fig,
@@ -429,7 +439,8 @@ def _grid_page(result, config):
             x="factor_return",
             y="portfolio_return",
             xlabel=xlabel,
-            ylabel="Portfolio return (% of NAV)",
+            ylabel=("Portfolio return (% of NAV)" if funded
+                    else "Portfolio P&L (% of reporting denominator)"),
             full_sample_order=0,
             add_universe_model_label=False,
             add_universe_model_prediction=False,
@@ -608,12 +619,13 @@ def _beta_page(result, config):
     if not funded:
         notes = [
             note.replace("MTM", "local response exposure").replace("holdings", "responses")
+            .replace("full-NAV weights", "full-denominator weights").replace("NAV", "N")
             for note in notes
         ]
         notes.append(
             "Response rows describe unit underlying risk, not derivative marks. "
             "Portfolio rows use aggregated payoff sensitivities, including shared "
-            "residual risk. NAV means the explicit reporting denominator."
+            "residual risk. N is the explicit reporting denominator."
         )
     _footnotes(fig, notes, y=0.15, width=190, fontsize=8.5)
     return fig

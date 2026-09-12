@@ -138,3 +138,36 @@ def test_factor_panels_rank_euler_risk_instead_of_dollar_exposure(market):
         ]
     finally:
         plt.close(fig)
+
+@pytest.mark.parametrize("funded", [True, False])
+def test_derivative_captions_preserve_denominator_meaning(market, funded):
+    """A gross-asset derivative denominator must never be labelled debt-net NAV."""
+    import matplotlib.pyplot as plt
+    from matplotlib.text import Text
+    from qis.portfolio.stress._figures import report_pages
+    from qis.portfolio.stress.instruments import InstrumentLeg, InstrumentType
+    from qis.portfolio.stress.portfolio import PortfolioHolding
+
+    kind = InstrumentType.DELTA_1 if funded else InstrumentType.FUTURE
+    holding = PortfolioHolding(
+        "position", "Position", 100.0 if funded else 0.0,
+        (InstrumentLeg(kind, "actual", 1.0),),
+    )
+    portfolio = market([holding])
+    grid = StressScenarios(pd.DataFrame({"Equity": [-0.2, 0.0, 0.2]}, index=[-0.2, 0, 0.2]))
+    result = run_portfolio_stress_test(portfolio, grid, factor_grids={"Equity": grid})
+    pages = list(report_pages(result, StressReportConfig(write_workbook=False)))
+    try:
+        texts = "\n".join(
+            item.get_text() for _, figure in pages for item in figure.findobj(Text)
+        )
+        if funded:
+            assert "Portfolio P&L (% of NAV)" in texts
+            assert "Dollar exposure = NAV x e_f" in texts
+        else:
+            assert "Portfolio P&L (% of reporting denominator)" in texts
+            assert "NAV" not in texts
+            assert "shared response" in texts
+    finally:
+        for _, figure in pages:
+            plt.close(figure)
