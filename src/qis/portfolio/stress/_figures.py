@@ -352,8 +352,9 @@ def _contributor_page(result, config):
             "residual variance / sigma_p gives total volatility sigma_p. All holding contributions "
             "to a factor sum to that factor's Euler term.",
             "Six largest absolute factor Euler terms and ten largest absolute holding "
-            "contributions per factor are shown; displayed subsets need not sum to full totals. Complete tables "
-            "are exported. Funded factor beta e_f = sum_i (MTM_i / NAV) x beta_if."
+            "contributions per factor are shown; displayed subsets need not sum to full totals. "
+            "Complete tables are exported. Funded factor beta e_f = "
+            "sum_i (MTM_i / NAV) x beta_if."
             if result.metadata["all_funded"]
             else "Six largest absolute factor Euler terms and ten largest absolute holding "
             "contributions per factor are shown; displayed subsets need not sum to full totals. "
