@@ -1,0 +1,282 @@
+"""Serialization and ten-page rendering of completed instrument stress results."""
+
+from dataclasses import dataclass, field
+import hashlib
+import json
+import re
+from pathlib import Path
+from types import MappingProxyType
+from typing import Mapping
+
+import numpy as np
+import pandas as pd
+
+from qis.portfolio.stress.analytics import PortfolioStressResult
+
+
+@dataclass(frozen=True)
+class StressReportConfig:
+    """Presentation options and caller-supplied estimation diagnostics.
+
+    Attributes:
+        title: Report heading and PDF title.
+        model_label: Optional plain model/version label.
+        factor_labels: Display aliases, keyed by actual factor ID.
+        response_diagnostics: Optional response-indexed diagnostics, including r2.
+        cluster_memberships: Optional fitted group-to-response membership Series.
+        cluster_linkages: Matching fitted linkage arrays in membership index order.
+        cluster_cutoffs: Matching fitted cutoffs; never estimated by the report.
+        selected_grids: Up to four caller-named grids for the sensitivity page.
+            Empty selects the first four; all grids are always exported.
+        notes: Plain methodology/coverage notes supplied by the application.
+        write_workbook: Write a numerical workbook using the existing QIS serializer.
+        write_previews: Also save PNG previews for inspection.
+    """
+
+    title: str = "Portfolio stress report"
+    model_label: str = ""
+    factor_labels: Mapping[str, str] = field(default_factory=dict)
+    response_diagnostics: pd.DataFrame | None = None
+    cluster_memberships: Mapping[str, pd.Series] = field(default_factory=dict)
+    cluster_linkages: Mapping[str, np.ndarray] = field(default_factory=dict)
+    cluster_cutoffs: Mapping[str, float] = field(default_factory=dict)
+    selected_grids: tuple[str, ...] = ()
+    notes: tuple[str, ...] = ()
+    write_workbook: bool = True
+    write_previews: bool = False
+
+    def __post_init__(self):
+        """Snapshot caller diagnostics and validate presentation choices."""
+        if not self.title:
+            raise ValueError("report title must be nonempty")
+        grids = tuple(self.selected_grids)
+        if len(grids) > 4 or len(set(grids)) != len(grids):
+            raise ValueError("selected_grids must contain at most four unique names")
+        if not (
+            set(self.cluster_memberships) == set(self.cluster_linkages) == set(self.cluster_cutoffs)
+        ):
+            raise ValueError("cluster membership, linkage and cutoff keys must agree")
+        if self.response_diagnostics is not None:
+            diagnostics = self.response_diagnostics.copy(deep=True)
+            if diagnostics.index.has_duplicates or diagnostics.columns.has_duplicates:
+                raise ValueError("response diagnostics require unique labels")
+            object.__setattr__(self, "response_diagnostics", diagnostics)
+        object.__setattr__(self, "factor_labels", MappingProxyType(dict(self.factor_labels)))
+        object.__setattr__(self, "selected_grids", grids)
+        object.__setattr__(self, "notes", tuple(self.notes))
+        object.__setattr__(
+            self,
+            "cluster_memberships",
+            MappingProxyType(
+                {key: value.copy(deep=True) for key, value in self.cluster_memberships.items()}
+            ),
+        )
+        object.__setattr__(
+            self,
+            "cluster_linkages",
+            MappingProxyType(
+                {
+                    key: np.asarray(value, dtype=float).copy()
+                    for key, value in self.cluster_linkages.items()
+                }
+            ),
+        )
+        object.__setattr__(self, "cluster_cutoffs", MappingProxyType(dict(self.cluster_cutoffs)))
+
+
+@dataclass(frozen=True)
+class StressReportArtifacts:
+    """Paths written by a report operation; the numerical result remains reusable.
+
+    Attributes:
+        pdf_path: Ten-page PDF.
+        table_paths: Numerical table names mapped to CSV paths.
+        workbook_path: Optional workbook path.
+        manifest_path: JSON with conventions, table mapping and content hashes.
+        preview_paths: Optional page PNGs.
+    """
+
+    pdf_path: Path
+    table_paths: Mapping[str, Path]
+    workbook_path: Path | None
+    manifest_path: Path
+    preview_paths: tuple[Path, ...] = ()
+
+
+def _report_tables(result, config):
+    """Collect all numerical observations without the PDF's display row limits."""
+    tables = {}
+    for key, summary in result.summaries.items():
+        tables[f"{key} summary"] = summary
+    tables["Historical worst months"] = result.historical_ranking
+    tables["Current factor exposures"] = pd.concat(
+        [result.factor_exposures, result.factor_betas], axis=1
+    )
+    tables["Current risk"] = result.risk.to_frame("value")
+    tables["Holding factor exposures"] = result.holding_factor_exposures
+    tables["Factor group exposures"] = result.factor_group_exposures
+    tables["Holding local risk"] = result.holding_risk
+    tables["Response risk contributions"] = result.response_risk_contributions
+    for key, value in result.valuations.items():
+        tables[f"{key} factor log shocks"] = value.factor_log_shocks
+        tables[f"{key} holding pnl"] = value.pnl
+        tables[f"{key} holding mtm"] = value.mtm
+        tables[f"{key} attribution"] = result.attribution[key]
+    for key, value in result.grids.items():
+        tables[f"Grid {key} summary"] = result.grid_summaries[key]
+        tables[f"Grid {key} log shocks"] = value.factor_log_shocks
+        tables[f"Grid {key} holding pnl"] = value.pnl
+        tables[f"Grid {key} holding mtm"] = value.mtm
+    if result.historical is not None:
+        tables["Historical all factor shocks"] = result.historical.factor_log_shocks
+        tables["Historical all holding pnl"] = result.historical.pnl
+        tables["Historical all holding mtm"] = result.historical.mtm
+    tables["Positions and payoff audit"] = result.positions
+    tables["Vanilla leg terms"] = result.leg_terms
+    tables["Holding response Jacobian"] = result.response_jacobian
+    tables["Shared response exposures"] = result.response_exposures.to_frame()
+    tables["Underlying response betas"] = result.factor_loadings
+    tables["Annual factor covariance"] = result.factor_covariance
+    tables["Annual residual variances"] = result.residual_variances.to_frame("variance")
+    tables["Historical coverage"] = result.historical_coverage
+    tables["Grid conventions"] = result.grid_metadata
+    if config.response_diagnostics is not None:
+        tables["Supplied fit diagnostics"] = config.response_diagnostics
+    for key, members in config.cluster_memberships.items():
+        tables[f"Cluster {key} membership"] = members.to_frame("cluster")
+        tables[f"Cluster {key} linkage"] = pd.DataFrame(
+            config.cluster_linkages[key], columns=["left", "right", "distance", "count"]
+        )
+    metadata = dict(result.metadata)
+    metadata.update(
+        {
+            "title": config.title,
+            "model_label": config.model_label,
+            "report_notes": list(config.notes),
+        }
+    )
+    tables["Conventions"] = pd.DataFrame(
+        {"value": {key: json.dumps(value, ensure_ascii=False) for key, value in metadata.items()}}
+    )
+    return tables
+
+
+def generate_portfolio_stress_report(
+    result: PortfolioStressResult, output_dir: str | Path, config: StressReportConfig | None = None
+) -> StressReportArtifacts:
+    """Render a completed result without fitting or re-evaluating any payoff.
+
+    The PDF preserves the ordinary report's ten subjects. Display limits are
+    explicitly labelled; CSV/workbook tables retain every holding/scenario/grid.
+
+    Args:
+        result: Detached result returned by run_portfolio_stress_test.
+        output_dir: Fresh output directory; existing directories are never overwritten.
+        config: Titles, display diagnostics and artifact preferences.
+
+    Returns:
+        Paths to the PDF, CSV tables, optional workbook and audit manifest.
+    """
+    config = config or StressReportConfig()
+    if set(config.selected_grids) - set(result.grids):
+        raise ValueError("selected_grids includes a grid absent from the result")
+    if set(config.factor_labels) - set(result.factor_loadings.columns):
+        raise ValueError("factor_labels includes an unknown fitted factor")
+    if config.response_diagnostics is not None:
+        if not set(config.response_diagnostics.index).issubset(result.factor_loadings.index):
+            raise ValueError("response diagnostics includes an unknown fitted response")
+    for members in config.cluster_memberships.values():
+        if not set(members.index).issubset(result.factor_loadings.index):
+            raise ValueError("cluster membership includes an unknown fitted response")
+    from matplotlib.backends.backend_pdf import PdfPages
+    import matplotlib.pyplot as plt
+    from qis.portfolio.stress._figures import report_pages
+
+    output_dir = Path(output_dir).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=False)
+    pdf_path = output_dir / "portfolio_stress_report.pdf"
+    tables = _report_tables(result, config)
+    table_dir = output_dir / "tables"
+    table_dir.mkdir()
+    table_paths = {}
+    table_manifest = []
+    workbook_tables = {}
+    for number, (name, frame) in enumerate(tables.items(), 1):
+        path = table_dir / f"{number:02d}.csv"
+        frame.to_csv(path)
+        table_paths[name] = path
+        prefix = f"{number:02d} "
+        clean_name = re.sub(r"[\\/?*:\[\]]", "_", name)
+        sheet = prefix + clean_name[: 31 - len(prefix)]
+        workbook_tables[sheet] = frame
+        table_manifest.append(
+            {
+                "name": name,
+                "workbook_sheet": sheet,
+                "csv": str(path.relative_to(output_dir)),
+                "rows": len(frame),
+                "columns": list(map(str, frame.columns)),
+            }
+        )
+    workbook_path = None
+    if config.write_workbook:
+        # Use the owning QIS serialization API; report rendering owns no Excel backend.
+        from qis.file_utils import save_df_dict_to_excel
+
+        workbook_path = Path(
+            save_df_dict_to_excel(
+                {
+                    "Contents": pd.DataFrame(table_manifest).set_index("workbook_sheet"),
+                    **workbook_tables,
+                },
+                file_name="portfolio_stress_tables",
+                local_path=str(output_dir),
+            )
+        )
+    previews, titles = [], []
+    with PdfPages(
+        pdf_path,
+        metadata={
+            "Title": config.title,
+            "Author": "QIS",
+            "Subject": "Intrinsic portfolio factor stress",
+        },
+    ) as pdf:
+        for number, (title, figure) in enumerate(report_pages(result, config), 1):
+            try:
+                pdf.savefig(figure)
+                titles.append(title)
+                if config.write_previews:
+                    path = output_dir / f"page_{number:02d}.png"
+                    figure.savefig(path, dpi=120, facecolor="white")
+                    previews.append(path)
+            finally:
+                plt.close(figure)
+    all_paths = [pdf_path, *table_paths.values(), *previews]
+    if workbook_path is not None:
+        all_paths.append(workbook_path)
+    manifest = {
+        "metadata": dict(result.metadata),
+        "title": config.title,
+        "model_label": config.model_label,
+        "report_notes": list(config.notes),
+        "page_count": len(titles),
+        "page_titles": titles,
+        "tables": table_manifest,
+        "display_limits": {
+            "scenario_rows": 12,
+            "contributors": 10,
+            "response_rows": 20,
+            "factor_panels": 6,
+            "grid_panels": 4,
+        },
+        "hashes": {
+            str(path.relative_to(output_dir)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in all_paths
+        },
+    }
+    manifest_path = output_dir / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    return StressReportArtifacts(
+        pdf_path, MappingProxyType(table_paths), workbook_path, manifest_path, tuple(previews)
+    )

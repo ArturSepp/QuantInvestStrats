@@ -28,6 +28,8 @@ from typing import Dict, Optional, Union
 import numpy as np
 import pandas as pd
 
+from qis.portfolio.risk.factor_groups import FactorGroupSpec
+
 
 WEIGHT_TOL: float = 1e-10
 COVAR_SYMMETRY_TOL: float = 1e-12
@@ -51,6 +53,7 @@ class RiskModel:
         factor_loadings: Optional asset-by-factor loading matrices by date.
         factor_covar: Optional factor covariance matrices by date.
         residual_vars: Optional asset residual variances by date.
+        factor_groups: Optional provider-neutral family membership and bump weights.
 
     Raises:
         ValueError: If the covariance or factor data are incomplete, non-finite,
@@ -61,6 +64,7 @@ class RiskModel:
     factor_loadings: Optional[Dict[pd.Timestamp, pd.DataFrame]] = None
     factor_covar: Optional[Dict[pd.Timestamp, pd.DataFrame]] = None
     residual_vars: Optional[Dict[pd.Timestamp, pd.Series]] = None
+    factor_groups: Optional[Dict[str, FactorGroupSpec]] = None
 
     def __post_init__(self) -> None:
         """Validate and normalise the dated model inputs."""
@@ -94,6 +98,48 @@ class RiskModel:
             self._validate_factor_loadings()
         if self.factor_covar is not None and self.residual_vars is not None:
             self._validate_factor_block()
+        if self.factor_groups is not None:
+            self._validate_factor_groups()
+
+    def _validate_factor_groups(self) -> None:
+        """Validate model-supplied family names against every fitted snapshot."""
+        if self.factor_loadings is None:
+            raise ValueError("factor_groups requires factor_loadings")
+        self.factor_groups = dict(self.factor_groups)
+        for key, group in self.factor_groups.items():
+            if not isinstance(group, FactorGroupSpec) or key != group.group_id:
+                raise ValueError("factor_groups keys must match FactorGroupSpec.group_id")
+            for loadings in self.factor_loadings.values():
+                if key in loadings.columns:
+                    raise ValueError(f"factor group {key} collides with a fitted factor")
+                if not set(group.members).issubset(loadings.columns):
+                    raise ValueError(f"factor group {key} has unknown members")
+
+    def compute_factor_group_exposures_at_date(self, portfolio_weights: pd.Series,
+                                              date: pd.Timestamp,
+                                              strict: bool = True) -> pd.DataFrame:
+        """Report family exposure sums separately from allocated bump sensitivities.
+
+        Args:
+            portfolio_weights: Signed response weights or dollar sensitivities.
+            date: Exact covariance date.
+            strict: Reject material response weights outside the model.
+
+        Returns:
+            Family-indexed table with exposure_sum and split_bump_exposure.
+            The latter is a local derivative, not finite-scenario P&L. Both
+            inherit the units of portfolio_weights.
+        """
+        exposures = self.compute_exposures_at_date(portfolio_weights, date, strict)
+        rows = {}
+        for key, group in (self.factor_groups or {}).items():
+            members = exposures.loc[list(group.members)]
+            rows[key] = {
+                "exposure_sum": float(members.sum()),
+                "split_bump_exposure": float(members @ np.asarray(group.weights)),
+            }
+        return pd.DataFrame.from_dict(rows, orient="index").reindex(
+            columns=["exposure_sum", "split_bump_exposure"])
 
     @staticmethod
     def _normalise_date_mapping(data: Dict[pd.Timestamp, object],

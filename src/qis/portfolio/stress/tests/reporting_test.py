@@ -1,0 +1,86 @@
+"""Artifact and result-only rendering contracts on synthetic portfolios."""
+
+import hashlib
+import json
+from pathlib import Path
+import zipfile
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from qis.portfolio.stress.analytics import run_portfolio_stress_test
+from qis.portfolio.stress.reporting import StressReportConfig, generate_portfolio_stress_report
+from qis.portfolio.stress.scenarios import ScenarioMode, ShockConvention, StressScenarios
+from qis.portfolio.stress.tests.scenarios_test import grouped_portfolio
+
+
+def test_ten_page_report_exports_all_values_without_repricing(market, tmp_path, monkeypatch):
+    """The renderer consumes results; original payoff/model access is unnecessary."""
+    p = grouped_portfolio(market)
+    request = StressScenarios(
+        pd.DataFrame({"Equity": [-0.2, 0.2]}, index=["down", "up"]),
+        convention=ShockConvention.SIMPLE,
+    )
+    grid = StressScenarios(
+        pd.DataFrame(
+            {"credit_family": [-0.1, 0.0, 0.1]},
+            index=pd.Index([-0.1, 0.0, 0.1], name="Total Credit bump"),
+        ),
+        ScenarioMode.CONDITIONAL,
+        ShockConvention.SIMPLE,
+    )
+    history = pd.DataFrame(
+        [[np.log(0.8), 0.0, 0.0, 0.0], [np.log(0.7), 0.0, 0.0, 0.0]],
+        index=pd.to_datetime(["2026-01-31", "2026-02-28"]),
+        columns=p.risk_model.factor_loadings[p.risk_date].columns,
+    )
+    result = run_portfolio_stress_test(p, request, history, {"Credit": grid})
+
+    def forbidden(*args, **kwargs):
+        """Reject any attempt to repeat portfolio valuation during rendering."""
+        raise AssertionError("report attempted to reprice")
+
+    monkeypatch.setattr(type(p), "evaluate", forbidden)
+    config = StressReportConfig(
+        title="Synthetic funded consumer",
+        model_label="Generic four-factor model",
+        response_diagnostics=pd.DataFrame({"r2": [0.8]}, index=["proxy"]),
+        cluster_memberships={"monthly": pd.Series([0, 0], index=["stock", "proxy"])},
+        cluster_linkages={"monthly": np.array([[0.0, 1.0, 0.6, 2.0]])},
+        cluster_cutoffs={"monthly": 0.7},
+    )
+    artifact = generate_portfolio_stress_report(result, tmp_path / "report", config)
+    manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["page_count"] == 10
+    assert len(manifest["page_titles"]) == 10
+    assert artifact.pdf_path.read_bytes().startswith(b"%PDF-")
+    for path, checksum in manifest["hashes"].items():
+        assert (
+            hashlib.sha256((artifact.pdf_path.parent / path).read_bytes()).hexdigest() == checksum
+        )
+    values = pd.read_csv(artifact.table_paths["requested holding pnl"], index_col=0)
+    pd.testing.assert_frame_equal(
+        values, result.valuations["requested"].pnl, check_names=False, rtol=1e-12
+    )
+    assert artifact.workbook_path.exists()
+    with zipfile.ZipFile(artifact.workbook_path) as archive:
+        sheets = [name for name in archive.namelist() if name.startswith("xl/worksheets/sheet")]
+        assert len(sheets) == len(artifact.table_paths) + 1
+    with pytest.raises(FileExistsError):
+        generate_portfolio_stress_report(result, tmp_path / "report", config)
+
+
+def test_report_rejects_unknown_diagnostics_before_writing(market, tmp_path):
+    """Presentation aliases must not silently relabel the model or add fitted rows."""
+    p = grouped_portfolio(market)
+    request = StressScenarios(pd.DataFrame({"Equity": [-0.2]}))
+    result = run_portfolio_stress_test(p, request)
+    for config in [
+        StressReportConfig(selected_grids=("Unknown",)),
+        StressReportConfig(factor_labels={"Unknown": "Equity"}),
+        StressReportConfig(response_diagnostics=pd.DataFrame({"r2": [0.9]}, index=["Unknown"])),
+    ]:
+        with pytest.raises(ValueError):
+            generate_portfolio_stress_report(result, tmp_path / "bad", config)
+        assert not Path(tmp_path / "bad").exists()

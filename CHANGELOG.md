@@ -5,6 +5,21 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.28.0] - 2026-09-12
+
+### Added
+
+- Public `qis.portfolio.stress` snapshot portfolios with funded assets, signed
+  intrinsic calls/puts and zero-MTM futures. Derivative values use observed-mark
+  anchoring, explicit local/reference FX responses and shared underlying residuals.
+- Reusable requested/conditional/historical stress evaluation, nonlinear P&L
+  attribution, current RiskModel exposures and deterministic payoff grids.
+- Result-only ten-page PDF report, full numerical CSV/workbook exports, and an
+  artifact manifest. Model labels, fitted clusters and R-squared remain caller supplied.
+- Optional `RiskModel.factor_groups` metadata and family exposure diagnostics.
+  Total simple-return family bumps split across members before `log1p` and joint
+  conditioning. Existing low-level stress defaults and signatures remain available.
+
 ## [5.26.0] - 2026-09-12
 
 ### Added

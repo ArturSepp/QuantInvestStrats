@@ -81,3 +81,7 @@ Grids and factor-family selection belong to the consumer.
         horizon_years=1/12, confidence=.95,
     )
     print(result.band.summary)
+
+## Instrument portfolios
+
+For anchored calls/puts, zero-MTM futures, shared response risk and a reusable ten-page report, see [Instrument portfolio stress](portfolio_stress.md). These existing low-level helpers retain their signatures and defaults.
