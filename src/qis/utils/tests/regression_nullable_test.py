@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from qis.utils.regression import estimate_ols_alpha_beta
+from qis.utils.regression import estimate_ols_alpha_beta, estimate_ols_alpha_beta_hac
 
 
 OlsInput = Union[np.ndarray, pd.Series, pd.DataFrame]
@@ -119,3 +119,72 @@ def test_estimate_ols_alpha_beta_keeps_nonnumeric_fallback() -> None:
     assert actual == (0.0, 0.0, 0.0, 0.0)
     pd.testing.assert_series_equal(x, x_before)
     pd.testing.assert_series_equal(y, y_before)
+
+
+def test_estimate_ols_alpha_beta_rejects_misaligned_pandas_indexes() -> None:
+    """Do not silently pair observations by position after discarding pandas labels."""
+    index = pd.Index(["a", "b", "c", "d"], name="observation")
+    x = pd.Series([0.0, 1.0, 2.0, 3.0], index=index, dtype="Float64", name="x")
+    y = pd.Series(
+        [1.0, 3.0, 5.0, 7.0],
+        index=index[::-1],
+        dtype="Float64",
+        name="y",
+    )
+
+    with pytest.warns(UserWarning, match="problem with x="):
+        actual = estimate_ols_alpha_beta(x=x, y=y)
+
+    assert actual == (0.0, 0.0, 0.0, 0.0)
+
+
+def test_estimate_ols_alpha_beta_hac_is_invariant_to_nullable_storage() -> None:
+    """Apply the same numeric normalization to the adjacent HAC regression path."""
+    x_values = np.array(
+        [-0.03, 0.01, 0.02, -0.01, 0.04, 0.00, -0.02, 0.03, 0.01, -0.01, 0.02, 0.04]
+    )
+    noise = np.array(
+        [
+            0.001,
+            -0.002,
+            0.0015,
+            -0.001,
+            0.0005,
+            0.001,
+            -0.0015,
+            0.002,
+            -0.0005,
+            0.001,
+            -0.001,
+            0.0015,
+        ]
+    )
+    y_values = 0.002 + 1.5 * x_values + noise
+    expected = estimate_ols_alpha_beta_hac(x=x_values, y=y_values)
+    index = pd.date_range("2024-01-31", periods=len(x_values), freq="ME")
+
+    actual = estimate_ols_alpha_beta_hac(
+        x=pd.Series(x_values, index=index, dtype="Float64", name="x"),
+        y=pd.Series(y_values, index=index, dtype="Float64", name="y"),
+    )
+
+    np.testing.assert_allclose(
+        [
+            actual.alpha,
+            actual.beta,
+            actual.r_squared,
+            actual.alpha_pvalue,
+            actual.alpha_hac_se,
+            *actual.alpha_confidence_interval,
+        ],
+        [
+            expected.alpha,
+            expected.beta,
+            expected.r_squared,
+            expected.alpha_pvalue,
+            expected.alpha_hac_se,
+            *expected.alpha_confidence_interval,
+        ],
+        rtol=0.0,
+        atol=1.0e-12,
+    )
