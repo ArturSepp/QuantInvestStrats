@@ -84,4 +84,4 @@ Grids and factor-family selection belong to the consumer.
 
 ## Instrument portfolios
 
-For anchored calls/puts, zero-MTM futures, shared response risk and a reusable ten-page report, see [Instrument portfolio stress](portfolio_stress.md). These existing low-level helpers retain their signatures and defaults.
+For anchored calls/puts, zero-MTM futures, shared response risk and a reusable nine-page report with an optional tenth-page appendix, see [Instrument portfolio stress](portfolio_stress.md). These existing low-level helpers retain their signatures and defaults.

@@ -9,6 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Public offline examples for funded/mixed instrument portfolios and a custom terminal-KO
+  payoff; linked site and installed-package guides cover adapters, factor families, shared
+  response risk, Euler additivity, audit tables and standard report generation.
 - Detached stress-report diagnostics for factor and family Euler volatility,
   holding contributions, unit response risk, full-denominator loading summaries,
   and through-zero quadratic OLS curves for funded portfolios.

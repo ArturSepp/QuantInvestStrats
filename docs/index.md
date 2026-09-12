@@ -52,6 +52,7 @@ software_design
 factsheets_and_reporting
 tracking_error_and_risk
 stress_testing
+portfolio_stress
 model_layer_attribution
 portfolio_breadth
 portfolio_backtesting

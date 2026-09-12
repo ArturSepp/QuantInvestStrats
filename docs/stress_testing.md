@@ -411,6 +411,14 @@ The repository's existing examples harness automatically executes the new offlin
 python -m pytest src/qis/tests/test_examples.py -k factor_stress_testing
 ~~~
 
+## Instrument portfolios and derivative reports
+
+For positions with observed marks, calls/puts, futures, shared underlying responses or custom
+payoff functions, use the higher-level [instrument portfolio stress interface](portfolio_stress.md).
+It calls these conditioning/risk primitives and adds original-holding valuation, nonlinear
+historical ranking, factor/family Euler exhibits and the standard nine-page report with an
+optional consumer appendix. The low-level APIs on this page keep their existing contracts.
+
 ## Related guides
 
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)

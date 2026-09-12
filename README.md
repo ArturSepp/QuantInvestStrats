@@ -41,6 +41,12 @@ tracking error, factor exposures, benchmark beta, Euler risk contributions, and 
 overlapping, or signed loading matrices. Ex-post analytics cover realised EWMA tracking error,
 whole-sample TE/IR, and EWMA beta/alpha. The same conventions serve the wider package stack.
 
+**Instrument-aware stress reports.** `qis.portfolio.stress` combines funded holdings, signed
+intrinsic calls/puts, futures and custom payoffs under an assigned `RiskModel`. It preserves
+source marks and shared underlying risk, splits factor-family scenarios, ranks historical
+months and exports the standard report with additive Euler risk tables. See the
+[instrument portfolio guide and offline examples](docs/portfolio_stress.md).
+
 **Documentation checked against the code.** The core dependency list is checked against
 `pyproject.toml`; README Python blocks are parsed for unresolved names; repository examples are
 checked for public symbols and introspectable keyword arguments; and examples without a data

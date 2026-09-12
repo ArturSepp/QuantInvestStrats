@@ -10,6 +10,33 @@ QIS values those holdings under factor shocks, computes current local exposures,
 ranks historical scenarios and renders a result. The application owns data
 acquisition, factor estimation, contract interpretation and lending decisions.
 
+## Choose the interface
+
+Use `InstrumentPortfolio` for absolute holdings whose source IDs, observed marks,
+contract quantities and payoff rules must be preserved. `PortfolioData` remains
+history/backtest state. The lower-level functions described in
+[Factor stress testing](stress_testing.md) remain useful for factor shock construction
+and funded exposure matrices; this interface adds instrument valuation and reporting.
+
+The source checkout includes two unattended, synthetic examples:
+
+```console
+python -m examples.portfolios.instrument_portfolio_stress
+python -m examples.portfolios.composite_payoff_stress
+```
+
+The first compares funded and mixed books and demonstrates all four primitive types,
+continuing accumulator/decumulator legs, local FX, Credit/Carry families, monthly replay
+and conditional grids. The second implements a terminal-knockout wrapper using only
+`HoldingPayoff`, `PayoffContext` and public vanilla valuation. Both verify numerical
+identities and write no files by default. Add `--output-dir <fresh directory>` to
+produce standard reports; the first also accepts `--case funded|mixed|all`.
+
+These examples are repository files, not installed package modules. Their complete
+source is included in the site guide `docs/portfolio_stress.md`. The self-contained
+example below works with the installed package alone. No production model or client
+data is needed by any of these examples.
+
 ## Executable public example
 
 This synthetic example uses no estimator or data-provider package.
@@ -89,6 +116,28 @@ from qis import StressReportConfig, generate_portfolio_stress_report
 The renderer takes the completed result and optional plain-data diagnostics. It
 does not access the portfolio's payoffs, refit a model or obtain prices.
 
+## Application input contract
+
+An adapter should assemble the following before calling the generic engine:
+
+| Input | Required meaning |
+|---|---|
+| Source holding ID | Stable original-position identity; multiple option legs retain one holding ID. |
+| Observed mark | Signed reference-currency amount from the source snapshot, including zero marks. |
+| Quantity and multiplier | Signed actual contract units and positive multiplier. Establish whether a remaining quantity already includes leverage before constructing legs. |
+| Quote and strike | Positive actual local spot and local strike units, independent of the risk proxy's price level. |
+| Response and FX basis | Shared fitted response ID plus explicit LOCAL or REFERENCE return basis; reference-per-local FX for each required currency. |
+| Risk snapshot | Exact date keys, labelled response/factor loadings, annual log-return covariance and annual residual variances. |
+| Historical panel | One complete factor log-return vector per month; no independently selected worst month for each factor. |
+| Reporting denominator | Positive declared capital/asset amount. Changing it changes ratios, not holdings or currency P&L. |
+| Contract coverage | Remaining quantities, barriers/state, strike-boundary policy and approximation limits supplied by the adapter. |
+
+The estimator or upstream adapter performs any FX translation and private-asset
+unsmoothing before supplying the fit. QIS does not unsmooth a previously fitted
+response again, infer a vendor ticker or reinterpret a bank's quantity convention.
+Missing live exposures must be resolved upstream; a deterministic response of `None`
+is an explicit cash policy, not a fallback for a missing fit.
+
 ## Objects and ownership
 
 | Object | Responsibility |
@@ -106,15 +155,22 @@ does not access the portfolio's payoffs, refit a model or obtain prices.
 
 Workflow:
 
-```mermaid
-flowchart LR
-    A[Application positions and fitted model] --> B[InstrumentPortfolio]
-    C[Requested shocks, history and grids] --> D[run_portfolio_stress_test]
-    B --> D
-    D --> E[PortfolioStressResult]
-    E --> F[generate_portfolio_stress_report]
-    E --> G[Application workbook or dashboard]
-    F --> H[PDF, tables and manifest]
+```text
+Application positions + assigned RiskModel
+                   |
+          InstrumentPortfolio
+                   |
+Requested shocks --+-- history + sensitivity grids
+                   |
+      run_portfolio_stress_test
+                   |
+       PortfolioStressResult
+                   |
+          +--------+------------------+
+          |                           |
+generate_portfolio_stress_report   Application workbook/dashboard
+          |
+     PDF + Excel + CSV + manifest
 ```
 
 QIS has no dependency on ROSAA, FS, OptimalPortfolios, FactorLasso or a vendor.
@@ -270,6 +326,10 @@ A family instruction conflicting with a supplied member instruction fails.
 
 `RiskModel.compute_factor_group_exposures_at_date` reports both the **sum of
 member exposures** and the **weighted local sensitivity to a split family bump**.
+For equal Credit weights, `exposure_sum = E_Credit + E_CreditEM`, whereas
+`split_bump_exposure = 0.5 * E_Credit + 0.5 * E_CreditEM`. The latter is only the
+local sensitivity per unit of the total split bump. Finite scenario P&L still comes
+from full payoff evaluation. Carry G10/EM can be declared with the same group contract.
 These answer different questions. No factor covariance, residual or historical
 vector is collapsed by this display grouping. Economic family definitions and
 the choice to split a particular scenario belong to the caller's model spec.
@@ -306,6 +366,30 @@ Ordinary funded portfolios retain existing baseline Gaussian conditional-factor
 plus shared-residual grid bands. Their horizon and central probability are
 explicit. Nonlinear/derivative grids show deterministic intrinsic curves with
 an unavailable-band status and no quadratic fit.
+
+## Euler volatility analytics
+
+Let N be the reporting denominator, d_j the aggregated shared-response dollar
+sensitivity, e_f the portfolio factor dollar sensitivity divided by N, and Sigma the
+annual factor covariance. The factor-model total variance is
+
+`v_model = e.T Sigma e + sum_j (d_j / N)^2 residual_var_j`.
+
+For `sigma_model = sqrt(v_model) > 0`, factor f contributes
+
+`RC_f = e_f (Sigma e)_f / sigma_model`.
+
+Holding h contributes `(E_hf / N) (Sigma e)_f / sigma_model` to factor f. These
+holding terms sum to `RC_f`. Factor terms sum to systematic variance divided by
+`sigma_model`; adding residual variance divided by `sigma_model` gives total
+model volatility. Standalone systematic and residual volatilities do not add.
+
+All terms are signed: a hedge can contribute negatively. Families sum constituent
+Euler terms, without scenario split weights. Ranking by absolute Euler contribution
+selects the largest risk allocations, which need not be the largest betas or dollar
+exposures. The PDF displays a subset of holdings/factors; use the complete exported
+Euler tables when checking additivity. Current payoff sensitivities are local, so
+these decompositions do not bound losses across option strikes or discontinuous barriers.
 
 ## Report subjects and audit exports
 
@@ -356,21 +440,70 @@ Those exhibits, the displayed loading table and optional parser appendix are als
 exported to Excel and CSV.
 
 The workbook is a numerical result export, not an editable payoff calculator.
+It has a linked contents index, wrapped headers, readable column widths, explicit
+number formats and frozen identifier/header panes. Display formatting preserves
+stored values; complete source fields remain accessible even when a PDF label is short.
+Derivative captions refer to the explicit reporting denominator rather than calling
+it NAV. Funded-asset reports retain their original NAV terminology.
+
+For concise labels, the adapter can supply `PortfolioHolding.metadata["short_name"]`
+and `StressReportConfig.response_diagnostics["name"]`. Use unique aliases of at most
+20 characters when following the standard desk layout. Retain the full source name
+in `PortfolioHolding.name`; shortening a display alias must not change an ID, risk
+response or holding aggregation.
+
+The principal result fields and exports have distinct interpretations:
+
+| Result or diagnostic table | Meaning / units |
+|---|---|
+| `valuations[*].mtm`, `.pnl` | Scenario by original holding; reference-currency value and change from the observed mark. |
+| `summaries[*].portfolio_return` | Currency P&L divided by N, including for zero/negative derivative marks. |
+| `factor_exposures`, `factor_betas` | Current reference-currency sensitivity per unit factor log move, and sensitivity divided by N. |
+| `response_jacobian`, `response_exposures` | Holding-by-shared-response sensitivities and their aggregated currency amounts. |
+| `factor_group_exposures` | Member exposure sums alongside sensitivities to the declared split bump. |
+| `Annualised portfolio risk` | Total/systematic/residual model vol, currency vol, variance shares and additive Euler allocations. |
+| `Factor Euler volatility`, `Family Euler volatility` | Signed contributions in annual volatility units. |
+| `Holding factor Euler volatility` | Original-holding allocations of each factor's Euler contribution. |
+| `Unit response risk`, `Loading aggregates` | Standalone fitted-response risk and full-denominator aggregate rows. |
+| `historical_ranking`, `historical_coverage` | Exact P&L ranking and the inclusion/exclusion reason for each supplied month. |
+| `attribution[*]` | Factor components plus the nonlinear payoff adjustment, reconciling to currency P&L. |
+| `positions`, `leg_terms` | Source marks, intrinsic baselines, constant basis offsets, payoff coverage and vanilla terms. |
+| `Grid quadratic regressions` | Through-zero coefficients for funded curves; empty for derivative portfolios. |
+
+Currency amounts are not automatically invested cash, executable proceeds or lending
+value. The R-squared in the Portfolio/Rest rows is a weighted fit diagnostic, not a
+regression of actual portfolio returns. Underlying response volatilities describe unit
+risk; the portfolio rows use signed dollar sensitivities divided by the full denominator.
 The CSV-to-table mapping, conventions, snapshot dates and SHA-256 artifact hashes
 are recorded in `manifest.json`. Existing output directories are rejected.
 
 ## Consumer adoption
 
-ROSAA/UAE adapters should construct funded holdings and convert their fitted
-snapshot into a RiskModel, preserving current scenarios and diagnostic inputs.
-MATF definitions should provide economic family membership, including the
-reviewed Credit simple-bump split, rather than introducing MATF imports in QIS.
+1. **Load and validate the snapshot.** Reconcile source IDs, signed marks and exact model
+   dates. Retain a separate source manifest for quotes, contract terms and fit provenance.
+2. **Build the model and registries.** Supply the assigned `RiskModel`, economic factor
+   families, actual local quotes, fitted response IDs and required FX conversions. A
+   consumer's `optimalportfolios.build_risk_model` adapter is optional; it is not a QIS
+   dependency or an additional estimator invoked by this report.
+3. **Map source holdings once.** Funded portfolios use DELTA_1. Futures use actual signed
+   quantities/multipliers, while a continuous contract can be their fitted response proxy.
+   Cash and collateral remain separate funded holdings. Structured accounts can use vanilla
+   call/put decompositions plus explicit composite payoffs for remaining terminal features.
+4. **Run common scenarios and retain full results.** Requested shocks, grids and complete
+   historical vectors all call the same evaluator. Compare zero-shock marks, source totals,
+   current Jacobians and representative nonlinear P&L against the source-specific reference.
+5. **Supply the application appendix and export.** Pass preformatted reconciliation rows and
+   explanatory notes to `StressReportConfig`. Additional plain DataFrames can be attached to
+   a copied `report_diagnostics` mapping using `dataclasses.replace`; the generic exporter
+   includes them without learning private contract or source-system types.
 
-JSR should retain source holding/account IDs and actual contract quantities,
-map continuing accumulators/decumulators to vanilla legs, and supply explicit
-composites for terminal KO, worst-of FCNs and declared TARF approximations.
-Settlement/delivery and collateral staircases remain application outputs.
+A composite's original terms should be exported as an application audit table because
+`leg_terms` contains only vanilla legs directly attached to holdings. QIS does not introspect
+private composite fields. Keep quantity-basis and barrier-state alternatives as separate
+portfolios/results when terms are unresolved. Do not label them probability bounds or silently
+apply leverage a second time.
 
-FS should map actual signed contract quantities and multipliers to FUTURE legs,
-using continuous contracts only as response proxies. Cash and collateral are
-separate funded holdings; future notional is not added to portfolio value.
+Settlement/delivery, accrued fixing paths, coupons, executable close-out, collateral haircuts
+and liquidation/credit staircases remain consumer outputs. They can reuse the generic result
+but require their own validated inputs. This boundary lets a private account parser and an
+open-source strategy use the same public portfolio and report objects.
