@@ -163,8 +163,8 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
         fig.add_axes([0.04, 0.125, 0.92, 0.32]),
         frame,
         "Top 10 asset contributions by absolute size; signed percentage points of portfolio NAV",
-        first=0.18,
-        fontsize=8,
+        first=0.14,
+        fontsize=7.5,
     )
     for ax in fig.axes:
         for table in ax.tables:
