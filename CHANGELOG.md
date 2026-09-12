@@ -21,6 +21,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Restore the original stress-report presentation: annualised risk table, family
   Euler bars, QIS scatter/regression/band grids, coloured loading table with Rest
   and Portfolio rows, fitted cadence dendrograms and covariance/formula page.
+- Rank stress-report factor panels by absolute factor Euler volatility contribution,
+  explain signed additivity and displayed-subset limits, and fit 20-character asset
+  display labels in scenario contributor cells.
 - Family Euler contributions sum constituent risk contributions; Credit scenario
   bumps still split before log conversion. Derivative scenarios retain exact
   intrinsic valuation and have no Gaussian prediction bands or quadratic fits.

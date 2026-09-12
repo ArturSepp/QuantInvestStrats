@@ -322,6 +322,14 @@ scenario groups have no unique additive partition and display atomic factor term
 The supplied asset-covariance risk remains a separate exported view if it differs
 from the factor-model total. Derivative risk uses current shared-response Jacobians.
 
+Page five ranks the six largest absolute factor Euler volatility contributions,
+retaining their signs, then shows each factor's ten largest absolute holding
+contributions. A factor Euler term is factor beta times marginal volatility, in
+percentage points of annual volatility. All factor terms sum to systematic
+variance divided by total model volatility; adding the residual term gives total
+model volatility. All holding terms for a factor sum to its factor term, while the
+displayed subsets need not add to the full totals.
+
 Page six calls QIS scatter plots and `fit_multivariate_ols` for through-zero
 quadratic fits on funded-asset scenario grids. Existing conditional bands stay
 centred on exact scenario valuations. Neither bands nor quadratic fits are inferred

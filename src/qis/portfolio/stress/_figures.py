@@ -149,7 +149,7 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
                 holding_id,
                 "metadata:short_name" if "metadata:short_name" in result.positions else "name",
             ]
-            display = "\n".join(textwrap.wrap(str(name), width=18, max_lines=2, placeholder="..."))
+            display = "\n".join(textwrap.wrap(str(name), width=20, max_lines=2, placeholder="..."))
             row[str(rank)] = f"{display}\n{values.loc[holding_id] / denominator:+.2%}"
         cells.append(row)
     frame = pd.DataFrame(cells, index=rows).fillna("").rename(index=display_labels)
@@ -314,11 +314,12 @@ def _contributor_page(result, config):
         config,
         5,
         "Largest factor exposures: asset risk contributors",
-        "Factors ranked by absolute MTM factor exposure. Assets ranked by absolute Euler "
+        "Factors ranked by absolute factor Euler contribution. Assets ranked by absolute Euler "
         "contribution to total annual portfolio volatility.",
     )
+    rc = result.report_diagnostics["Factor Euler volatility"].euler_vol
     factors = (
-        result.factor_exposures.loc[result.factor_exposures.ne(0)]
+        rc.loc[rc.ne(0)]
         .abs()
         .sort_values(ascending=False, kind="stable")
         .head(6)
@@ -327,7 +328,6 @@ def _contributor_page(result, config):
     grid = fig.add_gridspec(
         2, 3, left=0.11, right=0.96, top=0.86, bottom=0.20, hspace=0.48, wspace=0.68
     )
-    rc = result.report_diagnostics["Factor Euler volatility"].euler_vol
     for i, factor in enumerate(factors):
         values = result.report_diagnostics["Holding factor Euler volatility"][factor]
         selected = values.abs().sort_values(ascending=False, kind="stable").head(10).index
@@ -344,17 +344,21 @@ def _contributor_page(result, config):
     _footnotes(
         fig,
         [
-            "All panels: w_i = MTM_i / NAV; e_f = sum_i w_i beta_if. Factor ranking "
-            "uses abs(NAV x e_f). Asset RC = (w_i beta_if / e_f) x factor RC; bars allocate each "
-            "factor Euler contribution to annual portfolio volatility (%), and negative values "
-            "reduce risk. Top 10 assets per factor are shown; complete tables are exported. "
-            "Exposure is a sensitivity ratio; zero net factor exposures are omitted."
+            "Factor Euler RC_f = e_f x (Sigma e)_f / sigma_p: portfolio factor beta times "
+            "marginal volatility. Sigma is annual factor covariance; sigma_p is total model "
+            "volatility. Values are percentage points of annual volatility; negative terms "
+            "reduce risk.",
+            "Additivity: all factor Euler terms sum to systematic variance / sigma_p. Adding "
+            "residual variance / sigma_p gives total volatility sigma_p. All holding contributions "
+            "to a factor sum to that factor's Euler term.",
+            "Six largest absolute factor Euler terms and ten largest absolute holding "
+            "contributions per factor are shown; displayed subsets need not sum to full totals. Complete tables "
+            "are exported. Funded factor beta e_f = sum_i (MTM_i / NAV) x beta_if."
             if result.metadata["all_funded"]
-            else "Factor ranking uses absolute dollar sensitivity. "
-            "Bars allocate local factor Euler "
-            "risk to original holdings through their payoff Jacobians. Shared responses are "
-            "aggregated before portfolio risk; synthetic option legs remain under their source "
-            "holding. Negative contributions reduce local risk; complete tables are exported."
+            else "Six largest absolute factor Euler terms and ten largest absolute holding "
+            "contributions per factor are shown; displayed subsets need not sum to full totals. "
+            "Derivative betas use current payoff Jacobians and shared responses; these are local "
+            "risk contributions. Complete tables are exported."
         ],
         y=0.13,
         width=185,

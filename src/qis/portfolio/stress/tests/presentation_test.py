@@ -112,3 +112,29 @@ def test_overlapping_groups_keep_additive_atomic_risk(market):
     assert frame.euler_vol.sum() == pytest.approx(
         result.report_diagnostics["Annualised portfolio risk"].loc["Systematic", "euler_vol"]
     )
+
+
+def test_factor_panels_rank_euler_risk_instead_of_dollar_exposure(market):
+    """A lower-beta, higher-volatility factor must precede a larger dollar exposure."""
+    from dataclasses import replace
+    import matplotlib.pyplot as plt
+    from qis.portfolio.stress._figures import _contributor_page
+
+    p = grouped_portfolio(market)
+    model, date = p.risk_model, p.risk_date
+    factors = model.factor_covar[date].index
+    cov = pd.DataFrame(np.diag([0.01, 0.04, 0.25, 0.09]), index=factors, columns=factors)
+    beta = model.factor_loadings[date]
+    asset_cov = beta @ cov @ beta.T + np.diag(model.residual_vars[date])
+    p = replace(p, risk_model=replace(model, factor_covar={date: cov}, covar={date: asset_cov}))
+    result = run_portfolio_stress_test(p, StressScenarios(pd.DataFrame({"Equity": [-0.1]})))
+    assert result.factor_exposures.Equity > result.factor_exposures.Credit
+    fig = _contributor_page(result, StressReportConfig(model_name="MATF"))
+    try:
+        assert [ax.get_title().split("\n")[0] for ax in fig.axes] == [
+            "Credit",
+            "Credit EM",
+            "Equity",
+        ]
+    finally:
+        plt.close(fig)
