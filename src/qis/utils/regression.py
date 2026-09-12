@@ -189,17 +189,56 @@ def fit_multivariate_ols(x: pd.DataFrame,
     return prediction, params, reg_label
 
 
-def fit_ols(x: np.ndarray,
-            y: np.ndarray,
-            order: int = 1,
-            fit_intercept: bool = True
-            ) -> RegModel:
+def _to_ols_array(values: Union[np.ndarray, pd.Series, pd.DataFrame]) -> np.ndarray:
+    """Convert real-valued pandas containers without coercing other inputs."""
+    if isinstance(values, pd.DataFrame):
+        is_numeric = all(pd.api.types.is_any_real_numeric_dtype(dtype) for dtype in values.dtypes)
+    elif isinstance(values, pd.Series):
+        is_numeric = pd.api.types.is_any_real_numeric_dtype(values.dtype)
+    else:
+        return values
+
+    if is_numeric:
+        # Avoid object designs when statsmodels adds a constant to pandas extension dtypes.
+        return values.to_numpy(dtype=float, na_value=np.nan)
+    return values.to_numpy()
+
+
+def _prepare_ols_inputs(
+    x: Union[np.ndarray, pd.Series, pd.DataFrame],
+    y: Union[np.ndarray, pd.Series],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Validate pandas row identity before normalizing the statsmodels inputs."""
+    if isinstance(x, (pd.Series, pd.DataFrame)) and isinstance(y, pd.Series):
+        if not x.index.equals(y.index):
+            raise ValueError("x and y indices must be aligned")
+    return _to_ols_array(x), _to_ols_array(y)
+
+
+def fit_ols(
+    x: Union[np.ndarray, pd.Series, pd.DataFrame],
+    y: Union[np.ndarray, pd.Series],
+    order: int = 1,
+    fit_intercept: bool = True,
+) -> RegModel:
+    """Fit an OLS regression after validating and normalizing its inputs.
+
+    Args:
+        x: Explanatory values in an array, Series, or DataFrame.
+        y: Dependent observations in an array or Series.
+        order: Polynomial degree used to construct the design.
+        fit_intercept: Whether to include an intercept.
+
+    Returns:
+        The fitted statsmodels regression result.
+
+    Raises:
+        ValueError: If pandas inputs do not have identical row indexes.
     """
-    fit regression model
-    """
-    x, y, cond = filter_x_y(x=x, y=y)
-    x1 = get_ols_x(x=x, order=order, fit_intercept=fit_intercept)
-    reg_model = sm.OLS(y, x1).fit()
+    x_array, y_array = _prepare_ols_inputs(x=x, y=y)
+    x_array, y_array, _ = filter_x_y(x=x_array, y=y_array)
+    x1 = get_ols_x(x=x_array, order=order, fit_intercept=fit_intercept)
+    reg_model = sm.OLS(y_array, x1).fit()
     return reg_model
 
 
@@ -559,21 +598,6 @@ def filter_x_y(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np
     return x, y, cond
 
 
-def _to_ols_array(values: Union[np.ndarray, pd.Series, pd.DataFrame]) -> np.ndarray:
-    """Convert real-valued pandas containers without coercing other inputs."""
-    if isinstance(values, pd.DataFrame):
-        is_numeric = all(pd.api.types.is_any_real_numeric_dtype(dtype) for dtype in values.dtypes)
-    elif isinstance(values, pd.Series):
-        is_numeric = pd.api.types.is_any_real_numeric_dtype(values.dtype)
-    else:
-        return values
-
-    if is_numeric:
-        # Avoid object designs when statsmodels adds a constant to pandas extension dtypes.
-        return values.to_numpy(dtype=float, na_value=np.nan)
-    return values.to_numpy()
-
-
 def estimate_ols_alpha_beta(
     x: Union[np.ndarray, pd.Series, pd.DataFrame],
     y: Union[np.ndarray, pd.Series],
@@ -598,8 +622,8 @@ def estimate_ols_alpha_beta(
     """
     try:
         reg_model = fit_ols(
-            x=_to_ols_array(x),
-            y=_to_ols_array(y),
+            x=x,
+            y=y,
             order=order,
             fit_intercept=fit_intercept,
         )
