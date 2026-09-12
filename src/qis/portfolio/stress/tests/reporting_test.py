@@ -64,6 +64,12 @@ def test_nine_core_pages_export_all_values_without_repricing(market, tmp_path, m
         values, result.valuations["requested"].pnl, check_names=False, rtol=1e-12
     )
     assert artifact.workbook_path.exists()
+    from openpyxl import load_workbook
+    workbook = load_workbook(artifact.workbook_path)
+    total_share = workbook["01 Annualised portfolio risk"]["D2"]
+    assert total_share.value == 1
+    assert "%" in total_share.number_format
+    workbook.close()
     with zipfile.ZipFile(artifact.workbook_path) as archive:
         sheets = [name for name in archive.namelist() if name.startswith("xl/worksheets/sheet")]
         assert len(sheets) == len(artifact.table_paths) + 1

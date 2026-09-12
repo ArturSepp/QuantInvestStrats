@@ -275,7 +275,8 @@ def _format_workbook(path):
                     )
                 elif isinstance(cell.value, int) and not isinstance(cell.value, bool):
                     cell.number_format = (
-                        "0" if cell.column == 1 or headers[cell.column].endswith("_id")
+                        "0.00%;[Red](0.00%);0.00%" if headers[cell.column] in percent_columns
+                        else "0" if cell.column == 1 or headers[cell.column].endswith("_id")
                         else "#,##0;[Red](#,##0);0"
                     )
                 elif isinstance(cell.value, str):
