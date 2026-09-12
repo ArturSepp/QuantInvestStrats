@@ -14,6 +14,15 @@ batch and also shifts later sample columns.
 
 ### Added
 
+- Added `TurnoverComputationType` and the standalone `compute_turnover` engine, with explicit
+  target-weight, executed-notional-over-NAV and executed-notional-over-gross conventions,
+  detailed documentation and a synthetic example (5.25.0).
+
+- Added the provider-neutral factor stress-testing API in portfolio/risk/stress_testing.py:
+  explicit log-shock conversions, joint conditional shocks/covariances, exact model P&L
+  attribution and analytical conditional-factor-plus-residual prediction bands. The new
+  API is additive; existing RiskModel signatures and behaviour are unchanged (5.24.0).
+
 - Added explicit stack dependency and optional-import boundary checks, including
   isolated maintainer adapters, plus a fresh Python 3.10 lowest-direct dependency CI lane.
 
@@ -21,6 +30,10 @@ batch and also shifts later sample columns.
   validation; creating a GitHub Release remains optional.
 
 ### Changed
+
+- Changed QIS portfolio turnover to default to two-sided executed notional divided by NAV.
+  Derivative producers can now supply a separate `turnover_unit_notional` panel and set their
+  portfolio-level convention. The former boolean selector remains as a deprecated bridge.
 
 - Aligned package summaries, software citations, README navigation, and documentation
   landing pages with the canonical package identity and Read the Docs documentation.

@@ -90,6 +90,13 @@ different calculation.
 - **Strategy versus benchmark:** compare two portfolio books and their active difference.
 - **Multi-strategy:** compare several portfolio variants on shared tables and axes.
 
+Factsheet turnover is an investor-capital statistic and should use two-sided executed notional
+divided by NAV. For managed futures, supply full contract notionals as `turnover_unit_notional`;
+using executed contracts is essential, but it does not imply a gross-exposure denominator.
+Gross-normalized turnover deliberately removes leverage and is best reserved for a separate
+book-churn or implementation-capacity diagnostic. The [turnover methodology](
+turnover_conventions.md) gives the formulas and a 1x-versus-2x example.
+
 The [factsheet gallery](gallery.md) shows the four rendered forms. The wheel-shipped
 [factsheet convention note](factsheets.md) maps each facade input to its lower-level
 generator.
@@ -112,4 +119,5 @@ generator.
 - [Factsheet gallery](gallery.md)
 - [Factsheet convention](factsheets.md)
 - [Reporting-frequency convention](_included/reporting_frequencies.md)
+- [Two-sided turnover conventions](turnover_conventions.md)
 - [Canonical multi-asset example (requires the `data` extra)](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/multi_assets.py)

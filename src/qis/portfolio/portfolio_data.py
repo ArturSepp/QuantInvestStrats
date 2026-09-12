@@ -13,12 +13,11 @@ Reading ``weights`` as the target is the most common misuse of this class.
 
 Conventions that hold module-wide:
 
-    ``is_unit_based_traded_volume``, True by default, is the unit-based branch of turnover and
-        costs: turnover is traded notional over gross exposure, |Δu_t| p_t / Σ_i |u_t p_t|, and
-        costs are ``realized_costs`` divided by nav. Set it False for a backtest that produced
-        weights rather than units, and turnover becomes |Δw_t| on ``input_weights`` while costs
-        stay in currency, unnormalised. Both are summed over a rolling ``roll_period``, 260
-        observations by default.
+    Turnover delegates to :func:`qis.compute_turnover`. Executed unit changes are valued with
+        ``turnover_unit_notional`` rather than necessarily with return ``prices``. The default is
+        two-sided executed notional divided by nav; target-weight and gross-exposure conventions
+        are explicit ``TurnoverComputationType`` members. Turnover is summed over a rolling
+        ``roll_period``, 260 observations by default.
 
     ``instrument_pnl`` is arithmetic and additive across instruments. When not supplied it is
         reconstructed as prices.pct_change() * weights.shift(1) with missing values filled to
@@ -68,6 +67,11 @@ from qis.portfolio.risk.ewm_covar_risk import compute_portfolio_vol
 from qis.portfolio.risk.contributions import compute_portfolio_risk_contributions
 from qis.utils.annualisation import infer_annualisation_factor_from_df
 from qis.utils.df_str import date_to_str
+from qis.perfstats.turnover import (
+    TurnoverComputationType,
+    compute_turnover,
+    resolve_turnover_computation_type,
+)
 
 # default performance and regime params
 PERF_PARAMS = PerfParams(freq='W-WED')
@@ -162,6 +166,9 @@ class PortfolioData:
             rebalancings; these are not the target weights that were requested
         units: instrument units held
         prices: prices of the portfolio universe
+        turnover_unit_notional: value of one unit for turnover. Defaults to ``prices`` for cash
+            instruments; derivative backtests should supply contract notionals
+        turnover_computation_type: default turnover convention for this portfolio
         instrument_pnl: net pnl by instrument
         realized_costs: trading costs actually incurred, by instrument
         input_weights: the target weights as supplied, kept for reference against ``weights``
@@ -193,6 +200,10 @@ class PortfolioData:
     ticker: str = None
     strategy_signal_data: StrategySignalData = None
     covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None  # for computing risk contributions
+    turnover_unit_notional: pd.DataFrame = None  # unit or contract value used for turnover
+    turnover_computation_type: TurnoverComputationType = (
+        TurnoverComputationType.EXECUTED_NOTIONAL_NAV
+    )
 
     def __post_init__(self):
         if isinstance(self.nav, pd.DataFrame):
@@ -203,6 +214,11 @@ class PortfolioData:
             self.weights = pd.DataFrame(1.0, index=self.prices.index, columns=self.prices.columns)
         if self.units is None:  # default will be delta-1 portfolio of nav
             self.units = pd.DataFrame(1.0, index=self.prices.index, columns=self.prices.columns)
+        if self.turnover_unit_notional is None:
+            self.turnover_unit_notional = self.prices
+        self.turnover_computation_type = TurnoverComputationType(
+            self.turnover_computation_type
+        )
         if self.realized_costs is None:
             self.realized_costs = pd.DataFrame(0.0, index=self.prices.index, columns=self.prices.columns)
         if self.instrument_pnl is None:
@@ -235,6 +251,11 @@ class PortfolioData:
 
     def save(self, ticker: str, local_path: str = './') -> None:
         datasets = dict(nav=self.nav, prices=self.prices, weights=self.weights, units=self.units,
+                        turnover_unit_notional=self.turnover_unit_notional,
+                        turnover_computation_type=pd.Series(
+                            [self.turnover_computation_type.value],
+                            name='turnover_computation_type',
+                        ),
                         instrument_pnl=self.instrument_pnl, realized_costs=self.realized_costs)
         if self.group_data is not None:
             datasets['group_data'] = self.group_data
@@ -243,8 +264,13 @@ class PortfolioData:
 
     @classmethod
     def load(cls, ticker: str) -> PortfolioData:
-        dataset_keys = ['nav', 'prices', 'weights', 'units', 'instrument_pnl', 'realized_costs', 'group_data']
+        dataset_keys = ['nav', 'prices', 'weights', 'units', 'turnover_unit_notional',
+                        'turnover_computation_type', 'instrument_pnl', 'realized_costs',
+                        'group_data']
         datasets = qis.load_df_dict_from_csv(dataset_keys=dataset_keys, file_name=ticker)
+        turnover_computation_type = datasets.pop('turnover_computation_type', None)
+        if turnover_computation_type is not None:
+            datasets['turnover_computation_type'] = turnover_computation_type.iloc[0, 0]
         return cls(**datasets)
 
     """
@@ -487,17 +513,22 @@ class PortfolioData:
                      add_total: bool = True,
                      vol_span: int = 33,
                      freq: Optional[str] = None,
-                     is_unit_based_traded_volume: bool = True,
+                     is_unit_based_traded_volume: Optional[bool] = None,
+                     turnover_computation_type: Optional[TurnoverComputationType] = None,
                      **kwargs
                      ) -> Union[pd.DataFrame, pd.Series]:
-
-        if is_unit_based_traded_volume:  # for unit generated backtest
-            turnover = (self.units.diff(1).abs()).multiply(self.prices)
-            abs_exposure = self.units.multiply(self.prices).abs().sum(axis=1)
-            # turnover = turnover.divide(self.nav.to_numpy(), axis=0)
-            turnover = turnover.divide(abs_exposure.to_numpy(), axis=0)
-        else:  # for weight generated backtets
-            turnover = self.input_weights.diff(1).abs()
+        turnover_computation_type = resolve_turnover_computation_type(
+            default=self.turnover_computation_type,
+            computation_type=turnover_computation_type,
+            is_unit_based_traded_volume=is_unit_based_traded_volume,
+        )
+        turnover = compute_turnover(
+            computation_type=turnover_computation_type,
+            units=self.units,
+            unit_notional=self.turnover_unit_notional,
+            nav=self.nav,
+            input_weights=self.input_weights,
+        )
 
         if is_vol_adjusted:
             instrument_vols = compute_ewm_vol(data=qis.to_returns(self.prices, is_log_returns=True),
@@ -505,8 +536,9 @@ class PortfolioData:
                                               annualize=True)
             turnover = turnover.multiply(instrument_vols)
 
+        all_missing_turnover = turnover.isna().all(axis=1)
         if is_agg:
-            turnover = pd.Series(np.nansum(turnover, axis=1), index=turnover.index, name=self.nav.name)
+            turnover = turnover.sum(axis=1, min_count=1).rename(self.nav.name)
             turnover = turnover.reindex(index=self.nav.index)
         elif is_grouped:  # agg by groups
             if group_data is None:
@@ -518,14 +550,16 @@ class PortfolioData:
                                                 agg_func=np.nansum,
                                                 total_column=str(self.nav.name) if add_total else None,
                                                 group_order=group_order)
+            turnover.loc[all_missing_turnover] = np.nan
         else:
             if add_total:
-                turnover = pd.concat([turnover.sum(axis=1).rename(self.nav.name), turnover],
+                turnover = pd.concat([turnover.sum(axis=1, min_count=1).rename(self.nav.name),
+                                      turnover],
                                      axis=1, sort=True)
 
         if not turnover.empty:  # it may happen for undefined groupings
             if freq is not None:  # first aggregate by freq
-                turnover = turnover.resample(freq).sum()
+                turnover = turnover.resample(freq).sum(min_count=1)
             if roll_period is not None:  # now aggregate by roll
                 turnover = turnover.rolling(roll_period).sum()
             if time_period is not None:
@@ -537,11 +571,13 @@ class PortfolioData:
                   is_grouped: bool = False,
                   time_period: TimePeriod = None,
                   add_total: bool = True,
-                  is_unit_based_traded_volume: bool = True,
+                  is_unit_based_traded_volume: Optional[bool] = None,
                   roll_period: Optional[int] = 260,
                   freq: Optional[str] = None
                   ) -> Union[pd.DataFrame, pd.Series]:
 
+        if is_unit_based_traded_volume is None:
+            is_unit_based_traded_volume = True
         costs = self.realized_costs
         if is_unit_based_traded_volume:
             costs = costs.divide(self.nav.to_numpy(), axis=0)
@@ -702,7 +738,10 @@ class PortfolioData:
     def get_performance_attribution_data(self,
                                          attribution_metric: AttributionMetric = AttributionMetric.PNL,
                                          time_period: TimePeriod = None,
-                                         is_unit_based_traded_volume: bool = True,
+                                         turnover_computation_type: Optional[
+                                             TurnoverComputationType
+                                         ] = None,
+                                         is_unit_based_traded_volume: Optional[bool] = None,
                                          **kwargs
                                          ) -> Union[pd.DataFrame, pd.Series]:
         if attribution_metric == AttributionMetric.PNL:
@@ -712,8 +751,13 @@ class PortfolioData:
         elif attribution_metric == AttributionMetric.INST_PNL:
             data = self.get_instruments_navs(time_period=time_period)
         elif attribution_metric == AttributionMetric.COSTS:
+            is_unit_based_costs = (
+                True
+                if is_unit_based_traded_volume is None
+                else is_unit_based_traded_volume
+            )
             data = self.get_costs(is_agg=False, is_grouped=False, roll_period=None,
-                                  is_unit_based_traded_volume=is_unit_based_traded_volume,
+                                  is_unit_based_traded_volume=is_unit_based_costs,
                                   add_total=False,
                                   time_period=time_period)
             data = data.sum(axis=0)
@@ -721,6 +765,8 @@ class PortfolioData:
         elif attribution_metric == AttributionMetric.TURNOVER:
             data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
                                      add_total=False,
+                                     turnover_computation_type=turnover_computation_type,
+                                     is_unit_based_traded_volume=is_unit_based_traded_volume,
                                      time_period=time_period)
             an = infer_annualisation_factor_from_df(data=data)
             data = an * data.mean(axis=0)
@@ -728,6 +774,8 @@ class PortfolioData:
         elif attribution_metric == AttributionMetric.VOL_ADJUSTED_TURNOVER:
             data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
                                      add_total=False, is_vol_adjusted=True,
+                                     turnover_computation_type=turnover_computation_type,
+                                     is_unit_based_traded_volume=is_unit_based_traded_volume,
                                      time_period=time_period)
             an = infer_annualisation_factor_from_df(data=data)
             data = an * data.mean(axis=0)
@@ -1768,6 +1816,10 @@ class PortfolioData:
                       title: str = None,
                       regime_classifier: BenchmarkReturnsQuantilesRegime = None,
                       ax: plt.Subplot = None,
+                      turnover_computation_type: Optional[
+                          TurnoverComputationType
+                      ] = None,
+                      is_unit_based_traded_volume: Optional[bool] = None,
                       **kwargs
                       ) -> None:
         turnover = self.get_turnover(is_agg=is_agg,
@@ -1778,10 +1830,15 @@ class PortfolioData:
                                      roll_period=turnover_rolling_period,
                                      add_total=add_total,
                                      freq=freq_turnover,
+                                     turnover_computation_type=turnover_computation_type,
+                                     is_unit_based_traded_volume=is_unit_based_traded_volume,
                                      **kwargs)
         if not turnover.empty:
             freq = pd.infer_freq(turnover.index)
-            turnover_title = title or f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
+            turnover_title = (
+                title
+                or f"{turnover_rolling_period}-period rolling {freq}-freq Two-sided Turnover"
+            )
             qis.plot_time_series(df=turnover,
                                  var_format='{:,.1%}',
                                  y_limits=(0.0, None),

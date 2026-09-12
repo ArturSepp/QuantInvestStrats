@@ -37,6 +37,7 @@ examples/
 | `miss_best_worst_days_impact.py` | Performance with the best / worst N days per month removed. |
 | `infrequent_returns_interpolation.py` | `interpolate_infrequent_returns` for monthly/quarterly hedge-fund-like series. |
 | `timeseries_backfill.py` | Extend a newer provider history backwards with `bfill_timeseries`, preserving its recent price path. |
+| `turnover_conventions.py` | Yahoo SPY/TLT comparison of all three two-sided turnover conventions for a 100% funded 60/40 portfolio and the same portfolio at 2x leverage. |
 | `unsmoothing_and_delevering.py` | End-to-end walkthrough of `delever_returns`, `implied_leverage`, `unsmooth_returns_ar1_ewma` and `unsmooth_returns_glm` on a bundled OCSL/GCF dataset. |
 
 ## models — EWM, regression, vol estimation
@@ -76,6 +77,7 @@ examples/
 | `model_layer_attribution_simulated.py` | Offline, seeded layer and two-feature simulation for `compute_model_layer_alpha_beta_attribution` and `compute_model_feature_alpha_beta_attribution`: HAC(3) intervals, exact identities, return bridge, additive cumulative alpha and grouped Shapley sensitivity. Source of the figures in `docs/model_layer_attribution.md`. |
 | `vol_target_and_trend.py` | Vol-target + trend-following sweep via `examples.portfolios.strats.qis_delta1`. |
 | `seasonality_backtest.py` | Point-in-time calendar-month seasonality with annual trailing-window refits. |
+| `factor_stress_testing.py` | Offline assigned-model stress workflow: direct versus correlated targets, joint credit anchors, nonlinear P&L attribution and one-month conditional prediction bands; optional CSV/PNG/PDF export. See [analytics and formulas](../docs/stress_testing.md). |
 
 ## discrete_portfolio — event-based backtests
 

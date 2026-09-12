@@ -57,6 +57,13 @@ own horizon frequency (`QE` long, `ME` short) regardless of the reporting freque
 report and a daily report of the same long book are both split on the same `QE` regimes, so the
 conditioning is comparable across cadences.
 
+The window configuration does not determine the turnover convention. Configure investor
+factsheets to use two-sided executed notional divided by NAV so leverage remains visible on the
+same capital base as returns and costs. Futures portfolios must supply full contract notionals for
+the numerator. Gross-normalized turnover is a separate book-replacement diagnostic that
+intentionally scales away leverage; see the site guide `docs/turnover_conventions.md` for the
+formulas and use cases.
+
 ## The up-sampling guard
 
 Before rendering, every factsheet validates the input series against the requested reporting

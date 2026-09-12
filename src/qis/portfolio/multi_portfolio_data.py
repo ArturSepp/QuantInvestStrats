@@ -54,6 +54,7 @@ import qis.plots.derived.drawdowns as cdr
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 from qis.portfolio.risk.risk_model import RiskModel
 from qis.utils.struct_ops import merge_lists_unique
+from qis.perfstats.turnover import TurnoverComputationType
 
 
 # default perf params
@@ -234,16 +235,31 @@ class MultiPortfolioData:
                              freq_turnover: Optional[str] = 'B',
                              time_period: TimePeriod = None,
                              is_grouped: bool = False,
+                             turnover_computation_type: Optional[
+                                 TurnoverComputationType
+                             ] = None,
+                             is_unit_based_traded_volume: Optional[bool] = None,
                              **kwargs
                              ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
-        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=freq_turnover,
-                                                                            roll_period=turnover_rolling_period,
-                                                                            add_total=False, is_grouped=is_grouped)
-        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period,
-                                                                              freq=freq_turnover,
-                                                                              roll_period=turnover_rolling_period,
-                                                                              add_total=False, is_grouped=is_grouped)
+        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(
+            time_period=time_period,
+            freq=freq_turnover,
+            roll_period=turnover_rolling_period,
+            add_total=False,
+            is_grouped=is_grouped,
+            turnover_computation_type=turnover_computation_type,
+            is_unit_based_traded_volume=is_unit_based_traded_volume,
+        )
+        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(
+            time_period=time_period,
+            freq=freq_turnover,
+            roll_period=turnover_rolling_period,
+            add_total=False,
+            is_grouped=is_grouped,
+            turnover_computation_type=turnover_computation_type,
+            is_unit_based_traded_volume=is_unit_based_traded_volume,
+        )
         tickers_union = merge_lists_unique(list1=strategy_turnover.columns.to_list(),
                                            list2=benchmark_turnover.columns.to_list())
         # replace with ac order of benchmark
@@ -299,7 +315,10 @@ class MultiPortfolioData:
                                      freq: Optional[str] = 'B',
                                      time_period: TimePeriod = None,
                                      annualization_factor: float = 260,
-                                     is_unit_based_traded_volume: bool = True,
+                                     is_unit_based_traded_volume: Optional[bool] = None,
+                                     turnover_computation_type: Optional[
+                                         TurnoverComputationType
+                                     ] = None,
                                      **kwargs
                                      ) -> pd.DataFrame:
         """Compute per-instrument performance, information ratio, turnover, and costs.
@@ -316,6 +335,7 @@ class MultiPortfolioData:
             freq: Frequency of the attribution P&L tables.
             time_period: Optional reporting period.
             annualization_factor: Scale applied to average turnover and costs.
+            turnover_computation_type: Turnover convention; None uses each portfolio default.
             is_unit_based_traded_volume: Whether costs use unit-based traded volume.
             **kwargs: Reserved for compatibility with report callers.
 
@@ -334,8 +354,14 @@ class MultiPortfolioData:
         pnl_diff = strategy_pnl.subtract(benchmark_pnl)
 
         # strategy_weights = self.portfolio_datas[strategy_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
-        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(time_period=time_period, freq=None,
-                                                                            roll_period=None, add_total=False)
+        strategy_turnover = self.portfolio_datas[strategy_idx].get_turnover(
+            time_period=time_period,
+            freq=None,
+            roll_period=None,
+            add_total=False,
+            turnover_computation_type=turnover_computation_type,
+            is_unit_based_traded_volume=is_unit_based_traded_volume,
+        )
         strategy_cost = self.portfolio_datas[strategy_idx].get_costs(time_period=time_period, freq=freq,
                                                                      roll_period=None,
                                                                      add_total=False,
@@ -343,8 +369,14 @@ class MultiPortfolioData:
         strategy_ticker = self.portfolio_datas[strategy_idx].ticker
 
         # benchmark_weights = self.portfolio_datas[benchmark_idx].get_weights(time_period=time_period, freq=None, is_input_weights=True)
-        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(time_period=time_period, freq=None,
-                                                                              roll_period=None, add_total=False)
+        benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(
+            time_period=time_period,
+            freq=None,
+            roll_period=None,
+            add_total=False,
+            turnover_computation_type=turnover_computation_type,
+            is_unit_based_traded_volume=is_unit_based_traded_volume,
+        )
         benchmark_cost = self.portfolio_datas[benchmark_idx].get_costs(time_period=time_period, freq=freq,
                                                                        roll_period=None,
                                                                        add_total=False,
@@ -843,14 +875,21 @@ class MultiPortfolioData:
                      time_period: TimePeriod = None,
                      turnover_rolling_period: Optional[int] = 12,
                      freq_turnover: Optional[str] = 'ME',
-                     is_unit_based_traded_volume: bool = True,
+                     is_unit_based_traded_volume: Optional[bool] = None,
+                     turnover_computation_type: Optional[TurnoverComputationType] = None,
                      **kwargs
                      ):
         turnover = []
         for portfolio in self.portfolio_datas:
-            turnover.append(portfolio.get_turnover(roll_period=turnover_rolling_period, freq=freq_turnover, is_agg=True,
-                                                   is_unit_based_traded_volume=is_unit_based_traded_volume).rename(
-                portfolio.nav.name))
+            turnover.append(
+                portfolio.get_turnover(
+                    roll_period=turnover_rolling_period,
+                    freq=freq_turnover,
+                    is_agg=True,
+                    turnover_computation_type=turnover_computation_type,
+                    is_unit_based_traded_volume=is_unit_based_traded_volume,
+                ).rename(portfolio.nav.name)
+            )
         turnover = pd.concat(turnover, axis=1, sort=True)
         if time_period is not None:
             turnover = time_period.locate(turnover)
@@ -863,16 +902,20 @@ class MultiPortfolioData:
                       turnover_rolling_period: Optional[int] = 260,
                       freq_turnover: Optional[str] = 'B',
                       var_format: str = '{:.0%}',
-                      is_unit_based_traded_volume: bool = True,
+                      is_unit_based_traded_volume: Optional[bool] = None,
                       ax: plt.Subplot = None,
+                      turnover_computation_type: Optional[TurnoverComputationType] = None,
                       **kwargs) -> None:
 
         turnover = self.get_turnover(turnover_rolling_period=turnover_rolling_period,
                                      freq_turnover=freq_turnover,
+                                     turnover_computation_type=turnover_computation_type,
                                      is_unit_based_traded_volume=is_unit_based_traded_volume,
                                      time_period=time_period)
         freq = freq_turnover or pd.infer_freq(turnover.index)
-        turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
+        turnover_title = (
+            f"{turnover_rolling_period}-period rolling {freq}-freq Two-sided Turnover"
+        )
         pts.plot_time_series(df=turnover,
                              var_format=var_format,
                              y_limits=(0.0, None),
@@ -891,7 +934,7 @@ class MultiPortfolioData:
                    time_period: TimePeriod = None,
                    regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
                    var_format: str = '{:.2%}',
-                   is_unit_based_traded_volume: bool = True,
+                   is_unit_based_traded_volume: Optional[bool] = None,
                    ax: plt.Subplot = None,
                    **kwargs) -> None:
         costs = []

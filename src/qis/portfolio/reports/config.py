@@ -39,6 +39,7 @@ from qis import PerfParams, BenchmarkReturnsQuantilesRegime, TimePeriod, PerfSta
 from qis.utils.annualisation import (get_annualization_factor,
                                      infer_data_periods_per_year, infer_data_frequency_label)
 from qis.utils.dates import get_time_period_shifted_by_years
+from qis.perfstats.turnover import TurnoverComputationType
 
 # default params have no risk-free rate
 PERF_PARAMS = PerfParams(freq='W-WED', freq_reg='W-WED', rates_data=None)
@@ -295,7 +296,7 @@ class FactsheetConfig(NamedTuple):
     freq_turnover: str = 'B'   # daily freq
     cost_rolling_period: int = 260  # annual: cost.rolling(cost_rolling_period).sum()
     freq_cost: Optional[str] = 'B'  # for rolling costs
-    is_unit_based_traded_volume: bool = True  # for long-only protfolio use nrmalised costs
+    is_unit_based_traded_volume: Optional[bool] = None  # deprecated turnover selector
     factor_beta_span: int = 780  # 3y of daily returns (EWM span)
     freq_beta: str = 'B'  # for scatter plot
     weights_freq: str = 'B'  # for plotting strategy exposures
@@ -542,8 +543,11 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
                                 reporting_frequency: ReportingFrequency = ReportingFrequency.MONTHLY,
                                 long_threshold_years: float = 5.0,
                                 add_rates_data: bool = False,
-                                is_unit_based_traded_volume: bool = True,
-                                override: Dict[str, Any] = None
+                                is_unit_based_traded_volume: Optional[bool] = None,
+                                override: Dict[str, Any] = None,
+                                turnover_computation_type: Optional[
+                                    TurnoverComputationType
+                                ] = None,
                                 ) -> Dict[str, Any]:
     """
     the report keyword arguments for a given reporting frequency and reported span.
@@ -563,8 +567,8 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
         long_threshold_years: span in years above which the long-period presets are used
         add_rates_data: download the default 3M US rate and show excess-return columns. Needs the
             ``[data]`` extra, since the download goes through yfinance
-        is_unit_based_traded_volume: report turnover and cost on normalised units rather than
-            notional
+        turnover_computation_type: turnover convention; None uses each portfolio's default
+        is_unit_based_traded_volume: deprecated turnover selector retained for compatibility
         override: final overrides merged into the result, which win over every preset
 
     Returns:
@@ -579,7 +583,13 @@ def fetch_default_report_kwargs(time_period: Optional[TimePeriod] = None,
 
     kwargs = fetch_factsheet_config_kwargs(factsheet_config=factsheet_config,
                                            add_rates_data=add_rates_data)
-    kwargs = update_kwargs(kwargs, dict(is_unit_based_traded_volume=is_unit_based_traded_volume))
+    kwargs = update_kwargs(
+        kwargs,
+        dict(
+            turnover_computation_type=turnover_computation_type,
+            is_unit_based_traded_volume=is_unit_based_traded_volume,
+        ),
+    )
     if override is not None:
         kwargs = update_kwargs(kwargs, override)
     return kwargs

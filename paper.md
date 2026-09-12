@@ -118,7 +118,7 @@ draw across several aligned panels, so a factor and a residual panel resample to
 
 # Software design
 
-We organise the package into 12 capability groups, which `src/qis/api.py` names.
+We organise the package into 13 capability groups, which `src/qis/api.py` names.
 
 The backtester is 403 lines, and that follows from the design assumption rather than from
 compression. Because a strategy is a rule for producing weights, the backtester holds no strategy
@@ -126,8 +126,8 @@ logic: it converts target weights to units at each rebalancing, holds those unit
 one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
 one of the few loops here that cannot be vectorised.
 
-The public interface is `qis.__all__`, which holds 430 names; `src/qis/api.py` records that list as a
-literal together with a documented core of 125 symbols grouped by capability, and the suite fails
+The public interface is `qis.__all__`, which holds 441 names; `src/qis/api.py` records that list as a
+literal together with a documented core of 136 symbols grouped by capability, and the suite fails
 when either record disagrees with the namespace.
 
 Properties are enforced by tests rather than by convention: every exported plotting function draws a

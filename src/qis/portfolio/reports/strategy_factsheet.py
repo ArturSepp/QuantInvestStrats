@@ -132,13 +132,16 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 is_1y_exposures: bool = False,
                                 is_grouped: bool = False,
                                 dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
-                                is_unit_based_traded_volume: bool = True,
+                                is_unit_based_traded_volume: Optional[bool] = None,
                                 df_to_add: pd.DataFrame = None,
                                 factsheet_name: str = None,
                                 monthly_returns_heatmap_max_years: Optional[int] = 10,
                                 recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
                                     DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
                                 ),
+                                turnover_computation_type: Optional[
+                                    qis.TurnoverComputationType
+                                ] = None,
                                 **kwargs
                                 ) -> List[plt.Figure]:
     """
@@ -202,7 +205,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         is_1y_exposures: restrict the exposures panel to the trailing year
         is_grouped: aggregate the panels by ``group_data`` where the panel supports it
         dd_legend_type: how much detail the drawdown legend carries
-        is_unit_based_traded_volume: measure traded volume in units rather than in notional
+        turnover_computation_type: turnover convention; None uses the portfolio default
+        is_unit_based_traded_volume: deprecated turnover selector retained for compatibility;
+            it still controls whether costs are normalized by NAV
         df_to_add: extra frame appended as a table
         factsheet_name: report title
         **kwargs: forwarded to the underlying plot functions
@@ -357,9 +362,12 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=turnover_rolling_period,
                                            freq=freq_turnover,
                                            is_grouped=is_grouped,
+                                           turnover_computation_type=turnover_computation_type,
                                            is_unit_based_traded_volume=is_unit_based_traded_volume)
     freq = freq_turnover or pd.infer_freq(turnover.index)
-    turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq Turnover"
+    turnover_title = (
+        f"{turnover_rolling_period}-period rolling {freq}-freq Two-sided Turnover"
+    )
     qis.plot_time_series(df=turnover,
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
@@ -372,10 +380,13 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # costs
     ax = fig.add_subplot(gs[12:14, :2])
+    is_unit_based_costs = (
+        True if is_unit_based_traded_volume is None else is_unit_based_traded_volume
+    )
     costs = portfolio_data.get_costs(time_period=time_period, roll_period=cost_rolling_period,
                                      freq=freq_cost,
                                      is_grouped=is_grouped,
-                                     is_unit_based_traded_volume=is_unit_based_traded_volume)
+                                     is_unit_based_traded_volume=is_unit_based_costs)
     freq = freq_cost or pd.infer_freq(costs.index)
     costs_title = f"{cost_rolling_period}-period rolling {freq}-freq Costs"
     qis.plot_time_series(df=costs,
@@ -816,7 +827,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
         # turnover
         with sns.axes_style("whitegrid"):
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
+            local_kwargs = qis.update_kwargs(
+                kwargs=kwargs,
+                new_kwargs=dict(
+                    legend_loc=None,
+                    turnover_computation_type=turnover_computation_type,
+                    is_unit_based_traded_volume=is_unit_based_traded_volume,
+                ),
+            )
             portfolio_data.plot_performance_attribution(time_period=time_period,
                                                         attribution_metric=qis.AttributionMetric.TURNOVER,
                                                         ax=fig.add_subplot(gs[2, :2]),
@@ -828,7 +846,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
         # vol adjusted turnover
         with sns.axes_style("whitegrid"):
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
+            local_kwargs = qis.update_kwargs(
+                kwargs=kwargs,
+                new_kwargs=dict(
+                    legend_loc=None,
+                    turnover_computation_type=turnover_computation_type,
+                    is_unit_based_traded_volume=is_unit_based_traded_volume,
+                ),
+            )
             portfolio_data.plot_performance_attribution(time_period=time_period,
                                                         attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
                                                         ax=fig.add_subplot(gs[3, :2]),
@@ -840,7 +865,13 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
         # costs
         with sns.axes_style("whitegrid"):
-            local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None, is_unit_based_traded_volume=is_unit_based_traded_volume))
+            local_kwargs = qis.update_kwargs(
+                kwargs=kwargs,
+                new_kwargs=dict(
+                    legend_loc=None,
+                    is_unit_based_traded_volume=is_unit_based_costs,
+                ),
+            )
             portfolio_data.plot_performance_attribution(time_period=time_period,
                                                         attribution_metric=qis.AttributionMetric.COSTS,
                                                         ax=fig.add_subplot(gs[4, :2]),

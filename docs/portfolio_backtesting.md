@@ -77,6 +77,24 @@ on the price grid. `realised_weights` equals a target immediately after an execu
 apart from costs and unavailable legs, then drifts. `held_units` changes only when the strategy
 trades. `costs_by_asset` is in NAV currency, not basis points.
 
+## Turnover: executed contracts and the reporting denominator
+
+Turnover has two independent choices: which trades form the numerator and what capital base forms
+the denominator. Cash portfolios value changes in executed units at current prices. Futures and
+other derivatives must instead value changes in executed contracts at their full contract
+notionals, including multipliers and currency conversion; a normalized return index is not a
+contract value.
+
+For factsheets, transaction-cost comparisons, and investor-level reporting, divide that executed
+notional by NAV with `TurnoverComputationType.EXECUTED_NOTIONAL_NAV`. This retains leverage. Within
+a portfolio running at 2x gross exposure, `EXECUTED_NOTIONAL_GROSS` divides the same traded
+notional by approximately `2 × NAV`, so its result is half the NAV-normalized result. That
+convention is useful as a secondary book-replacement or capacity diagnostic, not as the primary
+investor turnover statistic.
+
+See [Two-sided turnover conventions](turnover_conventions.md) for the formulas and the Yahoo
+60/40 comparison at 1x and 2x leverage.
+
 ## Constraints and failure modes
 
 - A static vector does not dynamically redistribute an unavailable asset's weight. The residual
@@ -98,4 +116,5 @@ trades. `costs_by_asset` is in NAV currency, not basis points.
 - {doc}`Generated backtester API <api/generated/qis.backtest_model_portfolio>`
 - {doc}`Generated PortfolioData API <api/generated/qis.PortfolioData>`
 - [Reporting-frequency convention](_included/reporting_frequencies.md)
+- [Two-sided turnover conventions](turnover_conventions.md)
 - [Canonical portfolio examples](https://github.com/ArturSepp/QuantInvestStrats/tree/main/examples/portfolios)

@@ -375,13 +375,17 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                             benchmark_turnover[inst].rename(benchmark_name)], axis=1, sort=True)
             with sns.axes_style("darkgrid"):
                 fig1, axs = plt.subplots(2, 1, figsize=figsize, constrained_layout=True)
-                fig1.suptitle(f'{inst} Exposures and Turnover', fontweight="bold", fontsize=8, color='blue')
+                fig1.suptitle(
+                    f'{inst} Exposures and Two-sided Turnover',
+                    fontweight="bold",
+                    fontsize=8,
+                    color='blue')
                 figs.append(fig1)
                 qis.plot_time_series(df=df1, title='Exposures',
                                      legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
                                      var_format='{:,.2%}',
                                      ax=axs[0], **kwargs)
-                qis.plot_time_series(df=df2, title='Turnover',
+                qis.plot_time_series(df=df2, title='Two-sided Turnover',
                                      legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
                                      var_format='{:,.2%}',
                                      ax=axs[1], **kwargs)

@@ -99,3 +99,17 @@ from qis.portfolio.reports.overlays_smart_diversification import (SmartDiversifi
 
 # disable requirements for pybloqs
 # from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pybloqs
+
+from qis.portfolio.risk.stress_testing import (
+    FactorScenarioProjection,
+    ConditionalScenarioBand,
+    FactorSensitivityResult,
+    price_target_log_shock,
+    return_log_shock,
+    duration_log_shock,
+    conditional_factor_shock,
+    conditional_factor_covariance,
+    project_factor_scenarios,
+    compute_conditional_scenario_band,
+    compute_factor_sensitivity,
+)

@@ -51,9 +51,11 @@ performance_analytics_and_sharpe
 software_design
 factsheets_and_reporting
 tracking_error_and_risk
+stress_testing
 model_layer_attribution
 portfolio_breadth
 portfolio_backtesting
+turnover_conventions
 incomplete_and_mixed_frequency_data
 private_asset_unsmoothing
 fx_hedging_and_market_data

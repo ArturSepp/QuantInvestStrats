@@ -326,7 +326,7 @@ def test_portfolio_report_labels(portfolios, prices, report_kind, rf, grid, s_lo
         # drawdowns and under-water both on the native business-day grid
         assert blob.count("(B-freq)") >= 2, report_kind
         # turnover / cost panels carry the reporting grid (the QE-DEC fix lives here)
-        assert f"{grid}-freq Turnover" in blob, report_kind
+        assert f"{grid}-freq Two-sided Turnover" in blob, report_kind
         # the long-horizon rolling window for this frequency is the one actually used
         assert f"roll_period={s_long}" in blob, report_kind
         # a benchmark bull/bear/normal regime panel is present
