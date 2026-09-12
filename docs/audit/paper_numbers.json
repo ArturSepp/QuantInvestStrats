@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "c2cde9b06b449f8a777dd34655f266c99e302c74",
+  "measured_at_commit": "d6a231cbcdf5f0e67f55a936fe6bddeb7033b573",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,13 +46,13 @@
       "paper_phrase": "13 capability groups"
     },
     "collected_tests": {
-      "value": 3106,
+      "value": 3134,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 644,
+      "value": 646,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -94,10 +94,10 @@
       "paper_phrase": "references 87 symbols"
     },
     "core_symbols": {
-      "value": 136,
+      "value": 138,
       "how": "len(qis.api.core_api_names())",
       "live": true,
-      "paper_phrase": "documented core of 136 symbols"
+      "paper_phrase": "documented core of 138 symbols"
     },
     "exported_module_bindings": {
       "value": 9,
@@ -106,10 +106,10 @@
       "paper_phrase": null
     },
     "exported_symbols": {
-      "value": 441,
+      "value": 443,
       "how": "len(qis.__all__)",
       "live": true,
-      "paper_phrase": "holds 441 names"
+      "paper_phrase": "holds 443 names"
     },
     "first_commit_month": {
       "value": "2022-12",
