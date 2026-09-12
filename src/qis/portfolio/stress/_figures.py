@@ -127,6 +127,14 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
     if number == 3:
         rows = result.historical_ranking.index[:12]
     pnl = valuation.portfolio_pnl.loc[rows]
+    labels = result.metadata.get("scenario_descriptions", {}) if number != 3 else {}
+    overrides = result.metadata.get("scenario_completion_overrides", {}) if number != 3 else {}
+    display_labels = {
+        key: (str(labels.get(str(key), key)) + (" *" if str(key) in overrides else ""))
+        if number != 3 else key
+        for key in rows
+    }
+    pnl = pnl.rename(index=display_labels)
     _bars(fig.add_axes([0.16, 0.57, 0.32, 0.28]), pnl / scale, f"Portfolio P&L ({unit})")
     _bars(
         fig.add_axes([0.63, 0.57, 0.30, 0.28]),
@@ -140,11 +148,14 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
         selected = values.abs().sort_values(ascending=False, kind="stable").head(10).index
         row = {}
         for rank, holding_id in enumerate(selected, 1):
-            name = result.positions.loc[holding_id, "name"]
+            name = result.positions.loc[
+                holding_id,
+                "metadata:short_name" if "metadata:short_name" in result.positions else "name",
+            ]
             display = "\n".join(textwrap.wrap(str(name), width=18, max_lines=2, placeholder="..."))
             row[str(rank)] = f"{display}\n{values.loc[holding_id] / denominator:+.2%}"
         cells.append(row)
-    frame = pd.DataFrame(cells, index=rows).fillna("")
+    frame = pd.DataFrame(cells, index=rows).fillna("").rename(index=display_labels)
     frame.index = [
         str(item.date())
         if isinstance(item, pd.Timestamp)
@@ -163,7 +174,9 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
         "P&L = stressed value minus observed value. Percentages use the stated reporting "
         "denominator. Current holdings and fitted betas are held fixed in every scenario. "
         "Contributor rank uses absolute holding P&L; gains remain positive. "
-        "At most 12 scenarios are displayed; complete values and original IDs are exported.",
+        "At most 12 scenarios are displayed; complete values and original IDs are exported. "
+        + ("* Caller-pinned completion is retained on both pages; modes are exported."
+           if overrides else ""),
     )
     return fig
 
@@ -291,8 +304,16 @@ def _grid_page(result, config):
         if "lower_bound" in summary:
             ax.fill_between(x, summary.lower_bound, summary.upper_bound, alpha=0.14, color=BLUE)
         ax.axhline(0, color="#888888", lw=0.6)
-        ax.set_title(key, fontsize=12, color=INK)
-        ax.set_xlabel(summary.index.name or "Requested bump (supplied grid index)", fontsize=9)
+        groups = result.metadata.get("factor_groups", {})
+        requested_key = result.grid_metadata.loc[key, "requested_keys"]
+        group = groups.get(requested_key)
+        title = key
+        axis_label = summary.index.name or "Requested bump (supplied grid index)"
+        if group is not None:
+            title = " + ".join(group["members"]) + " (split total bump)"
+            axis_label = f"Total {group['label'] or requested_key} family bump"
+        ax.set_title(title, fontsize=12, color=INK)
+        ax.set_xlabel(axis_label, fontsize=9)
         ax.set_ylabel("P&L / reporting denominator", fontsize=9)
         ax.yaxis.set_major_formatter(PercentFormatter(1))
         ax.grid(alpha=0.2)
@@ -329,7 +350,7 @@ def _beta_page(result, config):
         "is explicitly unavailable.",
     )
     responses = result.response_exposures.abs().sort_values(ascending=False).head(20).index
-    factors = result.factor_exposures.abs().sort_values(ascending=False).head(8).index
+    factors = result.factor_exposures.abs().sort_values(ascending=False).head(12).index
     frame = result.factor_loadings.loc[responses, factors].map(lambda x: f"{x:.2f}")
     frame = frame.rename(columns=config.factor_labels)
     if config.response_diagnostics is not None and "r2" in config.response_diagnostics:
@@ -338,12 +359,32 @@ def _beta_page(result, config):
         )
     else:
         frame["R-squared"] = "Unavailable"
-    _table(fig.add_axes([0.04, 0.2, 0.92, 0.62]), frame, first=0.22, fontsize=9)
+    diagnostics = config.response_diagnostics
+    if diagnostics is not None:
+        for column, label in (
+            ("annual_systematic_vol", "Systematic vol"),
+            ("annual_residual_vol", "Residual vol"),
+            ("annual_factor_model_vol", "Model total vol"),
+        ):
+            if column in diagnostics:
+                frame[label] = diagnostics[column].reindex(responses).map(
+                    lambda x: "Unavailable" if pd.isna(x) else f"{x:.1%}"
+                )
+        if "name" in diagnostics:
+            frame.index = [
+                textwrap.shorten(str(diagnostics.loc[key, "name"]), 30)
+                if key in diagnostics.index and pd.notna(diagnostics.loc[key, "name"]) else key
+                for key in responses
+            ]
+    frame.columns = ["\n".join(textwrap.wrap(str(key), 11)) for key in frame.columns]
+    _table(fig.add_axes([0.04, 0.2, 0.92, 0.62]), frame, first=0.22, fontsize=8)
     _note(
         fig,
         "Rows are fitted response/proxy identities, not option marks. Columns are "
         "underlying log-return factor betas. R-squared is supplied regression explanatory "
-        "power; it is never inferred from volatility. Up to 20 responses and eight factors "
+        "power; it is never inferred from volatility. Supplied annual systematic/residual "
+        "vols describe unit response exposure, not portfolio weights. Up to 20 responses "
+        "and twelve factors "
         "are displayed, ranked by current exposure; complete matrices and diagnostics "
         "are exported.",
     )
@@ -469,7 +510,9 @@ def _coverage_page(result, config):
     _table(fig.add_axes([0.05, 0.47, 0.54, 0.35]), values, first=0.76)
     coverage = positions.groupby("coverage", sort=False).size().to_frame("Holdings")
     coverage.index = ["\n".join(textwrap.wrap(item, 48)) for item in coverage.index]
-    _table(fig.add_axes([0.64, 0.47, 0.31, 0.35]), coverage, first=0.82, fontsize=8)
+    coverage_height = min(0.35, 0.045 * (len(coverage) + 1))
+    _table(fig.add_axes([0.64, 0.82 - coverage_height, 0.31, coverage_height]),
+           coverage, first=0.82, fontsize=8)
     notes = list(config.notes) or ["No additional application-specific notes supplied."]
     notes += [
         "Systematic/residual risk shares the underlying response across stock and derivative legs.",
@@ -480,12 +523,17 @@ def _coverage_page(result, config):
         "Historical replay describes today's holdings under old factor returns, not realized "
         "client performance. No lending value, credit limit or liquidation trigger is inferred.",
     ]
+    note_text = "\n\n".join(textwrap.fill(note, 155) for note in notes)
+    # Fit caller notes inside the reserved region on the fixed ten-page template.
+    line_count = note_text.count("\n") + 1
+    note_fontsize = min(10.0, 0.265 * 11.69 * 72 / (1.2 * line_count))
     fig.text(
         0.05,
         0.38,
-        "\n\n".join(textwrap.fill(note, 155) for note in notes),
+        note_text,
         va="top",
-        fontsize=10,
+        fontsize=note_fontsize,
+        linespacing=1.2,
         color=INK,
     )
     _note(

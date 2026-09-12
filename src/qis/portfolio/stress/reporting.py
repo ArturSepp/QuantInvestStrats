@@ -267,6 +267,7 @@ def generate_portfolio_stress_report(
             "scenario_rows": 12,
             "contributors": 10,
             "response_rows": 20,
+            "response_factor_columns": 12,
             "factor_panels": 6,
             "grid_panels": 4,
         },

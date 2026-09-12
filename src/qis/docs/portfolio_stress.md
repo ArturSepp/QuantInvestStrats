@@ -316,8 +316,10 @@ coverage/reconciliation.
 
 All table exports retain every scenario, holding and grid. The fixed PDF uses
 explicit display limits: 12 scenario rows, ten contributors, six factor panels,
-four grid panels, 20 response rows and eight displayed beta factors. Missing
-R-squared and fitted trees are labelled unavailable. The caller supplies labels,
+four grid panels, 20 response rows and twelve displayed beta factors. Missing
+R-squared and fitted trees are labelled unavailable. Optional response diagnostics
+may include name, annual_systematic_vol, annual_residual_vol and annual_factor_model_vol;
+these describe a unit response, not a portfolio holding weight. The caller supplies labels,
 notes, diagnostics and existing tree topology; the renderer does not fit them.
 
 The workbook is a numerical result export, not an editable payoff calculator.

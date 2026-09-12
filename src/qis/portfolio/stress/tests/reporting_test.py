@@ -84,3 +84,25 @@ def test_report_rejects_unknown_diagnostics_before_writing(market, tmp_path):
         with pytest.raises(ValueError):
             generate_portfolio_stress_report(result, tmp_path / "bad", config)
         assert not Path(tmp_path / "bad").exists()
+
+
+def test_scenario_descriptions_are_visible_without_changing_ids(market):
+    """Consumer scenario labels must reach both charts and contribution tables."""
+    import matplotlib.pyplot as plt
+    from qis.portfolio.stress._figures import _scenario_page
+    p = grouped_portfolio(market)
+    request = StressScenarios(
+        pd.DataFrame({"Equity": [-0.2]}, index=["S01"]),
+        descriptions={"S01": "Global equities -20%"},
+    )
+    result = run_portfolio_stress_test(p, request)
+    fig = _scenario_page(result, StressReportConfig(), 1, "Requested",
+                         result.valuations["requested"], "Synthetic scenario")
+    try:
+        fig.canvas.draw()
+        strings = [str(item.get_text()) for item in fig.findobj()
+                   if hasattr(item, "get_text")]
+        assert any("Global equities" in text for text in strings)
+        assert result.valuations["requested"].pnl.index.tolist() == ["S01"]
+    finally:
+        plt.close(fig)

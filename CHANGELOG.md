@@ -16,6 +16,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   attribution, current RiskModel exposures and deterministic payoff grids.
 - Result-only ten-page PDF report, full numerical CSV/workbook exports, and an
   artifact manifest. Model labels, fitted clusters and R-squared remain caller supplied.
+- Scenario descriptions are displayed in charts and contributor tables without
+  replacing exported IDs; application notes fit the fixed coverage page.
 - Optional `RiskModel.factor_groups` metadata and family exposure diagnostics.
   Total simple-return family bumps split across members before `log1p` and joint
   conditioning. Existing low-level stress defaults and signatures remain available.
