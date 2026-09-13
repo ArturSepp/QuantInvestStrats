@@ -61,6 +61,8 @@ def get_annualization_factor(freq: str,
         4.0
         >>> get_annualization_factor('3ME')
         4.0
+        >>> get_annualization_factor('3QE')
+        1.3333333333333333
     """
     an_days = 365.0 if is_calendar else default_trading_days
 
@@ -109,7 +111,7 @@ def get_annualization_factor(freq: str,
     elif freq in ['2Q', '2QE', '2BQ', '2QS', '2BQS']:
         return 2.0
     elif freq in ['3Q', '3QE', '3BQ', '3QS', '3BQS']:
-        return 0.75  # ~4/12 of a year
+        return 4.0 / 3.0  # four quarters per year / three quarters per observation
 
     # Annual frequencies
     elif freq in ['YE', 'Y', 'A', 'BA', 'AS', 'YS', 'BAS']:
