@@ -193,7 +193,7 @@ def _report_tables(result, config):
         tables[f"{key} summary"] = summary
     tables["Historical worst months"] = result.historical_ranking
     tables["Current factor exposures"] = pd.concat(
-        [result.factor_exposures, result.factor_betas], axis=1
+        [result.factor_exposures, result.factor_betas], axis=1, sort=False
     )
     tables["Current risk"] = result.risk.to_frame("value")
     tables["Holding factor exposures"] = result.holding_factor_exposures

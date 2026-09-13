@@ -345,10 +345,13 @@ class InstrumentPortfolio:
         observed = pd.Series(
             {h.holding_id: h.observed_mtm for h in self.holdings}, name="observed_mtm"
         )
-        pnl = pd.concat([h.get_pnl(context, baseline_context) for h in self.holdings], axis=1)
+        pnl = pd.concat(
+            [h.get_pnl(context, baseline_context) for h in self.holdings], axis=1, sort=False
+        )
         mtm = pnl.add(observed, axis=1)
         audit = pd.concat(
-            [observed, baselines, (observed - baselines).rename("basis_offset")], axis=1
+            [observed, baselines, (observed - baselines).rename("basis_offset")],
+            axis=1, sort=False
         )
         audit["name"] = [h.name for h in self.holdings]
         audit["implementation"] = [
