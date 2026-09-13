@@ -225,12 +225,12 @@ def plot_strategies_returns_scatter(nav_data: pd.DataFrame,
                                  **kwargs)
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     BTC_SIMULATION = 1
     SPY_SIMULATION = 2
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -239,7 +239,7 @@ def run_local_test(local_test: LocalTests):
 
     import yfinance as yf
 
-    if local_test == LocalTests.BTC_SIMULATION:
+    if local == Locals.BTC_SIMULATION:
         prices = yf.download(tickers=['BTC-USD'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna()
 
         time_period = qis.TimePeriod('31Dec2015', '21Jun2023')
@@ -247,7 +247,7 @@ def run_local_test(local_test: LocalTests):
         fu.save_figs_to_pdf(figs=figs, file_name='btc_analysis', orientation='landscape',
                             add_current_date=True, local_path=None)
 
-    elif local_test == LocalTests.SPY_SIMULATION:
+    elif local == Locals.SPY_SIMULATION:
         prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna()
         time_period = qis.TimePeriod('31Dec2019', '15Aug2024')
         figs = create_time_series_report(prices=prices, time_period=time_period, vol_target=0.15, vol_af=260)
@@ -259,4 +259,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.SPY_SIMULATION)
+    run_local(local=Locals.SPY_SIMULATION)

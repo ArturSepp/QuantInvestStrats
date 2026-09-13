@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "description": "Seven fixed-sample synthetic exhibits: focused gallery previews and model-layer attribution, with common typography and recorded calculation conventions.",
+  "dependencies": [
+    "numpy",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "seaborn",
+    "statsmodels",
+    "numba",
+    "Pillow",
+    "qis"
+  ],
+  "producers": {
+    "gallery": {
+      "module": "tools.docs_analytics.gallery",
+      "callable": "produce",
+      "fixture": "qis.datasets.generate_synthetic_universe",
+      "parameters": {
+        "start": "2018-01-02",
+        "end": "2025-12-31",
+        "seed": 20260725,
+        "apply_quirks": true,
+        "assets": [
+          "SEQ_US",
+          "SBD_TSY",
+          "SBD_IG",
+          "SCM_GLD"
+        ],
+        "weights": {
+          "Balanced": [
+            0.5,
+            0.3,
+            0.1,
+            0.1
+          ],
+          "Defensive": [
+            0.2,
+            0.5,
+            0.2,
+            0.1
+          ],
+          "Growth": [
+            0.7,
+            0.1,
+            0.1,
+            0.1
+          ]
+        },
+        "rebalancing_freq": "QE",
+        "rebalancing_costs": 0.001,
+        "weight_implementation_lag": 0,
+        "reporting_frequency": "monthly"
+      },
+      "conventions": {
+        "data": "Synthetic, fixed sample; not observed market performance",
+        "returns": "Simple returns for backtesting; panel statistics use the recorded reporting preset",
+        "reporting_grid": "ME",
+        "native_grid": "B",
+        "regime_grid": "QE",
+        "rebalance_timing": "Units held between quarter-end rebalancings; close-t weights apply over [t,t+1]",
+        "rate_basis": "No risk-free-rate data; non-excess statistics",
+        "cost_basis": "Portfolio NAVs net of 10 bp per unit traded; synthetic benchmark has no costs"
+      },
+      "tables": [
+        "prices",
+        "benchmark",
+        "portfolio_navs",
+        "performance",
+        "balanced_weights",
+        "balanced_turnover",
+        "balanced_costs"
+      ],
+      "checks": [
+        "positive_complete_prices",
+        "finite_positive_navs",
+        "weights_sum_to_one",
+        "zero_cost_nav_reconciles_units"
+      ]
+    },
+    "model_layer": {
+      "module": "tools.docs_analytics.model_layer",
+      "callable": "produce",
+      "fixture": "examples.portfolios.model_layer_attribution_simulated",
+      "parameters": {
+        "seed": 169,
+        "feature_seed": 170,
+        "start": "2005-12-31",
+        "end": "2025-12-31",
+        "freq": "ME",
+        "hac_lags": 3,
+        "confidence_level": 0.95
+      },
+      "conventions": {
+        "data": "Dedicated seeded model-layer teaching fixture, preserved unchanged",
+        "returns": "Monthly additive log returns; annualised means multiply by 12",
+        "estimation": "Full-sample OLS, descriptive attribution",
+        "uncertainty": "95% Bartlett HAC(3) intervals",
+        "cost_basis": "Gross and net model NAVs; 0.15% annual proportional log-return cost drag",
+        "rate_basis": "Raw benchmark returns; no risk-free-rate subtraction",
+        "feature_basis": "Full factorial two-feature experiment; Shapley averages"
+      },
+      "tables": [
+        "navs",
+        "regressions",
+        "periodic_returns",
+        "components",
+        "annualised_components",
+        "feature_summary",
+        "feature_identity_errors",
+        "feature_scenarios",
+        "cumulative_alpha_lines"
+      ],
+      "checks": [
+        "ols_linearity_and_excess_basis",
+        "feature_design",
+        "shapley_identity",
+        "displayed_bridge_matches_components"
+      ]
+    }
+  },
+  "assets": [
+    {
+      "id": "multi_asset",
+      "document": "docs/gallery.md",
+      "path": "docs/images/multi_asset.png",
+      "producer": "gallery"
+    },
+    {
+      "id": "strategy",
+      "document": "docs/gallery.md",
+      "path": "docs/images/strategy.png",
+      "producer": "gallery"
+    },
+    {
+      "id": "strategy_vs_benchmark",
+      "document": "docs/gallery.md",
+      "path": "docs/images/strategy_vs_benchmark.png",
+      "producer": "gallery"
+    },
+    {
+      "id": "multi_strategy",
+      "document": "docs/gallery.md",
+      "path": "docs/images/multi_strategy.png",
+      "producer": "gallery"
+    },
+    {
+      "id": "model_layer_attribution_simulated",
+      "document": "docs/model_layer_attribution.md",
+      "path": "docs/images/model_layer_attribution_simulated.png",
+      "producer": "model_layer"
+    },
+    {
+      "id": "model_layer_attribution_cumulative_alpha_simulated",
+      "document": "docs/model_layer_attribution.md",
+      "path": "docs/images/model_layer_attribution_cumulative_alpha_simulated.png",
+      "producer": "model_layer"
+    },
+    {
+      "id": "model_feature_attribution_simulated",
+      "document": "docs/model_layer_attribution.md",
+      "path": "docs/images/model_feature_attribution_simulated.png",
+      "producer": "model_layer"
+    }
+  ],
+  "non_analytics": [
+    {
+      "document": "docs/quickstart.md",
+      "url": "https://colab.research.google.com/assets/colab-badge.svg",
+      "reason": "External Colab launch badge; not an analytics output."
+    }
+  ]
+}

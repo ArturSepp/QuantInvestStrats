@@ -1,179 +1,316 @@
+---
+myst:
+  html_meta:
+    description: >-
+      Compare four two-sided turnover conventions: target weights, volatility-normalised
+      targets, executed notional over NAV, and executed notional over gross exposure.
+---
+
 # Two-sided turnover conventions
 
-Turnover answers two separate questions:
+*[author / affiliation / date — placeholder]*
 
-1. What changed: requested target weights or actually executed units?
-2. What scales the traded amount: portfolio NAV or current gross exposure?
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
-QIS keeps these choices explicit with `TurnoverComputationType`. All supported modes are
-**two-sided**: purchases and sales are added in absolute value without multiplying their sum by
-one half.
+Portfolio turnover measures changes in an allocation or its executed holdings. Its interpretation
+depends on what changed and which denominator scales that change. qis provides four explicit
+conventions, all **two-sided**: purchases and sales contribute their absolute amounts, without
+multiplying their sum by one half.
 
-The calculation engine is `qis.compute_turnover`. Factsheets and `PortfolioData.get_turnover`
-delegate to it before applying frequency resampling, grouping, or rolling sums. The complete
-Yahoo example compares a 100% funded 60/40 portfolio with the same portfolio at 2x leverage:
-[`examples/perfstats/turnover_conventions.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/turnover_conventions.py).
+## Overview
 
-## Inputs
+`qis.compute_turnover` is the calculation engine. `PortfolioData.get_turnover` and factsheets
+use its results before grouping, resampling, or rolling aggregation.
 
-The executed modes distinguish return prices from unit notionals:
+| Convention | Numerator | Denominator / scaling | Principal use |
+|---|---|---|---|
+| `TARGET_WEIGHTS` | Absolute target-weight changes | Capital fractions already encoded in weights | Allocation-change proxy when executed units are unavailable |
+| `VOLATILITY_NORMALIZED_WEIGHTS` | Absolute target-weight changes | Multiplied by annualised instrument volatility | Theoretical signal and sizing analysis |
+| `EXECUTED_NOTIONAL_NAV` | Unit changes at current unit notionals | Current portfolio NAV | Investor reporting and comparison with costs per NAV; qis default |
+| `EXECUTED_NOTIONAL_GROSS` | Same executed traded notional | Current gross exposure | Book replacement and implementation diagnostics |
 
-- `prices` is the series used to calculate instrument returns.
-- `units` is the number of shares, fund units, or derivative contracts held.
-- `turnover_unit_notional` is the current value of one unit for turnover.
+A target proxy describes instructions. Executed turnover describes changes in held units.
+Changing the denominator does not turn one numerator into the other.
 
-For an ordinary cash security, `turnover_unit_notional` normally equals `prices`, which is the
-`PortfolioData` default. For a derivative, it must include the contract multiplier and currency
-conversion. A futures backtest should therefore pass its USD contract-value panel rather than a
-normalized total-return index.
+<a id="inputs"></a>
 
-## `TARGET_WEIGHTS`
+## Inputs, notation, and assumptions
 
-$$
-T_{i,t} = \left|w^{target}_{i,t} - w^{target}_{i,t-1}\right|
-$$
+| Symbol or input | Meaning | Units and contract |
+|---|---|---|
+| $w^*_{i,t}$ / `input_weights` | Target weight | Signed decimal fraction; dated rows and asset columns |
+| $u_{i,t}$ / `units` | Held units after trading | Shares, fund units, or actual contracts |
+| $n_{i,t}$ / `unit_notional` | Current exposure represented by one unit | Non-negative notional in the NAV currency |
+| $V_t$ / `nav` | Current portfolio NAV | Same monetary currency as unit notionals |
+| $G_t$ | Current gross book exposure | Sum of absolute position notionals |
+| $\sigma^{\mathrm{ann}}_{i,t}$ / `vols` | Annualised instrument volatility | Decimal fraction; aligned exactly with target weights |
 
-The portfolio total is the sum across instruments. This mode requires only `input_weights` and
-is useful when a model supplies allocation targets but no executed holdings.
+In `PortfolioData` the unit-notional field is named `turnover_unit_notional`; in
+`compute_turnover` the argument is `unit_notional`. Return prices and unit notionals serve
+different purposes:
 
-It is a target-turnover proxy, not executed turnover. It does not observe rounding, trading
-thresholds, partial fills, or trades required to maintain an unchanged exposure as an
-instrument's unit notional changes.
+- `prices` drives instrument returns and P&L.
+- `turnover_unit_notional` converts unit changes into monetary traded exposure.
+- For a cash security, one unit is normally one share or fund unit. The notional is its price
+  converted to the portfolio currency; `PortfolioData` defaults this field to `prices`.
+- For a futures contract, use the full contract notional, including multiplier and FX conversion.
+  A normalised return index or a contract's near-zero initial accounting value is not that notional.
+- If units already measure exposure in portfolio currency, the per-unit notional may be 1.
 
-Use it for:
+Supply dated, consistently ordered observations. Executed modes align the notional panel to the
+units' dates and columns; they do not infer missing market values. All unit columns must be
+present. The caller is responsible for compatible currencies, actual contract quantities, and
+economically meaningful notionals.
 
-- signal and allocation research where only target weights exist;
-- comparing how quickly competing allocation rules change;
-- compatibility with historical weight-only backtests.
+The first output row is normally missing because no preceding holding or target exists.
+Include an explicit prior flat row if an opening trade should appear in a turnover series.
+Do not silently interpret the first row as zero trading.
 
-Do not interpret it as actual traded volume when reliable units are available.
+## Methodology
 
-## `EXECUTED_NOTIONAL_NAV`
+### Executed traded notional
 
-$$
-N_{i,t} = \left|u_{i,t} - u_{i,t-1}\right|q_{i,t}
-$$
-
-$$
-T_{i,t}^{NAV} = \frac{N_{i,t}}{NAV_t}
-$$
-
-Here, `u` is the executed number of units and `q` is the unit notional. This mode measures traded
-notional as a percentage of investor capital. It is the default for `qis.compute_turnover` and
-for QIS-created `PortfolioData` objects.
-
-Use it for:
-
-- long-only and long-short portfolios compared on the same capital base;
-- relating turnover to transaction costs and performance expressed as a percentage of NAV;
-- reporting how much market notional a strategy trades per dollar of capital.
-
-For an unlevered long-only portfolio, NAV and gross exposure are usually close, so this mode and
-the gross-exposure mode will also be close. They diverge for levered or market-neutral books.
-
-Managed futures still require this NAV denominator for investor reporting. What makes the
-calculation appropriate for futures is the **numerator**: changes in executed contracts valued at
-their full contract notionals. The choice of denominator is separate. NAV keeps leverage visible
-and puts turnover on the same capital base as returns, volatility, transaction costs, and fees.
-If a strategy runs at gross leverage `L`, gross normalization divides by approximately `L × NAV`;
-at 2x leverage it therefore reports about half the NAV-normalized turnover for the same trades.
-
-## `EXECUTED_NOTIONAL_GROSS`
+Current notionals value changes in executed units:
 
 $$
-G_t = \sum_i \left|u_{i,t}q_{i,t}\right|
+N^{\mathrm{trade}}_{i,t}
+=\left|u_{i,t}-u_{i,t-1}\right|n_{i,t}.
 $$
 
+For example, a change of two contracts at CHF 150,000 notional per contract trades CHF 300,000.
+On a CHF 1,000,000 NAV, the contribution to NAV-normalised turnover is 30%.
+
+### `TARGET_WEIGHTS`
+
 $$
-T_{i,t}^{gross} = \frac{N_{i,t}}{G_t}
+T^{\mathrm{target}}_{i,t}
+=\left|w^*_{i,t}-w^*_{i,t-1}\right|.
 $$
 
-This mode measures trading relative to the size of the current gross book. It answers an
-implementation question—how quickly the deployed book is replaced—not the investor-capital
-question answered by NAV normalization. Because the denominator grows with leverage, it removes
-the leverage effect that investor reporting normally needs to retain.
+Only `input_weights` is required. Sum across instruments for total two-sided target turnover.
+This proxy is useful for comparing allocation rules or historical weight-only backtests.
+It does not observe trades caused by drift, contract rounding, thresholds, partial fills, or
+maintaining unchanged exposure when a unit's notional changes.
 
-Use it for:
+### `VOLATILITY_NORMALIZED_WEIGHTS`
 
-- implementation and capacity diagnostics for managed-futures or derivatives books;
-- comparing book replacement rates after intentionally normalizing away different leverage
-  targets;
-- answering what fraction of the currently deployed gross book was traded.
+[Sepp and Lucic (2026), Definition 4.5 and equation 4.15](https://arxiv.org/html/2607.19497v1#S4.SS4)
+define volatility-normalised turnover using periodic volatility $\sigma_{i,t}$ and
+annualisation factor $a$:
 
-Do not use it as the primary factsheet turnover measure when comparing transaction-cost drag or
-trading activity per dollar of investor capital. Use `EXECUTED_NOTIONAL_NAV` for those purposes.
+$$
+U_{i,t}=\sqrt{a}\,\sigma_{i,t}
+\left|w^*_{i,t}-w^*_{i,t-1}\right|.
+$$
 
-Gross exposure can be zero while a strategy is flat. QIS emits a `RuntimeWarning` and returns
-`NaN` for those dates rather than dividing by zero.
+qis takes `vols` already annualised, so the implemented equivalent is:
 
-## Example: unchanged exposure can still require trading
+$$
+U_{i,t}=\sigma^{\mathrm{ann}}_{i,t}
+\left|w^*_{i,t}-w^*_{i,t-1}\right|,
+\qquad
+\sigma^{\mathrm{ann}}_{i,t}=\sqrt{a}\,\sigma_{i,t}.
+$$
 
-Suppose a futures strategy maintains USD 100,000 of exposure. One contract is initially worth
-USD 100,000, so the strategy holds one contract. If its contract value rises to USD 110,000, the
-strategy must reduce the holding to approximately 0.909 contracts to keep the same exposure.
+This weights target changes by instrument risk. It includes changes caused by the target rule's
+signal and sizing estimates, but excludes realised holding drift and execution effects.
+It is a theoretical comparison measure, not executed market volume.
 
-- `TARGET_WEIGHTS` reports zero because the requested exposure did not change.
-- Both executed modes recognize the sale of approximately 0.091 contracts.
-- The NAV and gross modes differ only in which portfolio-level denominator scales that traded
-  notional.
+`vols` and `input_weights` must have identical indexes, columns, and column order. Negative
+volatilities are rejected; warm-up NaNs propagate. qis neither lags nor annualises `vols` here.
+Supply a point-in-time panel appropriate for the target decision.
 
-## Portfolio defaults and overrides
+Each output still corresponds to one target-change interval. Using annualised volatility does
+not by itself sum or annualise a turnover history. Group and time aggregation remain separate.
 
-QIS defaults to NAV-normalized executed turnover:
+### `EXECUTED_NOTIONAL_NAV`
+
+$$
+T^{\mathrm{NAV}}_{i,t}
+=\frac{N^{\mathrm{trade}}_{i,t}}{V_t}.
+$$
+
+This is the default for `compute_turnover` and qis-created `PortfolioData` objects.
+It expresses traded exposure per unit of investor capital and retains leverage. It is the
+primary convention when comparing trading activity, transaction costs, fees, and performance
+on a common NAV basis.
+
+The numerator makes it appropriate for derivatives: executed contract changes must be valued
+at full contract notionals. The NAV denominator remains appropriate for investor reporting.
+For the same traded notional, a book with gross exposure $L V_t$ has a gross-normalised
+turnover equal to its NAV-normalised turnover divided by $L$.
+
+### `EXECUTED_NOTIONAL_GROSS`
+
+$$
+G_t=\sum_i\left|u_{i,t}n_{i,t}\right|,
+\qquad
+T^{\mathrm{gross}}_{i,t}
+=\frac{N^{\mathrm{trade}}_{i,t}}{G_t}.
+$$
+
+This measures turnover relative to the **current post-trade gross book**, rather than investor
+capital. It is useful for book replacement or capacity diagnostics when leverage normalisation
+is intentional. At 2x gross exposure, the same trades produce half the NAV-normalised turnover.
+
+In an unlevered, fully invested long-only portfolio, gross exposure and NAV are usually close.
+They can differ materially for leveraged or market-neutral portfolios, or when the book holds
+cash. A zero gross denominator produces a `RuntimeWarning` and NaNs; a zero NAV denominator
+has the same treatment in the NAV mode. Liquidating the final position can therefore produce
+undefined gross-normalised turnover even though the trade has a meaningful NAV denominator.
+
+<a id="example-unchanged-exposure-can-still-require-trading"></a>
+
+## Worked example
+
+### A 2x book: the denominator is visible
+
+Consider two dated holdings rows with constant NAV 100 and constant unit notionals 100.
+Positions move from $(1,1)$ units to $(0.8,1.2)$, preserving gross exposure 200. Purchases plus
+sales trade 40 of notional. The targets change by $(−0.2,+0.2)$; annualised volatilities are
+20% and 10%.
+
+| Convention | Total on the second row |
+|---|---|
+| Target weights | $0.2+0.2=0.40$ (40%) |
+| Volatility-normalised targets | $0.20(0.2)+0.10(0.2)=0.06$ |
+| Executed notional / NAV | $40/100=0.40$ (40%) |
+| Executed notional / gross | $40/200=0.20$ (20%) |
+
+The following fixed accounting illustration is fully offline:
+
+```python
+from math import isclose
+
+import pandas as pd
+import qis
+
+dates = pd.to_datetime(['2024-01-02', '2024-01-03'])
+units = pd.DataFrame({'Asset A': [1.0, 0.8], 'Asset B': [1.0, 1.2]}, index=dates)
+unit_notionals = pd.DataFrame(100.0, index=dates, columns=units.columns)
+nav = pd.Series(100.0, index=dates, name='Illustrative 2x book')
+targets = units.copy()  # Here one unit equals one NAV of exposure.
+annualized_vols = pd.DataFrame(
+    {'Asset A': [0.20, 0.20], 'Asset B': [0.10, 0.10]}, index=dates
+)
+expected = {
+    qis.TurnoverComputationType.TARGET_WEIGHTS: 0.40,
+    qis.TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS: 0.06,
+    qis.TurnoverComputationType.EXECUTED_NOTIONAL_NAV: 0.40,
+    qis.TurnoverComputationType.EXECUTED_NOTIONAL_GROSS: 0.20,
+}
+for convention, total in expected.items():
+    result = qis.compute_turnover(
+        computation_type=convention, units=units, unit_notional=unit_notionals,
+        nav=nav, input_weights=targets, vols=annualized_vols,
+    )
+    assert result.iloc[0].isna().all()
+    assert isclose(result.iloc[1].sum(), total, abs_tol=1e-12)
+```
+
+### Unchanged exposure can still require trading
+
+Hold NAV fixed for this illustration. A strategy with USD 100,000 of exposure holds one contract with
+USD 100,000 unit notional. At USD 110,000 per contract, a fractional holding of about 0.9091
+keeps that exposure unchanged. Selling about 0.0909 contracts trades USD 10,000 of notional.
+
+An unchanged capital target reports zero target turnover, while executed modes recognise the
+sale. Fractional contracts are used only for this arithmetic illustration; actual contract
+rounding changes the realised quantities and must be reflected in `units`.
+
+## Implementation in qis
+
+### Portfolio defaults and overrides
+
+The [turnover engine](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/turnover.py)
+owns the four calculations. [PortfolioData](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/portfolio_data.py)
+adds reporting transformations and stores the preferred convention.
+
+Continuing the offline example above:
 
 ```python
 portfolio = qis.PortfolioData(
-    nav=nav,
-    prices=prices,
-    units=units,
-    turnover_unit_notional=prices,
+    nav=nav, prices=unit_notionals, units=units, input_weights=targets,
+    turnover_unit_notional=unit_notionals,
+    turnover_computation_type=qis.TurnoverComputationType.EXECUTED_NOTIONAL_NAV,
 )
-```
-
-A managed-futures producer should pass full contract values while retaining NAV normalization
-for factsheets and investor-level analytics:
-
-```python
-portfolio = qis.PortfolioData(
-    nav=nav,
-    prices=futures_return_indices,
-    units=contract_sizes,
-    turnover_unit_notional=contract_value_usd,
-    turnover_computation_type=(
-        qis.TurnoverComputationType.EXECUTED_NOTIONAL_NAV
-    ),
-)
-```
-
-Gross-normalized book churn remains available as an explicit diagnostic:
-
-```python
+executed_turnover = portfolio.get_turnover(roll_period=None)
 gross_book_churn = portfolio.get_turnover(
     turnover_computation_type=qis.TurnoverComputationType.EXECUTED_NOTIONAL_GROSS,
+    roll_period=None,
 )
-```
-
-Callers can also select the target-weight proxy explicitly:
-
-```python
-turnover = portfolio.get_turnover(
+target_turnover = portfolio.get_turnover(
     turnover_computation_type=qis.TurnoverComputationType.TARGET_WEIGHTS,
+    roll_period=None,
+)
+theoretical_turnover = portfolio.get_turnover(
+    turnover_computation_type=qis.TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS,
+    vols=annualized_vols,
+    roll_period=None,
 )
 ```
 
-The former `is_unit_based_traded_volume` turnover selector remains temporarily available for
-compatibility. `True` maps to `EXECUTED_NOTIONAL_GROSS`; `False` maps to `TARGET_WEIGHTS`. New code
-should use the enum because the boolean cannot express NAV-normalized executed turnover.
+For derivative reporting, pass the instrument return indices as `prices`, actual held contracts
+as `units`, and full contract values in portfolio currency as `turnover_unit_notional`. Do not
+reinterpret units generated from a normalised return index as actual executed contracts.
 
-## Resampling and rolling reports
+The deprecated `is_unit_based_traded_volume` selector remains available for compatibility:
+`True` maps to `EXECUTED_NOTIONAL_GROSS`; `False` maps to `TARGET_WEIGHTS`. It cannot select the
+NAV-normalised or volatility-normalised modes. Use the enum for new code, and do not pass both
+the enum and the deprecated selector.
 
-`compute_turnover` returns per-instrument, per-period turnover. `PortfolioData.get_turnover` then
-performs the requested transformations in this order:
+### Resampling and rolling reports
 
-1. aggregate instruments or groups when requested;
-2. sum observations to `freq`, when supplied;
-3. sum the resulting series over `roll_period`, when supplied;
-4. restrict the result to `time_period`.
+`compute_turnover` returns per-instrument, per-observation results. `PortfolioData.get_turnover`
+then applies, in order:
 
-These transformations do not change the underlying turnover convention. Factsheet titles use
-“Two-sided Turnover” to make the purchase-plus-sale convention visible.
+1. instrument or group aggregation, when requested;
+2. sums to `freq`, when supplied;
+3. a sum over `roll_period` observations on the resulting grid;
+4. restriction to `time_period`.
+
+The default `roll_period` is 260. Use `roll_period=None` to inspect the underlying observations,
+as in the example. Resampling and rolling sums do not change the turnover convention; a rolling
+sum of per-date NAV ratios is not a single traded amount divided by one common NAV.
+The returned default table includes a total alongside instrument columns; do not sum that total
+again with its constituents. Factsheet titles label the convention as “Two-sided Turnover”.
+
+The separate [Yahoo tactical SPY/TLT example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/turnover_conventions.py)
+compares 1x and 2x leverage on downloaded data. It requires the data extra and network access;
+its market sample is separate from the fixed arithmetic example above.
+
+## Interpretation and limitations
+
+- Two-sided turnover counts purchases plus sales. Do not compare it directly with a measure
+  that halves their sum without reconciling definitions.
+- Target changes can miss drift, rounding, or execution-driven trades. Use recorded unit
+  changes when the question concerns actual trading.
+- NAV normalisation keeps leverage visible; gross normalisation intentionally divides by
+  current book size. Always identify the denominator.
+- A missing first row means no previous holding was supplied. Backtesting costs can still
+  include opening trades; turnover and costs require consistent opening boundaries to reconcile.
+- The cost engine uses trade-date cost rates and monetary traded amounts. A changing cost
+  panel or reporting aggregation means a turnover total alone cannot reconstruct all costs.
+- Missing prices/notionals, zero denominators, incompatible currencies, or theoretical units
+  mistaken for contracts can make the result uninterpretable even when inputs have matching shapes.
+- Volatility-normalised target turnover is a theoretical risk-scaled measure, not a replacement
+  for traded-notional turnover in investor factsheets.
+
+## See also
+
+- [Portfolio backtesting and execution timing](portfolio_backtesting.md)
+- [Portfolio breadth](portfolio_breadth.md)
+- [Factsheets and reporting](factsheets_and_reporting.md)
+- [Reporting-frequency convention](frequency_convention_note.md)
+- [Turnover implementation and enum](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/turnover.py)
+- [Turnover regression examples](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/tests/turnover_test.py)
+
+## References
+
+1. Sepp, A., and Lucic, V. (2026).
+   [The Science and Practice of Trend-Following Systems](https://arxiv.org/abs/2607.19497).
+   Definition 4.5 and equation 4.15; qis accepts annualised volatility in the equivalent formula.
+2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+   Software, MIT licence. Citation metadata:
+   [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

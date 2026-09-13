@@ -13,18 +13,18 @@ import yfinance as yf
 import qis
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     RETURNS_BOXPLOT = 1
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
 
-    if local_test == LocalTests.RETURNS_BOXPLOT:
+    if local == Locals.RETURNS_BOXPLOT:
         asset = 'SPY'
         regime_benchmark = '^VIX'
         prices = yf.download([asset, regime_benchmark], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna()
@@ -48,4 +48,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.RETURNS_BOXPLOT)
+    run_local(local=Locals.RETURNS_BOXPLOT)

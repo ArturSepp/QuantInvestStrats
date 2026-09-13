@@ -1,5 +1,5 @@
 """
-Examples for the FX hedging research pipeline (run_local_test dispatcher).
+Examples for the FX hedging research pipeline (run_local dispatcher).
 
 Loads the USD benchmark universe and the FX rates data, then exercises the
 container methods and the hedging reports. Data creation lives in the
@@ -33,7 +33,7 @@ def load_usd_assets(local_path: str,
                                      file_name=file_name, local_path=local_path)
     return data['usd_assets']
 
-class LocalTests(Enum):
+class Locals(Enum):
     # A live CHF-hedged-index demo using bbg_fetch lives in the rosaa example
     # layer, not here: qis examples stay free of Bloomberg and tickers.
     LOAD_DATA = 2
@@ -44,7 +44,7 @@ class LocalTests(Enum):
     LOCAL_RATE_ADJUSTMENT = 8
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real universe and generate reports.
@@ -56,14 +56,14 @@ def run_local_test(local_test: LocalTests):
 
     from qis import local_path as lp
 
-    if local_test == LocalTests.LOAD_DATA:
+    if local == Locals.LOAD_DATA:
         fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
         usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         print(usd_assets)
         print(fx_spots)
         print(domestic_rates)
 
-    elif local_test == LocalTests.CHECK_HEDGED_RETURN:
+    elif local == Locals.CHECK_HEDGED_RETURN:
         fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
         usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         asset_price_local_ccy = usd_assets['Equities']
@@ -111,7 +111,7 @@ def run_local_test(local_test: LocalTests):
         qis.plot_time_series(fx_beta)
         qis.plot_time_series(fx_vol)
 
-    elif local_test == LocalTests.PLOT_HEDGE_REPORT:
+    elif local == Locals.PLOT_HEDGE_REPORT:
         time_period = qis.TimePeriod('31Dec2004', '31Oct2025')
         fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
         usd_assets = load_usd_assets(local_path=lp.get_resource_path())
@@ -124,7 +124,7 @@ def run_local_test(local_test: LocalTests):
                                     reference_ccy='CHF',
                                     time_period=time_period)
 
-    elif local_test == LocalTests.MULTI_ASSET_HEDGE:
+    elif local == Locals.MULTI_ASSET_HEDGE:
         time_period = qis.TimePeriod('31Dec2004', '31Oct2025')
         fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
         usd_assets = load_usd_assets(local_path=lp.get_resource_path())
@@ -136,7 +136,7 @@ def run_local_test(local_test: LocalTests):
                                              reference_ccy='CHF')
         print(out)
 
-    elif local_test == LocalTests.MULTI_ASSET_HEDGE_REPORT:
+    elif local == Locals.MULTI_ASSET_HEDGE_REPORT:
         time_period = qis.TimePeriod('31Dec2004', '31Oct2025')
         fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
         usd_assets = load_usd_assets(local_path=lp.get_resource_path())
@@ -147,7 +147,7 @@ def run_local_test(local_test: LocalTests):
                                           local_ccy='USD',
                                           reference_ccy='CHF')
 
-    elif local_test == LocalTests.LOCAL_RATE_ADJUSTMENT:
+    elif local == Locals.LOCAL_RATE_ADJUSTMENT:
         fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
         usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
@@ -168,4 +168,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.LOCAL_RATE_ADJUSTMENT)
+    run_local(local=Locals.LOCAL_RATE_ADJUSTMENT)

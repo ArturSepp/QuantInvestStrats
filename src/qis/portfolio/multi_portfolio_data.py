@@ -239,6 +239,7 @@ class MultiPortfolioData:
                                  TurnoverComputationType
                              ] = None,
                              is_unit_based_traded_volume: Optional[bool] = None,
+                             vols: Optional[pd.DataFrame] = None,
                              **kwargs
                              ) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
@@ -250,6 +251,7 @@ class MultiPortfolioData:
             is_grouped=is_grouped,
             turnover_computation_type=turnover_computation_type,
             is_unit_based_traded_volume=is_unit_based_traded_volume,
+            vols=vols,
         )
         benchmark_turnover = self.portfolio_datas[benchmark_idx].get_turnover(
             time_period=time_period,
@@ -259,6 +261,7 @@ class MultiPortfolioData:
             is_grouped=is_grouped,
             turnover_computation_type=turnover_computation_type,
             is_unit_based_traded_volume=is_unit_based_traded_volume,
+            vols=vols,
         )
         tickers_union = merge_lists_unique(list1=strategy_turnover.columns.to_list(),
                                            list2=benchmark_turnover.columns.to_list())
@@ -319,6 +322,7 @@ class MultiPortfolioData:
                                      turnover_computation_type: Optional[
                                          TurnoverComputationType
                                      ] = None,
+                                     vols: Optional[pd.DataFrame] = None,
                                      **kwargs
                                      ) -> pd.DataFrame:
         """Compute per-instrument performance, information ratio, turnover, and costs.
@@ -336,6 +340,7 @@ class MultiPortfolioData:
             time_period: Optional reporting period.
             annualization_factor: Scale applied to average turnover and costs.
             turnover_computation_type: Turnover convention; None uses each portfolio default.
+            vols: Annualized volatility panel for volatility-normalized weight turnover.
             is_unit_based_traded_volume: Whether costs use unit-based traded volume.
             **kwargs: Reserved for compatibility with report callers.
 
@@ -361,6 +366,7 @@ class MultiPortfolioData:
             add_total=False,
             turnover_computation_type=turnover_computation_type,
             is_unit_based_traded_volume=is_unit_based_traded_volume,
+            vols=vols,
         )
         strategy_cost = self.portfolio_datas[strategy_idx].get_costs(time_period=time_period, freq=freq,
                                                                      roll_period=None,
@@ -376,6 +382,7 @@ class MultiPortfolioData:
             add_total=False,
             turnover_computation_type=turnover_computation_type,
             is_unit_based_traded_volume=is_unit_based_traded_volume,
+            vols=vols,
         )
         benchmark_cost = self.portfolio_datas[benchmark_idx].get_costs(time_period=time_period, freq=freq,
                                                                        roll_period=None,
@@ -877,6 +884,7 @@ class MultiPortfolioData:
                      freq_turnover: Optional[str] = 'ME',
                      is_unit_based_traded_volume: Optional[bool] = None,
                      turnover_computation_type: Optional[TurnoverComputationType] = None,
+                     vols: Optional[pd.DataFrame] = None,
                      **kwargs
                      ):
         turnover = []
@@ -888,6 +896,7 @@ class MultiPortfolioData:
                     is_agg=True,
                     turnover_computation_type=turnover_computation_type,
                     is_unit_based_traded_volume=is_unit_based_traded_volume,
+                    vols=vols,
                 ).rename(portfolio.nav.name)
             )
         turnover = pd.concat(turnover, axis=1, sort=True)
@@ -905,16 +914,35 @@ class MultiPortfolioData:
                       is_unit_based_traded_volume: Optional[bool] = None,
                       ax: plt.Subplot = None,
                       turnover_computation_type: Optional[TurnoverComputationType] = None,
+                      vols: Optional[pd.DataFrame] = None,
                       **kwargs) -> None:
 
         turnover = self.get_turnover(turnover_rolling_period=turnover_rolling_period,
                                      freq_turnover=freq_turnover,
                                      turnover_computation_type=turnover_computation_type,
                                      is_unit_based_traded_volume=is_unit_based_traded_volume,
+                                     vols=vols,
                                      time_period=time_period)
         freq = freq_turnover or pd.infer_freq(turnover.index)
+        is_volatility_normalized = (
+            turnover_computation_type
+            == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
+            or (
+                turnover_computation_type is None
+                and is_unit_based_traded_volume is None
+                and all(
+                    portfolio.turnover_computation_type
+                    == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
+                    for portfolio in self.portfolio_datas
+                )
+            )
+        )
+        turnover_label = (
+            'Volatility-Normalized Weight Turnover'
+            if is_volatility_normalized else 'Two-sided Turnover'
+        )
         turnover_title = (
-            f"{turnover_rolling_period}-period rolling {freq}-freq Two-sided Turnover"
+            f"{turnover_rolling_period}-period rolling {freq}-freq {turnover_label}"
         )
         pts.plot_time_series(df=turnover,
                              var_format=var_format,
@@ -1123,46 +1151,71 @@ class MultiPortfolioData:
                              ax=ax,
                              **kwargs)
 
-    def compute_brinson_attribution(self,
-                                    strategy_idx: int = 0,
-                                    benchmark_idx: int = 1,
-                                    group_data: Optional[pd.Series] = None,
-                                    group_order: Optional[List[str]] = None,
-                                    freq: Optional[str] = None,
-                                    total_column: str = 'Total Sum',
-                                    time_period: TimePeriod = None,
-                                    is_exclude_interaction_term: bool = True
-                                    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def compute_brinson_attribution(
+            self, strategy_idx: int = 0, benchmark_idx: int = 1,
+            group_data: Optional[pd.Series] = None, group_order: Optional[List[str]] = None,
+            freq: Optional[str] = None, total_column: str = 'Total Sum',
+            time_period: TimePeriod = None, is_exclude_interaction_term: bool = True,
+            *, is_linked: bool = True, is_net: bool = False,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """Compute native-period BHB effects, then aggregate increments for display.
 
-        strategy_portfolio = self.portfolio_datas[strategy_idx]
-        strategy_pnl = strategy_portfolio._get_attribution_table_by_instrument_canonical(
-            time_period=time_period, freq=freq)
-        strategy_weights = strategy_portfolio.get_weights(
-            time_period=time_period, freq=freq, is_input_weights=False)
+        The first shared NAV inside time_period is the baseline, not a return.
+        Each contribution uses its preceding stored weight. Native return grids
+        inside the common window must match; missing interior dates are not filled.
 
-        benchmark_portfolio = self.portfolio_datas[benchmark_idx]
-        benchmark_pnl = benchmark_portfolio._get_attribution_table_by_instrument_canonical(
-            time_period=time_period, freq=freq)
-        benchmark_weights = benchmark_portfolio.get_weights(
-            time_period=time_period, freq=freq, is_input_weights=False)
+        Args:
+            strategy_idx: Strategy position in portfolio_datas.
+            benchmark_idx: Benchmark position in portfolio_datas.
+            group_data: Canonical instrument groups; defaults to the union of both
+                portfolios' groups, with strategy labels taking precedence.
+            group_order: Preferred group order; other observed groups are appended.
+            freq: Display frequency; None retains native observations. Linking is
+                performed before aggregation, preserving intra-period trades.
+            total_column: Summary row and effect-series total label.
+            time_period: Requested NAV window; the first shared NAV is the baseline.
+            is_exclude_interaction_term: Merge interaction into selection when True.
+            is_linked: Frongello-linked increments by default; False gives arithmetic effects.
+            is_net: Deduct realised trading costs when True. Default gross instrument
+                attribution excludes them. Neither mode attributes management fees,
+                funding or other cash flows absent from instrument_pnl.
 
+        Returns:
+            The five DataFrames from compute_brinson_attribution_table. Totals and
+            native-observation mean weights do not depend on display frequency.
+
+        Raises:
+            ValueError: If there is no common return interval or native dates do not match.
+        """
+        strategy = self.portfolio_datas[strategy_idx]
+        benchmark = self.portfolio_datas[benchmark_idx]
+        navs = pd.concat(
+            [strategy.nav, benchmark.nav], axis=1, join='inner', sort=True).dropna()
+        if time_period is not None:
+            navs = time_period.locate(navs)
+        if len(navs) < 2:
+            raise ValueError('Brinson requires at least two shared NAV observations')
+        baseline, end = navs.index[0], navs.index[-1]
+        inputs = []
+        for portfolio in (strategy, benchmark):
+            pnl, weights = portfolio.get_brinson_inputs(freq=None, is_net=is_net)
+            pnl = pnl.loc[(pnl.index > baseline) & (pnl.index <= end)]
+            inputs.extend((pnl, weights.reindex(pnl.index)))
+        strategy_pnl, strategy_weights, benchmark_pnl, benchmark_weights = inputs
         if group_data is None:
-            group_data = self.portfolio_datas[strategy_idx].group_data
+            group_data = strategy.group_data.combine_first(benchmark.group_data)
         if group_order is None:
-            group_order = self.portfolio_datas[strategy_idx].group_order
-
-        totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
-            qis.compute_brinson_attribution_table(benchmark_pnl=benchmark_pnl,
-                                                  strategy_pnl=strategy_pnl,
-                                                  strategy_weights=strategy_weights,
-                                                  benchmark_weights=benchmark_weights,
-                                                  asset_class_data=group_data,
-                                                  group_order=group_order,
-                                                  total_column=total_column,
-                                                  is_exclude_interaction_term=is_exclude_interaction_term,
-                                                  strategy_name=self.portfolio_datas[strategy_idx].ticker or 'Strategy',
-                                                  benchmark_name=self.portfolio_datas[benchmark_idx].ticker or 'Benchmark')
-        return totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return
+            group_order = strategy.group_order
+        result = qis.compute_brinson_attribution_table(
+            benchmark_pnl=benchmark_pnl, strategy_pnl=strategy_pnl,
+            strategy_weights=strategy_weights, benchmark_weights=benchmark_weights,
+            asset_class_data=group_data, group_order=group_order, total_column=total_column,
+            is_exclude_interaction_term=is_exclude_interaction_term,
+            strategy_name=strategy.ticker or 'Strategy',
+            benchmark_name=benchmark.ticker or 'Benchmark', is_linked=is_linked)
+        if freq is None:
+            return result
+        return (result[0], *(frame.resample(freq).sum(min_count=1) for frame in result[1:]))
 
     def plot_brinson_attribution(self,
                                  strategy_idx: int = 0,
@@ -1172,8 +1225,11 @@ class MultiPortfolioData:
                                  total_column: str = 'Total Sum',
                                  time_period: TimePeriod = None,
                                  is_exclude_interaction_term: bool = True,
+                                 is_linked: bool = True,
+                                 is_net: bool = False,
                                  **kwargs
                                  ) -> Tuple[plt.Figure, plt.Figure, plt.Figure, plt.Figure, plt.Figure]:
+        """Plot canonical Brinson effects; see compute_brinson_attribution for conventions."""
 
         totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
             self.compute_brinson_attribution(strategy_idx=strategy_idx,
@@ -1181,7 +1237,8 @@ class MultiPortfolioData:
                                              freq=freq,
                                              total_column=total_column,
                                              time_period=time_period,
-                                             is_exclude_interaction_term=is_exclude_interaction_term)
+                                             is_exclude_interaction_term=is_exclude_interaction_term,
+                                             is_linked=is_linked, is_net=is_net)
 
         brinson_figs = qis.plot_brinson_attribution_table(
             totals_table=totals_table,

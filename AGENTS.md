@@ -7,6 +7,10 @@
 - Never run plain `uv sync` or plain `uv run` from this checkout: uv otherwise creates `<repo>\.venv` even when uv was launched through a Python executable under `C:\Python`.
 - If a uv project operation is required, first set `UV_PROJECT_ENVIRONMENT=C:\Python\QuantInvestStrats312`; for pip-style operations prefer `uv pip ... --python C:\Python\QuantInvestStrats312\Scripts\python.exe`.
 - If any OneDrive-local environment already exists, do not use it; report it for removal.
+- Run standard portfolio tasks through
+  `& "$env:USERPROFILE\OneDrive\analytics\my_github\ArturSepp\scripts\repo_governance\Invoke-Repo.ps1" -Task verify`.
+  Use `-Task check` or `-Task test` for a narrower run. The launcher selects this repository's
+  external interpreter and routes generated state to C:.
 
 # AGENTS.md
 
@@ -155,14 +159,44 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
   without flagging it: `optimalportfolios` and `trendfollowing` import from it.
 - Do not add hard runtime dependencies. Optional functionality belongs behind an
   extra in `[project.optional-dependencies]` with a guarded import.
-- Do not commit generated factsheets, PDFs, or figure output.
+- Do not commit generated factsheets, PDFs, or figure output, except reviewed documentation
+  preview PNGs and their provenance record explicitly allowlisted by the documentation analytics
+  manifest. Generate on C-local storage and copy back only those intentional deliverables.
 - Do not modify `settings.yaml` or `local_path.py` to hardcode a machine-specific path.
 - Examples must run on free data (yfinance) — do not make an example require Bloomberg.
+
+## Methodology and analytics documentation
+
+- Follow [the documentation standard](docs/documentation_standard.md). Methodology articles use
+  a definition-led lead, inputs and notation, methodology, a worked example, implementation in
+  qis, interpretation and limitations, related reading, and verified references. Utility pages
+  use the shorter form defined there.
+- Put `*[author / affiliation / date — placeholder]*` after the title until the author supplies
+  those details. Include ordinary Markdown links to the qis repository and `CITATION.cff` in
+  every human-authored page. Never infer an affiliation or claim an unperformed verification.
+- Use `$...$` inline and standalone `$$` display blocks, with blank lines around display math.
+  Do not use MyST-only math directives in article prose. Define units, return convention,
+  sampling/estimation frequency, annualisation, and timing where they affect the calculation.
+- Check revised pages with `python tools/check_docs.py --files docs/<page>.md`. The default
+  checks adopted pages and reports pending migration; `--all` requires the entire inventory.
+  Run Python tools only after the mandatory C-local setup below. Source checks do not replace
+  numerical verification, strict Sphinx builds, or inspection in the supported Markdown viewers.
+- Register every displayed analytics figure in `tools/docs_analytics/manifest.json`. Regenerate
+  the full bundle with `python -m tools.docs_analytics.run --all --output-dir <new-local-bundle>`.
+  Follow its README to review and publish all seven previews with their provenance; verify them
+  with `python -m tools.docs_analytics.publish --verify --repo <checkout>`. Record the producer,
+  sample, conventions and actual qis source version. Keep captions and displayed numbers tied
+  to the same computed result.
+- Distinguish fixed synthetic sample dates, observed-data as-of dates, generation timestamps,
+  and substantive review dates. Re-rendering a teaching figure does not require new market data
+  or a changed seed. Numerical functions remain in their canonical qis modules.
+- Preserve ordinary source links beside Sphinx includes and generated API references. Keep
+  `src/qis/docs/` text-only and `docs/brinson_attribution.md` authoritative for Brinson methodology.
 
 <!-- ===== SHARED AGENT CORE (builder variant) — begin =====
      Generated from SHARED_AGENT_CORE.md in the maintainer's project knowledge. Do not hand-edit
      between these markers — propose the change to the maintainer instead. Variants: builder
-     (qis) / consumer / standalone. Last synced 2026-09-08, agent core v1.5 -->
+     (qis) / consumer / standalone. Last synced 2026-09-13, agent core v1.6 -->
 
 ## Domain invariants
 
@@ -232,11 +266,14 @@ between your read of it and your write.
 - Prefer minimal anchored edits over whole-file replacement. If the on-disk content is not what
   you expected, stop and reconcile your change onto the current content rather than overwrite.
 
-## Roadmap execution
+## Agent-generated artifacts
 
-Feature roadmaps live at the repository root as `ROADMAP_<feature>.md`. An execution request
-names the file and the stage. A stage is complete when its stated verification command passes;
-its out-of-scope list is binding.
+All agent-generated roadmaps, execution plans, audits, reports, handoffs, and other working
+outputs live under the repository-root `agents/` directory, which is local and ignored by Git.
+Never create `ROADMAP_*.md`, `Claude outputs/`, `Codex outputs/`, or similar agent-output
+artifacts at the repository root. Name feature roadmaps `agents/ROADMAP_<feature>.md`. An
+execution request names the file and stage. A stage is complete when its stated verification
+command passes; its out-of-scope list is binding.
 
 <!-- ===== SHARED AGENT CORE — end ===== -->
 
@@ -274,6 +311,11 @@ skips. It does mean the suite a wheel user runs is smaller than the one CI runs.
 - **`docs/` is the Sphinx site and the generated records.** `conf.py` mirrors `src/qis/docs/` into
   `docs/_included/` at build time so the site reads as one tree while the package keeps one source
   of truth. Do not move package notes up, and do not move site pages down.
+- **Brinson attribution is an explicit exception.** `docs/brinson_attribution.md`
+  contains the complete, authoritative methodology and calculation contract.
+  `src/qis/docs/brinson_attribution.md` is only a pointer for installed users.
+  Keep all Brinson methodology in the top-level document; do not replace it with
+  an include wrapper or duplicate its formulas in the packaged note.
 
 ## Release checklist
 
@@ -307,9 +349,9 @@ The FX-rates development runner intentionally omits the former `CREATE_DATA` cas
 construction belongs in the consuming production layer, while QIS loads and analyses supplied
 provider-neutral panels.
 
-`src/qis/tests/baseline/` is empty and `pytest-mpl` is not in any extra, so the four
-`@pytest.mark.mpl_image_compare` tests in `src/qis/tests/test_reporting_goldens.py` run their bodies
-and compare nothing.
+`src/qis/tests/test_reporting_goldens.py` checks the multi-asset report's panel count and axes
+geometry across reporting frequencies. It does not compare baseline images or prove that text,
+legends, and tables are readable; documentation previews also need visual review.
 
 ## OneDrive Git durability and C-local execution
 
@@ -331,17 +373,17 @@ and compare nothing.
 ### Mandatory C-local generated-state helpers
 
 - Before Python, uv, pytest, Ruff, mypy, coverage, or similar Python-tool work in this
-  repository or linked worktree, run the shared setup in the PowerShell session that will
+  repository or a linked worktree, run the shared setup in the PowerShell session that will
   run those tools:
-  `. "$env:USERPROFILE\OneDrive\analytics\my_github\_agent_tools\Enter-AgentRepo.ps1"`.
+  `. "$env:USERPROFILE\OneDrive\analytics\my_github\ArturSepp\scripts\repo_governance\Enter-AgentRepo.ps1"`.
   Run it again after switching repositories or worktrees. Do not override the paths it sets
   back into OneDrive.
-- The setup routes bytecode, tool caches, coverage data, temporary files, uv environments,
-  builds, analyses, outputs, and runs below `$env:LOCALAPPDATA\AgentWork`. Never create or
-  use repository-local `.venv`, `__pycache__`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`,
-  or equivalent generated-state directories.
+- The setup routes bytecode, tool caches, coverage data, temporary files, builds, analyses,
+  outputs, and runs below `$env:LOCALAPPDATA\AgentWork`. Never create or use repository-local
+  `.venv`, `__pycache__`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, or equivalent
+  generated-state directories.
 - Build LaTeX only through
-  `& "$env:USERPROFILE\OneDrive\analytics\my_github\_agent_tools\Build-AgentLatex.ps1"`
+  `& "$env:USERPROFILE\OneDrive\analytics\my_github\ArturSepp\scripts\repo_governance\Build-AgentLatex.ps1"`
   with `-MainTex <path>`. The helper keeps auxiliary and output files on C. Use `-Publish`
   only to copy an intentional final PDF beside its source; use `-ForcePublish` only after
   reviewing an existing destination.

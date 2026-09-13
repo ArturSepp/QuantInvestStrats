@@ -64,18 +64,18 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
     return multi_portfolio_data
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     VOLPARITY_SPAN = 1
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
 
-    if local_test == LocalTests.VOLPARITY_SPAN:
+    if local == Locals.VOLPARITY_SPAN:
         # time period for portfolio reporting
         time_period = qis.TimePeriod('31Dec2005', '31Dec2025')
 
@@ -114,4 +114,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.VOLPARITY_SPAN)
+    run_local(local=Locals.VOLPARITY_SPAN)

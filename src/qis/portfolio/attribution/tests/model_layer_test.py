@@ -1189,7 +1189,7 @@ def test_cumulative_rolling_alpha_validates_dates_and_warmup() -> None:
         )
     with pytest.raises(ValueError, match='warmup_periods'):
         compute_model_layer_cumulative_alpha_after_warmup(
-            attribution, base_date=index[11], warmup_periods=0
+            attribution, base_date=index[11], warmup_periods=-1
         )
 
 

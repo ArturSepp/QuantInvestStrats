@@ -15,7 +15,7 @@ from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_fa
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     CORE_ETFS = 1
     BTC_SQQQ = 2
     HEDGED_ETFS = 3
@@ -24,7 +24,7 @@ class LocalTests(Enum):
     HYG_ETFS = 6
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -35,22 +35,22 @@ def run_local_test(local_test: LocalTests):
 
     prices = None  # if Noe, use yahoo finance data
 
-    if local_test == LocalTests.CORE_ETFS:
+    if local == Locals.CORE_ETFS:
         benchmark = 'SPY'
         tickers = [benchmark, 'QQQ', 'EEM', 'TLT', 'IEF', 'LQD', 'HYG', 'SHY', 'GLD']
         time_period = qis.TimePeriod('31Dec2002', end_date)  # time period for reporting
 
-    elif local_test == LocalTests.BTC_SQQQ:
+    elif local == Locals.BTC_SQQQ:
         benchmark = 'QQQ'
         tickers = [benchmark, 'BTC-USD', 'TQQQ', 'SQQQ']
         time_period = qis.TimePeriod('31Dec2019', end_date)
 
-    elif local_test == LocalTests.HEDGED_ETFS:
+    elif local == Locals.HEDGED_ETFS:
         benchmark = 'SPY'
         tickers = [benchmark, 'SHY', 'LQDH', 'HYGH', 'FLOT']
         time_period = qis.TimePeriod('27May2014', end_date)
 
-    elif local_test == LocalTests.BBG:
+    elif local == Locals.BBG:
         benchmark = 'SPTR'
         tickers = {'SPTR Index': benchmark,
                    'SGEPMLU Index': 'SG AI long/short', 'SGEPMLUL Index': 'SG AI long', 'SGEPMLUS Index': 'SG AI short',
@@ -64,7 +64,7 @@ def run_local_test(local_test: LocalTests):
         prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
         prices = prices.rename(tickers, axis=1)
 
-    elif local_test == LocalTests.RATES_FUTURES:
+    elif local == Locals.RATES_FUTURES:
         benchmark = '2y UST'
         tickers = {'TU1 Comdty': benchmark,
                    'ED5 Comdty': 'USD IR',
@@ -77,7 +77,7 @@ def run_local_test(local_test: LocalTests):
         prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
         prices = prices.rename(tickers, axis=1)
 
-    elif local_test == LocalTests.HYG_ETFS:
+    elif local == Locals.HYG_ETFS:
         benchmark = 'IBOXHY'
         tickers = {'IBOXHY Index': benchmark,
                    'HYDB US Equity': 'HYDB',
@@ -112,4 +112,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.CORE_ETFS)
+    run_local(local=Locals.CORE_ETFS)

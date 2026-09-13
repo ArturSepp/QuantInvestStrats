@@ -5,6 +5,75 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.30.0] - 2026-09-12
+
+### Changed
+
+- Corrected the existing `compute_brinson_attribution_table` to recover sector
+  returns from weighted contributions before BHB allocation/selection. It now
+  defaults to Frongello-linked increments and compounded Return Total columns.
+  Use `is_linked=False` for corrected arithmetic effects and Return Sum columns.
+  The existing five-table tuple and report-module import path are retained.
+- Corrected `MultiPortfolioData.compute_brinson_attribution` to use stored native
+  instrument P&L and matching prior weights, with a shared NAV baseline, before
+  aggregating linked effects for display. Native, monthly and quarterly totals
+  now agree even with intra-month trades. Gross remains the default;
+  `is_net=True` includes realised trading costs, not management fees/funding.
+- Corrected `PortfolioData.get_brinson_inputs` to compound contribution
+  aggregation within reporting periods instead of adding native returns.
+
+### Added
+
+- Brinson methodology/migration documentation and an executable offline
+  synthetic example, including independent component and NAV reconciliation tests.
+
+### Removed
+
+- Removed the duplicate report-layer formula body and the temporary local 5.29
+  `qis.portfolio.attribution.brinson.compute_brinson_attribution` entry point.
+  All callers use the one canonical `qis.compute_brinson_attribution_table`.
+
+## [5.29.0] - 2026-09-12
+
+### Added
+
+- Added the opt-in `qis.portfolio.attribution.brinson.compute_brinson_attribution`
+  function: BHB effects use unweighted sector returns, with optional Frongello
+  linking to reconcile compounded portfolio-minus-benchmark return at every date.
+  Existing attribution APIs and their numerical defaults remain unchanged.
+
+## [5.28.0] - 2026-09-12
+
+### Added
+
+- Added optional net-model NAV input to lagged EWMA model-layer attribution, preserving
+  gross-model betas and exposing realised trading-cost drag and net total alpha.
+- Added exact report-date cumulative alpha with `warmup_periods=0`, including a validated
+  initial NAV baseline. Existing twelve-period warm-up defaults are unchanged.
+- Added net cumulative display paths that retain nonzero costs and omit zero-cost entries.
+- Added `PortfolioData.get_brinson_inputs` for full-history arithmetic contributions and
+  applied holdings, with optional realised trading costs on the preceding-NAV basis.
+  Slicing retains the first requested return; existing attribution defaults are unchanged.
+
+### Fixed
+
+- Omit identically zero trading-cost bars and annotations from the current EWMA return
+  bridge while retaining its net endpoint and contiguous model-component positions.
+
+## [5.27.0] - 2026-09-12
+
+### Added
+
+- Added `TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS`, implementing the theoretical
+  volatility-normalized turnover of Sepp and Lucic (2026), Definition 4.5. `compute_turnover`
+  accepts an aligned annualized `vols` panel and validates its index, columns, and values.
+
+### Changed
+
+- Changed volatility-adjusted turnover attribution to use annualized volatility times absolute
+  target-weight changes, excluding portfolio drift and execution effects as required by the
+  theoretical convention.
+
 ## [5.26.0] - 2026-09-12
 
 ### Added

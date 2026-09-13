@@ -15,11 +15,11 @@ from qis import PerfParams, TimePeriod
 import yfinance as yf
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     LONG_IEF_SHORT_LQD = 1
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -35,7 +35,7 @@ def run_local_test(local_test: LocalTests):
 
     time_period = TimePeriod('31Dec2021', '19Sep2022')
 
-    if local_test == LocalTests.LONG_IEF_SHORT_LQD:
+    if local == Locals.LONG_IEF_SHORT_LQD:
         prices = yf.download(tickers=['IEF', 'LQD', 'LQDH', 'IGIB'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close']
         prices = time_period.locate(prices)
         rets = qis.to_returns(prices=prices, is_first_zero=True)
@@ -59,4 +59,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.LONG_IEF_SHORT_LQD)
+    run_local(local=Locals.LONG_IEF_SHORT_LQD)

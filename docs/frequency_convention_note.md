@@ -1,223 +1,299 @@
-# Performance Statistics Are Frequency-Relative: A Reporting Convention for Internally Consistent Factsheets
+---
+myst:
+  html_meta:
+    description: >-
+      How reporting frequency affects volatility, Sharpe ratios and higher moments,
+      and how qis calibrates factsheet windows, frequency guards and panel labels.
+---
+
+<a id="performance-statistics-are-frequency-relative-a-reporting-convention-for-internally-consistent-factsheets"></a>
+
+# Performance statistics and reporting frequency
 
 *[author / affiliation / date — placeholder]*
 
-## Abstract
+Reporting frequency is the sampling grid used to estimate and label performance
+statistics. This article explains its statistical consequences and the factsheet
+convention implemented in [qis](https://github.com/ArturSepp/QuantInvestStrats).
+Software reference: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
-Annualized volatility, the Sharpe ratio, skewness, beta and correlation are not properties of a
-return series. They are properties of a return series *sampled at a stated frequency*. A track
-record reported as "12% annualized volatility, Sharpe 1.1" is underspecified until one knows whether
-those numbers were estimated from daily, weekly, monthly or quarterly observations — and for
-serially dependent returns the answer materially changes the figures. Yet performance factsheets
-routinely either hard-code a single frequency or, more often, mix several frequencies within one
-document without labelling them, which makes cross-strategy and cross-mandate comparison quietly
-unreliable. This note argues for treating the reporting frequency as an explicit, first-class
-choice: every statistic in a report is calibrated to a chosen frequency, or labelled with the
-frequency at which it was computed; an up-sampling guard forbids reporting at a finer resolution
-than the data supports; and trailing windows widen as the frequency coarsens so that estimates
-remain estimable. We set out the convention and its correctness properties, and describe its
-implementation in the open-source `qis` library.
+## Overview
 
-## 1. Statistics are frequency-relative
+<a id="abstract"></a>
 
-Let $r_t$ denote periodic returns observed at frequency $f$ with $m_f$ periods per year
-(approximately 260 for business days, 52 weekly, 12 monthly, 4 quarterly). The annualized
-volatility reported from this series is
+Annualised volatility, Sharpe ratios, skewness, beta and correlation depend on the
+return convention, observation frequency and estimation window. A reported
+volatility of 12% is therefore incomplete without those choices. Frequency affects
+both the information available to an estimator and, under serial dependence, the
+population quantity it estimates.
 
-$$\hat\sigma_{\text{ann}}(f) = \hat\sigma_f \sqrt{m_f},$$
+The qis convention makes reporting frequency an explicit input, derives window
+settings from that frequency and the report horizon, and labels panels that use a
+different grid. It also rejects reporting frequencies finer than the observed data
+and widens the multi-asset report's trailing correlation window at coarse frequencies.
 
-where $\hat\sigma_f$ is the sample standard deviation of per-period returns. The question is whether
-$\hat\sigma_{\text{ann}}$ depends on the choice of $f$. It does, in two distinct ways.
+<a id="2-the-silent-mixing-failure-mode"></a>
 
-**Under serial independence the point estimate is frequency-invariant, but its precision is not.**
-If returns are i.i.d., variance is additive across periods, so $\sigma_f^2 \propto 1/m_f$ and the
-product $\sigma_f\sqrt{m_f}$ is constant in expectation. Coarsening the frequency does not change
-what we are estimating — but it sharply reduces the number of observations behind the estimate
-(roughly $m_f \times$ years), so the same ten-year track record yields a far noisier annualized
-volatility at quarterly sampling than at daily. Frequency choice is, at minimum, an
-estimation-variance choice.
+### The silent-mixing failure mode
 
-**Under serial dependence the point estimate itself diverges across frequencies.** For weakly
-stationary returns with autocorrelations $\rho_j$, the variance of $k$-period returns is not $k$
-times the one-period variance. Writing the variance ratio
+A report may show native daily drawdowns, monthly Sharpe ratios and quarterly
+regime statistics. Each can be useful, but their grids must be visible. In
+particular, a native drawdown preserves observed intraperiod troughs that a
+quarterly series can omit. Panel labels let the reader distinguish that intended
+difference from an accidental mismatch between estimates.
 
-$$\mathrm{VR}(k) = \frac{\mathrm{Var}\!\left(\sum_{i=1}^{k} r_i\right)}{k\,\mathrm{Var}(r)}
-= 1 + 2\sum_{j=1}^{k-1}\left(1 - \frac{j}{k}\right)\rho_j,$$
+## Inputs, notation, and assumptions
 
-the annualized volatility estimated at the coarser ($k$-period) frequency equals the
-finer-frequency annualized volatility scaled by $\sqrt{\mathrm{VR}(k)}$. Positive autocorrelation —
-trend, momentum, or the stale-pricing/smoothing that pervades illiquid and privately marked assets
-— gives $\mathrm{VR}(k) > 1$ and inflates low-frequency volatility relative to high; negative
-autocorrelation (mean reversion) gives $\mathrm{VR}(k) < 1$ and deflates it. The same NAV path
-therefore produces a *term structure* of annualized volatility across daily, weekly, monthly and
-quarterly sampling, and the gradient of that term structure is informative about the return process
-rather than being a nuisance to be averaged away.
+| Symbol or setting | Definition |
+|---|---|
+| $f$, $m_f$ | Sampling frequency and its annualisation factor: business daily 260, weekly 52, monthly 12 or quarterly 4 in the presets. |
+| $r_t$ | Simple return over one observation period, in decimal units. |
+| $x_t = \log(1+r_t)$ | Log return, additive over adjacent periods when wealth is positive. |
+| $\hat\sigma_f$ | Sample standard deviation at frequency $f$, for the stated return convention. |
+| $k$, $S_k$ | Number of adjacent periods and their aggregate log return, $S_k = \sum_{i=1}^{k}x_i$. |
+| $\rho_j$, $\mathrm{VR}(k)$ | Lag-$j$ autocorrelation of $x_t$ and its $k$-period variance ratio. |
+| $\gamma_1$, $\kappa$ | Population skewness and excess kurtosis of a one-period log return. |
+| $N_{\min}$ | Target minimum observation count for the trailing correlation window; default 12. |
 
-The case where this matters most is smoothing. Funds holding illiquid or model-marked positions
-report a series whose observed returns are a moving average of true economic returns; the induced
-positive serial correlation depresses short-horizon volatility and distorts the variance term
-structure (Getmansky, Lo and Makarov, 2004). A monthly-sampled volatility of such a series can
-understate the economic volatility substantially, and the discrepancy is precisely a
-frequency-of-sampling artefact. The Sharpe ratio inherits the whole problem: the familiar
-$\sqrt{T}$ annualization of a Sharpe estimate is invalid under autocorrelation, and the correct
-scaling depends on the same $\mathrm{VR}(k)$ object (Lo, 2002). None of these statistics has a
-frequency-free value to report.
+The variance-ratio identity assumes covariance stationarity and finite variance.
+The higher-moment scaling below additionally assumes independent, identically
+distributed increments with finite third and fourth moments. These assumptions
+describe theoretical log-return aggregation; they are not guarantees about a
+sample of compounded simple returns. State the convention explicitly when using
+`qis.to_returns(..., is_log_returns=...)`.
 
-## 2. The silent-mixing failure mode
+<a id="3-two-axes-reporting-frequency-and-horizon"></a>
 
-If frequency dependence were merely acknowledged, the problem would be manageable. The practical
-failure is that factsheets leave the frequency implicit and, worse, inconsistent across panels.
-A common layout shows drawdowns computed on the daily NAV, a Sharpe ratio annualized from monthly
-returns, regression betas estimated on a quarterly grid, and regime-conditional statistics on yet
-another grid — with none of these cadences stated. A reader cannot reconstruct what is comparable
-to what. Two managers each reporting "Sharpe 1.2" may have computed it from daily and from monthly
-returns respectively, and under any serial dependence those numbers are not the same quantity.
+### Two axes: reporting frequency and horizon
 
-The point is not that mixing frequencies is always wrong. Some statistics are intrinsically tied to
-a particular grid — a drawdown is a property of the realized path and should be measured on the
-native, highest-resolution series, not down-sampled. The defect is leaving the choice implicit. A
-statistic computed at a frequency the reader cannot identify is a statistic the reader cannot use.
+Reporting frequency selects the return grid and annualisation factor. The report
+horizon selects window lengths and display settings. In
+`fetch_default_report_kwargs`, an unspecified report period selects the long
+preset; otherwise a period exceeding `long_threshold_years` (default five years)
+selects long, and a shorter or equal period selects short. Explicit overrides can
+change the presets and should be described in the report.
 
-## 3. Two axes: reporting frequency and horizon
+## Methodology
 
-A report is specified by two separate choices that together fix every window and grid in it.
+<a id="1-statistics-are-frequency-relative"></a>
 
-The first axis is the **reporting frequency** — daily, weekly, monthly or quarterly — which fixes
-the sampling grid on which returns are taken and the annualization factor applied to per-period
-quantities. The second axis is the **horizon**, the distinction between a long track record and a
-short one. The horizon sets the *lengths* of rolling windows and selects a coarser regime grid for
-long histories and a finer one for short. The two axes are orthogonal: a fifteen-year book reported
-monthly and an eighteen-month book reported daily call for different window lengths even for the
-nominally identical "rolling volatility," and conflating frequency with horizon is a frequent source
-of miscalibrated windows.
+### Statistics are frequency-relative
 
-## 4. The convention: one stated frequency, applied by lookup
+The usual annualised volatility estimate is
 
-The convention is simple to state. Within a report, every statistic is computed at the chosen
-reporting frequency, or — for the path-native statistics of Section 8 — at a frequency explicitly
-labelled on its own panel. All rolling-window lengths, the regression grid, the regime-classification
-grid and the annualization factor are *derived* from the pair (frequency, horizon) by table lookup,
-not chosen per statistic at the analyst's discretion. Removing that discretion is the point: it is
-what makes two reports produced by two people on two books mechanically comparable.
+$$
+\hat\sigma_{\mathrm{ann}}(f) = \hat\sigma_f\sqrt{m_f}.
+$$
 
-The calibration we use is the following, with window lengths expressed in periods of the sampling
-grid and the horizon axis shown as *long · short*:
+Under independent additive increments, population variance scales with elapsed
+time. This does **not** make sample annualised volatilities identical across
+frequencies: aggregation reduces the number of observations and changes sampling
+error. Nor is unbiasedness of the sample standard deviation implied by an
+unbiased sample variance. Exact additive scaling applies to log returns, whereas
+multi-period simple returns compound.
 
-| Reporting frequency | Sampling grid | Vol / Sharpe window | Beta window | Regime grid | Periods/yr |
+With serial dependence, even the population scaling changes. For stationary log
+returns, the variance ratio is
+
+$$
+\mathrm{VR}(k)
+= \frac{\mathrm{Var}(S_k)}{k\,\mathrm{Var}(x_t)}
+= 1 + 2\sum_{j=1}^{k-1}\left(1-\frac{j}{k}\right)\rho_j.
+$$
+
+When the coarse annualisation factor is $m_f/k$, its population annualised
+log-return volatility equals the fine-frequency value times
+$\sqrt{\mathrm{VR}(k)}$. Sample estimates need not satisfy that identity exactly.
+A positive weighted sum of autocorrelations raises the variance ratio above one;
+a negative weighted sum lowers it. Variance-ratio analysis is discussed by
+[Lo and MacKinlay (1988)](https://doi.org/10.1093/rfs/1.1.41).
+
+Illiquid or model-marked assets can exhibit return smoothing that depresses
+observed short-horizon volatility; this is not necessarily resolved by changing
+the reporting grid.
+[Getmansky, Lo and Makarov (2004)](https://doi.org/10.1016/j.jfineco.2004.04.001)
+model the serial correlation induced by illiquidity. Serial dependence also
+invalidates the usual square-root-of-time scaling of a Sharpe ratio in general;
+[Lo (2002)](https://doi.org/10.2469/faj.v58.n4.2453) treats its sampling and
+annualisation consequences. A frequency label alone does not apply a statistical
+correction for either effect.
+
+<a id="4-the-convention-one-stated-frequency-applied-by-lookup"></a>
+
+### The convention: one stated frequency, applied by lookup
+
+The configuration derives the following presets from frequency and horizon.
+Counts are periods of the indicated grid, shown as **long · short**.
+
+| Reporting frequency | Sampling grid | Vol / Sharpe span or window | Beta span | Regime grid | Periods/year |
 |---|---|---|---|---|---|
-| Daily     | business day | 260 · 260 | 780 · 260 | quarterly · monthly | ≈260 |
-| Weekly    | W-WED        | 156 · 52  | 156 · 52  | quarterly · monthly | 52   |
-| Monthly   | month-end    | 36 · 12   | 36 · 12   | quarterly · monthly | 12   |
-| Quarterly | quarter-end  | 12 · 4    | 12 · 4    | quarterly · monthly | 4    |
+| Daily | `B` | 260 · 260 | 780 · 260 | quarterly · monthly | 260 |
+| Weekly | `W-WED` | 156 · 52 | 156 · 52 | quarterly · monthly | 52 |
+| Monthly | `ME` | 36 · 12 | 36 · 12 | quarterly · monthly | 12 |
+| Quarterly | `QE` | 12 · 4 | 12 · 4 | quarterly · monthly | 4 |
 
-Three calibration choices are worth noting. The volatility and Sharpe windows are deliberately
-identical, because a rolling Sharpe is a rolling mean over a rolling volatility and reporting them on
-different windows invites visual misattribution. The beta window is longer than the volatility
-window (most visibly at daily frequency), because covariation with a benchmark is a slower-moving
-quantity than own-volatility and a short beta window is dominated by noise. The regime grid is
-always coarser than the reporting grid, so that each regime bucket contains enough observations for
-the conditional statistic to mean anything.
+The volatility and variance parameters are exponentially weighted spans; the
+Sharpe parameter is a rolling window. Matching their counts does not make their
+weighting kernels identical. Beta uses a longer span than volatility in the daily
+long preset and the same count in the other presets shown here.
 
-## 5. The up-sampling guard as a correctness invariant
+Regime classification follows the horizon axis independently: quarterly for long
+reports, monthly for short reports. It is **not always coarser** than the reporting
+grid. A quarterly short report still requests monthly regimes, so the underlying
+data must support the intended regime analysis. The table is a configuration
+contract, not evidence that every input contains enough information for every
+panel.
 
-A report may always be produced at a frequency *coarser* than the data; it may never be produced at
-a frequency *finer* than the data. Computing daily statistics from a monthly-marked NAV is not a
-degraded estimate — it is a fabricated one, because the intra-month path required to define daily
-returns does not exist in the data and can only be invented by interpolation. Coarsening, by
-contrast, is well defined: it is subsampling or aggregation of observations that are actually there.
+<a id="5-the-up-sampling-guard-as-a-correctness-invariant"></a>
 
-We therefore treat the direction of the frequency change as a correctness property and enforce it: a
-validation step compares the requested reporting frequency against the native sampling of the input
-and refuses any request to report finer than the data supports. This is not an ergonomic guard rail
-to be relaxed under pressure; it is the boundary between summarizing a track record and manufacturing
-one.
+### The up-sampling guard as a correctness invariant
 
-## 6. What changes with frequency, and what does not
+The report validator compares the requested grid with the input's inferred native
+sampling frequency. It rejects a daily or weekly report from monthly observations;
+equal or coarser reporting grids are accepted. Interpolating a monthly NAV cannot
+recover its unobserved daily path.
 
-Cumulative or total return is frequency-invariant: compounding telescopes, so the growth of a unit
-of capital over a fixed interval is the same whether measured through daily or quarterly steps
-(absent data gaps). Every dispersion- and dependence-based statistic, however, is frequency-dependent
-— volatility and Sharpe as shown in Section 1, and beta and correlation through the same variance-
-and covariance-ratio mechanics.
+This guard concerns observed timestamp frequency. It cannot establish economic
+information frequency: a forward-filled daily series may still contain only
+monthly marks. Irregular dates, stale prices and mixed-frequency columns require
+the separate input checks described in
+[incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md).
 
-Skewness is the most acute case, and it makes the cleanest worked example. Under aggregation the
-central limit theorem washes higher moments out: summing more increments pushes the distribution of
-the aggregate toward Gaussian. For i.i.d. returns the third central moment is additive while the
-standard deviation grows as $\sqrt{k}$, so the skewness of a $k$-period return decays as
+<a id="6-what-changes-with-frequency-and-what-does-not"></a>
 
-$$\mathrm{skew}(S_k) = \frac{\gamma_1}{\sqrt{k}}, \qquad
-\text{excess kurtosis}(S_k) = \frac{\kappa}{k}.$$
+### What changes with frequency, and what does not
 
-A monthly skewness is therefore roughly a daily skewness divided by $\sqrt{21}$ — a different number
-by construction, not by estimation noise. Reporting "skewness $= -0.4$" without a frequency is close
-to meaningless, and computing skewness on a fixed grid while the rest of the report sits on another
-grid is internally inconsistent in exactly the way the convention is meant to forbid. The convention
-samples skewness on the reporting grid, so the moment shares the cadence of every other statistic on
-the page; a report at monthly frequency shows monthly skewness, and one at quarterly frequency shows
-quarterly.
+Total return over fixed, retained endpoints is unchanged by regrouping simple
+returns: compounding telescopes to the endpoint price ratio. Resampling that drops
+an endpoint or changes missing-data treatment is a different comparison.
+Volatility, Sharpe, beta, correlation and higher moments can change with frequency.
 
-## 7. Estimation under coarse sampling: trailing-window adaptation
+For independent, identically distributed log returns with the required finite
+moments, additive aggregation gives
 
-Coarsening the frequency reduces the observation count inside every window, and below a floor the
-window stops being an estimator. A "trailing one-year correlation" reported at quarterly frequency
-rests on four observations; it is not a correlation estimate in any useful sense. The convention
-therefore widens trailing and recent windows as the frequency coarsens, enforcing a minimum
-observation count $N_{\min}$:
+$$
+\mathrm{skew}(S_k) = \frac{\gamma_1}{\sqrt{k}}, \qquad
+\mathrm{excess\ kurtosis}(S_k) = \frac{\kappa}{k}.
+$$
 
-$$\text{trailing years} = \max\!\left(1,\ \left\lceil \frac{N_{\min}}{m_f} \right\rceil\right).$$
+These are population identities, not exact relations between sample statistics.
+The familiar division of daily skewness by $\sqrt{21}$ is therefore only an
+illustration under those assumptions, not a conversion rule for observed monthly
+simple-return skewness. Factsheets estimate skewness on the chosen return grid.
 
-At daily, weekly and monthly frequencies a one-year window already clears the floor, so nothing
-changes; at quarterly frequency a nominal one-year trailing window widens to three years to reach a
-workable sample. The widening is a deliberate bias–variance trade: a longer window is less responsive
-to recent change, but below the observation floor the alternative is not a more responsive estimate,
-it is noise, so the floor binds first.
+<a id="7-estimation-under-coarse-sampling-trailing-window-adaptation"></a>
 
-## 8. Per-panel labelling discipline
+### Estimation under coarse sampling: trailing-window adaptation
 
-The convention is credible only if it is legible, so every panel states the frequency at which it
-was computed. Cumulative and rolling statistics carry the reporting frequency; turnover and cost
-panels carry the frequency at which they were sampled; regime panels name the regime grid. The
-path-native statistics — drawdowns and time-under-water — are explicitly labelled with the *native*
-NAV grid and are deliberately not down-sampled, because a drawdown is a property of the realized path
-and subsampling it to the reporting frequency would step over intra-period troughs and understate the
-true maximum loss. The labelling is what allows a reader to audit the convention from the page itself,
-and it is what distinguishes a deliberate mix of frequencies (drawdowns on the native grid, dispersion
-statistics on the reporting grid) from the silent mix criticized in Section 2.
+The multi-asset report widens its trailing correlation window using
 
-## 9. Implementation
+$$
+\mathrm{trailing\ years}
+= \max\left(1,\left\lceil\frac{N_{\min}}{m_f}\right\rceil\right).
+$$
 
-The convention is implemented in the open-source `qis` library. A small enumeration
-(`ReportingFrequency`) carries the four frequencies; a configuration layer
-(`make_factsheet_config` / `fetch_default_report_kwargs`) performs the table lookup over the
-(frequency, horizon) pair and emits the calibrated windows, grids and annualization factor; and a
-single entry point (`qis.factsheet`) produces a report from prices or returns with the reporting
-frequency as an argument. The up-sampling guard is enforced at the validation step, and the
-calibration, the guard, the moment behaviour and the per-panel labels are all locked by a regression
-test suite so that the convention cannot silently drift. Full details are in the library's reporting
-documentation.
+With the default $N_{\min}=12$, the nominal window is one year at daily, weekly
+and monthly frequency and three years at quarterly frequency. This rule applies
+to the trailing correlation panel, not to every rolling statistic or recent
+performance table. Missing data and a short history can still leave fewer than
+12 usable paired returns. A longer window improves observation count at the cost
+of responsiveness and does not guarantee a well-conditioned correlation matrix.
 
-## 10. Discussion and limitations
+<a id="8-per-panel-labelling-discipline"></a>
 
-The immediate payoff is comparability. When two mandates — or the same mandate reported in two base
-currencies — are produced under one convention, their volatilities, Sharpe ratios and higher moments
-are the same kind of object and can be placed side by side. The secondary payoff is honesty: a report
-shows only the resolution the track record can support, and states the resolution it used.
+### Per-panel labelling discipline
 
-The convention standardizes and labels; it does not dissolve the underlying estimation problem.
-The choice of horizon and the definition of regimes remain matters of judgment that the calibration
-table fixes by fiat rather than derives. Annualization itself assumes that scaling a per-period
-quantity to an annual one is meaningful, which Section 1 shows is exactly where serial dependence
-bites — so a fully rigorous treatment of a smoothed or strongly autocorrelated series would report
-the variance term structure, or a serial-correlation-adjusted Sharpe, rather than a single annualized
-number. The convention's contribution is narrower and, we think, more broadly useful: it makes the
-frequency of every reported statistic an explicit, consistent and auditable choice, and it refuses to
-report a resolution the data does not contain. That is a small, enforceable discipline, and it removes
-a common and nearly invisible source of error in performance reporting.
+Rolling volatility, Sharpe, beta, correlations and return-scatter panels identify
+their reporting grid and relevant window. Turnover and cost panels identify their
+own sampling grid; regime panels identify their classification grid.
+
+Running drawdown and time-under-water panels use the native observed NAV path and
+label that grid. A resampled risk-table drawdown can differ because it omits
+intraperiod troughs; the native panel and sampled table describe different paths.
+Visible cumulative and annualised returns retain observed endpoints, while
+frequency-based ratios use complete reporting boundaries on the asset's observed
+support. The [packaged reporting note](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/docs/reporting_frequencies.md)
+records these implementation conventions.
+
+## Worked example
+
+The following offline example inspects the quarterly long-report preset. It
+fetches configuration only and explicitly disables rate-data downloads.
+
+```python
+import qis
+
+settings = qis.fetch_default_report_kwargs(
+    time_period=None,
+    reporting_frequency=qis.ReportingFrequency.QUARTERLY,
+    add_rates_data=False,
+)
+assert settings["vol_rolling_window"] == 12
+assert settings["sharpe_rolling_window"] == 12
+assert settings["factor_beta_span"] == 12
+assert settings["freq_regime"] == "QE"
+```
+
+Twelve quarterly periods represent three years. The same long preset at monthly
+frequency uses 36 periods. Separately, the default trailing correlation rule gives
+$\max(1,\lceil 12/4\rceil)=3$ years for quarterly data. These settings make the
+calendar horizons comparable; they do not make their observation counts or
+statistical uncertainty equal.
+
+## Implementation in qis
+
+<a id="9-implementation"></a>
+
+`qis.ReportingFrequency` names the four frequencies and
+`qis.fetch_default_report_kwargs` exposes the preset lookup. The
+[`config.py` implementation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/config.py) contains
+`make_factsheet_config`, the frequency validator and the underlying field schema.
+`qis.factsheet` accepts a reporting frequency and generates the appropriate report
+from prices, returns or stored portfolio histories.
+
+The [reporting-frequency note](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/docs/reporting_frequencies.md) documents
+configuration details and usage. The
+[multi-asset report implementation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/multi_assets_factsheet.py)
+contains the trailing correlation rule. The
+[reporting convention tests](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/tests/test_reporting_conventions.py) cover
+preset propagation, frequency guards and labels. For return and rate conventions,
+including the three labelled Sharpe variants, see
+[performance analytics and Sharpe](performance_analytics_and_sharpe.md).
+
+## Interpretation and limitations
+
+<a id="10-discussion-and-limitations"></a>
+
+- The convention standardises reporting choices. It does not remove sampling
+  uncertainty, serial correlation, illiquidity or differences in return/rate basis.
+- Horizon thresholds and regime grids are configurable reporting choices. Disclose
+  overrides when comparing mandates or report versions.
+- More observations are not necessarily more independent information. Check
+  stale prices and smoothing before interpreting a fine-grid statistic.
+- The frequency guard and trailing-window rule have distinct scopes. Neither
+  promises enough observations for every asset, estimator or regime.
+- For strongly dependent returns, consider an explicitly specified dependence
+  adjustment or several sampling frequencies. The ordinary factsheet annualisation
+  factor is not such an adjustment.
+
+## See also
+
+- [Factsheets and reporting](factsheets_and_reporting.md).
+- [Performance analytics and Sharpe](performance_analytics_and_sharpe.md).
+- [Incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md).
+- [Private-asset unsmoothing](private_asset_unsmoothing.md).
 
 ## References
 
-- Getmansky, M., Lo, A. W., and Makarov, I. (2004). An econometric model of serial correlation and
-  illiquidity in hedge fund returns. *Journal of Financial Economics*, 74(3).
-- Lo, A. W. (2002). The statistics of Sharpe ratios. *Financial Analysts Journal*, 58(4).
-- Lo, A. W., and MacKinlay, A. C. (1988). Stock market prices do not follow random walks: evidence
-  from a simple specification test. *Review of Financial Studies*, 1(1).
+- Getmansky, M., Lo, A. W., and Makarov, I. (2004).
+  [An econometric model of serial correlation and illiquidity in hedge fund returns](https://doi.org/10.1016/j.jfineco.2004.04.001).
+  *Journal of Financial Economics*, 74(3), 529–609.
+- Lo, A. W. (2002).
+  [The Statistics of Sharpe Ratios](https://doi.org/10.2469/faj.v58.n4.2453).
+  *Financial Analysts Journal*, 58(4), 36–52.
+- Lo, A. W., and MacKinlay, A. C. (1988).
+  [Stock Market Prices Do Not Follow Random Walks: Evidence from a Simple Specification Test](https://doi.org/10.1093/rfs/1.1.41).
+  *Review of Financial Studies*, 1(1), 41–66.
+- [qis source and project documentation](https://github.com/ArturSepp/QuantInvestStrats).
+  Cite the software version used through
+  [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

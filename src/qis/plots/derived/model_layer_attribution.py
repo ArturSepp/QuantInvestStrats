@@ -726,6 +726,9 @@ def plot_model_layer_ewma_return_bridge(
             'Full Model Net Return and Trading Cost Drag must either both be present or absent'
         )
     cost_drag = float(values['Trading Cost Drag']) if has_net_return else None
+    show_cost = has_net_return and bool(
+        (attribution.component_returns['Trading Cost Drag'].to_numpy(dtype=float) != 0.0).any()
+    )
     net_return = float(values['Full Model Net Return']) if has_net_return else None
     if has_net_return:
         if not np.isfinite([cost_drag, net_return]).all():
@@ -803,20 +806,15 @@ def plot_model_layer_ewma_return_bridge(
             display_labels['Integration'], beta_integration, r_squared_integration
         ),
     ]
-    if has_net_return:
-        endpoint_position = 7
-        endpoint_return = net_return
+    endpoint_position = 7 if show_cost else 6
+    endpoint_return = net_return if has_net_return else full_return
+    if show_cost:
         bars.append((6, full_return, cost_drag, 'Trading Cost Drag', True, None))
-        tick_labels.extend([
-            display_labels['Trading Cost Drag'],
-            _regression_label(display_labels['Full Model Net'], beta_full, r_squared_full),
-        ])
-    else:
-        endpoint_position = 6
-        endpoint_return = full_return
-        tick_labels.append(
-            _regression_label(display_labels['Full Model Gross'], beta_full, r_squared_full)
-        )
+        tick_labels.append(display_labels['Trading Cost Drag'])
+    endpoint_key = 'Full Model Net' if has_net_return else 'Full Model Gross'
+    tick_labels.append(
+        _regression_label(display_labels[endpoint_key], beta_full, r_squared_full)
+    )
 
     try:
         endpoint_alpha = float(attribution.regression_table.loc['Full Model', alpha_column])
@@ -831,7 +829,7 @@ def plot_model_layer_ewma_return_bridge(
     if not np.isfinite([endpoint_alpha, *endpoint_ci]).all():
         raise ValueError("endpoint inference for 'Full Model' must be finite")
     endpoint_systematic = beta_full * benchmark_return
-    endpoint_cost = cost_drag if has_net_return else None
+    endpoint_cost = cost_drag if show_cost else None
     endpoint_cost_value = 0.0 if endpoint_cost is None else endpoint_cost
     if not np.isclose(
             endpoint_systematic + endpoint_alpha + endpoint_cost_value,
@@ -872,7 +870,7 @@ def plot_model_layer_ewma_return_bridge(
         (3, 4, systematic_return + risk_alpha),
         (4, 5, systematic_return + risk_alpha + signal_alpha),
     ]
-    if has_net_return:
+    if show_cost:
         connectors.extend([(5, 6, full_return), (6, 7, net_return)])
     else:
         connectors.append((5, 6, full_return))

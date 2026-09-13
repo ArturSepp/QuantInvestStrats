@@ -73,11 +73,11 @@ def perf_wo_best_worst(prices: pd.Series,
     return joint_data
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     PERF1 = 1
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -89,7 +89,7 @@ def run_local_test(local_test: LocalTests):
 
     freq = 'ME'
     wo_type = WoType.BEST
-    if local_test == LocalTests.PERF1:
+    if local == Locals.PERF1:
         fig, ax = plt.subplots(1, 1, figsize=(10, 10), tight_layout=True)
         perf_wo_best_worst(prices=prices, freq=freq, wo_type=WoType.WORST, ax=ax)
 
@@ -98,4 +98,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.PERF1)
+    run_local(local=Locals.PERF1)

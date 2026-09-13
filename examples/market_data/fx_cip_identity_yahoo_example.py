@@ -38,12 +38,12 @@ def _excess_return(fx_rates_data, prices, hedge_ratio: float, reference_ccy: str
     return res[FREQ][ASSET].dropna()
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     CIP_HEDGED_IDENTITY = 1     # CHF-hedged excess == USD excess (CIP holds)
     UNHEDGED_DIVERGENCE = 2     # CHF-unhedged excess diverges by FX vol
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     pd.set_option('display.width', 180)
 
     fx_rates_data = fetch_fx_rates_data_from_yahoo(start_date='2005-12-31')
@@ -51,7 +51,7 @@ def run_local_test(local_test: LocalTests):
 
     usd_excess = _excess_return(fx_rates_data, prices, hedge_ratio=0.0, reference_ccy='USD')
 
-    if local_test == LocalTests.CIP_HEDGED_IDENTITY:
+    if local == Locals.CIP_HEDGED_IDENTITY:
         chf_hedged_excess = _excess_return(fx_rates_data, prices, hedge_ratio=1.0, reference_ccy=REFERENCE_CCY)
         common = usd_excess.index.intersection(chf_hedged_excess.index)
         gap_bp = abs(usd_excess.loc[common].mean() - chf_hedged_excess.loc[common].mean()) * 12 * 1e4
@@ -68,7 +68,7 @@ def run_local_test(local_test: LocalTests):
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
         qis.plot_prices(prices=navs, ax=ax, title='CIP: CHF-hedged excess overlays USD excess')
 
-    elif local_test == LocalTests.UNHEDGED_DIVERGENCE:
+    elif local == Locals.UNHEDGED_DIVERGENCE:
         chf_unhedged_excess = _excess_return(fx_rates_data, prices, hedge_ratio=0.0, reference_ccy=REFERENCE_CCY)
         common = usd_excess.index.intersection(chf_unhedged_excess.index)
         diff_std_bp = (usd_excess.loc[common] - chf_unhedged_excess.loc[common]).std() * np.sqrt(12) * 1e4
@@ -84,6 +84,6 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.CIP_HEDGED_IDENTITY)
+    run_local(local=Locals.CIP_HEDGED_IDENTITY)
 
     plt.show()

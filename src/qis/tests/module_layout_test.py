@@ -139,10 +139,10 @@ def test_source_adjacent_development_runner_layout() -> None:
         if any(name.startswith("test_") for name in definitions):
             failures.append(f"{relative}: defines a pytest-shaped function")
         guards = [node for node in tree.body if _is_main_guard(node)]
-        if len(guards) != 1 or len(guards[0].body) != 1 or not _is_direct_run_local_call(
-            guards[0].body[0]
+        if len(guards) != 1 or not any(
+            _is_direct_run_local_call(statement) for statement in guards[0].body
         ):
-            failures.append(f"{relative}: main guard must directly select one Locals member")
+            failures.append(f"{relative}: main guard must select one Locals member")
 
     misplaced = sorted(
         path.relative_to(PACKAGE_ROOT).as_posix()
@@ -151,6 +151,53 @@ def test_source_adjacent_development_runner_layout() -> None:
     )
     failures.extend(f"{path}: _run.py outside run_local" for path in misplaced)
     assert failures == [], "development-runner layout violations:\n" + "\n".join(failures)
+
+
+@requires_development_runners
+def test_repository_examples_use_current_plural_dispatcher_api() -> None:
+    """Plural example dispatchers use ``Locals`` and ``run_local(local=...)``."""
+    failures: list[str] = []
+    examples_root = REPO_ROOT.joinpath("examples")
+
+    for path in sorted(examples_root.rglob("*.py")):
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        tree = _tree(path)
+        classes = {
+            node.name
+            for node in tree.body
+            if isinstance(node, ast.ClassDef)
+        }
+        functions = {
+            node.name: node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        if "LocalTests" in classes:
+            failures.append(f"{relative}: retains the old LocalTests enum")
+        if "Locals" not in classes:
+            continue
+
+        dispatcher = functions.get("run_local")
+        if dispatcher is None:
+            failures.append(f"{relative}: Locals enum requires run_local")
+        else:
+            args = dispatcher.args.args
+            annotation = args[0].annotation if len(args) == 1 else None
+            if (
+                len(args) != 1
+                or args[0].arg != "local"
+                or not isinstance(annotation, ast.Name)
+                or annotation.id != "Locals"
+            ):
+                failures.append(f"{relative}: expected run_local(local: Locals)")
+
+        guards = [node for node in tree.body if _is_main_guard(node)]
+        if len(guards) != 1 or not any(
+            _is_direct_run_local_call(statement) for statement in guards[0].body
+        ):
+            failures.append(f"{relative}: main guard must select one Locals member")
+
+    assert failures == [], "example dispatcher violations:\n" + "\n".join(failures)
 
 
 @requires_development_runners

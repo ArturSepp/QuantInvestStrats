@@ -84,7 +84,7 @@ def generate_volparity_multiportfolio(prices: pd.DataFrame,
     return multi_portfolio_data
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     STRATEGY_BENCHMARK_PLT = 1
     PERFORMANCE_ATTRIBUTION = 2
     ACTIVE_PERFORMANCE = 3
@@ -92,7 +92,7 @@ class LocalTests(Enum):
 
 
 @qis.timer
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -112,7 +112,7 @@ def run_local_test(local_test: LocalTests):
                                                              rebalancing_costs=0.0010  # per traded volume
                                                              )
 
-    if local_test == LocalTests.STRATEGY_BENCHMARK_PLT:
+    if local == Locals.STRATEGY_BENCHMARK_PLT:
         pnl_attribution = False
         figs = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=multi_portfolio_data,
                                                          backtest_name='Vol Parity Portfolio vs Equal Weight',
@@ -135,19 +135,19 @@ def run_local_test(local_test: LocalTests):
             qis.save_fig(fig=figs[1], file_name=f"brinson_attribution", local_path=qis.local_path.get_output_path())
             qis.save_fig(fig=figs[2], file_name=f"pnl_attribution", local_path=qis.local_path.get_output_path())
 
-    elif local_test == LocalTests.PERFORMANCE_ATTRIBUTION:
+    elif local == Locals.PERFORMANCE_ATTRIBUTION:
         figs = generate_performance_attribution_report(multi_portfolio_data=multi_portfolio_data,
                                                        time_period=TimePeriod('31Dec2021', None),
                                                        **fetch_default_report_kwargs(time_period=time_period))
 
-    elif local_test == LocalTests.ACTIVE_PERFORMANCE:
+    elif local == Locals.ACTIVE_PERFORMANCE:
         figs = generate_strategy_benchmark_active_perf_plt(multi_portfolio_data=multi_portfolio_data,
                                                            time_period=time_period,
                                                            figsize=(11, 6),
                                                            is_long_only=True,
                                                            **fetch_default_report_kwargs(time_period=time_period))
 
-    elif local_test == LocalTests.TRACKING_ERROR:
+    elif local == Locals.TRACKING_ERROR:
         # compute pd_covras
         covar_dict = qis.estimate_rolling_ewma_covar(prices=prices,
                                                      time_period=time_period,
@@ -173,4 +173,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.STRATEGY_BENCHMARK_PLT)
+    run_local(local=Locals.STRATEGY_BENCHMARK_PLT)

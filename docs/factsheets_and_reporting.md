@@ -2,57 +2,155 @@
 myst:
   html_meta:
     description: >-
-      Build multi-asset, strategy, strategy-versus-benchmark, and multi-strategy factsheets with
-      frequency-calibrated qis reporting.
+      Factsheet inputs, report selection, return conventions, reporting grids, and
+      reproducible offline examples for qis portfolio and multi-asset analytics.
 ---
 
 # Factsheets and reporting
 
-Use `qis.factsheet` when a practitioner needs a consistent multi-panel or multi-page review of an
-asset universe, a backtested strategy, or several strategies. The facade chooses one of four
-report archetypes and applies one reporting-frequency configuration across performance, rolling
-risk, regression, regime, and drawdown panels. Use the underlying `generate_*_factsheet`
-functions when page composition or individual settings need full control.
+*[author / affiliation / date — placeholder]*
 
-## Inputs and the four report archetypes
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
-| Input | Selected report | Additional requirement |
+A factsheet combines performance, risk and portfolio diagnostics into a set of related panels.
+Its interpretation depends on the input history, benchmark, return convention and observation
+grid. A common page layout alone does not make two analyses comparable.
+
+## Overview
+
+`qis.factsheet` selects a report from its input and applies a reporting-frequency preset.
+The four forms answer different questions:
+
+- **Multi-asset:** how do instruments compare with a reference series?
+- **Single strategy:** how do a portfolio's returns relate to its holdings, turnover and costs?
+- **Strategy versus benchmark:** how do two portfolio books differ?
+- **Multi-strategy:** how do several portfolio variants compare on shared tables and axes?
+
+The [reference](factsheets.md) lists the API choices. The [gallery](gallery.md) illustrates
+the page forms and links to scripts for regenerating their analytics.
+
+## Inputs, notation, and assumptions
+
+### Inputs and the four report archetypes
+
+| Input | Selected report | Benchmark information |
 |---|---|---|
-| price/return `Series` or `DataFrame` | multi-asset universe | reference defaults to the first column; override with `benchmark` or `benchmark_prices` |
-| `PortfolioData` | single strategy | supply `benchmark_prices` |
-| `MultiPortfolioData` | multiple strategies | none beyond valid contained portfolios |
-| `MultiPortfolioData` with `kind='strategy_benchmark'` | strategy versus benchmark strategy | the object must contain the intended pair |
+| Price or return `Series` or `DataFrame` | Multi-asset universe | A reference column via `benchmark`, or a separate series/panel via `benchmark_prices`. With neither supplied, the first input column is used. |
+| `PortfolioData` | Single strategy | Supply `benchmark_prices`. |
+| `MultiPortfolioData` | Multiple strategies | Store the reference price panel on the object for regime and beta panels. |
+| `MultiPortfolioData` with `kind='strategy_benchmark'` | Strategy versus benchmark portfolio | The first two portfolios are the default pair; the object's reference price panel supplies market regimes/betas. |
 
-By default, pandas inputs are positive price or NAV levels. With `data_is_returns=True`, inputs
-are simple fractional periodic returns (`0.01` means 1%); the facade geometrically compounds them
-to NAVs before reporting. Columns and benchmark identifiers must be unique and aligned to the
-intended economics.
+Use a sorted `DatetimeIndex` and meaningful, unique string column names. Prices and NAVs
+are positive levels by default. On the **multi-asset path only**,
+`data_is_returns=True` treats both the pandas input and any separately supplied
+`benchmark_prices` as simple fractional returns: 0.01 means 1%. Do not combine return
+input with an unconverted benchmark price panel under that switch. Portfolio objects already
+contain their calculated NAVs and accounting records; the switch does not rebuild them.
 
-## Frequency, annualisation, and missing values
+Let $P_t$ denote a price/NAV level at observation $t$, and $r_t$ its simple return from the
+previous observation. State whether the supplied history includes trading costs, fees and
+cash flows. Raw price inputs do not imply any portfolio rebalancing or cost model.
 
-`reporting_frequency` accepts daily, weekly, monthly, or quarterly. The corresponding base grids
-and annualisation factors are `B`/260, `W-WED`/52, `ME`/12, and `QE`/4. Window counts, EWM spans,
-regressions, and panel labels are calibrated together. Long and short reporting spans use
-different window lengths; the [full reporting-frequency convention](
-_included/reporting_frequencies.md) records the exact presets.
+## Methodology
 
-Default performance tables compute volatility from log returns, report compound p.a. return as
-the headline return, and use a zero risk-free rate. `add_rates_data=True` supplies the downloaded
-cash series for excess-return statistics; it does not change the input price/return convention.
+### From returns to levels
 
-Factsheets reject a reporting frequency finer than the native data: monthly observations can be
-reported monthly or quarterly, but not as daily or weekly information. Running drawdown panels
-use the native price path, while frequency-dependent risk tables use the reporting grid; their
-labels make that distinction explicit.
+For a complete positive history with an explicit starting level,
 
-NaNs are handled by the underlying analytics rather than by a universal imputation policy.
-Ragged starts, internal gaps, stale values, delisted tails, and genuinely low-frequency sleeves
-have different meanings. Check the input and the resulting observation windows; the facade does
-not certify that a forward-filled value is economically tradable.
+$$
+r_t = \frac{P_t}{P_{t-1}} - 1,
+\qquad
+P_t = P_0 \prod_{j=1}^{t}(1+r_j).
+$$
 
-## Minimal offline example
+The multi-asset return switch uses `qis.returns_to_nav` with its simple-return defaults.
+Supply an explicit baseline row, and inspect missing observations before conversion.
+The helper has its own initialisation and forward-fill behaviour; the switch is not a
+general missing-data policy. See [incomplete and mixed-frequency data](
+incomplete_and_mixed_frequency_data.md).
 
-The clean synthetic subset keeps the example focused on reporting rather than data repair.
+### Frequency, annualisation, and missing values
+
+Three time scales matter: the native observation path, the base grid for sampled statistics,
+and the regime/heatmap bins. The reporting preset coordinates their settings; it does not
+resample every visible curve to one common grid.
+
+| Reporting choice | Base grid | Periods per year |
+|---|---|---:|
+| Daily | Business day (`B`) | 260 |
+| Weekly | Wednesday week-end (`W-WED`) | 52 |
+| Monthly | Month-end (`ME`) | 12 |
+| Quarterly | Quarter-end (`QE`) | 4 |
+
+The facade infers the full available reporting span when `time_period` is omitted.
+A span **greater than** `long_threshold_years` (default 5.0) selects the long preset;
+otherwise it selects the short preset. In a monthly long report, volatility/variance spans,
+rolling Sharpe windows and beta spans are 36 observations. Turnover and cost totals roll over
+12 observations, regimes use quarterly bins, and the annual-return heatmap uses yearly bins.
+In a monthly short report, those risk windows/spans are 12 observations and regimes use
+monthly bins. EWM spans are decay parameters; they are not fixed-length rolling windows.
+
+The [reporting-frequency convention](_included/reporting_frequencies.md) records every preset.
+Running drawdown and time-under-water panels use the native price path; risk-table drawdowns
+use the configured sampling grid. Intramonth losses can therefore appear in the native
+drawdown panel without appearing in month-end risk statistics. A reporting grid finer than
+the inferred input frequency is rejected. This guard cannot detect information hidden by
+forward-filled monthly observations in a daily index.
+
+### Performance, costs and turnover
+
+Default performance tables use log returns for volatility, compound annual return as the
+headline return, and zero-rate Sharpe statistics. These are separate conventions, described
+in [performance analytics and Sharpe ratios](performance_analytics_and_sharpe.md).
+`add_rates_data=False` is the offline default. Enabling rate downloads does not change
+the input price/return convention; inspect the resulting rate data before interpreting an
+excess-return statistic.
+
+Portfolio reports inherit their NAV, costs and turnover from `PortfolioData`. A reporting
+frequency changes how those records are summarised, not the underlying rebalancing schedule.
+Between rebalancings, qis holds units and weights drift with prices.
+
+For investor-capital turnover, use two-sided executed notional divided by NAV. Managed
+futures require full contract notionals through `turnover_unit_notional`. Gross-normalised
+book churn and volatility-normalised signal turnover answer different questions; neither
+should silently replace realised investor turnover. The [turnover methodology](
+turnover_conventions.md) specifies these conventions and their inputs.
+
+## Worked example
+
+### Compounding is not addition
+
+A 10% gain followed by a 10% loss leaves 99% of the initial capital:
+
+$$
+\frac{P_2}{P_0} = 1.10 \times 0.90 = 0.99.
+$$
+
+This complete monthly example includes a zero-return baseline and performs no filling.
+
+```python
+import numpy as np
+import pandas as pd
+
+import qis
+
+returns = pd.Series(
+    [0.0, 0.10, -0.10],
+    index=pd.to_datetime(['2025-01-31', '2025-02-28', '2025-03-31']),
+    name='Illustration',
+)
+nav = qis.returns_to_nav(
+    returns, is_log_returns=False, ffill_between_nans=False
+)
+np.testing.assert_allclose(nav.to_numpy(), [1.0, 1.10, 0.99])
+assert np.isclose(nav.iloc[-1] / nav.iloc[0] - 1.0, -0.01)
+```
+
+### Minimal offline example
+
+This report uses a clean subset of the frozen synthetic fixture. It is a demonstration of
+report construction, not historical market performance. The 2018–2025 sample and seed are fixed.
 
 ```python
 import matplotlib.pyplot as plt
@@ -61,63 +159,82 @@ import qis
 from qis.datasets import generate_synthetic_universe
 
 universe = generate_synthetic_universe(
-    start='2018-01-02', end='2025-12-31', apply_quirks=False
+    start='2018-01-02', end='2025-12-31', seed=20260725, apply_quirks=False
 )
 prices = universe.prices[['SEQ_US', 'SBD_TSY', 'SCM_GLD']]
 figures = qis.factsheet(
     prices,
     benchmark='SEQ_US',
     reporting_frequency='monthly',
+    add_rates_data=False,
+    factsheet_name='Synthetic assets | monthly reporting',
 )
-
-assert all(isinstance(figure, plt.Figure) for figure in figures)
+assert figures and all(isinstance(figure, plt.Figure) for figure in figures)
 for figure in figures:
+    figure.canvas.draw()
     plt.close(figure)
 ```
 
-Without `file_name`, the result is a list of Matplotlib `Figure` objects for inspection,
-embedding, or custom saving. The call renders figures but does not write a report. With
-`file_name='book'`, `qis.factsheet` writes an A4 PDF and returns its path as a string; pass an
-explicit `local_path` when the destination matters. A saved PDF is an output artefact, not a
-different calculation.
+The result is a multi-asset report. Selecting an input column as a reference does not create
+a strategy backtest. The [gallery workflow](gallery.md#build-the-four-report-types) constructs
+portfolio objects for the other three forms.
 
-## How to interpret and choose a report
+## Implementation in qis
 
-- **Multi-asset:** compare instruments against a reference series, including cumulative return,
-  risk-adjusted statistics, rolling risk, drawdowns, correlation, and regimes.
-- **Single strategy:** add weights, turnover, costs, and holding-level attribution from a
-  `PortfolioData` backtest.
-- **Strategy versus benchmark:** compare two portfolio books and their active difference.
-- **Multi-strategy:** compare several portfolio variants on shared tables and axes.
+Without `file_name`, the facade returns a list of Matplotlib figures and writes no report
+file. With a filename, it saves the generated pages to PDF and returns the path string.
+Pass an explicit, existing `local_path`; the default otherwise uses the package's configured
+output directory. The PDF helper appends the current date by default. A PDF generation date
+does not change the analytics sample cutoff.
 
-Factsheet turnover is an investor-capital statistic and should use two-sided executed notional
-divided by NAV. For managed futures, supply full contract notionals as `turnover_unit_notional`;
-using executed contracts is essential, but it does not imply a gross-exposure denominator.
-Gross-normalized turnover deliberately removes leverage and is best reserved for a separate
-book-churn or implementation-capacity diagnostic. The [turnover methodology](
-turnover_conventions.md) gives the formulas and a 1x-versus-2x example.
+Page count depends on the report type, selected appendices and available history.
+Do not assume every call produces one page. Close figures after saving or inspection in
+batch processes.
 
-The [factsheet gallery](gallery.md) shows the four rendered forms. The wheel-shipped
-[factsheet convention note](factsheets.md) maps each facade input to its lower-level
-generator.
+For direct generator calls, use `qis.fetch_default_report_kwargs` to build the preset.
+Caller overrides take precedence, so overrides to one frequency/window should be reviewed
+alongside the related fields. See the [full-control example](factsheets.md#full-control).
 
-## Constraints and common failure modes
+The [facade source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/factsheet_facade.py)
+defines dispatch and output handling; the
+[configuration source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/config.py)
+defines presets. The [batch analytics scripts](https://github.com/ArturSepp/QuantInvestStrats/tree/main/tools/docs_analytics)
+generate figures, supporting tables and provenance together.
 
-- A `PortfolioData` single-strategy report without `benchmark_prices` raises `ValueError`.
-- A `kind` override must match the input type; it cannot turn raw prices into a portfolio object.
-- Reporting finer than the input frequency raises rather than inventing observations.
-- Wide universes can exceed a page's legend capacity. The renderer warns; reduce the number of
-  series or adjust the documented figure/font settings rather than ignoring a collapsed layout.
-- `add_rates_data=True` downloads risk-free-rate data and therefore needs the `data` extra and
-  network access. Core/offline reporting leaves it false.
-- `file_name` authorises a filesystem write. Omit it for a pure figure-list result and close
-  figures in batch or test processes.
+## Interpretation and limitations
+
+<a id="how-to-interpret-and-choose-a-report"></a>
+<a id="constraints-and-common-failure-modes"></a>
+
+- A single-strategy `PortfolioData` report without `benchmark_prices` raises
+  `ValueError`. A `kind` override must match the supplied object; it does not construct
+  portfolios from raw prices.
+- In multi-portfolio reports, the comparison portfolio and the market reference series are
+  separate inputs. Supply the reference panel on `MultiPortfolioData`; the facade's
+  standalone `benchmark_prices` argument is used on the raw-pandas and single-strategy paths.
+- Missing observations, stale values and ragged histories can give panels different effective
+  samples. Neither the facade nor its frequency guard certifies tradability or data quality.
+- `add_rates_data=True` attempts a download through the optional `data` extra.
+  Missing yfinance or an empty result can leave `rates_data=None`. Verify coverage and
+  conventions; do not infer successful excess-return calculation from that flag alone.
+- Dense tables and legends require visual review at the intended display size. Layout tests
+  check geometry, not readability. Reduce the series count or adjust documented display settings.
+- Synthetic reports demonstrate behaviour under specified inputs. Their returns, Sharpe ratios
+  and drawdowns are not estimates of an investable strategy's expected performance.
 
 ## See also
 
-- {doc}`Generated qis.factsheet API <api/generated/qis.factsheet>`
-- [Factsheet gallery](gallery.md)
-- [Factsheet convention](factsheets.md)
-- [Reporting-frequency convention](_included/reporting_frequencies.md)
-- [Two-sided turnover conventions](turnover_conventions.md)
-- [Canonical multi-asset example (requires the `data` extra)](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/multi_assets.py)
+- [Factsheet API and configuration reference](factsheets.md)
+- [Factsheet gallery and regeneration](gallery.md)
+- [Frequency and annualisation](frequency_convention_note.md)
+- [Portfolio backtesting](portfolio_backtesting.md)
+- [Brinson attribution](brinson_attribution.md)
+- [Documentation and figure standard](documentation_standard.md)
+
+## References
+
+- qis contributors. [Factsheet dispatch and output contract](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/factsheet_facade.py)
+  and [reporting presets](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/config.py).
+  Primary implementation sources for the conventions on this page.
+- Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet
+  reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

@@ -46,18 +46,18 @@ def compute_vols(prices: pd.Series,
     return vols
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     VOLS = 1
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
 
-    if local_test == LocalTests.VOLS:
+    if local == Locals.VOLS:
         prices = fetch_hourly_data(ticker='BTC-USD')['close']
         vol = compute_vols(prices=prices)
         with sns.axes_style("darkgrid"):
@@ -69,4 +69,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.VOLS)
+    run_local(local=Locals.VOLS)

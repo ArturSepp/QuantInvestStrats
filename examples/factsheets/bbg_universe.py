@@ -203,12 +203,12 @@ def run_price():
                             start_to_one=False)
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     REPORT = 1
     PRICE = 2
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -219,10 +219,10 @@ def run_local_test(local_test: LocalTests):
     pd.set_option('display.width', 1000)
 
 
-    if local_test == LocalTests.REPORT:
+    if local == Locals.REPORT:
         run_report()
 
-    elif local_test == LocalTests.PRICE:
+    elif local == Locals.PRICE:
         run_price()
 
     plt.show()
@@ -230,4 +230,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.REPORT)
+    run_local(local=Locals.REPORT)

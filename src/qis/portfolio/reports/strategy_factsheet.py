@@ -142,6 +142,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                 turnover_computation_type: Optional[
                                     qis.TurnoverComputationType
                                 ] = None,
+                                turnover_vols: Optional[pd.DataFrame] = None,
                                 **kwargs
                                 ) -> List[plt.Figure]:
     """
@@ -206,6 +207,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         is_grouped: aggregate the panels by ``group_data`` where the panel supports it
         dd_legend_type: how much detail the drawdown legend carries
         turnover_computation_type: turnover convention; None uses the portfolio default
+        turnover_vols: annualized volatility panel for volatility-normalized weight turnover
         is_unit_based_traded_volume: deprecated turnover selector retained for compatibility;
             it still controls whether costs are normalized by NAV
         df_to_add: extra frame appended as a table
@@ -363,10 +365,25 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                            freq=freq_turnover,
                                            is_grouped=is_grouped,
                                            turnover_computation_type=turnover_computation_type,
-                                           is_unit_based_traded_volume=is_unit_based_traded_volume)
+                                           is_unit_based_traded_volume=is_unit_based_traded_volume,
+                                           vols=turnover_vols)
     freq = freq_turnover or pd.infer_freq(turnover.index)
+    is_volatility_normalized = (
+        turnover_computation_type
+        == qis.TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
+        or (
+            turnover_computation_type is None
+            and is_unit_based_traded_volume is None
+            and portfolio_data.turnover_computation_type
+            == qis.TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
+        )
+    )
+    turnover_label = (
+        'Volatility-Normalized Weight Turnover'
+        if is_volatility_normalized else 'Two-sided Turnover'
+    )
     turnover_title = (
-        f"{turnover_rolling_period}-period rolling {freq}-freq Two-sided Turnover"
+        f"{turnover_rolling_period}-period rolling {freq}-freq {turnover_label}"
     )
     qis.plot_time_series(df=turnover,
                          var_format='{:,.2%}',
@@ -833,6 +850,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                     legend_loc=None,
                     turnover_computation_type=turnover_computation_type,
                     is_unit_based_traded_volume=is_unit_based_traded_volume,
+                    vols=turnover_vols,
                 ),
             )
             portfolio_data.plot_performance_attribution(time_period=time_period,
@@ -852,6 +870,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                     legend_loc=None,
                     turnover_computation_type=turnover_computation_type,
                     is_unit_based_traded_volume=is_unit_based_traded_volume,
+                    vols=turnover_vols,
                 ),
             )
             portfolio_data.plot_performance_attribution(time_period=time_period,

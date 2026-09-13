@@ -37,7 +37,7 @@ examples/
 | `miss_best_worst_days_impact.py` | Performance with the best / worst N days per month removed. |
 | `infrequent_returns_interpolation.py` | `interpolate_infrequent_returns` for monthly/quarterly hedge-fund-like series. |
 | `timeseries_backfill.py` | Extend a newer provider history backwards with `bfill_timeseries`, preserving its recent price path. |
-| `turnover_conventions.py` | Yahoo SPY/TLT comparison of all three two-sided turnover conventions for a 100% funded 60/40 portfolio and the same portfolio at 2x leverage. |
+| `turnover_conventions.py` | Yahoo SPY/TLT comparison of all four turnover conventions for a 100% funded tactical portfolio and the same portfolio at 2x leverage. |
 | `unsmoothing_and_delevering.py` | End-to-end walkthrough of `delever_returns`, `implied_leverage`, `unsmooth_returns_ar1_ewma` and `unsmooth_returns_glm` on a bundled OCSL/GCF dataset. |
 
 ## models — EWM, regression, vol estimation
@@ -67,6 +67,7 @@ examples/
 
 | File | What it shows |
 |---|---|
+| `brinson_attribution.py` | Offline BHB sector attribution with Frongello linking, prior holdings, native-date trading costs, monthly/quarterly reconciliation and optional QIS PDF/PNG/CSV export. See [methodology](../docs/brinson_attribution.md). |
 | `balanced_60_40.py` | 60/40 SPY/IEF with management fee — `backtest_model_portfolio`. |
 | `balanced_60_40_with_btc.py` | Impact of adding a 2% BTC sleeve to a 60/40 portfolio. |
 | `constant_notional_short.py` | Constant-notional vs constant-weight short SPY simulation. |

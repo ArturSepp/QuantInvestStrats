@@ -74,7 +74,7 @@ def compute_one_factor_weights(mu_market: float = 0.06,
     return output
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     RUN_UTILITY = 1
     RUN_PORTFOLIO_RETURN = 2
     RUN_PORTFOLIO_RETURN_UTILITY = 3
@@ -82,7 +82,7 @@ class LocalTests(Enum):
     ONE_FACTOR_PLOTS = 5
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -92,19 +92,19 @@ def run_local_test(local_test: LocalTests):
     pd.set_option('display.max_columns', 500)
     pd.set_option('display.width', 1000)
 
-    if local_test == LocalTests.RUN_UTILITY:
+    if local == Locals.RUN_UTILITY:
         gamma = np.linspace(0.01, 3.0, 21)
         leverage = compute_utility_weight(gamma=gamma)
         print(leverage)
 
-    elif local_test == LocalTests.RUN_PORTFOLIO_RETURN:
+    elif local == Locals.RUN_PORTFOLIO_RETURN:
         leverage = np.linspace(0.0, 1.0, 21)
         p_sharpe, p_return, p_vol = compute_portfolio_return_vol(leverage)
         print(p_sharpe)
         print(p_return)
         print(p_vol)
 
-    elif local_test == LocalTests.RUN_PORTFOLIO_RETURN_UTILITY:
+    elif local == Locals.RUN_PORTFOLIO_RETURN_UTILITY:
         gamma = np.linspace(0.02, 1.5, 21)
         leverage = compute_utility_weight(gamma=gamma)
         print(leverage)
@@ -113,11 +113,11 @@ def run_local_test(local_test: LocalTests):
         print(p_return)
         print(p_vol)
 
-    elif local_test == LocalTests.ONE_FACTOR:
+    elif local == Locals.ONE_FACTOR:
         output = compute_one_factor_weights(gamma=10.0, beta_target=1.0)
         print(output)
 
-    elif local_test == LocalTests.ONE_FACTOR_PLOTS:
+    elif local == Locals.ONE_FACTOR_PLOTS:
         beta_target = 0.0
         mu_market = 0.06
         sigma_market = 0.15
@@ -189,4 +189,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.ONE_FACTOR_PLOTS)
+    run_local(local=Locals.ONE_FACTOR_PLOTS)

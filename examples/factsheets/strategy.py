@@ -86,13 +86,13 @@ def generate_equity_bond_portfolio(prices: pd.DataFrame,
     return volparity_portfolio
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     VOLPARITY_PORTFOLIO = 1
     EQUITY_BOND = 2
     DELTA1_STRATEGY = 3
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -103,7 +103,7 @@ def run_local_test(local_test: LocalTests):
     time_period_short = TimePeriod('31Dec2022', time_period.end)
     rebalancing_costs = 0.0010  # per traded volume
 
-    if local_test == LocalTests.VOLPARITY_PORTFOLIO:
+    if local == Locals.VOLPARITY_PORTFOLIO:
 
         prices, benchmark_prices, group_data = fetch_universe_data()
         portfolio_data = generate_volparity_portfolio(prices=prices,
@@ -135,7 +135,7 @@ def run_local_test(local_test: LocalTests):
         qis.save_fig(fig=figs[2], file_name=f"strategy3", local_path=qis.local_path.get_output_path())
         """
 
-    elif local_test == LocalTests.EQUITY_BOND:
+    elif local == Locals.EQUITY_BOND:
         prices, benchmark_prices, group_data = fetch_equity_bond()
         portfolio_data = generate_equity_bond_portfolio(prices=prices,
                                                         weights=[0.6, 0.4],
@@ -159,7 +159,7 @@ def run_local_test(local_test: LocalTests):
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
                              local_path=qis.local_path.get_output_path())
 
-    elif local_test == LocalTests.DELTA1_STRATEGY:
+    elif local == Locals.DELTA1_STRATEGY:
         from bbg_fetch import fetch_field_timeseries_per_tickers
         prices = fetch_field_timeseries_per_tickers(tickers={'UISYMH5S Index': 'CDX_HY'})
         benchmark_prices = fetch_field_timeseries_per_tickers(tickers={'HYG US Equity': 'HYG'})
@@ -184,4 +184,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.VOLPARITY_PORTFOLIO)
+    run_local(local=Locals.VOLPARITY_PORTFOLIO)

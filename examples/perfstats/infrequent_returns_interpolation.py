@@ -15,12 +15,12 @@ from enum import Enum
 import qis as qis
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     YF = 1
     BBG = 2
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -31,14 +31,14 @@ def run_local_test(local_test: LocalTests):
     pd.set_option('display.max_columns', 500)
     pd.set_option('display.width', 1000)
 
-    if local_test == LocalTests.YF:
+    if local == Locals.YF:
         import yfinance as yf
         pivot = 'SPY'
         asset = 'QQQ'
         tickers = [pivot, asset]
         prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close']
 
-    elif local_test == LocalTests.BBG:
+    elif local == Locals.BBG:
         from bbg_fetch import fetch_field_timeseries_per_tickers
         pivot = 'SPTR Index'
         asset = 'XNDX Index'
@@ -78,4 +78,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.YF)
+    run_local(local=Locals.YF)

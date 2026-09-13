@@ -207,32 +207,32 @@ def plot_conditional_performances(dfs: Dict[str, pd.DataFrame], title: str) -> p
     return fig
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     ELECTION_RESULTS = 1
     ELECTION_DATES = 2
     UNCONDITIONAL_PERFORMANCES = 3
     CONDITIONAL_PERFORMANCES = 4
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
 
-    if local_test == LocalTests.ELECTION_RESULTS:
+    if local == Locals.ELECTION_RESULTS:
         df = pd.DataFrame.from_dict(US_ELECTION_RESULTS, orient='index')
         print(df)
 
-    elif local_test == LocalTests.ELECTION_DATES:
+    elif local == Locals.ELECTION_DATES:
         dates = generate_us_election_dates()
         print(dates)
 
         before_after_dates = generate_before_after_dates(dates)
         print(before_after_dates)
 
-    elif local_test == LocalTests.UNCONDITIONAL_PERFORMANCES:
+    elif local == Locals.UNCONDITIONAL_PERFORMANCES:
         tickers = {'SPX Index': 'S&P 500',
                    'DXY Curncy': 'DXY',
                    'TY1 Comdty': 'UST 10y bond future'}
@@ -243,7 +243,7 @@ def run_local_test(local_test: LocalTests):
             figs.append(fig)
         qis.save_figs_to_pdf(figs, file_name='election_perf_unconditional', local_path=qis.get_output_path())
 
-    elif local_test == LocalTests.CONDITIONAL_PERFORMANCES:
+    elif local == Locals.CONDITIONAL_PERFORMANCES:
         tickers = {'SPX Index': 'S&P 500',
                    'DXY Curncy': 'DXY',
                    'TY1 Comdty': 'UST 10y bond future'}
@@ -273,4 +273,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.CONDITIONAL_PERFORMANCES)
+    run_local(local=Locals.CONDITIONAL_PERFORMANCES)

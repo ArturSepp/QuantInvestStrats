@@ -89,7 +89,7 @@ def ewm_covar_tensor_nans():
     covar_tensor_txy = qis.compute_ewm_covar_tensor(a=a, span=200, nan_backfill=qis.NanBackfill.NAN_FILL)
     print(covar_tensor_txy)
 
-class LocalTests(Enum):
+class Locals(Enum):
     TIME_COMP_WITH_PANDAS_EWM = 1
     VOL_COMP_WITH_PANDAS_EWM = 2
     EWMA_NP = 3
@@ -102,7 +102,7 @@ class LocalTests(Enum):
     EWMA_COVAR_TENSOR_NANS = 10
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -111,13 +111,13 @@ def run_local_test(local_test: LocalTests):
 
     np.random.seed(1)
 
-    if local_test == LocalTests.TIME_COMP_WITH_PANDAS_EWM:
+    if local == Locals.TIME_COMP_WITH_PANDAS_EWM:
         time_comp_with_pandas_ewm()
 
-    elif local_test == LocalTests.VOL_COMP_WITH_PANDAS_EWM:
+    elif local == Locals.VOL_COMP_WITH_PANDAS_EWM:
         vol_comp_with_pandas_ewm()
 
-    elif local_test == LocalTests.EWMA_COVAR_TENSOR_NANS:
+    elif local == Locals.EWMA_COVAR_TENSOR_NANS:
         ewm_covar_tensor_nans()
 
     else:  # apply same data for these tests
@@ -127,7 +127,7 @@ def run_local_test(local_test: LocalTests):
         ewm_lambda3 = np.array([0.94, 0.50, 0.10])
         plot_data, title = None, None
 
-        if local_test == LocalTests.EWMA_NP:
+        if local == Locals.EWMA_NP:
             ewm1 = qm.ewm_recursion(a=data.iloc[:, 0].to_numpy(dtype=np.double), ewm_lambda=ewm_lambda, init_value=0.0)
             print(ewm1)
 
@@ -137,7 +137,7 @@ def run_local_test(local_test: LocalTests):
             ewm3 = qm.ewm_recursion(a=data.to_numpy(), ewm_lambda=ewm_lambda3, init_value=np.zeros(len(data.columns)))
             print(ewm3)
 
-        elif local_test == LocalTests.EWMA_DF:
+        elif local == Locals.EWMA_DF:
 
             ewm_df1 = qm.compute_ewm(data=data.iloc[:, 0], ewm_lambda=ewm_lambda, init_type=qm.InitType.MEAN)
             print(ewm_df1)
@@ -158,7 +158,7 @@ def run_local_test(local_test: LocalTests):
             plot_data = pd.concat([data, ewm_df3], axis=1)
             title = 'ewm'
 
-        elif local_test == LocalTests.EWMA_MEAN:
+        elif local == Locals.EWMA_MEAN:
 
             datas = {'np1': data.iloc[:, 0].to_numpy(), 'np': data.to_numpy(), 'series': data.iloc[:, 0], 'df': data}
 
@@ -176,7 +176,7 @@ def run_local_test(local_test: LocalTests):
             plot_data = pd.concat([data, ewm_mean, ewm_data], axis=1)
             title = 'ewm-mean'
 
-        elif local_test == LocalTests.EWMA_VOL:
+        elif local == Locals.EWMA_VOL:
 
             datas = {'np1': data.iloc[:, 0].to_numpy(), 'np': data.to_numpy(), 'series': data.iloc[:, 0], 'df': data}
 
@@ -192,7 +192,7 @@ def run_local_test(local_test: LocalTests):
             plot_data = pd.concat([np.power(data, 2), ewm_data], axis=1)
             title = 'ewm vol'
 
-        elif local_test == LocalTests.EWMA_BETA:
+        elif local == Locals.EWMA_BETA:
 
             cross_xy_types = [qm.CrossXyType.COVAR, qm.CrossXyType.BETA, qm.CrossXyType.CORR]
 
@@ -208,7 +208,7 @@ def run_local_test(local_test: LocalTests):
             plot_data = pd.concat([data, ewm_data], axis=1)
             title = 'ewm beta'
 
-        elif local_test == LocalTests.EWMA_AUTO_CORR:
+        elif local == Locals.EWMA_AUTO_CORR:
             plot_data = qm.compute_ewm_matrix_autocorr_df(data=data,
                                                           ewm_lambda=ewm_lambda,
                                                           mean_adj_type=qm.MeanAdjType.NONE,
@@ -231,4 +231,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.EWMA_COVAR_TENSOR_NANS)
+    run_local(local=Locals.EWMA_COVAR_TENSOR_NANS)

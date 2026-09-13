@@ -103,6 +103,7 @@ class ModelLayerEwmaAlphaAttribution:
         beta_lag: Number of periods between beta estimation and application.
         beta_init_value: Point-in-time beta prior used before an estimate is available.
         mean_adj_type: Point-in-time mean adjustment used in beta estimation.
+        nav_start_date: Actual common NAV baseline, before the first realised return.
 
     The ``ewma_annualised_components`` and ``ewma_annualised_alpha`` properties apply the same
     span as the beta estimator to the exact realised, lagged-beta component returns. Their
@@ -120,6 +121,7 @@ class ModelLayerEwmaAlphaAttribution:
     beta_lag: int
     beta_init_value: float
     mean_adj_type: MeanAdjType
+    nav_start_date: Optional[pd.Timestamp] = None
 
     @property
     def ewma_annualised_components(self) -> pd.DataFrame:
@@ -139,6 +141,8 @@ class ModelLayerEwmaAlphaAttribution:
             'Signal Layer Alpha',
             'Integration Alpha',
         ]
+        if 'Net Total Model Alpha' in self.component_returns:
+            alpha_columns.extend(['Trading Cost Drag', 'Net Total Model Alpha'])
         return self.ewma_annualised_components[alpha_columns]
 
     @property
@@ -224,6 +228,30 @@ class ModelLayerCumulativeAlphaAttribution:
     beta_lag: int
     beta_init_value: float
     mean_adj_type: MeanAdjType
+
+    def get_cumulative_alpha(self, is_net: bool = True) -> pd.DataFrame:
+        """Return additive display paths, omitting identically zero realised costs.
+
+        Args:
+            is_net: Prefer net total alpha when a net NAV was supplied.
+
+        Returns:
+            Total, risk, signal, integration and optional nonzero cost paths.
+            Complete gross/net audit data remain in cumulative_alpha.
+        """
+        total = (
+            'Net Total Model Alpha'
+            if is_net and 'Net Total Model Alpha' in self.cumulative_alpha
+            else 'Total Model Alpha'
+        )
+        columns = [total, 'Risk Layer Alpha', 'Signal Layer Alpha', 'Integration Alpha']
+        if total == 'Net Total Model Alpha':
+            costs = self.alpha_returns['Trading Cost Drag'].to_numpy(dtype=float)
+            if not np.isfinite(costs).all():
+                raise ValueError('trading-cost contributions must be finite')
+            if (costs != 0.0).any():
+                columns.append('Trading Cost Drag')
+        return self.cumulative_alpha.loc[:, columns].copy()
 
 
 def compute_model_layer_alpha_beta_attribution(
@@ -466,6 +494,11 @@ def _to_common_model_layer_returns(
         raise ValueError('rolling model-layer attribution requires at least three returns')
     if np.isclose(periodic_returns['Benchmark'].var(ddof=0), 0.0):
         raise ValueError('rolling model-layer attribution requires varying benchmark returns')
+    initial_values = navs.loc[first_valid].to_numpy(dtype=float)
+    periodic_returns.attrs['nav_start_date'] = (
+        first_valid if np.isfinite(initial_values).all() and (initial_values > 0.0).all()
+        else None
+    )
     return periodic_returns
 
 
@@ -986,6 +1019,8 @@ def compute_model_layer_ewma_alpha_attribution(
         beta_lag: int = 1,
         beta_init_value: float = 1.0,
         mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
+        *,
+        full_model_net_nav: Optional[pd.Series] = None,
 ) -> ModelLayerEwmaAlphaAttribution:
     """Estimate model-layer alpha using point-in-time, lagged EWMA betas.
 
@@ -1007,6 +1042,8 @@ def compute_model_layer_ewma_alpha_attribution(
         beta_init_value: Finite beta prior used before an estimate is available. Defaults to one.
         mean_adj_type: Point-in-time beta mean adjustment. Defaults to EWMA. ``INSAMPLE`` is
             rejected because it is forward-looking.
+        full_model_net_nav: Optional same-weights NAV after trading costs. Adds exact log-return
+            cost drag and net total alpha on the unchanged gross-model beta basis.
 
     Returns:
         Rolling betas, exact realised alpha components and expanding alpha estimates.
@@ -1031,6 +1068,7 @@ def compute_model_layer_ewma_alpha_attribution(
         signal_layer_nav=signal_layer_nav,
         full_model_nav=full_model_nav,
         freq=freq,
+        full_model_net_nav=full_model_net_nav,
     )
     layer_columns = ['Risk Layer', 'Signal Layer', 'Full Model']
     estimated_betas, *_ = compute_ewm_beta_alpha_forecast(
@@ -1067,6 +1105,14 @@ def compute_model_layer_ewma_alpha_attribution(
         'Integration Alpha': integration_alpha,
         'Full Model Return': periodic_returns['Full Model'],
     })
+    if full_model_net_nav is not None:
+        component_returns['Trading Cost Drag'] = (
+            periodic_returns['Full Model Net'] - periodic_returns['Full Model']
+        )
+        component_returns['Net Total Model Alpha'] = (
+            total_alpha + component_returns['Trading Cost Drag']
+        )
+        component_returns['Full Model Net Return'] = periodic_returns['Full Model Net']
     if not np.isfinite(component_returns.to_numpy(dtype=float)).all():
         raise RuntimeError('rolling model-layer components contain non-finite values')
     alpha_columns = [
@@ -1075,6 +1121,8 @@ def compute_model_layer_ewma_alpha_attribution(
         'Signal Layer Alpha',
         'Integration Alpha',
     ]
+    if full_model_net_nav is not None:
+        alpha_columns.extend(['Trading Cost Drag', 'Net Total Model Alpha'])
     cumulative_alpha = component_returns[alpha_columns].cumsum()
     expanding_annualised_alpha = (
         component_returns[alpha_columns]
@@ -1094,6 +1142,7 @@ def compute_model_layer_ewma_alpha_attribution(
         beta_lag=int(beta_lag),
         beta_init_value=float(beta_init_value),
         mean_adj_type=mean_adj_type,
+        nav_start_date=periodic_returns.attrs.get('nav_start_date'),
     )
 
 
@@ -1112,6 +1161,8 @@ def compute_model_layer_cumulative_alpha_after_warmup(
         attribution: Point-in-time EWMA-beta attribution containing realised alpha residuals.
         base_date: Date on which cumulative alpha is rebased to zero.
         warmup_periods: Minimum estimator observations through ``base_date``. Defaults to 12.
+            Zero allows an exact reporting base, including the validated initial NAV date.
+            The existing beta prior applies until a lagged estimate is available.
 
     Returns:
         Post-warm-up alpha returns and their unannualised cumulative sums.
@@ -1120,17 +1171,26 @@ def compute_model_layer_cumulative_alpha_after_warmup(
         ValueError: If settings, dates or available warm-up observations are invalid.
         RuntimeError: If the first post-warm-up return does not use the base-date beta.
     """
-    _validate_positive_integer(value=warmup_periods, name='warmup_periods')
+    if (isinstance(warmup_periods, (bool, np.bool_))
+            or not isinstance(warmup_periods, (int, np.integer)) or warmup_periods < 0):
+        raise ValueError('warmup_periods must be a nonnegative integer')
     requested_base_date = pd.Timestamp(base_date)
     index = attribution.component_returns.index
     if not index.is_unique:
         raise ValueError('rolling attribution index must be unique')
-    if requested_base_date not in index:
+    if not index.is_monotonic_increasing:
+        raise ValueError('rolling attribution index must be monotonic increasing')
+    is_initial_base = (
+        attribution.nav_start_date is not None
+        and requested_base_date == attribution.nav_start_date
+        and requested_base_date < index[0]
+    )
+    if requested_base_date not in index and not is_initial_base:
         raise ValueError(
             f'cumulative alpha base date {requested_base_date:%Y-%m-%d} is not in the '
             'periodic return index'
         )
-    base_position = int(index.get_loc(requested_base_date))
+    base_position = -1 if is_initial_base else int(index.get_loc(requested_base_date))
     observed_warmup_periods = base_position + 1
     if observed_warmup_periods < warmup_periods:
         raise ValueError(
@@ -1147,6 +1207,8 @@ def compute_model_layer_cumulative_alpha_after_warmup(
         'Signal Layer Alpha',
         'Integration Alpha',
     ]
+    if 'Net Total Model Alpha' in attribution.component_returns:
+        alpha_columns.extend(['Trading Cost Drag', 'Net Total Model Alpha'])
     alpha_returns = attribution.component_returns.loc[first_alpha_date:, alpha_columns].copy()
     baseline = pd.DataFrame(
         0.0,
@@ -1155,9 +1217,12 @@ def compute_model_layer_cumulative_alpha_after_warmup(
     )
     cumulative_alpha = pd.concat([baseline, alpha_returns.cumsum()])
     if attribution.beta_lag == 1:
-        expected_first_beta = attribution.estimated_betas.loc[
-            requested_base_date
-        ].fillna(attribution.beta_init_value)
+        expected_first_beta = (
+            pd.Series(attribution.beta_init_value, index=attribution.applied_betas.columns)
+            if is_initial_base else attribution.estimated_betas.loc[
+                requested_base_date
+            ].fillna(attribution.beta_init_value)
+        )
         if not np.allclose(
                 attribution.applied_betas.loc[first_alpha_date],
                 expected_first_beta,

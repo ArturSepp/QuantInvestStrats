@@ -14,6 +14,9 @@ class TurnoverComputationType(str, Enum):
     Attributes:
         TARGET_WEIGHTS: Absolute changes in target weights. This is a target-allocation proxy,
             not a reconstruction of executed trades.
+        VOLATILITY_NORMALIZED_WEIGHTS: Absolute changes in target weights multiplied by
+            contemporaneous annualized volatility. This is the theoretical turnover convention
+            of Sepp and Lucic (2026), Definition 4.5.
         EXECUTED_NOTIONAL_NAV: Absolute changes in units valued at current unit notional and
             divided by portfolio NAV.
         EXECUTED_NOTIONAL_GROSS: Absolute changes in units valued at current unit notional and
@@ -21,6 +24,7 @@ class TurnoverComputationType(str, Enum):
     """
 
     TARGET_WEIGHTS = 'target_weights'
+    VOLATILITY_NORMALIZED_WEIGHTS = 'volatility_normalized_weights'
     EXECUTED_NOTIONAL_NAV = 'executed_notional_nav'
     EXECUTED_NOTIONAL_GROSS = 'executed_notional_gross'
 
@@ -80,6 +84,17 @@ def _align_unit_notional(units: pd.DataFrame,
     return unit_notional.reindex(index=units.index, columns=units.columns)
 
 
+def _validate_vols_alignment(input_weights: pd.DataFrame,
+                             vols: pd.DataFrame
+                             ) -> None:
+    if not vols.index.equals(input_weights.index):
+        raise ValueError("vols index must exactly match input_weights index")
+    if not vols.columns.equals(input_weights.columns):
+        raise ValueError("vols columns must exactly match input_weights columns and order")
+    if vols.lt(0.0).any(axis=None):
+        raise ValueError("vols must not contain negative values")
+
+
 def _divide_by_denominator(traded_notional: pd.DataFrame,
                            denominator: pd.Series,
                            denominator_name: str
@@ -105,13 +120,16 @@ def compute_turnover(
         unit_notional: Optional[pd.DataFrame] = None,
         nav: Optional[pd.Series] = None,
         input_weights: Optional[pd.DataFrame] = None,
+        vols: Optional[pd.DataFrame] = None,
         ) -> pd.DataFrame:
     """Compute per-instrument two-sided turnover before resampling or rolling aggregation.
 
     Executed turnover values unit changes with the current date's unit notional. For cash
     securities this is normally the asset price. For derivatives it is the full contract
     notional, including multiplier and currency conversion. Target-weight turnover is retained
-    as an explicit proxy for backtests that do not carry executed holdings.
+    as an explicit proxy for backtests that do not carry executed holdings. Volatility-normalized
+    weight turnover is ``annualized_volatility[t] * abs(weight[t] - weight[t-1])``. It uses target
+    weights rather than drifted holdings because it is a theoretical signal-turnover measure.
 
     Args:
         computation_type: Holdings and denominator convention. The default is executed traded
@@ -120,7 +138,11 @@ def compute_turnover(
         unit_notional: Current value of one unit or contract. Required by both executed modes.
         nav: Portfolio NAV in the same currency as ``unit_notional``. Required by
             ``EXECUTED_NOTIONAL_NAV``.
-        input_weights: Requested target weights. Required by ``TARGET_WEIGHTS``.
+        input_weights: Requested target weights. Required by ``TARGET_WEIGHTS`` and
+            ``VOLATILITY_NORMALIZED_WEIGHTS``.
+        vols: Annualized fractional volatility for each target weight. Required by
+            ``VOLATILITY_NORMALIZED_WEIGHTS`` and required to have exactly the same index,
+            columns, and column order as ``input_weights``. Warm-up NaNs are preserved.
 
     Returns:
         Per-instrument two-sided turnover on the input index. The first row is normally missing
@@ -128,13 +150,20 @@ def compute_turnover(
 
     Raises:
         TypeError: If a required input is not a pandas object of the expected type.
-        ValueError: If ``unit_notional`` does not contain every unit column or the computation
-            type is unsupported.
+        ValueError: If ``unit_notional`` does not contain every unit column, if ``vols`` is not
+            exactly aligned or contains negative values, or if the computation type is
+            unsupported.
     """
     computation_type = TurnoverComputationType(computation_type)
     if computation_type == TurnoverComputationType.TARGET_WEIGHTS:
         input_weights = _require_frame(input_weights, 'input_weights')
         return input_weights.diff(1).abs()
+
+    if computation_type == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS:
+        input_weights = _require_frame(input_weights, 'input_weights')
+        vols = _require_frame(vols, 'vols')
+        _validate_vols_alignment(input_weights=input_weights, vols=vols)
+        return input_weights.diff(1).abs().multiply(vols)
 
     units = _require_frame(units, 'units')
     unit_notional = _require_frame(unit_notional, 'unit_notional')

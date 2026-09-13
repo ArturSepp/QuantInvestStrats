@@ -1,9 +1,9 @@
 """Compare all turnover conventions for funded and leveraged Yahoo portfolios.
 
-The example holds a fixed 60/40 allocation to SPY and TLT and rebalances monthly. The first
-portfolio is 100% funded (60% + 40%); the second has 2x gross exposure (120% + 80%) and an
-implicit cash borrowing of 100% of NAV. Financing costs and trading costs are omitted so the
-turnover denominators are the only difference between the two cases.
+The example applies a simple six-month relative-strength tilt between SPY and TLT and rebalances
+monthly. The first portfolio is 100% funded; the second applies the same weights at 2x gross
+exposure and borrows 100% of NAV. Financing costs and trading costs are omitted so the turnover
+definitions are the only difference between the cases.
 """
 from typing import Dict, Tuple
 
@@ -41,17 +41,24 @@ def build_monthly_rebalanced_portfolio(
         prices: pd.DataFrame,
         gross_leverage: float,
         ) -> Tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
-    """Create monthly NAV, post-trade units, and fixed target weights.
+    """Create monthly NAV, post-trade units, and tactical target weights.
 
     Positions are rebalanced at each observed month end. Between month ends, the previous units
     and cash balance determine the next pre-trade NAV. The 2x portfolio borrows one NAV of cash;
     its financing return is deliberately zero in this turnover-only illustration.
+    The asset with the stronger trailing six-month return receives 70% and the other receives
+    30%. The first six observations use 60/40. Scaling by ``gross_leverage`` keeps the same signal
+    while changing only the capital leverage.
     """
-    target = gross_leverage * pd.Series([0.60, 0.40], index=prices.columns)
-    target_weights = pd.DataFrame(
-        [target.to_numpy()] * len(prices.index),
+    trailing_returns = prices.pct_change(6, fill_method=None)
+    has_signal = trailing_returns.notna().all(axis=1)
+    spy_is_stronger = trailing_returns['SPY'].ge(trailing_returns['TLT'])
+    spy_weight = pd.Series(0.60, index=prices.index)
+    spy_weight.loc[has_signal & spy_is_stronger] = 0.70
+    spy_weight.loc[has_signal & ~spy_is_stronger] = 0.30
+    target_weights = gross_leverage * pd.DataFrame(
+        {'SPY': spy_weight, 'TLT': 1.0 - spy_weight},
         index=prices.index,
-        columns=prices.columns,
     )
     units = pd.DataFrame(index=prices.index, columns=prices.columns, dtype=float)
     nav = pd.Series(index=prices.index, dtype=float, name=f'{gross_leverage:.0f}x NAV')
@@ -59,6 +66,7 @@ def build_monthly_rebalanced_portfolio(
     cash = INITIAL_NAV
     previous_units = pd.Series(0.0, index=prices.columns)
     for date, current_prices in prices.iterrows():
+        target = target_weights.loc[date]
         current_nav = cash + previous_units.dot(current_prices)
         current_units = current_nav * target.divide(current_prices)
 
@@ -79,6 +87,11 @@ def compute_convention_comparison(
         prices=prices,
         gross_leverage=gross_leverage,
     )
+    # The paper's sqrt(a) * sigma[t] input is annualized here with a=12.
+    annualized_vols = (
+        prices.pct_change(fill_method=None).ewm(span=12, adjust=False).std()
+        * (12.0 ** 0.5)
+    )
     results = {}
     for computation_type in qis.TurnoverComputationType:
         by_instrument = qis.compute_turnover(
@@ -87,6 +100,7 @@ def compute_convention_comparison(
             unit_notional=prices,
             nav=nav,
             input_weights=target_weights,
+            vols=annualized_vols,
         )
         results[computation_type.value] = by_instrument.sum(axis=1, min_count=1)
     return pd.DataFrame(results)
@@ -95,11 +109,11 @@ def compute_convention_comparison(
 def main() -> None:
     prices = fetch_monthly_prices()
     comparisons: Dict[str, pd.DataFrame] = {
-        '100% funded: 60% SPY + 40% TLT': compute_convention_comparison(
+        '100% funded tactical SPY/TLT': compute_convention_comparison(
             prices=prices,
             gross_leverage=1.0,
         ),
-        '2x leverage: 120% SPY + 80% TLT': compute_convention_comparison(
+        '2x leveraged tactical SPY/TLT': compute_convention_comparison(
             prices=prices,
             gross_leverage=2.0,
         ),

@@ -15,9 +15,11 @@ Conventions that hold module-wide:
 
     Turnover delegates to :func:`qis.compute_turnover`. Executed unit changes are valued with
         ``turnover_unit_notional`` rather than necessarily with return ``prices``. The default is
-        two-sided executed notional divided by nav; target-weight and gross-exposure conventions
-        are explicit ``TurnoverComputationType`` members. Turnover is summed over a rolling
-        ``roll_period``, 260 observations by default.
+        two-sided executed notional divided by nav; target-weight, gross-exposure, and
+        volatility-normalized target-weight conventions are explicit
+        ``TurnoverComputationType`` members. The volatility-normalized convention requires an
+        aligned panel of annualized volatilities and deliberately excludes drift and execution.
+        Turnover is summed over a rolling ``roll_period``, 260 observations by default.
 
     ``instrument_pnl`` is arithmetic and additive across instruments. When not supplied it is
         reconstructed as prices.pct_change() * weights.shift(1) with missing values filled to
@@ -129,7 +131,7 @@ class AttributionMetric(str, Enum):
     INST_PNL = 'Instrument P&L'
     COSTS = 'Instrument Total Costs'
     TURNOVER = 'Instrument Annualised Turnover'
-    VOL_ADJUSTED_TURNOVER = 'Instrument Annualised Vol-Adjusted Turnover'
+    VOL_ADJUSTED_TURNOVER = 'Instrument Annualised Volatility-Normalized Weight Turnover'
 
 
 class SnapshotPeriod(str, Enum):
@@ -515,6 +517,7 @@ class PortfolioData:
                      freq: Optional[str] = None,
                      is_unit_based_traded_volume: Optional[bool] = None,
                      turnover_computation_type: Optional[TurnoverComputationType] = None,
+                     vols: Optional[pd.DataFrame] = None,
                      **kwargs
                      ) -> Union[pd.DataFrame, pd.Series]:
         turnover_computation_type = resolve_turnover_computation_type(
@@ -522,12 +525,20 @@ class PortfolioData:
             computation_type=turnover_computation_type,
             is_unit_based_traded_volume=is_unit_based_traded_volume,
         )
+        if (is_vol_adjusted
+                and turnover_computation_type
+                == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS):
+            raise ValueError(
+                "is_vol_adjusted cannot be combined with "
+                "VOLATILITY_NORMALIZED_WEIGHTS"
+            )
         turnover = compute_turnover(
             computation_type=turnover_computation_type,
             units=self.units,
             unit_notional=self.turnover_unit_notional,
             nav=self.nav,
             input_weights=self.input_weights,
+            vols=vols,
         )
 
         if is_vol_adjusted:
@@ -742,6 +753,7 @@ class PortfolioData:
                                              TurnoverComputationType
                                          ] = None,
                                          is_unit_based_traded_volume: Optional[bool] = None,
+                                         vols: Optional[pd.DataFrame] = None,
                                          **kwargs
                                          ) -> Union[pd.DataFrame, pd.Series]:
         if attribution_metric == AttributionMetric.PNL:
@@ -767,15 +779,32 @@ class PortfolioData:
                                      add_total=False,
                                      turnover_computation_type=turnover_computation_type,
                                      is_unit_based_traded_volume=is_unit_based_traded_volume,
+                                     vols=vols,
                                      time_period=time_period)
             an = infer_annualisation_factor_from_df(data=data)
             data = an * data.mean(axis=0)
             # print(f"total turnover = {np.nansum(data)}")
         elif attribution_metric == AttributionMetric.VOL_ADJUSTED_TURNOVER:
+            if vols is None:
+                if not isinstance(self.input_weights, pd.DataFrame):
+                    raise TypeError(
+                        "input_weights must be a pandas DataFrame for volatility-normalized "
+                        "weight turnover"
+                    )
+                vols = compute_ewm_vol(
+                    data=qis.to_returns(self.prices, is_log_returns=True),
+                    span=33,
+                    annualize=True,
+                ).reindex(
+                    index=self.input_weights.index,
+                    columns=self.input_weights.columns,
+                )
             data = self.get_turnover(is_agg=False, is_grouped=False, roll_period=None,
-                                     add_total=False, is_vol_adjusted=True,
-                                     turnover_computation_type=turnover_computation_type,
-                                     is_unit_based_traded_volume=is_unit_based_traded_volume,
+                                     add_total=False,
+                                     turnover_computation_type=(
+                                         TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
+                                     ),
+                                     vols=vols,
                                      time_period=time_period)
             an = infer_annualisation_factor_from_df(data=data)
             data = an * data.mean(axis=0)
@@ -819,6 +848,54 @@ class PortfolioData:
             data = data.rename(index=self.tickers_to_names_map)
 
         return data
+
+    def get_brinson_inputs(
+            self, time_period: Optional[TimePeriod] = None,
+            freq: Optional[str] = 'ME', is_net: bool = False,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Return instrument contributions and prior holdings for Brinson attribution.
+
+        Start from the full stored arithmetic instrument P&L before slicing, so the first
+        requested return retains its preceding NAV/holding observation. With is_net=True,
+        deduct each realised trading cost divided by the preceding NAV, exactly once.
+        Management fees and cash funding are not instrument trading costs and are not added.
+        Coarser-period contributions compound using within-period portfolio wealth;
+        prior weights are averaged within the period. Those averages are effective
+        exposures, not weights held constant throughout a month. For exact allocation
+        effects across intra-period trades, use native inputs (freq=None), compute
+        Brinson and only then aggregate its linked effect increments. Contributions
+        reconcile to NAV returns when fees/funding are zero and is_net=True.
+
+        Args:
+            time_period: Return dates to include, excluding the NAV baseline.
+            freq: Optional aggregation frequency; None keeps the native observations.
+            is_net: Include realised trading-cost drag by instrument.
+
+        Returns:
+            Arithmetic instrument return contributions and their applied weight panel.
+        """
+        # get_instruments_pnl(is_net=True) uses rolling current-NAV costs; Brinson needs
+        # individual realised costs on the same preceding-NAV basis as arithmetic returns.
+        pnl = self.get_instruments_pnl(is_net=False)
+        weights = self.weights.shift(1)
+        if is_net:
+            previous_nav = self.nav.shift(1)
+            costs = self.get_costs(
+                add_total=False, is_unit_based_traded_volume=False, roll_period=None)
+            pnl = pnl - costs.div(previous_nav, axis=0)
+        # The initial NAV is a baseline, not a realised return; never manufacture its weight.
+        pnl = pnl.iloc[1:]
+        weights = weights.reindex(pnl.index)
+        if time_period is not None:
+            pnl = time_period.locate(pnl)
+            weights = time_period.locate(weights)
+        if freq is not None:
+            # Chain contributions on beginning-of-native-period wealth within each bin.
+            growth = (1.0 + pnl.sum(axis=1)).groupby(pd.Grouper(freq=freq)).cumprod()
+            prior = growth.groupby(pd.Grouper(freq=freq)).shift(1).fillna(1.0)
+            pnl = pnl.mul(prior, axis=0).resample(freq).sum(min_count=1)
+            weights = weights.resample(freq).mean()
+        return pnl, weights
 
     def _get_attribution_table_by_instrument_canonical(self,
                                                        time_period: TimePeriod = None,
@@ -1422,6 +1499,11 @@ class PortfolioData:
                                      max_bars: Optional[int] = None,
                                      fontsize: float = 10,
                                      ax: plt.Subplot = None,
+                                     turnover_computation_type: Optional[
+                                         TurnoverComputationType
+                                     ] = None,
+                                     is_unit_based_traded_volume: Optional[bool] = None,
+                                     vols: Optional[pd.DataFrame] = None,
                                      **kwargs
                                      ) -> None:
         """
@@ -1449,10 +1531,20 @@ class PortfolioData:
                 that reads today is untouched. 0 disables the reduction and plots everything
             fontsize: tick label font size, which sets how many labels the panel holds
             ax: axis to draw on
+            turnover_computation_type: turnover convention for turnover attribution
+            is_unit_based_traded_volume: deprecated turnover selector
+            vols: annualized volatility panel for volatility-normalized weight turnover
             **kwargs: forwarded to :func:`qis.plot_bars`
         """
         data = self.get_performance_attribution_data(attribution_metric=attribution_metric,
                                                      time_period=time_period,
+                                                     turnover_computation_type=(
+                                                         turnover_computation_type
+                                                     ),
+                                                     is_unit_based_traded_volume=(
+                                                         is_unit_based_traded_volume
+                                                     ),
+                                                     vols=vols,
                                                      **kwargs)
         if remove_zero_data:
             # data = data.replace({0.0: np.nan}).dropna()
@@ -1820,6 +1912,7 @@ class PortfolioData:
                           TurnoverComputationType
                       ] = None,
                       is_unit_based_traded_volume: Optional[bool] = None,
+                      vols: Optional[pd.DataFrame] = None,
                       **kwargs
                       ) -> None:
         turnover = self.get_turnover(is_agg=is_agg,
@@ -1832,12 +1925,27 @@ class PortfolioData:
                                      freq=freq_turnover,
                                      turnover_computation_type=turnover_computation_type,
                                      is_unit_based_traded_volume=is_unit_based_traded_volume,
+                                     vols=vols,
                                      **kwargs)
         if not turnover.empty:
             freq = pd.infer_freq(turnover.index)
+            is_volatility_normalized = (
+                turnover_computation_type
+                == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
+                or (
+                    turnover_computation_type is None
+                    and is_unit_based_traded_volume is None
+                    and self.turnover_computation_type
+                    == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
+                )
+            )
+            turnover_label = (
+                'Volatility-Normalized Weight Turnover'
+                if is_volatility_normalized else 'Two-sided Turnover'
+            )
             turnover_title = (
                 title
-                or f"{turnover_rolling_period}-period rolling {freq}-freq Two-sided Turnover"
+                or f"{turnover_rolling_period}-period rolling {freq}-freq {turnover_label}"
             )
             qis.plot_time_series(df=turnover,
                                  var_format='{:,.1%}',

@@ -64,6 +64,11 @@ the numerator. Gross-normalized turnover is a separate book-replacement diagnost
 intentionally scales away leverage; see the site guide `docs/turnover_conventions.md` for the
 formulas and use cases.
 
+The separate `VOLATILITY_NORMALIZED_WEIGHTS` convention is theoretical: annualized instrument
+volatility times absolute target-weight change. It excludes drift and execution turnover and
+requires an annualized volatility panel aligned exactly with the target weights. It follows
+Definition 4.5 of Sepp and Lucic (2026), arXiv:2607.19497.
+
 ## The up-sampling guard
 
 Before rendering, every factsheet validates the input series against the requested reporting

@@ -1,40 +1,87 @@
-# qis 5.9.2 — removed from the public API
-
-| symbol | replacement or reason |
-| --- | --- |
-| `qis.PerfStat.TE` | Labels are now literal strings in `compute_te_ir_errors`. |
-| `qis.PerfStat.IR` | Labels are now literal strings in `compute_te_ir_errors`. |
-| `qis.TRE_TABLE_COLUMNS` | None — the spec requested statistics no qis table builder fills, and `get_ra_perf_columns` silently dropped them. |
-
+---
+myst:
+  html_meta:
+    description: >-
+      Historical qis API removals and renames, practical upgrade checks, and
+      a current module-import reference for legacy helper calls.
 ---
 
-# qis 5.0 — removed from the public namespace
+# API migration history
 
-**568 -> 373 public symbols.** At the 5.0 transition, nothing was deleted unless listed under
-*Deleted* below: the top-level `qis` namespace was reduced, and every other symbol remained
-importable from its defining module. Two subsequently unused deep-import helpers are also recorded
-below.
+*[author / affiliation / date — placeholder]*
 
-```python
-qis.set_spines(ax)                        # 4.x  -> AttributeError in 5.0
+This guide accompanies [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
-from qis.plots.utils import set_spines    # 5.0
+The version sections record historical changes; the module reference below lists imports that
+resolve in the current source. Later releases may restore a public export or remove an internal
+helper. Use the [changelog](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CHANGELOG.md)
+for the transition you are making and `qis.__all__` for the current public surface.
+
+## Upgrade checks
+
+Record the version and import path as shown in the [installation guide](install.md).
+Then check a specific public name without importing every submodule:
+
+~~~python
+import qis
+
+name = 'df_nanmean'
+assert name in qis.__all__
+print(name, 'is exported by the imported qis package')
+~~~
+
+The [API reference](api/index.rst) and
+[public API record](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/api.py)
+locate supported operations. For an internal helper, search its definition in a source checkout,
+then import the identified module. For example:
+
+~~~console
+rg -n "^def set_spines" src/qis
+~~~
+
+Avoid a recursive import scan: it executes module-level code and can reach optional backends
+or development diagnostics. A name's presence in a module does not give it the compatibility
+status of a top-level public export.
+
+## qis 5.9.2 — removed from the public API
+
+| Historical symbol | Replacement or reason |
+|---|---|
+| `qis.PerfStat.TE` | `compute_te_ir_errors` returns a Series named `'TE'`; the former enum member was removed. |
+| `qis.PerfStat.IR` | `compute_te_ir_errors` returns a Series named `'IR'`; the former enum member was removed. |
+| `qis.TRE_TABLE_COLUMNS` | Removed without a replacement; the requested statistics were not filled by the table builder. |
+
+These removals are recorded in the
+[5.9.2 changelog](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CHANGELOG.md#592---2026-08-09).
+For the current calculation contract, see [tracking error and information ratio](tracking_error_and_risk.md).
+
+## qis 5.0 — removed from the public namespace
+
+The 5.0 changelog records a reduction from **568 to 373 public symbols**. Those are historical
+counts, not the size of the current API. Many helper implementations remained importable from
+their defining module, while renamed and deleted operations required separate changes.
+
+For example, legacy code using `qis.set_spines(ax)` can import the plotting helper explicitly.
+This complete example creates its own axes and closes the figure:
+
+~~~python
+import matplotlib.pyplot as plt
+
+from qis.plots.utils import set_spines
+
+figure, ax = plt.subplots()
+ax.plot([0, 1], [0, 1])
 set_spines(ax)
-```
+figure.canvas.draw()
+plt.close(figure)
+~~~
 
-To locate any symbol not listed here:
-
-```bash
-python -c "import qis, pkgutil, importlib; [print(m.name) for m in pkgutil.walk_packages(qis.__path__, 'qis.') if hasattr(importlib.import_module(m.name), 'YOUR_SYMBOL')]"
-```
-
----
-
-## 1. Renamed (breaking, no shim)
+### 1. Renamed (breaking, no shim)
 
 `qis.nanmean` / `nanmedian` / `nansum` shadowed the numpy names while carrying different
 semantics: DataFrame in, Series out, non-finite entries excluded, and `axis=1` by default
-(the opposite of pandas). The whole module is renamed for consistency.
+(the opposite of pandas). The aggregation functions were renamed for consistency; the module remains `qis.utils.df_agg`.
 
 | 4.x | 5.0 |
 | --- | --- |
@@ -54,67 +101,81 @@ semantics: DataFrame in, Series out, non-finite entries excluded, and `axis=1` b
 | `qis.sum_weighted` | `qis.series_nansum_weighted` |
 | `qis.get_signed_np_data` | `qis.utils.df_agg._get_signed_np_data (private)` |
 
-`sum_weighted` takes two `pd.Series` and returns a `float`, so it is not prefixed `df_`.
-Its first parameter is renamed from `df` to `data`.
+`sum_weighted` takes two `pd.Series` and returns a `float`, so its replacement is not
+prefixed `df_`. Its first parameter changed from `df` to `data`. `df_last_row` is also an
+exception to the Series-returning aggregation pattern: it returns an array and defaults to
+`axis=0`, taking each column's last nonmissing value with `is_nonan=True`. Check each operation's
+signature rather than applying one rule to the entire table.
 
 ---
 
-## 2. Deleted
+### 2. Deleted
 
-| symbol | note |
+| Removed symbol | Module and migration note |
 | --- | --- |
-| `qis.ReportType` | module `qis.plots.reports.utils` deleted |
-| `qis.df_price_fill_first_nan_by_cross_median` | deleted; use `qis.utils.df_ops.df_fill_first_nan_by_cross_median` |
-| `qis.econ_data_report` | module `qis.plots.reports.econ_data_single` deleted |
-| `qis.replace_nan_by_median` | deleted; no replacement |
-| `qis.utils.df_ops.norm_df_by_ax_mean` | deleted after 5.19; unused |
-| `qis.utils.np_ops.select_non_nan_x_y` | deleted after 5.19; OLS paths use `qis.utils.regression.filter_x_y` |
-| `qis.plots.contour.contour_multi` | deleted after 5.19; unused and its defaults were invalid |
-| `qis.plots.utils.validate_returns_plot` | deleted after 5.19; unused |
-| `qis.plots.utils.align_x_limits_ax12` | deleted after 5.19; use `align_x_limits_axs` |
-| `qis.plots.utils.get_n_mlt_colors` | deleted after 5.19; use the active palette helpers |
-| `qis.plots.table.set_column_edge_color` | deleted after 5.19; unused |
-| `qis.portfolio.reports.strategy_benchmark_tre_factsheet.plot_exposures_long_short_groups` | deleted after 5.19; unused |
-| `qis.utils.df_ops.dfs_indicators` | deleted after 5.19; unused |
-| `qis.utils.df_ops.factor_dict_to_asset_dict` | deleted after 5.19; unused |
-| `qis.utils.df_ops.df_time_dict_to_pd` | deleted after 5.19; unused |
-| `qis.utils.df_ops.dfs_to_upper_lower_diag` | deleted after 5.19; unused |
-| `qis.utils.df_ops.df12_merge_with_tz` | deleted after 5.19; unused |
-| `qis.utils.np_ops.np_matrix_add_array` | deleted after 5.19; unused and dimensionally defective |
-| `qis.utils.np_ops.to_nearest_values` | deleted after 5.19; unused |
-| `qis.utils.struct_ops.split_dict` | deleted after 5.19; unused |
-| `qis.utils.dates.shift_time_period_by_days` | deleted after 5.19; unused |
-| `qis.utils.dates.get_month_days` | deleted after 5.19; use `calendar.monthrange` |
-| `qis.utils.dates.months_between` | deleted after 5.19; unused and incomplete |
-| `qis.utils.dates.min_timestamp` | deleted after 5.19; unused |
-| `qis.utils.df_to_weights.WeightMethod` | deleted after 5.19 with its sole consumer |
-| `qis.utils.df_to_weights.compute_long_only_portfolio_weights` | deleted after 5.19; use the supported allocation helpers |
-| `qis.utils.df_to_weights.fill_long_short_signal` | deleted after 5.19 with its defective callers |
-| `qis.utils.df_to_weights.compute_long_short_ind_by_row` | deleted after 5.19; use `df_to_top_bottom_n_indicators` |
-| `qis.utils.df_to_weights.compute_long_short_ind` | deleted after 5.19; use `df_to_top_bottom_n_indicators` |
+| `ReportType` | `qis` export; module `qis.plots.reports.utils` deleted |
+| `df_price_fill_first_nan_by_cross_median` | `qis` export; deleted; use `qis.utils.df_ops.df_fill_first_nan_by_cross_median` |
+| `econ_data_report` | `qis` export; module `qis.plots.reports.econ_data_single` deleted |
+| `replace_nan_by_median` | `qis` export; deleted; no replacement |
+| `norm_df_by_ax_mean` | `qis.utils.df_ops`; deleted after 5.19; unused |
+| `get_data_samples_df` | `qis.utils.sampling`; deleted after 5.19; no direct replacement |
+| `split_to_train_live_samples` | `qis.utils.sampling`; deleted after 5.19; no direct replacement |
+| `select_non_nan_x_y` | `qis.utils.np_ops`; deleted after 5.19; OLS paths use `qis.utils.regression.filter_x_y` |
+| `contour_multi` | `qis.plots.contour`; deleted after 5.19; unused and its defaults were invalid |
+| `validate_returns_plot` | `qis.plots.utils`; deleted after 5.19; unused |
+| `align_x_limits_ax12` | `qis.plots.utils`; deleted after 5.19; use `align_x_limits_axs` |
+| `get_n_mlt_colors` | `qis.plots.utils`; deleted after 5.19; use the active palette helpers |
+| `set_column_edge_color` | `qis.plots.table`; deleted after 5.19; unused |
+| `plot_exposures_long_short_groups` | `qis.portfolio.reports.strategy_benchmark_tre_factsheet`; deleted after 5.19; unused |
+| `dfs_indicators` | `qis.utils.df_ops`; deleted after 5.19; unused |
+| `factor_dict_to_asset_dict` | `qis.utils.df_ops`; deleted after 5.19; unused |
+| `df_time_dict_to_pd` | `qis.utils.df_ops`; deleted after 5.19; unused |
+| `dfs_to_upper_lower_diag` | `qis.utils.df_ops`; deleted after 5.19; unused |
+| `df12_merge_with_tz` | `qis.utils.df_ops`; deleted after 5.19; unused |
+| `np_matrix_add_array` | `qis.utils.np_ops`; deleted after 5.19; unused and dimensionally defective |
+| `to_nearest_values` | `qis.utils.np_ops`; deleted after 5.19; unused |
+| `split_dict` | `qis.utils.struct_ops`; deleted after 5.19; unused |
+| `shift_time_period_by_days` | `qis.utils.dates`; deleted after 5.19; unused |
+| `get_month_days` | `qis.utils.dates`; deleted after 5.19; use `calendar.monthrange` |
+| `months_between` | `qis.utils.dates`; deleted after 5.19; unused and incomplete |
+| `min_timestamp` | `qis.utils.dates`; deleted after 5.19; unused |
+| `WeightMethod` | `qis.utils.df_to_weights`; deleted after 5.19 with its sole consumer |
+| `compute_long_only_portfolio_weights` | `qis.utils.df_to_weights`; deleted after 5.19; use the supported allocation helpers |
+| `fill_long_short_signal` | `qis.utils.df_to_weights`; deleted after 5.19 with its defective callers |
+| `compute_long_short_ind_by_row` | `qis.utils.df_to_weights`; deleted after 5.19; use `df_to_top_bottom_n_indicators` |
+| `compute_long_short_ind` | `qis.utils.df_to_weights`; deleted after 5.19; use `df_to_top_bottom_n_indicators` |
+
+This table also records later removals after 5.19. `split_to_samples` remains a calendar-period
+slicer; it is not an equivalent train/live splitter.
 
 `qis/plots/reports/` is removed. `price_history.py` and `gantt_data_history.py` moved to
 `qis/plots/derived/`; `econ_data_single.py` and `reports/utils.py` are deleted.
 `qis.plots.derived.gantt_data_history` is not imported by `qis/plots/__init__.py`
-because it requires plotly, which is not a qis dependency. Import it by full path.
+because Plotly is optional. That module requires the `visualization` extra; import it by full path.
 
 ---
 
-## 3. Example code, never API
+### 3. Example code, never API
 
 | symbol | file |
 | --- | --- |
-| `qis.DEFAULT_RA_TABLE_COLUMNS` | `qis/examples/_helpers/reporting_helpers.py` |
-| `qis.generate_performance_report` | `qis/examples/_helpers/reporting_helpers.py` |
-| `qis.load_usd_assets` | `qis/examples/market_data/fx_hedging_example.py` |
+| `qis.DEFAULT_RA_TABLE_COLUMNS` | [examples/_helpers/reporting_helpers.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/_helpers/reporting_helpers.py) |
+| `qis.generate_performance_report` | Same reporting example helper. |
+| `qis.load_usd_assets` | [examples/market_data/fx_hedging_example.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_hedging_example.py) |
 
-Do not import from `qis/examples/`. It is documentation and is restructured without notice.
+These helpers now live under the repository's `examples/` tree, outside the installed
+package. They demonstrate workflows and may be reorganised; do not use them as production APIs.
 
 ---
 
-## 4. Moved out of the namespace (206 symbols)
+<a id="4-moved-out-of-the-namespace-206-symbols"></a>
 
-Grouped by the module to import from.
+## Current module import reference
+
+These grouped imports resolve in the current source. Some names have since returned to
+`qis.__all__`; their module paths remain usable. Other entries are internal helpers whose
+compatibility is governed by the changelog rather than a promise of a stable top-level API.
+The list is a migration aid, not a count of the present public namespace.
 
 ### `qis.plots.utils` (42)
 
@@ -338,15 +399,16 @@ from qis.utils.df_groups import (
 )
 ```
 
-### `qis.perfstats.config` (5)
+<a id="qisperfstatsconfig-5"></a>
+
+### `qis.perfstats.config` (4)
 
 ```python
 from qis.perfstats.config import (
     FULL_TABLE_COLUMNS,  # const
     RA_TABLE_COLUMNS,  # const
     RA_TABLE_COMPACT_COLUMNS,  # const
-    SD_PERF_COLUMNS,  # const
-    TRE_TABLE_COLUMNS  # const
+    SD_PERF_COLUMNS  # const
 )
 ```
 
@@ -424,13 +486,13 @@ from qis.utils.df_to_scores import (
 )
 ```
 
-### `qis.utils.sampling` (3)
+<a id="qisutilssampling-3"></a>
+
+### `qis.utils.sampling` (1)
 
 ```python
 from qis.utils.sampling import (
-    get_data_samples_df,
-    split_to_samples,
-    split_to_train_live_samples
+    split_to_samples
 )
 ```
 
@@ -474,3 +536,11 @@ from qis.plots.derived.returns_heatmap import (
     compute_periodic_returns_by_row_table
 )
 ```
+
+## References
+
+- qis contributors. [Release changelog](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CHANGELOG.md),
+  [public API record](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/api.py),
+  and [current source tree](https://github.com/ArturSepp/QuantInvestStrats/tree/main/src/qis).
+- Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet
+  reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

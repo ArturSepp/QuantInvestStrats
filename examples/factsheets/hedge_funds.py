@@ -62,14 +62,14 @@ def run_em() -> pd.DataFrame:
     return prices
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     HEDGE_FUNDS = 1
     ILS = 2
     RE = 3
     EM = 4
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -80,19 +80,19 @@ def run_local_test(local_test: LocalTests):
     pd.set_option('display.width', 1000)
 
 
-    if local_test == LocalTests.HEDGE_FUNDS:
+    if local == Locals.HEDGE_FUNDS:
         prices = run_hedge_funds()
         time_period = qis.TimePeriod('31Dec2004', '30Sep2025')
 
-    elif local_test == LocalTests.ILS:
+    elif local == Locals.ILS:
         prices = run_ils()
         time_period = qis.TimePeriod('31Dec2014', '30Sep2025')
 
-    elif local_test == LocalTests.RE:
+    elif local == Locals.RE:
         prices = run_re()
         time_period = qis.TimePeriod('31Dec2014', '30Sep2025')
 
-    elif local_test == LocalTests.EM:
+    elif local == Locals.EM:
         prices = run_em()
         time_period = qis.TimePeriod('31Dec2014', '30Sep2025')
 
@@ -116,4 +116,4 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.EM)
+    run_local(local=Locals.EM)

@@ -117,7 +117,7 @@ def fetch_usd_assets_from_bloomberg(start_date: pd.Timestamp = pd.Timestamp('31D
                                               start_date=start_date).ffill()
 
 
-class LocalTests(Enum):
+class Locals(Enum):
     SHOW_FX_DATA = 1
     CROSS_RATES = 2
     FX_TOTAL_RETURN_NAVS = 3
@@ -128,34 +128,34 @@ class LocalTests(Enum):
     MULTI_ASSET_REPORT = 8
 
 
-def run_local_test(local_test: LocalTests):
+def run_local(local: Locals):
     """Illustrate the FxRatesData container built from Bloomberg data."""
     pd.set_option('display.max_columns', 50)
     pd.set_option('display.width', 1000)
 
     fx_rates_data = fetch_fx_rates_data_from_bloomberg()
 
-    if local_test == LocalTests.SHOW_FX_DATA:
+    if local == Locals.SHOW_FX_DATA:
         print("fx_spots — units of USD per 1 unit of local ccy (USD pinned to 1.0):")
         print(fx_rates_data.fx_spots.tail())
         print("\ndomestic_rates — short rates as decimals (3M, overnight for SGD):")
         print(fx_rates_data.domestic_rates.tail())
 
-    elif local_test == LocalTests.CROSS_RATES:
+    elif local == Locals.CROSS_RATES:
         # cross rate = units of reference ccy per 1 unit of local ccy
         crosses = pd.concat([fx_rates_data.get_local_to_reference_fx_rate(local_ccy=l, reference_ccy=r)
                              for l, r in (('EUR', 'CHF'), ('GBP', 'USD'), ('EUR', 'GBP'))], axis=1)
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
         qis.plot_prices(prices=crosses, ax=ax, title='FX cross rates (reference per local)')
 
-    elif local_test == LocalTests.FX_TOTAL_RETURN_NAVS:
+    elif local == Locals.FX_TOTAL_RETURN_NAVS:
         # spot move + carry, as a total-return NAV for each pair vs USD
         navs = pd.concat([fx_rates_data.get_fx_total_return_nav(local_ccy=l, reference_ccy='USD')
                           for l in ('EUR', 'GBP', 'CHF', 'JPY', 'AUD')], axis=1)
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
         qis.plot_prices(prices=navs, ax=ax, title='FX total-return NAVs vs USD (spot + carry)')
 
-    elif local_test == LocalTests.CARRY_FORWARD_PREMIUM:
+    elif local == Locals.CARRY_FORWARD_PREMIUM:
         # annualised CIP forward premium of each ccy vs USD (per-period rate * periods-per-year)
         ppy = qis.get_annualization_factor(FREQ)
         premia = pd.concat([fx_rates_data.get_forward_rate_for_local_ccy(local_ccy=l, reference_ccy='USD', freq=FREQ) * ppy
@@ -165,14 +165,14 @@ def run_local_test(local_test: LocalTests):
         ax.set_title('Annualised CIP forward premium vs USD (real 3M rates)')
         ax.axhline(0.0, color='black', lw=0.5)
 
-    elif local_test == LocalTests.CASH_NAVS:
+    elif local == Locals.CASH_NAVS:
         # money-market NAV compounding each local short rate
         cash = pd.concat([fx_rates_data.build_local_cash_nav(local_ccy=c, freq='B')
                           for c in ('USD', 'EUR', 'CHF', 'JPY')], axis=1)
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
         qis.plot_prices(prices=cash, ax=ax, title='Money-market cash NAVs by currency')
 
-    elif local_test == LocalTests.TRANSLATE_ASSET_PANEL:
+    elif local == Locals.TRANSLATE_ASSET_PANEL:
         # translate the USD benchmark panel into a CHF investor's frame, unhedged vs fully hedged
         assets = fetch_usd_assets_from_bloomberg()
         local_ccys = pd.Series('USD', index=assets.columns)
@@ -189,14 +189,14 @@ def run_local_test(local_test: LocalTests):
         print(f"unhedged-in-{REFERENCE_CCY} NAVs (tail):\n", navs_unhedged.tail())
         print(f"\nhedged-in-{REFERENCE_CCY} NAVs (tail):\n", navs_hedged.tail())
 
-    elif local_test == LocalTests.ASSET_HEDGE_REPORT:
+    elif local == Locals.ASSET_HEDGE_REPORT:
         # single-asset hedging tearsheet for USD Equities viewed in CHF
         assets = fetch_usd_assets_from_bloomberg()
         run_asset_fx_hedging_report(asset_price_local_ccy=assets['Equities'], fx_rates_data=fx_rates_data,
                                     local_ccy='USD', reference_ccy=REFERENCE_CCY,
                                     time_period=qis.TimePeriod('31Dec2005', assets.index[-1]))
 
-    elif local_test == LocalTests.MULTI_ASSET_REPORT:
+    elif local == Locals.MULTI_ASSET_REPORT:
         # multi-asset hedging heatmap report across the USD benchmark panel viewed in CHF
         assets = fetch_usd_assets_from_bloomberg()
         plot_multi_asset_fx_hedging_report(asset_prices=assets, fx_rates_data=fx_rates_data,
@@ -206,6 +206,6 @@ def run_local_test(local_test: LocalTests):
 
 if __name__ == '__main__':
 
-    run_local_test(local_test=LocalTests.SHOW_FX_DATA)
+    run_local(local=Locals.SHOW_FX_DATA)
 
     plt.show()

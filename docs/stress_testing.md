@@ -8,6 +8,17 @@ myst:
 
 # Factor stress testing: shocks, valuation and prediction bands
 
+*[author / affiliation / date — placeholder]*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
+Factor stress testing evaluates portfolio exposures under specified factor moves. A conditional
+scenario additionally assigns co-moves to factors whose shocks were not fixed. Its valuation
+centre and its uncertainty band answer separate questions.
+
+## Overview
+
 `qis.portfolio.risk.stress_testing` turns an assigned factor model and current holdings into
 portfolio stress results. It separates the specified market move, the implied co-moves of other
 factors, exact valuation under frozen log-return loadings, and uncertainty around that valuation.
@@ -15,9 +26,12 @@ factors, exact valuation under frozen log-return loadings, and uncertainty aroun
 The functions are also exported directly from `qis`. They require no particular model provider,
 optimiser, asset taxonomy or data vendor. The caller supplies the fitted snapshot, chooses the
 stress anchors and owns their economic interpretation. This guide describes the API added in
-5.24.0. Its runnable source is `examples/portfolios/factor_stress_testing.py`.
+5.24.0. Its runnable source is the
+[offline factor-stress example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/factor_stress_testing.py).
 
-## Inputs, dimensions and units
+<a id="inputs-dimensions-and-units"></a>
+
+## Inputs, notation, and assumptions
 
 Let $n$ be the number of assets, $k$ the number of factors and $m$ the number of scenarios.
 
@@ -33,6 +47,11 @@ Let $n$ be the number of assets, $k$ the number of factors and $m$ the number of
 | `horizon_years`, $T$ | Positive scalar | One month is $1/12$ |
 | `confidence`, $c$ | Scalar strictly between zero and one | 95% is `0.95` |
 
+Let $w_i=a_i/N$ be the signed portfolio weight and $R_s$ the simple NAV return under scenario $s$.
+In the method below, $A$ and $F$ index anchored and free factors; $C$ is conditional factor
+covariance, $\Omega_{\mid A}$ is conditional asset covariance, $e$ is the factor exposure vector,
+and $v$ is annual portfolio variance. The subscript $F$ denotes free factors, not a forward price.
+
 Weights are $w_i=a_i/N$. They are **not renormalised** to net or gross exposure.
 Every modelled asset must have a loading row, even when that row is all zero.
 A zero-loading cash position still needs an explicit residual variance, normally zero.
@@ -47,25 +66,11 @@ Factor definitions matter. A bond-factor return is not a yield change, a credit-
 is not a spread change, and an FX return must use the assigned quote direction. A commodity
 spot target is not automatically a rolling-futures factor target when their bases differ.
 
-## Public entry points
+## Methodology
 
-| Function | Purpose | Result |
-|---|---|---|
-| `price_target_log_shock` | Positive price endpoints to a log shock | Scalar |
-| `return_log_shock` | Simple underlying return and fixed exposure to a log shock | Scalar |
-| `duration_log_shock` | Decimal yield move and duration to a log shock | Scalar |
-| `conditional_factor_shock` | Jointly condition free factors on explicit anchors | Full ordered Series |
-| `conditional_factor_covariance` | Remove uncertainty in fixed factors | Full ordered DataFrame |
-| `project_factor_scenarios` | Value holdings and allocate P&L | `FactorScenarioProjection` |
-| `compute_conditional_scenario_band` | Add conditional-factor and residual risk around supplied centres | `ConditionalScenarioBand` |
-| `compute_factor_sensitivity` | Run a supplied joint-anchor grid through all three steps | `FactorSensitivityResult` |
+### 1. Convert the requested market move
 
-See the [generated API reference](api/index.rst) for signatures and defaults.
-The shipped concise note is {doc}`_included/stress_testing`.
-
-## 1. Convert the requested market move
-
-### Price target
+#### Price target
 
 For positive current price $P_0$ and target $P_1$,
 
@@ -77,7 +82,7 @@ $$
 $z=\log(1.2)\approx0.182322$. Both endpoints must be positive and expressed in identical units.
 The example uses synthetic price anchors, not current market quotes.
 
-### Simple return and fixed exposure
+#### Simple return and fixed exposure
 
 With simple underlying return $r$ and fixed effective exposure $h$,
 
@@ -90,7 +95,7 @@ For a partially invested basket, `effective_weight` explicitly supplies $h$;
 the uninvested part has zero instantaneous carry. This is a frozen exposure conversion:
 it does not rerun volatility targeting, rebalancing or dynamic leverage.
 
-### Duration and yield changes
+#### Duration and yield changes
 
 With nonnegative effective duration $D$ and decimal yield change $\Delta y$,
 
@@ -111,10 +116,10 @@ These signs follow the generic duration convention. An externally calibrated sce
 can imply a different vector; supply that explicit vector to valuation and label its source.
 There is no implicit duration-eight default in qis, no convexity term, and no yield-level lookup.
 
-## 2. Construct joint correlated shocks
+### 2. Construct joint correlated shocks
 
 Partition the factors into anchored factors $A$ and free factors $F$. Anchors are the specified
-log moves $z_A$. Under a zero-mean factor model, the conditional mean of the free factors is
+log moves $z_A$. Under a zero-mean jointly Gaussian factor model, the conditional mean of the free factors is
 
 $$
 \begin{aligned}
@@ -140,37 +145,30 @@ $$
 =\rho_{ij}\frac{\sigma_i}{\sigma_j}z_j.
 $$
 
+The Gaussian conditioning result is derived in [Geyer (2019), slides 136–140](https://www.stat.umn.edu/geyer/s19/5101/slides/s5.pdf).
+Without joint normality, the same covariance regression gives a linear projection; a covariance
+matrix alone does not determine a general nonlinear conditional expectation.
+
 Correlation alone is insufficient: the volatility ratio determines shock magnitude.
 If annual equity volatility is 20%, rates volatility is 10%, and their correlation is $-0.4$,
 an equity shock $\log(0.8)$ implies rates log shock $-0.2\log(0.8)=0.044629$,
 or approximately **+4.56%** in simple returns.
 
-An omitted factor is free; an explicitly supplied zero is fixed. Compare:
-
-~~~python
-equity_only = qis.conditional_factor_shock(covariance, {"Equity": qis.return_log_shock(-.20)})
-rates_fixed = qis.conditional_factor_shock(
-    covariance, {"Equity": qis.return_log_shock(-.20), "Rates": 0.0})
-~~~
-
-The second call fixes rates at zero and jointly conditions all other factors on both constraints.
-The first lets rates respond. A zero in a full scenario DataFrame is an actual zero shock;
+An omitted factor is free; an explicitly supplied zero is fixed. An anchor mapping containing
+only `"Equity"` leaves rates free. Adding `"Rates": 0.0` fixes rates as well and jointly conditions
+other factors on both constraints. The complete example below executes both cases.
+A zero in a full scenario DataFrame is an actual zero shock;
 valuation does not reinterpret it as a missing anchor.
 
-### Multiple credit anchors
+#### Multiple credit anchors
 
-For two credit factors, pass both anchors in **one** call:
-
-~~~python
-credit = qis.conditional_factor_shock(
-    covariance,
-    {"Credit IG": qis.return_log_shock(-.10), "Credit HY": qis.return_log_shock(-.10)})
-~~~
+For two credit factors, supply both `"Credit IG"` and `"Credit HY"` in **one** anchor mapping, each with log
+shock `qis.return_log_shock(-0.10)`. The canonical five-factor example below demonstrates this call.
 
 Adding two single-anchor conditional vectors generally double-counts dependence and need not
 preserve either requested anchor. The joint solve accounts for dependence within $A$.
 
-### Direct, correlated and historical scenarios
+#### Direct, correlated and historical scenarios
 
 A **direct** scenario fills all unspecified factor returns with zero. A **correlated** scenario
 fills free factors using the joint-conditioning formula above.
@@ -181,7 +179,7 @@ A historical scenario already supplies a complete realised factor vector. Pass t
 directly to `project_factor_scenarios`; do not condition them again. Historical-month selection,
 ranking and point-in-time covariance selection remain caller decisions.
 
-## 3. Reprice assets and reconcile attribution
+### 3. Reprice assets and reconcile attribution
 
 For scenario $s$ and asset $i$, the modelled asset log return, simple return and currency P&L are
 
@@ -236,7 +234,7 @@ be unstable around zero. Top-ten tables should retain an “other” remainder i
 `FactorScenarioProjection` contains `asset_pnl`, `factor_attribution` and
 `asset_log_returns`. It does not choose company labels or truncate contributors.
 
-## 4. Compute conditional covariance
+### 4. Compute conditional covariance
 
 Holding the anchored factors fixed removes their uncertainty. The free-factor covariance is
 the Schur complement
@@ -257,7 +255,7 @@ In the two-factor example above, equity held fixed leaves rates annual variance
 $0.10^2(1-(-0.4)^2)=0.0084$, hence conditional annual rates volatility about **9.17%**.
 Zeroing all free-factor covariance would retain only idiosyncratic risk and yield a narrower band.
 
-## 5. Add analytical prediction bands
+### 5. Add analytical prediction bands
 
 The conditional asset covariance, baseline portfolio exposures and annual variance are
 
@@ -290,22 +288,89 @@ and annual portfolio idiosyncratic volatility 2%. Annual conditional variance is
 $0.5^2(0.0084)+0.02^2=0.0025$. Total annual conditional volatility is 5% and the
 one-month 95% half-width is approximately **2.83% of NAV**.
 
-### Interpretation and limits
+## Worked example
 
-The centre uses the nonlinear valuation in the asset-valuation formula above.
-The band is a **linearised, additive return-risk approximation around that centre**, with fixed
-baseline exposures and covariance. Its width is therefore constant within a fixed-anchor grid,
-although different anchor sets generally have different widths.
+The two-factor illustration fixes annual equity/rates volatilities at 20%/10% and correlation
+at -0.4. An equity fall of 20% conditions the free rates log return to approximately 0.044629,
+or a 4.564% simple gain. Holding rates explicitly at zero instead removes that response.
 
-It is a pointwise prediction band conditional on the prescribed factor move. It is not a
-confidence interval for estimated betas, a regression-fit interval, a simultaneous band covering
-the entire curve, or a probability assigned to the stress target. It excludes parameter
-uncertainty, covariance regime changes, nonlinear dispersion effects and non-normal tails.
-There is no conditional Monte Carlo in this implementation. It is possible for the additive
-lower bound to cross -100%; bounds are not clipped or interpreted as exact return quantiles.
+Take a single rates fund worth USD 50 in a portfolio with NAV USD 100; the remaining USD 50 is
+zero-risk cash. The fund's rates loading is one, its equity loading zero, and its annual
+independent residual volatility 4%. The portfolio's residual volatility is therefore 2%.
+The conditioned log-shock vector gives a **2.281978%** scenario NAV return. Conditional annual
+variance is 0.0025 and the one-month 95% half-width is approximately **2.828964% of NAV**.
 
-When all factors are anchored, only idiosyncratic risk remains. With zero residual variances as
-well, the band collapses to the scenario centre.
+These are fixed teaching inputs. The assertions compare the implementation with the
+single-anchor covariance ratio, cash P&L, and separately calculated horizon variance.
+
+```python
+from math import isclose, sqrt
+from statistics import NormalDist
+import pandas as pd
+import qis
+
+factors = ['Equity', 'Rates']
+covariance = pd.DataFrame(
+    [[0.04, -0.008], [-0.008, 0.01]], index=factors, columns=factors,
+)
+equity_anchor = qis.return_log_shock(-0.20)
+equity_only = qis.conditional_factor_shock(
+    covariance, {'Equity': equity_anchor},
+)
+rates_fixed = qis.conditional_factor_shock(
+    covariance, {'Equity': equity_anchor, 'Rates': 0.0},
+)
+conditional = qis.conditional_factor_covariance(covariance, ['Equity'])
+assert isclose(equity_only['Rates'], -0.2 * equity_anchor, abs_tol=1e-12)
+assert isclose(rates_fixed['Rates'], 0.0, abs_tol=1e-12)
+assert isclose(conditional.loc['Rates', 'Rates'], 0.0084, abs_tol=1e-12)
+
+assets = ['Rates fund']
+betas = pd.DataFrame([[0.0, 1.0]], index=assets, columns=factors)
+amounts = pd.Series([50.0], index=assets)
+residual_variances = pd.Series([0.04 ** 2], index=assets)
+nav = 100.0
+shocks = equity_only.to_frame('Equity -20%').T
+projection = qis.project_factor_scenarios(betas, amounts, shocks)
+centres = projection.asset_pnl.sum(axis=1) / nav
+expected_return = 0.5 * (0.8 ** (-0.2) - 1.0)
+assert isclose(centres.iloc[0], expected_return, abs_tol=1e-12)
+assert isclose(
+    projection.factor_attribution.sum(axis=1).iloc[0],
+    projection.asset_pnl.sum(axis=1).iloc[0], abs_tol=1e-12,
+)
+
+band = qis.compute_conditional_scenario_band(
+    covariance=covariance, betas=betas, residual_variances=residual_variances,
+    weights=amounts / nav, anchors=['Equity'], centres=centres,
+    horizon_years=1.0 / 12.0, confidence=0.95,
+)
+expected_half_width = NormalDist().inv_cdf(0.975) * sqrt(0.0025 / 12.0)
+assert isclose(band.annual_total_vol, 0.05, abs_tol=1e-12)
+assert isclose(band.summary.band_half_width.iloc[0], expected_half_width, abs_tol=1e-12)
+```
+
+## Implementation in qis
+
+### Public entry points
+
+| Function | Purpose | Result |
+|---|---|---|
+| `price_target_log_shock` | Positive price endpoints to a log shock | Scalar |
+| `return_log_shock` | Simple underlying return and fixed exposure to a log shock | Scalar |
+| `duration_log_shock` | Decimal yield move and duration to a log shock | Scalar |
+| `conditional_factor_shock` | Jointly condition free factors on explicit anchors | Full ordered Series |
+| `conditional_factor_covariance` | Remove uncertainty in fixed factors | Full ordered DataFrame |
+| `project_factor_scenarios` | Value holdings and allocate P&L | `FactorScenarioProjection` |
+| `compute_conditional_scenario_band` | Add conditional-factor and residual risk around supplied centres | `ConditionalScenarioBand` |
+| `compute_factor_sensitivity` | Run a supplied joint-anchor grid through all three steps | `FactorSensitivityResult` |
+
+See the [generated API reference](api/index.rst) for signatures and defaults.
+The shipped concise note is {doc}`_included/stress_testing`; its
+[ordinary source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/docs/stress_testing.md)
+is available outside Sphinx. The
+[canonical calculation source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/stress_testing.py)
+owns conditioning, valuation and the band contract.
 
 ### Result fields
 
@@ -324,12 +389,12 @@ The result also retains the full annual `conditional_factor_covariance`, annual 
 factor and total volatilities, horizon and confidence. `FactorSensitivityResult` adds the ordered
 `anchors`, complete `factor_log_shocks` and the structured `projection`.
 
-## 6. End-to-end offline use case
+### 6. End-to-end offline use case
 
 The runnable example creates a USD 100m synthetic portfolio with four positions, including
 a short gold hedge. Five synthetic return histories represent equity, rates, investment-grade
 credit, high-yield credit and gold. They come from the frozen `qis.datasets.synthetic` generator
-with quirks disabled. Loadings and independent residual volatilities are explicit teaching inputs;
+with quirks disabled, default seed 20260725 and fixed dates 2014-01-02–2025-12-31. Loadings and independent residual volatilities are explicit teaching inputs;
 the script does not pretend to estimate asset betas.
 
 It estimates annual covariance from Wednesday weekly log returns with EWMA span 52, sampled
@@ -365,16 +430,18 @@ converted to $\log(1+x)$. To impose different relative magnitudes on multiple an
 construct the vectors with `conditional_factor_shock`, call `project_factor_scenarios`,
 then pass portfolio return centres to `compute_conditional_scenario_band`.
 
-### Canonical runnable source
+#### Canonical runnable source
 
-The guide includes the example directly, so code and documentation cannot drift apart.
+The site includes the canonical example directly. In ordinary Markdown, open the
+[complete runnable source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/factor_stress_testing.py)
+from the same source revision.
 
 ~~~{literalinclude} ../examples/portfolios/factor_stress_testing.py
 :language: python
 :linenos:
 ~~~
 
-### Adapting the example to an assigned model
+#### Adapting the example to an assigned model
 
 Replace the synthetic covariance, loadings, residual variances and MTM with aligned point-in-time
 model inputs. Set NAV explicitly and choose factors from that model's definitions. Keep
@@ -385,17 +452,7 @@ The example uses `qis.plot_bars` and `qis.plot_scatter`. Matplotlib supplies lay
 already-computed analytical bounds. Scatter regression fitting and regression confidence bands
 are disabled. Call `qis.plot_df_table` on formatted result tables when composing a report page.
 
-## Validation and failure modes
-
-The API rejects nonfinite inputs, duplicate or mismatched ordered labels, nonpositive price/NAV
-endpoints, simple returns at or below -100%, negative residual variance, invalid horizon/confidence,
-unknown or duplicate anchors, and ill-conditioned anchor blocks (condition number above $10^8$).
-Covariance must be symmetric positive semidefinite within numerical tolerances. No pseudoinverse,
-automatic missing-exposure filling or covariance repair is applied.
-
-Negative duration is rejected; the first-order duration endpoint must remain positive.
-Short **positions** are supported independently of these factor-endpoint restrictions.
-Scenario attribution is checked against total asset P&L.
+### Verification
 
 The offline numerical suite covers single and joint conditioning, explicit zero anchors,
 Schur-complement identities, long/short nonlinear valuation, adjustment reconciliation and
@@ -411,12 +468,46 @@ The repository's existing examples harness automatically executes the new offlin
 python -m pytest src/qis/tests/test_examples.py -k factor_stress_testing
 ~~~
 
-## Related guides
+## Interpretation and limitations
+
+### Interpretation and limits
+
+The centre uses the nonlinear valuation in the asset-valuation formula above.
+The band is a **linearised, additive return-risk approximation around that centre**, with fixed
+baseline exposures and covariance. Its width is therefore constant within a fixed-anchor grid,
+although different anchor sets generally have different widths.
+
+It is a pointwise prediction band conditional on the prescribed factor move. It is not a
+confidence interval for estimated betas, a regression-fit interval, a simultaneous band covering
+the entire curve, or a probability assigned to the stress target. It excludes parameter
+uncertainty, covariance regime changes, nonlinear dispersion effects and non-normal tails.
+There is no conditional Monte Carlo in this implementation. It is possible for the additive
+lower bound to cross -100%; bounds are not clipped or interpreted as exact return quantiles.
+
+When all factors are anchored, only idiosyncratic risk remains. With zero residual variances as
+well, the band collapses to the scenario centre.
+
+### Validation and failure modes
+
+The API rejects nonfinite inputs, duplicate or mismatched ordered labels, nonpositive price/NAV
+endpoints, simple returns at or below -100%, negative residual variance, invalid horizon/confidence,
+unknown or duplicate anchors, and ill-conditioned anchor blocks (condition number above $10^8$).
+Covariance must be symmetric positive semidefinite within numerical tolerances. No pseudoinverse,
+automatic missing-exposure filling or covariance repair is applied.
+
+Negative duration is rejected; the first-order duration endpoint must remain positive.
+Short **positions** are supported independently of these factor-endpoint restrictions.
+Scenario attribution is checked against total asset P&L.
+
+<a id="related-guides"></a>
+
+## See also
 
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)
 - [Factsheets and reporting](factsheets_and_reporting.md)
 - [Private-asset unsmoothing](private_asset_unsmoothing.md)
-- [Concise shipped stress-testing note](_included/stress_testing.md)
+- [Concise shipped stress-testing note](_included/stress_testing.md) and
+  [packaged source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/docs/stress_testing.md)
 
 
 ~~~{toctree}
@@ -424,3 +515,14 @@ python -m pytest src/qis/tests/test_examples.py -k factor_stress_testing
 
 _included/stress_testing
 ~~~
+
+## References
+
+1. Geyer, C. J. (2019). [Stat 5101 Lecture Slides: Deck 5](https://www.stat.umn.edu/geyer/s19/5101/slides/s5.pdf),
+   University of Minnesota, slides 136–140. Conditional means and covariance for a partitioned
+   multivariate normal distribution.
+2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+   Software, MIT licence. The proportional log-component P&L allocation and baseline-exposure
+   band are implementation conventions described above. Use
+   [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
+   and identify the version/source used for a calculation.
