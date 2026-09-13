@@ -5,6 +5,15 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.32.0] - 2026-09-13
+
+### Added
+
+- Optional StressReportConfig.report_name identifies the account/portfolio above the
+  first-page scenario title. Its default is the existing report title; the header
+  appends the actual reporting notional, currency and assigned risk model. The name
+  and composed header are included in the artifact manifest and conventions table.
+
 ## [5.31.0] - 2026-09-13
 
 ### Changed

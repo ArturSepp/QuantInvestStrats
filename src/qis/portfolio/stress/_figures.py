@@ -12,7 +12,7 @@ from qis.plots.table import plot_df_table
 from qis.plots.derived.clustering import plot_clusters
 from qis.plots.scatter import plot_scatter
 from qis.models.linear.plot_correlations import plot_corr_matrix_from_covar
-from qis.portfolio.stress.reporting import _loading_table
+from qis.portfolio.stress.reporting import _loading_table, _report_heading
 
 
 INK = "#18354B"
@@ -23,8 +23,15 @@ RED = "#A64045"
 def _page(result, config, number, title, subtitle):
     """Create a consistent landscape canvas with dated currency/denominator footers."""
     fig = plt.figure(figsize=(16.54, 11.69), facecolor="white")
-    fig.text(0.04, 0.955, title, fontsize=21, weight="bold", color=INK)
-    fig.text(0.04, 0.923, textwrap.fill(subtitle, 160), fontsize=10, color=BLUE)
+    title_y, subtitle_y = 0.955, 0.923
+    if number == 1:
+        heading = fig.text(0.04, 0.978, _report_heading(result, config),
+                           fontsize=12, weight="bold", color=BLUE)
+        width = heading.get_window_extent(fig.canvas.get_renderer()).width
+        heading.set_fontsize(min(12., 12. * fig.bbox.width * .92 / max(width, 1.)))
+        title_y, subtitle_y = 0.94, 0.907
+    fig.text(0.04, title_y, title, fontsize=21, weight="bold", color=INK)
+    fig.text(0.04, subtitle_y, textwrap.fill(subtitle, 160), fontsize=10, color=BLUE)
     meta = result.metadata
     footer = (
         f"{config.title} | {config.model_label} | Positions {meta['valuation_date'][:10]} | "

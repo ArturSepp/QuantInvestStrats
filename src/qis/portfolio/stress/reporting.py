@@ -27,7 +27,8 @@ class StressReportConfig:
         cluster_linkages: Matching fitted linkage arrays in membership index order.
         cluster_cutoffs: Matching fitted cutoffs; never estimated by the report.
         selected_grids: Up to six caller-named grids for the sensitivity page.
-            Empty selects the first four; all grids are always exported.
+            Empty selects the ranked individual factors or first six custom grids;
+            all grids are always exported.
         notes: Plain methodology/coverage notes supplied by the application.
         write_workbook: Write a numerical workbook using the existing QIS serializer.
         write_previews: Also save PNG previews for inspection.
@@ -36,6 +37,8 @@ class StressReportConfig:
         appendix_title: Parser-owned page title.
         appendix_subtitle: Parser-owned description above the table.
         appendix_notes: Parser-owned variable definitions and source explanations.
+        report_name: Optional account/portfolio name on the first page; defaults to title.
+            The header appends the actual notional, currency and assigned model label.
     """
 
     title: str = "Portfolio stress report"
@@ -54,9 +57,14 @@ class StressReportConfig:
     appendix_title: str = "Coverage and estimation quality"
     appendix_subtitle: str = ""
     appendix_notes: tuple[str, ...] = ()
+    report_name: str | None = None
 
     def __post_init__(self):
         """Snapshot caller diagnostics and validate presentation choices."""
+        if self.report_name is not None:
+            if not isinstance(self.report_name, str) or not self.report_name.strip():
+                raise ValueError("report_name must be a nonempty string or None")
+            object.__setattr__(self, "report_name", self.report_name.strip())
         if not self.title:
             raise ValueError("report title must be nonempty")
         if not self.model_name or not self.appendix_title:
@@ -120,6 +128,16 @@ class StressReportArtifacts:
     workbook_path: Path | None
     manifest_path: Path
     preview_paths: tuple[Path, ...] = ()
+
+
+
+def _report_heading(result, config):
+    """Describe the account, actual reporting notional and assigned risk model."""
+    meta = result.metadata
+    name = config.report_name or config.title
+    model = config.model_label or config.model_name
+    return (f"{name} | Notional {meta['reference_currency']} "
+            f"{meta['reporting_denominator']:,.0f} | Risk model {model}")
 
 
 def _loading_table(result, config):
@@ -207,6 +225,8 @@ def _report_tables(result, config):
     metadata.update(
         {
             "title": config.title,
+            "report_name": config.report_name or config.title,
+            "report_heading": _report_heading(result, config),
             "model_label": config.model_label,
             "report_notes": list(config.notes),
             "appendix_notes": list(config.appendix_notes),
@@ -422,6 +442,8 @@ def generate_portfolio_stress_report(
     manifest = {
         "metadata": dict(result.metadata),
         "title": config.title,
+        "report_name": config.report_name or config.title,
+        "report_heading": _report_heading(result, config),
         "model_label": config.model_label,
         "report_notes": list(config.notes),
         "page_count": len(titles),

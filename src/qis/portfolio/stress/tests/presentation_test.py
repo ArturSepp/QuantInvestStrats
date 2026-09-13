@@ -74,6 +74,8 @@ def test_v0_pages_show_regression_and_parser_content(market):
     result = run_portfolio_stress_test(p, grid, factor_grids={"Credit": grid})
     config = StressReportConfig(
         model_name="MATF",
+        report_name="Example account",
+        model_label="MATF CUSTOM",
         appendix_title="Source validation",
         appendix_table=pd.DataFrame({"Status": ["Source confirmed"]}, index=["Account"]),
         appendix_notes=("Parser variable explanation",),
@@ -84,6 +86,16 @@ def test_v0_pages_show_regression_and_parser_content(market):
         assert len(pages) == 10
         titles = [title for title, _ in pages]
         assert titles[3] == "Portfolio MATF exposures and risk"
+        first_texts = pages[0][1].texts
+        heading = next(text for text in first_texts
+                       if text.get_text().startswith("Example account | Notional"))
+        assert "Risk model MATF CUSTOM" in heading.get_text()
+        assert f"{result.metadata['reporting_denominator']:,.0f}" in heading.get_text()
+        section = next(text for text in first_texts
+                       if text.get_text() == titles[0])
+        assert heading.get_position()[1] > section.get_position()[1]
+        assert not any("Example account | Notional" in text.get_text()
+                       for text in pages[1][1].texts)
         assert titles[6:9] == [
             "Estimated MATF loadings and explanatory power",
             "MATF asset cluster dendrograms",
