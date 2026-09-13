@@ -996,12 +996,14 @@ def _guide_column(fig, entries, x, top=0.785):
     for title, paragraphs in entries:
         heading = fig.text(x, top, textwrap.fill(title, 76), fontsize=11,
                            fontweight="bold", color=BLUE, va="top", gid="guide-heading")
-        top -= heading.get_window_extent(renderer).height / fig.bbox.height + 0.007
-        lines = [paragraph if paragraph.startswith("$") else textwrap.fill(paragraph, 104)
-                 for paragraph in paragraphs]
-        body = fig.text(x, top, "\n".join(lines), fontsize=10, color=INK,
-                        va="top", linespacing=1.25, gid="guide-body")
-        top -= body.get_window_extent(renderer).height / fig.bbox.height + 0.017
+        top -= heading.get_window_extent(renderer).height / fig.bbox.height + 0.005
+        for paragraph in paragraphs:
+            equation = paragraph.startswith("$")
+            body = fig.text(x, top, paragraph if equation else textwrap.fill(paragraph, 104),
+                            fontsize=11 if equation else 10, color=INK, va="top",
+                            linespacing=1.25, gid="guide-body")
+            top -= body.get_window_extent(renderer).height / fig.bbox.height + 0.003
+        top -= 0.012
 
 
 def _analysis_guide_page(result, config):
@@ -1078,10 +1080,10 @@ def _analysis_guide_page(result, config):
         )),
     ]
     grid_note = (
-        "At each x, fix the named factor return or divide a family bump across its members "
-        "(equal by default, before log1p); jointly complete the other factors conditionally. "
-        "The same six groups/order as page 5 are used unless explicitly selected. "
-        "Scatter points show exact portfolio P&L / N; axes state the supplied return ranges."
+        "Each x fixes a factor return or splits a family bump (equal by default, before "
+        "log1p), then completes free factors conditionally. Panels follow page 5's six "
+        "groups/order unless overridden. Scatter points are exact portfolio P&L / N; "
+        "axes show the supplied return ranges."
     )
     if any(row.completion != "conditional" or row.bump_convention != "simple"
            for _, row in result.grid_metadata.iterrows()):
@@ -1094,12 +1096,12 @@ def _analysis_guide_page(result, config):
     right = [
         ("6. Sensitivity to largest factor exposures", (
             grid_note,
-            "Dashed curve: least-squares R_p = a x + b x squared, through zero; uncentered "
-            "R-squared = 1 - SSE / sum(R_p squared). Where enabled, shading is conditional "
-            f"+/-1 and +/-2 local standard deviations over {months:g} month(s). It uses "
-            "scenario-local sensitivities and fixed conditional covariance (page 10), "
-            "including residual risk. This is a local Gaussian risk band, not a fitted-curve "
-            "confidence interval; the latter is exported separately.",
+            "Dashed line: quadratic OLS R_p = a x + b x squared through zero; uncentered "
+            "R-squared = 1 - SSE / sum(R_p squared). Shading, when enabled: +/-1 and +/-2 "
+            f"conditional local standard deviations over {months:g} month(s). Use scenario-local "
+            "sensitivities and fixed conditional covariance plus residual risk (page 10). "
+            "These local Gaussian risk bands differ from the regression confidence "
+            "intervals exported separately.",
         )),
         (f"7. Estimated {model} loadings and explanatory power", (
             "Asset beta and R-squared columns come from the supplied fit; R-squared measures "
