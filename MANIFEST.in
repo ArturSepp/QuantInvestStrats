@@ -23,7 +23,7 @@ recursive-include src/qis *.yml *.yaml *.json *.txt *.md
 
 # Explicitly exclude figures, notebooks, and image files
 recursive-exclude examples/figures *
-recursive-exclude src/qis *figures*
+# Renderer modules such as _figures.py are source; exclude image formats below.
 global-exclude *.png
 global-exclude *.jpg
 global-exclude *.jpeg

@@ -137,6 +137,7 @@ jobs:
             "qis/portfolio/stress/scenarios.py",
             "qis/portfolio/stress/analytics.py",
             "qis/portfolio/stress/reporting.py",
+            "qis/portfolio/stress/_figures.py",
             "qis/portfolio/stress/tests/public_api_test.py",
         }
         missing_stress = sorted(expected_stress - names)

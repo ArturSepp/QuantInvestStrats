@@ -70,6 +70,7 @@ jobs:
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/release-wheel-env/bin/python" -I - <<'PY'
           import qis
+          import qis.portfolio.stress._figures
           from qis.portfolio.stress import (
               InstrumentPortfolio, StressReportConfig, generate_portfolio_stress_report,
           )

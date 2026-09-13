@@ -26,6 +26,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Keep Python renderer modules such as _figures.py in source distributions and wheels;
+  the old filename exclusion for figures also removed executable reporting source.
+  Wheel and publication checks now require the stress renderer explicitly.
 - Preserve the causal joint-unsmoothing warmup and missing-row fixes and finite-date
   as-of lookup fixes merged after 5.30.0.
 
