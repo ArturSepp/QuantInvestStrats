@@ -365,7 +365,7 @@ exact scenario P&L. There is no logarithm or P&L division by derivative MTM.
 Ordinary funded portfolios retain existing baseline Gaussian conditional-factor
 plus shared-residual grid bands. Their horizon and central probability are
 explicit. Nonlinear/derivative grids show deterministic intrinsic curves with
-an unavailable-band status and a descriptive through-zero cubic fit.
+an unavailable-band status and a descriptive through-zero quadratic fit.
 
 ## Euler volatility analytics
 
@@ -415,7 +415,7 @@ model volatility. All holding terms for a factor sum to its factor term, while t
 displayed subsets need not add to the full totals.
 
 Page six calls QIS scatter plots and `fit_multivariate_ols` for through-zero
-quadratic fits when `all_funded=True` and cubic fits otherwise. Both pass through
+quadratic fits for every portfolio, including derivatives. Fits pass through
 zero and use decimal grid returns. The legend displays the equation and uncentered
 R-squared: `1 - sum((actual - fitted)^2) / sum(actual^2)`. A zero curve has undefined
 R-squared; a grid without enough independent regressors has no fitted line. These
@@ -473,7 +473,7 @@ The principal result fields and exports have distinct interpretations:
 | `historical_ranking`, `historical_coverage` | Exact P&L ranking and the inclusion/exclusion reason for each supplied month. |
 | `attribution[*]` | Factor components plus the nonlinear payoff adjustment, reconciling to currency P&L. |
 | `positions`, `leg_terms` | Source marks, intrinsic baselines, constant basis offsets, payoff coverage and vanilla terms. |
-| `Grid polynomial regressions` | Linear/quadratic/cubic coefficients, selected order (2 funded; 3 otherwise) and uncentered R-squared. Funded cubic coefficients are zero. |
+| `Grid polynomial regressions` | Linear/quadratic coefficients, order (always 2) and uncentered R-squared. The cubic column is retained as zero for export compatibility. |
 
 Currency amounts are not automatically invested cash, executable proceeds or lending
 value. The R-squared in the Portfolio/Rest rows is a weighted fit diagnostic, not a

@@ -85,7 +85,7 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
             }
         )
         aggregates[key] = row
-    regressions = _grid_regressions(grids, order=2 if all_funded else 3)
+    regressions = _grid_regressions(grids)
     return {
         "Annualised portfolio risk": table,
         "Factor Euler volatility": factor.rename("euler_vol").to_frame(),
@@ -97,8 +97,8 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
     }
 
 
-def _grid_regressions(grids, order):
-    """Fit through-zero grid summaries; R-squared uses the uncentered OLS convention."""
+def _grid_regressions(grids):
+    """Fit through-zero quadratics; R-squared uses the uncentered OLS convention."""
     regressions = {}
     for key, summary in grids.items():
         try:
@@ -106,13 +106,11 @@ def _grid_regressions(grids, order):
             y = summary.portfolio_return.astype(float)
         except (TypeError, ValueError):
             continue
-        if len(x) < order or not np.isfinite(x).all() or not np.isfinite(y).all():
+        if len(x) < 2 or not np.isfinite(x).all() or not np.isfinite(y).all():
             continue
         terms = {"linear": x, "quadratic": x * x}
-        if order == 3:
-            terms["cubic"] = x * x * x
         design = pd.DataFrame(terms, index=summary.index)
-        if np.linalg.matrix_rank(design) < order:
+        if np.linalg.matrix_rank(design) < 2:
             continue
         if np.any(y != 0.0):
             prediction, params, _ = fit_multivariate_ols(
@@ -126,7 +124,7 @@ def _grid_regressions(grids, order):
             r_squared = np.nan
         regressions[key] = {
             "linear": params["linear"], "quadratic": params["quadratic"],
-            "cubic": params.get("cubic", 0.0), "order": order, "r_squared": r_squared,
+            "cubic": 0.0, "order": 2, "r_squared": r_squared,
         }
     return pd.DataFrame.from_dict(
         regressions, orient="index", columns=["linear", "quadratic", "cubic", "order", "r_squared"]

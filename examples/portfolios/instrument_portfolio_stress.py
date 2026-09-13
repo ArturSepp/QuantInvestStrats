@@ -187,7 +187,7 @@ def verify_result(portfolio, result, derivatives):
     )
     assert ("lower_bound" in result.grid_summaries["Credit"]) is (not derivatives)
     regressions = result.report_diagnostics["Grid polynomial regressions"]
-    assert regressions["order"].eq(3 if derivatives else 2).all()
+    assert regressions["order"].eq(2).all()
     assert set(regressions.index) == set(result.grid_summaries)
     if derivatives:
         # -5 contracts x multiplier 50 x spot 2000: zero MTM still has -500,000 exposure.

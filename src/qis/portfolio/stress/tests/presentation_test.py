@@ -175,9 +175,9 @@ def test_derivative_captions_preserve_denominator_meaning(market, funded):
             plt.close(figure)
 
 
-@pytest.mark.parametrize("funded, order", [(True, 2), (False, 3)])
-def test_grid_polynomial_order_and_legend_follow_payoff_type(market, funded, order):
-    """Independent least squares agrees with the displayed quadratic or cubic curve."""
+@pytest.mark.parametrize("funded, order", [(True, 2), (False, 2)])
+def test_grid_polynomial_is_quadratic_for_every_payoff_type(market, funded, order):
+    """Independent least squares agrees with quadratic fits for funded and option holdings."""
     import matplotlib.pyplot as plt
     from qis.portfolio.stress._figures import _grid_page
     from qis.portfolio.stress.instruments import InstrumentLeg, InstrumentType
@@ -199,8 +199,7 @@ def test_grid_polynomial_order_and_legend_follow_payoff_type(market, funded, ord
     terms = ["linear", "quadratic", "cubic"][:order]
     np.testing.assert_allclose(row[terms], reference, rtol=1e-10, atol=1e-12)
     assert row["order"] == order
-    if funded:
-        assert row.cubic == 0.0
+    assert row.cubic == 0.0
     assert row.r_squared == pytest.approx(1 - np.sum((y - design @ reference) ** 2) / (y @ y))
     assert ("lower_bound" in result.grid_summaries["Equity"]) is funded
     figure = _grid_page(result, StressReportConfig())
@@ -211,23 +210,24 @@ def test_grid_polynomial_order_and_legend_follow_payoff_type(market, funded, ord
         assert curve.get_ydata()[30] == pytest.approx(0.0, abs=1e-12)
         legend = figure.axes[0].get_legend().get_texts()[0].get_text()
         assert "R^2" in legend
-        assert ("x^3" in legend) is (not funded)
+        assert "x^3" not in legend
     finally:
         plt.close(figure)
 
 
-def test_cubic_grid_requires_three_independent_regressors(market):
-    """A three-point symmetric grid cannot identify a through-zero cubic."""
+@pytest.mark.parametrize("anchors, identifiable", [([-0.2, 0.0, 0.2], True), ([0.0, 0.2], False)])
+def test_quadratic_grid_requires_two_independent_regressors(market, anchors, identifiable):
+    """A symmetric three-point grid identifies the fit; a single nonzero anchor does not."""
     from qis.portfolio.stress.instruments import InstrumentLeg, InstrumentType
     from qis.portfolio.stress.portfolio import PortfolioHolding
 
     portfolio = market([PortfolioHolding(
         "future", "Future", 0.0, (InstrumentLeg(InstrumentType.FUTURE, "actual", 1.0),),
     )])
-    x = np.array([-0.2, 0.0, 0.2])
+    x = np.array(anchors)
     grid = StressScenarios(pd.DataFrame({"Equity": x}, index=x))
     result = run_portfolio_stress_test(portfolio, grid, factor_grids={"Equity": grid})
-    assert result.report_diagnostics["Grid polynomial regressions"].empty
+    assert result.report_diagnostics["Grid polynomial regressions"].empty is (not identifiable)
 
 
 def test_zero_payoff_grid_has_zero_coefficients_and_undefined_r_squared(market):

@@ -88,8 +88,8 @@ single source of those conventions and is also available inside an installed QIS
 - **Euler volatility contributions** are signed allocations of total model volatility.
   Factor terms plus the residual Euler term add to total volatility. The page-five panels
   select factors by absolute Euler contribution, then rank their holding contributions.
-- **Sensitivity grids** fit a through-zero quadratic when `all_funded=True` and a cubic
-  otherwise. Legends show the equation and uncentered R-squared on the displayed grid.
+- **Sensitivity grids** fit a through-zero quadratic for every portfolio, including
+  derivatives. Legends show the equation and uncentered R-squared on the displayed grid.
   Exact payoff points remain authoritative, including at strikes and knockout jumps.
   Funded portfolios retain baseline conditional prediction bands; derivative portfolios
   have no such bands. Current local covariance risk remains available separately.

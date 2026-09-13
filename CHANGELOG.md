@@ -21,10 +21,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- Fit through-zero quadratic sensitivity curves for funded portfolios and cubic curves
-  for derivative portfolios, with equations and uncentered R-squared in the legends.
+- Fit through-zero quadratic sensitivity curves for every portfolio, including
+  derivatives, with equations and uncentered R-squared in the legends.
   Rename the unreleased `Grid quadratic regressions` diagnostic/export to
-  `Grid polynomial regressions`; add cubic coefficient, order and R-squared columns.
+  `Grid polynomial regressions`; add order and R-squared columns. Retain the cubic
+  coefficient as zero for export compatibility; every fitted order is 2.
   Exact scenario valuations and the funded-only prediction-band policy are unchanged.
 - Restore the original stress-report presentation: annualised risk table, family
   Euler bars, QIS scatter/regression/band grids, coloured loading table with Rest
