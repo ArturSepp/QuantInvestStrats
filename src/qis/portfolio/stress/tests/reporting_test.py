@@ -15,7 +15,7 @@ from qis.portfolio.stress.scenarios import ScenarioMode, ShockConvention, Stress
 from qis.portfolio.stress.tests.scenarios_test import grouped_portfolio
 
 
-def test_nine_core_pages_export_all_values_without_repricing(market, tmp_path, monkeypatch):
+def test_ten_core_pages_export_all_values_without_repricing(market, tmp_path, monkeypatch):
     """The renderer consumes results; original payoff/model access is unnecessary."""
     p = grouped_portfolio(market)
     request = StressScenarios(
@@ -52,8 +52,11 @@ def test_nine_core_pages_export_all_values_without_repricing(market, tmp_path, m
     )
     artifact = generate_portfolio_stress_report(result, tmp_path / "report", config)
     manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
-    assert manifest["page_count"] == 9
-    assert len(manifest["page_titles"]) == 9
+    assert manifest["page_count"] == 10
+    assert len(manifest["page_titles"]) == 10
+    assert manifest["page_titles"][8] == (
+        "Cluster contributions to stress, factor exposures and risk")
+    assert "Cluster conditional NAV contributions" in artifact.table_paths
     assert artifact.pdf_path.read_bytes().startswith(b"%PDF-")
     for path, checksum in manifest["hashes"].items():
         assert (

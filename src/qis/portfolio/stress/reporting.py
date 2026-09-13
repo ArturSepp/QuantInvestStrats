@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from qis.portfolio.stress.analytics import PortfolioStressResult
+from qis.portfolio.stress._clusters import compute_cluster_contributions
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ class StressReportConfig:
         write_workbook: Write a numerical workbook using the existing QIS serializer.
         write_previews: Also save PNG previews for inspection.
         model_name: Short model name used in slide and figure titles.
-        appendix_table: Optional preformatted parser-owned table for page ten.
+        appendix_table: Optional preformatted parser-owned table for page eleven.
         appendix_title: Parser-owned page title.
         appendix_subtitle: Parser-owned description above the table.
         appendix_notes: Parser-owned variable definitions and source explanations.
@@ -116,7 +117,7 @@ class StressReportArtifacts:
     """Paths written by a report operation; the numerical result remains reusable.
 
     Attributes:
-        pdf_path: Nine core pages, plus page ten when a parser supplies a table.
+        pdf_path: Ten core pages, plus page eleven when a parser supplies a table.
         table_paths: Numerical table names mapped to CSV paths.
         workbook_path: Optional workbook path.
         manifest_path: JSON with conventions, table mapping and content hashes.
@@ -219,6 +220,16 @@ def _report_tables(result, config):
         tables[f"Cluster {key} linkage"] = pd.DataFrame(
             config.cluster_linkages[key], columns=["left", "right", "distance", "count"]
         )
+    clusters = compute_cluster_contributions(result, config.cluster_memberships)
+    tables["Cluster holding assignments"] = clusters.holdings
+    tables["Cluster portfolio summary"] = clusters.summary
+    tables["Cluster weighted factor exposures"] = clusters.factor_exposures
+    tables["Cluster dollar factor exposures"] = clusters.factor_dollars
+    tables["Cluster Euler risk contributions"] = clusters.risk
+    tables["Cluster display grouping"] = clusters.display_groups.to_frame()
+    for name in clusters.scenario_pnl:
+        tables[f"Cluster {name} pnl"] = clusters.scenario_pnl[name]
+        tables[f"Cluster {name} NAV contributions"] = clusters.scenario_nav[name]
     if config.appendix_table is not None:
         tables["Parser appendix"] = config.appendix_table
     metadata = dict(result.metadata)
@@ -349,7 +360,7 @@ def generate_portfolio_stress_report(
 ) -> StressReportArtifacts:
     """Render a completed result without fitting or re-evaluating any payoff.
 
-    The PDF has nine core subjects and an optional parser-supplied tenth page. Display limits are
+    The PDF has ten core subjects and an optional parser-supplied eleventh page. Display limits are
     explicitly labelled; CSV/workbook tables retain every holding/scenario/grid.
 
     Args:

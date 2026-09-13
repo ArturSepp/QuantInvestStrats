@@ -62,7 +62,7 @@ interpreter. An existing target is rejected before report output is written.
 | 4 | `InstrumentPortfolio` | Holdings, model/position dates, quote and FX registries, positive reporting denominator | `get_mtm`, `get_pnl`, batch `evaluate` and current `response_jacobian` |
 | 5 | `StressScenarios` | Factor/family anchors, simple/log convention and completion policy | Complete factor log-shock vectors; independent or jointly conditional |
 | 6 | `run_portfolio_stress_test` | Portfolio, requests, optional monthly history and named grids | Detached `PortfolioStressResult`: full valuations, exposures, local risk, attribution and audit tables |
-| 7 | `generate_portfolio_stress_report` | Completed result and `StressReportConfig` | Nine core PDF pages, optional tenth page, all numerical tables and artifact hashes |
+| 7 | `generate_portfolio_stress_report` | Completed result and `StressReportConfig` | Ten core PDF pages, optional eleventh page, all numerical tables and artifact hashes |
 
 The application owns quote acquisition, factor estimation, unsmoothing, contract interpretation
 and settlement/credit decisions. A consumer can construct `RiskModel` directly or use its own
@@ -158,3 +158,38 @@ label validation, ambiguous factor instructions, shared residuals and kink polic
 
 _included/portfolio_stress
 ~~~
+
+## Cluster contributions
+
+The exhibit following the fitted dendrogram groups the existing holding results by
+the caller's fitted response memberships. Cadence prefixes distinguish, for example,
+ME-1 from QE-1. No clustering or payoff valuation is repeated.
+
+The top heatmap displays requested conditional-scenario P&L summed over holdings in
+each cluster, divided by the full reporting notional. The bottom left shows current
+holding response dollar sensitivities times factor betas, summed by cluster and
+divided by that same notional. Values are exposure ratios, displayed to two decimals.
+Both tables append an additive portfolio row.
+
+The bottom right stacks signed systematic and idiosyncratic Euler contributions to
+annual **factor-model portfolio volatility**. These are not standalone cluster
+volatilities. Systematic contributions aggregate the existing holding-factor Euler
+allocation. Shared-response residual Euler terms are scaled to the model-volatility
+denominator and allocated by signed current response sensitivities before grouping.
+Offsets within the same response retain their shared residual identity. Every
+component and cluster together reconciles to model portfolio volatility; negative
+diversifying contributions remain signed.
+
+All three panels use gross-MTM ordering. The display keeps at most eight groups,
+reserving explicit unassigned and multi-cluster buckets and combining smaller
+regular clusters as Other clusters. The labels show net notional weight and holding
+count. Every cluster remains individually available in CSV/workbook tables for
+membership, display mapping, MTM, dollar/weighted factor exposure, Euler risk, and
+all independent, conditional, requested and historical scenario contributions.
+
+A holding with missing fitted response membership is unassigned. A holding spanning
+multiple known clusters has a separate multi-cluster bucket, avoiding arbitrary
+allocation of nonlinear P&L. Positions excluded from the supplied model remain
+outside these diagnostics, with their count and gross MTM stated explicitly;
+their missing analytics are never replaced with zero and the full notional remains
+the denominator. Without fitted memberships the page displays an unassigned group.

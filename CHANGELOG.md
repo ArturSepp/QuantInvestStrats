@@ -5,6 +5,18 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.33.0] - 2026-09-13
+
+### Added
+
+- Cluster contribution exhibit after fitted dendrograms: exact correlated-scenario
+  P&L as a share of full notional, weighted factor exposures, and signed systematic
+  and idiosyncratic Euler contributions to annual model volatility. Eight displayed
+  groups preserve smaller clusters in an additive remainder; incomplete memberships
+  and holdings spanning clusters remain explicit. Full cluster audit tables are exported.
+- Core reports now have ten pages, plus an optional eleventh parser appendix.
+  Existing holding valuations, loadings, scenarios and risk estimates are unchanged.
+
 ## [5.32.0] - 2026-09-13
 
 ### Added

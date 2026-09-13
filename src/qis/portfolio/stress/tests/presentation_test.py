@@ -83,7 +83,7 @@ def test_v0_pages_show_regression_and_parser_content(market):
     )
     pages = list(report_pages(result, config))
     try:
-        assert len(pages) == 10
+        assert len(pages) == 11
         titles = [title for title, _ in pages]
         assert titles[3] == "Portfolio MATF exposures and risk"
         first_texts = pages[0][1].texts
@@ -96,9 +96,10 @@ def test_v0_pages_show_regression_and_parser_content(market):
         assert heading.get_position()[1] > section.get_position()[1]
         assert not any("Example account | Notional" in text.get_text()
                        for text in pages[1][1].texts)
-        assert titles[6:9] == [
+        assert titles[6:10] == [
             "Estimated MATF loadings and explanatory power",
             "MATF asset cluster dendrograms",
+            "Cluster contributions to stress, factor exposures and risk",
             "MATF correlation and scenario construction",
         ]
         assert titles[-1] == "Source validation"
