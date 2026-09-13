@@ -53,7 +53,7 @@ status of a top-level public export.
 | `qis.TRE_TABLE_COLUMNS` | Removed without a replacement; the requested statistics were not filled by the table builder. |
 
 These removals are recorded in the
-[5.9.2 changelog](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CHANGELOG.md#592---2026-08-09).
+[5.9.2 changelog](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CHANGELOG.md).
 For the current calculation contract, see [tracking error and information ratio](tracking_error_and_risk.md).
 
 ## qis 5.0 — removed from the public namespace
