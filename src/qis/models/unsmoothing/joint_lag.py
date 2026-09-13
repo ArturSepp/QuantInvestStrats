@@ -86,10 +86,10 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
             same index and frequency as ``returns``.
         span: EWMA span for the rolling coefficients, in periods of ``returns``.
         mean_adj_type: How to demean r_t, r_{t-1}, F_{t-1} for the beta fit. The
-            inversion uses raw levels and stays mean-preserving regardless.
+            default EWMA mode uses a point-in-time ``InitType.X0`` seed. The inversion
+            uses raw levels and stays mean-preserving regardless.
         warmup_period: Initial periods masked before the first valid coefficient,
-            then back-filled (mirrors ``adjust_returns_with_ar`` /
-            ``adjust_returns_with_factor_lag``). None disables.
+            which remain missing until the rolling pair is observable. None disables.
         max_ar_coeff: Upper cap on phi_1, strictly < 1, bounding the inflation
             factor 1 / (1 - phi_1). Default 0.9 caps inflation at 10x.
         min_ar_coeff: Lower cap on phi_1. None disables.
@@ -128,11 +128,11 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
     # Demean the target and the two regressors for the beta fit only.
     if mean_adj_type != MeanAdjType.NONE:
         y_adj = compute_rolling_mean_adj(data=returns, mean_adj_type=mean_adj_type,
-                                         span=span, init_type=InitType.MEAN)
+                                         span=span, init_type=InitType.X0)
         r_lag_adj = compute_rolling_mean_adj(data=r_lag_raw, mean_adj_type=mean_adj_type,
-                                             span=span, init_type=InitType.MEAN)
+                                             span=span, init_type=InitType.X0)
         f_lag_adj = compute_rolling_mean_adj(data=f_lag_raw, mean_adj_type=mean_adj_type,
-                                             span=span, init_type=InitType.MEAN)
+                                             span=span, init_type=InitType.X0)
     else:
         y_adj, r_lag_adj, f_lag_adj = returns, r_lag_raw, f_lag_raw
 
@@ -168,8 +168,11 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         phi1 = phi1.clip(lower=lo_phi, upper=max_ar_coeff)   # smoother can overshoot the cap
 
     if warmup_period is not None:
-        phi1 = set_nans_for_warmup_period(a=phi1, warmup_period=warmup_period).reindex(index=returns.index).bfill()
-        beta1 = set_nans_for_warmup_period(a=beta1, warmup_period=warmup_period).reindex(index=returns.index).bfill()
+        # Leave unidentified coefficients missing; backward fill would import future estimates.
+        phi1 = set_nans_for_warmup_period(a=phi1, warmup_period=warmup_period).reindex(
+            index=returns.index)
+        beta1 = set_nans_for_warmup_period(a=beta1, warmup_period=warmup_period).reindex(
+            index=returns.index)
 
     # Lag the coefficients one period (no look-ahead), invert with raw levels.
     phi1_l = phi1.shift(1)
