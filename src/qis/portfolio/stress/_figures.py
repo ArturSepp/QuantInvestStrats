@@ -952,12 +952,13 @@ def _conditional_page(result, config):
     finite = finite[np.isfinite(finite)]
     limit = max(float(np.max(np.abs(finite))) if finite.size else .1, .1)
     for left, bump, table in zip((.105, .605), (-.1, .1), tables):
-        fig.text(left, .888, f"Anchor each factor at {bump:+.0%}", fontsize=13,
+        fig.text(left, .888, f"Anchor each factor at {bump:+.0%}: implied moves (%)", fontsize=13,
                  weight="bold", color=INK)
         ax = fig.add_axes([left, .410, .355, .365])
-        display = table.rename(index=config.factor_labels, columns=config.factor_labels)
-        plot_heatmap(display, ax=ax, cmap="PiYG", var_format="{:+.1%}", fontsize=9,
-                     top_x_label=True, vmin=-limit, vmax=limit, date_format=None, x_rotation=90)
+        display = 100 * table.rename(index=config.factor_labels, columns=config.factor_labels)
+        plot_heatmap(display, ax=ax, cmap="PiYG", var_format="{:+.1f}", fontsize=9,
+                     top_x_label=True, vmin=-100*limit, vmax=100*limit,
+                     date_format=None, x_rotation=90)
         ax.set_xlabel("")
         ax.set_ylabel("")
         ax.tick_params(axis="both", length=0)
