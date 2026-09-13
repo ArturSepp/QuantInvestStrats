@@ -978,10 +978,11 @@ def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Ti
 
     Returns:
         The latest timestamp in index that is <= date, or None if date is before
-        the earliest finite timestamp in the index.
+        the earliest finite timestamp in the index or the index contains no finite timestamps.
 
     Warns:
-        UserWarning: If the target date is before the earliest finite date in the index.
+        UserWarning: If the target date is before the earliest finite date in the index or the
+            index contains no finite timestamps.
 
     Example:
         >>> index = pd.date_range('2023-01-01', periods=5, freq='D')
@@ -994,6 +995,13 @@ def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Ti
     ordered_index = cast(
         List[pd.Timestamp], pd.DatetimeIndex(index).dropna().sort_values().to_list()
     )
+    if not ordered_index:
+        warnings.warn(
+            "find_upto_date_from_datetime_index: index contains no finite timestamps, "
+            "returning None",
+            stacklevel=2,
+        )
+        return None
     matched_index = bisect_right(ordered_index, date)
     # check left boundary
     if matched_index == 0:

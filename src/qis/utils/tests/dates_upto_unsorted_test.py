@@ -97,6 +97,24 @@ def test_find_upto_date_from_datetime_index_warns_against_chronological_first_da
     assert actual is None
 
 
+@pytest.mark.parametrize("index", (pd.DatetimeIndex([pd.NaT]), [pd.NaT]))
+def test_find_upto_date_from_datetime_index_returns_none_without_finite_dates(
+    index: pd.DatetimeIndex | list[pd.Timestamp],
+) -> None:
+    """Return None with a useful warning when no finite timestamp can match.
+
+    Args:
+        index: Public DatetimeIndex or timestamp-list input containing only ``NaT``.
+    """
+    with pytest.warns(UserWarning, match="contains no finite timestamps"):
+        actual = qis.find_upto_date_from_datetime_index(
+            index=index,
+            date=cast(pd.Timestamp, pd.Timestamp("2024-01-02")),
+        )
+
+    assert actual is None
+
+
 def test_find_upto_date_from_datetime_index_preserves_sorted_duplicate_control() -> None:
     """Keep exact and off-grid lookup unchanged when equal labels share one timestamp."""
     index = pd.DatetimeIndex(("2024-01-01", "2024-01-02", "2024-01-02", "2024-01-03"))
