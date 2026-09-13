@@ -78,6 +78,22 @@ def _assert_prefix_equal(shorter: Sequence[pd.DataFrame], longer: Sequence[pd.Da
         )
 
 
+def _first_joint_position(
+    returns: pd.DataFrame,
+    factor: pd.Series,
+    column: str,
+) -> int:
+    """Return the first row where target, own lag, and factor lag are all observable."""
+    jointly_observable = (
+        returns[column].notna()
+        & returns[column].shift(1).notna()
+        & factor.shift(1).notna()
+    )
+    positions = np.flatnonzero(jointly_observable.to_numpy())
+    assert positions.size
+    return int(positions[0])
+
+
 def test_adjust_returns_with_joint_unsmoothing_keeps_warmup_prefix_unavailable() -> None:
     """A newly identified coefficient pair must not fill an earlier unavailable prefix."""
     returns, factor = _joint_returns()
@@ -103,7 +119,9 @@ def test_adjust_returns_with_joint_unsmoothing_keeps_warmup_prefix_unavailable()
     first_coefficient = phi1["complete"].first_valid_index()
     assert first_coefficient == beta1["complete"].first_valid_index()
     assert first_coefficient is not None
-    first_position = int(returns.index.get_indexer([first_coefficient])[0]) + 1
+    coefficient_position = int(returns.index.get_indexer([first_coefficient])[0])
+    assert coefficient_position == _first_joint_position(returns, factor, "complete") + 16
+    first_position = coefficient_position + 1
     observed_return = cast(float, returns["complete"].iloc[first_position])
     prior_observed_return = cast(float, returns["complete"].iloc[first_position - 1])
     prior_phi = cast(float, phi1["complete"].iloc[first_position - 1])
@@ -132,6 +150,10 @@ def test_adjust_returns_with_joint_unsmoothing_ewma_mean_is_prefix_invariant() -
     )
 
     _assert_prefix_equal(shorter=shorter, longer=longer)
+    _, phi1, beta1 = longer
+    first_joint = _first_joint_position(returns, factor, "complete")
+    assert phi1["complete"].first_valid_index() == returns.index[first_joint]
+    assert beta1["complete"].first_valid_index() == returns.index[first_joint]
 
 
 def test_adjust_returns_with_joint_unsmoothing_mixed_panel_is_causal_without_warnings() -> None:
@@ -148,6 +170,11 @@ def test_adjust_returns_with_joint_unsmoothing_mixed_panel_is_causal_without_war
         longer = _adjust_with_diagnostics(returns, factor)
 
     _assert_prefix_equal(shorter=shorter, longer=longer)
+    _, phi1, beta1 = longer
+    for column in ("complete", "ragged"):
+        expected_position = _first_joint_position(returns, factor, column) + 16
+        assert phi1[column].first_valid_index() == returns.index[expected_position]
+        assert beta1[column].first_valid_index() == returns.index[expected_position]
     for panel in shorter:
         assert panel.index.equals(returns.index[:45])
         assert panel.columns.equals(returns.columns)
@@ -156,3 +183,20 @@ def test_adjust_returns_with_joint_unsmoothing_mixed_panel_is_causal_without_war
         assert cast(bool, panel["all_missing"].isna().all())
     pd.testing.assert_frame_equal(returns, returns_before)
     pd.testing.assert_series_equal(factor, factor_before)
+
+
+def test_adjust_returns_with_joint_unsmoothing_holds_betas_across_joint_gaps() -> None:
+    """A row excluded from the joint fit must age both regression moments equally."""
+    returns, factor = _joint_returns()
+    returns.loc[returns.index[30], "complete"] = np.nan
+    _, phi1, beta1 = _adjust_with_diagnostics(
+        returns,
+        factor,
+        mean_adj_type=MeanAdjType.NONE,
+        warmup_period=None,
+        apply_ewma_mean_smoother=False,
+    )
+
+    # Row 30 has no target and row 31 has no own lag, so neither adds information.
+    np.testing.assert_allclose(phi1["complete"].iloc[31], phi1["complete"].iloc[29])
+    np.testing.assert_allclose(beta1["complete"].iloc[31], beta1["complete"].iloc[29])

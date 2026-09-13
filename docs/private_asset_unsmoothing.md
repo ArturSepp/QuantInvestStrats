@@ -104,18 +104,21 @@ rolling prefix. `MeanAdjType.INSAMPLE` uses the full-sample mean and is descript
 for a historical decision path.
 
 `adjust_returns_with_joint_unsmoothing` uses the same point-in-time seed while estimating its
-own-lag and lagged-factor coefficients together. A masked coefficient pair remains missing until
-it is observable; the one-period application lag does not make future backward fill causal.
+own-lag and lagged-factor coefficients together. Its regression moments update only when the
+target, own lag and factor lag are jointly observable, so factor history before a ragged asset's
+inception cannot enter that asset's fit. A masked coefficient pair remains missing until it is
+observable; the one-period application lag does not make future backward fill causal.
 
 The price wrapper defaults to coefficient-sum bounds of -0.25 and 0.75. Clipping applies to the
 **sum**, rescaling the coefficient vector, with optional further EWMA coefficient smoothing.
 A positive denominator permits inversion; a cap does not establish that the smoothing model is
 economically correct. Optional non-negativity and its tolerance are separate modelling choices.
 
-Warm-up has both estimator and outer masking stages, followed by the application lag. Thus
-`warmup_period=8` does not promise a valid result after eight observations. The implementation
-combines these stages to determine a structural row floor; missing data or an unidentified fit
-can require more observations. By default, entirely unidentified columns stay NaN.
+Joint unsmoothing masks exactly `warmup_period` jointly observable coefficient dates per asset,
+once, followed by the one-period application lag. Thus `warmup_period=8` makes the ninth jointly
+observable coefficient available and the next observed return is the first corrected return.
+Missing data or an unidentified fit can require more calendar rows. By default, entirely
+unidentified columns stay NaN.
 The policy enum `qis.models.unsmoothing.ar_lag.InsufficientData` supplies the alternatives:
 `RAISE` reports those columns; explicitly choosing `PASSTHROUGH` returns them unchanged and must
 be labelled as a skipped correction.

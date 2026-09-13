@@ -47,7 +47,6 @@ import numpy as np
 import pandas as pd
 from typing import Optional, Tuple, Union
 
-from qis.utils.np_ops import set_nans_for_warmup_period
 from qis.models.linear.ewm import (compute_ewm, compute_ewm_xy_beta_tensor, MeanAdjType,
                                     compute_rolling_mean_adj, InitType, NanBackfill)
 
@@ -64,7 +63,9 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
                                           apply_ewma_mean_smoother: bool = True,
                                           return_diagnostics: bool = False
                                           ) -> Union[pd.DataFrame,
-                                                     Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+                                                     Tuple[pd.DataFrame,
+                                                           pd.DataFrame,
+                                                           pd.DataFrame]]:
     """Jointly EWMA-fit phi_1 (own-lag) and beta_1 (lagged factor) and unsmooth.
 
     The fitted model is ``r[t] = phi1 * r[t-1] + beta1 * F[t-1] + e[t]``. The inversion is
@@ -88,8 +89,9 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         mean_adj_type: How to demean r_t, r_{t-1}, F_{t-1} for the beta fit. The
             default EWMA mode uses a point-in-time ``InitType.X0`` seed. The inversion
             uses raw levels and stays mean-preserving regardless.
-        warmup_period: Initial periods masked before the first valid coefficient,
-            which remain missing until the rolling pair is observable. None disables.
+        warmup_period: Number of jointly observable coefficient dates masked once
+            per asset. The application lag then makes the next return the first
+            corrected one. None disables the warmup mask.
         max_ar_coeff: Upper cap on phi_1, strictly < 1, bounding the inflation
             factor 1 / (1 - phi_1). Default 0.9 caps inflation at 10x.
         min_ar_coeff: Lower cap on phi_1. None disables.
@@ -108,11 +110,13 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         the tuple ``(corrected, phi_1, beta_1)``.
 
     Raises:
-        ValueError: if ``span <= 0``, ``factor_returns`` is not an aligned Series,
-            or ``max_ar_coeff >= 1``.
+        ValueError: if ``span <= 0``, ``warmup_period < 0``, ``factor_returns``
+            is not an aligned Series, or ``max_ar_coeff >= 1``.
     """
     if span <= 0:
         raise ValueError(f"span must be positive, got {span!r}")
+    if warmup_period is not None and warmup_period < 0:
+        raise ValueError(f"warmup_period must be >= 0 or None, got {warmup_period!r}")
     if not isinstance(factor_returns, pd.Series):
         raise ValueError(f"factor_returns must be a pd.Series, got {type(factor_returns)}")
     if max_ar_coeff >= 1.0:
@@ -139,20 +143,30 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
     f_lag_np = f_lag_adj.to_numpy(float)
     phi1 = pd.DataFrame(index=returns.index, columns=cols, dtype=float)
     beta1 = pd.DataFrame(index=returns.index, columns=cols, dtype=float)
+    jointly_observable = pd.DataFrame(False, index=returns.index, columns=cols)
     for col in cols:
         # Asset-specific design [r_{t-1}, F_{t-1}]; the own lag differs per asset,
         # so unlike the all-factor engine the design cannot be shared.
         x = np.column_stack([r_lag_adj[col].to_numpy(float), f_lag_np])
         y = y_adj[col].to_numpy(float)
+        joint_valid = np.isfinite(y) & np.all(np.isfinite(x), axis=1)
+        jointly_observable[col] = joint_valid
+
+        # Update every regression moment from the same rows. In particular, do not
+        # accumulate factor variance before a ragged asset itself is observable.
+        x_for_fit = np.where(joint_valid[:, None], x, np.nan)
+        y_for_fit = np.where(joint_valid, y, np.nan)
         bt = compute_ewm_xy_beta_tensor(
-            x=x, y=y, span=span,
-            warmup_period=warmup_period if warmup_period is not None else 20,
+            x=x_for_fit, y=y_for_fit, span=span,
+            warmup_period=-1,                          # publish masking is applied once below
             is_x_correlated=True,                        # joint 2x2 cross-moment inverse
-            nan_backfill=NanBackfill.FFILL,
+            # Decay XX and XY equally across excluded rows, preserving their ratio.
+            nan_backfill=NanBackfill.DEFLATED_FFILL,
         )                                                # shape [t, 2, 1]
-        valid = returns[col].notna().to_numpy()
-        phi1[col] = np.where(valid, bt[:, 0, 0], np.nan)
-        beta1[col] = np.where(valid, bt[:, 1, 0], np.nan)
+        has_joint_observation = np.logical_or.accumulate(joint_valid)
+        publish = returns[col].notna().to_numpy() & has_joint_observation
+        phi1[col] = np.where(publish, bt[:, 0, 0], np.nan)
+        beta1[col] = np.where(publish, bt[:, 1, 0], np.nan)
 
     # Caps. phi_1 capped below 1 for inversion stability; beta_1 optional.
     lo_phi = -np.inf if min_ar_coeff is None else min_ar_coeff
@@ -168,11 +182,11 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         phi1 = phi1.clip(lower=lo_phi, upper=max_ar_coeff)   # smoother can overshoot the cap
 
     if warmup_period is not None:
-        # Leave unidentified coefficients missing; backward fill would import future estimates.
-        phi1 = set_nans_for_warmup_period(a=phi1, warmup_period=warmup_period).reindex(
-            index=returns.index)
-        beta1 = set_nans_for_warmup_period(a=beta1, warmup_period=warmup_period).reindex(
-            index=returns.index)
+        # Mask exactly the requested number of usable regression dates per asset.
+        # The tensor itself is deliberately unmasked, so this is not applied twice.
+        coefficient_ready = jointly_observable.cumsum().gt(warmup_period)
+        phi1 = phi1.where(coefficient_ready)
+        beta1 = beta1.where(coefficient_ready)
 
     # Lag the coefficients one period (no look-ahead), invert with raw levels.
     phi1_l = phi1.shift(1)
