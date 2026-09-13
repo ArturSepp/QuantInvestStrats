@@ -767,8 +767,10 @@ def _cluster_contribution_page(result, config):
         ax.legend(loc="upper center", bbox_to_anchor=(.5, -.13), ncol=legend_columns,
                   fontsize=6.7, frameon=False, columnspacing=.8, handlelength=1.3)
         for y, value in enumerate(values.sum(axis=1)):
-            ax.annotate(f"{value:+.2%}", (value, y), xytext=(4 if value >= 0 else -4, 0),
-                        textcoords="offset points", ha="right" if value < 0 else "left",
+            # A negative subtotal rounding to zero otherwise collides with its row label.
+            right_side = value >= 0 or abs(value) < 0.00005
+            ax.annotate(f"{value:+.2%}", (value, y), xytext=(4 if right_side else -4, 0),
+                        textcoords="offset points", ha="left" if right_side else "right",
                         va="center", fontsize=7.4, color=INK)
 
     labels = {name: f"{name} | {row.nav_weight:+.1%} | n={int(row.holding_count)}"
