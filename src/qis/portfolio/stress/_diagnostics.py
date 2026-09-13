@@ -85,20 +85,7 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
             }
         )
         aggregates[key] = row
-    regressions = {}
-    if all_funded:
-        for key, summary in grids.items():
-            try:
-                x = np.asarray(summary.index, dtype=float)
-            except (TypeError, ValueError):
-                continue
-            design = pd.DataFrame({"linear": x, "quadratic": x * x}, index=summary.index)
-            if len(x) < 2 or not np.isfinite(x).all() or np.linalg.matrix_rank(design) < 2:
-                continue
-            _, params, _ = fit_multivariate_ols(
-                design, summary.portfolio_return, fit_intercept=False, verbose=False
-            )
-            regressions[key] = params
+    regressions = _grid_regressions(grids, order=2 if all_funded else 3)
     return {
         "Annualised portfolio risk": table,
         "Factor Euler volatility": factor.rename("euler_vol").to_frame(),
@@ -106,7 +93,41 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
         "Holding factor Euler volatility": holding,
         "Unit response risk": pd.DataFrame.from_dict(unit_risk, orient="index"),
         "Loading aggregates": pd.DataFrame.from_dict(aggregates, orient="index"),
-        "Grid quadratic regressions": pd.DataFrame.from_dict(
-            regressions, orient="index", columns=["linear", "quadratic"]
-        ),
+        "Grid polynomial regressions": regressions,
     }
+
+
+def _grid_regressions(grids, order):
+    """Fit through-zero grid summaries; R-squared uses the uncentered OLS convention."""
+    regressions = {}
+    for key, summary in grids.items():
+        try:
+            x = np.asarray(summary.index, dtype=float)
+            y = summary.portfolio_return.astype(float)
+        except (TypeError, ValueError):
+            continue
+        if len(x) < order or not np.isfinite(x).all() or not np.isfinite(y).all():
+            continue
+        terms = {"linear": x, "quadratic": x * x}
+        if order == 3:
+            terms["cubic"] = x * x * x
+        design = pd.DataFrame(terms, index=summary.index)
+        if np.linalg.matrix_rank(design) < order:
+            continue
+        if np.any(y != 0.0):
+            prediction, params, _ = fit_multivariate_ols(
+                design, y, fit_intercept=False, verbose=False
+            )
+            # Match no-intercept statsmodels R-squared using QIS's fitted predictions.
+            r_squared = 1.0 - (y - prediction).pow(2).sum() / y.pow(2).sum()
+        else:
+            # A full-rank zero response has zero coefficients and undefined R-squared.
+            params = pd.Series(0.0, index=design.columns)
+            r_squared = np.nan
+        regressions[key] = {
+            "linear": params["linear"], "quadratic": params["quadratic"],
+            "cubic": params.get("cubic", 0.0), "order": order, "r_squared": r_squared,
+        }
+    return pd.DataFrame.from_dict(
+        regressions, orient="index", columns=["linear", "quadratic", "cubic", "order", "r_squared"]
+    )

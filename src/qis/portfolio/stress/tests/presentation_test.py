@@ -38,7 +38,9 @@ def test_euler_families_and_regressions_have_independent_references(market):
     ref = np.linalg.lstsq(
         np.column_stack([x, x * x]), result.grid_summaries["Credit"].portfolio_return, rcond=None
     )[0]
-    np.testing.assert_allclose(tables["Grid quadratic regressions"].loc["Credit"], ref)
+    np.testing.assert_allclose(
+        tables["Grid polynomial regressions"].loc["Credit", ["linear", "quadratic"]], ref
+    )
     np.testing.assert_allclose(
         result.grids["Credit"].factor_log_shocks["Credit"], np.log1p(x / 2), atol=1e-15
     )
@@ -171,3 +173,75 @@ def test_derivative_captions_preserve_denominator_meaning(market, funded):
     finally:
         for _, figure in pages:
             plt.close(figure)
+
+
+@pytest.mark.parametrize("funded, order", [(True, 2), (False, 3)])
+def test_grid_polynomial_order_and_legend_follow_payoff_type(market, funded, order):
+    """Independent least squares agrees with the displayed quadratic or cubic curve."""
+    import matplotlib.pyplot as plt
+    from qis.portfolio.stress._figures import _grid_page
+    from qis.portfolio.stress.instruments import InstrumentLeg, InstrumentType
+    from qis.portfolio.stress.portfolio import PortfolioHolding
+
+    kind = InstrumentType.DELTA_1 if funded else InstrumentType.CALL
+    leg = InstrumentLeg(kind, "proxy_quote", 1.0, strike=None if funded else 80.0)
+    portfolio = market([PortfolioHolding("position", "Position", 80.0, (leg,))])
+    x = np.linspace(-0.3, 0.3, 61)
+    grid = StressScenarios(
+        pd.DataFrame({"Equity": x}, index=x),
+        ScenarioMode.CONDITIONAL, ShockConvention.SIMPLE,
+    )
+    result = run_portfolio_stress_test(portfolio, grid, factor_grids={"Equity": grid})
+    row = result.report_diagnostics["Grid polynomial regressions"].loc["Equity"]
+    y = result.grid_summaries["Equity"].portfolio_return.to_numpy()
+    design = np.column_stack([x ** power for power in range(1, order + 1)])
+    reference = np.linalg.lstsq(design, y, rcond=None)[0]
+    terms = ["linear", "quadratic", "cubic"][:order]
+    np.testing.assert_allclose(row[terms], reference, rtol=1e-10, atol=1e-12)
+    assert row["order"] == order
+    if funded:
+        assert row.cubic == 0.0
+    assert row.r_squared == pytest.approx(1 - np.sum((y - design @ reference) ** 2) / (y @ y))
+    assert ("lower_bound" in result.grid_summaries["Equity"]) is funded
+    figure = _grid_page(result, StressReportConfig())
+    try:
+        figure.canvas.draw()
+        curve = next(line for line in figure.axes[0].lines if line.get_linestyle() == "--")
+        np.testing.assert_allclose(curve.get_ydata(), design @ reference, atol=1e-12)
+        assert curve.get_ydata()[30] == pytest.approx(0.0, abs=1e-12)
+        legend = figure.axes[0].get_legend().get_texts()[0].get_text()
+        assert "R^2" in legend
+        assert ("x^3" in legend) is (not funded)
+    finally:
+        plt.close(figure)
+
+
+def test_cubic_grid_requires_three_independent_regressors(market):
+    """A three-point symmetric grid cannot identify a through-zero cubic."""
+    from qis.portfolio.stress.instruments import InstrumentLeg, InstrumentType
+    from qis.portfolio.stress.portfolio import PortfolioHolding
+
+    portfolio = market([PortfolioHolding(
+        "future", "Future", 0.0, (InstrumentLeg(InstrumentType.FUTURE, "actual", 1.0),),
+    )])
+    x = np.array([-0.2, 0.0, 0.2])
+    grid = StressScenarios(pd.DataFrame({"Equity": x}, index=x))
+    result = run_portfolio_stress_test(portfolio, grid, factor_grids={"Equity": grid})
+    assert result.report_diagnostics["Grid polynomial regressions"].empty
+
+
+def test_zero_payoff_grid_has_zero_coefficients_and_undefined_r_squared(market):
+    """A flat zero payoff must not be reported as a spurious perfect fit."""
+    from qis.portfolio.stress.instruments import InstrumentLeg, InstrumentType
+    from qis.portfolio.stress.portfolio import PortfolioHolding
+
+    portfolio = market([PortfolioHolding(
+        "zero", "Zero position", 0.0,
+        (InstrumentLeg(InstrumentType.FUTURE, "actual", 0.0),),
+    )])
+    x = np.linspace(-0.2, 0.2, 9)
+    grid = StressScenarios(pd.DataFrame({"Equity": x}, index=x))
+    result = run_portfolio_stress_test(portfolio, grid, factor_grids={"Equity": grid})
+    row = result.report_diagnostics["Grid polynomial regressions"].loc["Equity"]
+    np.testing.assert_allclose(row[["linear", "quadratic", "cubic"]], 0.0)
+    assert np.isnan(row.r_squared)

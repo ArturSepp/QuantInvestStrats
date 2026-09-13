@@ -379,7 +379,7 @@ def _contributor_page(result, config):
 
 
 def _grid_page(result, config):
-    """Use QIS scatter plots, through-zero regressions and exact-value-centred bands."""
+    """Show exact grids, quadratic/cubic summaries and supported conditional bands."""
     funded = result.metadata["all_funded"]
     confidence = result.metadata["confidence"]
     months = result.metadata["horizon_years"] * 12
@@ -467,11 +467,17 @@ def _grid_page(result, config):
                 fontsize=8,
                 color=INK,
             )
-        coefficients = result.report_diagnostics["Grid quadratic regressions"]
+        coefficients = result.report_diagnostics["Grid polynomial regressions"]
         if key in coefficients.index:
-            b1, b2 = coefficients.loc[key, ["linear", "quadratic"]]
-            label = rf"$R_p(x)={b1:.2f}x{b2:+.2f}x^2$"
-            ax.plot(x, b1 * x + b2 * x * x, color="#C46B27", ls="--", lw=1.5, label=label)
+            row = coefficients.loc[key]
+            b1, b2, b3 = row[["linear", "quadratic", "cubic"]]
+            equation = rf"$R_p(x)={b1:.2f}x{b2:+.2f}x^2"
+            if row["order"] == 3:
+                equation += rf"{b3:+.2f}x^3"
+            fit = rf"$R^2$={row.r_squared:.1%}" if np.isfinite(row.r_squared) else "$R^2$: n/a"
+            label = equation + "$\n" + fit
+            ax.plot(x, b1 * x + b2 * x * x + b3 * x**3,
+                    color="#C46B27", ls="--", lw=1.5, label=label)
             ax.legend(
                 loc="upper right" if str(key).lower() == "fx" else "upper left",
                 fontsize=9,
@@ -519,9 +525,13 @@ def _grid_page(result, config):
                   "No conditional prediction band was computed for these grids."]
     else:
         notes += [
-            "Derivative portfolios show exact intrinsic-payoff scenarios. No Gaussian "
-            "band or quadratic regression is supplied for nonlinear derivative payoffs."
+            "Derivative points use exact intrinsic-payoff scenarios. Dashed: cubic OLS through "
+            "zero on the displayed grid (decimal returns); no Gaussian prediction bands.",
+            "The cubic is a descriptive approximation; strike kinks and knockout jumps remain "
+            "in exact valuations and can be missed by a smooth fitted curve."
         ]
+    notes.append("Fit R-squared is uncentered: 1 - sum(error squared) / sum(return squared); "
+                 "n/a for a zero curve. A rank-deficient grid has no fitted line.")
     if any(result.grid_metadata.loc[key, "bump_convention"] != "simple"
            or result.grid_metadata.loc[key, "completion"] != "conditional" for key in keys):
         notes[0] = ("Each panel uses the supplied grid index and exported Grid conventions. "

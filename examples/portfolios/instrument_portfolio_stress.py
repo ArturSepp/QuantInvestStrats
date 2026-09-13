@@ -186,6 +186,9 @@ def verify_result(portfolio, result, derivatives):
         + risk.loc["Idiosyncratic", "euler_vol"], risk.loc["Total", "annual_vol"],
     )
     assert ("lower_bound" in result.grid_summaries["Credit"]) is (not derivatives)
+    regressions = result.report_diagnostics["Grid polynomial regressions"]
+    assert regressions["order"].eq(3 if derivatives else 2).all()
+    assert set(regressions.index) == set(result.grid_summaries)
     if derivatives:
         # -5 contracts x multiplier 50 x spot 2000: zero MTM still has -500,000 exposure.
         assert result.response_jacobian.loc["future", "metal_response"] == -500_000.0

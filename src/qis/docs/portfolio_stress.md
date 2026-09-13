@@ -365,7 +365,7 @@ exact scenario P&L. There is no logarithm or P&L division by derivative MTM.
 Ordinary funded portfolios retain existing baseline Gaussian conditional-factor
 plus shared-residual grid bands. Their horizon and central probability are
 explicit. Nonlinear/derivative grids show deterministic intrinsic curves with
-an unavailable-band status and no quadratic fit.
+an unavailable-band status and a descriptive through-zero cubic fit.
 
 ## Euler volatility analytics
 
@@ -415,9 +415,14 @@ model volatility. All holding terms for a factor sum to its factor term, while t
 displayed subsets need not add to the full totals.
 
 Page six calls QIS scatter plots and `fit_multivariate_ols` for through-zero
-quadratic fits on funded-asset scenario grids. Existing conditional bands stay
-centred on exact scenario valuations. Neither bands nor quadratic fits are inferred
-for derivative portfolios. Credit grids retain the caller's total-family split.
+quadratic fits when `all_funded=True` and cubic fits otherwise. Both pass through
+zero and use decimal grid returns. The legend displays the equation and uncentered
+R-squared: `1 - sum((actual - fitted)^2) / sum(actual^2)`. A zero curve has undefined
+R-squared; a grid without enough independent regressors has no fitted line. These
+are descriptive curve fits, not new portfolio valuations or fitted-factor R-squared.
+Cubic curves can smooth over strike kinks and knockout jumps. Existing funded
+conditional bands stay centred on exact scenario valuations; derivative portfolios
+have no Gaussian bands. Credit grids retain the caller's total-family split.
 Page seven includes signed beta colours, fitted R-squared, annual systematic and
 residual volatility, Rest of assets, and Portfolio rows. Rest uses full-denominator
 weights, not a renormalised sleeve. Portfolio R-squared is an absolute-response-
@@ -435,7 +440,7 @@ response rows plus aggregate rows. All fitted factors appear in model order.
 Missing R-squared and fitted trees are labelled unavailable. The caller supplies
 names, diagnostics and original topology; the renderer never estimates them.
 `PortfolioStressResult.report_diagnostics` retains numerical Euler tables, unit
-response risk, loading aggregates and quadratic coefficients before rendering.
+response risk, loading aggregates and polynomial coefficients before rendering.
 Those exhibits, the displayed loading table and optional parser appendix are also
 exported to Excel and CSV.
 
@@ -468,7 +473,7 @@ The principal result fields and exports have distinct interpretations:
 | `historical_ranking`, `historical_coverage` | Exact P&L ranking and the inclusion/exclusion reason for each supplied month. |
 | `attribution[*]` | Factor components plus the nonlinear payoff adjustment, reconciling to currency P&L. |
 | `positions`, `leg_terms` | Source marks, intrinsic baselines, constant basis offsets, payoff coverage and vanilla terms. |
-| `Grid quadratic regressions` | Through-zero coefficients for funded curves; empty for derivative portfolios. |
+| `Grid polynomial regressions` | Linear/quadratic/cubic coefficients, selected order (2 funded; 3 otherwise) and uncentered R-squared. Funded cubic coefficients are zero. |
 
 Currency amounts are not automatically invested cash, executable proceeds or lending
 value. The R-squared in the Portfolio/Rest rows is a weighted fit diagnostic, not a

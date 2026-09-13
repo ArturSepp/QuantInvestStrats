@@ -21,6 +21,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Fit through-zero quadratic sensitivity curves for funded portfolios and cubic curves
+  for derivative portfolios, with equations and uncentered R-squared in the legends.
+  Rename the unreleased `Grid quadratic regressions` diagnostic/export to
+  `Grid polynomial regressions`; add cubic coefficient, order and R-squared columns.
+  Exact scenario valuations and the funded-only prediction-band policy are unchanged.
 - Restore the original stress-report presentation: annualised risk table, family
   Euler bars, QIS scatter/regression/band grids, coloured loading table with Rest
   and Portfolio rows, fitted cadence dendrograms and covariance/formula page.
@@ -34,7 +39,7 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   report captions retain their original NAV terminology.
 - Family Euler contributions sum constituent risk contributions; Credit scenario
   bumps still split before log conversion. Derivative scenarios retain exact
-  intrinsic valuation and have no Gaussian prediction bands or quadratic fits.
+  intrinsic valuation and have no Gaussian prediction bands.
 
 ## [5.28.0] - 2026-09-12
 
