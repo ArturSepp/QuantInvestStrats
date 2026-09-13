@@ -118,6 +118,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Made `find_upto_date_from_datetime_index` select the latest eligible finite timestamp from
+  unsorted inputs instead of returning a future, stale, or `NaT` entry.
+
 - Kept joint own-lag and factor-lag unsmoothing point-in-time by using the established causal
   EWMA mean seed, updating all regression moments only on jointly observed rows, and applying
   each asset's warm-up mask exactly once instead of twice.

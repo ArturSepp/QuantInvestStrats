@@ -32,12 +32,13 @@ Also here: ``generate_sample_dates`` and ``split_df_by_freq`` for overlapping wi
 
 from __future__ import annotations  # to allow class method annotations
 
+from bisect import bisect_right
 import warnings
 import datetime as dt
 import re
 import pandas as pd
 import numpy as np
-from typing import List, Union, Tuple, Optional, NamedTuple, Dict
+from typing import List, Union, Tuple, Optional, NamedTuple, Dict, cast
 from enum import Enum
 
 from qis.utils.struct_ops import separate_number_from_string
@@ -967,18 +968,21 @@ def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Ti
 
     Uses binary search to efficiently find the largest date in the index that is
     less than or equal to the target date, even when the target date is not
-    present in the index.
+    present in the index. Input order does not affect the result, and ``NaT``
+    entries do not match a finite target.
 
     Args:
-        index: DatetimeIndex or list of timestamps to search within.
+        index: DatetimeIndex or list of timestamps to search within. The timestamps
+            need not be chronologically ordered.
         date: Target date to find the latest preceding date for.
 
     Returns:
         The latest timestamp in index that is <= date, or None if date is before
-        the first timestamp in the index.
+        the earliest finite timestamp in the index or the index contains no finite timestamps.
 
     Warns:
-        UserWarning: If the target date is before the first date in the index.
+        UserWarning: If the target date is before the earliest finite date in the index or the
+            index contains no finite timestamps.
 
     Example:
         >>> index = pd.date_range('2023-01-01', periods=5, freq='D')
@@ -987,13 +991,27 @@ def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Ti
         >>> find_upto_date_from_datetime_index(index, pd.Timestamp('2023-01-02 12:00'))
         Timestamp('2023-01-02 00:00:00', freq='D')
     """
-    matched_index = pd.Series(index).sort_values().searchsorted(date, side='right')
-    # check left boundary
-    if matched_index == 0 and date != index[0]:
-        warnings.warn(f"find_upto_date_from_datetime_index: date={date} is below first date of the index={index[0]}, "
-                      f"returning None", stacklevel=2)
+    # Search and return from one ordered view so the insertion position addresses the same data.
+    ordered_index = cast(
+        List[pd.Timestamp], pd.DatetimeIndex(index).dropna().sort_values().to_list()
+    )
+    if not ordered_index:
+        warnings.warn(
+            "find_upto_date_from_datetime_index: index contains no finite timestamps, "
+            "returning None",
+            stacklevel=2,
+        )
         return None
-    matched_date = index[matched_index - 1]
+    matched_index = bisect_right(ordered_index, date)
+    # check left boundary
+    if matched_index == 0:
+        warnings.warn(
+            f"find_upto_date_from_datetime_index: date={date} is below first date of "
+            f"the index={ordered_index[0]}, returning None",
+            stacklevel=2,
+        )
+        return None
+    matched_date = ordered_index[matched_index - 1]
     return matched_date
 
 
