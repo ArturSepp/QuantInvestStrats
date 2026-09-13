@@ -238,17 +238,26 @@ def _format_workbook(path):
     }
     for sheet in book:
         sheet.sheet_view.showGridLines = False
-        sheet.freeze_panes = "B2"
         sheet.row_dimensions[1].height = 44
         if not sheet.merged_cells.ranges:
             sheet.auto_filter.ref = sheet.dimensions
         headers = {cell.column: str(cell.value or "") for cell in sheet[1]}
         sheet_percent_columns = percent_columns
-        if {"mean_ci_lower", "mean_ci_upper"}.issubset(headers.values()):
+        has_regression_ci = {"mean_ci_lower", "mean_ci_upper"}.issubset(headers.values())
+        pane = "C2" if has_regression_ci else "B2"
+        if sheet.freeze_panes != pane:
+            sheet.freeze_panes = pane
+        # Reapplying openpyxl freeze_panes appends duplicate selections; keep one per pane.
+        selections = {}
+        for selection in sheet.sheet_view.selection:
+            selection.activeCell = selection.activeCell or "A1"
+            selection.sqref = selection.sqref or "A1"
+            selections.setdefault(selection.pane, selection)
+        sheet.sheet_view.selection = list(selections.values())
+        if has_regression_ci:
             sheet_percent_columns = percent_columns | {
                 "factor_return", "mean", "mean_se", "mean_ci_lower", "mean_ci_upper", "confidence",
             }
-            sheet.freeze_panes = "C2"
             for merged in list(sheet.merged_cells.ranges):
                 if merged.min_col == merged.max_col == 1:
                     grid = sheet.cell(merged.min_row, 1).value

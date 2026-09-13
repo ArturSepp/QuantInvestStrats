@@ -73,12 +73,20 @@ def test_nine_core_pages_export_all_values_without_repricing(market, tmp_path, m
                          if table["name"] == "Grid regression confidence bands")
     ci_sheet = workbook[ci_sheet_name]
     assert ci_sheet.freeze_panes == "C2"
+    assert len(ci_sheet.sheet_view.selection) == 3
     assert not ci_sheet.merged_cells.ranges
     assert ci_sheet["A2"].value == ci_sheet["A3"].value == "Credit"
     assert ci_sheet.auto_filter.ref == ci_sheet.dimensions
     assert "%" in ci_sheet["C2"].number_format
     assert "%" in ci_sheet["E2"].number_format
     workbook.close()
+    from qis.portfolio.stress.reporting import _format_workbook
+    with zipfile.ZipFile(artifact.workbook_path) as archive:
+        before_format = {name: archive.read(name) for name in archive.namelist()
+                         if name.startswith("xl/worksheets/")}
+    _format_workbook(artifact.workbook_path)
+    with zipfile.ZipFile(artifact.workbook_path) as archive:
+        assert before_format == {name: archive.read(name) for name in before_format}
     with zipfile.ZipFile(artifact.workbook_path) as archive:
         sheets = [name for name in archive.namelist() if name.startswith("xl/worksheets/sheet")]
         assert len(sheets) == len(artifact.table_paths) + 1
