@@ -140,3 +140,50 @@ def test_axes_contract_rejects_partial_or_conflicting_destinations(problem):
         _, table_ax = plt.subplots()
     with pytest.raises(ValueError):
         plot_clusters(clusters, linkages, cutoffs, axes=axes, table_ax=table_ax)
+
+
+def test_descriptive_labels_preserve_raw_ids_and_reject_unknown_clusters():
+    """Descriptions are display metadata; returned memberships keep fitted IDs."""
+    clusters, linkages, cutoffs = inputs()
+    expected, _ = plot_clusters(clusters, linkages, cutoffs)
+    actual, fig = plot_clusters(clusters, linkages, cutoffs, cluster_labels={
+        "ME-1": "Equity core", "ME-2": "Rates long-duration", "QE-1": "Credit low-vol"})
+    pd.testing.assert_series_equal(actual, expected)
+    text = " ".join(cell.get_text().get_text() for ax in fig.axes
+                    for table in ax.tables for cell in table.get_celld().values())
+    assert "Equity core" in text and "Cluster label" in text
+    before = plt.get_fignums()
+    with pytest.raises(ValueError, match="Unknown descriptive"):
+        plot_clusters(clusters, linkages, cutoffs, cluster_labels={"ME-99": "Unknown"})
+    assert plt.get_fignums() == before
+
+
+def test_portfolio_weights_follow_asset_ids_without_normalising():
+    """Shuffled signed weights retain the full-portfolio denominator after cluster sorting."""
+    clusters, linkages, cutoffs = inputs()
+    weights = pd.Series([.1, -.2, .4, .15], index=["B", "D", "A", "C"])
+    before = weights.copy()
+    membership, fig = plot_clusters(
+        clusters, linkages, cutoffs, portfolio_weights=weights,
+        display_names={"A": "Alpha", "B": "Beta", "C": "Charlie", "D": "Delta"})
+    cells = fig.axes[-1].tables[0].get_celld()
+    header = next(c for (r, c), cell in cells.items()
+                  if r == 0 and cell.get_text().get_text() == "Portfolio weight")
+    actual = [cells[(r, header)].get_text().get_text() for r in range(1, 5)]
+    assert membership.index.tolist() == ["D", "C", "B", "A"]
+    assert actual == ["-20.00%", "15.00%", "10.00%", "40.00%"]
+    pd.testing.assert_series_equal(weights, before)
+
+
+@pytest.mark.parametrize("weights", [
+    pd.Series([.1], index=["A"]),
+    pd.Series([.1, .2, .3, .4], index=["A", "A", "C", "D"]),
+    pd.Series([.1, .2, float("nan"), .4], index=["A", "B", "C", "D"]),
+])
+def test_portfolio_weights_reject_incomplete_or_ambiguous_inputs(weights):
+    """Missing weights cannot silently become zero or be attached by row position."""
+    clusters, linkages, cutoffs = inputs()
+    before = plt.get_fignums()
+    with pytest.raises(ValueError, match="weights"):
+        plot_clusters(clusters, linkages, cutoffs, portfolio_weights=weights)
+    assert plt.get_fignums() == before

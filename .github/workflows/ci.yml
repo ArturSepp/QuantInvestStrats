@@ -128,7 +128,19 @@ jobs:
             "qis/docs/plotting_kwargs.md",
             "qis/docs/reporting_frequencies.md",
             "qis/docs/sharpe_conventions.md",
+            "qis/docs/portfolio_stress.md",
         }
+        expected_stress = {
+            "qis/portfolio/stress/__init__.py",
+            "qis/portfolio/stress/instruments.py",
+            "qis/portfolio/stress/portfolio.py",
+            "qis/portfolio/stress/scenarios.py",
+            "qis/portfolio/stress/analytics.py",
+            "qis/portfolio/stress/reporting.py",
+            "qis/portfolio/stress/tests/public_api_test.py",
+        }
+        missing_stress = sorted(expected_stress - names)
+        assert not missing_stress, f"the wheel misses stress interfaces: {missing_stress}"
         missing_docs = sorted(expected_docs - names)
         assert tests, "the wheel ships no qis test modules"
         assert not examples, f"repository examples leaked into the wheel: {examples[:5]}"

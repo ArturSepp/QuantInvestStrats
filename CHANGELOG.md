@@ -5,6 +5,33 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.30.1] - 2026-09-13
+
+### Added
+
+- Integrate the instrument-portfolio stress framework omitted from the published 5.30.0
+  source. Public qis.portfolio.stress interfaces cover funded assets, intrinsic calls/puts,
+  futures and consumer-defined composite payoffs, with original-mark-anchored valuation,
+  shared underlying responses, FX conversion and exact nonlinear scenario P&L.
+- Add optional RiskModel.factor_groups and factor-family exposure aggregation. Family
+  scenarios split simple-return bumps before log conversion and joint conditioning.
+- Add historical replay, conditional factor grids, scenario-local one/two-sigma risk bands,
+  and through-zero quadratic sensitivity fits. Risk bands describe conditional covariance
+  uncertainty; they are distinct from fitted-regression confidence intervals.
+- Add the unified PDF, Excel and CSV stress report: factor/family Euler contributions,
+  six ranked sensitivity panels, fitted loadings, risk tables, cluster diagnostics and
+  contributors, conditional-shock matrices, optional parser coverage and notation guide.
+- Add optional cluster descriptions and signed portfolio weights to plot_clusters,
+  with synthetic examples, shipped methodology and installed-wheel interface checks.
+
+### Fixed
+
+- Preserve the causal joint-unsmoothing warmup and missing-row fixes and finite-date
+  as-of lookup fixes merged after 5.30.0.
+
+The unreleased stress-branch versions 5.28-5.36 are consolidated into this release;
+those branch labels did not identify published stress-framework distributions.
+
 ## [5.30.0] - 2026-09-13
 
 ### Changed

@@ -37,6 +37,7 @@ METHODOLOGY_PAGES = frozenset({
 UTILITY_PAGES = frozenset({
     'documentation_standard.md', 'factsheets.md', 'gallery.md', 'index.md', 'install.md',
     'package_comparison.md', 'quickstart.md', 'REMOVED_5_0.md', 'software_design.md',
+    'portfolio_stress.md',
 })
 # Adoption is explicit. Do not infer it from a byline or let new pages evade the inventory.
 ADOPTED_PAGES = frozenset({
@@ -49,7 +50,7 @@ ADOPTED_PAGES = frozenset({
     'model_layer_attribution.md', 'reproducibility.md',
     'factsheets_and_reporting.md', 'factsheets.md', 'gallery.md',
     'install.md', 'quickstart.md', 'software_design.md', 'package_comparison.md',
-    'REMOVED_5_0.md',
+    'REMOVED_5_0.md', 'portfolio_stress.md',
 })
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')

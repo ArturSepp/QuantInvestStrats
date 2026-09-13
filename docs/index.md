@@ -139,6 +139,7 @@ Brinson attribution <brinson_attribution>
 
 Model-layer attribution <model_layer_attribution>
 Factor stress testing <stress_testing>
+Instrument portfolios and stress reports <portfolio_stress>
 incomplete_and_mixed_frequency_data
 Private-asset unsmoothing <private_asset_unsmoothing>
 FX hedging and market data <fx_hedging_and_market_data>

@@ -45,10 +45,12 @@ def main(output_dir=None):
     grid = fig.add_gridspec(2, 3)
     axes = {group: fig.add_subplot(grid[i, :2]) for i, group in enumerate(clusters)}
     table_ax = fig.add_subplot(grid[:, 2])
+    assets = pd.concat(clusters.values()).index
+    weights = pd.Series(1. / len(assets), index=assets)
     membership, _ = qis.plot_clusters(
         clusters, linkages, cutoffs, axes=axes, table_ax=table_ax,
         titles={group: f"{group}: illustrative Ward tree" for group in clusters},
-        show_distance=True, table_title="Fitted membership",
+        show_distance=True, table_title="Fitted membership", portfolio_weights=weights,
     )
     fig.suptitle("Synthetic asset clustering: reusable QIS plots")
     print(f"{len(membership)} assets across {len(clusters)} supplied trees")

@@ -68,7 +68,16 @@ jobs:
           uv venv --python 3.12 "$RUNNER_TEMP/release-wheel-env"
           uv pip install --python "$RUNNER_TEMP/release-wheel-env/bin/python" "$RUNNER_TEMP/release-dist/"*.whl
           cd "$RUNNER_TEMP"
-          "$RUNNER_TEMP/release-wheel-env/bin/python" -I -c "import qis; print(qis.__file__)"
+          "$RUNNER_TEMP/release-wheel-env/bin/python" -I - <<'PY'
+          import qis
+          from qis.portfolio.stress import (
+              InstrumentPortfolio, StressReportConfig, generate_portfolio_stress_report,
+          )
+          assert qis.InstrumentPortfolio is InstrumentPortfolio
+          assert qis.StressReportConfig is StressReportConfig
+          assert qis.generate_portfolio_stress_report is generate_portfolio_stress_report
+          print(qis.__file__)
+          PY
       - name: Verify artifact metadata and immutable PyPI digests
         id: artifacts
         env:

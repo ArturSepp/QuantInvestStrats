@@ -113,3 +113,11 @@ from qis.portfolio.risk.stress_testing import (
     compute_conditional_scenario_band,
     compute_factor_sensitivity,
 )
+
+from qis.portfolio.stress import (
+    FactorGroupSpec, HoldingPayoff, InstrumentLeg, InstrumentPortfolio, InstrumentType,
+    KinkPolicy, PayoffContext, PortfolioHolding, PortfolioStressResult,
+    PortfolioValuationResult, ResponseBasis, ScenarioMode, ShockConvention, StressScenarios,
+    StressTestConfig, Underlying, run_portfolio_stress_test,
+    StressReportArtifacts, StressReportConfig, generate_portfolio_stress_report,
+)
