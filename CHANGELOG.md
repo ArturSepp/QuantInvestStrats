@@ -68,6 +68,9 @@ batch and also shifts later sample columns.
 - Corrected explicit three-quarter frequency aliases to annualize at four-thirds observations per
   year, consistently with anchored and case-normalized multiplier forms.
 
+- Matched modern business month- and quarter-end aliases and their positive multipliers to the
+  equivalent calendar-period annualization factors.
+
 - Added opt-in causal FX spot alignment that leaves leading gaps unavailable, while preserving
   historical leading backfill by default. Both modes normalize source chronology and retain the
   exact price-panel axes before cash or futures return conversion.

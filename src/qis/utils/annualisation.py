@@ -3,9 +3,10 @@ annualisation factors: periods per year for a pandas frequency string or a data 
 
 ``get_annualization_factor`` maps a frequency to periods per year, handling multipliers and
 anchors ('2W' -> 26, 'QE-DEC' -> 4) and falling back to a regex parse, with a UserWarning and a
-factor of 1.0 for a string it cannot read. 'D' is 365 always, 'B' is ``default_trading_days``
-(252 by default), and ``is_calendar=True`` moves the business-day family to 365. Intraday aliases
-use 24 clock hours within each selected active day; they do not infer an exchange session.
+factor of 1.0 for a string it cannot read. Business month- and quarter-end aliases share their
+calendar counterparts' factors. 'D' is 365 always, 'B' is ``default_trading_days`` (252 by default),
+and ``is_calendar=True`` moves the business-day family to 365. Intraday aliases use 24 clock hours
+within each selected active day; they do not infer an exchange session.
 ``get_annualisation_conversion_factor`` is the ratio of two such factors.
 
 Two inference paths differ on an irregular index. ``infer_annualisation_factor_from_df`` reads
@@ -37,7 +38,7 @@ def get_annualization_factor(freq: str,
     Handles various frequency formats including multipliers and anchors.
 
     Args:
-        freq: Pandas frequency string (e.g., 'D', 'W-FRI', '2ME', 'QE-DEC')
+        freq: Pandas frequency string (e.g., 'D', 'W-FRI', '2ME', '2BME', 'QE-DEC', 'BQE')
         is_calendar: If True, use 365 active days; otherwise use ``default_trading_days``.
             Intraday frequencies use 24 clock hours within each selected active day.
         default_trading_days: Active days per year outside calendar mode. This does not imply an
@@ -143,11 +144,13 @@ def get_annualization_factor(freq: str,
             'MS': 12.0,
             'BM': 12.0,
             'BMS': 12.0,
+            'BME': 12.0,
             'QE': 4.0,
             'Q': 4.0,
             'QS': 4.0,
             'BQ': 4.0,
             'BQS': 4.0,
+            'BQE': 4.0,
             'YE': 1.0,
             'Y': 1.0,
             'A': 1.0,
