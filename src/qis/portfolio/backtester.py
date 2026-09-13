@@ -103,8 +103,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
             is per-instrument and constant in time; a DataFrame of dates x tickers is
             reindexed to ``prices`` dates taking the last schedule row at or before each
             date, so a cost schedule stated on era boundaries applies from each boundary
-            onward. Costs are read at every trade date, including an opening trade on the
-            first price date; dates before the first schedule row are costless
+            onward. Numeric pandas extension dtypes are accepted. Costs are read at every trade
+            date, including an opening trade on the first price date; dates before the first
+            schedule row are costless
         weight_implementation_lag: non-negative integer observations of the price index between a
             weight being observed and traded, so 1 on a business-day panel trades the next
             business day. None means zero. It selects the entry price for the units only and
@@ -267,7 +268,8 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                                  f"{list(missing_columns)}")
             rebalancing_costs = rebalancing_costs.sort_index().reindex(index=prices.index,
                                                                        method='ffill')
-            rebalancing_costs = rebalancing_costs[prices.columns].fillna(0.0).to_numpy()
+            # Nullable DataFrame columns otherwise combine into an object array Numba cannot type.
+            rebalancing_costs = rebalancing_costs[prices.columns].fillna(0.0).to_numpy(dtype=float)
         elif isinstance(rebalancing_costs, pd.Series):
             if isinstance(rebalancing_costs.index, pd.DatetimeIndex):
                 raise ValueError("a date-indexed rebalancing_costs Series is ambiguous: "
