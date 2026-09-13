@@ -23,6 +23,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   too. Charts shade exact payoff curves with one/two-sigma ranges and keep quadratic
   equations/R-squared; regression confidence intervals remain available in tables only.
   Bands are local covariance approximations, not exact nonlinear probability intervals.
+- Sensitivity panels label one/two-sigma half-widths at zero shock on separate rows;
+  the footnote distinguishes these labels from scenario-varying shaded bands.
 
 ## [5.29.0] - 2026-09-12
 

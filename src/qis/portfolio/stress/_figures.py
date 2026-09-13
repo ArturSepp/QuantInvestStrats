@@ -464,9 +464,12 @@ def _grid_page(result, config):
                 color=BLUE, alpha=0.25, zorder=1, label="Conditional +/-1sigma",
             )
             band_handles = [inner, outer]
-            sigma = summary.conditional_vol_horizon
-            ax.text(0.98, 0.03, f"1sigma width: {sigma.min():.2%} to {sigma.max():.2%}",
-                    transform=ax.transAxes, ha="right", fontsize=8, color=INK)
+            zero = np.flatnonzero(np.isclose(x, 0.0, rtol=0.0, atol=1e-12)) if numeric else []
+            sigma = summary.conditional_vol_horizon.iloc[zero[0]] if len(zero) == 1 else np.nan
+            widths = [f"{multiple * sigma:.2%}" if np.isfinite(sigma) else "n/a"
+                      for multiple in (1, 2)]
+            ax.text(0.98, 0.03, f"1sigma band +/- {widths[0]}\n2sigma band +/- {widths[1]}",
+                    transform=ax.transAxes, ha="right", va="bottom", fontsize=8, color=INK)
         coefficients = result.report_diagnostics["Grid polynomial regressions"]
         if key in coefficients.index:
             row = coefficients.loc[key]
@@ -500,7 +503,8 @@ def _grid_page(result, config):
         "conditional solve. Appendix, page 9.",
         f"Shading: conditional +/-1sigma (dark) and +/-2sigma (light) over {months:g} month. "
         "Bands are centred on exact payoff valuations; local sensitivities are recalculated "
-        "at each grid point using the fixed reporting denominator.",
+        "at each grid point using the fixed reporting denominator. Panel labels show half-widths "
+        "at zero shock (n/a if unavailable); shading varies along the grid.",
         "Sigma includes remaining conditional factor risk plus shared-underlying residual "
         "risk. Signed factor Euler contributions plus residual Euler sum to sigma; the "
         "selected factors are fixed, not removed by subtracting their original Euler values.",
