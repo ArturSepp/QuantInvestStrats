@@ -72,6 +72,15 @@ intersphinx_mapping = {
 # SciPy is a runtime dependency, but no public annotation links to its documentation. Omitting its
 # unreliable inventory avoids network-only documentation failures without removing rendered links.
 
+# DOI redirects commonly terminate at publisher sites that reject automated CI requests with
+# HTTP 403 even though the canonical DOI remains valid. The Frongello paper is likewise retained
+# as a reader-facing historical reference while its host has an expired TLS certificate. Keep
+# these links rendered, but do not make releases depend on those external server policies.
+linkcheck_ignore = [
+    r"https://doi\.org/.*",
+    r"https://frongello\.com/support/Works/JPMSpring2002\.pdf",
+]
+
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 source_suffix = {'.rst': 'restructuredtext', '.md': 'markdown'}
