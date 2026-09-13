@@ -49,6 +49,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Ordered portfolio-backtester prices, funding rates, and instrument carry chronologically before
+  stateful processing, and rejected ambiguous duplicate or missing price timestamps.
+
 - Normalized real-valued pandas regression inputs before standard and HAC statsmodels design
   construction, so nullable benchmark returns no longer fail or fall through to all-zero alpha,
   beta, and R-squared statistics. Pandas row indexes remain an enforced alignment boundary.

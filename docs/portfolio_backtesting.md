@@ -15,8 +15,10 @@ units remain fixed until the next rebalance while realised weights drift with pr
 
 ## Data and calculation contract
 
-- **Prices:** a `pandas.DataFrame` of levels, dates in a `DatetimeIndex`, assets in columns. Price
-  units can differ by asset because the engine holds units. Columns must be unique.
+- **Prices:** a `pandas.DataFrame` of levels, unique non-missing dates in a `DatetimeIndex`, assets
+  in columns. The backtester orders price rows chronologically on a local copy before constructing
+  state; duplicate timestamps are rejected because their state-transition order is ambiguous.
+  Price units can differ by asset because the engine holds units. Columns must be unique.
 - **Target weights:** a dictionary, Series, list, array, or date-by-asset DataFrame. Named inputs
   align by ticker; list and array inputs are positional. A fixed vector is reapplied at
   `rebalancing_freq`; a DataFrame supplies its own decision dates and ignores that frequency.
@@ -27,7 +29,8 @@ units remain fixed until the next rebalance while realised weights drift with pr
   assumption is intentional.
 - **Returns and annualisation:** prices produce simple holding-period P&L. `funding_rate`,
   `management_fee`, and `instruments_carry` are annualised decimal rates converted to the price
-  grid. A cash residual earns `funding_rate`, which defaults to zero.
+  grid. Dated funding and carry inputs are ordered chronologically before that alignment. A cash
+  residual earns `funding_rate`, which defaults to zero.
 - **Trading costs:** `rebalancing_costs` is a decimal fraction of absolute traded notional;
   `0.0010` is 10 bp. A scalar applies everywhere, a ticker-indexed Series varies by asset, and a
   date-by-ticker DataFrame is forward-filled through time. Costs are read on the trade date.
