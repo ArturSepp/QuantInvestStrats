@@ -4,12 +4,15 @@ import copy
 import json
 import runpy
 import socket
+import sys
 from pathlib import Path
 
 import pytest
 
 
 ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 RUNNER = ROOT / 'tools/docs_analytics/run.py'
 if not RUNNER.is_file():
     pytest.skip('Documentation analytics tooling is not shipped in wheels.',
