@@ -21,6 +21,7 @@ from qis.portfolio.stress.reporting import _loading_table, _report_heading
 INK = "#18354B"
 BLUE = "#315B7A"
 RED = "#A64045"
+FOOTNOTE_FONTSIZE = 9
 
 
 def _page(result, config, number, title, subtitle):
@@ -41,14 +42,15 @@ def _page(result, config, number, title, subtitle):
         f"Risk {meta['risk_date'][:10]} | {meta['reference_currency']} | "
         f"{meta['denominator_label']} {meta['reporting_denominator']:,.2f}"
     )
-    fig.text(0.04, 0.025, textwrap.shorten(footer, 220), fontsize=8, color=BLUE)
+    fig.text(0.04, 0.025, textwrap.shorten(footer, 220), fontsize=FOOTNOTE_FONTSIZE, color=BLUE)
     fig.text(0.96, 0.025, str(number), ha="right", fontsize=9, color=INK)
     return fig
 
 
 def _note(fig, text):
     """Place wrapped variable definitions in a reserved footer band."""
-    fig.text(0.04, 0.07, textwrap.fill(text, 170), fontsize=8.5, color=BLUE, va="center")
+    fig.text(0.04, 0.07, textwrap.fill(text, 170), fontsize=FOOTNOTE_FONTSIZE,
+             color=BLUE, va="center")
 
 
 def _empty(ax, message):
@@ -204,7 +206,7 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
             if note not in notes:
                 notes.append(note)
         notes.append("Correlated-shock methodology and formulas: see Appendix, page 10.")
-    _footnotes(fig, notes, y=0.10, width=190, fontsize=7.6)
+    _footnotes(fig, notes, y=0.115)
     return fig
 
 
@@ -215,17 +217,16 @@ def _currency_scale(result):
     return scale, f"{currency} millions" if scale == 1e6 else currency
 
 
-def _footnotes(fig, notes, y=0.115, width=190, fontsize=8):
-    """Place complete explanations within the reserved note band."""
+def _footnotes(fig, notes, y=0.115, width=220):
+    """Wrap complete explanations at the fixed, report-wide readable footnote size."""
     lines = [line for note in notes for line in textwrap.wrap(str(note), width)]
-    available = max(y - 0.044, 0.02) * 11.69 * 72
-    fontsize = min(fontsize, available / max(1, len(lines)) / 1.3)
-    fig.text(0.04, y, "\n".join(lines), fontsize=fontsize, color=INK, va="top", linespacing=1.3)
+    fig.text(0.04, y, "\n".join(lines), fontsize=FOOTNOTE_FONTSIZE,
+             color=INK, va="top", linespacing=1.3)
 
 
 def _panel_note(fig, x, y, note):
     """Wrap one panel's variable definitions without crossing the adjacent column."""
-    fig.text(x, y, textwrap.fill(note, 88), fontsize=8, color=INK, va="top")
+    fig.text(x, y, textwrap.fill(note, 88), fontsize=FOOTNOTE_FONTSIZE, color=INK, va="top")
 
 
 def _risk_page(result, config):
@@ -386,7 +387,6 @@ def _contributor_page(result, config):
         ],
         y=0.13,
         width=185,
-        fontsize=9,
     )
     return fig
 
@@ -414,7 +414,7 @@ def _grid_page(result, config):
         subtitle += " Deterministic payoff curves; local-risk bands disabled or unavailable."
     fig = _page(result, config, 6, "Sensitivity to largest factor exposures", subtitle)
     grid = fig.add_gridspec(
-        2, 3, left=0.07, right=0.97, top=0.83, bottom=0.235, hspace=0.58, wspace=0.38
+        2, 3, left=0.07, right=0.97, top=0.83, bottom=0.275, hspace=0.58, wspace=0.38
     )
     for i in range(6):
         ax = fig.add_subplot(grid[i // 3, i % 3])
@@ -536,7 +536,7 @@ def _grid_page(result, config):
         notes[0] = ("Each panel uses the supplied grid index and exported Grid conventions. "
                     "Simple family bumps split before log1p; log family bumps split in log units. "
                     "Only conditional grids complete free factors by a joint covariance solve.")
-    _footnotes(fig, notes, y=0.135, width=190, fontsize=7.6)
+    _footnotes(fig, notes, y=0.185)
     return fig
 
 
@@ -636,7 +636,7 @@ def _beta_page(result, config):
             "Portfolio rows use aggregated payoff sensitivities, including shared "
             "residual risk. N is the explicit reporting denominator."
         )
-    _footnotes(fig, notes, y=0.15, width=190, fontsize=8.5)
+    _footnotes(fig, notes, y=0.15)
     return fig
 
 
@@ -718,9 +718,7 @@ def _clusters_page(result, config):
             "FactorLasso factor/volatility labels from this fitted snapshot (equal member "
             "weights), without changing memberships or estimating a new tree."
         ],
-        y=0.105,
-        width=185,
-        fontsize=8,
+        y=0.115,
     )
     return fig
 
@@ -815,7 +813,7 @@ def _cluster_contribution_page(result, config):
     exposure.columns = ["\n".join(textwrap.wrap(str(config.factor_labels.get(key, key)), 8,
                                                break_long_words=False))
                         for key in exposure.columns]
-    heatmap(fig.add_axes([.105, .205, .40, .245]), exposure, False, fontsize=7.1)
+    heatmap(fig.add_axes([.105, .27, .40, .18]), exposure, False, fontsize=7.1)
 
     fig.text(.605, .49, "Top-five factor risk contributions", fontsize=10,
              weight="bold", color=INK)
@@ -823,12 +821,12 @@ def _cluster_contribution_page(result, config):
         ascending=False, kind="stable").head(5).index
     factor_risk = displayed(clusters.factor_risk.loc[:, selected])
     factor_risk.columns = [config.factor_labels.get(key, key) for key in selected]
-    stacked(fig.add_axes([.605, .205, .145, .245]), factor_risk,
+    stacked(fig.add_axes([.605, .27, .145, .18]), factor_risk,
             ["#315B7A", "#C49A3A", "#648E6C", "#A15B77", "#8A7CB4"][:len(selected)], 2)
 
     fig.text(.835, .49, "Annual model volatility", fontsize=10,
              weight="bold", color=INK)
-    stacked(fig.add_axes([.835, .205, .13, .245]),
+    stacked(fig.add_axes([.835, .27, .13, .18]),
             displayed(clusters.risk[["Systematic", "Idiosyncratic"]]),
             [BLUE, "#C49A3A"], 1)
     notes = [
@@ -857,7 +855,7 @@ def _cluster_contribution_page(result, config):
         notes.append(f"Excluded: {len(excluded)} unmodelled holdings, gross MTM "
                      f"{result.metadata['reference_currency']} {gross:,.0f}. Their stress and risk "
                      "are unknown; displayed ratios retain the full portfolio notional.")
-    _footnotes(fig, notes, y=.125, width=190, fontsize=7.5)
+    _footnotes(fig, notes, y=.18)
     return fig
 
 
@@ -974,10 +972,7 @@ def _methodology_page(result, config):
     special = result.metadata.get("source_provenance", {}).get("external_target_method")
     if special:
         notes.append(str(special))
-    lines = []
-    for note in notes:
-        lines.extend(textwrap.wrap(note, 175))
-    fig.text(0.04, 0.115, "\n".join(lines), fontsize=9, color=INK, va="top", linespacing=1.4)
+    _footnotes(fig, notes)
     if not result.metadata["all_funded"]:
         # The ordinary funded-asset formula does not value calls, puts or futures.
         for text in fig.texts:
@@ -990,7 +985,7 @@ def _coverage_page(result, config):
     """Render only the optional parser-supplied table and footnote explanations."""
     fig = _page(result, config, 11, config.appendix_title, config.appendix_subtitle)
     _table(fig.add_axes([0.04, 0.265, 0.92, 0.55]), config.appendix_table, first=0.23, fontsize=8.5)
-    _footnotes(fig, config.appendix_notes, y=0.215, width=175, fontsize=9)
+    _footnotes(fig, config.appendix_notes, y=0.215)
     return fig
 
 
