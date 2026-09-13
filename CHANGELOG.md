@@ -5,6 +5,21 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.35.0] - 2026-09-13
+
+### Added
+
+- Optional asset-indexed `portfolio_weights` in `plot_clusters`, displayed as signed
+  percentages without normalisation. Stress reports pass full-denominator weights and
+  export them alongside fitted memberships; derivative responses are labelled separately.
+- Second and third largest holding contributors in each cluster's worst correlated
+  scenario, preserving signed NAV contributions and leaving unavailable ranks blank.
+
+### Changed
+
+- Fitted loadings now immediately precede the factor-correlation methodology page.
+  Page numbers and the final notation guide follow the revised analysis order.
+
 ## [5.34.0] - 2026-09-13
 
 ### Added

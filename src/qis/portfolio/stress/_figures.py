@@ -548,7 +548,7 @@ def _beta_page(result, config):
     fig = _page(
         result,
         config,
-        7,
+        9,
         f"Estimated {config.model_name} loadings and explanatory power",
         f"{count} assets shown by largest absolute MTM; portfolio row uses all modelled "
         "holdings, including assets outside this display."
@@ -645,7 +645,7 @@ def _clusters_page(result, config):
     fig = _page(
         result,
         config,
-        8,
+        7,
         f"{config.model_name} asset cluster dendrograms",
         "Clusters and merge distances from the assigned production fit; each observation "
         "cadence is clustered separately.",
@@ -685,7 +685,10 @@ def _clusters_page(result, config):
             f"{clusters[freq].nunique()} clusters; cutoff {cutoffs[freq]:.2f}"
         )
         top -= height + gap
-    table_ax = fig.add_axes([0.575, 0.17, 0.39, 0.68])
+    table_ax = fig.add_axes([0.56, 0.17, 0.405, 0.68])
+    weight_label = "Portfolio weight" if result.metadata["all_funded"] else "Response weight"
+    weights = (result.response_exposures / result.metadata["reporting_denominator"]).rename(
+        weight_label)
     plot_clusters(
         clusters,
         linkages,
@@ -697,9 +700,10 @@ def _clusters_page(result, config):
         fontsize=9,
         show_distance=True,
         table_title="Fitted cluster membership",
-        table_kwargs={"fontsize": 8, "col_widths": [.44, .16, .40]}
-        if config.cluster_labels else {"fontsize": 10},
+        table_kwargs={"fontsize": 8, "col_widths": [.40, .12, .15, .33]}
+        if config.cluster_labels else {"fontsize": 9, "col_widths": [.58, .20, .22]},
         cluster_labels=config.cluster_labels,
+        portfolio_weights=weights,
     )
     for ax in axes.values():
         ax.set_title(ax.get_title(), fontsize=11, color=INK, pad=8)
@@ -716,7 +720,12 @@ def _clusters_page(result, config):
             "new clustering of the displayed betas. Original asset IDs, linkages and cutoffs "
             "are exported. Descriptive labels are supplied by the caller; ROSAA uses "
             "FactorLasso factor/volatility labels from this fitted snapshot (equal member "
-            "weights), without changing memberships or estimating a new tree."
+            "weights), without changing memberships or estimating a new tree.",
+            ("Portfolio weight = signed asset MTM / full portfolio NAV. Weights are not "
+             "normalised within a cluster; zero-weight fitted assets remain visible."
+             if result.metadata["all_funded"] else
+             "Response weight = aggregated local response dollar sensitivity / full reporting "
+             "denominator. This is an underlying sensitivity, not an allocated derivative MTM.")
         ],
         y=0.115,
     )
@@ -730,7 +739,7 @@ def _cluster_contribution_page(result, config):
     scope = ("Modelled subtotal" if result.metadata.get("scope") == "modelled subtotal"
              else "Portfolio")
     denominator_label = "NAV" if result.metadata["all_funded"] else "reporting denominator"
-    fig = _page(result, config, 9, "Cluster contributions to stress, factor exposures and risk",
+    fig = _page(result, config, 8, "Cluster contributions to stress, factor exposures and risk",
                 f"Fitted clusters ordered by gross MTM. Signed contributions use full "
                 f"{denominator_label}; {scope.lower()} includes {len(clusters.holdings)} holdings.")
 
@@ -779,26 +788,37 @@ def _cluster_contribution_page(result, config):
                      f"n={int(summary.holding_count.sum())}")
     fig.text(.21, .89, f"Correlated requested scenarios: cluster P&L (% of {denominator_label})",
              fontsize=12, weight="bold", color=INK)
-    ax = fig.add_axes([.21, .575, .575, .255])
-    contributor_ax = fig.add_axes([.80, .575, .17, .255])
+    ax = fig.add_axes([.21, .575, .435, .255])
+    contributor_ax = fig.add_axes([.665, .575, .305, .255])
     if "conditional" in clusters.scenario_nav:
         stress = displayed(clusters.scenario_nav["conditional"].iloc[:, :12])
         descriptions = result.metadata.get("scenario_descriptions", {})
-        stress.columns = ["\n".join(textwrap.wrap(str(descriptions.get(str(key), key)), 13,
-                                                break_long_words=False))
+        header_width = 10 if len(stress.columns) > 9 else 13
+        stress.columns = ["\n".join(textwrap.wrap(
+            str(descriptions.get(str(key), key)), header_width, break_long_words=False))
                           for key in stress.columns]
-        heatmap(ax, stress, True, labels, fontsize=7.7)
         top = cluster_top_contributors(result, clusters, displayed=True).reindex(stress.index)
+        row_labels = {}
         cells = []
-        for _, row in top.iterrows():
-            name = textwrap.shorten(str(row["name"]), width=25, placeholder="...")
+        for group, row in top.iterrows():
             scenario = textwrap.shorten(
-                str(descriptions.get(str(row.scenario), row.scenario)), width=31,
+                str(descriptions.get(str(row.scenario), row.scenario)), width=32,
                 placeholder="...")
-            cells.append(f"{name} {row.nav_contribution:+.2%}\n{scenario}")
+            row_labels[group] = f"{labels[group]}\nWorst: {scenario}"
+            ranked_cells = []
+            for rank in range(1, 4):
+                suffix = "" if rank == 1 else f"_{rank}"
+                if pd.isna(row["holding_id" + suffix]):
+                    ranked_cells.append("")
+                    continue
+                name = textwrap.shorten(str(row["name" + suffix]), width=22, placeholder="...")
+                ranked_cells.append(f"{name}\n{row['nav_contribution' + suffix]:+.2%}")
+            cells.append(ranked_cells)
+        heatmap(ax, stress, True, row_labels, fontsize=7.7)
         from matplotlib.colors import ListedColormap
-        plot_heatmap(pd.DataFrame(0., index=top.index, columns=["Top contributor"]),
-                     ax=contributor_ax, annot=np.asarray(cells).reshape(-1, 1),
+        headings = [f"{rank} largest\ncontributor" for rank in ("1st", "2nd", "3rd")]
+        plot_heatmap(pd.DataFrame(0., index=top.index, columns=headings),
+                     ax=contributor_ax, annot=np.asarray(cells),
                      var_format=None, cmap=ListedColormap(["#F0F4F7"]),
                      fontsize=7.4, top_x_label=True, date_format=None,
                      hline_rows=[len(top)-1], x_rotation=0)
@@ -833,10 +853,10 @@ def _cluster_contribution_page(result, config):
             [BLUE, "#C49A3A"], 1)
     notes = [
         "Stress (first 12 requested correlated scenarios): exact holding P&L summed by cluster / "
-        "full notional. Top contributor: largest absolute holding P&L in that row's worst "
-        f"correlated scenario, with its signed % of {denominator_label} and scenario name; "
-        "the portfolio row uses "
-        "the portfolio's worst scenario. Methodology: appendix, page 10.",
+        "full notional. Contributors rank the three largest absolute holding P&Ls in that "
+        f"row's worst correlated scenario and show signed % of {denominator_label}. The scenario "
+        "is named beside the row; Portfolio uses its own worst scenario. Blank ranks mean fewer "
+        "than three holdings. Methodology: appendix, page 10.",
         "Exposures: sum current holding response dollar sensitivities times factor betas / "
         "notional. Factor risk bars: portfolio's five largest absolute atomic-factor Euler "
         "contributions, using the same factors and colours for every cluster. Labels show their "
@@ -1105,7 +1125,30 @@ def _analysis_guide_page(result, config):
             "These local Gaussian risk bands differ from the regression confidence "
             "intervals exported separately.",
         )),
-        (f"7. Estimated {model} loadings and explanatory power", (
+        (f"7. {model} asset cluster dendrograms", (
+            "Trees use the original fit's linkage distances and cutoffs, separately by "
+            "observation cadence. The membership table joins each asset's fitted cluster ID "
+            "to its supplied label and signed full-portfolio weight (MTM / N for funded "
+            "assets; response sensitivity / N otherwise), without cluster normalisation. "
+            "ROSAA descriptions use equal-member factor/volatility profiles. No clustering is "
+            "rerun; missing topology "
+            "is reported as unavailable.",
+        )),
+        ("8. Cluster contributions to stress, factor exposures and risk", (
+            "Scenario heatmap: sum holding P&L within each cluster and divide by full N. "
+            "Three contributor columns rank absolute holding P&L in that cluster's worst "
+            "correlated scenario and show signed contribution / N. Its scenario is beside "
+            "the row; Portfolio uses its own worst case. Missing ranks stay blank.",
+            "Exposure heatmap: e_c = sum of holding factor exposures / N. Factor-risk stacks "
+            "sum holding Euler terms within each cluster for the portfolio's top five "
+            "absolute atomic factor contributions. Their subtotal omits other factors.",
+            "Total-risk stacks: systematic = sum of all factor Euler terms; residual = "
+            "sum_j q_cj q_j residual_var_j / sigma_p. Here q_cj is cluster response sensitivity "
+            "/ N. Both components and all clusters add to sigma_p. Show up to eight groups "
+            "by gross MTM, with Other/unassigned buckets preserving totals. Portfolio rows "
+            "sum all groups; these risk bars are allocations, not standalone cluster vols.",
+        )),
+        (f"9. Estimated {model} loadings and explanatory power", (
             "Asset beta and R-squared columns come from the supplied fit; R-squared measures "
             "its explanatory power. Show the top 20 by absolute "
             + ("MTM" if funded else "response dollar sensitivity") + ". Unit asset systematic "
@@ -1116,26 +1159,6 @@ def _analysis_guide_page(result, config):
             "R-squared, not a portfolio regression. Aggregate vols use signed weights and "
             "the full model covariance, not average asset vols. The | amount is summed "
             "exposure in millions; beta colours are capped only for display.",
-        )),
-        (f"8. {model} asset cluster dendrograms", (
-            "Trees use the original fit's linkage distances and cutoffs, separately by "
-            "observation cadence. The membership table joins each asset's fitted cluster ID "
-            "to its supplied descriptive label. ROSAA labels use FactorLasso factor/volatility "
-            "profiles with equal member weights. No clustering is rerun; missing topology "
-            "is reported as unavailable.",
-        )),
-        ("9. Cluster contributions to stress, factor exposures and risk", (
-            "Scenario heatmap: sum holding P&L within each cluster and divide by full N. "
-            "Top contributor: largest absolute holding P&L in that cluster's worst "
-            "correlated scenario, with its signed contribution / N and scenario name.",
-            "Exposure heatmap: e_c = sum of holding factor exposures / N. Factor-risk stacks "
-            "sum holding Euler terms within each cluster for the portfolio's top five "
-            "absolute atomic factor contributions. Their subtotal omits other factors.",
-            "Total-risk stacks: systematic = sum of all factor Euler terms; residual = "
-            "sum_j q_cj q_j residual_var_j / sigma_p. Here q_cj is cluster response sensitivity "
-            "/ N. Both components and all clusters add to sigma_p. Show up to eight groups "
-            "by gross MTM, with Other/unassigned buckets preserving totals. Portfolio rows "
-            "sum all groups; these risk bars are allocations, not standalone cluster vols.",
         )),
         (f"10. {model} correlation and scenario construction", (
             "Lower triangle: rho_if = Sigma_if / (sigma_i sigma_f); diagonal: annual factor "
@@ -1218,9 +1241,9 @@ def report_pages(result, config):
         (f"Portfolio {model} exposures and risk", _risk_page),
         ("Largest factor exposures: asset risk contributors", _contributor_page),
         ("Sensitivity to largest factor exposures", _grid_page),
-        (f"Estimated {model} loadings and explanatory power", _beta_page),
         (f"{model} asset cluster dendrograms", _clusters_page),
         ("Cluster contributions to stress, factor exposures and risk", _cluster_contribution_page),
+        (f"Estimated {model} loadings and explanatory power", _beta_page),
         (f"{model} correlation and scenario construction", _methodology_page),
     ]:
         yield title, builder(result, config)

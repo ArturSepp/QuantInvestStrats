@@ -27,6 +27,7 @@ def plot_clusters(
     table_title: str = "Cluster IDs",
     table_kwargs: Optional[dict] = None,
     cluster_labels: Optional[Mapping[str, str]] = None,
+    portfolio_weights: Optional[pd.Series] = None,
 ) -> tuple[pd.Series, plt.Figure]:
     """Render supplied trees and membership with automatic or caller-owned axes.
 
@@ -49,6 +50,9 @@ def plot_clusters(
         table_title: Heading above the membership table.
         table_kwargs: Additional qis table options, including colour and column widths.
         cluster_labels: Optional cadence-prefixed cluster-ID to descriptive label mapping.
+        portfolio_weights: Optional asset-indexed signed decimal weights. Must cover every
+            displayed asset; no normalisation is applied. Its name supplies the column
+            heading, defaulting to Portfolio weight. Extra asset IDs are ignored.
 
     Returns:
         Cadence-prefixed membership Series with original asset IDs, and its figure.
@@ -69,6 +73,13 @@ def plot_clusters(
     identities = pd.concat([clusters[group] for group in order])
     if not identities.index.is_unique:
         raise ValueError("Assets must belong to exactly one cadence/group")
+    weights = None
+    if portfolio_weights is not None:
+        if not isinstance(portfolio_weights, pd.Series) or not portfolio_weights.index.is_unique:
+            raise ValueError("Portfolio weights require a uniquely asset-indexed Series")
+        weights = portfolio_weights.reindex(identities.index)
+        if not np.isfinite(weights.to_numpy(dtype=float)).all():
+            raise ValueError("Portfolio weights must be finite and cover every fitted asset")
     descriptions = dict(cluster_labels or {})
     cluster_ids = {f"{group}-{value}" for group, members in clusters.items() for value in members}
     if set(descriptions) - cluster_ids:
@@ -105,6 +116,9 @@ def plot_clusters(
     aggregate = pd.concat(labelled).sort_values()
     aggregate = aggregate.reindex(index=aggregate.index[::-1])
     table = aggregate.to_frame(name="Cluster ID")
+    if weights is not None:
+        table[weights.name or "Portfolio weight"] = weights.reindex(aggregate.index).map(
+            lambda value: f"{value:.2%}")
     if descriptions:
         table["Cluster label"] = aggregate.map(descriptions).fillna("").map(
             lambda value: "\n".join(textwrap.wrap(

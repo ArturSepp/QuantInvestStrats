@@ -75,3 +75,30 @@ def test_descriptive_cluster_labels_are_optional_and_copied():
         cluster_labels=labels)
     labels["ME-1"] = "Changed"
     assert config.cluster_labels["ME-1"] == "Equity core"
+
+
+def test_top_three_keep_signed_contributions_and_missing_ranks(market):
+    """Rank absolute P&L in each group's own worst case, with no repeated small-group assets."""
+    from qis.portfolio.stress._clusters import (
+        compute_cluster_contributions, cluster_top_contributors)
+    result = _result(market)
+    groups = compute_cluster_contributions(result, {
+        "ME": pd.Series([1, 2], index=["stock", "proxy"])})
+    top = cluster_top_contributors(result, groups, displayed=True)
+    valuation = result.valuations["conditional"].pnl
+    for group in [*groups.summary.index, "Portfolio"]:
+        ids = (groups.holdings.index if group == "Portfolio" else
+               groups.holdings.index[groups.holdings.cluster.eq(group)])
+        worst = min(valuation.index, key=lambda scenario: sum(valuation.loc[scenario, ids]))
+        ranked = sorted(ids, key=lambda asset: -abs(valuation.loc[worst, asset]))[:3]
+        assert top.loc[group, "scenario"] == worst
+        for rank in range(1, 4):
+            suffix = "" if rank == 1 else f"_{rank}"
+            if rank > len(ranked):
+                assert pd.isna(top.loc[group, "holding_id" + suffix])
+                assert pd.isna(top.loc[group, "nav_contribution" + suffix])
+            else:
+                asset = ranked[rank - 1]
+                assert top.loc[group, "holding_id" + suffix] == asset
+                np.testing.assert_allclose(top.loc[group, "nav_contribution" + suffix],
+                                           valuation.loc[worst, asset] / 100.)

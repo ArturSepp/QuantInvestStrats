@@ -97,9 +97,9 @@ def test_v0_pages_show_regression_and_parser_content(market):
         assert not any("Example account | Notional" in text.get_text()
                        for text in pages[1][1].texts)
         assert titles[6:10] == [
-            "Estimated MATF loadings and explanatory power",
             "MATF asset cluster dendrograms",
             "Cluster contributions to stress, factor exposures and risk",
+            "Estimated MATF loadings and explanatory power",
             "MATF correlation and scenario construction",
         ]
         assert titles[-2] == "Source validation"
@@ -109,7 +109,7 @@ def test_v0_pages_show_regression_and_parser_content(market):
         headings = [item.get_text() for item in guide_texts if item.get_gid() == "guide-heading"]
         assert len(headings) == 10
         assert [heading.split(".")[0] for heading in headings] == [str(i) for i in range(1, 11)]
-        assert "MATF" in headings[3] and "MATF" in headings[6]
+        assert "MATF" in headings[3] and "MATF" in headings[8]
         assert min(item.get_fontsize() for item in guide_texts) >= 9
         curves = [line for line in pages[5][1].axes[0].lines if line.get_linestyle() == "--"]
         assert len(curves) == 1

@@ -122,8 +122,10 @@ def display_cluster_table(frame, contributions):
 
 
 def cluster_top_contributors(result, contributions, displayed=False):
-    """Identify each cluster's largest absolute asset P&L in its worst conditional scenario."""
-    columns = ["scenario", "holding_id", "name", "pnl", "nav_contribution"]
+    """Rank three absolute holding P&Ls in each cluster's worst conditional scenario."""
+    fields = ["holding_id", "name", "pnl", "nav_contribution"]
+    columns = ["scenario", *fields, *[f"{field}_{rank}"
+               for rank in (2, 3) for field in fields]]
     valuation = result.valuations.get("conditional")
     if valuation is None:
         return pd.DataFrame(columns=columns)
@@ -141,9 +143,16 @@ def cluster_top_contributors(result, contributions, displayed=False):
     rows = {}
     for group, ids in selections.items():
         scenario = valuation.pnl[ids].sum(axis=1).idxmin()
-        holding = valuation.pnl.loc[scenario, ids].abs().idxmax()
-        pnl = float(valuation.pnl.loc[scenario, holding])
-        rows[group] = {"scenario": scenario, "holding_id": holding,
-                       "name": result.positions.loc[holding, name_col], "pnl": pnl,
-                       "nav_contribution": pnl/result.metadata["reporting_denominator"]}
+        ranked = valuation.pnl.loc[scenario, ids].abs().sort_values(
+            ascending=False, kind="stable").head(3).index
+        rows[group] = {"scenario": scenario}
+        for rank, holding in enumerate(ranked, 1):
+            suffix = "" if rank == 1 else f"_{rank}"
+            pnl = float(valuation.pnl.loc[scenario, holding])
+            rows[group].update({
+                "holding_id" + suffix: holding,
+                "name" + suffix: result.positions.loc[holding, name_col],
+                "pnl" + suffix: pnl,
+                "nav_contribution" + suffix: pnl/result.metadata["reporting_denominator"],
+            })
     return pd.DataFrame.from_dict(rows, orient="index", columns=columns)

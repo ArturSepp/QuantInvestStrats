@@ -54,7 +54,7 @@ def test_analysis_and_guide_export_without_repricing(market, tmp_path, monkeypat
     manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
     assert manifest["page_count"] == 11
     assert len(manifest["page_titles"]) == 11
-    assert manifest["page_titles"][8] == (
+    assert manifest["page_titles"][7] == (
         "Cluster contributions to stress, factor exposures and risk")
     assert manifest["page_titles"][-1] == "Notation and guide to the analysis"
     assert "Cluster conditional NAV contributions" in artifact.table_paths

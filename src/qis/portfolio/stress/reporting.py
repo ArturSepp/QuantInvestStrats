@@ -226,7 +226,11 @@ def _report_tables(result, config):
     if config.response_diagnostics is not None:
         tables["Supplied fit diagnostics"] = config.response_diagnostics
     for key, members in config.cluster_memberships.items():
-        tables[f"Cluster {key} membership"] = members.to_frame("cluster")
+        membership = members.to_frame("cluster")
+        weight_name = "portfolio_weight" if result.metadata["all_funded"] else "response_weight"
+        membership[weight_name] = result.response_exposures.reindex(members.index) / float(
+            result.metadata["reporting_denominator"])
+        tables[f"Cluster {key} membership"] = membership
         tables[f"Cluster {key} linkage"] = pd.DataFrame(
             config.cluster_linkages[key], columns=["left", "right", "distance", "count"]
         )
@@ -281,7 +285,8 @@ def _format_workbook(path):
         "annual_vol", "euler_vol", "variance_share", "portfolio_return", "r2", "rsquared",
         "r_squared", "R-squared", "annual_total_vol", "annual_systematic_vol",
         "annual_residual_vol", "annual_factor_model_vol", "lower_bound", "upper_bound",
-        "band_half_width",
+        "band_half_width", "portfolio_weight", "response_weight",
+        "nav_contribution", "nav_contribution_2", "nav_contribution_3",
     }
     for sheet in book:
         sheet.sheet_view.showGridLines = False
