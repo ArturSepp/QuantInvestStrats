@@ -795,7 +795,8 @@ def _cluster_contribution_page(result, config):
         descriptions = result.metadata.get("scenario_descriptions", {})
         header_width = 10 if len(stress.columns) > 9 else 13
         stress.columns = ["\n".join(textwrap.wrap(
-            str(descriptions.get(str(key), key)), header_width, break_long_words=False))
+            str(descriptions.get(str(key), key)).replace("Commodities", "Commod."),
+            header_width, break_long_words=False))
                           for key in stress.columns]
         top = cluster_top_contributors(result, clusters, displayed=True).reindex(stress.index)
         row_labels = {}
