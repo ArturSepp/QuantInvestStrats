@@ -73,6 +73,9 @@ def test_nine_core_pages_export_all_values_without_repricing(market, tmp_path, m
                          if table["name"] == "Grid regression confidence bands")
     ci_sheet = workbook[ci_sheet_name]
     assert ci_sheet.freeze_panes == "C2"
+    assert not ci_sheet.merged_cells.ranges
+    assert ci_sheet["A2"].value == ci_sheet["A3"].value == "Credit"
+    assert ci_sheet.auto_filter.ref == ci_sheet.dimensions
     assert "%" in ci_sheet["C2"].number_format
     assert "%" in ci_sheet["E2"].number_format
     workbook.close()

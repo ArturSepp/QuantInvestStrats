@@ -249,6 +249,14 @@ def _format_workbook(path):
                 "factor_return", "mean", "mean_se", "mean_ci_lower", "mean_ci_upper", "confidence",
             }
             sheet.freeze_panes = "C2"
+            for merged in list(sheet.merged_cells.ranges):
+                if merged.min_col == merged.max_col == 1:
+                    grid = sheet.cell(merged.min_row, 1).value
+                    first, last = merged.min_row, merged.max_row
+                    sheet.unmerge_cells(str(merged))
+                    for row_number in range(first, last + 1):
+                        sheet.cell(row_number, 1, grid)
+            sheet.auto_filter.ref = sheet.dimensions
         for column in range(1, sheet.max_column + 1):
             sample = [sheet.cell(row, column).value for row in range(2, min(sheet.max_row, 80) + 1)]
             text_width = max((len(str(value)) for value in sample
