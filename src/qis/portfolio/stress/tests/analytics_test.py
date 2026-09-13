@@ -94,7 +94,7 @@ def test_credit_grid_bands_and_scenario_parity_for_funded_portfolio(market):
     pd.testing.assert_frame_equal(result.grids["Credit"].pnl, result.valuations["requested"].pnl)
     assert "lower_bound" in result.grid_summaries["Credit"]
     assert result.grid_summaries["Credit"].loc[0.0, "portfolio_return"] == 0.0
-    assert "baseline Gaussian" in result.grid_metadata.loc["Credit", "band_status"]
+    assert "scenario-local conditional" in result.grid_metadata.loc["Credit", "band_status"]
     np.testing.assert_allclose(
         result.attribution["requested"].iloc[:, :-1].sum(axis=1),
         result.valuations["requested"].portfolio_pnl,
@@ -102,8 +102,8 @@ def test_credit_grid_bands_and_scenario_parity_for_funded_portfolio(market):
     np.testing.assert_allclose(result.attribution["requested"].iloc[:, -1], 0.0, atol=1e-12)
 
 
-def test_derivative_grids_do_not_claim_gaussian_bands(market):
-    """The deterministic intrinsic curve carries an explicit unsupported-band status."""
+def test_derivative_grids_use_local_approximation_bands(market):
+    """Derivative bounds retain an explicit local-risk approximation status."""
     p = market(
         [
             PortfolioHolding(
@@ -117,8 +117,8 @@ def test_derivative_grids_do_not_claim_gaussian_bands(market):
         ShockConvention.SIMPLE,
     )
     result = run_portfolio_stress_test(p, request(), factor_grids={"Equity": grid})
-    assert "lower_bound" not in result.grid_summaries["Equity"]
-    assert "deterministic curve only" in result.grid_metadata.loc["Equity", "band_status"]
+    assert "lower_1sigma" in result.grid_summaries["Equity"]
+    assert "scenario-local" in result.grid_metadata.loc["Equity", "band_status"]
     assert result.grids["Equity"].pnl.loc[0.0, "put"] == 0.0
 
 

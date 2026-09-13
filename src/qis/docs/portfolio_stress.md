@@ -362,10 +362,49 @@ projection. For derivatives, factor contributions use the current Jacobian;
 a separate "Nonlinear payoff adjustment" reconciles those contributions to
 exact scenario P&L. There is no logarithm or P&L division by derivative MTM.
 
-Ordinary funded portfolios retain existing baseline Gaussian conditional-factor
-plus shared-residual grid bands. Their horizon and central probability are
-explicit. Nonlinear/derivative grids show deterministic intrinsic curves with
-an unavailable-band status and a descriptive through-zero quadratic fit.
+Conditional grids use scenario-local factor and shared-residual volatility bands for
+funded holdings and derivatives. The legacy `ordinary_asset_bands` switch enables
+this calculation for all supported holdings; `False` disables it. Independent grids
+remain unbanded. Quotes, marks, units and the reporting denominator are not rebased.
+The public `portfolio.response_jacobian(delta_f)` evaluates local sensitivities at a
+complete labelled factor log-shock vector; omitting the argument preserves current risk.
+
+At each grid point x, aggregate holding dollar derivatives by shared response into
+w(x) after division by the fixed reporting denominator N. Condition the original
+annual factor covariance on the selected anchors, using the same joint conditioning
+as the scenario grid. With e(x) = beta.T w(x):
+
+`v(x) = e(x).T Sigma_cond e(x) + sum_j w_j(x)^2 residual_variance_j`.
+
+All portfolio risk arithmetic uses QIS RiskModel. Displayed bounds are the exact
+scenario return plus/minus `k * sqrt(T * v(x))`, for k=1 and k=2. T is in years,
+by default 1/12. These are exactly one/two standard deviations, approximately
+68%/95% under the local Gaussian approximation. They are not fixed percentage widths.
+The existing `confidence` setting continues to control exported `lower_bound`,
+`upper_bound` and `band_half_width` quantile columns, and OLS diagnostics; it does
+not change the plotted one/two-sigma multipliers.
+
+Conditional factor Euler contributions are signed and sum, together with the residual
+Euler term, to conditional volatility. Residual Euler is residual variance divided by
+total volatility, not standalone residual volatility. Zero total risk has zero
+contributions. Exports use horizon volatility; baseline annual Euler exhibits remain
+annual. Family contributions sum members without scenario split weights. Overlapping
+families fall back to atomic factors to preserve additivity. Do not subtract an
+anchor's original Euler contribution: condition covariance and recompute instead.
+
+Calls/puts use their declared strike-side delta; futures retain their original
+settlement reference, including FX exposure on stressed settlement value. Composites
+must implement `scenario_response_jacobian(context)` for nonzero response shocks.
+The single scenario row contains stressed quotes/FX, while baseline properties retain
+original quote/FX references. See the terminal knockout example. A missing method
+fails explicitly; no stale current sensitivity is silently used. Existing baseline
+composites still work for direct valuation and current risk with bands disabled.
+
+These are local delta risk bands. Intrinsic option curvature, crossing a strike or
+knockout, parameter uncertainty and non-normal tails are not included. A zero local
+delta can produce a zero band despite nonlinear risk nearby. Payoff boundary rules
+remain explicit in the position audit. No Monte Carlo, random sampling or estimation
+refit is involved.
 
 ## Euler volatility analytics
 
@@ -420,20 +459,16 @@ zero and use decimal grid returns. The legend displays the equation and uncenter
 R-squared: `1 - sum((actual - fitted)^2) / sum(actual^2)`. A zero curve has undefined
 R-squared; a grid without enough independent regressors has no fitted line. These
 are descriptive curve fits, not new portfolio valuations or fitted-factor R-squared.
-Quadratic curves can smooth over strike kinks and knockout jumps. Orange shading
-shows pointwise Student-t confidence intervals for the fitted mean for every portfolio.
-The interval is `fitted_mean +/- t_(n-2, (1+confidence)/2) * mean_se`, using the
-covariance of the same zero-intercept quadratic OLS estimate. `StressTestConfig.confidence`
-sets its central probability (95% by default). The standard error is zero at the forced
-zero intercept. With no residual degrees of freedom, bounds are unavailable; a full-rank
-zero curve with positive residual degrees of freedom has zero-width intervals.
+Quadratic curves can smooth over strike kinks and knockout jumps. Blue shading
+shows scenario-local conditional one/two-sigma risk bands centred on exact valuations.
+The quadratic equation and uncentered R-squared remain in the legend.
 
-These conventional OLS intervals assume independent, constant-variance regression
-errors. Scenario points are deterministic, so the intervals describe the polynomial
-approximation under those assumptions and depend on the supplied grid. They are not
-simultaneous confidence bands or a distribution of future portfolio P&L. Existing blue
-funded-asset conditional prediction bands remain centred on exact scenario valuations;
-derivative portfolios do not receive those covariance-based scenario risk bands.
+Pointwise OLS mean confidence intervals remain available in the exported diagnostic
+for audit, but are not plotted. Their formula is `fitted_mean +/- t_(n-2) * mean_se`,
+using the same zero-intercept fit and configured confidence. They assume independent,
+constant-variance regression errors on a deterministic grid; they measure polynomial
+approximation, not portfolio risk. A forced zero intercept has zero standard error;
+no error degrees of freedom means no interval.
 Credit grids retain the caller's total-family split.
 Page seven includes signed beta colours, fitted R-squared, annual systematic and
 residual volatility, Rest of assets, and Portfolio rows. Rest uses full-denominator
@@ -487,6 +522,10 @@ The principal result fields and exports have distinct interpretations:
 | `positions`, `leg_terms` | Source marks, intrinsic baselines, constant basis offsets, payoff coverage and vanilla terms. |
 | `Grid polynomial regressions` | Linear/quadratic coefficients, order (always 2) and uncentered R-squared. The cubic column is retained as zero for export compatibility. |
 | `Grid regression confidence bands` | Grid/anchor-indexed fitted mean, mean standard error, pointwise lower/upper OLS confidence bounds, central confidence probability and residual degrees of freedom. Means, errors and bounds use the reporting-denominator return convention. |
+| `Grid conditional factor Euler` | Grid/anchor-indexed signed factor and residual contributions, in horizon volatility units; all contributions sum to Total. |
+| `Grid conditional family Euler` | The same risk allocated to nonoverlapping factor families; atomic fallback for overlapping groups. |
+| `Grid scenario response exposures` | Aggregate local dollar sensitivities by shared response at each grid point; division by the fixed denominator gives the risk weights. |
+
 
 Currency amounts are not automatically invested cash, executable proceeds or lending
 value. The R-squared in the Portfolio/Rest rows is a weighted fit diagnostic, not a

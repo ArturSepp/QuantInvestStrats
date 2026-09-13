@@ -259,6 +259,18 @@ def project_factor_scenarios(
         pnl, attribution, pd.DataFrame(logs, index=extra.index, columns=extra.columns))
 
 
+def _conditional_risk_model(covariance, betas, residual_variances, anchors):
+    """Build one static conditional model reusable across local scenario exposures."""
+    conditional = conditional_factor_covariance(covariance, anchors)
+    # Covariance construction lives here; all portfolio risk arithmetic stays in RiskModel.
+    asset_covariance = betas @ conditional @ betas.T
+    asset_covariance += pd.DataFrame(np.diag(residual_variances),
+                                    index=betas.index, columns=betas.index)
+    date = pd.Timestamp(0)
+    return RiskModel(covar={date: asset_covariance}, factor_loadings={date: betas},
+                     factor_covar={date: conditional}, residual_vars={date: residual_variances})
+
+
 def compute_conditional_scenario_band(
         covariance: pd.DataFrame, betas: pd.DataFrame, residual_variances: pd.Series,
         weights: pd.Series, anchors: Sequence[str], centres: pd.Series,
@@ -294,14 +306,9 @@ def compute_conditional_scenario_band(
     if centres.empty or not centres.index.is_unique or centres.index.hasnans:
         raise ValueError("Scenario centres require unique nonempty labels")
     _finite(centres, "Scenario centres")
-    conditional = conditional_factor_covariance(covariance, anchors)
-    # Build a consistent static asset covariance; portfolio risk arithmetic stays in RiskModel.
-    asset_covariance = betas @ conditional @ betas.T
-    asset_covariance += pd.DataFrame(np.diag(residual_variances),
-                                    index=betas.index, columns=betas.index)
-    date = pd.Timestamp(0)  # Internal static snapshot key; no date selection or annualisation.
-    model = RiskModel(covar={date: asset_covariance}, factor_loadings={date: betas},
-                      factor_covar={date: conditional}, residual_vars={date: residual_variances})
+    model = _conditional_risk_model(covariance, betas, residual_variances, anchors)
+    date = pd.Timestamp(0)
+    conditional = model.factor_covar[date]
     risk = model.compute_tre_decomposition_at_date(weights * 0, weights, date)
     residual_vol = float(risk.residual_te * np.sqrt(horizon_years))
     conditional_vol = float(risk.tracking_error * np.sqrt(horizon_years))

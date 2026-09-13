@@ -243,8 +243,8 @@ def _format_workbook(path):
             sheet.auto_filter.ref = sheet.dimensions
         headers = {cell.column: str(cell.value or "") for cell in sheet[1]}
         sheet_percent_columns = percent_columns
-        has_regression_ci = {"mean_ci_lower", "mean_ci_upper"}.issubset(headers.values())
-        pane = "C2" if has_regression_ci else "B2"
+        has_grid_audit = headers.get(1) == "grid" and headers.get(2) == "factor_return"
+        pane = "C2" if has_grid_audit else "B2"
         if sheet.freeze_panes != pane:
             sheet.freeze_panes = pane
         # Reapplying openpyxl freeze_panes appends duplicate selections; keep one per pane.
@@ -254,7 +254,11 @@ def _format_workbook(path):
             selection.sqref = selection.sqref or "A1"
             selections.setdefault(selection.pane, selection)
         sheet.sheet_view.selection = list(selections.values())
-        if has_regression_ci:
+        sheet_percent_columns = sheet_percent_columns | {
+            "lower_1sigma", "upper_1sigma", "lower_2sigma", "upper_2sigma",
+            "conditional_vol_horizon", "conditional_factor_vol_horizon", "residual_vol_horizon",
+        }
+        if has_grid_audit:
             sheet_percent_columns = percent_columns | {
                 "factor_return", "mean", "mean_se", "mean_ci_lower", "mean_ci_upper", "confidence",
             }
@@ -266,6 +270,8 @@ def _format_workbook(path):
                     for row_number in range(first, last + 1):
                         sheet.cell(row_number, 1, grid)
             sheet.auto_filter.ref = sheet.dimensions
+            if "Grid conditional" in sheet.title:
+                sheet_percent_columns |= set(headers.values()) - {"grid"}
         for column in range(1, sheet.max_column + 1):
             sample = [sheet.cell(row, column).value for row in range(2, min(sheet.max_row, 80) + 1)]
             text_width = max((len(str(value)) for value in sample

@@ -56,6 +56,12 @@ class TerminalKnockoutAccumulator:
             return self.vanilla.response_jacobian(context)
         return pd.Series(0.0, index=context.response_log_shocks.columns)
 
+    def scenario_response_jacobian(self, context: qis.PayoffContext) -> pd.Series:
+        """Apply the same declared KO boundary to the stressed quote, keeping original terms."""
+        if context.quotes.iloc[0][self.quote_id] < self.knockout:
+            return self.vanilla.response_jacobian(context)
+        return pd.Series(0.0, index=context.response_log_shocks.columns)
+
 
 def run_example(output_dir=None):
     """Replace one vanilla holding with a composite and verify its factor derivative."""

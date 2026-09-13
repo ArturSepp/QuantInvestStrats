@@ -8,11 +8,11 @@ import numpy as np
 import pandas as pd
 
 from qis.portfolio.risk.stress_testing import (
-    compute_conditional_scenario_band,
     project_factor_scenarios,
 )
 from qis.portfolio.stress.portfolio import InstrumentPortfolio, PortfolioValuationResult
 from qis.portfolio.stress.scenarios import ScenarioMode, StressScenarios
+from qis.portfolio.stress._bands import conditional_grid_bands
 
 
 @dataclass(frozen=True)
@@ -22,9 +22,11 @@ class StressTestConfig:
     Attributes:
         historical_count: Number of worst complete historical months to present.
         horizon_years: Positive risk-band horizon in years.
-        confidence: Central probability for funded risk bands and pointwise OLS mean-fit CIs.
+        confidence: Central probability for exported quantile bounds and OLS mean-fit CIs.
+            Plotted volatility bands always use exactly one and two standard deviations.
         include_conditional_comparison: Also evaluate joint conditional completion.
-        ordinary_asset_bands: Enable existing Gaussian grid bands for funded portfolios.
+        ordinary_asset_bands: Legacy switch enabling conditional local-risk bands for all
+            supported holdings, including derivatives. False disables risk-band calculations.
     """
 
     historical_count: int = 10
@@ -62,7 +64,7 @@ class PortfolioStressResult:
         summaries: Value/P&L and denominator returns for each valuation batch.
         attribution: Reconciled factor contributions and nonlinear adjustment by batch.
         grids: Caller-named evaluated sensitivity grids.
-        grid_summaries: Curve returns and supported ordinary-asset bands.
+        grid_summaries: Curve returns and scenario-local conditional volatility bounds.
         grid_metadata: Bump units, group/member allocations and band coverage.
         historical: All eligible complete monthly vectors revalued on current holdings.
         historical_ranking: Worst months ranked by exact current-portfolio P&L.
@@ -270,7 +272,7 @@ def run_portfolio_stress_test(
     attribution = {
         key: _attribution(portfolio, value, jacobian) for key, value in valuations.items()
     }
-    grids, grid_summaries, grid_metadata = {}, {}, []
+    grids, grid_summaries, grid_metadata, grid_diagnostics = {}, {}, [], {}
     all_funded = all(h.is_delta_one for h in portfolio.holdings)
     for key, request in (factor_grids or {}).items():
         if not isinstance(key, str) or not key:
@@ -280,27 +282,19 @@ def run_portfolio_stress_test(
         grids[key] = value
         summary = _summary(value, denominator)
         band_status = "disabled"
-        if not all_funded:
-            band_status = "unavailable: nonlinear/derivative payoff; deterministic curve only"
-        elif config.ordinary_asset_bands and all(
+        if config.ordinary_asset_bands and all(
             request.scenario_modes.get(label, request.mode) is ScenarioMode.CONDITIONAL
             for label in expanded.index
         ):
-            rows = []
-            for label, row in expanded.iterrows():
-                band = compute_conditional_scenario_band(
-                    model.factor_covar[date],
-                    betas,
-                    model.residual_vars[date],
-                    weights,
-                    row.dropna().index.tolist(),
-                    summary.loc[[label], "portfolio_return"],
-                    config.horizon_years,
-                    config.confidence,
-                )
-                rows.append(band.summary)
-            summary = summary.drop(columns="portfolio_return").join(pd.concat(rows))
-            band_status = "baseline Gaussian conditional factor + shared residual"
+            bands, audit = conditional_grid_bands(
+                portfolio, value.factor_log_shocks, expanded, summary.portfolio_return,
+                config.horizon_years, config.confidence,
+            )
+            summary = summary.drop(columns="portfolio_return").join(bands)
+            for name, table in audit.items():
+                grid_diagnostics.setdefault(name, {})[key] = table
+            band_status = ("scenario-local conditional factor + shared residual; "
+                           "+/-1sigma, +/-2sigma")
         elif config.ordinary_asset_bands:
             band_status = "unavailable: grid does not request conditional completion"
         grid_summaries[key] = summary
@@ -329,6 +323,10 @@ def run_portfolio_stress_test(
             )
     metadata = {
         "all_funded": all_funded,
+        "volatility_bands": "conditional scenario-local Euler risk; exactly +/-1sigma, +/-2sigma",
+        "band_limitations": ("Local delta approximation; no curvature, boundary jumps "
+                             "or tail coverage"),
+        "risk_bands_enabled": config.ordinary_asset_bands,
         "valuation_date": str(portfolio.valuation_date),
         "risk_date": str(date),
         "reference_currency": portfolio.reference_currency,
@@ -365,6 +363,10 @@ def run_portfolio_stress_test(
     diagnostics = report_diagnostics(
         model, date, jacobian, denominator, risk, grid_summaries, all_funded, config.confidence
     )
+    diagnostics.update({
+        name: pd.concat(tables, names=["grid", "factor_return"])
+        for name, tables in grid_diagnostics.items()
+    })
     return PortfolioStressResult(
         MappingProxyType(valuations),
         MappingProxyType(summaries),

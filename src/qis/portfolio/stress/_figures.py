@@ -379,11 +379,9 @@ def _contributor_page(result, config):
 
 
 def _grid_page(result, config):
-    """Show exact grids, quadratic mean-fit confidence intervals and conditional risk bands."""
+    """Show exact grids and quadratic fits with conditional one/two-sigma local-risk bands."""
     funded = result.metadata["all_funded"]
-    confidence = result.metadata["confidence"]
     months = result.metadata["horizon_years"] * 12
-    regression_bands = result.report_diagnostics["Grid regression confidence bands"]
     keys = config.selected_grids or tuple(result.grids)[:4]
     ranges = []
     for key in keys:
@@ -403,13 +401,10 @@ def _grid_page(result, config):
         )
     if standard:
         subtitle = "Correlated shocks: equity +/-30%; rates, credit, FX +/-20%; step 1%."
-    if any("lower_bound" in result.grid_summaries[key] for key in keys):
-        subtitle += f" Blue: {confidence:.0%} conditional prediction band ({months:g} month)."
+    if any("lower_1sigma" in result.grid_summaries[key] for key in keys):
+        subtitle += f" Shading: conditional +/-1sigma and +/-2sigma ({months:g} month)."
     else:
-        subtitle += " Deterministic payoff curves."
-    if any(key in regression_bands.index.get_level_values("grid")
-           and regression_bands.loc[key, "mean_ci_lower"].notna().all() for key in keys):
-        subtitle += f" Orange: {confidence:.0%} quadratic-fit confidence band."
+        subtitle += " Deterministic payoff curves; local-risk bands disabled or unavailable."
     fig = _page(result, config, 6, "Sensitivity to equity, rates, credit and FX factors", subtitle)
     boxes = [
         [0.085, 0.575, 0.38, 0.265],
@@ -458,19 +453,20 @@ def _grid_page(result, config):
             fontsize=9,
             ax=ax,
         )
-        if "lower_bound" in summary:
-            ax.fill_between(
-                x, summary.lower_bound, summary.upper_bound, color=BLUE, alpha=0.18, zorder=0
+        band_handles = []
+        if "lower_1sigma" in summary:
+            outer = ax.fill_between(
+                x, summary.lower_2sigma, summary.upper_2sigma,
+                color=BLUE, alpha=0.12, zorder=0, label="Conditional +/-2sigma",
             )
-            ax.text(
-                0.98,
-                0.03,
-                f"{confidence:.0%} band: +/-{summary.band_half_width.iloc[0]:.2%} of NAV",
-                transform=ax.transAxes,
-                ha="right",
-                fontsize=8,
-                color=INK,
+            inner = ax.fill_between(
+                x, summary.lower_1sigma, summary.upper_1sigma,
+                color=BLUE, alpha=0.25, zorder=1, label="Conditional +/-1sigma",
             )
+            band_handles = [inner, outer]
+            sigma = summary.conditional_vol_horizon
+            ax.text(0.98, 0.03, f"1sigma width: {sigma.min():.2%} to {sigma.max():.2%}",
+                    transform=ax.transAxes, ha="right", fontsize=8, color=INK)
         coefficients = result.report_diagnostics["Grid polynomial regressions"]
         if key in coefficients.index:
             row = coefficients.loc[key]
@@ -480,22 +476,15 @@ def _grid_page(result, config):
             label = equation + "$\n" + fit
             curve, = ax.plot(x, b1 * x + b2 * x * x,
                              color="#C46B27", ls="--", lw=1.5, label=label)
-            handles = [curve]
-            if key in regression_bands.index.get_level_values("grid"):
-                band = regression_bands.loc[key].reindex(summary.index)
-                if band[["mean_ci_lower", "mean_ci_upper"]].notna().all().all():
-                    shading = ax.fill_between(
-                        x, band.mean_ci_lower, band.mean_ci_upper,
-                        color="#C46B27", alpha=0.23, zorder=1,
-                        label=f"{confidence:.0%} quadratic-fit CI",
-                    )
-                    handles.append(shading)
+            handles = [curve, *band_handles]
             ax.legend(
                 handles=handles,
                 loc="upper right" if str(key).lower() == "fx" else "upper left",
-                fontsize=9,
+                fontsize=8.5,
                 frameon=False,
             )
+        elif band_handles:
+            ax.legend(handles=band_handles, loc="upper left", fontsize=8.5, frameon=False)
         ax.set_title(title, fontsize=12, color=INK, fontweight="bold", pad=12)
         ax.grid(True, color="#DFE7F0", linewidth=0.6)
         ax.axhline(0, color="#7B8D9B", lw=0.6)
@@ -505,41 +494,22 @@ def _grid_page(result, config):
             ax.set_xticks(np.arange(np.ceil(x.min() * 10), np.floor(x.max() * 10) + 1) / 10)
         elif len(x):
             ax.set_xticks(x, [str(item) for item in summary.index], rotation=30)
-    if any("lower_bound" in result.grid_summaries[key] for key in keys):
-        fig.text(
-            0.085,
-            0.15,
-            f"{confidence:.0%} bands include conditional factor risk + "
-            f"idiosyncratic risk over {months:g} month. Baseline portfolio exposures; "
-            "analytical covariance method.",
-            fontsize=10,
-            fontweight="bold",
-            color=INK,
-        )
     notes = [
-        "Credit: x is the total family bump; each of n Credit factors receives "
-        "log(1+x/n) for an equal split. Other panels anchor at log(1+x). Free factors "
-        "use one joint conditional solve. Appendix, page 9.",
-        "All x-axes are factor returns, not yield or spread changes.",
-    ]
-    if funded and any("lower_bound" in result.grid_summaries[key] for key in keys):
-        notes += [
-            "Blue: conditional factor dispersion plus asset residual risk, centred on exact "
-            "scenario valuations. Baseline exposures, Gaussian covariance and horizon scaling; "
-            "constant width within each panel.",
-        ]
-    elif not funded:
-        notes += ["Derivative points use exact intrinsic payoffs, including strike kinks and "
-                  "knockout jumps. A smooth quadratic can miss these features."]
-    notes += [
-        f"Orange: {confidence:.0%} pointwise Student-t confidence interval for the quadratic "
-        "OLS fitted mean, with zero intercept and n-2 error degrees of freedom.",
-        "Grid points are deterministic. OLS intervals assume independent, constant-variance "
-        "regression errors; they describe the fitted approximation, not future portfolio "
-        "loss risk.",
-        "Dashed: quadratic fit in decimal returns. Uncentered R-squared = 1 - SSE/sum(return "
-        "squared); n/a for a zero curve. No CI without error degrees of freedom; no fit on a "
-        "rank-deficient grid.",
+        "Credit: x is the total family bump; each of n Credit factors receives log(1+x/n) "
+        "for an equal split. Other panels anchor at log(1+x). Free factors use one joint "
+        "conditional solve. Appendix, page 9.",
+        f"Shading: conditional +/-1sigma (dark) and +/-2sigma (light) over {months:g} month. "
+        "Bands are centred on exact payoff valuations; local sensitivities are recalculated "
+        "at each grid point using the fixed reporting denominator.",
+        "Sigma includes remaining conditional factor risk plus shared-underlying residual "
+        "risk. Signed factor Euler contributions plus residual Euler sum to sigma; the "
+        "selected factors are fixed, not removed by subtracting their original Euler values.",
+        "Local delta/Gaussian covariance approximation: about 68%/95% coverage only under "
+        "that approximation. Curvature, strike/knockout jumps and covariance/tail uncertainty "
+        "are omitted; zero local delta does not establish absence of nonlinear risk.",
+        "All x-axes are factor returns, not yield/spread changes. Dashed: quadratic OLS "
+        "through zero; uncentered R-squared = 1 - SSE/sum(return squared). Regression CIs "
+        "are exported as diagnostics only and do not determine the shading.",
     ]
     if any(result.grid_metadata.loc[key, "bump_convention"] != "simple"
            or result.grid_metadata.loc[key, "completion"] != "conditional" for key in keys):
@@ -793,25 +763,27 @@ def _methodology_page(result, config):
         fontsize=15,
         color=INK,
     )
-    fig.text(left, 0.530, "Analytical prediction band", fontsize=15, fontweight="bold", color=INK)
+    fig.text(left, 0.530, "Conditional local volatility bands",
+             fontsize=15, fontweight="bold", color=INK)
     fig.text(
         left,
         0.486,
-        r"$v_{p|A}=e_F^\top\Sigma_{F|A}e_F+\sum_j w_j^2\sigma_{\epsilon,j}^2$",
+        r"$v_{p|A}(x)=e_F(x)^\top\Sigma_{F|A}e_F(x)+\sum_j w_j(x)^2\sigma_{\epsilon,j}^2$",
         fontsize=14,
         color=INK,
     )
     fig.text(
-        left, 0.442, r"$R_p(x)\;\pm\;\Phi^{-1}((1+c)/2)\sqrt{T\,v_{p|A}}$", fontsize=14, color=INK
+        left, 0.442, r"$R_p(x)\;\pm\;k\sqrt{T\,v_{p|A}(x)},\quad k=1,2$", fontsize=14, color=INK
     )
     fig.text(
         left,
         0.403,
-        "w = MTM / NAV; e = beta.T w (baseline exposures).\n"
-        f"T = {Fraction(result.metadata['horizon_years']).limit_denominator(365)} year; "
-        f"c = {result.metadata['confidence']:.0%}. Independent residuals.\n"
-        "Gaussian conditional covariance; linearised NAV risk.\n"
-        "Same covariance and exposures at every grid point.",
+        "w(x) = scenario response dollar sensitivity / N.\n"
+        "e(x) = beta.T w(x); N: fixed reporting denominator.\n"
+        f"T = {Fraction(result.metadata['horizon_years']).limit_denominator(365)} year. "
+        "Shared response residuals.\n"
+        "Signed factor Euler + residual Euler = local sigma.\n"
+        "Fixed conditional covariance; scenario-local deltas.",
         fontsize=9.5,
         color=INK,
         va="top",
@@ -851,17 +823,6 @@ def _methodology_page(result, config):
         for text in fig.texts:
             if text.get_text().startswith("$R_p(x)="):
                 text.set_text(r"$R_p(x)=\sum_h[V_h(z(x))-V_h(0)]/N$")
-            if text.get_text() == "Analytical prediction band":
-                text.set_text("Local risk (no derivative bands)")
-            if text.get_text().startswith("w = MTM"):
-                text.set_text(
-                    "w = shared response dollar sensitivity / N.\n"
-                    "N: explicit reporting denominator.\n"
-                    "Intrinsic payoff changes retain observed MTM anchors.\n"
-                    "No derivative prediction bands are displayed."
-                )
-            if text.get_text().startswith("$R_p(x)\\;"):
-                text.set_text("Band formula applies to funded assets only.")
     return fig
 
 

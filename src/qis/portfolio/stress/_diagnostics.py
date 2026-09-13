@@ -31,23 +31,7 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
     )
     factor = compute_portfolio_risk_contributions(beta, model.factor_covar[date])
     factor *= systematic / total if total else 0.0
-    families, assigned = {}, set()
-    groups = model.factor_groups or {}
-    members = [member for group in groups.values() for member in group.members]
-    # Overlapping scenario groups have no unique additive partition: display atomic
-    # factors instead, preserving their valid scenario semantics and total risk.
-    if len(members) != len(set(members)):
-        groups = {}
-    for key, group in groups.items():
-        assigned.update(group.members)
-        families[key] = {
-            "label": group.label or key,
-            "members": ", ".join(group.members),
-            "euler_vol": factor.loc[list(group.members)].sum(),
-        }
-    for name in factor.index:
-        if name not in assigned:
-            families[name] = {"label": name, "members": name, "euler_vol": factor[name]}
+    families = _family_euler(factor, model.factor_groups)
     # compute_marginal_tre_at_date aggregates over factors; this exhibit retains
     # each holding/factor cell, including offsetting holdings at zero net factor beta.
     holding = (
@@ -89,7 +73,7 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
     return {
         "Annualised portfolio risk": table,
         "Factor Euler volatility": factor.rename("euler_vol").to_frame(),
-        "Family Euler volatility": pd.DataFrame.from_dict(families, orient="index"),
+        "Family Euler volatility": families,
         "Holding factor Euler volatility": holding,
         "Unit response risk": pd.DataFrame.from_dict(unit_risk, orient="index"),
         "Loading aggregates": pd.DataFrame.from_dict(aggregates, orient="index"),
@@ -144,3 +128,25 @@ def _grid_regressions(grids, confidence):
         )
     )
     return coefficients, confidence_bands
+
+
+def _family_euler(factor, groups):
+    """Aggregate signed Euler contributions only over a nonoverlapping partition."""
+    families, assigned = {}, set()
+    groups = groups or {}
+    members = [member for group in groups.values() for member in group.members]
+    # Overlapping scenario groups have no unique additive partition: display atomic
+    # factors instead, preserving their valid scenario semantics and total risk.
+    if len(members) != len(set(members)):
+        groups = {}
+    for key, group in groups.items():
+        assigned.update(group.members)
+        families[key] = {
+            "label": group.label or key,
+            "members": ", ".join(group.members),
+            "euler_vol": factor.loc[list(group.members)].sum(),
+        }
+    for name in factor.index:
+        if name not in assigned:
+            families[name] = {"label": name, "members": name, "euler_vol": factor[name]}
+    return pd.DataFrame.from_dict(families, orient="index")

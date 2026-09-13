@@ -185,9 +185,16 @@ def verify_result(portfolio, result, derivatives):
         result.report_diagnostics["Factor Euler volatility"].euler_vol.sum()
         + risk.loc["Idiosyncratic", "euler_vol"], risk.loc["Total", "annual_vol"],
     )
-    assert ("lower_bound" in result.grid_summaries["Credit"]) is (not derivatives)
+    assert "lower_1sigma" in result.grid_summaries["Credit"]
     regressions = result.report_diagnostics["Grid polynomial regressions"]
     assert regressions["order"].eq(2).all()
+    for key, grid in result.grid_summaries.items():
+        np.testing.assert_allclose(grid.upper_2sigma-grid.portfolio_return,
+                                   2*grid.conditional_vol_horizon, atol=1e-12)
+        euler = result.report_diagnostics["Grid conditional factor Euler"].loc[key]
+        np.testing.assert_allclose(euler.drop(columns="Total").sum(axis=1),
+                                   grid.conditional_vol_horizon, atol=1e-12)
+
     assert set(regressions.index) == set(result.grid_summaries)
     bands = result.report_diagnostics["Grid regression confidence bands"]
     assert set(bands.index.get_level_values("grid")) == set(result.grid_summaries)

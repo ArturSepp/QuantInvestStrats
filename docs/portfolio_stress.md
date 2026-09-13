@@ -91,10 +91,12 @@ single source of those conventions and is also available inside an installed QIS
 - **Sensitivity grids** fit a through-zero quadratic for every portfolio, including
   derivatives. Legends show the equation and uncentered R-squared on the displayed grid.
   Exact payoff points remain authoritative, including at strikes and knockout jumps.
-  Orange shading shows pointwise OLS confidence intervals for the fitted quadratic mean
-  for both funded and derivative portfolios. These describe the regression approximation
-  on the deterministic grid, not the range of future portfolio losses. Funded portfolios
-  also retain blue baseline conditional scenario prediction bands.
+  Blue shading shows conditional +/-1sigma and +/-2sigma volatility ranges using
+  scenario-local exposures for funded and derivative holdings. Factor Euler plus
+  residual Euler contributions reconcile to each band's horizon volatility. OLS
+  mean-fit confidence intervals remain exported diagnostics, not chart shading.
+  Local bands omit curvature and boundary-crossing risk; they are not exact nonlinear
+  confidence intervals. Scenario-local risk and Euler exports are included in 5.30.0.
 - **Loadings and fit** distinguish unit underlying response risk from portfolio exposure. Fitted
   R-squared and original clustering trees must come from the caller; absent diagnostics are
   labelled unavailable. No fitted R-squared or original trees are invented by these examples.

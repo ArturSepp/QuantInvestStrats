@@ -147,29 +147,45 @@ class PortfolioHolding:
         return self.observed_mtm + self.get_pnl(context, baseline_context)
 
     def response_jacobian(self, context: PayoffContext) -> pd.Series:
-        """Return current dollar derivative by shared underlying response.
+        """Return local dollar derivative by shared underlying response at one scenario.
 
         Args:
-            context: A zero-shock public market view.
+            context: A single-scenario market view retaining original quote/FX baselines.
 
         Returns:
             Dollar sensitivities indexed by every fitted response ID.
         """
         quote_map, fx_map = context.quote_response_jacobian, context.fx_response_jacobian
         result = pd.Series(0.0, index=quote_map.columns)
+        if len(context.quotes) != 1:
+            raise ValueError("response Jacobian requires exactly one scenario")
         if self.payoff is not None:
-            result = self.payoff.response_jacobian(context)
+            if np.any(context.response_log_shocks.to_numpy() != 0.0):
+                method = getattr(self.payoff, "scenario_response_jacobian", None)
+                if method is None:
+                    raise NotImplementedError(
+                        "Composite must implement scenario_response_jacobian for stressed "
+                        "local risk; disable ordinary_asset_bands to retain valuation only."
+                    )
+                result = method(context)
+            else:
+                result = self.payoff.response_jacobian(context)
         elif self.is_delta_one:
             key = self.legs[0].underlying_id
             currency = context.quote_currencies.loc[key]
-            result = self.observed_mtm * (quote_map.loc[key] + fx_map.loc[currency])
+            value = (self.observed_mtm * (context.quotes.iloc[0][key]
+                     / context.baseline_quotes[key]) * (context.fx_rates.iloc[0][currency]
+                     / context.baseline_fx_rates[currency]))
+            result = value * (quote_map.loc[key] + fx_map.loc[currency])
         else:
-            quotes, fx = context.baseline_quotes, context.baseline_fx_rates
+            quotes, fx = context.quotes.iloc[0], context.fx_rates.iloc[0]
             for leg in self.legs:
                 key = leg.underlying_id
                 currency = context.quote_currencies.loc[key]
                 spot = quotes.loc[key]
-                local_payoff = leg.get_payoff(pd.Series([spot]), spot).iloc[0]
+                local_payoff = leg.get_payoff(
+                    pd.Series([spot]), context.baseline_quotes[key]
+                ).iloc[0]
                 dollar_delta = leg.get_quote_delta(spot, self.kink_policy) * spot
                 result += fx.loc[currency] * (
                     dollar_delta * quote_map.loc[key] + local_payoff * fx_map.loc[currency]
@@ -381,7 +397,21 @@ class InstrumentPortfolio:
             raise ValueError("delta_f must be a labelled Series")
         return self.evaluate(delta_f.to_frame().T).pnl.iloc[0]
 
-    def response_jacobian(self) -> pd.DataFrame:
-        """Return original-holding-by-shared-response current dollar sensitivities."""
-        context = self._baseline_context()
+    def response_jacobian(self, delta_f: pd.Series | None = None) -> pd.DataFrame:
+        """Return original-holding-by-shared-response local dollar sensitivities.
+
+        Args:
+            delta_f: Complete labelled factor log shocks at which to differentiate.
+                None retains the original current-exposure calculation. Original marks,
+                quote baselines and futures settlement references are never rebased.
+
+        Returns:
+            Dollar sensitivities at the supplied scenario, before denominator scaling.
+            Composite payoffs require a scenario_response_jacobian(context) method
+            at nonzero response shocks; declared boundary policies remain in force.
+        """
+        if delta_f is not None and not isinstance(delta_f, pd.Series):
+            raise ValueError("delta_f must be a labelled Series or None")
+        context = (self._baseline_context() if delta_f is None
+                   else build_context(self, delta_f.to_frame().T))
         return pd.DataFrame([h.response_jacobian(context) for h in self.holdings])

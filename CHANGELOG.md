@@ -5,6 +5,25 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.30.0] - 2026-09-13
+
+### Added
+
+- Optional factor-shock argument to InstrumentPortfolio.response_jacobian for local
+  sensitivities at a stress point, preserving original marks and futures references.
+- Conditional grid volatility bands for funded holdings, calls, puts and futures:
+  exact one/two-sigma bounds with scenario-local exposures and shared residual risk.
+  Export monthly factor/family Euler contributions and scenario response exposures.
+- Composite payoffs can implement scenario_response_jacobian(context); missing support
+  fails explicitly at nonzero shocks instead of reusing stale baseline sensitivities.
+
+### Changed
+
+- The legacy ordinary_asset_bands switch now enables local risk bands for derivatives
+  too. Charts shade exact payoff curves with one/two-sigma ranges and keep quadratic
+  equations/R-squared; regression confidence intervals remain available in tables only.
+  Bands are local covariance approximations, not exact nonlinear probability intervals.
+
 ## [5.29.0] - 2026-09-12
 
 ### Added

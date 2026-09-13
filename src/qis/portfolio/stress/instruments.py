@@ -263,6 +263,14 @@ class HoldingPayoff(Protocol):
         implementation_id: Stable implementation/version identifier for the audit.
         coverage: Plain-language payoff approximation and omitted contract states.
         boundary_policy: Declared current derivative convention at discontinuities.
+
+    For conditional bands at nonzero shocks, also implement the optional
+    scenario_response_jacobian(context) method. It reads the single scenario row
+    from context.quotes and context.fx_rates, while baseline properties retain
+    the original valuation references. Return shared-response dollar derivatives
+    with the same boundary policy. Baseline-only composites remain valid for
+    valuation/current risk; requesting stressed risk without the method fails
+    explicitly. Disable StressTestConfig.ordinary_asset_bands for those consumers.
     """
 
     implementation_id: str

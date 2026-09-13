@@ -206,7 +206,7 @@ def test_grid_polynomial_is_quadratic_for_every_payoff_type(market, funded, orde
     assert row["order"] == order
     assert row.cubic == 0.0
     assert row.r_squared == pytest.approx(1 - np.sum((y - design @ reference) ** 2) / (y @ y))
-    assert ("lower_bound" in result.grid_summaries["Equity"]) is funded
+    assert "lower_1sigma" in result.grid_summaries["Equity"]
     band = result.report_diagnostics["Grid regression confidence bands"].loc["Equity"]
     residual_variance = np.sum((y - design @ reference) ** 2) / (len(x) - order)
     _, r = np.linalg.qr(design)
@@ -229,9 +229,10 @@ def test_grid_polynomial_is_quadratic_for_every_payoff_type(market, funded, orde
         assert "R^2" in legend
         assert "x^3" not in legend
         shading = next(collection for collection in figure.axes[0].collections
-                       if collection.get_label() == f"{confidence:.0%} quadratic-fit CI")
+                       if collection.get_label() == "Conditional +/-2sigma")
         vertices = shading.get_paths()[0].vertices
-        for anchor, lower, upper in zip(x, band.mean_ci_lower, band.mean_ci_upper):
+        risk_band = result.grid_summaries["Equity"]
+        for anchor, lower, upper in zip(x, risk_band.lower_2sigma, risk_band.upper_2sigma):
             ys = vertices[np.isclose(vertices[:, 0], anchor, atol=1e-14), 1]
             np.testing.assert_allclose([ys.min(), ys.max()], [lower, upper], atol=1e-12)
     finally:
