@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from enum import Enum
 import qis.plots.utils as put
-from qis.plots.utils import TrendLine, LastLabel
+from qis.plots.utils import TrendLine
 from qis.plots.time_series import plot_time_series, plot_time_series_2ax
 
 
@@ -28,13 +28,11 @@ def run_local(local: Locals):
                          'markersize': 1}
         plot_time_series(df=prices,
                          legend_stats=put.LegendStats.AVG_LAST,
-                         last_label=LastLabel.AVERAGE_VALUE_SORTED,
                          trend_line=TrendLine.AVERAGE_SHADOWS,
                          ax=axs[0],
                          **global_kwargs)
         plot_time_series(df=prices,
                          legend_stats=put.LegendStats.AVG_LAST,
-                         last_label=LastLabel.LAST_VALUE,
                          trend_line=TrendLine.AVERAGE_SHADOWS,
                          ax=axs[1],
                          **global_kwargs)

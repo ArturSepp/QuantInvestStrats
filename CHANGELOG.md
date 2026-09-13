@@ -32,6 +32,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Preserve the causal joint-unsmoothing warmup and missing-row fixes and finite-date
   as-of lookup fixes merged after 5.30.0.
 
+### Removed
+
+- Breaking plotting API change: remove `LastLabel` and the `plot_time_series`
+  options `last_label`, `sort_by_value_stretch_factor` and
+  `indices_for_shaded_areas`. Remove these arguments from callers; they no longer
+  draw annotations or shaded areas. Use `legend_stats` for last/average values
+  in the legend and caller-supplied Matplotlib axes for custom annotations.
+
 The unreleased stress-branch versions 5.28-5.36 are consolidated into this release;
 those branch labels did not identify published stress-framework distributions.
 

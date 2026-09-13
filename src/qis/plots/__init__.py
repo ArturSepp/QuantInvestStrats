@@ -10,7 +10,6 @@ exported here and are imported by full path, e.g. `from qis.plots.utils import s
 
 from qis.plots.utils import (
     TrendLine,
-    LastLabel,
     LegendStats,
     set_suptitle
 )

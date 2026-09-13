@@ -46,7 +46,6 @@ def run_local(local: Locals):
                              title=title,
                              legend_loc='upper left',
                              legend_stats=qis.LegendStats.AVG,
-                             last_label=qis.LastLabel.AVERAGE_VALUE,
                              trend_line=qis.TrendLine.AVERAGE,
                              var_format='{:.2f}')
 

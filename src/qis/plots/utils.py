@@ -6,11 +6,10 @@ marks - titles, tick formats, spines, limit alignment across paired axes, date a
 colour sequences, table sizing - factored out so that a title, a percentage format or a legend
 means the same thing on every panel of a factsheet.
 
-Four things are public, and they are the ones that appear in a caller's signature:
+Three things are public, and they are the ones that appear in a caller's signature:
 
     ``TrendLine``   the overlay drawn on a series - none, mean, zero line, fitted trend, each
                     with or without a shaded band
-    ``LastLabel``   whether and how the final point of a line is annotated
     ``LegendStats`` which summary statistics the legend prints beside each series name
     ``set_suptitle``  the figure-level title above a grid of axes
 
@@ -58,7 +57,6 @@ from qis.plots.table import ROW_HIGHT, COLUMN_WIDTH, FIRST_COLUMN_WIDTH
 # public API of this module: everything else is internal plotting machinery and is
 # imported by its full path, e.g. `from qis.plots.utils import set_spines`
 __all__ = ['TrendLine',        # enum, appears in plot_prices() / plot_prices_2ax() signatures
-           'LastLabel',        # enum, appears in plot_time_series() signature
            'LegendStats',      # enum, appears in plot_bars() / plot_histogram() signatures
            'set_suptitle'      # figure title helper, used across qis, optimalportfolios, rosaa
            ]
@@ -94,14 +92,6 @@ class TrendLine(Enum):
     TREND_LINE = 5
     TREND_LINE_SHADOWS = 6
     ABOVE_ZERO_SHADOWS = 7
-
-
-class LastLabel(Enum):
-    NONE = 0
-    LAST_VALUE = 1
-    LAST_VALUE_SORTED = 2
-    AVERAGE_VALUE = 3
-    AVERAGE_VALUE_SORTED = 4
 
 
 def create_dummy_line(**kwargs) -> Line2D:

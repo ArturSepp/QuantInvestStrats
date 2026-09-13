@@ -18,11 +18,11 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import List, Union, Tuple, Optional, Dict
+from typing import List, Union, Tuple, Optional
 # qis
 import qis.utils.struct_ops as sop
 import qis.plots.utils as put
-from qis.plots.utils import LegendStats, TrendLine, LastLabel
+from qis.plots.utils import LegendStats, TrendLine
 from qis.perfstats.desc_table import compute_desc_table, DescTableType
 
 
@@ -33,14 +33,11 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                      date_format: str = '%d-%b-%y',
                      legend_title: str = None,
                      legend_loc: Optional[Union[str, bool]] = 'upper left',
-                     last_label: LastLabel = LastLabel.NONE,
-                     sort_by_value_stretch_factor: float = 1.0,
                      trend_line: Optional[TrendLine] = TrendLine.NONE,
                      trend_line_colors: List[str] = None,
                      legend_stats: LegendStats = LegendStats.AVG_LAST,
                      desc_table_type: DescTableType = DescTableType.NONE,
                      legend_labels: List[str] = None,
-                     indices_for_shaded_areas: Dict[str, Tuple[int, int]] = None,
                      xlabel: str = None,
                      ylabel: str = None,
                      var_format: Optional[str] = '{:,.2f}',
@@ -73,9 +70,6 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
         x_date_freq: tick frequency on the date axis
         date_format: strftime format for the tick labels
         legend_title: heading above the legend entries
-        last_label: whether to annotate the last point of each line, and with what
-        sort_by_value_stretch_factor: vertical spread applied when last labels are sorted by
-            value, to keep them from overlapping
         trend_line: trend line drawn through each series
         trend_line_colors: colours for those trend lines, defaulting to the series colours
         legend_stats: which statistics each legend entry reports; see :class:`LegendStats`
@@ -84,8 +78,6 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
             None, table values use native scalar text
         legend_labels: replace the column names in the legend. Statistics from
             ``legend_stats`` are appended to these
-        indices_for_shaded_areas: name to (start, end) positional index pairs, shaded to mark
-            episodes. Positional, not dates, so it survives an irregular index
         markers: marker style per column, or False for lines only
         is_log: log scale on the vertical axis
         x_limits: (low, high) on the date axis, either end may be None
@@ -216,94 +208,6 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
                     y = data1[column]
                     ax.fill_between(data1.index, y, y_line, where=y_line >= y,
                                     facecolor=color, interpolate=True, alpha=0.2, lw=linewidth)
-
-    # add last labels
-    if last_label in [LastLabel.AVERAGE_VALUE, LastLabel.AVERAGE_VALUE_SORTED]:
-        average_dict = {}
-        for column, color in zip(columns, colors):
-            data2 = data1[column].dropna()  # exclude nans from showing the average lines
-
-            if data2.empty:  # skip this columns from ere
-                continue
-            else:
-                average = np.nanmean(data2.to_numpy())
-
-            if var_format is not None:
-                average_str = var_format.format(average)
-            else:
-                average_str = average
-            y1 = average
-            variable_label = f"{column}, average={average_str}"
-            average_dict.update({y1: [variable_label, color]})
-
-        x1 = data1.index[-1]
-        ymin, ymax = ax.get_ylim()
-        mid = sort_by_value_stretch_factor * (ymax - ymin)
-        if last_label == LastLabel.AVERAGE_VALUE_SORTED:
-            pivot_dict = sorted(average_dict)
-            locs = np.linspace(pivot_dict[0], sort_by_value_stretch_factor*mid, len(pivot_dict), endpoint=True)
-        else:
-            pivot_dict = average_dict
-            locs = [dict for dict in pivot_dict]
-
-        for key, loc in zip(pivot_dict, locs):
-            ax.annotate(average_dict[key][0],
-                        xy=(x1, key), xytext=(x1, loc),
-                        fontsize=fontsize, weight='normal', color=average_dict[key][1],
-                        textcoords='data', ha='left', va='bottom',
-                        bbox={'boxstyle': 'round,pad=0.5', 'fc': average_dict[key][1], 'alpha': 0.1},
-                        arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
-
-    elif last_label in [LastLabel.LAST_VALUE, LastLabel.LAST_VALUE_SORTED]:
-        last_dict = {}
-        for column, color in zip(columns, colors):
-            y = data1[column].dropna()
-            if last_label == LastLabel.LAST_VALUE:
-                if var_format is not None:
-                    if len(y.index) > 0:
-                        variable_str = var_format.format(y.iloc[-1])
-                    else:
-                        variable_str = 'nan'
-                else:
-                    variable_str = y.iloc[-1]
-                variable_label = f"{column}, last = {variable_str}"
-
-                if len(y.index) > 0:
-                    y1 = y.iloc[-1]
-                else:
-                    y1 = np.nan
-                last_dict.update({y1: [variable_label, color]})
-
-        # plot dicts sorted by last value
-        x1 = data1.index[-1]
-        ymin, ymax = ax.get_ylim()
-        mid = sort_by_value_stretch_factor * (ymax - ymin)
-
-        if last_label == LastLabel.LAST_VALUE_SORTED:
-            pivot_dict = sorted(last_dict)
-            locs = np.linspace(pivot_dict[0], sort_by_value_stretch_factor*mid, len(pivot_dict), endpoint=True)
-        else:
-            pivot_dict = last_dict
-            locs = [dict for dict in pivot_dict]
-
-        for key, loc in zip(pivot_dict,locs):
-            ax.annotate(last_dict[key][0],
-                        xy=(x1, key), xytext=(x1, loc),
-                        fontsize=fontsize, weight ='normal', color = last_dict[key][1],
-                        textcoords='data', ha='left', va='bottom',
-                        bbox={'boxstyle': 'round,pad=0.5', 'fc': last_dict[key][1], 'alpha': 0.1},
-                        arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
-
-    if indices_for_shaded_areas is not None:
-        if len(data1.columns) == 1:
-            warnings.warn(f"cannot do indices_for_shaded_areas = {indices_for_shaded_areas} for dataframe with one columns ")
-        else:
-            for col, indxs in indices_for_shaded_areas.items():
-                y0 = data1.iloc[:, indxs[0]]
-                y1 = data1.iloc[:, indxs[1]]
-                ax.fill_between(data1.index, y0, y1, where=y0 >= y1,
-                                facecolor=col, alpha=0.2,
-                                interpolate=True)
 
     if legend_loc is not None:
         if legend_labels is None:

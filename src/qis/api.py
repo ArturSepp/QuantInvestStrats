@@ -50,7 +50,7 @@ PUBLIC_API: Tuple[str, ...] = (
     'FactorsData', 'FactsheetConfig', 'FileTypes', 'FxRatesData', 'HoldingPayoff', 'InitType',
     'InstrumentLeg', 'InstrumentPortfolio', 'InstrumentType', 'KinkPolicy',
     'LN_BENCHMARK_TABLE_COLUMNS', 'LN_BENCHMARK_TABLE_COLUMNS_SHORT', 'LN_TABLE_COLUMNS',
-    'LastLabel', 'LegendStats', 'LinearModel', 'MeanAdjType', 'ModelFeatureAlphaBetaAttribution',
+    'LegendStats', 'LinearModel', 'MeanAdjType', 'ModelFeatureAlphaBetaAttribution',
     'ModelLayerAlphaBetaAttribution', 'ModelLayerCumulativeAlphaAttribution',
     'ModelLayerEwmaAlphaAttribution', 'ModelLayerEwmaRegressionAttribution', 'ModelLayerNavs',
     'MultiAssetsReport', 'MultiPortfolioData', 'NanBackfill', 'OutlierPolicy', 'PayoffContext',
