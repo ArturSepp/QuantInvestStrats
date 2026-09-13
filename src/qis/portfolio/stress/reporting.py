@@ -26,7 +26,7 @@ class StressReportConfig:
         cluster_memberships: Optional fitted group-to-response membership Series.
         cluster_linkages: Matching fitted linkage arrays in membership index order.
         cluster_cutoffs: Matching fitted cutoffs; never estimated by the report.
-        selected_grids: Up to four caller-named grids for the sensitivity page.
+        selected_grids: Up to six caller-named grids for the sensitivity page.
             Empty selects the first four; all grids are always exported.
         notes: Plain methodology/coverage notes supplied by the application.
         write_workbook: Write a numerical workbook using the existing QIS serializer.
@@ -69,8 +69,8 @@ class StressReportConfig:
             object.__setattr__(self, "appendix_table", self.appendix_table.copy(deep=True))
         object.__setattr__(self, "appendix_notes", tuple(self.appendix_notes))
         grids = tuple(self.selected_grids)
-        if len(grids) > 4 or len(set(grids)) != len(grids):
-            raise ValueError("selected_grids must contain at most four unique names")
+        if len(grids) > 6 or len(set(grids)) != len(grids):
+            raise ValueError("selected_grids must contain at most six unique names")
         if not (
             set(self.cluster_memberships) == set(self.cluster_linkages) == set(self.cluster_cutoffs)
         ):

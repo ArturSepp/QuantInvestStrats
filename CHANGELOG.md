@@ -5,6 +5,15 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.31.0] - 2026-09-13
+
+### Changed
+
+- StressReportConfig accepts up to six selected sensitivity grids. The report renders
+  them in supplied order on a 2-by-3 page, preserving exact valuations, quadratic fits,
+  and conditional one/two-sigma bands. Single-factor Credit panels no longer carry
+  the explanation for a split family shock.
+
 ## [5.30.0] - 2026-09-13
 
 ### Added

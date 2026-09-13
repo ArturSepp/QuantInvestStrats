@@ -281,3 +281,50 @@ def test_two_point_quadratic_has_no_estimable_regression_confidence_band(market)
     band = result.report_diagnostics["Grid regression confidence bands"].loc["Equity"]
     assert band.df_resid.eq(0).all()
     assert band[["mean_se", "mean_ci_lower", "mean_ci_upper"]].isna().all().all()
+
+
+def test_six_selected_sensitivity_panels_preserve_caller_order(market):
+    """Six supplied grids render row-major without dropping or reordering a curve."""
+    import matplotlib.pyplot as plt
+    from qis.portfolio.stress._figures import _grid_page
+
+    p = grouped_portfolio(market)
+    x = np.array([-.2, 0., .2])
+    grid = StressScenarios(pd.DataFrame({"Equity": x}, index=x),
+                           ScenarioMode.CONDITIONAL, ShockConvention.SIMPLE)
+    keys = ("sixth", "first", "third", "second", "fifth", "fourth")
+    result = run_portfolio_stress_test(p, grid, factor_grids={key: grid for key in keys})
+    config = StressReportConfig(selected_grids=keys)
+    fig = _grid_page(result, config)
+    try:
+        assert len(fig.axes) == 6
+        assert len({round(ax.get_position().y0, 6) for ax in fig.axes}) == 2
+        assert len({round(ax.get_position().x0, 6) for ax in fig.axes}) == 3
+        for ax, key in zip(fig.axes, keys):
+            line = next(line for line in ax.lines if line.get_linestyle() == "--")
+            coeff = result.report_diagnostics["Grid polynomial regressions"].loc[key]
+            np.testing.assert_allclose(line.get_ydata(), coeff.linear*x + coeff.quadratic*x*x)
+        with pytest.raises(ValueError, match="six"):
+            StressReportConfig(selected_grids=keys + ("seventh",))
+    finally:
+        plt.close(fig)
+
+
+def test_no_active_factor_contributions_leave_sensitivity_slots_empty(market):
+    """A zero-risk portfolio must not select arbitrary factors through empty defaults."""
+    from dataclasses import replace
+    import matplotlib.pyplot as plt
+    from qis.portfolio.stress._figures import _grid_page
+    p = grouped_portfolio(market)
+    x = np.array([-.2, 0., .2])
+    grid = StressScenarios(pd.DataFrame({"Equity": x}, index=x),
+                           ScenarioMode.CONDITIONAL, ShockConvention.SIMPLE)
+    result = run_portfolio_stress_test(p, grid, factor_grids={"Equity": grid})
+    diagnostics = dict(result.report_diagnostics)
+    diagnostics["Factor Euler volatility"] = diagnostics["Factor Euler volatility"] * 0.
+    result = replace(result, report_diagnostics=diagnostics)
+    fig = _grid_page(result, StressReportConfig())
+    try:
+        assert all(not ax.axison for ax in fig.axes)
+    finally:
+        plt.close(fig)

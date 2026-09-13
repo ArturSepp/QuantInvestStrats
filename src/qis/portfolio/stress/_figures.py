@@ -317,6 +317,13 @@ def _risk_page(result, config):
     return fig
 
 
+def _contributor_factors(result):
+    """Return the shared six-factor display order, including stable ties."""
+    rc = result.report_diagnostics["Factor Euler volatility"].euler_vol
+    return tuple(rc.loc[rc.ne(0)].abs().sort_values(
+        ascending=False, kind="stable").head(6).index)
+
+
 def _contributor_page(result, config):
     """Allocate the largest factor Euler contributions to original holdings."""
     fig = _page(
@@ -328,13 +335,7 @@ def _contributor_page(result, config):
         "contribution to total annual portfolio volatility.",
     )
     rc = result.report_diagnostics["Factor Euler volatility"].euler_vol
-    factors = (
-        rc.loc[rc.ne(0)]
-        .abs()
-        .sort_values(ascending=False, kind="stable")
-        .head(6)
-        .index
-    )
+    factors = _contributor_factors(result)
     grid = fig.add_gridspec(
         2, 3, left=0.11, right=0.96, top=0.86, bottom=0.20, hspace=0.48, wspace=0.68
     )
@@ -382,40 +383,28 @@ def _grid_page(result, config):
     """Show exact grids and quadratic fits with conditional one/two-sigma local-risk bands."""
     funded = result.metadata["all_funded"]
     months = result.metadata["horizon_years"] * 12
-    keys = config.selected_grids or tuple(result.grids)[:4]
-    ranges = []
-    for key in keys:
-        try:
-            x = np.asarray(result.grid_summaries[key].index, dtype=float)
-            ranges.append(f"{key} {x.min():+.0%} to {x.max():+.0%}")
-        except (TypeError, ValueError):
-            ranges.append(key)
-    subtitle = "Correlated shocks: " + "; ".join(ranges) + "."
-    standard = tuple(str(key).lower() for key in keys) == ("equity", "rates", "credit", "fx")
-    if standard:
-        expected = [np.arange(-30, 31) / 100] + [np.arange(-20, 21) / 100] * 3
-        standard = all(
-            len(result.grid_summaries[key]) == len(axis)
-            and np.allclose(np.asarray(result.grid_summaries[key].index, dtype=float), axis)
-            for key, axis in zip(keys, expected)
-        )
-    if standard:
-        subtitle = "Correlated shocks: equity +/-30%; rates, credit, FX +/-20%; step 1%."
+    keys = config.selected_grids
+    ranked = _contributor_factors(result)
+    if not keys:
+        if set(result.grids).issubset(result.factor_exposures.index):
+            keys = tuple(factor for factor in ranked if factor in result.grids)
+        else:
+            keys = tuple(result.grids)[:6]
+    subtitle = "Correlated shocks; factor-return ranges shown on each axis."
+    if keys and keys == ranked:
+        subtitle += " Same factor order as the contributor page."
     if any("lower_1sigma" in result.grid_summaries[key] for key in keys):
         subtitle += f" Shading: conditional +/-1sigma and +/-2sigma ({months:g} month)."
     else:
         subtitle += " Deterministic payoff curves; local-risk bands disabled or unavailable."
-    fig = _page(result, config, 6, "Sensitivity to equity, rates, credit and FX factors", subtitle)
-    boxes = [
-        [0.085, 0.575, 0.38, 0.265],
-        [0.575, 0.575, 0.38, 0.265],
-        [0.085, 0.215, 0.38, 0.265],
-        [0.575, 0.215, 0.38, 0.265],
-    ]
-    for i, box in enumerate(boxes):
-        ax = fig.add_axes(box)
+    fig = _page(result, config, 6, "Sensitivity to largest factor exposures", subtitle)
+    grid = fig.add_gridspec(
+        2, 3, left=0.07, right=0.97, top=0.83, bottom=0.235, hspace=0.58, wspace=0.38
+    )
+    for i in range(6):
+        ax = fig.add_subplot(grid[i // 3, i % 3])
         if i >= len(keys):
-            _empty(ax, "No additional sensitivity grid supplied.")
+            ax.set_axis_off()
             continue
         key = keys[i]
         summary = result.grid_summaries[key]
@@ -427,8 +416,8 @@ def _grid_page(result, config):
             x = np.arange(len(summary), dtype=float)
         requested = result.grid_metadata.loc[key, "requested_keys"]
         group = result.metadata.get("factor_groups", {}).get(requested)
-        title = requested
-        xlabel = requested + " factor return"
+        title = config.factor_labels.get(requested, requested)
+        xlabel = title + " factor return"
         if group is not None:
             title = " + ".join(group["members"]) + " (split total family bump)"
             xlabel = f"Total {group['label'] or requested} family bump"
@@ -449,8 +438,8 @@ def _grid_page(result, config):
             full_sample_color=BLUE,
             xvar_format="{:+.0%}" if numeric else "{:.0f}",
             yvar_format="{:+.0%}",
-            markersize=17,
-            fontsize=9,
+            markersize=13,
+            fontsize=8,
             ax=ax,
         )
         band_handles = []
@@ -483,11 +472,11 @@ def _grid_page(result, config):
             ax.legend(
                 handles=handles,
                 loc="upper right" if str(key).lower() == "fx" else "upper left",
-                fontsize=8.5,
+                fontsize=7.5,
                 frameon=False,
             )
         elif band_handles:
-            ax.legend(handles=band_handles, loc="upper left", fontsize=8.5, frameon=False)
+            ax.legend(handles=band_handles, loc="upper left", fontsize=7.5, frameon=False)
         ax.set_title(title, fontsize=12, color=INK, fontweight="bold", pad=12)
         ax.grid(True, color="#DFE7F0", linewidth=0.6)
         ax.axhline(0, color="#7B8D9B", lw=0.6)
@@ -498,9 +487,10 @@ def _grid_page(result, config):
         elif len(x):
             ax.set_xticks(x, [str(item) for item in summary.index], rotation=30)
     notes = [
-        "Credit: x is the total family bump; each of n Credit factors receives log(1+x/n) "
-        "for an equal split. Other panels anchor at log(1+x). Free factors use one joint "
-        "conditional solve. Appendix, page 9.",
+        "Each single-factor panel anchors its named factor at log(1+x); other factors use "
+        "the joint conditional covariance solve. Credit and Credit EM are separate anchors "
+        "when displayed separately. Explicit family grids split the total bump across members. "
+        "See scenario construction in the appendix, page 9.",
         f"Shading: conditional +/-1sigma (dark) and +/-2sigma (light) over {months:g} month. "
         "Bands are centred on exact payoff valuations; local sensitivities are recalculated "
         "at each grid point using the fixed reporting denominator. Panel labels show half-widths "
@@ -901,7 +891,7 @@ def report_pages(result, config):
     for title, builder in [
         (f"Portfolio {model} exposures and risk", _risk_page),
         ("Largest factor exposures: asset risk contributors", _contributor_page),
-        ("Sensitivity to equity, rates, credit and FX factors", _grid_page),
+        ("Sensitivity to largest factor exposures", _grid_page),
         (f"Estimated {model} loadings and explanatory power", _beta_page),
         (f"{model} asset cluster dendrograms", _clusters_page),
         (f"{model} correlation and scenario construction", _methodology_page),
