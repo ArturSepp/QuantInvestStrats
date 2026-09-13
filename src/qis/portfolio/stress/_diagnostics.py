@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from qis.portfolio.risk.contributions import compute_portfolio_risk_contributions
+from qis.portfolio.risk.stress_testing import conditional_factor_shock
 from qis.utils.regression import fit_ols
 
 
@@ -91,7 +92,30 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
         "Loading aggregates": pd.DataFrame.from_dict(aggregates, orient="index"),
         "Grid polynomial regressions": regressions,
         "Grid regression confidence bands": confidence_bands,
+        **_conditional_shock_tables(model.factor_covar[date]),
     }
+
+
+
+def _conditional_shock_tables(covariance):
+    """Complete each atomic +/-10% anchor and retain affected rows, anchored columns.
+
+    Tables contain simple factor returns, not covariance entries. A zero-variance
+    factor cannot support a nonzero conditional anchor and remains unavailable.
+    """
+    tables = {}
+    for bump in (-0.10, 0.10):
+        columns = {}
+        for factor in covariance.columns:
+            columns[factor] = (
+                np.expm1(conditional_factor_shock(covariance, {factor: np.log1p(bump)}))
+                if covariance.loc[factor, factor] > 0 else
+                pd.Series(np.nan, index=covariance.index)
+            )
+        table = pd.DataFrame(columns, index=covariance.index).rename_axis(
+            index="Affected factor", columns="Anchored factor")
+        tables[f"Conditional factor shocks {bump:+.0%}"] = table
+    return tables
 
 
 def _grid_regressions(grids, confidence):

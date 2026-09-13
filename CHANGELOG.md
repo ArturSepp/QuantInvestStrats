@@ -5,6 +5,21 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.36.0] - 2026-09-13
+
+### Added
+
+- Conditional-shock illustration after the factor-correlation appendix: separate
+  -10%/+10% single-factor anchors in columns, implied simple factor returns in rows,
+  shared heatmap colours and full-precision CSV/workbook tables. Zero-variance
+  anchors are explicitly unavailable rather than implying zero co-moves.
+
+### Changed
+
+- Conditional mean, covariance and local-band formulas move to the new illustration.
+  The final guide covers eleven analysis exhibits, with twelve pages without source
+  coverage and thirteen with it. Earlier portfolio scenarios and risk remain unchanged.
+
 ## [5.35.0] - 2026-09-13
 
 ### Added

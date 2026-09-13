@@ -127,7 +127,7 @@ class StressReportArtifacts:
     """Paths written by a report operation; the numerical result remains reusable.
 
     Attributes:
-        pdf_path: Ten analysis pages, optional parser coverage, and a final notation guide.
+        pdf_path: Eleven analysis pages, optional parser coverage, and a final notation guide.
         table_paths: Numerical table names mapped to CSV paths.
         workbook_path: Optional workbook path.
         manifest_path: JSON with conventions, table mapping and content hashes.
@@ -324,6 +324,8 @@ def _format_workbook(path):
             sheet.auto_filter.ref = f"A1:{get_column_letter(sheet.max_column)}{sheet.max_row}"
             if "Grid conditional" in sheet.title:
                 sheet_percent_columns |= set(headers.values()) - {"grid"}
+        if "Conditional factor shocks" in sheet.title:
+            sheet_percent_columns |= set(headers.values()) - {headers[1]}
         for column in range(1, sheet.max_column + 1):
             sample = [sheet.cell(row, column).value for row in range(2, min(sheet.max_row, 80) + 1)]
             text_width = max((len(str(value)) for value in sample
@@ -381,7 +383,7 @@ def generate_portfolio_stress_report(
 ) -> StressReportArtifacts:
     """Render a completed result without fitting or re-evaluating any payoff.
 
-    The PDF has ten analysis subjects, optional parser coverage, and a final notation guide.
+    The PDF has eleven analysis subjects, optional parser coverage, and a final notation guide.
     Display limits are explicitly labelled; CSV/workbook tables retain every holding/scenario/grid.
 
     Args:

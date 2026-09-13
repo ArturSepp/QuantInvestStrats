@@ -205,7 +205,7 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
                 note = note.replace("{" + str(factor) + "}", f"{np.expm1(shock):+.2%}")
             if note not in notes:
                 notes.append(note)
-        notes.append("Correlated-shock methodology and formulas: see Appendix, page 10.")
+        notes.append("Correlated-shock methodology and formulas: see Appendix, page 11.")
     _footnotes(fig, notes, y=0.115)
     return fig
 
@@ -508,7 +508,7 @@ def _grid_page(result, config):
         "Each single-factor panel anchors its named factor at log(1+x); other factors use "
         "the joint conditional covariance solve. Family panels divide x equally across members "
         "before log1p; all member anchors are fixed jointly (Credit + Credit EM: x/2 each). "
-        "See scenario construction in the appendix, page 10.",
+        "See scenario construction in the appendix, page 11.",
         f"Shading: conditional +/-1sigma (dark) and +/-2sigma (light) over {months:g} month. "
         "Bands are centred on exact payoff valuations; local sensitivities are recalculated "
         "at each grid point using the fixed reporting denominator. Panel labels show half-widths "
@@ -529,7 +529,7 @@ def _grid_page(result, config):
         if group and not np.allclose(group["weights"], 1.0/len(group["members"])):
             notes[0] = ("Family grids allocate total bumps using the exported member weights "
                         "before log1p; the panel axis identifies the split. Other factors use "
-                        "the joint conditional covariance solve; see appendix, page 10.")
+                        "the joint conditional covariance solve; see appendix, page 11.")
             break
     if any(result.grid_metadata.loc[key, "bump_convention"] != "simple"
            or result.grid_metadata.loc[key, "completion"] != "conditional" for key in keys):
@@ -857,7 +857,7 @@ def _cluster_contribution_page(result, config):
         "full notional. Contributors rank the three largest absolute holding P&Ls in that "
         f"row's worst correlated scenario and show signed % of {denominator_label}. The scenario "
         "is named beside the row; Portfolio uses its own worst scenario. Blank ranks mean fewer "
-        "than three holdings. Methodology: appendix, page 10.",
+        "than three holdings. Methodology: appendix, page 11.",
         "Exposures: sum current holding response dollar sensitivities times factor betas / "
         "notional. Factor risk bars: portfolio's five largest absolute atomic-factor Euler "
         "contributions, using the same factors and colours for every cluster. Labels show their "
@@ -883,130 +883,129 @@ def _cluster_contribution_page(result, config):
 
 
 def _methodology_page(result, config):
-    """Append the owning qis covariance display and the conditional-shock formula."""
+    """Show the fitted covariance and map declared economic targets to factor returns."""
     fig = _page(
-        result,
-        config,
-        10,
-        f"{config.model_name} correlation and scenario construction",
+        result, config, 10, f"{config.model_name} correlation and scenario construction",
         f"Fitted covariance at {pd.Timestamp(result.metadata['risk_date']):%d %b %Y}; "
         "lower triangle: correlations; diagonal: annualised factor volatilities.",
     )
     ax = fig.add_axes([0.105, 0.235, 0.48, 0.60])
     plot_corr_matrix_from_covar(
         result.factor_covariance.rename(index=config.factor_labels, columns=config.factor_labels),
-        ax=ax,
-        title=None,
-        cmap="PiYG",
-        corr_format="{:.2f}",
-        vol_format="{:.1%}",
-        fontsize=9,
-        x_rotation=90,
+        ax=ax, title=None, cmap="PiYG", corr_format="{:.2f}", vol_format="{:.1%}",
+        fontsize=9, x_rotation=90,
     )
-    fig.text(
-        0.105,
-        0.895,
-        str(
-            result.metadata.get("source_provenance", {}).get(
-                "covariance_method", "Covariance supplied by the assigned portfolio model."
-            )
-        ),
-        fontsize=11,
-        color=INK,
-    )
-    from fractions import Fraction
-
+    fig.text(0.105, 0.895, str(result.metadata.get("source_provenance", {}).get(
+        "covariance_method", "Covariance supplied by the assigned portfolio model.")),
+        fontsize=11, color=INK)
     left = 0.62
-    fig.text(left, 0.835, "Conditional factor shocks", fontsize=15, fontweight="bold", color=INK)
-    fig.text(left, 0.791, r"$z_A=\log(P_A^{\mathrm{target}}/P_A^0)$", fontsize=16, color=INK)
-    fig.text(
-        left,
-        0.746,
-        r"$z_F=\Sigma_{FA}\Sigma_{AA}^{-1}z_A;\quad r_i=e^{z_i}-1$",
-        fontsize=15,
-        color=INK,
-    )
-    fig.text(
-        left,
-        0.704,
-        "A: anchored factors; F: free factors.\nSigma: annual factor log-return covariance.\n"
-        "Anchors stay fixed; no mean return is added.",
-        fontsize=10,
-        color=INK,
-        va="top",
-        linespacing=1.3,
-    )
-    fig.text(left, 0.625, "Conditional covariance", fontsize=15, fontweight="bold", color=INK)
-    fig.text(
-        left,
-        0.580,
-        r"$\Sigma_{F|A}=\Sigma_{FF}-\Sigma_{FA}\Sigma_{AA}^{-1}\Sigma_{AF}$",
-        fontsize=15,
-        color=INK,
-    )
-    fig.text(left, 0.530, "Conditional local volatility bands",
-             fontsize=15, fontweight="bold", color=INK)
-    fig.text(
-        left,
-        0.486,
-        r"$v_{p|A}(x)=e_F(x)^\top\Sigma_{F|A}e_F(x)+\sum_j w_j(x)^2\sigma_{\epsilon,j}^2$",
-        fontsize=14,
-        color=INK,
-    )
-    fig.text(
-        left, 0.442, r"$R_p(x)\;\pm\;k\sqrt{T\,v_{p|A}(x)},\quad k=1,2$", fontsize=14, color=INK
-    )
-    fig.text(
-        left,
-        0.403,
-        "w(x) = scenario response dollar sensitivity / N.\n"
-        "e(x) = beta.T w(x); N: fixed reporting denominator.\n"
-        f"T = {Fraction(result.metadata['horizon_years']).limit_denominator(365)} year. "
-        "Shared response residuals.\n"
-        "Signed factor Euler + residual Euler = local sigma.\n"
-        "Fixed conditional covariance; scenario-local deltas.",
-        fontsize=9.5,
-        color=INK,
-        va="top",
-        linespacing=1.35,
-    )
-    fig.text(left, 0.299, "Portfolio scenario valuation", fontsize=13, fontweight="bold", color=INK)
-    fig.text(left, 0.256, r"$R_p(x)=\sum_jw_j[\exp(\beta_j^\top z(x))-1]$", fontsize=15, color=INK)
-    fig.text(
-        0.105,
-        0.186,
-        r"Single anchor: $z_i=\rho_{ia}(\sigma_i/\sigma_a)z_a$",
-        fontsize=12,
-        color=INK,
-    )
-    fig.text(
-        0.105,
-        0.151,
-        "Yield mapping: z = log(1 - D x change in yield), or the declared external proxy.",
-        fontsize=9,
-        color=INK,
-    )
+    fig.text(left, .835, "Reading the covariance display", fontsize=14, weight="bold", color=INK)
+    fig.text(left, .785, r"$\sigma_i=\sqrt{\Sigma_{ii}};\quad"
+             r"\rho_{ij}=\Sigma_{ij}/(\sigma_i\sigma_j)$", fontsize=15, color=INK)
+    fig.text(left, .720, "From a request to a factor anchor", fontsize=14,
+             weight="bold", color=INK)
+    fig.text(left, .675, r"$z_a=\log(1+r_a)$", fontsize=16, color=INK)
+    fig.text(left, .630, r"$z_a=\log(P_a^{\mathrm{target}}/P_a^0)$", fontsize=16, color=INK)
+    fig.text(left, .585, r"$z_{\mathrm{rates}}=\log(1-D\,\Delta y)$", fontsize=16, color=INK)
+    fig.text(left, .548, "r: simple factor return; z: factor log return.\n"
+             "P: price on the declared quote/tracker basis.\n"
+             "D: effective duration; yield changes in decimals.\n"
+             "Use the declared external proxy when required.",
+             fontsize=10, color=INK, va="top", linespacing=1.4)
+    fig.text(left, .420, "Portfolio scenario valuation", fontsize=14,
+             weight="bold", color=INK)
+    valuation = (r"$R_p=\sum_h w_h[\exp(\beta_h^\top z)-1]$"
+                 if result.metadata["all_funded"] else
+                 r"$R_p=\sum_h[V_h(z)-V_h(0)]/N$")
+    fig.text(left, .370, valuation, fontsize=15, color=INK)
+    fig.text(left, .330, "N: fixed reporting denominator; w = MTM / N.\n"
+             "Reprice the current holdings at the completed vector.\n"
+             "Conditional shocks, covariance and risk bands:\n"
+             "see the worked matrices on page 11.",
+             fontsize=10, color=INK, va="top", linespacing=1.4)
     notes = [
-        "Level/price targets use correlated shocks on both requested pages. Explicit return shocks "
-        "use isolated factors on page 1 and conditional co-moves on page 2.",
-        "This is a conditional scenario under the fitted covariance, not a shock to the "
-        "correlation matrix or a forecast probability. The EWMA span is not a hard rolling window.",
+        "Level/price targets use correlated shocks on both requested pages. Explicit return "
+        "shocks hold other factors at zero on page 1 and use conditional co-moves on page 2.",
+        "The EWMA span is a decay parameter, not a hard rolling window. Page 11 illustrates "
+        "conditional mean shocks and explains the remaining conditional covariance.",
     ]
     special = result.metadata.get("source_provenance", {}).get("external_target_method")
     if special:
         notes.append(str(special))
     _footnotes(fig, notes)
-    if not result.metadata["all_funded"]:
-        # The ordinary funded-asset formula does not value calls, puts or futures.
-        for text in fig.texts:
-            if text.get_text().startswith("$R_p(x)="):
-                text.set_text(r"$R_p(x)=\sum_h[V_h(z(x))-V_h(0)]/N$")
+    return fig
+
+
+def _conditional_page(result, config):
+    """Illustrate single-factor co-moves and explain conditional covariance and bands."""
+    from fractions import Fraction
+    from matplotlib.patches import Rectangle
+
+    fig = _page(
+        result, config, 11, f"{config.model_name} conditional shocks and covariance",
+        "Each column is a separate scenario: fix its named factor at -10% or +10%, then "
+        "complete all other factors. Rows show the resulting simple factor returns.",
+    )
+    tables = [result.report_diagnostics[f"Conditional factor shocks {bump:+.0%}"]
+              for bump in (-.1, .1)]
+    finite = np.concatenate([frame.to_numpy().ravel() for frame in tables])
+    finite = finite[np.isfinite(finite)]
+    limit = max(float(np.max(np.abs(finite))) if finite.size else .1, .1)
+    for left, bump, table in zip((.105, .605), (-.1, .1), tables):
+        fig.text(left, .888, f"Anchor each factor at {bump:+.0%}", fontsize=13,
+                 weight="bold", color=INK)
+        ax = fig.add_axes([left, .410, .355, .365])
+        display = table.rename(index=config.factor_labels, columns=config.factor_labels)
+        plot_heatmap(display, ax=ax, cmap="PiYG", var_format="{:+.2%}", fontsize=9,
+                     top_x_label=True, vmin=-limit, vmax=limit, date_format=None, x_rotation=90)
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.tick_params(axis="both", length=0)
+        ax.tick_params(axis="y", pad=5)
+        for j in range(len(table)):
+            if np.isfinite(table.iloc[j, j]):
+                ax.add_patch(Rectangle((j, j), 1, 1, fill=False, edgecolor=INK, linewidth=1.1))
+            else:
+                for i in range(len(table)):
+                    ax.text(j+.5, i+.5, "n/a", ha="center", va="center", fontsize=9)
+    fig.text(.04, .349, "Conditional mean shocks", fontsize=13, weight="bold", color=INK)
+    fig.text(.04, .307, r"$z_a=\log(1+s);\quad z_i=\frac{\Sigma_{ia}}{\Sigma_{aa}}z_a;"
+             r"\quad r_i=e^{z_i}-1$", fontsize=14, color=INK)
+    fig.text(.04, .260, r"$z_F=\Sigma_{FA}\Sigma_{AA}^{-1}z_A$", fontsize=14, color=INK)
+    fig.text(.04, .223, "s = -10% or +10%. A: fixed factors; F: free factors.\n"
+             "Table cells are conditional mean returns, not covariance entries.\n"
+             "Signs can differ from the anchor; simple-return conversion\n"
+             "means the +10% and -10% tables need not be opposites.",
+             fontsize=10, color=INK, va="top", linespacing=1.35)
+    fig.text(.54, .349, "Conditional covariance and local risk bands", fontsize=13,
+             weight="bold", color=INK)
+    fig.text(.54, .307,
+             r"$\Sigma_{F|A}=\Sigma_{FF}-\Sigma_{FA}\Sigma_{AA}^{-1}\Sigma_{AF}$",
+             fontsize=14, color=INK)
+    fig.text(.54, .260,
+             r"$v_{p|A}(x)=e_F(x)^\top\Sigma_{F|A}e_F(x)+\sum_jq_j(x)^2d_j$",
+             fontsize=13, color=INK)
+    fig.text(.54, .216, r"$R_p(x)\;\pm\;k\sqrt{T\,v_{p|A}(x)},\quad k=1,2$",
+             fontsize=13, color=INK)
+    fig.text(.54, .181,
+             "q: scenario response dollar sensitivity / N; e = beta.T q.\n"
+             f"d: annual residual variance; T = "
+             f"{Fraction(result.metadata['horizon_years']).limit_denominator(365)} year.",
+             fontsize=10, color=INK, va="top", linespacing=1.35)
+    _footnotes(fig, [
+        "Columns condition one atomic factor at a time, without family splitting. "
+        "Outlined diagonal cells are fixed anchors. Both tables share the same colour scale; "
+        "zero-variance anchors are unavailable (n/a). Full-precision tables are exported.",
+        "Conditional covariance has zero anchored rows/columns and is identical for +/-10% "
+        "when the anchor set is unchanged. Local sensitivities, hence band widths, can change. "
+        "These are fitted co-moves, not a shocked correlation matrix or scenario probabilities.",
+    ], y=.115)
     return fig
 
 
 def _coverage_page(result, config):
     """Render only the optional parser-supplied table and footnote explanations."""
-    fig = _page(result, config, 11, config.appendix_title, config.appendix_subtitle)
+    fig = _page(result, config, 12, config.appendix_title, config.appendix_subtitle)
     _table(fig.add_axes([0.04, 0.265, 0.92, 0.55]), config.appendix_table, first=0.23, fontsize=8.5)
     _footnotes(fig, config.appendix_notes, y=0.215)
     return fig
@@ -1030,15 +1029,15 @@ def _guide_column(fig, entries, x, top=0.785):
 
 
 def _analysis_guide_page(result, config):
-    """Explain all ten analysis exhibits and their table calculations on the final page."""
+    """Explain all eleven analysis exhibits and their table calculations on the final page."""
     model = config.model_name
     funded = result.metadata["all_funded"]
     denominator = "portfolio NAV" if funded else "reporting denominator"
     months = result.metadata["horizon_years"] * 12
     fig = _page(
-        result, config, 12 if config.appendix_table is not None else 11,
+        result, config, 13 if config.appendix_table is not None else 12,
         "Notation and guide to the analysis",
-        "Reading guide to analysis pages 1-10. Coverage and estimation quality is a "
+        "Reading guide to analysis pages 1-11. Coverage and estimation quality is a "
         "separate source audit. All percentages use the stated units below.",
     )
     fig.text(0.04, 0.885, "Common notation", fontsize=11, fontweight="bold", color=BLUE)
@@ -1071,7 +1070,7 @@ def _analysis_guide_page(result, config):
         )),
         (f"2. Requested scenarios with latest {model} co-moves", (
             "Preserve the anchored factor shocks and complete free-factor shocks with the "
-            "conditional mean from the fitted covariance (page 10). Reprice every holding "
+            "conditional mean from the fitted covariance (page 11). Reprice every holding "
             "with that joint vector. The currency bars, % bars and independently ranked "
             "top-ten table use exactly the same calculations as page 1.",
         )),
@@ -1122,7 +1121,7 @@ def _analysis_guide_page(result, config):
             "Dashed line: quadratic OLS R_p = a x + b x squared through zero; uncentered "
             "R-squared = 1 - SSE / sum(R_p squared). Shading, when enabled: +/-1 and +/-2 "
             f"conditional local standard deviations over {months:g} month(s). Use scenario-local "
-            "sensitivities and fixed conditional covariance plus residual risk (page 10). "
+            "sensitivities and fixed conditional covariance plus residual risk (page 11). "
             "These local Gaussian risk bands differ from the regression confidence "
             "intervals exported separately.",
         )),
@@ -1163,23 +1162,31 @@ def _analysis_guide_page(result, config):
         )),
         (f"10. {model} correlation and scenario construction", (
             "Lower triangle: rho_if = Sigma_if / (sigma_i sigma_f); diagonal: annual factor "
-            "vol = sqrt(Sigma_ff). Use the dated covariance and EWMA convention stated on "
-            "that page. A denotes fixed anchors and F the remaining factors.",
+            "vol = sqrt(Sigma_ff). Use the dated covariance and stated EWMA convention. "
+            "Targets map to log(target / current); yields use the declared duration or proxy. "
+            "Conditional calculations are illustrated on page 11.",
+        )),
+        (f"11. {model} conditional shocks and covariance", (
+            "Two tables: each column fixes one atomic factor at -10% or +10% simple return; "
+            "rows contain the conditionally implied simple returns. The outlined diagonal "
+            "retains the anchor. No family split is applied. The tables show conditional "
+            "means, not covariance entries; log conversion makes their magnitudes asymmetric.",
             r"$z_F=\Sigma_{FA}\Sigma_{AA}^{-1}z_A;\quad "
             r"\Sigma_{F|A}=\Sigma_{FF}-\Sigma_{FA}\Sigma_{AA}^{-1}\Sigma_{AF}.$",
-            "Targets map to log(target / current); yields use the declared duration or proxy "
-            "mapping. Bands are R_p(x) +/- k sqrt(T v(x)), k = 1, 2; T is years and v(x) "
-            "uses conditional free-factor covariance plus shared residual risk at that "
-            "shock. These are conditional co-moves, not a changed correlation matrix.",
+            "Fixed factors have zero remaining covariance. Bands are R_p(x) +/- k sqrt(T v(x)), "
+            "k = 1, 2, using conditional free-factor covariance plus shared residual risk and "
+            "scenario-local sensitivities. T is years. This is not a correlation-matrix shock.",
         )),
     ]
+    # Balance eleven exhibits without shrinking the readable guide font.
+    left.append(right.pop(0))
     _guide_column(fig, left, 0.04)
     _guide_column(fig, right, 0.525)
     return fig
 
 
 def report_pages(result, config):
-    """Yield ten analysis exhibits, optional source coverage, and the final notation guide."""
+    """Yield eleven analysis exhibits, optional source coverage, and the final notation guide."""
     model = config.model_name
     meta = result.metadata
     currency = meta["reference_currency"]
@@ -1246,6 +1253,7 @@ def report_pages(result, config):
         ("Cluster contributions to stress, factor exposures and risk", _cluster_contribution_page),
         (f"Estimated {model} loadings and explanatory power", _beta_page),
         (f"{model} correlation and scenario construction", _methodology_page),
+        (f"{model} conditional shocks and covariance", _conditional_page),
     ]:
         yield title, builder(result, config)
     if config.appendix_table is not None:

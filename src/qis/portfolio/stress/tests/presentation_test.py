@@ -83,7 +83,7 @@ def test_v0_pages_show_regression_and_parser_content(market):
     )
     pages = list(report_pages(result, config))
     try:
-        assert len(pages) == 12
+        assert len(pages) == 13
         titles = [title for title, _ in pages]
         assert titles[3] == "Portfolio MATF exposures and risk"
         first_texts = pages[0][1].texts
@@ -102,15 +102,22 @@ def test_v0_pages_show_regression_and_parser_content(market):
             "Estimated MATF loadings and explanatory power",
             "MATF correlation and scenario construction",
         ]
+        assert titles[10] == "MATF conditional shocks and covariance"
         assert titles[-2] == "Source validation"
         assert titles[-1] == "Notation and guide to the analysis"
         assert any("Parser variable explanation" in text.get_text() for text in pages[-2][1].texts)
         guide_texts = pages[-1][1].texts
         headings = [item.get_text() for item in guide_texts if item.get_gid() == "guide-heading"]
-        assert len(headings) == 10
-        assert [heading.split(".")[0] for heading in headings] == [str(i) for i in range(1, 11)]
+        assert len(headings) == 11
+        assert [heading.split(".")[0] for heading in headings] == [str(i) for i in range(1, 12)]
         assert "MATF" in headings[3] and "MATF" in headings[8]
         assert min(item.get_fontsize() for item in guide_texts) >= 9
+        pages[-1][1].canvas.draw()
+        renderer = pages[-1][1].canvas.get_renderer()
+        bounds = [item.get_window_extent(renderer) for item in guide_texts
+                  if item.get_gid() in ("guide-heading", "guide-body")]
+        assert min(box.y0 for box in bounds) / pages[-1][1].bbox.height > .055
+        assert max(box.x1 for box in bounds) / pages[-1][1].bbox.width < .985
         curves = [line for line in pages[5][1].axes[0].lines if line.get_linestyle() == "--"]
         assert len(curves) == 1
         assert len(pages[5][1].axes[0].collections) >= 2

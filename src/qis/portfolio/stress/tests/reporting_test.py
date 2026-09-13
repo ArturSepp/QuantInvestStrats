@@ -52,8 +52,8 @@ def test_analysis_and_guide_export_without_repricing(market, tmp_path, monkeypat
     )
     artifact = generate_portfolio_stress_report(result, tmp_path / "report", config)
     manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
-    assert manifest["page_count"] == 11
-    assert len(manifest["page_titles"]) == 11
+    assert manifest["page_count"] == 12
+    assert len(manifest["page_titles"]) == 12
     assert manifest["page_titles"][7] == (
         "Cluster contributions to stress, factor exposures and risk")
     assert manifest["page_titles"][-1] == "Notation and guide to the analysis"
@@ -83,6 +83,12 @@ def test_analysis_and_guide_export_without_repricing(market, tmp_path, monkeypat
     assert ci_sheet.auto_filter.ref == ci_sheet.dimensions
     assert "%" in ci_sheet["C2"].number_format
     assert "%" in ci_sheet["E2"].number_format
+    for bump in (-.1, .1):
+        name = f"Conditional factor shocks {bump:+.0%}"
+        sheet_name = next(row["workbook_sheet"] for row in manifest["tables"]
+                          if row["name"] == name)
+        assert workbook[sheet_name]["B2"].value == pytest.approx(bump)
+        assert "%" in workbook[sheet_name]["B2"].number_format
     workbook.close()
     from qis.portfolio.stress.reporting import _format_workbook
     with zipfile.ZipFile(artifact.workbook_path) as archive:

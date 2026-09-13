@@ -228,13 +228,34 @@ idiosyncratic decomposition. Full cluster-by-factor Euler tables are exported.
 
 ## Final notation and analysis guide
 
-The report ends with a two-column guide to the ten analysis exhibits. It defines the
+The report ends with a two-column guide to the eleven analysis exhibits. It defines the
 reporting denominator, factor and response sensitivities, covariance, residual risk and
 Euler contributions, then explains each chart and table, including scenario attribution,
 conditional bands, loading aggregates and cluster allocations. The guide uses the configured
 model name and reports the selected band horizon. Its 10-point body text remains above the
 shared 9-point footnote minimum.
 
-The optional parser-owned coverage table precedes this guide: reports have twelve pages
-with coverage and eleven without it. Adding the guide does not re-estimate or reprice
-anything; the original ten analysis exhibits and all numerical exports are preserved.
+The optional parser-owned coverage table precedes this guide: reports have thirteen pages
+with coverage and twelve without it. Page 10 shows the dated correlation/volatility matrix
+and target-to-factor mappings. Page 11 illustrates conditional mean shocks and contains the
+conditional covariance and local-band formulas. Portfolio valuation and risk are unchanged.
+
+## Conditional-shock illustration (5.36)
+
+Two colour-coded tables independently anchor every atomic factor at -10% and +10% simple
+return. Each column is one anchored factor; each row is an affected factor. The diagonal
+retains the anchor and is outlined. No family splitting is used on this page. Both tables
+share a symmetric colour scale, display signed percentages and retain original factor order.
+
+For anchor a and simple bump s, QIS fixes z_a = log(1+s), completes z_i = Sigma_ia / Sigma_aa
+x z_a and displays exp(z_i)-1. Thus a negative correlation can produce an opposite-sign
+co-move, and the two simple-return tables need not be exact negatives. The tables are
+conditional mean returns, not covariance matrices. Zero-variance anchors are unavailable.
+
+The accompanying Schur-complement formula explains remaining covariance. It is the same
+for both signs when the anchored set is unchanged; scenario-local sensitivities can still
+change the conditional risk-band widths. No separate correlation-matrix shock is imposed.
+
+`PortfolioStressResult.report_diagnostics` contains `Conditional factor shocks -10%` and
+`Conditional factor shocks +10%`. Both are exported without PDF rounding. The renderer only
+consumes these detached calculations and does not reprice or refit a portfolio.
