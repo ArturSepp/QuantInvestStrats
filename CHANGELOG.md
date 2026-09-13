@@ -5,7 +5,7 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.30.0] - 2026-09-12
+## [5.30.0] - 2026-09-13
 
 ### Changed
 
