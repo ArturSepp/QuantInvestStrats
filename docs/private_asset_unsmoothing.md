@@ -103,6 +103,10 @@ point-in-time `InitType.X0` mean seed. Appending later observations does not rev
 rolling prefix. `MeanAdjType.INSAMPLE` uses the full-sample mean and is descriptive, not suitable
 for a historical decision path.
 
+`adjust_returns_with_joint_unsmoothing` uses the same point-in-time seed while estimating its
+own-lag and lagged-factor coefficients together. A masked coefficient pair remains missing until
+it is observable; the one-period application lag does not make future backward fill causal.
+
 The price wrapper defaults to coefficient-sum bounds of -0.25 and 0.75. Clipping applies to the
 **sum**, rescaling the coefficient vector, with optional further EWMA coefficient smoothing.
 A positive denominator permits inversion; a cap does not establish that the smoothing model is

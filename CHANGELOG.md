@@ -118,6 +118,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Kept joint own-lag and factor-lag unsmoothing point-in-time by using the established causal
+  EWMA mean seed and leaving unidentified warm-up coefficients missing.
+
 - Ordered portfolio-backtester prices, funding rates, and instrument carry chronologically before
   stateful processing, and rejected ambiguous duplicate or missing price timestamps.
 
