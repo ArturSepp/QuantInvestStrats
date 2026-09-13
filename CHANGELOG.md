@@ -9,6 +9,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Pointwise Student-t confidence bands for the fitted quadratic mean in every stress
+  sensitivity grid, including derivatives. Detached bounds and their confidence level
+  are exported to Excel/CSV; orange regression intervals are distinguished from blue
+  funded-asset conditional scenario risk bands. Zero residual degrees of freedom leaves
+  the interval unavailable, without suppressing identified coefficients.
 - Public offline examples for funded/mixed instrument portfolios and a custom terminal-KO
   payoff; linked site and installed-package guides cover adapters, factor families, shared
   response risk, Euler additivity, audit tables and standard report generation.

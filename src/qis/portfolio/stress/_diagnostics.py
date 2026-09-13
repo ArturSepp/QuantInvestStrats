@@ -4,10 +4,10 @@ import numpy as np
 import pandas as pd
 
 from qis.portfolio.risk.contributions import compute_portfolio_risk_contributions
-from qis.utils.regression import fit_multivariate_ols
+from qis.utils.regression import fit_ols
 
 
-def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_funded):
+def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_funded, confidence):
     """Compute additive Euler exhibits and unit-response risk using canonical QIS analytics.
 
     The risk table uses the factor-model total so its systematic and independent
@@ -85,7 +85,7 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
             }
         )
         aggregates[key] = row
-    regressions = _grid_regressions(grids)
+    regressions, confidence_bands = _grid_regressions(grids, confidence)
     return {
         "Annualised portfolio risk": table,
         "Factor Euler volatility": factor.rename("euler_vol").to_frame(),
@@ -94,12 +94,14 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
         "Unit response risk": pd.DataFrame.from_dict(unit_risk, orient="index"),
         "Loading aggregates": pd.DataFrame.from_dict(aggregates, orient="index"),
         "Grid polynomial regressions": regressions,
+        "Grid regression confidence bands": confidence_bands,
     }
 
 
-def _grid_regressions(grids):
-    """Fit through-zero quadratics; R-squared uses the uncentered OLS convention."""
-    regressions = {}
+def _grid_regressions(grids, confidence):
+    """Fit through-zero quadratics and pointwise Student-t intervals for their fitted mean."""
+    regressions, bands = {}, {}
+    band_columns = ["mean", "mean_se", "mean_ci_lower", "mean_ci_upper"]
     for key, summary in grids.items():
         try:
             x = np.asarray(summary.index, dtype=float)
@@ -108,24 +110,37 @@ def _grid_regressions(grids):
             continue
         if len(x) < 2 or not np.isfinite(x).all() or not np.isfinite(y).all():
             continue
-        terms = {"linear": x, "quadratic": x * x}
-        design = pd.DataFrame(terms, index=summary.index)
+        design = pd.DataFrame({"linear": x, "quadratic": x * x}, index=summary.index)
         if np.linalg.matrix_rank(design) < 2:
             continue
-        if np.any(y != 0.0):
-            prediction, params, _ = fit_multivariate_ols(
-                design, y, fit_intercept=False, verbose=False
-            )
-            # Match no-intercept statsmodels R-squared using QIS's fitted predictions.
-            r_squared = 1.0 - (y - prediction).pow(2).sum() / y.pow(2).sum()
-        else:
-            # A full-rank zero response has zero coefficients and undefined R-squared.
-            params = pd.Series(0.0, index=design.columns)
-            r_squared = np.nan
+        model = fit_ols(x=x, y=y.to_numpy(), order=2, fit_intercept=False)
+        prediction = pd.Series(model.predict(design), index=summary.index)
+        params = pd.Series(model.params, index=design.columns)
+        # Match no-intercept statsmodels R-squared without warning on a zero response.
+        r_squared = (1.0 - (y - prediction).pow(2).sum() / y.pow(2).sum()
+                     if np.any(y != 0.0) else np.nan)
         regressions[key] = {
             "linear": params["linear"], "quadratic": params["quadratic"],
             "cubic": 0.0, "order": 2, "r_squared": r_squared,
         }
-    return pd.DataFrame.from_dict(
+        if model.df_resid > 0:
+            band = model.get_prediction(design).summary_frame(alpha=1.0 - confidence)
+            band = band[band_columns].set_axis(summary.index)
+        else:
+            # Coefficients are identified, but residual variance cannot be estimated.
+            band = pd.DataFrame(np.nan, index=summary.index, columns=band_columns)
+            band["mean"] = prediction
+        band["confidence"] = confidence
+        band["df_resid"] = model.df_resid
+        bands[key] = band
+    coefficients = pd.DataFrame.from_dict(
         regressions, orient="index", columns=["linear", "quadratic", "cubic", "order", "r_squared"]
     )
+    confidence_bands = (
+        pd.concat(bands, names=["grid", "factor_return"])
+        if bands else pd.DataFrame(
+            columns=band_columns + ["confidence", "df_resid"],
+            index=pd.MultiIndex.from_tuples([], names=["grid", "factor_return"]),
+        )
+    )
+    return coefficients, confidence_bands

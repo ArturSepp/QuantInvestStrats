@@ -22,7 +22,7 @@ class StressTestConfig:
     Attributes:
         historical_count: Number of worst complete historical months to present.
         horizon_years: Positive risk-band horizon in years.
-        confidence: Central Gaussian probability for supported funded-asset bands.
+        confidence: Central probability for funded risk bands and pointwise OLS mean-fit CIs.
         include_conditional_comparison: Also evaluate joint conditional completion.
         ordinary_asset_bands: Enable existing Gaussian grid bands for funded portfolios.
     """
@@ -363,7 +363,7 @@ def run_portfolio_stress_test(
     from qis.portfolio.stress._diagnostics import report_diagnostics
 
     diagnostics = report_diagnostics(
-        model, date, jacobian, denominator, risk, grid_summaries, all_funded
+        model, date, jacobian, denominator, risk, grid_summaries, all_funded, config.confidence
     )
     return PortfolioStressResult(
         MappingProxyType(valuations),

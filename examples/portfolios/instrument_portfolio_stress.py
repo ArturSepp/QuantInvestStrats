@@ -189,6 +189,9 @@ def verify_result(portfolio, result, derivatives):
     regressions = result.report_diagnostics["Grid polynomial regressions"]
     assert regressions["order"].eq(2).all()
     assert set(regressions.index) == set(result.grid_summaries)
+    bands = result.report_diagnostics["Grid regression confidence bands"]
+    assert set(bands.index.get_level_values("grid")) == set(result.grid_summaries)
+    assert bands[["mean_ci_lower", "mean_ci_upper"]].notna().all().all()
     if derivatives:
         # -5 contracts x multiplier 50 x spot 2000: zero MTM still has -500,000 exposure.
         assert result.response_jacobian.loc["future", "metal_response"] == -500_000.0

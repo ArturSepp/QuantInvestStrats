@@ -414,15 +414,27 @@ variance divided by total model volatility; adding the residual term gives total
 model volatility. All holding terms for a factor sum to its factor term, while the
 displayed subsets need not add to the full totals.
 
-Page six calls QIS scatter plots and `fit_multivariate_ols` for through-zero
+Page six calls QIS scatter plots and `qis.utils.regression.fit_ols` for through-zero
 quadratic fits for every portfolio, including derivatives. Fits pass through
 zero and use decimal grid returns. The legend displays the equation and uncentered
 R-squared: `1 - sum((actual - fitted)^2) / sum(actual^2)`. A zero curve has undefined
 R-squared; a grid without enough independent regressors has no fitted line. These
 are descriptive curve fits, not new portfolio valuations or fitted-factor R-squared.
-Cubic curves can smooth over strike kinks and knockout jumps. Existing funded
-conditional bands stay centred on exact scenario valuations; derivative portfolios
-have no Gaussian bands. Credit grids retain the caller's total-family split.
+Quadratic curves can smooth over strike kinks and knockout jumps. Orange shading
+shows pointwise Student-t confidence intervals for the fitted mean for every portfolio.
+The interval is `fitted_mean +/- t_(n-2, (1+confidence)/2) * mean_se`, using the
+covariance of the same zero-intercept quadratic OLS estimate. `StressTestConfig.confidence`
+sets its central probability (95% by default). The standard error is zero at the forced
+zero intercept. With no residual degrees of freedom, bounds are unavailable; a full-rank
+zero curve with positive residual degrees of freedom has zero-width intervals.
+
+These conventional OLS intervals assume independent, constant-variance regression
+errors. Scenario points are deterministic, so the intervals describe the polynomial
+approximation under those assumptions and depend on the supplied grid. They are not
+simultaneous confidence bands or a distribution of future portfolio P&L. Existing blue
+funded-asset conditional prediction bands remain centred on exact scenario valuations;
+derivative portfolios do not receive those covariance-based scenario risk bands.
+Credit grids retain the caller's total-family split.
 Page seven includes signed beta colours, fitted R-squared, annual systematic and
 residual volatility, Rest of assets, and Portfolio rows. Rest uses full-denominator
 weights, not a renormalised sleeve. Portfolio R-squared is an absolute-response-
@@ -474,6 +486,7 @@ The principal result fields and exports have distinct interpretations:
 | `attribution[*]` | Factor components plus the nonlinear payoff adjustment, reconciling to currency P&L. |
 | `positions`, `leg_terms` | Source marks, intrinsic baselines, constant basis offsets, payoff coverage and vanilla terms. |
 | `Grid polynomial regressions` | Linear/quadratic coefficients, order (always 2) and uncentered R-squared. The cubic column is retained as zero for export compatibility. |
+| `Grid regression confidence bands` | Grid/anchor-indexed fitted mean, mean standard error, pointwise lower/upper OLS confidence bounds, central confidence probability and residual degrees of freedom. Means, errors and bounds use the reporting-denominator return convention. |
 
 Currency amounts are not automatically invested cash, executable proceeds or lending
 value. The R-squared in the Portfolio/Rest rows is a weighted fit diagnostic, not a

@@ -379,10 +379,11 @@ def _contributor_page(result, config):
 
 
 def _grid_page(result, config):
-    """Show exact grids, quadratic summaries and supported conditional bands."""
+    """Show exact grids, quadratic mean-fit confidence intervals and conditional risk bands."""
     funded = result.metadata["all_funded"]
     confidence = result.metadata["confidence"]
     months = result.metadata["horizon_years"] * 12
+    regression_bands = result.report_diagnostics["Grid regression confidence bands"]
     keys = config.selected_grids or tuple(result.grids)[:4]
     ranges = []
     for key in keys:
@@ -403,9 +404,12 @@ def _grid_page(result, config):
     if standard:
         subtitle = "Correlated shocks: equity +/-30%; rates, credit, FX +/-20%; step 1%."
     if any("lower_bound" in result.grid_summaries[key] for key in keys):
-        subtitle += f" Shading: {confidence:.0%} conditional prediction band ({months:g} month)."
+        subtitle += f" Blue: {confidence:.0%} conditional prediction band ({months:g} month)."
     else:
-        subtitle += " Deterministic payoff curves; no prediction bands."
+        subtitle += " Deterministic payoff curves."
+    if any(key in regression_bands.index.get_level_values("grid")
+           and regression_bands.loc[key, "mean_ci_lower"].notna().all() for key in keys):
+        subtitle += f" Orange: {confidence:.0%} quadratic-fit confidence band."
     fig = _page(result, config, 6, "Sensitivity to equity, rates, credit and FX factors", subtitle)
     boxes = [
         [0.085, 0.575, 0.38, 0.265],
@@ -474,9 +478,20 @@ def _grid_page(result, config):
             equation = rf"$R_p(x)={b1:.2f}x{b2:+.2f}x^2"
             fit = rf"$R^2$={row.r_squared:.1%}" if np.isfinite(row.r_squared) else "$R^2$: n/a"
             label = equation + "$\n" + fit
-            ax.plot(x, b1 * x + b2 * x * x,
-                    color="#C46B27", ls="--", lw=1.5, label=label)
+            curve, = ax.plot(x, b1 * x + b2 * x * x,
+                             color="#C46B27", ls="--", lw=1.5, label=label)
+            handles = [curve]
+            if key in regression_bands.index.get_level_values("grid"):
+                band = regression_bands.loc[key].reindex(summary.index)
+                if band[["mean_ci_lower", "mean_ci_upper"]].notna().all().all():
+                    shading = ax.fill_between(
+                        x, band.mean_ci_lower, band.mean_ci_upper,
+                        color="#C46B27", alpha=0.23, zorder=1,
+                        label=f"{confidence:.0%} quadratic-fit CI",
+                    )
+                    handles.append(shading)
             ax.legend(
+                handles=handles,
                 loc="upper right" if str(key).lower() == "fx" else "upper left",
                 fontsize=9,
                 frameon=False,
@@ -509,33 +524,29 @@ def _grid_page(result, config):
     ]
     if funded and any("lower_bound" in result.grid_summaries[key] for key in keys):
         notes += [
-            "Shading includes remaining factor dispersion using conditional covariance "
-            "plus independent asset residuals. Gaussian, pointwise, additive NAV-return "
-            "approximation with baseline exposures and square-root-of-time scaling.",
-            "Constant width within each panel uses the same baseline exposures and covariance "
-            "for every anchor value; parameter uncertainty and non-normal tails are excluded.",
-            "Dashed: quadratic OLS through zero (decimal returns). Bands remain centred on "
-            "exact scenario valuations, not the polynomial fit. No Monte Carlo or regression "
-            "confidence interval.",
+            "Blue: conditional factor dispersion plus asset residual risk, centred on exact "
+            "scenario valuations. Baseline exposures, Gaussian covariance and horizon scaling; "
+            "constant width within each panel.",
         ]
-    elif funded:
-        notes += ["Dashed: quadratic OLS through zero on the supplied numerical grid. "
-                  "No conditional prediction band was computed for these grids."]
-    else:
-        notes += [
-            "Derivative points use exact intrinsic-payoff scenarios. Dashed: quadratic OLS through "
-            "zero on the displayed grid (decimal returns); no Gaussian prediction bands.",
-            "The quadratic is a descriptive approximation; strike kinks and knockout jumps remain "
-            "in exact valuations and can be missed by a smooth fitted curve."
-        ]
-    notes.append("Fit R-squared is uncentered: 1 - sum(error squared) / sum(return squared); "
-                 "n/a for a zero curve. A rank-deficient grid has no fitted line.")
+    elif not funded:
+        notes += ["Derivative points use exact intrinsic payoffs, including strike kinks and "
+                  "knockout jumps. A smooth quadratic can miss these features."]
+    notes += [
+        f"Orange: {confidence:.0%} pointwise Student-t confidence interval for the quadratic "
+        "OLS fitted mean, with zero intercept and n-2 error degrees of freedom.",
+        "Grid points are deterministic. OLS intervals assume independent, constant-variance "
+        "regression errors; they describe the fitted approximation, not future portfolio "
+        "loss risk.",
+        "Dashed: quadratic fit in decimal returns. Uncentered R-squared = 1 - SSE/sum(return "
+        "squared); n/a for a zero curve. No CI without error degrees of freedom; no fit on a "
+        "rank-deficient grid.",
+    ]
     if any(result.grid_metadata.loc[key, "bump_convention"] != "simple"
            or result.grid_metadata.loc[key, "completion"] != "conditional" for key in keys):
         notes[0] = ("Each panel uses the supplied grid index and exported Grid conventions. "
                     "Simple family bumps split before log1p; log family bumps split in log units. "
                     "Only conditional grids complete free factors by a joint covariance solve.")
-    _footnotes(fig, notes, y=0.115, width=190, fontsize=7.6)
+    _footnotes(fig, notes, y=0.135, width=190, fontsize=7.6)
     return fig
 
 

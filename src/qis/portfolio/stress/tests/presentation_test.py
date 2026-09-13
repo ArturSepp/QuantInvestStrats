@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from qis.portfolio.stress.analytics import run_portfolio_stress_test
+from qis.portfolio.stress.analytics import StressTestConfig, run_portfolio_stress_test
 from qis.portfolio.stress.reporting import StressReportConfig
 from qis.portfolio.stress.scenarios import ScenarioMode, ShockConvention, StressScenarios
 from qis.portfolio.stress.tests.scenarios_test import grouped_portfolio
@@ -176,9 +176,11 @@ def test_derivative_captions_preserve_denominator_meaning(market, funded):
 
 
 @pytest.mark.parametrize("funded, order", [(True, 2), (False, 2)])
-def test_grid_polynomial_is_quadratic_for_every_payoff_type(market, funded, order):
+@pytest.mark.parametrize("confidence", [0.8, 0.95])
+def test_grid_polynomial_is_quadratic_for_every_payoff_type(market, funded, order, confidence):
     """Independent least squares agrees with quadratic fits for funded and option holdings."""
     import matplotlib.pyplot as plt
+    from scipy.stats import t
     from qis.portfolio.stress._figures import _grid_page
     from qis.portfolio.stress.instruments import InstrumentLeg, InstrumentType
     from qis.portfolio.stress.portfolio import PortfolioHolding
@@ -191,7 +193,10 @@ def test_grid_polynomial_is_quadratic_for_every_payoff_type(market, funded, orde
         pd.DataFrame({"Equity": x}, index=x),
         ScenarioMode.CONDITIONAL, ShockConvention.SIMPLE,
     )
-    result = run_portfolio_stress_test(portfolio, grid, factor_grids={"Equity": grid})
+    result = run_portfolio_stress_test(
+        portfolio, grid, factor_grids={"Equity": grid},
+        config=StressTestConfig(confidence=confidence),
+    )
     row = result.report_diagnostics["Grid polynomial regressions"].loc["Equity"]
     y = result.grid_summaries["Equity"].portfolio_return.to_numpy()
     design = np.column_stack([x ** power for power in range(1, order + 1)])
@@ -202,6 +207,18 @@ def test_grid_polynomial_is_quadratic_for_every_payoff_type(market, funded, orde
     assert row.cubic == 0.0
     assert row.r_squared == pytest.approx(1 - np.sum((y - design @ reference) ** 2) / (y @ y))
     assert ("lower_bound" in result.grid_summaries["Equity"]) is funded
+    band = result.report_diagnostics["Grid regression confidence bands"].loc["Equity"]
+    residual_variance = np.sum((y - design @ reference) ** 2) / (len(x) - order)
+    _, r = np.linalg.qr(design)
+    mean_se = np.sqrt(residual_variance * np.sum((design @ np.linalg.inv(r)) ** 2, axis=1))
+    width = t.ppf((1 + confidence) / 2, len(x) - order) * mean_se
+    np.testing.assert_allclose(band["mean"], design @ reference, atol=1e-12)
+    np.testing.assert_allclose(band.mean_se, mean_se, atol=1e-12)
+    np.testing.assert_allclose(band.mean_ci_lower, design @ reference - width, atol=1e-12)
+    np.testing.assert_allclose(band.mean_ci_upper, design @ reference + width, atol=1e-12)
+    assert band.confidence.eq(confidence).all()
+    assert band.df_resid.eq(len(x) - order).all()
+    assert band.loc[0.0, "mean_se"] == 0.0
     figure = _grid_page(result, StressReportConfig())
     try:
         figure.canvas.draw()
@@ -211,6 +228,12 @@ def test_grid_polynomial_is_quadratic_for_every_payoff_type(market, funded, orde
         legend = figure.axes[0].get_legend().get_texts()[0].get_text()
         assert "R^2" in legend
         assert "x^3" not in legend
+        shading = next(collection for collection in figure.axes[0].collections
+                       if collection.get_label() == f"{confidence:.0%} quadratic-fit CI")
+        vertices = shading.get_paths()[0].vertices
+        for anchor, lower, upper in zip(x, band.mean_ci_lower, band.mean_ci_upper):
+            ys = vertices[np.isclose(vertices[:, 0], anchor, atol=1e-14), 1]
+            np.testing.assert_allclose([ys.min(), ys.max()], [lower, upper], atol=1e-12)
     finally:
         plt.close(figure)
 
@@ -245,3 +268,15 @@ def test_zero_payoff_grid_has_zero_coefficients_and_undefined_r_squared(market):
     row = result.report_diagnostics["Grid polynomial regressions"].loc["Equity"]
     np.testing.assert_allclose(row[["linear", "quadratic", "cubic"]], 0.0)
     assert np.isnan(row.r_squared)
+
+
+def test_two_point_quadratic_has_no_estimable_regression_confidence_band(market):
+    """Two independent anchors identify coefficients but leave no error degrees of freedom."""
+    portfolio = grouped_portfolio(market)
+    x = np.array([0.1, 0.2])
+    grid = StressScenarios(pd.DataFrame({"Equity": x}, index=x))
+    result = run_portfolio_stress_test(portfolio, grid, factor_grids={"Equity": grid})
+    assert not result.report_diagnostics["Grid polynomial regressions"].empty
+    band = result.report_diagnostics["Grid regression confidence bands"].loc["Equity"]
+    assert band.df_resid.eq(0).all()
+    assert band[["mean_se", "mean_ci_lower", "mean_ci_upper"]].isna().all().all()

@@ -91,8 +91,10 @@ single source of those conventions and is also available inside an installed QIS
 - **Sensitivity grids** fit a through-zero quadratic for every portfolio, including
   derivatives. Legends show the equation and uncentered R-squared on the displayed grid.
   Exact payoff points remain authoritative, including at strikes and knockout jumps.
-  Funded portfolios retain baseline conditional prediction bands; derivative portfolios
-  have no such bands. Current local covariance risk remains available separately.
+  Orange shading shows pointwise OLS confidence intervals for the fitted quadratic mean
+  for both funded and derivative portfolios. These describe the regression approximation
+  on the deterministic grid, not the range of future portfolio losses. Funded portfolios
+  also retain blue baseline conditional scenario prediction bands.
 - **Loadings and fit** distinguish unit underlying response risk from portfolio exposure. Fitted
   R-squared and original clustering trees must come from the caller; absent diagnostics are
   labelled unavailable. No fitted R-squared or original trees are invented by these examples.

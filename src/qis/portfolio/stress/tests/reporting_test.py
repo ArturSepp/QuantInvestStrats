@@ -69,6 +69,12 @@ def test_nine_core_pages_export_all_values_without_repricing(market, tmp_path, m
     total_share = workbook["01 Annualised portfolio risk"]["D2"]
     assert total_share.value == 1
     assert "%" in total_share.number_format
+    ci_sheet_name = next(table["workbook_sheet"] for table in manifest["tables"]
+                         if table["name"] == "Grid regression confidence bands")
+    ci_sheet = workbook[ci_sheet_name]
+    assert ci_sheet.freeze_panes == "C2"
+    assert "%" in ci_sheet["C2"].number_format
+    assert "%" in ci_sheet["E2"].number_format
     workbook.close()
     with zipfile.ZipFile(artifact.workbook_path) as archive:
         sheets = [name for name in archive.namelist() if name.startswith("xl/worksheets/sheet")]

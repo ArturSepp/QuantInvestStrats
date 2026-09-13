@@ -243,6 +243,12 @@ def _format_workbook(path):
         if not sheet.merged_cells.ranges:
             sheet.auto_filter.ref = sheet.dimensions
         headers = {cell.column: str(cell.value or "") for cell in sheet[1]}
+        sheet_percent_columns = percent_columns
+        if {"mean_ci_lower", "mean_ci_upper"}.issubset(headers.values()):
+            sheet_percent_columns = percent_columns | {
+                "factor_return", "mean", "mean_se", "mean_ci_lower", "mean_ci_upper", "confidence",
+            }
+            sheet.freeze_panes = "C2"
         for column in range(1, sheet.max_column + 1):
             sample = [sheet.cell(row, column).value for row in range(2, min(sheet.max_row, 80) + 1)]
             text_width = max((len(str(value)) for value in sample
@@ -270,12 +276,12 @@ def _format_workbook(path):
                 elif isinstance(cell.value, float):
                     cell.number_format = (
                         "0.00%;[Red](0.00%);0.00%"
-                        if headers[cell.column] in percent_columns
+                        if headers[cell.column] in sheet_percent_columns
                         else "#,##0.0000;[Red](#,##0.0000);0.0000"
                     )
                 elif isinstance(cell.value, int) and not isinstance(cell.value, bool):
                     cell.number_format = (
-                        "0.00%;[Red](0.00%);0.00%" if headers[cell.column] in percent_columns
+                        "0.00%;[Red](0.00%);0.00%" if headers[cell.column] in sheet_percent_columns
                         else "0" if cell.column == 1 or headers[cell.column].endswith("_id")
                         else "#,##0;[Red](#,##0);0"
                     )
