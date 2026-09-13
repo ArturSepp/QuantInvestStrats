@@ -9,7 +9,8 @@ from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 from qis.plots.bars import plot_bars
 from qis.plots.heatmap import plot_heatmap
-from qis.portfolio.stress._clusters import compute_cluster_contributions, display_cluster_table
+from qis.portfolio.stress._clusters import (
+    compute_cluster_contributions, display_cluster_table, cluster_top_contributors)
 from qis.plots.table import plot_df_table
 from qis.plots.derived.clustering import plot_clusters
 from qis.plots.scatter import plot_scatter
@@ -327,8 +328,8 @@ def _risk_page(result, config):
 
 
 def _contributor_factors(result):
-    """Return the shared six-factor display order, including stable ties."""
-    rc = result.report_diagnostics["Factor Euler volatility"].euler_vol
+    """Return the shared six-family display order, including stable ties."""
+    rc = result.report_diagnostics["Reported factor groups"].euler_vol
     return tuple(rc.loc[rc.ne(0)].abs().sort_values(
         ascending=False, kind="stable").head(6).index)
 
@@ -340,16 +341,17 @@ def _contributor_page(result, config):
         config,
         5,
         "Largest factor exposures: asset risk contributors",
-        "Factors ranked by absolute factor Euler contribution. Assets ranked by absolute Euler "
-        "contribution to total annual portfolio volatility.",
+        "Factor families ranked by absolute summed Euler contribution. Assets ranked by absolute "
+        "Euler contribution to total annual portfolio volatility.",
     )
-    rc = result.report_diagnostics["Factor Euler volatility"].euler_vol
+    groups = result.report_diagnostics["Reported factor groups"]
+    rc = groups.euler_vol
     factors = _contributor_factors(result)
     grid = fig.add_gridspec(
         2, 3, left=0.11, right=0.96, top=0.86, bottom=0.20, hspace=0.48, wspace=0.68
     )
     for i, factor in enumerate(factors):
-        values = result.report_diagnostics["Holding factor Euler volatility"][factor]
+        values = result.report_diagnostics["Holding reported factor Euler volatility"][factor]
         selected = values.abs().sort_values(ascending=False, kind="stable").head(10).index
         values = values.loc[selected].copy()
         name_col = "metadata:short_name" if "metadata:short_name" in result.positions else "name"
@@ -357,8 +359,8 @@ def _contributor_page(result, config):
         _bars(
             fig.add_subplot(grid[i // 3, i % 3]),
             values,
-            f"{config.factor_labels.get(factor, factor)}\n"
-            f"Exposure {result.factor_betas[factor]:+.2f}; factor Euler {rc[factor]:+.2%}",
+            f"{config.factor_labels.get(factor, groups.loc[factor, 'label'])}\n"
+            f"Exposure {groups.loc[factor, 'factor_beta']:+.2f}; factor Euler {rc[factor]:+.2%}",
             percent=True,
         )
     _footnotes(
@@ -369,14 +371,15 @@ def _contributor_page(result, config):
             "volatility. Values are percentage points of annual volatility; negative terms "
             "reduce risk.",
             "Additivity: all factor Euler terms sum to systematic variance / sigma_p. Adding "
-            "residual variance / sigma_p gives total volatility sigma_p. All holding contributions "
-            "to a factor sum to that factor's Euler term.",
-            "Six largest absolute factor Euler terms and ten largest absolute holding "
+            "residual variance / sigma_p gives total volatility sigma_p. Family exposures and "
+            "holding Euler terms sum all member factors without "
+            "shock-allocation weights. Holding contributions sum to the family Euler term.",
+            "Six largest absolute factor/family Euler sums and ten largest absolute holding "
             "contributions per factor are shown; displayed subsets need not sum to full totals. "
             "Complete tables are exported. Funded factor beta e_f = "
             "sum_i (MTM_i / NAV) x beta_if."
             if result.metadata["all_funded"]
-            else "Six largest absolute factor Euler terms and ten largest absolute holding "
+            else "Six largest absolute factor/family Euler sums and ten largest absolute holding "
             "contributions per factor are shown; displayed subsets need not sum to full totals. "
             "Derivative betas use current payoff Jacobians and shared responses; these are local "
             "risk contributions. Complete tables are exported."
@@ -395,9 +398,12 @@ def _grid_page(result, config):
     keys = config.selected_grids
     ranked = _contributor_factors(result)
     if not keys:
-        if set(result.grids).issubset(result.factor_exposures.index):
-            keys = tuple(factor for factor in ranked if factor in result.grids)
-        else:
+        known = set(result.factor_exposures.index) | set(
+            result.report_diagnostics["Reported factor groups"].index)
+        by_request = {row.requested_keys: key for key, row in result.grid_metadata.iterrows()}
+        keys = tuple(factor if factor in result.grids else by_request[factor]
+                     for factor in ranked if factor in result.grids or factor in by_request)
+        if not keys and ranked and not set(result.grids).issubset(known):
             keys = tuple(result.grids)[:6]
     subtitle = "Correlated shocks; factor-return ranges shown on each axis."
     if keys and keys == ranked:
@@ -428,8 +434,11 @@ def _grid_page(result, config):
         title = config.factor_labels.get(requested, requested)
         xlabel = title + " factor return"
         if group is not None:
-            title = " + ".join(group["members"]) + " (split total family bump)"
-            xlabel = f"Total {group['label'] or requested} family bump"
+            title = group["label"] or requested
+            equal = np.allclose(group["weights"], 1.0/len(group["members"]))
+            split = "equal split" if equal else "/".join(
+                f"{weight:.0%}" for weight in group["weights"])
+            xlabel = f"Total {group['label'] or requested} family bump ({split})"
         points = pd.DataFrame({"factor_return": x, "portfolio_return": summary.portfolio_return})
         plot_scatter(
             points,
@@ -497,8 +506,8 @@ def _grid_page(result, config):
             ax.set_xticks(x, [str(item) for item in summary.index], rotation=30)
     notes = [
         "Each single-factor panel anchors its named factor at log(1+x); other factors use "
-        "the joint conditional covariance solve. Credit and Credit EM are separate anchors "
-        "when displayed separately. Explicit family grids split the total bump across members. "
+        "the joint conditional covariance solve. Family panels divide x equally across members "
+        "before log1p; all member anchors are fixed jointly (Credit + Credit EM: x/2 each). "
         "See scenario construction in the appendix, page 10.",
         f"Shading: conditional +/-1sigma (dark) and +/-2sigma (light) over {months:g} month. "
         "Bands are centred on exact payoff valuations; local sensitivities are recalculated "
@@ -514,6 +523,14 @@ def _grid_page(result, config):
         "through zero; uncentered R-squared = 1 - SSE/sum(return squared). Regression CIs "
         "are exported as diagnostics only and do not determine the shading.",
     ]
+    for key in keys:
+        group = result.metadata.get("factor_groups", {}).get(
+            result.grid_metadata.loc[key, "requested_keys"])
+        if group and not np.allclose(group["weights"], 1.0/len(group["members"])):
+            notes[0] = ("Family grids allocate total bumps using the exported member weights "
+                        "before log1p; the panel axis identifies the split. Other factors use "
+                        "the joint conditional covariance solve; see appendix, page 10.")
+            break
     if any(result.grid_metadata.loc[key, "bump_convention"] != "simple"
            or result.grid_metadata.loc[key, "completion"] != "conditional" for key in keys):
         notes[0] = ("Each panel uses the supplied grid index and exported Grid conventions. "
@@ -549,7 +566,7 @@ def _beta_page(result, config):
         if key == "Portfolio":
             label = (
                 "Modelled subtotal" if result.metadata.get("scope") == "modelled subtotal" else key
-            )
+            ) + f" | {row.response_exposure / 1e6:.1f}m"
         else:
             label = f"{names.get(key, key)} | {row.response_exposure / 1e6:.1f}m"
         labels.append(label)
@@ -661,14 +678,14 @@ def _clusters_page(result, config):
     top = 0.85
     axes, titles = {}, {}
     for freq, height in zip(order, heights):
-        axes[freq] = fig.add_axes([0.20, top - height, 0.42, height])
+        axes[freq] = fig.add_axes([0.19, top - height, 0.35, height])
         cadence = {"ME": "Monthly", "QE": "Quarterly"}.get(freq, str(freq))
         titles[freq] = (
             f"{cadence}: {len(clusters[freq])} assets; "
             f"{clusters[freq].nunique()} clusters; cutoff {cutoffs[freq]:.2f}"
         )
         top -= height + gap
-    table_ax = fig.add_axes([0.69, 0.17, 0.27, 0.68])
+    table_ax = fig.add_axes([0.575, 0.17, 0.39, 0.68])
     plot_clusters(
         clusters,
         linkages,
@@ -680,7 +697,9 @@ def _clusters_page(result, config):
         fontsize=9,
         show_distance=True,
         table_title="Fitted cluster membership",
-        table_kwargs={"fontsize": 10},
+        table_kwargs={"fontsize": 8, "col_widths": [.44, .16, .40]}
+        if config.cluster_labels else {"fontsize": 10},
+        cluster_labels=config.cluster_labels,
     )
     for ax in axes.values():
         ax.set_title(ax.get_title(), fontsize=11, color=INK, pad=8)
@@ -695,7 +714,9 @@ def _clusters_page(result, config):
             "branch colours identify groups below that cut. Cluster IDs are local to each "
             "cadence. These are return-dependence clusters used in factor estimation, not a "
             "new clustering of the displayed betas. Original asset IDs, linkages and cutoffs "
-            "are exported."
+            "are exported. Descriptive labels are supplied by the caller; ROSAA uses "
+            "FactorLasso factor/volatility labels from this fitted snapshot (equal member "
+            "weights), without changing memberships or estimating a new tree."
         ],
         y=0.105,
         width=185,
@@ -705,101 +726,138 @@ def _clusters_page(result, config):
 
 
 def _cluster_contribution_page(result, config):
-    """Show additive cluster stress, factor and Euler-risk diagnostics through QIS."""
+    """Compare cluster stress, exposures and signed Euler risk on aligned QIS panels."""
     clusters = compute_cluster_contributions(result, config.cluster_memberships)
     summary = display_cluster_table(clusters.summary, clusters)
     scope = ("Modelled subtotal" if result.metadata.get("scope") == "modelled subtotal"
              else "Portfolio")
     denominator_label = "NAV" if result.metadata["all_funded"] else "reporting denominator"
     fig = _page(result, config, 9, "Cluster contributions to stress, factor exposures and risk",
-                f"Fitted asset clusters, ordered by gross MTM. Signed contributions use the full "
+                f"Fitted clusters ordered by gross MTM. Signed contributions use full "
                 f"{denominator_label}; {scope.lower()} includes {len(clusters.holdings)} holdings.")
 
     def displayed(frame):
-        """Keep one group order and append the additive modelled portfolio total."""
+        """Keep the common gross-MTM order and append an additive portfolio total."""
         table = display_cluster_table(frame, clusters)
         table.loc[scope] = frame.sum()
         return table
 
-    def heatmap(ax, table, percent, labels=None):
-        """Colour signed cells using the report's shared diverging palette."""
+    def heatmap(ax, table, percent, labels=None, fontsize=8):
+        """Place column names above signed cells in the report's diverging palette."""
         table = table.copy()
         if labels is not None:
             table.index = [labels.get(key, key) for key in table.index]
         limit = max(float(table.abs().max().max()), 1e-12)
         plot_heatmap(table, ax=ax, cmap="PiYG", var_format="{:+.2%}" if percent else "{:.2f}",
-                     fontsize=8.5, top_x_label=False, vmin=-limit, vmax=limit,
+                     fontsize=fontsize, top_x_label=True, vmin=-limit, vmax=limit,
                      date_format=None, hline_rows=[len(table)-1], x_rotation=0)
         ax.set_ylabel("")
         ax.tick_params(axis="both", length=0)
         ax.get_yticklabels()[-1].set_weight("bold")
 
-    labels = {name: f"{name} | {row.nav_weight:+.1%} | {int(row.holding_count)} holdings"
+    def stacked(ax, values, colors, legend_columns):
+        """Draw shared-order signed Euler bars and annotate their displayed net totals."""
+        plot_bars(values, ax=ax, is_horizontal=True, stacked=True, colors=colors,
+                  fontsize=7.5, add_bar_values=False, x_rotation=0, legend_loc=None,
+                  xvar_format="{:.1%}", yvar_format="{:.1%}")
+        ax.set_ylabel("")
+        ax.axvline(0., color=INK, lw=.7)
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=3))
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda value, position: f"{value:.1%}"))
+        ax.grid(axis="x", color="#E4EAF0", linewidth=.5)
+        ax.margins(x=.25)
+        ax.legend(loc="upper center", bbox_to_anchor=(.5, -.13), ncol=legend_columns,
+                  fontsize=6.7, frameon=False, columnspacing=.8, handlelength=1.3)
+        for y, value in enumerate(values.sum(axis=1)):
+            ax.annotate(f"{value:+.2%}", (value, y), xytext=(4 if value >= 0 else -4, 0),
+                        textcoords="offset points", ha="right" if value < 0 else "left",
+                        va="center", fontsize=7.4, color=INK)
+
+    labels = {name: f"{name} | {row.nav_weight:+.1%} | n={int(row.holding_count)}"
               for name, row in summary.iterrows()}
     labels[scope] = (f"{scope} | {summary.nav_weight.sum():+.1%} | "
-                     f"{int(summary.holding_count.sum())} holdings")
-    fig.text(.25, .875, f"Correlated requested scenarios: cluster P&L (% of {denominator_label})",
+                     f"n={int(summary.holding_count.sum())}")
+    fig.text(.21, .89, f"Correlated requested scenarios: cluster P&L (% of {denominator_label})",
              fontsize=12, weight="bold", color=INK)
-    ax = fig.add_axes([.25, .605, .70, .255])
+    ax = fig.add_axes([.21, .575, .575, .255])
+    contributor_ax = fig.add_axes([.80, .575, .17, .255])
     if "conditional" in clusters.scenario_nav:
         stress = displayed(clusters.scenario_nav["conditional"].iloc[:, :12])
         descriptions = result.metadata.get("scenario_descriptions", {})
-        stress.columns = ["\n".join(textwrap.wrap(str(descriptions.get(str(key), key)), 13))
+        stress.columns = ["\n".join(textwrap.wrap(str(descriptions.get(str(key), key)), 13,
+                                                break_long_words=False))
                           for key in stress.columns]
-        heatmap(ax, stress, True, labels)
+        heatmap(ax, stress, True, labels, fontsize=7.7)
+        top = cluster_top_contributors(result, clusters, displayed=True).reindex(stress.index)
+        cells = []
+        for _, row in top.iterrows():
+            name = textwrap.shorten(str(row["name"]), width=25, placeholder="...")
+            scenario = textwrap.shorten(
+                str(descriptions.get(str(row.scenario), row.scenario)), width=31,
+                placeholder="...")
+            cells.append(f"{name} {row.nav_contribution:+.2%}\n{scenario}")
+        from matplotlib.colors import ListedColormap
+        plot_heatmap(pd.DataFrame(0., index=top.index, columns=["Top contributor"]),
+                     ax=contributor_ax, annot=np.asarray(cells).reshape(-1, 1),
+                     var_format=None, cmap=ListedColormap(["#F0F4F7"]),
+                     fontsize=7.4, top_x_label=True, date_format=None,
+                     hline_rows=[len(top)-1], x_rotation=0)
+        contributor_ax.set_yticklabels([])
+        contributor_ax.set_ylabel("")
+        contributor_ax.tick_params(axis="both", length=0)
     else:
         _empty(ax, "Conditional requested scenarios were not computed.")
+        contributor_ax.set_axis_off()
 
-    fig.text(.16, .505, "Portfolio-weighted factor exposures", fontsize=12,
+    fig.text(.105, .49, "Portfolio-weighted factor exposures", fontsize=11,
              weight="bold", color=INK)
     exposure = displayed(clusters.factor_exposures)
-    exposure.columns = ["\n".join(textwrap.wrap(str(config.factor_labels.get(key, key)), 8))
+    exposure.columns = ["\n".join(textwrap.wrap(str(config.factor_labels.get(key, key)), 8,
+                                               break_long_words=False))
                         for key in exposure.columns]
-    heatmap(fig.add_axes([.16, .23, .455, .26]), exposure, False)
+    heatmap(fig.add_axes([.105, .205, .40, .245]), exposure, False, fontsize=7.1)
 
-    fig.text(.755, .505, "Contributions to annual model volatility", fontsize=11,
+    fig.text(.605, .49, "Top-five factor risk contributions", fontsize=10,
              weight="bold", color=INK)
-    risk = displayed(clusters.risk[["Systematic", "Idiosyncratic"]])
-    ax = fig.add_axes([.755, .23, .195, .26])
-    plot_bars(risk, ax=ax, is_horizontal=True, stacked=True,
-              colors=[BLUE, "#C49A3A"], fontsize=8.5, add_bar_values=False,
-              x_rotation=0, legend_loc=None, xvar_format="{:.1%}", yvar_format="{:.1%}")
-    ax.set_ylabel("")
-    ax.axvline(0., color=INK, lw=.7)
-    ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
-    ax.xaxis.set_major_formatter(FuncFormatter(lambda value, position: f"{value:.1%}"))
-    ax.grid(axis="x", color="#E4EAF0", linewidth=.5)
-    ax.margins(x=.22)
-    ax.legend(loc="upper center", bbox_to_anchor=(.5, -.16), ncol=2,
-              fontsize=8, frameon=False)
-    for y, value in enumerate(risk.sum(axis=1)):
-        ax.annotate(f"{value:+.2%}", (value, y), xytext=(4 if value >= 0 else -4, 0),
-                    textcoords="offset points", ha="right" if value < 0 else "left",
-                    va="center", fontsize=8, color=INK)
+    selected = result.report_diagnostics["Factor Euler volatility"].euler_vol.abs().sort_values(
+        ascending=False, kind="stable").head(5).index
+    factor_risk = displayed(clusters.factor_risk.loc[:, selected])
+    factor_risk.columns = [config.factor_labels.get(key, key) for key in selected]
+    stacked(fig.add_axes([.605, .205, .145, .245]), factor_risk,
+            ["#315B7A", "#C49A3A", "#648E6C", "#A15B77", "#8A7CB4"][:len(selected)], 2)
 
+    fig.text(.835, .49, "Annual model volatility", fontsize=10,
+             weight="bold", color=INK)
+    stacked(fig.add_axes([.835, .205, .13, .245]),
+            displayed(clusters.risk[["Systematic", "Idiosyncratic"]]),
+            [BLUE, "#C49A3A"], 1)
     notes = [
-        "Stress (first 12 requested scenarios): sum exact holding P&L within each fitted cluster, "
-        "divided by the full reporting "
-        "notional; cluster rows sum to the portfolio row. Uses the correlated scenarios on page 2; "
-        "methodology and shock formulas: appendix, page 10.",
-        "Exposures: sum each holding's current response dollar sensitivity times its factor beta, "
-        "divided by notional. Risk: signed systematic and shared-response idiosyncratic Euler "
-        "contributions to annual model portfolio volatility; components and clusters sum to total "
-        "model volatility. These are additive contributions, not standalone cluster volatilities.",
-        "Labels show cadence-local cluster ID, net weight and holding count. At most eight groups "
-        "are displayed; smaller clusters are combined as Other clusters. Unassigned and "
-        "multi-cluster holdings remain explicit. Complete memberships, exposures, risk and all "
-        "scenario contributions are exported."
+        "Stress (first 12 requested correlated scenarios): exact holding P&L summed by cluster / "
+        "full notional. Top contributor: largest absolute holding P&L in that row's worst "
+        f"correlated scenario, with its signed % of {denominator_label} and scenario name; "
+        "the portfolio row uses "
+        "the portfolio's worst scenario. Methodology: appendix, page 10.",
+        "Exposures: sum current holding response dollar sensitivities times factor betas / "
+        "notional. Factor risk bars: portfolio's five largest absolute atomic-factor Euler "
+        "contributions, using the same factors and colours for every cluster. Labels show their "
+        "signed subtotal; omitted factors mean this is not total systematic risk. All factors "
+        "are retained in the exported table.",
+        "Annual model volatility: systematic plus shared-response idiosyncratic Euler terms; "
+        "components and clusters sum to total portfolio model volatility. Negative contributions "
+        "reduce risk. These are additive contributions, not standalone cluster volatilities.",
+        "Rows show cadence-local ID, net weight and holding count. At most eight display groups "
+        "preserve smaller clusters in Other clusters. Unassigned and multi-cluster holdings remain "
+        "explicit. Full memberships, labels and contribution tables are exported."
     ]
     if not config.cluster_memberships:
         notes.append("No fitted memberships supplied: modelled holdings are shown as unassigned.")
     if result.metadata.get("scope") == "modelled subtotal":
         excluded = result.metadata.get("excluded_position_ids", [])
         gross = result.metadata.get("excluded_gross_mtm", 0.)
-        notes.append(f"Excluded from analytics: {len(excluded)} unmodelled holdings, gross MTM "
-                     f"{result.metadata['reference_currency']} {gross:,.0f}. Their risk and stress "
-                     "are unknown; all displayed percentages retain the full portfolio notional.")
-    _footnotes(fig, notes, y=.145, width=185, fontsize=8)
+        notes.append(f"Excluded: {len(excluded)} unmodelled holdings, gross MTM "
+                     f"{result.metadata['reference_currency']} {gross:,.0f}. Their stress and risk "
+                     "are unknown; displayed ratios retain the full portfolio notional.")
+    _footnotes(fig, notes, y=.125, width=190, fontsize=7.5)
     return fig
 
 

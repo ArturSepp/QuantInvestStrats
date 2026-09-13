@@ -147,8 +147,7 @@ def test_factor_panels_rank_euler_risk_instead_of_dollar_exposure(market):
     fig = _contributor_page(result, StressReportConfig(model_name="MATF"))
     try:
         assert [ax.get_title().split("\n")[0] for ax in fig.axes] == [
-            "Credit",
-            "Credit EM",
+            "credit_family",
             "Equity",
         ]
     finally:
@@ -335,6 +334,8 @@ def test_no_active_factor_contributions_leave_sensitivity_slots_empty(market):
     result = run_portfolio_stress_test(p, grid, factor_grids={"Equity": grid})
     diagnostics = dict(result.report_diagnostics)
     diagnostics["Factor Euler volatility"] = diagnostics["Factor Euler volatility"] * 0.
+    diagnostics["Reported factor groups"] = diagnostics["Reported factor groups"].copy()
+    diagnostics["Reported factor groups"]["euler_vol"] = 0.
     result = replace(result, report_diagnostics=diagnostics)
     fig = _grid_page(result, StressReportConfig())
     try:

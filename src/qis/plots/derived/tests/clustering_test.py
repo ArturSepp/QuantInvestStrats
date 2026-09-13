@@ -140,3 +140,19 @@ def test_axes_contract_rejects_partial_or_conflicting_destinations(problem):
         _, table_ax = plt.subplots()
     with pytest.raises(ValueError):
         plot_clusters(clusters, linkages, cutoffs, axes=axes, table_ax=table_ax)
+
+
+def test_descriptive_labels_preserve_raw_ids_and_reject_unknown_clusters():
+    """Descriptions are display metadata; returned memberships keep fitted IDs."""
+    clusters, linkages, cutoffs = inputs()
+    expected, _ = plot_clusters(clusters, linkages, cutoffs)
+    actual, fig = plot_clusters(clusters, linkages, cutoffs, cluster_labels={
+        "ME-1": "Equity core", "ME-2": "Rates long-duration", "QE-1": "Credit low-vol"})
+    pd.testing.assert_series_equal(actual, expected)
+    text = " ".join(cell.get_text().get_text() for ax in fig.axes
+                    for table in ax.tables for cell in table.get_celld().values())
+    assert "Equity core" in text and "Cluster label" in text
+    before = plt.get_fignums()
+    with pytest.raises(ValueError, match="Unknown descriptive"):
+        plot_clusters(clusters, linkages, cutoffs, cluster_labels={"ME-99": "Unknown"})
+    assert plt.get_fignums() == before

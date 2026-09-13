@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from qis.portfolio.stress.analytics import PortfolioStressResult
-from qis.portfolio.stress._clusters import compute_cluster_contributions
+from qis.portfolio.stress._clusters import compute_cluster_contributions, cluster_top_contributors
 
 
 @dataclass(frozen=True)
@@ -27,8 +27,9 @@ class StressReportConfig:
         cluster_memberships: Optional fitted group-to-response membership Series.
         cluster_linkages: Matching fitted linkage arrays in membership index order.
         cluster_cutoffs: Matching fitted cutoffs; never estimated by the report.
+        cluster_labels: Optional cadence-prefixed cluster-ID to descriptive label mapping.
         selected_grids: Up to six caller-named grids for the sensitivity page.
-            Empty selects the ranked individual factors or first six custom grids;
+            Empty selects the ranked factor families or first six custom grids;
             all grids are always exported.
         notes: Plain methodology/coverage notes supplied by the application.
         write_workbook: Write a numerical workbook using the existing QIS serializer.
@@ -59,6 +60,7 @@ class StressReportConfig:
     appendix_subtitle: str = ""
     appendix_notes: tuple[str, ...] = ()
     report_name: str | None = None
+    cluster_labels: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
         """Snapshot caller diagnostics and validate presentation choices."""
@@ -77,6 +79,14 @@ class StressReportConfig:
                 raise ValueError("appendix_table supports at most 24 rows and 10 columns")
             object.__setattr__(self, "appendix_table", self.appendix_table.copy(deep=True))
         object.__setattr__(self, "appendix_notes", tuple(self.appendix_notes))
+        labels = dict(self.cluster_labels)
+        cluster_ids = {f"{cadence}-{label}" for cadence, members
+                       in self.cluster_memberships.items() for label in members}
+        if set(labels) - cluster_ids:
+            raise ValueError("cluster_labels contains an unknown fitted cluster ID")
+        if any(not isinstance(value, str) or not value.strip() for value in labels.values()):
+            raise ValueError("cluster_labels require nonempty descriptive strings")
+        object.__setattr__(self, "cluster_labels", MappingProxyType(labels))
         grids = tuple(self.selected_grids)
         if len(grids) > 6 or len(set(grids)) != len(grids):
             raise ValueError("selected_grids must contain at most six unique names")
@@ -226,6 +236,12 @@ def _report_tables(result, config):
     tables["Cluster weighted factor exposures"] = clusters.factor_exposures
     tables["Cluster dollar factor exposures"] = clusters.factor_dollars
     tables["Cluster Euler risk contributions"] = clusters.risk
+    tables["Cluster factor Euler contributions"] = clusters.factor_risk
+    tables["Cluster worst-scenario top contributors"] = cluster_top_contributors(result, clusters)
+    tables["Displayed cluster top contributors"] = cluster_top_contributors(
+        result, clusters, displayed=True)
+    tables["Cluster descriptive labels"] = pd.Series(
+        config.cluster_labels, dtype=object, name="label").to_frame()
     tables["Cluster display grouping"] = clusters.display_groups.to_frame()
     for name in clusters.scenario_pnl:
         tables[f"Cluster {name} pnl"] = clusters.scenario_pnl[name]
@@ -271,7 +287,7 @@ def _format_workbook(path):
         sheet.sheet_view.showGridLines = False
         sheet.row_dimensions[1].height = 44
         if not sheet.merged_cells.ranges:
-            sheet.auto_filter.ref = sheet.dimensions
+            sheet.auto_filter.ref = f"A1:{get_column_letter(sheet.max_column)}{sheet.max_row}"
         headers = {cell.column: str(cell.value or "") for cell in sheet[1]}
         sheet_percent_columns = percent_columns
         has_grid_audit = headers.get(1) == "grid" and headers.get(2) == "factor_return"
@@ -300,7 +316,7 @@ def _format_workbook(path):
                     sheet.unmerge_cells(str(merged))
                     for row_number in range(first, last + 1):
                         sheet.cell(row_number, 1, grid)
-            sheet.auto_filter.ref = sheet.dimensions
+            sheet.auto_filter.ref = f"A1:{get_column_letter(sheet.max_column)}{sheet.max_row}"
             if "Grid conditional" in sheet.title:
                 sheet_percent_columns |= set(headers.values()) - {"grid"}
         for column in range(1, sheet.max_column + 1):

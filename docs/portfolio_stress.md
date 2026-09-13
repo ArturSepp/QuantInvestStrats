@@ -193,3 +193,35 @@ allocation of nonlinear P&L. Positions excluded from the supplied model remain
 outside these diagnostics, with their count and gross MTM stated explicitly;
 their missing analytics are never replaced with zero and the full notional remains
 the denominator. Without fitted memberships the page displays an unassigned group.
+
+### Family panels and cluster descriptions
+
+The largest-contributor and default sensitivity panels use the same six groups,
+ranked by absolute summed Euler risk. Declared disjoint families combine all member
+factor exposures and holding Euler contributions by summation. Overlapping scenario
+groups retain atomic factor reporting, avoiding double-counting. Individual grids
+remain available in the numerical audit. A family sensitivity curve is an exact
+revaluation, not an average of individual curves: the default equal total simple bump x anchors each
+of n members at log(1+x/n), then jointly conditions every free factor.
+Custom QIS groups may supply other weights; their axes state the actual allocation.
+
+StressReportConfig.cluster_labels accepts a mapping from cadence-prefixed IDs
+(such as ME-1) to plain descriptive labels. The fitted dendrogram membership table
+shows these alongside raw IDs. The QIS plotting helper plot_clusters accepts the
+same optional mapping. Providers own label generation; QIS never imports an estimator
+or rebuilds a tree. ROSAA calls FactorLasso's factor_labels/labels_at workflow on the
+single fitted snapshot with equal cluster-member weighting. These are descriptive
+factor/volatility labels, not claims about cluster persistence.
+
+The cluster page puts scenario and factor names above both heatmaps. Its adjacent
+Top contributor column identifies, for each displayed row, the holding with the
+largest absolute P&L under that row's worst requested conditional scenario. It shows
+the signed contribution divided by full notional, plus the scenario. The portfolio
+row uses its own worst scenario, and an Other clusters row is evaluated after
+combining its memberships. Full raw-cluster and displayed-row results are exported.
+
+The factor-risk bars use the portfolio's five largest absolute **atomic** factor
+Euler contributions with fixed colours across all cluster rows. Their annotations
+are signed subtotals over those five factors. They exclude other systematic factors
+and residual risk; the adjacent total-risk bars retain the full systematic and
+idiosyncratic decomposition. Full cluster-by-factor Euler tables are exported.

@@ -24,6 +24,7 @@ class ClusterContributions:
     scenario_pnl: Mapping[str, pd.DataFrame]
     scenario_nav: Mapping[str, pd.DataFrame]
     display_groups: pd.Series
+    factor_risk: pd.DataFrame
 
 
 def compute_cluster_contributions(result, memberships, max_groups=8):
@@ -83,6 +84,8 @@ def compute_cluster_contributions(result, memberships, max_groups=8):
     shares = result.response_jacobian.div(
         result.response_exposures.replace(0., np.nan), axis=1).fillna(0.)
     holding_residual = shares @ residual
+    factor_risk = result.report_diagnostics["Holding factor Euler volatility"].groupby(
+        groups, sort=False).sum().reindex(order)
     risk = pd.DataFrame({"Systematic": systematic, "Idiosyncratic": holding_residual})
     risk = risk.groupby(groups, sort=False).sum().reindex(order)
     risk["Total"] = risk.sum(axis=1)
@@ -106,7 +109,7 @@ def compute_cluster_contributions(result, memberships, max_groups=8):
         keep = set(regular[:max_groups - len(special) - 1] + special)
         display.loc[~display.index.isin(keep)] = OTHER
     return ClusterContributions(holdings, summary, factor_exposures, dollars, risk,
-                                pnl, nav, display)
+                                pnl, nav, display, factor_risk)
 
 
 def display_cluster_table(frame, contributions):
@@ -116,3 +119,31 @@ def display_cluster_table(frame, contributions):
         contributions.display_groups, sort=False).sum()
     return result.reindex(gross.sort_values(ascending=False, kind="stable").index)
 
+
+
+def cluster_top_contributors(result, contributions, displayed=False):
+    """Identify each cluster's largest absolute asset P&L in its worst conditional scenario."""
+    columns = ["scenario", "holding_id", "name", "pnl", "nav_contribution"]
+    valuation = result.valuations.get("conditional")
+    if valuation is None:
+        return pd.DataFrame(columns=columns)
+    assignments = contributions.holdings.cluster
+    if displayed:
+        assignments = assignments.map(contributions.display_groups)
+        order = display_cluster_table(contributions.summary, contributions).index
+    else:
+        order = contributions.summary.index
+    selections = {group: assignments.index[assignments.eq(group)] for group in order}
+    scope = ("Modelled subtotal" if result.metadata.get("scope") == "modelled subtotal"
+             else "Portfolio")
+    selections[scope] = assignments.index
+    name_col = "metadata:short_name" if "metadata:short_name" in result.positions else "name"
+    rows = {}
+    for group, ids in selections.items():
+        scenario = valuation.pnl[ids].sum(axis=1).idxmin()
+        holding = valuation.pnl.loc[scenario, ids].abs().idxmax()
+        pnl = float(valuation.pnl.loc[scenario, holding])
+        rows[group] = {"scenario": scenario, "holding_id": holding,
+                       "name": result.positions.loc[holding, name_col], "pnl": pnl,
+                       "nav_contribution": pnl/result.metadata["reporting_denominator"]}
+    return pd.DataFrame.from_dict(rows, orient="index", columns=columns)

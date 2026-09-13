@@ -5,6 +5,23 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.34.0] - 2026-09-13
+
+### Added
+
+- Optional descriptive cluster labels in StressReportConfig and plot_clusters.
+  Cluster tables retain raw IDs; supplied descriptions do not change fitted topology.
+- Cluster worst-scenario asset contributor cells and top-five factor Euler bars,
+  with complete signed numerical exports and top-aligned heatmap headers.
+
+### Changed
+
+- Contributor and default sensitivity pages aggregate declared nonoverlapping factor
+  families. Family Euler contributions and exposures sum members without shock weights;
+  family sensitivity requests split simple bumps equally before taking logarithms.
+- Portfolio loading summaries now include their aggregate amount in millions.
+- Empty-table workbook filter ranges remain stable on repeated formatting.
+
 ## [5.33.0] - 2026-09-13
 
 ### Added

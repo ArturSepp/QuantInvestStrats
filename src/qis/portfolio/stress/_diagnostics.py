@@ -69,11 +69,23 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
             }
         )
         aggregates[key] = row
+    reported, holding_reported = {}, {}
+    for key, row in families.iterrows():
+        group = (model.factor_groups or {}).get(key)
+        members = list(group.members) if group is not None else [key]
+        display_key = key if len(members) > 1 else members[0]
+        label = row["label"] if len(members) > 1 else members[0]
+        reported[display_key] = {
+            "label": label, "members": ", ".join(members), "member_count": len(members),
+            "factor_beta": beta.loc[members].sum(), "euler_vol": row.euler_vol}
+        holding_reported[display_key] = holding[members].sum(axis=1)
     regressions, confidence_bands = _grid_regressions(grids, confidence)
     return {
         "Annualised portfolio risk": table,
         "Factor Euler volatility": factor.rename("euler_vol").to_frame(),
         "Family Euler volatility": families,
+        "Reported factor groups": pd.DataFrame.from_dict(reported, orient="index"),
+        "Holding reported factor Euler volatility": pd.DataFrame(holding_reported),
         "Holding factor Euler volatility": holding,
         "Unit response risk": pd.DataFrame.from_dict(unit_risk, orient="index"),
         "Loading aggregates": pd.DataFrame.from_dict(aggregates, orient="index"),

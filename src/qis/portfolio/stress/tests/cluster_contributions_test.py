@@ -160,7 +160,7 @@ def test_cluster_panels_share_the_same_visual_row_order(market):
     fig = _cluster_contribution_page(result, config)
     try:
         fig.canvas.draw()
-        exposure, risk = fig.axes[1:]
+        exposure, risk = fig.axes[2], fig.axes[4]
         assert [t.get_text() for t in risk.get_yticklabels()] == [
             t.get_text() for t in exposure.get_yticklabels()]
         assert risk.yaxis_inverted() == exposure.yaxis_inverted()

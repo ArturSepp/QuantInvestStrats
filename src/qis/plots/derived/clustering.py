@@ -1,5 +1,6 @@
 """Composite dendrogram and membership views of already fitted asset clusters."""
 from collections.abc import Mapping
+import textwrap
 from typing import Optional
 
 import numpy as np
@@ -25,6 +26,7 @@ def plot_clusters(
     show_distance: bool = False,
     table_title: str = "Cluster IDs",
     table_kwargs: Optional[dict] = None,
+    cluster_labels: Optional[Mapping[str, str]] = None,
 ) -> tuple[pd.Series, plt.Figure]:
     """Render supplied trees and membership with automatic or caller-owned axes.
 
@@ -46,6 +48,7 @@ def plot_clusters(
         show_distance: Display merge-distance ticks.
         table_title: Heading above the membership table.
         table_kwargs: Additional qis table options, including colour and column widths.
+        cluster_labels: Optional cadence-prefixed cluster-ID to descriptive label mapping.
 
     Returns:
         Cadence-prefixed membership Series with original asset IDs, and its figure.
@@ -66,6 +69,12 @@ def plot_clusters(
     identities = pd.concat([clusters[group] for group in order])
     if not identities.index.is_unique:
         raise ValueError("Assets must belong to exactly one cadence/group")
+    descriptions = dict(cluster_labels or {})
+    cluster_ids = {f"{group}-{value}" for group, members in clusters.items() for value in members}
+    if set(descriptions) - cluster_ids:
+        raise ValueError("Unknown descriptive cluster labels")
+    if any(not isinstance(value, str) or not value.strip() for value in descriptions.values()):
+        raise ValueError("Cluster descriptions must be nonempty strings")
     if (axes is None) != (table_ax is None):
         raise ValueError("Supply both axes and table_ax, or neither")
     if axes is not None:
@@ -95,7 +104,12 @@ def plot_clusters(
         labelled.append(members.map(lambda value: f"{group}-{value}"))
     aggregate = pd.concat(labelled).sort_values()
     aggregate = aggregate.reindex(index=aggregate.index[::-1])
-    table = aggregate.rename(index=aliases).to_frame(name="Cluster ID")
+    table = aggregate.to_frame(name="Cluster ID")
+    if descriptions:
+        table["Cluster label"] = aggregate.map(descriptions).fillna("").map(
+            lambda value: "\n".join(textwrap.wrap(
+                value, 23, break_long_words=False, break_on_hyphens=False)))
+    table = table.rename(index=aliases)
     options = dict(index_column_name="Instrument", fontsize=fontsize, title=table_title,
                    rows_edge_lines=get_table_lines_for_group_data(aggregate))
     options.update(table_kwargs or {})
