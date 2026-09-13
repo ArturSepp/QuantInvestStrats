@@ -35,7 +35,7 @@ class StressReportConfig:
         write_workbook: Write a numerical workbook using the existing QIS serializer.
         write_previews: Also save PNG previews for inspection.
         model_name: Short model name used in slide and figure titles.
-        appendix_table: Optional preformatted parser-owned table for page eleven.
+        appendix_table: Optional preformatted parser-owned table before the final notation guide.
         appendix_title: Parser-owned page title.
         appendix_subtitle: Parser-owned description above the table.
         appendix_notes: Parser-owned variable definitions and source explanations.
@@ -127,7 +127,7 @@ class StressReportArtifacts:
     """Paths written by a report operation; the numerical result remains reusable.
 
     Attributes:
-        pdf_path: Ten core pages, plus page eleven when a parser supplies a table.
+        pdf_path: Ten analysis pages, optional parser coverage, and a final notation guide.
         table_paths: Numerical table names mapped to CSV paths.
         workbook_path: Optional workbook path.
         manifest_path: JSON with conventions, table mapping and content hashes.
@@ -376,8 +376,8 @@ def generate_portfolio_stress_report(
 ) -> StressReportArtifacts:
     """Render a completed result without fitting or re-evaluating any payoff.
 
-    The PDF has ten core subjects and an optional parser-supplied eleventh page. Display limits are
-    explicitly labelled; CSV/workbook tables retain every holding/scenario/grid.
+    The PDF has ten analysis subjects, optional parser coverage, and a final notation guide.
+    Display limits are explicitly labelled; CSV/workbook tables retain every holding/scenario/grid.
 
     Args:
         result: Detached result returned by run_portfolio_stress_test.

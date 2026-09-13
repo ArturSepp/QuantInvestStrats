@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Final two-column notation and analysis guide describing all ten stress exhibits and
+  their table calculations, placed after optional coverage with readable 10-point text.
 - Optional descriptive cluster labels in StressReportConfig and plot_clusters.
   Cluster tables retain raw IDs; supplied descriptions do not change fitted topology.
 - Cluster worst-scenario asset contributor cells and top-five factor Euler bars,

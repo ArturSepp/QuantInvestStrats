@@ -62,7 +62,7 @@ interpreter. An existing target is rejected before report output is written.
 | 4 | `InstrumentPortfolio` | Holdings, model/position dates, quote and FX registries, positive reporting denominator | `get_mtm`, `get_pnl`, batch `evaluate` and current `response_jacobian` |
 | 5 | `StressScenarios` | Factor/family anchors, simple/log convention and completion policy | Complete factor log-shock vectors; independent or jointly conditional |
 | 6 | `run_portfolio_stress_test` | Portfolio, requests, optional monthly history and named grids | Detached `PortfolioStressResult`: full valuations, exposures, local risk, attribution and audit tables |
-| 7 | `generate_portfolio_stress_report` | Completed result and `StressReportConfig` | Ten core PDF pages, optional eleventh page, all numerical tables and artifact hashes |
+| 7 | `generate_portfolio_stress_report` | Completed result and `StressReportConfig` | Ten analysis PDF pages, optional coverage, final notation guide, all numerical tables and artifact hashes |
 
 The application owns quote acquisition, factor estimation, unsmoothing, contract interpretation
 and settlement/credit decisions. A consumer can construct `RiskModel` directly or use its own
@@ -225,3 +225,16 @@ Euler contributions with fixed colours across all cluster rows. Their annotation
 are signed subtotals over those five factors. They exclude other systematic factors
 and residual risk; the adjacent total-risk bars retain the full systematic and
 idiosyncratic decomposition. Full cluster-by-factor Euler tables are exported.
+
+## Final notation and analysis guide
+
+The report ends with a two-column guide to the ten analysis exhibits. It defines the
+reporting denominator, factor and response sensitivities, covariance, residual risk and
+Euler contributions, then explains each chart and table, including scenario attribution,
+conditional bands, loading aggregates and cluster allocations. The guide uses the configured
+model name and reports the selected band horizon. Its 10-point body text remains above the
+shared 9-point footnote minimum.
+
+The optional parser-owned coverage table precedes this guide: reports have twelve pages
+with coverage and eleven without it. Adding the guide does not re-estimate or reprice
+anything; the original ten analysis exhibits and all numerical exports are preserved.

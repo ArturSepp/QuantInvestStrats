@@ -989,8 +989,169 @@ def _coverage_page(result, config):
     return fig
 
 
+
+def _guide_column(fig, entries, x, top=0.785):
+    """Lay out readable explanatory blocks using their rendered height, without shrinking."""
+    renderer = fig.canvas.get_renderer()
+    for title, paragraphs in entries:
+        heading = fig.text(x, top, textwrap.fill(title, 76), fontsize=11,
+                           fontweight="bold", color=BLUE, va="top", gid="guide-heading")
+        top -= heading.get_window_extent(renderer).height / fig.bbox.height + 0.007
+        lines = [paragraph if paragraph.startswith("$") else textwrap.fill(paragraph, 104)
+                 for paragraph in paragraphs]
+        body = fig.text(x, top, "\n".join(lines), fontsize=10, color=INK,
+                        va="top", linespacing=1.25, gid="guide-body")
+        top -= body.get_window_extent(renderer).height / fig.bbox.height + 0.017
+
+
+def _analysis_guide_page(result, config):
+    """Explain all ten analysis exhibits and their table calculations on the final page."""
+    model = config.model_name
+    funded = result.metadata["all_funded"]
+    denominator = "portfolio NAV" if funded else "reporting denominator"
+    months = result.metadata["horizon_years"] * 12
+    fig = _page(
+        result, config, 12 if config.appendix_table is not None else 11,
+        "Notation and guide to the analysis",
+        "Reading guide to analysis pages 1-10. Coverage and estimation quality is a "
+        "separate source audit. All percentages use the stated units below.",
+    )
+    fig.text(0.04, 0.885, "Common notation", fontsize=11, fontweight="bold", color=BLUE)
+    fig.text(
+        0.04, 0.858,
+        f"N: fixed {denominator}; h: holding; j: fitted asset/underlying response; "
+        "f: factor; c: cluster. All values are in the report reference currency.\n"
+        "z: factor log shocks; B: fitted beta matrix; Sigma: annual factor log-return covariance; "
+        "squared residual vol: annual residual variance.\n"
+        "q_j: response dollar sensitivity / N (MTM / N for funded assets); "
+        "e = B.T q: portfolio factor beta; e_h: holding contribution to e; "
+        "sigma_p: annual total model vol.",
+        fontsize=10, color=INK, va="top", linespacing=1.3,
+    )
+    valuation = (
+        r"$\Delta V_h=\mathrm{MTM}_h[\exp(\beta_h^\top z)-1];\quad R_p=\sum_h\Delta V_h/N.$"
+        if funded else
+        r"$\Delta V_h=V_h(z)-V_h(0);\quad R_p=\sum_h\Delta V_h/N.$"
+    )
+    left = [
+        ("1. Requested independent stress scenarios", (
+            "Explicit return shocks fix the named factors; other factors are zero. "
+            "Level/price targets use their declared correlated completion. Any supplied "
+            "alternative completion policy is identified on page 1.",
+            valuation,
+            "Total P&L bars sum holding valuation changes; % bars divide by N. Each attribution "
+            "row ranks holdings by absolute P&L and shows the top ten: short name plus signed "
+            "100 x holding P&L / N. These are contributions to portfolio return, not shares "
+            "of net scenario P&L; the omitted holdings remain in the total.",
+        )),
+        (f"2. Requested scenarios with latest {model} co-moves", (
+            "Preserve the anchored factor shocks and complete free-factor shocks with the "
+            "conditional mean from the fitted covariance (page 10). Reprice every holding "
+            "with that joint vector. The currency bars, % bars and independently ranked "
+            "top-ten table use exactly the same calculations as page 1.",
+        )),
+        (f"3. Worst {model} historical scenario months", (
+            "Replay each complete observed monthly factor log-return vector on today's "
+            "holdings and fitted betas; rank total portfolio P&L from worst to best and show "
+            "the requested number of worst months (default ten). The two bar charts and "
+            "asset attribution table use page 1's calculations. This is a current-portfolio "
+            "stress replay, not the portfolio's historical performance.",
+        )),
+        (f"4. Portfolio {model} exposures and risk", (
+            "Exposure bars show e_f and N x e_f: portfolio factor sensitivity in ratio and "
+            "currency units. Annualised risk uses the factor model and independent response "
+            "residuals, with shared underlying sensitivities combined first.",
+            r"$v_{\rm sys}=e^\top\Sigma e;\quad v_{\rm idio}=\sum_jq_j^2\sigma_{\epsilon,j}^2;"
+            r"\quad \sigma_p=\sqrt{v_{\rm sys}+v_{\rm idio}}.$",
+            "For each risk-table row with variance v: annual vol = sqrt(v), dollar vol = "
+            "N x sqrt(v), variance share = v / sigma_p squared, and Euler vol = v / sigma_p. "
+            "The family bar sums signed member-factor Euler terms; standalone vols do not add.",
+        )),
+        ("5. Largest factor exposures: asset risk contributors", (
+            r"$RC_f=e_f(\Sigma e)_f/\sigma_p;\quad RC_{h,f}=e_{h,f}(\Sigma e)_f/\sigma_p.$",
+            "Rank up to six factors/families by absolute summed Euler contribution. "
+            "For each, show the ten holdings with largest absolute holding Euler terms. "
+            "Family exposures and risk terms sum members without shock-split weights. "
+            "All holdings add to the factor/family total; displayed subsets may not. "
+            "Signed % values are contributions to annual volatility; negative values "
+            "reduce model risk.",
+        )),
+    ]
+    grid_note = (
+        "At each x, fix the named factor return or divide a family bump across its members "
+        "(equal by default, before log1p); jointly complete the other factors conditionally. "
+        "The same six groups/order as page 5 are used unless explicitly selected. "
+        "Scatter points show exact portfolio P&L / N; axes state the supplied return ranges."
+    )
+    if any(row.completion != "conditional" or row.bump_convention != "simple"
+           for _, row in result.grid_metadata.iterrows()):
+        grid_note = (
+            "Each grid uses its supplied bump convention and completion policy; see exported "
+            "Grid conventions. Simple family bumps split before log1p; log bumps split in log "
+            "units. Conditional grids complete free factors jointly. Scatter points show "
+            "exact portfolio P&L / N, with the selected groups and ranges on the axes."
+        )
+    right = [
+        ("6. Sensitivity to largest factor exposures", (
+            grid_note,
+            "Dashed curve: least-squares R_p = a x + b x squared, through zero; uncentered "
+            "R-squared = 1 - SSE / sum(R_p squared). Where enabled, shading is conditional "
+            f"+/-1 and +/-2 local standard deviations over {months:g} month(s). It uses "
+            "scenario-local sensitivities and fixed conditional covariance (page 10), "
+            "including residual risk. This is a local Gaussian risk band, not a fitted-curve "
+            "confidence interval; the latter is exported separately.",
+        )),
+        (f"7. Estimated {model} loadings and explanatory power", (
+            "Asset beta and R-squared columns come from the supplied fit; R-squared measures "
+            "its explanatory power. Show the top 20 by absolute "
+            + ("MTM" if funded else "response dollar sensitivity") + ". Unit asset systematic "
+            "vol = sqrt(beta.T Sigma beta), idio vol = sqrt(residual variance); model total "
+            "vol is the square root of their squared sum.",
+            "Rest of assets and Portfolio betas sum full-denominator weighted exposures. "
+            "Their R-squared is an absolute-exposure-weighted mean of available asset "
+            "R-squared, not a portfolio regression. Aggregate vols use signed weights and "
+            "the full model covariance, not average asset vols. The | amount is summed "
+            "exposure in millions; beta colours are capped only for display.",
+        )),
+        (f"8. {model} asset cluster dendrograms", (
+            "Trees use the original fit's linkage distances and cutoffs, separately by "
+            "observation cadence. The membership table joins each asset's fitted cluster ID "
+            "to its supplied descriptive label. ROSAA labels use FactorLasso factor/volatility "
+            "profiles with equal member weights. No clustering is rerun; missing topology "
+            "is reported as unavailable.",
+        )),
+        ("9. Cluster contributions to stress, factor exposures and risk", (
+            "Scenario heatmap: sum holding P&L within each cluster and divide by full N. "
+            "Top contributor: largest absolute holding P&L in that cluster's worst "
+            "correlated scenario, with its signed contribution / N and scenario name.",
+            "Exposure heatmap: e_c = sum of holding factor exposures / N. Factor-risk stacks "
+            "sum holding Euler terms within each cluster for the portfolio's top five "
+            "absolute atomic factor contributions. Their subtotal omits other factors.",
+            "Total-risk stacks: systematic = sum of all factor Euler terms; residual = "
+            "sum_j q_cj q_j residual_var_j / sigma_p. Here q_cj is cluster response sensitivity "
+            "/ N. Both components and all clusters add to sigma_p. Show up to eight groups "
+            "by gross MTM, with Other/unassigned buckets preserving totals. Portfolio rows "
+            "sum all groups; these risk bars are allocations, not standalone cluster vols.",
+        )),
+        (f"10. {model} correlation and scenario construction", (
+            "Lower triangle: rho_if = Sigma_if / (sigma_i sigma_f); diagonal: annual factor "
+            "vol = sqrt(Sigma_ff). Use the dated covariance and EWMA convention stated on "
+            "that page. A denotes fixed anchors and F the remaining factors.",
+            r"$z_F=\Sigma_{FA}\Sigma_{AA}^{-1}z_A;\quad "
+            r"\Sigma_{F|A}=\Sigma_{FF}-\Sigma_{FA}\Sigma_{AA}^{-1}\Sigma_{AF}.$",
+            "Targets map to log(target / current); yields use the declared duration or proxy "
+            "mapping. Bands are R_p(x) +/- k sqrt(T v(x)), k = 1, 2; T is years and v(x) "
+            "uses conditional free-factor covariance plus shared residual risk at that "
+            "shock. These are conditional co-moves, not a changed correlation matrix.",
+        )),
+    ]
+    _guide_column(fig, left, 0.04)
+    _guide_column(fig, right, 0.525)
+    return fig
+
+
 def report_pages(result, config):
-    """Yield ten core exhibits and an eleventh page only when supplied by the parser."""
+    """Yield ten analysis exhibits, optional source coverage, and the final notation guide."""
     model = config.model_name
     meta = result.metadata
     currency = meta["reference_currency"]
@@ -1061,3 +1222,5 @@ def report_pages(result, config):
         yield title, builder(result, config)
     if config.appendix_table is not None:
         yield config.appendix_title, _coverage_page(result, config)
+
+    yield "Notation and guide to the analysis", _analysis_guide_page(result, config)

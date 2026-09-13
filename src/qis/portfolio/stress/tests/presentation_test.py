@@ -47,7 +47,7 @@ def test_euler_families_and_regressions_have_independent_references(market):
 
 
 def test_parser_appendix_is_optional_and_snapshotted():
-    """A parser supplies the last-page table and explanations, or omits the page."""
+    """A parser supplies the coverage table and explanations, or omits that page."""
     assert StressReportConfig().appendix_table is None
     table = pd.DataFrame({"Value": ["Parser-owned"]}, index=["Source"])
     config = StressReportConfig(
@@ -83,7 +83,7 @@ def test_v0_pages_show_regression_and_parser_content(market):
     )
     pages = list(report_pages(result, config))
     try:
-        assert len(pages) == 11
+        assert len(pages) == 12
         titles = [title for title, _ in pages]
         assert titles[3] == "Portfolio MATF exposures and risk"
         first_texts = pages[0][1].texts
@@ -102,8 +102,15 @@ def test_v0_pages_show_regression_and_parser_content(market):
             "Cluster contributions to stress, factor exposures and risk",
             "MATF correlation and scenario construction",
         ]
-        assert titles[-1] == "Source validation"
-        assert any("Parser variable explanation" in text.get_text() for text in pages[-1][1].texts)
+        assert titles[-2] == "Source validation"
+        assert titles[-1] == "Notation and guide to the analysis"
+        assert any("Parser variable explanation" in text.get_text() for text in pages[-2][1].texts)
+        guide_texts = pages[-1][1].texts
+        headings = [item.get_text() for item in guide_texts if item.get_gid() == "guide-heading"]
+        assert len(headings) == 10
+        assert [heading.split(".")[0] for heading in headings] == [str(i) for i in range(1, 11)]
+        assert "MATF" in headings[3] and "MATF" in headings[6]
+        assert min(item.get_fontsize() for item in guide_texts) >= 9
         curves = [line for line in pages[5][1].axes[0].lines if line.get_linestyle() == "--"]
         assert len(curves) == 1
         assert len(pages[5][1].axes[0].collections) >= 2
