@@ -30,9 +30,10 @@ nothing else: the weight observed at t is traded at the price ``weight_implement
 observations of the price index later. It does not shift, resample or otherwise touch prices, so
 instrument returns are the same under any lag.
 
-Caller-owned weights are never modified; dated schedules are ordered chronologically on a local
-copy. An instrument with no price on a rebalancing date is not traded and its weight stays in the
-cash balance; allocating that weight over the priced instruments instead is
+Caller-owned dated inputs are never modified. Prices and dated schedules are ordered
+chronologically on local copies, and the price index must contain unique, non-missing timestamps.
+An instrument with no price on a rebalancing date is not traded and its weight stays in the cash
+balance; allocating that weight over the priced instruments instead is
 ``qis.generate_static_weights_schedule``, before the backtest.
 
 ``backtest_rebalanced_portfolio`` is the numba kernel underneath: a genuine recursion in nav and
@@ -49,6 +50,7 @@ from numba import njit
 from typing import Union, Dict, Tuple, List, Optional
 # qis
 from qis.utils.dates import generate_rebalancing_indicators, set_rebalancing_timeindex_on_given_timeindex
+from qis.utils.df_freq import validate_calendar_index
 from qis.utils.df_ops import multiply_df_by_dt
 from qis.utils.df_to_weights import align_weights_to_columns
 from qis.utils.np_ops import repeat_by_columns, repeat_by_rows
@@ -79,7 +81,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
 
     Args:
         prices: instrument prices, columns are tickers. Costs, carry and fees are applied on
-            this grid
+            this grid. A nonempty input must use a ``DatetimeIndex`` with unique, non-missing
+            timestamps. Rows are ordered chronologically on a local copy before any portfolio
+            state is constructed; the caller-owned object is not modified
         weights: target weights. A Dict or pd.DataFrame is safest, since both are aligned to
             ``prices.columns`` by name; a list or array is positional and must match the
             column count. A fixed weight vector is applied at every date in
@@ -89,9 +93,11 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         rebalancing_freq: calendar anchor for rebalancing when ``weights`` is a fixed vector,
             passed to :func:`generate_rebalancing_indicators`
         initial_nav: starting nav
-        funding_rate: annualised rate applied to positive and negative cash balances
+        funding_rate: annualised rate applied to positive and negative cash balances. Dated rows
+            are ordered chronologically on a local copy before alignment to ``prices``
         management_fee: annualised fee accrued on nav
-        instruments_carry: per-instrument carry, expressed on nav
+        instruments_carry: per-instrument carry, expressed on nav. Dated rows are ordered
+            chronologically on a local copy before alignment to ``prices``
         rebalancing_costs: proportional cost on traded notional, fractional units (0.0010 is
             10 bp). A float applies to every instrument and date; a Series indexed by ticker
             is per-instrument and constant in time; a DataFrame of dates x tickers is
@@ -116,16 +122,28 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         costs, including costs charged on an opening trade
 
     Raises:
-        ValueError: if ``prices`` is not a pd.DataFrame, if the dated-weight implementation lag
-            is neither None nor a non-negative integer, if a weight vector does not match the
-            number of price columns, if the price history starts after the weights do, if two
-            weight dates resolve to the same traded date on the price index, if no weight date
-            is traded at all, if a ``rebalancing_costs`` DataFrame is missing a price column,
-            or if a ``rebalancing_costs`` Series is indexed by dates rather than tickers
+        TypeError: if a nonempty ``prices`` input does not use a ``DatetimeIndex``
+        ValueError: if ``prices`` is not a pd.DataFrame, if its nonempty date index contains
+            ``NaT`` or duplicate timestamps, if the dated-weight implementation lag is neither
+            None nor a non-negative integer, if a weight vector does not match the number of
+            price columns, if the price history starts after the weights do, if two weight dates
+            resolve to the same traded date on the price index, if no weight date is traded at
+            all, if a ``rebalancing_costs`` DataFrame is missing a price column, or if a
+            ``rebalancing_costs`` Series is indexed by dates rather than tickers
         NotImplementedError: if ``weights`` is of an unsupported type
     """
     if not isinstance(prices, pd.DataFrame):
         raise ValueError(f"prices type={type(prices)} must be pd.Dataframe")
+
+    validate_calendar_index(prices, argument_name="prices")
+    # Two state transitions at one timestamp have no unambiguous economic order.
+    if prices.index.has_duplicates:
+        raise ValueError("prices index must be unique")
+
+    # Each row is a portfolio state transition, so all validation and dated companions must use
+    # one chronological grid rather than the caller's physical row order.
+    if not prices.index.is_monotonic_increasing:
+        prices = prices.sort_index(kind="stable")
 
     # The lag applies only to dated schedules; validate it before mapping decision dates
     # onto the price index.
@@ -221,9 +239,11 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                       f"qis.generate_static_weights_schedule()",
                       UserWarning, stacklevel=2)
 
-    # adjust rates at rebealncing
+    # Sort dated funding and carry before multiply_df_by_dt forward-fills them onto the price grid.
     if funding_rate is not None:
-        funding_rate_dt = multiply_df_by_dt(df=funding_rate, dates=prices.index, lag=0)
+        funding_rate_dt = multiply_df_by_dt(
+            df=funding_rate.sort_index(kind="stable"), dates=prices.index, lag=0
+        )
     else:
         funding_rate_dt = pd.Series(0.0, index=prices.index)
 
@@ -233,7 +253,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         management_fee_dt = pd.Series(0.0, index=prices.index)
 
     if instruments_carry is not None:
-        instruments_carry_dt = multiply_df_by_dt(df=instruments_carry, dates=prices.index, lag=0)
+        instruments_carry_dt = multiply_df_by_dt(
+            df=instruments_carry.sort_index(kind="stable"), dates=prices.index, lag=0
+        )
     else:
         instruments_carry_dt = pd.Series(0.0, index=prices.index)
 

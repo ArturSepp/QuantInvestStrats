@@ -32,7 +32,7 @@ drift, implementation lags, unavailable assets, and costs visible.
 
 | Symbol or input | Meaning | Units and timing |
 |---|---|---|
-| $p_{i,t}$ / `prices` | Price of asset $i$ | Consistent monetary value per unit; dates in a sorted `DatetimeIndex`, unique asset columns |
+| $p_{i,t}$ / `prices` | Price of asset $i$ | Monetary value per asset unit; unique non-missing dates in a `DatetimeIndex`, unique asset columns |
 | $w^*_{i,t}$ / `weights` | Target capital fraction | Signed decimal weights; named inputs align by ticker, arrays/lists are positional |
 | $u_{i,t}$ | Units held after execution on date $t$ | Shares or model units |
 | $C_t$ | Cash balance after execution and costs | NAV currency; negative cash can represent funding |
@@ -42,15 +42,17 @@ drift, implementation lags, unavailable assets, and costs visible.
 
 ### Data and calculation contract
 
-Prices are a `pandas.DataFrame`. A fixed vector, dictionary, or Series is reapplied at
-`rebalancing_freq`. A date-by-asset DataFrame supplies its own decision dates and ignores that
-frequency; its implementation lag maps decisions onto the price grid. A lag on a fixed vector
-does not create a delayed signal schedule: use dated targets when timing matters.
+Prices are a `pandas.DataFrame`. The backtester rejects missing or duplicate timestamps, then
+orders price rows chronologically on a local copy before constructing state; it does not mutate
+the caller's frame. A fixed vector, dictionary, or Series is reapplied at `rebalancing_freq`. A
+date-by-asset DataFrame supplies its own decision dates and ignores that frequency; its
+implementation lag maps decisions onto the price grid. A lag on a fixed vector does not create a
+delayed signal schedule: use dated targets when timing matters.
 
 `funding_rate`, `management_fee`, and `instruments_carry` are annualised decimal inputs converted
-to the price grid. The residual cash balance earns the funding rate, which defaults to zero.
-Returns arise from simple holding-period P&L; do not substitute asset log returns into the cash
-accounting.
+to the price grid. Dated funding and carry inputs are ordered chronologically before alignment.
+The residual cash balance earns the funding rate, which defaults to zero. Returns arise from
+simple holding-period P&L; do not substitute asset log returns into the cash accounting.
 
 Cost inputs may be a scalar, ticker-indexed Series, or date-by-ticker DataFrame. A dated cost
 panel is forward-filled and read on the trade date, with zero cost before its first dated value.

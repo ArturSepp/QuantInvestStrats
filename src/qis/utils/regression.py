@@ -189,17 +189,56 @@ def fit_multivariate_ols(x: pd.DataFrame,
     return prediction, params, reg_label
 
 
-def fit_ols(x: np.ndarray,
-            y: np.ndarray,
-            order: int = 1,
-            fit_intercept: bool = True
-            ) -> RegModel:
+def _to_ols_array(values: Union[np.ndarray, pd.Series, pd.DataFrame]) -> np.ndarray:
+    """Convert real-valued pandas containers without coercing other inputs."""
+    if isinstance(values, pd.DataFrame):
+        is_numeric = all(pd.api.types.is_any_real_numeric_dtype(dtype) for dtype in values.dtypes)
+    elif isinstance(values, pd.Series):
+        is_numeric = pd.api.types.is_any_real_numeric_dtype(values.dtype)
+    else:
+        return values
+
+    if is_numeric:
+        # Avoid object designs when statsmodels adds a constant to pandas extension dtypes.
+        return values.to_numpy(dtype=float, na_value=np.nan)
+    return values.to_numpy()
+
+
+def _prepare_ols_inputs(
+    x: Union[np.ndarray, pd.Series, pd.DataFrame],
+    y: Union[np.ndarray, pd.Series],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Validate pandas row identity before normalizing the statsmodels inputs."""
+    if isinstance(x, (pd.Series, pd.DataFrame)) and isinstance(y, pd.Series):
+        if not x.index.equals(y.index):
+            raise ValueError("x and y indices must be aligned")
+    return _to_ols_array(x), _to_ols_array(y)
+
+
+def fit_ols(
+    x: Union[np.ndarray, pd.Series, pd.DataFrame],
+    y: Union[np.ndarray, pd.Series],
+    order: int = 1,
+    fit_intercept: bool = True,
+) -> RegModel:
+    """Fit an OLS regression after validating and normalizing its inputs.
+
+    Args:
+        x: Explanatory values in an array, Series, or DataFrame.
+        y: Dependent observations in an array or Series.
+        order: Polynomial degree used to construct the design.
+        fit_intercept: Whether to include an intercept.
+
+    Returns:
+        The fitted statsmodels regression result.
+
+    Raises:
+        ValueError: If pandas inputs do not have identical row indexes.
     """
-    fit regression model
-    """
-    x, y, cond = filter_x_y(x=x, y=y)
-    x1 = get_ols_x(x=x, order=order, fit_intercept=fit_intercept)
-    reg_model = sm.OLS(y, x1).fit()
+    x_array, y_array = _prepare_ols_inputs(x=x, y=y)
+    x_array, y_array, _ = filter_x_y(x=x_array, y=y_array)
+    x1 = get_ols_x(x=x_array, order=order, fit_intercept=fit_intercept)
+    reg_model = sm.OLS(y_array, x1).fit()
     return reg_model
 
 
@@ -559,13 +598,35 @@ def filter_x_y(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np
     return x, y, cond
 
 
-def estimate_ols_alpha_beta(x: Union[np.ndarray, pd.Series, pd.DataFrame],
-                            y: Union[np.ndarray, pd.Series],
-                            order: int = 1,
-                            fit_intercept: bool = True
-                            ) -> Tuple[float, float, float, float]:
+def estimate_ols_alpha_beta(
+    x: Union[np.ndarray, pd.Series, pd.DataFrame],
+    y: Union[np.ndarray, pd.Series],
+    order: int = 1,
+    fit_intercept: bool = True,
+) -> Tuple[float, float, float, float]:
+    """Estimate scalar OLS statistics from numeric NumPy or pandas inputs.
+
+    Real-valued numeric pandas containers are normalized before fitting so ordinary and nullable
+    storage use the same statsmodels design. Nonnumeric or otherwise invalid inputs retain the
+    established warning and four-zero fallback.
+
+    Args:
+        x: One explanatory variable in an array, Series, or one-column DataFrame.
+        y: Dependent observations in an array or Series.
+        order: Polynomial degree passed to the OLS design builder.
+        fit_intercept: Whether to include and report an intercept.
+
+    Returns:
+        Alpha, beta, R-squared, and the conventional alpha p-value. Without an intercept, alpha
+        and its p-value are zero. A failed fit warns and returns four zeros.
+    """
     try:
-        reg_model = fit_ols(x=x, y=y, order=order, fit_intercept=fit_intercept)
+        reg_model = fit_ols(
+            x=x,
+            y=y,
+            order=order,
+            fit_intercept=fit_intercept,
+        )
     except Exception:
         warnings.warn(f"problem with x={x}, y={y}")
         return 0.0, 0.0, 0.0, 0.0

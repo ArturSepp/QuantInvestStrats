@@ -194,6 +194,11 @@ check exposure preservation and failure cases.
 
 ## Interpretation and limitations
 
+For multi-asset periodic tables, `qis.compute_periodic_returns` preserves a leading missing region
+until an asset supplies two observed price boundaries. A column with fewer than two observations
+has neither periodic nor total returns. The table calculation continues to forward-fill internal
+and trailing gaps; that display-oriented convention is not a liquidation or delisting policy.
+
 - Backfilling a ragged start invents pre-inception history and can create look-ahead.
 - Carrying a terminated investment indefinitely can hide liquidation, recovery or default losses.
 - Repeated marks change observed return dependence; they are not evidence of low economic risk.
