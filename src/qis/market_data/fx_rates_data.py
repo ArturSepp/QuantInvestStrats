@@ -37,9 +37,18 @@ import numpy as np
 import pandas as pd
 import qis as qis
 from dataclasses import dataclass
-from typing import Tuple, Union, Optional, Dict, Literal
+from typing import Tuple, Union, Optional, Dict, Literal, cast
 
 from qis.market_data.fx_hedging import compute_performance_of_local_ccy_asset_in_reference_ccy
+
+
+def _resample_nav_at_period_end(nav: pd.Series, freq: str) -> pd.Series:
+    """Select the final available NAV for each completed reporting period."""
+    if nav.empty:
+        return nav.asfreq(freq)
+    sampled = nav.resample(freq).last()
+    # Resampling labels the unfinished final period beyond the observed support; omit that label.
+    return sampled.loc[sampled.index <= nav.index[-1]].ffill()
 
 
 @dataclass
@@ -212,7 +221,8 @@ class FxRatesData:
             reference_ccy: Reference currency of the pair.
             time_period: Optional date filter applied to the daily return before
                 compounding.
-            freq: Optional resampling of the output NAV (``None`` keeps daily).
+            freq: Optional period-end reporting frequency. Each completed period uses its final
+                available NAV; ``None`` keeps daily values.
 
         Returns:
             Series of NAV levels (starting at 1.0), at daily or ``freq`` cadence.
@@ -222,9 +232,9 @@ class FxRatesData:
         total_return = np.add(local_return, carry_return).rename(f"{local_ccy}-{reference_ccy}")
         if time_period is not None:
             total_return = time_period.locate(total_return)
-        nav = qis.returns_to_nav(total_return, is_log_returns=False)
+        nav = cast(pd.Series, qis.returns_to_nav(total_return, is_log_returns=False))
         if freq is not None:
-            nav = nav.asfreq(freq).ffill()
+            nav = _resample_nav_at_period_end(nav, freq)
         return nav
 
     def get_carry_fx_return_nav(self,
@@ -259,7 +269,8 @@ class FxRatesData:
             reference_ccy: Reference currency of the pair.
             is_normalise_by_spot_vol: Apply the vol-matching adjustment.
             time_period: Optional filter applied before normalisation.
-            freq: Optional resample of the output NAV.
+            freq: Optional period-end reporting frequency. Each completed period uses its final
+                available NAV; ``None`` keeps daily values.
             is_causal: If True, use expanding-window statistics to
                 avoid look-ahead (recommended for backtests).
 
@@ -288,9 +299,9 @@ class FxRatesData:
                                 + 0.5 * float(np.nanvar(local_return)))
             carry_return = carry_return + local_return
 
-        nav = qis.returns_to_nav(carry_return, is_log_returns=False)
+        nav = cast(pd.Series, qis.returns_to_nav(carry_return, is_log_returns=False))
         if freq is not None:
-            nav = nav.asfreq(freq).ffill()
+            nav = _resample_nav_at_period_end(nav, freq)
         return nav
 
     def build_local_cash_nav(self,
