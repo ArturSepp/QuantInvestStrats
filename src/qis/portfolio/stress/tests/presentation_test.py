@@ -357,3 +357,29 @@ def test_no_active_factor_contributions_leave_sensitivity_slots_empty(market):
         assert all(not ax.axison for ax in fig.axes)
     finally:
         plt.close(fig)
+
+
+def test_sensitivity_ticks_cover_wide_conditional_bands(market):
+    """Small conditional means must not bunch tick labels inside much wider risk bands."""
+    import matplotlib.pyplot as plt
+    from qis.portfolio.stress._figures import _grid_page
+
+    p = grouped_portfolio(market)
+    x = np.array([-.001, 0., .001])
+    grid = StressScenarios(pd.DataFrame({"Equity": x}, index=x),
+                           ScenarioMode.CONDITIONAL, ShockConvention.SIMPLE)
+    result = run_portfolio_stress_test(p, grid, factor_grids={"Equity": grid})
+    fig = _grid_page(result, StressReportConfig(selected_grids=("Equity",)))
+    try:
+        fig.canvas.draw()
+        ax = fig.axes[0]
+        low, high = ax.get_ylim()
+        ticks = ax.get_yticks()
+        visible = ticks[(ticks >= low) & (ticks <= high)]
+        assert len(visible) >= 3
+        assert np.ptp(visible) >= .6 * (high - low)
+        pixel_gap = np.diff(ax.transData.transform(
+            np.column_stack([np.zeros(len(visible)), visible]))[:, 1])
+        assert pixel_gap.min() >= 15
+    finally:
+        plt.close(fig)

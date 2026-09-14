@@ -496,6 +496,9 @@ def _grid_page(result, config):
         elif band_handles:
             ax.legend(handles=band_handles, loc="upper left", fontsize=7.5, frameon=False)
         ax.set_title(title, fontsize=12, color=INK, fontweight="bold", pad=12)
+        # Recompute ticks after bands extend the scatter plot's original y range.
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda value, position: f"{value:+.0%}"))
         ax.grid(True, color="#DFE7F0", linewidth=0.6)
         ax.axhline(0, color="#7B8D9B", lw=0.6)
         ax.axvline(0, color="#7B8D9B", lw=0.6)

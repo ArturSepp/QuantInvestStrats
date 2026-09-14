@@ -63,6 +63,8 @@ The quickstart page includes that source and provides links for Markdown viewers
   risk, signal and integration layers, with factor and feature contribution methods.
 - [Factor stress testing](stress_testing.md):
   specified factor shocks, valuation changes and prediction bands.
+- [Stress testing with options](stress_testing_with_options.md):
+  five stocks, ten short VOP-priced options and a four-ETF EWMA risk model.
 - [Incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md):
   missing observations, instrument lifetimes and differing reporting schedules.
 - [Private-asset unsmoothing](private_asset_unsmoothing.md):
@@ -140,6 +142,7 @@ Brinson attribution <brinson_attribution>
 Model-layer attribution <model_layer_attribution>
 Factor stress testing <stress_testing>
 Instrument portfolios and stress reports <portfolio_stress>
+Stress testing with options <stress_testing_with_options>
 incomplete_and_mixed_frequency_data
 Private-asset unsmoothing <private_asset_unsmoothing>
 FX hedging and market data <fx_hedging_and_market_data>

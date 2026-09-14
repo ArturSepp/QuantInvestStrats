@@ -470,6 +470,9 @@ python -m pytest src/qis/tests/test_examples.py -k factor_stress_testing
 
 ### Instrument portfolios and derivative reports
 
+For full time-value option repricing with Yahoo stock/ETF data, a four-factor EWMA model
+and ten VOP-priced short calls/puts, see [Stress testing with options](stress_testing_with_options.md).
+
 For positions with observed marks, intrinsic calls/puts, futures or composite payoffs,
 use the [instrument portfolio stress interface](portfolio_stress.md), available from 5.30.1.
 It uses these conditioning and risk primitives and adds original-holding valuation,

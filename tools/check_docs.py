@@ -31,7 +31,8 @@ METHODOLOGY_PAGES = frozenset({
     'fx_hedging_and_market_data.md', 'incomplete_and_mixed_frequency_data.md',
     'model_layer_attribution.md', 'performance_analytics_and_sharpe.md',
     'portfolio_backtesting.md', 'portfolio_breadth.md', 'private_asset_unsmoothing.md',
-    'reproducibility.md', 'stress_testing.md', 'tracking_error_and_risk.md',
+    'reproducibility.md', 'stress_testing.md', 'stress_testing_with_options.md',
+    'tracking_error_and_risk.md',
     'turnover_conventions.md',
 })
 UTILITY_PAGES = frozenset({
@@ -46,7 +47,7 @@ ADOPTED_PAGES = frozenset({
     'performance_analytics_and_sharpe.md', 'tracking_error_and_risk.md',
     'portfolio_backtesting.md', 'turnover_conventions.md',
     'incomplete_and_mixed_frequency_data.md', 'private_asset_unsmoothing.md',
-    'fx_hedging_and_market_data.md', 'stress_testing.md',
+    'fx_hedging_and_market_data.md', 'stress_testing.md', 'stress_testing_with_options.md',
     'model_layer_attribution.md', 'reproducibility.md',
     'factsheets_and_reporting.md', 'factsheets.md', 'gallery.md',
     'install.md', 'quickstart.md', 'software_design.md', 'package_comparison.md',
