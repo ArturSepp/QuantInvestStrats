@@ -5,14 +5,6 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Fixed
-
-- Align `FxRatesData` spot and domestic-rate panels chronologically so unsorted rows cannot carry
-  future quotes backward and rate updates between spot dates remain available to later FX carry and
-  conversion calculations.
-
 ## [5.30.2] - 2026-09-14
 
 ### Added
@@ -177,6 +169,10 @@ batch and also shifts later sample columns.
   landing pages with the canonical package identity and Read the Docs documentation.
 
 ### Fixed
+
+- Align `FxRatesData` spot and domestic-rate panels chronologically so unsorted rows cannot carry
+  future quotes backward and rate updates between spot dates remain available to later FX carry and
+  conversion calculations.
 
 - Interpreted valid uniquely dated price histories chronologically throughout total-return,
   elapsed-time, annualized-return, and performance-table endpoint calculations.
