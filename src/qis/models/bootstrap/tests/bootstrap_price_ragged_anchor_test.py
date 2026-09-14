@@ -116,6 +116,42 @@ def test_bootstrap_price_data_anchors_mixed_ragged_columns_independently(
     pd.testing.assert_frame_equal(prices, original)
 
 
+def test_bootstrap_price_data_resumes_after_sampled_missing_returns() -> None:
+    """NumPy reconstruction keeps valid sampled returns after an interior gap."""
+    prices = pd.DataFrame(
+        {
+            "Complete": [100.0, 110.0, 121.0, 133.1, 146.41],
+            "Late": [np.nan, np.nan, 50.0, 55.0, 60.5],
+        },
+        index=DATES,
+    )
+    original = prices.copy(deep=True)
+    sampled_indexes: IntArray = np.array([[2], [0], [3]], dtype=np.int64)
+    expected = np.array(
+        [
+            [146.4100, 60.50],
+            [161.0510, 60.50],
+            [177.1561, 66.55],
+        ]
+    )
+
+    result = cast(
+        object,
+        bootstrap_price_data(
+            prices=prices,
+            bootstrap_output=BootstrapOutput.DF_TO_LIST_ARRAYS,
+            num_samples=1,
+            index_length=len(sampled_indexes),
+            bootstrapped_indices=sampled_indexes,
+            init_to_end=True,
+        ),
+    )
+    actual = _first_list_path(result)
+
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-13)
+    pd.testing.assert_frame_equal(prices, original)
+
+
 @pytest.mark.parametrize(
     "bootstrap_output", [BootstrapOutput.DF_TO_LIST_ARRAYS, BootstrapOutput.SERIES_TO_DF]
 )
