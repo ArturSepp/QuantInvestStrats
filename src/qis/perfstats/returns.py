@@ -49,18 +49,42 @@ from qis.perfstats.config import PerfStat, ReturnTypes, PerfParams
 from qis.utils.annualisation import infer_annualisation_factor_from_df, CALENDAR_DAYS_PER_YEAR_SHARPE
 
 
-def compute_num_days(prices: Union[pd.DataFrame, pd.Series]) -> int:
-    """Compute number of calendar days in price series.
+def _chronological_prices(
+    prices: Union[pd.DataFrame, pd.Series],
+) -> Union[pd.DataFrame, pd.Series]:
+    """Order a valid uniquely dated price history chronologically.
 
     Args:
         prices: Price time series
 
     Returns:
+        Chronologically ordered prices, or the original object when no ordering is needed or the
+        date axis contains duplicates or missing labels.
+    """
+    index = prices.index
+    if (
+        isinstance(index, pd.DatetimeIndex)
+        and index.is_unique
+        and not index.hasnans
+        and not index.is_monotonic_increasing
+    ):
+        return prices.sort_index()
+    return prices
+
+
+def compute_num_days(prices: Union[pd.DataFrame, pd.Series]) -> int:
+    """Compute number of calendar days in price series.
+
+    Args:
+        prices: Price time series. Valid uniquely dated histories are interpreted chronologically
+
+    Returns:
         Number of days between first and last price
 
     Raises:
-        ValueError: If dates are in reverse chronological order
+        ValueError: If endpoint labels remain in reverse order after valid date normalization
     """
+    prices = _chronological_prices(prices=prices)
     if prices.index[0] > prices.index[-1]:
         raise ValueError(f"inconsistent dates t0={prices.index[0]} t1={prices.index[-1]}")
     return np.maximum((prices.index[-1] - prices.index[0]).days, 1)
@@ -72,7 +96,7 @@ def compute_num_years(prices: Union[pd.DataFrame, pd.Series],
     """Compute number of years in price series.
 
     Args:
-        prices: Price time series
+        prices: Price time series. Valid uniquely dated histories are interpreted chronologically
         days_per_year: Calendar days per year (default: 365.25)
 
     Returns:
@@ -205,7 +229,7 @@ def to_total_returns(prices: Union[pd.Series, pd.DataFrame]) -> pd.Series:
     """Compute total returns over entire price history.
 
     Args:
-        prices: Price time series
+        prices: Price time series. Valid uniquely dated histories are interpreted chronologically
 
     Returns:
         Series of total returns indexed by asset
@@ -225,11 +249,12 @@ def compute_total_return(prices: Union[pd.DataFrame, pd.Series]) -> Union[np.nda
     """Compute total return from first to last price.
 
     Args:
-        prices: Price time series
+        prices: Price time series. Valid uniquely dated histories are interpreted chronologically
 
     Returns:
         Array of total returns for DataFrame, float for Series
     """
+    prices = _chronological_prices(prices=prices)
     if len(prices.index) == 1:
         if isinstance(prices, pd.DataFrame):
             return np.full(len(prices.columns), fill_value=np.nan)
@@ -285,7 +310,7 @@ def compute_pa_return(prices: Union[pd.DataFrame, pd.Series],
     """Compute annualized (per annum) return with geometric compounding.
 
     Args:
-        prices: Price time series
+        prices: Price time series. Valid uniquely dated histories are interpreted chronologically
         annualize_less_1y: If True, annualize periods <1 year linearly;
                           if False, return total return without annualization
 
@@ -330,7 +355,7 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
     """Compute comprehensive dictionary of return metrics.
 
     Args:
-        prices: Price time series
+        prices: Price time series. Valid uniquely dated histories are interpreted chronologically
         perf_params: Performance parameters including risk-free rates
         annualize_less_1y: Annualize returns for periods <1 year
 
@@ -361,6 +386,8 @@ def compute_returns_dict(prices: Union[pd.DataFrame, pd.Series],
                            PerfStat.AN_LOG_EXCESS_RETURN.to_str(): np.full(n, fill_value=np.nan),
                            PerfStat.NUM_YEARS.to_str(): np.full(n, fill_value=np.nan)}
         return return_dict
+
+    prices = _chronological_prices(prices=prices)
 
     if perf_params is None:
         perf_params = PerfParams()
