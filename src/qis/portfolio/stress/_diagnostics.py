@@ -98,24 +98,30 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
 
 
 def _conditional_shock_tables(covariance):
-    """Complete each atomic +/-10% anchor and retain affected rows, anchored columns.
+    """Complete fixed-percentage and annual-volatility-magnitude simple-return anchors.
 
-    Tables contain simple factor returns, not covariance entries. A zero-variance
-    factor cannot support a nonzero conditional anchor and remains unavailable.
+    Rows respond to anchored columns. Sigma magnitudes are sqrt(diag(annual
+    covariance)), used directly as simple returns to match the correlation-page
+    diagonal. Zero variance or a simple downside at/below -100% is unavailable.
     """
     tables = {}
-    for bump in (-0.10, 0.10):
+    volatility = pd.Series(np.sqrt(np.diag(covariance)), index=covariance.index)
+    anchors = [(f"{bump:+.0%}", volatility * 0 + bump) for bump in (-.10, .10)]
+    anchors += [(f"{sign:+d}sigma", sign * volatility) for sign in (-1, 1)]
+    for label, bumps in anchors:
         columns = {}
         for factor in covariance.columns:
+            bump = bumps.loc[factor]
             columns[factor] = (
                 np.expm1(conditional_factor_shock(covariance, {factor: np.log1p(bump)}))
-                if covariance.loc[factor, factor] > 0 else
+                if covariance.loc[factor, factor] > 0 and bump > -1 else
                 pd.Series(np.nan, index=covariance.index)
             )
         table = pd.DataFrame(columns, index=covariance.index).rename_axis(
             index="Affected factor", columns="Anchored factor")
-        tables[f"Conditional factor shocks {bump:+.0%}"] = table
+        tables[f"Conditional factor shocks {label}"] = table
     return tables
+
 
 
 def _grid_regressions(grids, confidence):

@@ -83,7 +83,7 @@ def test_v0_pages_show_regression_and_parser_content(market):
     )
     pages = list(report_pages(result, config))
     try:
-        assert len(pages) == 13
+        assert len(pages) == 14
         titles = [title for title, _ in pages]
         assert titles[3] == "Portfolio MATF exposures and risk"
         first_texts = pages[0][1].texts
@@ -102,14 +102,15 @@ def test_v0_pages_show_regression_and_parser_content(market):
             "Estimated MATF loadings and explanatory power",
             "MATF correlation and scenario construction",
         ]
-        assert titles[10] == "MATF conditional shocks and covariance"
+        assert titles[10] == "MATF conditional shocks and covariance at 10% shocks"
+        assert titles[11] == "MATF conditional shocks and covariance at 1-sigma shocks"
         assert titles[-2] == "Source validation"
         assert titles[-1] == "Notation and guide to the analysis"
         assert any("Parser variable explanation" in text.get_text() for text in pages[-2][1].texts)
         guide_texts = pages[-1][1].texts
         headings = [item.get_text() for item in guide_texts if item.get_gid() == "guide-heading"]
-        assert len(headings) == 11
-        assert [heading.split(".")[0] for heading in headings] == [str(i) for i in range(1, 12)]
+        assert len(headings) == 12
+        assert [heading.split(".")[0] for heading in headings] == [str(i) for i in range(1, 13)]
         assert "MATF" in headings[3] and "MATF" in headings[8]
         assert min(item.get_fontsize() for item in guide_texts) >= 9
         pages[-1][1].canvas.draw()

@@ -66,7 +66,7 @@ interpreter. An existing target is rejected before report output is written.
 | 4 | `InstrumentPortfolio` | Holdings, model/position dates, quote and FX registries, positive reporting denominator | `get_mtm`, `get_pnl`, batch `evaluate` and current `response_jacobian` |
 | 5 | `StressScenarios` | Factor/family anchors, simple/log convention and completion policy | Complete factor log-shock vectors; independent or jointly conditional |
 | 6 | `run_portfolio_stress_test` | Portfolio, requests, optional monthly history and named grids | Detached `PortfolioStressResult`: full valuations, exposures, local risk, attribution and audit tables |
-| 7 | `generate_portfolio_stress_report` | Completed result and `StressReportConfig` | Eleven analysis PDF pages, optional coverage, final notation guide, all numerical tables and artifact hashes |
+| 7 | `generate_portfolio_stress_report` | Completed result and `StressReportConfig` | Twelve analysis PDF pages, optional coverage, final notation guide, all numerical tables and artifact hashes |
 
 The application owns quote acquisition, factor estimation, unsmoothing, contract interpretation
 and settlement/credit decisions. A consumer can construct `RiskModel` directly or use its own
@@ -232,19 +232,22 @@ idiosyncratic decomposition. Full cluster-by-factor Euler tables are exported.
 
 ## Final notation and analysis guide
 
-The report ends with a two-column guide to the eleven analysis exhibits. It defines the
+The report ends with a two-column guide to the twelve analysis exhibits. It defines the
 reporting denominator, factor and response sensitivities, covariance, residual risk and
 Euler contributions, then explains each chart and table, including scenario attribution,
 conditional bands, loading aggregates and cluster allocations. The guide uses the configured
 model name and reports the selected band horizon. Its 10-point body text remains above the
 shared 9-point footnote minimum.
 
-The optional parser-owned coverage table precedes this guide: reports have thirteen pages
-with coverage and twelve without it. Page 10 shows the dated correlation/volatility matrix
-and target-to-factor mappings. Page 11 illustrates conditional mean shocks and contains the
-conditional covariance and local-band formulas. Portfolio valuation and risk are unchanged.
+The optional parser-owned coverage table precedes this guide: reports have fourteen pages
+with coverage and thirteen without it. Page 10 shows the dated correlation/volatility matrix
+and target-to-factor mappings. Pages 11 and 12 illustrate conditional shocks at fixed 10%
+and annual-volatility-sized anchors, with conditional covariance and local-band formulas.
+Portfolio valuation, requested scenarios and risk are unchanged.
 
-## Conditional-shock illustration (5.36)
+<a id="conditional-shock-illustration-536"></a>
+
+## Conditional-shock illustrations
 
 Two colour-coded tables independently anchor every atomic factor at -10% and +10% simple
 return. Each column is one anchored factor; each row is an affected factor. The diagonal
@@ -263,3 +266,15 @@ change the conditional risk-band widths. No separate correlation-matrix shock is
 `PortfolioStressResult.report_diagnostics` contains `Conditional factor shocks -10%` and
 `Conditional factor shocks +10%`. Both are exported without PDF rounding. The renderer only
 consumes these detached calculations and does not reprice or refit a portfolio.
+
+Page 12, **conditional shocks and covariance at 1-sigma shocks**, uses the annual
+volatilities from the page-10 diagonal as simple-return magnitudes. For each atomic
+factor a, the downside anchor is minus sqrt(Sigma_aa), the upside is plus
+sqrt(Sigma_aa), and log1p converts that chosen simple return for conditional projection.
+For example, annual volatility 13.3% gives simple anchors -13.3% and +13.3%. These are
+annual-volatility-sized simple shocks: they are not exponentiated log-sigma shocks and
+are not divided by sqrt(12). The risk-band horizon remains separately configured.
+Zero variance, or a downside simple return at/below -100%, is marked unavailable
+rather than clipped. Exports add `Conditional factor shocks -1sigma` and
+`Conditional factor shocks +1sigma`, with the same affected-row/anchored-column axes.
+The companion page does not alter requested scenarios or family-splitting rules.

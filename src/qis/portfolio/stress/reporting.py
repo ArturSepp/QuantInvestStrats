@@ -127,7 +127,7 @@ class StressReportArtifacts:
     """Paths written by a report operation; the numerical result remains reusable.
 
     Attributes:
-        pdf_path: Eleven analysis pages, optional parser coverage, and a final notation guide.
+        pdf_path: Twelve analysis pages, optional parser coverage, and a final notation guide.
         table_paths: Numerical table names mapped to CSV paths.
         workbook_path: Optional workbook path.
         manifest_path: JSON with conventions, table mapping and content hashes.
@@ -383,7 +383,7 @@ def generate_portfolio_stress_report(
 ) -> StressReportArtifacts:
     """Render a completed result without fitting or re-evaluating any payoff.
 
-    The PDF has eleven analysis subjects, optional parser coverage, and a final notation guide.
+    The PDF has twelve analysis subjects, optional parser coverage, and a final notation guide.
     Display limits are explicitly labelled; CSV/workbook tables retain every holding/scenario/grid.
 
     Args:

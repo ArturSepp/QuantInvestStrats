@@ -5,6 +5,20 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.30.2] - 2026-09-14
+
+### Added
+
+- Add a shared conditional-shock report page using annual factor volatility magnitudes
+  as +/- simple-return anchors, alongside the existing +/-10% page. Export both new
+  diagnostic tables and mark unsupported downside anchors unavailable.
+
+### Changed
+
+- Label the original conditional page "at 10% shocks", explain anchored columns and
+  responding rows on both pages, and update the notation guide and page numbering.
+  Requested scenarios, factor-family splitting and portfolio valuations are unchanged.
+
 ## [5.30.1] - 2026-09-14
 
 ### Added

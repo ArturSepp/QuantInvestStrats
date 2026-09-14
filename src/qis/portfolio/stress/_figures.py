@@ -936,31 +936,34 @@ def _methodology_page(result, config):
     return fig
 
 
-def _conditional_page(result, config):
-    """Illustrate single-factor co-moves and explain conditional covariance and bands."""
+def _conditional_page(result, config, volatility_scaled=False):
+    """Illustrate conditional co-moves for percentage or annual-volatility-sized anchors."""
     from fractions import Fraction
     from matplotlib.patches import Rectangle
 
+    scale = "1-sigma" if volatility_scaled else "10%"
     fig = _page(
-        result, config, 11, f"{config.model_name} conditional shocks and covariance",
-        "Each column is a separate scenario: fix its named factor at -10% or +10%, then "
-        "complete all other factors. Rows show the resulting simple factor returns.",
+        result, config, 12 if volatility_scaled else 11,
+        f"{config.model_name} conditional shocks and covariance at {scale} shocks",
+        "Each column is a separate scenario - the diagonal is the factor shock and "
+        "off-diagonal cells are induced conditional shocks: rows identify responding factors.",
     )
-    tables = [result.report_diagnostics[f"Conditional factor shocks {bump:+.0%}"]
-              for bump in (-.1, .1)]
+    keys = ("-1sigma", "+1sigma") if volatility_scaled else ("-10%", "+10%")
+    tables = [result.report_diagnostics[f"Conditional factor shocks {key}"] for key in keys]
     finite = np.concatenate([frame.to_numpy().ravel() for frame in tables])
     finite = finite[np.isfinite(finite)]
     limit = max(float(np.max(np.abs(finite))) if finite.size else .1, .1)
-    for left, bump, table in zip((.105, .605), (-.1, .1), tables):
-        fig.text(left, .888, f"Anchor each factor at {bump:+.0%}: implied moves (%)", fontsize=13,
+    labels = ("-1 sigma", "+1 sigma") if volatility_scaled else ("-10%", "+10%")
+    for left, label, table in zip((.105, .605), labels, tables):
+        fig.text(left, .888, f"Anchor each factor at {label}: implied moves (%)", fontsize=13,
                  weight="bold", color=INK)
         ax = fig.add_axes([left, .410, .355, .365])
         display = 100 * table.rename(index=config.factor_labels, columns=config.factor_labels)
         plot_heatmap(display, ax=ax, cmap="PiYG", var_format="{:+.1f}", fontsize=9,
                      top_x_label=True, vmin=-100*limit, vmax=100*limit,
                      date_format=None, x_rotation=90)
-        ax.set_xlabel("")
-        ax.set_ylabel("")
+        ax.set_xlabel("Anchored factor (column)", fontsize=9, labelpad=8)
+        ax.set_ylabel("Responding factor (row)", fontsize=9, labelpad=8)
         ax.tick_params(axis="both", length=0)
         ax.tick_params(axis="y", pad=5)
         for j in range(len(table)):
@@ -970,14 +973,24 @@ def _conditional_page(result, config):
                 for i in range(len(table)):
                     ax.text(j+.5, i+.5, "n/a", ha="center", va="center", fontsize=9)
     fig.text(.04, .349, "Conditional mean shocks", fontsize=13, weight="bold", color=INK)
-    fig.text(.04, .307, r"$z_a=\log(1+s);\quad z_i=\frac{\Sigma_{ia}}{\Sigma_{aa}}z_a;"
+    fig.text(.04, .307, r"$z_a=\log(1+s_a);\quad z_i=\frac{\Sigma_{ia}}{\Sigma_{aa}}z_a;"
              r"\quad r_i=e^{z_i}-1$", fontsize=14, color=INK)
     fig.text(.04, .260, r"$z_F=\Sigma_{FA}\Sigma_{AA}^{-1}z_A$", fontsize=14, color=INK)
-    fig.text(.04, .223, "s = -10% or +10%. A: fixed factors; F: free factors.\n"
-             "Table cells are conditional mean returns, not covariance entries.\n"
-             "Signs can differ from the anchor; simple-return conversion\n"
-             "means the +10% and -10% tables need not be opposites.",
-             fontsize=10, color=INK, va="top", linespacing=1.35)
+    if volatility_scaled:
+        interpretation = (
+            "s_a = +/-sqrt(Sigma_aa): annual volatility from page 10.\n"
+            "Use that magnitude as a simple-return anchor, then log1p.\n"
+            "These are annual-volatility-sized shocks, not monthly sigma.\n"
+            "Example: 13.3% annual vol gives -13.3% and +13.3% anchors."
+        )
+    else:
+        interpretation = (
+            "s_a = -10% or +10%. A: fixed factors; F: free factors.\n"
+            "Table cells are conditional returns, not covariance entries.\n"
+            "Equal percentage shocks have unequal volatility severity.\n"
+            "Page 12 instead uses each factor's annual volatility."
+        )
+    fig.text(.04, .223, interpretation, fontsize=10, color=INK, va="top", linespacing=1.35)
     fig.text(.54, .349, "Conditional covariance and local risk bands", fontsize=13,
              weight="bold", color=INK)
     fig.text(.54, .307,
@@ -993,21 +1006,31 @@ def _conditional_page(result, config):
              f"d: annual residual variance; T = "
              f"{Fraction(result.metadata['horizon_years']).limit_denominator(365)} year.",
              fontsize=10, color=INK, va="top", linespacing=1.35)
+    unavailable = (
+        "Zero-variance anchors and simple downside shocks at/below -100% are n/a. "
+        if volatility_scaled else "Zero-variance anchors are n/a. "
+    )
     _footnotes(fig, [
         "Columns condition one atomic factor at a time, without family splitting. "
-        "Outlined diagonal cells are fixed anchors. Both tables share the same colour scale; "
-        "zero-variance anchors are unavailable (n/a). Cells round to 0.1%; "
-        "exports retain full precision.",
-        "Conditional covariance has zero anchored rows/columns and is identical for +/-10% "
-        "when the anchor set is unchanged. Local sensitivities, hence band widths, can change. "
-        "These are fitted co-moves, not a shocked correlation matrix or scenario probabilities.",
+        "Outlined diagonal cells are fixed anchors; each table retains factor order. "
+        "Both tables share the same colour scale. " + unavailable +
+        "Cells round to 0.1%; exports retain full precision.",
+        "Negative correlation can reverse a response's sign; log1p/expm1 makes the two "
+        "signs asymmetric. Conditional covariance depends on the anchor set, not its size "
+        "or sign. Local sensitivities and band widths can change. These are fitted "
+        "co-moves, not causal forecasts or scenario probabilities.",
     ], y=.115)
     return fig
 
 
+def _conditional_sigma_page(result, config):
+    """Render the companion conditional page with annual-volatility-magnitude anchors."""
+    return _conditional_page(result, config, volatility_scaled=True)
+
+
 def _coverage_page(result, config):
     """Render only the optional parser-supplied table and footnote explanations."""
-    fig = _page(result, config, 12, config.appendix_title, config.appendix_subtitle)
+    fig = _page(result, config, 13, config.appendix_title, config.appendix_subtitle)
     _table(fig.add_axes([0.04, 0.265, 0.92, 0.55]), config.appendix_table, first=0.23, fontsize=8.5)
     _footnotes(fig, config.appendix_notes, y=0.215)
     return fig
@@ -1027,19 +1050,19 @@ def _guide_column(fig, entries, x, top=0.785):
                             fontsize=11 if equation else 10, color=INK, va="top",
                             linespacing=1.25, gid="guide-body")
             top -= body.get_window_extent(renderer).height / fig.bbox.height + 0.003
-        top -= 0.012
+        top -= 0.010
 
 
 def _analysis_guide_page(result, config):
-    """Explain all eleven analysis exhibits and their table calculations on the final page."""
+    """Explain all twelve analysis exhibits and their table calculations on the final page."""
     model = config.model_name
     funded = result.metadata["all_funded"]
     denominator = "portfolio NAV" if funded else "reporting denominator"
     months = result.metadata["horizon_years"] * 12
     fig = _page(
-        result, config, 13 if config.appendix_table is not None else 12,
+        result, config, 14 if config.appendix_table is not None else 13,
         "Notation and guide to the analysis",
-        "Reading guide to analysis pages 1-11. Coverage and estimation quality is a "
+        "Reading guide to analysis pages 1-12. Coverage and estimation quality is a "
         "separate source audit. All percentages use the stated units below.",
     )
     fig.text(0.04, 0.885, "Common notation", fontsize=11, fontweight="bold", color=BLUE)
@@ -1166,21 +1189,27 @@ def _analysis_guide_page(result, config):
             "Lower triangle: rho_if = Sigma_if / (sigma_i sigma_f); diagonal: annual factor "
             "vol = sqrt(Sigma_ff). Use the dated covariance and stated EWMA convention. "
             "Targets map to log(target / current); yields use the declared duration or proxy. "
-            "Conditional calculations are illustrated on page 11.",
+            "Pages 11-12 illustrate conditional calculations at fixed and volatility-sized shocks.",
         )),
-        (f"11. {model} conditional shocks and covariance", (
-            "Two tables: each column fixes one atomic factor at -10% or +10% simple return; "
-            "rows contain the conditionally implied simple returns. The outlined diagonal "
-            "retains the anchor. No family split is applied. The tables show conditional "
-            "means, not covariance entries; log conversion makes their magnitudes asymmetric.",
+        (f"11. {model} conditional shocks and covariance at 10% shocks", (
+            "Each column fixes one atomic factor at +/-10% simple return. Diagonal: fixed "
+            "shock; off-diagonal: induced conditional returns of row factors. No family split. "
+            "Equal percentages have unequal volatility severity; log conversion makes the "
+            "two signs asymmetric.",
             r"$z_F=\Sigma_{FA}\Sigma_{AA}^{-1}z_A;\quad "
             r"\Sigma_{F|A}=\Sigma_{FF}-\Sigma_{FA}\Sigma_{AA}^{-1}\Sigma_{AF}.$",
-            "Fixed factors have zero remaining covariance. Bands are R_p(x) +/- k sqrt(T v(x)), "
-            "k = 1, 2, using conditional free-factor covariance plus shared residual risk and "
-            "scenario-local sensitivities. T is years. This is not a correlation-matrix shock.",
+            "Anchored rows/columns have zero conditional covariance. Bands use "
+            "R_p(x) +/- k sqrt(T v(x)), k = 1, 2, with free-factor covariance, shared residual "
+            "risk and scenario-local sensitivities; T is years.",
         )),
     ]
-    # Balance eleven exhibits without shrinking the readable guide font.
+    right.append((f"12. {model} conditional shocks and covariance at 1-sigma shocks", (
+        "Use page 10's +/-sqrt(Sigma_aa) as each diagonal simple-return anchor before "
+        "log1p (13.3% vol means +/-13.3%). No monthly scaling or log-sigma exponentiation. "
+        "Off-diagonals use page 11's conditional formula. Zero variance or downside "
+        "at/below -100% is n/a. Requested scenarios and the band horizon stay unchanged.",
+    )))
+    # Balance twelve exhibits without shrinking the readable guide font.
     left.append(right.pop(0))
     _guide_column(fig, left, 0.04)
     _guide_column(fig, right, 0.525)
@@ -1188,7 +1217,7 @@ def _analysis_guide_page(result, config):
 
 
 def report_pages(result, config):
-    """Yield eleven analysis exhibits, optional source coverage, and the final notation guide."""
+    """Yield twelve analysis exhibits, optional source coverage, and the final notation guide."""
     model = config.model_name
     meta = result.metadata
     currency = meta["reference_currency"]
@@ -1255,7 +1284,8 @@ def report_pages(result, config):
         ("Cluster contributions to stress, factor exposures and risk", _cluster_contribution_page),
         (f"Estimated {model} loadings and explanatory power", _beta_page),
         (f"{model} correlation and scenario construction", _methodology_page),
-        (f"{model} conditional shocks and covariance", _conditional_page),
+        (f"{model} conditional shocks and covariance at 10% shocks", _conditional_page),
+        (f"{model} conditional shocks and covariance at 1-sigma shocks", _conditional_sigma_page),
     ]:
         yield title, builder(result, config)
     if config.appendix_table is not None:
