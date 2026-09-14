@@ -180,7 +180,7 @@ $$
 Here $\Phi$ is the standard normal distribution function. VOP's compiled forward-grid
 pricer evaluates all shocked spots for one option. Values are per share; signed holding
 marks multiply by **contracts times 100**, once. See
-[Black and Scholes (1973)](https://www.journals.uchicago.edu/doi/10.1086/260062) and the
+[Black and Scholes (1973)](https://doi.org/10.1086/260062) and the
 [VOP implementation](https://github.com/ArturSepp/VanillaOptionPricers/blob/main/src/vanilla_option_pricers/black_scholes.py).
 
 The option holding change and total portfolio return are
@@ -392,7 +392,7 @@ Ordinary source link:
 
 1. Black, F., and Scholes, M. (1973). The Pricing of Options and Corporate Liabilities.
    *Journal of Political Economy*, 81(3), 637-654.
-   [DOI: 10.1086/260062](https://www.journals.uchicago.edu/doi/10.1086/260062).
+   [DOI: 10.1086/260062](https://doi.org/10.1086/260062).
 2. Geyer, C. J. (2019). *Stat 5101 Lecture Slides: Deck 5*, University of Minnesota,
    slides 136-140. [Conditional multivariate normal distributions](https://www.stat.umn.edu/geyer/s19/5101/slides/s5.pdf).
 3. Sepp, A. [VanillaOptionPricers](https://github.com/ArturSepp/VanillaOptionPricers),
