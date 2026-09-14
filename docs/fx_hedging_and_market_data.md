@@ -46,13 +46,12 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 | $h_t$ | Local opening principal sold forward | Fraction; 0 unhedged, 1 principal hedge |
 
 The cross is `fx_spots[local] / fx_spots[reference]`. For EUR assets viewed in CHF, it is CHF per
-EUR. Asset and currency labels must agree; construct chronologically ordered panels with the
-necessary currencies.
+EUR. Asset and currency labels must agree, and the panels must contain the necessary currencies.
 
-Construction forward-fills spots, reindexes rates to the spot dates, and forward-fills that rate
-panel. Quotes on dates absent from the spot index are not retained by this reindexing step.
-Align the input calendars deliberately; missing leading observations cannot be filled from
-future quotes.
+Construction sorts and forward-fills spots chronologically. Rates are sorted and forward-filled on
+the union of their source calendar and the spot calendar before being selected at the spot dates,
+so off-grid rate updates remain available to later observations. Missing leading values remain
+missing; future quotes are never carried backward.
 
 The pair calculation aligns and forward-fills asset prices and cross rates. Hedge ratios and
 forward premiums are as-of aligned to its return grid, then lagged one observation. Return $t$
