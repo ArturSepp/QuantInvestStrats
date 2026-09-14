@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "45e469e506f5eb6aedf467b10d420c1c0ef90eea",
+  "measured_at_commit": "38b36ee0e1d5a7eecf6ced08e1a0e580a9f451c2",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -28,16 +28,16 @@
       "paper_phrase": null
     },
     "backtester_nonblank_lines": {
-      "value": 376,
+      "value": 378,
       "how": "nonblank lines of src/qis/portfolio/backtester.py",
       "live": true,
       "paper_phrase": null
     },
     "backtester_physical_lines": {
-      "value": 425,
+      "value": 427,
       "how": "physical lines of src/qis/portfolio/backtester.py",
       "live": true,
-      "paper_phrase": "backtester is 425 lines"
+      "paper_phrase": "backtester is 427 lines"
     },
     "capability_groups": {
       "value": 14,
@@ -46,13 +46,13 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 3856,
+      "value": 3859,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 709,
+      "value": 710,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null

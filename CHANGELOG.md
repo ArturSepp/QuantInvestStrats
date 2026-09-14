@@ -163,6 +163,9 @@ batch and also shifts later sample columns.
   EWMA mean seed, updating all regression moments only on jointly observed rows, and applying
   each asset's warm-up mask exactly once instead of twice.
 
+- Normalized nullable numeric transaction-cost DataFrames before portfolio backtesting, preserving
+  the existing missing-cost, alignment, and traded-notional accounting conventions.
+
 - Ordered portfolio-backtester prices, funding rates, and instrument carry chronologically before
   stateful processing, and rejected ambiguous duplicate or missing price timestamps.
 
