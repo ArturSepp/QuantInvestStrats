@@ -13,6 +13,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   completed reporting period's final available NAV instead of carrying the previous period's NAV
   when its calendar boundary is absent from the source observations.
 
+- Align NAV-normalized portfolio costs and market-cap participation by row label, and reject
+  missing, extra, or duplicate NAV and report labels instead of pairing values positionally.
+
 ## [5.30.2] - 2026-09-14
 
 ### Added
