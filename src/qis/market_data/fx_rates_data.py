@@ -2,8 +2,9 @@
 ``FxRatesData``: spot rates and domestic short rates, and everything currency conversion needs.
 
 Two panels on one index: ``fx_spots``, quoted as USD per one unit of each currency, and
-``domestic_rates``, the annualised short rate per currency. Rates are reindexed onto the spot
-dates and forward filled on construction, so the two never drift apart.
+``domestic_rates``, the annualised short rate per currency. Construction sorts both source
+calendars, forward fills them causally, and retains off-grid rate updates before selecting the
+spot dates, so the two stored panels never drift apart.
 
 The quote convention is the thing to get right, because it is what makes every downstream sign
 correct. Each spot column is USD per 1 unit of that currency, so USD is identically one and a
@@ -47,8 +48,9 @@ class FxRatesData:
     FX spot rates and domestic short rates, aligned on a common index.
 
     Spots are quoted as USD per one unit of the local currency, so a cross rate is a ratio of two
-    columns and the quote currency's own column is identically one. Rates are reindexed onto the
-    spot dates and forward-filled on construction, so the two are always aligned.
+    columns and the quote currency's own column is identically one. Construction sorts each source
+    calendar before time-directed filling and retains off-grid rate updates before reindexing rates
+    onto the spot dates, so the two stored panels are causally aligned.
 
     Attributes:
         fx_spots: USD per 1 unit of each currency, one column per currency
@@ -58,9 +60,17 @@ class FxRatesData:
     domestic_rates: pd.DataFrame
 
     def __post_init__(self):
-        """Align domestic rates to FX spot dates and forward fill missing values."""
-        self.fx_spots = self.fx_spots.ffill()
-        self.domestic_rates = self.domestic_rates.reindex(index=self.fx_spots.index).ffill()
+        """Sort and causally align domestic rates to the forward-filled FX spot dates."""
+        # Fill only after sorting so physical row order cannot carry a future spot into the past.
+        self.fx_spots = self.fx_spots.sort_index(kind='stable').ffill()
+        # Fill on the union calendar so rate updates between spot dates remain available as-of.
+        rate_calendar = self.domestic_rates.index.union(self.fx_spots.index).sort_values()
+        self.domestic_rates = (
+            self.domestic_rates.sort_index(kind='stable')
+            .reindex(index=rate_calendar)
+            .ffill()
+            .reindex(index=self.fx_spots.index)
+        )
 
     @classmethod
     def load(cls, local_path: str, time_period: qis.TimePeriod = None) -> FxRatesData:

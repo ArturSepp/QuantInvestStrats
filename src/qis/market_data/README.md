@@ -49,8 +49,9 @@ class FxRatesData:
   (e.g. `0.045` for 4.5%). `XAU` carries the USD rate as a financing-cost proxy; `GBp` shares the
   `GBP` sovereign curve.
 
-`__post_init__` forward-fills `fx_spots` and reindexes `domestic_rates` onto the spot calendar, so a
-container is ready to use the moment it is constructed.
+`__post_init__` sorts and forward-fills `fx_spots`, then forward-fills `domestic_rates` on the union
+of the rate and spot calendars before selecting the spot dates. A container is therefore ready to
+use immediately without carrying future observations backward or discarding off-grid rate updates.
 
 ### Construction
 
