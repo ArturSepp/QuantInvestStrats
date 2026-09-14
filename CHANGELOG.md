@@ -170,6 +170,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Interpreted valid uniquely dated price histories chronologically throughout total-return,
+  elapsed-time, annualized-return, and performance-table endpoint calculations.
+
 - Made `find_upto_date_from_datetime_index` select the latest eligible finite timestamp from
   unsorted inputs instead of returning a future, stale, or `NaT` entry.
 
