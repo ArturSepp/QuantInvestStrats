@@ -74,11 +74,14 @@ intersphinx_mapping = {
 
 # DOI redirects commonly terminate at publisher sites that reject automated CI requests with
 # HTTP 403 even though the canonical DOI remains valid. The Frongello paper is likewise retained
-# as a reader-facing historical reference while its host has an expired TLS certificate. Keep
-# these links rendered, but do not make releases depend on those external server policies.
+# as a reader-facing historical reference while its host has an expired TLS certificate. Source
+# links back into this repository are validated locally and excluded from remote checks because
+# GitHub throttles the many concurrent unauthenticated requests. Keep all of these links rendered,
+# but do not make releases depend on those external server policies.
 linkcheck_ignore = [
     r"https://doi\.org/.*",
     r"https://frongello\.com/support/Works/JPMSpring2002\.pdf",
+    r"https://github\.com/ArturSepp/QuantInvestStrats/(?:blob|tree)/main/.*",
 ]
 
 templates_path = ['_templates']
