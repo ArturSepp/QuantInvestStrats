@@ -9,8 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
-- Preserve each completed reporting period's final available FX total-return and carry NAV when
-  its calendar boundary is absent from the source observations.
+- Make `FxRatesData.get_fx_total_return_nav` and `FxRatesData.get_carry_fx_return_nav` use each
+  completed reporting period's final available NAV instead of carrying the previous period's NAV
+  when its calendar boundary is absent from the source observations.
 
 ## [5.30.2] - 2026-09-14
 

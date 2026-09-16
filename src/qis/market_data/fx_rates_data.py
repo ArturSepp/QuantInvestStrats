@@ -37,19 +37,9 @@ import numpy as np
 import pandas as pd
 import qis as qis
 from dataclasses import dataclass
-from typing import Tuple, Union, Optional, Dict, Literal, cast
+from typing import Tuple, Union, Optional, Dict, Literal
 
 from qis.market_data.fx_hedging import compute_performance_of_local_ccy_asset_in_reference_ccy
-
-
-def _resample_nav_at_period_end(nav: pd.Series, freq: str) -> pd.Series:
-    """Select the final available NAV for each completed reporting period."""
-    if nav.empty:
-        return nav.asfreq(freq)
-    sampled = nav.resample(freq).last()
-    # Resampling labels the unfinished final period beyond the observed support; omit that label.
-    return sampled.loc[sampled.index <= nav.index[-1]].ffill()
-
 
 @dataclass
 class FxRatesData:
@@ -232,9 +222,9 @@ class FxRatesData:
         total_return = np.add(local_return, carry_return).rename(f"{local_ccy}-{reference_ccy}")
         if time_period is not None:
             total_return = time_period.locate(total_return)
-        nav = cast(pd.Series, qis.returns_to_nav(total_return, is_log_returns=False))
+        nav = qis.returns_to_nav(total_return, is_log_returns=False)
         if freq is not None:
-            nav = _resample_nav_at_period_end(nav, freq)
+            nav = qis.df_asfreq(df=nav, freq=freq)
         return nav
 
     def get_carry_fx_return_nav(self,
@@ -299,9 +289,9 @@ class FxRatesData:
                                 + 0.5 * float(np.nanvar(local_return)))
             carry_return = carry_return + local_return
 
-        nav = cast(pd.Series, qis.returns_to_nav(carry_return, is_log_returns=False))
+        nav = qis.returns_to_nav(carry_return, is_log_returns=False)
         if freq is not None:
-            nav = _resample_nav_at_period_end(nav, freq)
+            nav = qis.df_asfreq(df=nav, freq=freq)
         return nav
 
     def build_local_cash_nav(self,

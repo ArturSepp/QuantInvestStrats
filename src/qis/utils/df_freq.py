@@ -165,6 +165,7 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     # outside the observed range.
     df = _apply_fill(df, fill_na_method)
 
+    freq_index = freq_index.rename(df.index.name)
     freq_data = df.reindex(index=freq_index, method=method)
     freq_data = _apply_fill(freq_data, fill_na_method)
     return freq_data
