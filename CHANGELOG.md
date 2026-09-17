@@ -5,6 +5,14 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Make `FxRatesData.get_fx_total_return_nav` and `FxRatesData.get_carry_fx_return_nav` use each
+  completed reporting period's final available NAV instead of carrying the previous period's NAV
+  when its calendar boundary is absent from the source observations.
+
 ## [5.30.2] - 2026-09-14
 
 ### Added

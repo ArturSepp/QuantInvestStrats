@@ -195,3 +195,16 @@ def test_df_asfreq_preserves_valid_timezone_aware_nullable_values(shape: _PanelS
 
     _assert_panel_unchanged(actual, expected)
     _assert_panel_unchanged(panel, original)
+
+
+def test_df_asfreq_preserves_datetime_index_name() -> None:
+    """Retain the source date-axis name when constructing a reporting schedule."""
+    index = pd.bdate_range("2024-01-02", "2024-02-29", name="observation_date")
+    panel = pd.Series(range(len(index)), index=index, dtype=float, name="Asset")
+    expected_index = pd.date_range(
+        "2024-01-31", "2024-02-29", freq="ME", name="observation_date"
+    )
+
+    actual = df_asfreq(panel, freq="ME")
+
+    pd.testing.assert_index_equal(actual.index, expected_index)
