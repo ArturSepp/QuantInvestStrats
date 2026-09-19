@@ -148,8 +148,9 @@ z_F=\Sigma_{FA}\Sigma_{AA}^{-1}z_A.
 $$
 
 An explicit zero is an anchor; an omitted factor is free. QIS performs one joint solve,
-not a sum of separately conditioned scenarios. The conditional Gaussian interpretation is
-described in [Geyer's partitioned-normal derivation](https://www.stat.umn.edu/geyer/s19/5101/slides/s5.pdf).
+not a sum of separately conditioned scenarios. The construction is the conditional factor
+stress of [Kupiec (1998)](https://jod.pm-research.com/content/6/1/7). The conditional
+Gaussian mean is a textbook result (Anderson, 2003, Section 2.5).
 The [factor stress-testing guide](stress_testing.md) documents validation and shock conventions.
 
 Stock $i$ then moves to
@@ -393,9 +394,12 @@ Ordinary source link:
 1. Black, F., and Scholes, M. (1973). The Pricing of Options and Corporate Liabilities.
    *Journal of Political Economy*, 81(3), 637-654.
    [DOI: 10.1086/260062](https://doi.org/10.1086/260062).
-2. Geyer, C. J. (2019). *Stat 5101 Lecture Slides: Deck 5*, University of Minnesota,
-   slides 136-140. [Conditional multivariate normal distributions](https://www.stat.umn.edu/geyer/s19/5101/slides/s5.pdf).
-3. Sepp, A. [VanillaOptionPricers](https://github.com/ArturSepp/VanillaOptionPricers),
+2. Kupiec, P. H. (1998). Stress testing in a value at risk framework.
+   *Journal of Derivatives*, 6(1), 7-24.
+   [Publisher page](https://jod.pm-research.com/content/6/1/7).
+3. Anderson, T. W. (2003). *An Introduction to Multivariate Statistical Analysis*, 3rd edition.
+   Wiley. Section 2.5: conditional distributions of the multivariate normal.
+4. Sepp, A. [VanillaOptionPricers](https://github.com/ArturSepp/VanillaOptionPricers),
    software and forward-price/Greek implementation. Example verified with version 2.2.0.
-4. Aroussi, R., and contributors. [yfinance download API](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html).
-5. Sepp, A., and qis contributors. [qis software and citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+5. Aroussi, R., and contributors. [yfinance download API](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html).
+6. Sepp, A., and qis contributors. [qis software and citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

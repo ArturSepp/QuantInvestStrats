@@ -85,3 +85,13 @@ Grids and factor-family selection belong to the consumer.
 ## Instrument portfolios
 
 For anchored calls/puts, zero-MTM futures, shared response risk and a reusable nine-page report with an optional tenth-page appendix, see [Instrument portfolio stress](portfolio_stress.md). These existing low-level helpers retain their signatures and defaults.
+
+## References
+
+The construction is the conditional factor stress of Kupiec (1998), Stress testing in a
+value at risk framework, Journal of Derivatives 6(1), 7-24. The conditional covariance of the
+free factors and its stressed-correlation extension are Kim and Finger (2000), A stress test
+to incorporate correlation breakdown, Journal of Risk 2(3). The partitioned-normal results are
+textbook, for example Anderson (2003), An Introduction to Multivariate Statistical Analysis,
+Section 2.5. The full reference list, including plausibility measures and non-Gaussian scenario
+selection, is in docs/stress_testing.md of the repository.

@@ -145,9 +145,17 @@ $$
 =\rho_{ij}\frac{\sigma_i}{\sigma_j}z_j.
 $$
 
-The Gaussian conditioning result is derived in [Geyer (2019), slides 136–140](https://www.stat.umn.edu/geyer/s19/5101/slides/s5.pdf).
-Without joint normality, the same covariance regression gives a linear projection; a covariance
-matrix alone does not determine a general nonlinear conditional expectation.
+The conditional mean and covariance of a partitioned multivariate normal are textbook results,
+for example Anderson (2003, Section 2.5) and Mardia, Kent and Bibby (1979, Chapter 3).
+Their use for stress testing, fixing a subset of risk factors and completing the rest through
+the covariance regression, is due to
+[Kupiec (1998)](https://jod.pm-research.com/content/6/1/7).
+[Kim and Finger (2000)](https://www.risk.net/journal-risk/2161074/stress-test-incorporate-correlation-breakdown)
+added the conditional covariance of the free factors and a broken-correlation regime for it,
+and RiskMetrics productised the construction as the predictive stress test. qis implements the
+same construction with labelled inputs and explicit anchors and claims no methodological novelty
+for it. Without joint normality, the same covariance regression gives a linear projection. A
+covariance matrix alone does not determine a general nonlinear conditional expectation.
 
 Correlation alone is insufficient: the volatility ratio determines shock magnitude.
 If annual equity volatility is 20%, rates volatility is 10%, and their correlation is $-0.4$,
@@ -245,7 +253,10 @@ $$
 
 `conditional_factor_covariance` returns this as a **full factor-order matrix** $C$,
 with anchor rows and columns exactly zero. If all factors are anchored, the entire matrix is zero.
-For a Gaussian model $C$ does not depend on the realised anchor values.
+For a Gaussian model $C$ does not depend on the realised anchor values. This is the conditional
+covariance of Kim and Finger (2000), who further replace it with a stressed-correlation regime for
+the free factors. qis does not do that: a caller who wants a stressed regime passes a different
+covariance to these functions.
 
 A useful independent interpretation is the covariance of regression residuals:
 $f_F-\Sigma_{FA}\Sigma_{AA}^{-1}f_A$. Conditioning removes explained variance rather than
@@ -498,6 +509,18 @@ lower bound to cross -100%; bounds are not clipped or interpreted as exact retur
 When all factors are anchored, only idiosyncratic risk remains. With zero residual variances as
 well, the band collapses to the scenario centre.
 
+The primitives attach no plausibility measure to a completed scenario.
+[Breuer, Jandačka, Rheinberger and Summer (2009)](https://www.ijcb.org/journal/ijcb09q3a7.pdf)
+define one as the Mahalanobis distance of the full factor vector under the same covariance, and a
+caller can compute it from the returned shocks. Scenario selection without the Gaussian
+assumption is developed by
+[Glasserman, Kang and Kang (2015)](https://doi.org/10.1080/14697688.2014.926019), and causal
+conditioning through Bayesian networks by Rebonato (2010). The choice of covariance is the
+caller's, with one caution: a covariance estimated on a subsample selected by the sign or size of
+one factor is not a regime estimate, because conditioning on a variable changes its sample
+correlation even under a stationary bivariate normal
+([Boyer, Gibson and Loretan, 1999](https://www.federalreserve.gov/pubs/ifdp/1997/597/ifdp597.pdf)).
+
 ### Validation and failure modes
 
 The API rejects nonfinite inputs, duplicate or mismatched ordered labels, nonpositive price/NAV
@@ -529,10 +552,32 @@ _included/stress_testing
 
 ## References
 
-1. Geyer, C. J. (2019). [Stat 5101 Lecture Slides: Deck 5](https://www.stat.umn.edu/geyer/s19/5101/slides/s5.pdf),
-   University of Minnesota, slides 136–140. Conditional means and covariance for a partitioned
-   multivariate normal distribution.
-2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+1. Anderson, T. W. (2003). *An Introduction to Multivariate Statistical Analysis*, 3rd edition.
+   Wiley. Section 2.5: conditional distributions of the multivariate normal.
+2. Mardia, K. V., Kent, J. T., and Bibby, J. M. (1979). *Multivariate Analysis*. Academic Press.
+   Chapter 3: normal distribution theory, including the conditional distribution.
+3. Kupiec, P. H. (1998). Stress testing in a value at risk framework.
+   *Journal of Derivatives*, 6(1), 7–24.
+   [Publisher page](https://jod.pm-research.com/content/6/1/7). The origin of conditional
+   factor stress: fixed factors, free factors completed by the covariance regression.
+4. Kim, J., and Finger, C. C. (2000). A stress test to incorporate correlation breakdown.
+   *Journal of Risk*, 2(3).
+   [Publisher page](https://www.risk.net/journal-risk/2161074/stress-test-incorporate-correlation-breakdown).
+   Conditional covariance of the free factors and a broken-correlation regime, productised as
+   the RiskMetrics predictive stress test.
+5. Breuer, T., Jandačka, M., Rheinberger, K., and Summer, M. (2009). How to find plausible,
+   severe and useful stress scenarios. *International Journal of Central Banking*, 5(3), 205–224.
+   [PDF](https://www.ijcb.org/journal/ijcb09q3a7.pdf). Mahalanobis plausibility of a scenario.
+6. Glasserman, P., Kang, C., and Kang, W. (2015). Stress scenario selection by empirical
+   likelihood. *Quantitative Finance*, 15(1), 25–41.
+   [DOI: 10.1080/14697688.2014.926019](https://doi.org/10.1080/14697688.2014.926019).
+7. Rebonato, R. (2010). *Coherent Stress Testing: A Bayesian Approach to the Analysis of
+   Financial Stress*. Wiley. Causal conditioning as an alternative to covariance regression.
+8. Boyer, B. H., Gibson, M. S., and Loretan, M. (1999). Pitfalls in tests for changes in
+   correlations. Federal Reserve Board, International Finance Discussion Papers 597.
+   [PDF](https://www.federalreserve.gov/pubs/ifdp/1997/597/ifdp597.pdf). Sample correlations
+   conditioned on one variable change without any change in dependence.
+9. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
    Software, MIT licence. The proportional log-component P&L allocation and baseline-exposure
    band are implementation conventions described above. Use
    [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
