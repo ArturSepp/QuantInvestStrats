@@ -8,7 +8,7 @@ myst:
 
 # Instrument portfolios and standard stress reports
 
-*[author / affiliation / date — placeholder]*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-12](https://github.com/ArturSepp/QuantInvestStrats/commit/5adefaa96c58e6fc225335eb10e43412f9c51c51)*
 
 A workflow guide for [qis](https://github.com/ArturSepp/QuantInvestStrats);
 see the [software citation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

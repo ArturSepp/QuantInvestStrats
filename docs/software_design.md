@@ -8,7 +8,7 @@ myst:
 
 # Software design
 
-*[author / affiliation / date — placeholder]*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-08-21](https://github.com/ArturSepp/QuantInvestStrats/commit/10cc0ab622d064908a782dddfce7205e44dea7fc)*
 
 [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats)
 is an analytics and reporting library built around labelled data and explicit conventions.

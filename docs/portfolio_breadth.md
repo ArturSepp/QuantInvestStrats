@@ -8,7 +8,7 @@ myst:
 
 # Portfolio breadth and allocation efficiency
 
-*[author / affiliation / date — placeholder]*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-06](https://github.com/ArturSepp/QuantInvestStrats/commit/1e42e13562707bc34686695c1bf2ad425a4af0e9)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

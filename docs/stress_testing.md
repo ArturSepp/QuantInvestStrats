@@ -8,7 +8,7 @@ myst:
 
 # Factor stress testing: shocks, valuation and prediction bands
 
-*[author / affiliation / date — placeholder]*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-12](https://github.com/ArturSepp/QuantInvestStrats/commit/334d942db051de44b5abecedc1f5a2f1fa167c51)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

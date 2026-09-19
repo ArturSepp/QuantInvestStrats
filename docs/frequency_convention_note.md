@@ -10,7 +10,7 @@ myst:
 
 # Performance statistics and reporting frequency
 
-*[author / affiliation / date — placeholder]*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-06-19](https://github.com/ArturSepp/QuantInvestStrats/commit/a39da9f97a11a25848e1d6ff8bc644f7501d53a8)*
 
 Reporting frequency is the sampling grid used to estimate and label performance
 statistics. This article explains its statistical consequences and the factsheet

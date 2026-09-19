@@ -9,7 +9,7 @@ myst:
 
 # Model-layer attribution: risk-layer, signal-layer, and integration alpha
 
-*[author / affiliation / date — placeholder]*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-08-29](https://github.com/ArturSepp/QuantInvestStrats/commit/e61077f07098e118d1304e0da99aced93bcc9c60)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

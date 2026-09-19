@@ -171,9 +171,12 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
   a definition-led lead, inputs and notation, methodology, a worked example, implementation in
   qis, interpretation and limitations, related reading, and verified references. Utility pages
   use the shorter form defined there.
-- Put `*[author / affiliation / date — placeholder]*` after the title until the author supplies
-  those details. Include ordinary Markdown links to the qis repository and `CITATION.cff` in
-  every human-authored page. Never infer an affiliation or claim an unperformed verification.
+- Use Artur Sepp as the confirmed author, linked to `https://github.com/ArturSepp`, after
+  the title. Label the date `First recorded` and link it to the article's earliest available
+  Git commit, following renames and earlier RST sources. This is a repository-history date,
+  not a verified public posting or review date. Omit unavailable dates and affiliations.
+  Include ordinary Markdown links to the qis repository and `CITATION.cff` in every
+  human-authored page. Do not restore author placeholders or claim unperformed verification.
 - Use `$...$` inline and standalone `$$` display blocks, with blank lines around display math.
   Do not use MyST-only math directives in article prose. Define units, return convention,
   sampling/estimation frequency, annualisation, and timing where they affect the calculation.

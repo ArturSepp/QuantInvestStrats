@@ -8,7 +8,7 @@ myst:
 
 # Reproducibility: what an unstated convention costs
 
-*[author / affiliation / date — placeholder]*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-07-26](https://github.com/ArturSepp/QuantInvestStrats/commit/3633b53d0dd486077aff96f2ca752d23efebb4fe)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

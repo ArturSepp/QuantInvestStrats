@@ -7,6 +7,7 @@ link checker, or numerical validator; those checks remain separate.
 """
 
 import argparse
+from datetime import date
 import re
 from pathlib import Path
 from typing import NamedTuple, Optional, Sequence
@@ -15,7 +16,6 @@ from typing import NamedTuple, Optional, Sequence
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_URL = 'https://github.com/ArturSepp/QuantInvestStrats'
 CITATION_URL = f'{PROJECT_URL}/blob/main/CITATION.cff'
-PLACEHOLDER = '*[author / affiliation / date — placeholder]*'
 ARTICLE_HEADINGS = (
     'Overview',
     'Inputs, notation, and assumptions',
@@ -56,7 +56,11 @@ ADOPTED_PAGES = frozenset({
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
 LINK = re.compile(r'(?<!!)\[[^\]\n]+\]\((https://[^\s)]+)\)')
-BYLINE = re.compile(r'^\*Author: .+ / Affiliation: .+ / Date: \d{4}-\d{2}-\d{2}\*$')
+BYLINE = re.compile(
+    r'^\*Author: \[[^\]\n]+\]\(https://github\.com/[A-Za-z0-9-]+\)'
+    r'(?: / First recorded: \[(?P<date>\d{4}-\d{2}-\d{2})\]'
+    rf'\({re.escape(PROJECT_URL)}/commit/[0-9a-f]{{40}}\))?\*$'
+)
 
 
 class Issue(NamedTuple):
@@ -157,6 +161,19 @@ def prose_lines(text: str) -> tuple[list[tuple[int, str]], list[Issue], str]:
     return visible, issues, metadata
 
 
+def valid_byline(line: str) -> bool:
+    """Check linked attribution and an optional, calendar-valid repository-evidence date."""
+    match = BYLINE.fullmatch(line)
+    if match is None:
+        return False
+    if match['date'] is not None:
+        try:
+            date.fromisoformat(match['date'])
+        except ValueError:
+            return False
+    return True
+
+
 def check_document(text: str, *, methodology: bool) -> list[Issue]:
     """Check one article's metadata, structure, byline, references, and math source.
 
@@ -189,9 +206,9 @@ def check_document(text: str, *, methodology: bool) -> list[Issue]:
         previous = level
     title_line = titles[0][0] if titles else 0
     opening = [line for number, line in visible if title_line < number <= title_line + 12]
-    if not any(line == PLACEHOLDER or BYLINE.fullmatch(line) for line in opening):
+    if not any(valid_byline(line) for line in opening):
         issues.append(Issue(title_line or 1,
-                            'Put the author/affiliation/date byline after the title.'))
+                            'Use a linked author byline; any date needs a valid commit link.'))
     prose = '\n'.join(line for _, line in visible)
     links = set(LINK.findall(prose))
     if PROJECT_URL not in links and PROJECT_URL + '/' not in links:

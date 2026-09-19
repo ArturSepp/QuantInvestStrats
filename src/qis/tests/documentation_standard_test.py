@@ -14,6 +14,9 @@ if not CHECKER_PATH.is_file():
 CHECKER = runpy.run_path(str(CHECKER_PATH))
 CHECK = CHECKER['check_document']
 PROJECT = 'https://github.com/ArturSepp/QuantInvestStrats'
+AUTHOR_BYLINE = '*Author: [Artur Sepp](https://github.com/ArturSepp)*'
+DATED_BYLINE = (AUTHOR_BYLINE[:-1] + ' / First recorded: [2026-09-06]('
+                + PROJECT + '/commit/' + 'a' * 40 + ')*')
 HEADER = f'''---
 myst:
   html_meta:
@@ -23,7 +26,7 @@ myst:
 
 # An analytical method
 
-*[author / affiliation / date — placeholder]*
+{DATED_BYLINE}
 
 Implemented in [qis]({PROJECT}).
 Software reference: [CITATION.cff]({PROJECT}/blob/main/CITATION.cff).
@@ -74,7 +77,7 @@ def test_complete_article_and_short_utility_page_pass():
 
 
 @pytest.mark.parametrize('before,after,message', [
-    ('*[author / affiliation / date — placeholder]*', '', 'byline'),
+    (DATED_BYLINE, '', 'byline'),
     (f'[qis]({PROJECT})', 'qis', 'project repository'),
     (f'[CITATION.cff]({PROJECT}/blob/main/CITATION.cff)', 'CITATION.cff', 'CITATION.cff'),
     ('    description: >-\n      A reproducible analytical method implemented in qis.',
@@ -159,3 +162,28 @@ def test_cli_distinguishes_pending_pages_from_all_pages(tmp_path, monkeypatch, c
 
 def test_adopted_repository_pages_pass():
     assert CHECKER['main']([]) == 0
+
+
+@pytest.mark.parametrize('byline', [
+    AUTHOR_BYLINE,
+    DATED_BYLINE,
+    DATED_BYLINE.replace('2026-09-06', '2024-02-29'),
+])
+def test_linked_author_and_evidenced_date_pass(byline):
+    """Allow confirmed authors without inventing an affiliation or uncommitted date."""
+    assert not CHECK(HEADER.replace(DATED_BYLINE, byline), methodology=False)
+
+
+@pytest.mark.parametrize('byline', [
+    '*[author / affiliation / date — placeholder]*',
+    AUTHOR_BYLINE.replace('[Artur Sepp](https://github.com/ArturSepp)', 'Artur Sepp'),
+    AUTHOR_BYLINE.replace('https://github.com/', 'https://example.com/'),
+    DATED_BYLINE.replace('2026-09-06', '2026-02-30'),
+    DATED_BYLINE.replace('a' * 40, 'abcdef'),
+    DATED_BYLINE.replace(PROJECT + '/commit/', PROJECT + '/tree/'),
+    DATED_BYLINE.replace(PROJECT + '/commit/', 'https://example.com/commit/'),
+])
+def test_invalid_author_metadata_is_rejected(byline):
+    """Reject placeholders, broken attribution and dates without a valid evidence link."""
+    issues = CHECK(HEADER.replace(DATED_BYLINE, byline), methodology=False)
+    assert any('byline' in issue.message for issue in issues)
