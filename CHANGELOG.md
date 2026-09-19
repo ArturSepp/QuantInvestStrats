@@ -5,13 +5,6 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Fixed
-
-- Continue geometric NumPy NAV paths after interior missing returns, matching the established
-  pandas gap-filling policy while preserving leading and trailing missing regions.
-
 ## [5.30.2] - 2026-09-14
 
 ### Added
@@ -176,6 +169,9 @@ batch and also shifts later sample columns.
   landing pages with the canonical package identity and Read the Docs documentation.
 
 ### Fixed
+
+- Continue geometric NumPy NAV paths after interior missing returns, matching the established
+  pandas gap-filling policy while preserving leading and trailing missing regions.
 
 - Align NAV-normalized portfolio costs by row label, and reject missing, extra, or duplicate NAV
   and cost-report labels instead of pairing values positionally.

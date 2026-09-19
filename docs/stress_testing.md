@@ -149,7 +149,7 @@ The conditional mean and covariance of a partitioned multivariate normal are tex
 for example Anderson (2003, Section 2.5) and Mardia, Kent and Bibby (1979, Chapter 3).
 Their use for stress testing, fixing a subset of risk factors and completing the rest through
 the covariance regression, is due to
-[Kupiec (1998)](https://jod.pm-research.com/content/6/1/7).
+[Kupiec (1998)](https://doi.org/10.3905/jod.1998.408008).
 [Kim and Finger (2000)](https://www.risk.net/journal-risk/2161074/stress-test-incorporate-correlation-breakdown)
 added the conditional covariance of the free factors and a broken-correlation regime for it,
 and RiskMetrics productised the construction as the predictive stress test. qis implements the
@@ -558,7 +558,7 @@ _included/stress_testing
    Chapter 3: normal distribution theory, including the conditional distribution.
 3. Kupiec, P. H. (1998). Stress testing in a value at risk framework.
    *Journal of Derivatives*, 6(1), 7–24.
-   [Publisher page](https://jod.pm-research.com/content/6/1/7). The origin of conditional
+   [Publisher page](https://doi.org/10.3905/jod.1998.408008). The origin of conditional
    factor stress: fixed factors, free factors completed by the covariance regression.
 4. Kim, J., and Finger, C. C. (2000). A stress test to incorporate correlation breakdown.
    *Journal of Risk*, 2(3).

@@ -843,7 +843,7 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
         freq: Resampling frequency
         constant_trade_level: If True, use arithmetic cumsum; if False, use geometric compounding
         ffill_between_nans: Forward-fill NAV between NaN returns while preserving leading and
-            trailing missing regions, including for NumPy inputs
+            trailing missing regions, including for geometric NumPy inputs
         is_log_returns: If True, convert from log returns
 
     Returns:

@@ -149,7 +149,7 @@ $$
 
 An explicit zero is an anchor; an omitted factor is free. QIS performs one joint solve,
 not a sum of separately conditioned scenarios. The construction is the conditional factor
-stress of [Kupiec (1998)](https://jod.pm-research.com/content/6/1/7). The conditional
+stress of [Kupiec (1998)](https://doi.org/10.3905/jod.1998.408008). The conditional
 Gaussian mean is a textbook result (Anderson, 2003, Section 2.5).
 The [factor stress-testing guide](stress_testing.md) documents validation and shock conventions.
 
@@ -396,7 +396,7 @@ Ordinary source link:
    [DOI: 10.1086/260062](https://doi.org/10.1086/260062).
 2. Kupiec, P. H. (1998). Stress testing in a value at risk framework.
    *Journal of Derivatives*, 6(1), 7-24.
-   [Publisher page](https://jod.pm-research.com/content/6/1/7).
+   [DOI: 10.3905/jod.1998.408008](https://doi.org/10.3905/jod.1998.408008).
 3. Anderson, T. W. (2003). *An Introduction to Multivariate Statistical Analysis*, 3rd edition.
    Wiley. Section 2.5: conditional distributions of the multivariate normal.
 4. Sepp, A. [VanillaOptionPricers](https://github.com/ArturSepp/VanillaOptionPricers),
