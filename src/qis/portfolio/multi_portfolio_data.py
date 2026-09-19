@@ -120,7 +120,7 @@ class MultiPortfolioData:
         self.navs = pd.concat(navs, axis=1, sort=True)
 
         if freq is not None:
-            self.navs = self.navs.asfreq(freq=freq, method='ffill')
+            self.navs = qis.df_asfreq(df=self.navs, freq=freq)
 
         if self.benchmark_prices is not None:
             self.benchmark_prices = self.benchmark_prices.reindex(index=self.navs.index, method='ffill')

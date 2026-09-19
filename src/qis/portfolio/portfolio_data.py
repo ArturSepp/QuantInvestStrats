@@ -289,7 +289,7 @@ class PortfolioData:
         else:
             nav_ = self.nav.copy()
         if freq is not None:
-            nav_ = nav_.asfreq(freq=freq, method='ffill')
+            nav_ = qis.df_asfreq(df=nav_, freq=freq)
         if ticker is not None:
             nav_ = nav_.rename(ticker)
         return nav_

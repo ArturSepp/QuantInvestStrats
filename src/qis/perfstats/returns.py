@@ -881,9 +881,9 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
         initial_value_first = dfo.get_first_nonnan_values(df=strategy_nav)
         strategy_nav = strategy_nav*(init_value / initial_value_first)
 
-    # Resample and forward-fill if needed
+    # Sample NAV levels at completed calendar boundaries through the shared level convention.
     if freq is not None and isinstance(returns, np.ndarray) is False:
-        strategy_nav = strategy_nav.asfreq(freq, method='ffill').ffill()
+        strategy_nav = dff.df_asfreq(df=strategy_nav, freq=freq)
 
     if ffill_between_nans and isinstance(returns, np.ndarray) is False:
         strategy_nav = df_price_ffill_between_nans(prices=strategy_nav, method='ffill')

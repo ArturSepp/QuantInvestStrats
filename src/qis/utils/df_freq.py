@@ -70,18 +70,22 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     """
     Wrapper to asfreq with closed period.
 
-    Reindexes df onto a date schedule generated at the given freq,
-    with optional inclusion of the original start/end dates.
+    Reindexes df onto completed calendar boundaries generated at the given frequency. The
+    original start or terminal partial-period observation is included only when explicitly
+    requested.
 
     Args:
         df: Input time series. Calendar resampling requires a nonempty object to use a
             ``DatetimeIndex`` without ``NaT``; arbitrary indexes remain valid when ``freq=None``.
         freq: pandas frequency string; None returns df unchanged
         method: fill method passed to pd.DataFrame.reindex()
-        fill_na_method: residual fill applied after reindex (handles leading/trailing NaNs)
+        fill_na_method: Fill applied before and after reindexing when the input frequency differs
+            from ``freq``. This lets an exact-boundary missing value use the latest earlier value.
+            Already-periodic input is returned without changing its missing-value mask.
         inclusive: reserved, currently unused
-        include_start_date: if True, ensures df's first date is in the output index
-        include_end_date: if True, ensures df's last date is in the output index
+        include_start_date: If True, include ``df``'s first observation date.
+        include_end_date: If True, include ``df``'s last observation date, representing a terminal
+            partial period when it is not a regular boundary.
         tz: timezone string passed to date schedule generation
 
     Raises:
@@ -91,7 +95,8 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
             ``NaT``.
 
     Note:
-        Using include_start_date / include_end_date may produce an irregular index.
+        With both inclusion flags false, a history shorter than one complete period returns an
+        empty object with the input schema. Using either flag may produce an irregular index.
         A df whose index is not in chronological order is sorted before resampling.
     """
     if freq is None or df.empty:
@@ -125,6 +130,11 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
         if inferred is not None and inferred == freq:
             return df
 
+    # Fill on the source grid before boundary reindexing. In particular, pandas
+    # reindex(method=...) does not replace a NaN already stored exactly at a requested boundary.
+    # The same-frequency shortcut above deliberately preserves an existing missing-value mask.
+    df = _apply_fill(df, fill_na_method)
+
     freq_index = da.generate_dates_schedule(
         time_period=da.get_time_period(df=df, tz=tz),
         freq=freq,
@@ -133,17 +143,7 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     )
 
     if freq_index.empty:
-        warnings.warn(
-            f"df_asfreq: cannot resample with freq={freq} over "
-            f"[{df.index[0]}, {df.index[-1]}]; falling back to endpoints"
-        )
-        freq_index = pd.DatetimeIndex([df.index[0], df.index[-1]])
-
-    # ensure boundary dates are present when requested
-    if include_start_date and freq_index[0] != df.index[0]:
-        freq_index = freq_index.insert(0, df.index[0])
-    if include_end_date and freq_index[-1] != df.index[-1]:
-        freq_index = freq_index.insert(len(freq_index), df.index[-1])
+        return df.iloc[0:0].copy()
 
     # Pre-fill NaN values in df BEFORE the reindex.
     #
@@ -163,8 +163,6 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     # The post-reindex _apply_fill below stays in place: it handles
     # leading/trailing NaNs introduced by reindex when target dates fall
     # outside the observed range.
-    df = _apply_fill(df, fill_na_method)
-
     freq_index = freq_index.rename(df.index.name)
     freq_data = df.reindex(index=freq_index, method=method)
     freq_data = _apply_fill(freq_data, fill_na_method)
