@@ -138,7 +138,8 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
         benchmark: Benchmark asset name
         perf_params: Performance calculation parameters
         freq: Sampling frequency
-        is_use_benchmark_means: Use benchmark means for normalization
+        is_use_benchmark_means: Replace the benchmark's ordered P.a. regime values with its
+            conditional periodic means
         is_add_ra_perf_table: Include risk-adjusted performance table
         drop_benchmark: Exclude benchmark from final table
         additive_pa_returns_to_pa_total: Adjust regime PA to sum to total
@@ -187,9 +188,9 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
         regime_pa1 = regime_pa
 
     if is_use_benchmark_means and benchmark is not None:
-        # pandas 3.0 CoW: chained assignment regime_pa1.loc[benchmark][regime_pa_columns] = ...
-        # silently no-ops. Use single .loc[row, cols] indexer instead.
-        regime_pa1.loc[benchmark, regime_pa_columns] = regime_avg.loc[benchmark]
+        # Average and P.a. columns share regime order but not display labels. Use one .loc
+        # operation for pandas CoW and assign the already ordered values positionally.
+        regime_pa1.loc[benchmark, regime_pa_columns] = regime_avg.loc[benchmark].to_numpy()
 
     # Compute regime Sharpe ratios
     sharpe_convention = perf_params.sharpe_convention if perf_params is not None \
@@ -328,7 +329,8 @@ class RegimeClassifier(ABC):
             freq: Sampling frequency
             perf_params: Performance parameters; perf_params.sharpe_convention selects the
                 regime-Sharpe convention (PA default, ARITHMETIC/LOG exactly additive)
-            is_use_benchmark_means: Use benchmark means for normalization
+            is_use_benchmark_means: Replace the benchmark's ordered P.a. regime values with its
+                conditional periodic means
             is_add_ra_perf_table: Include risk-adjusted performance
             drop_benchmark: Exclude benchmark from results
             additive_pa_returns_to_pa_total: Adjust regime PA to sum to total

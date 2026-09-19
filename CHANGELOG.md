@@ -170,6 +170,12 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Preserved benchmark conditional means in
+  `compute_regimes_pa_perf_table_from_sampled_returns` and
+  `RegimeClassifier.compute_regimes_pa_perf_table` when `is_use_benchmark_means=True`, instead of
+  replacing their P.a. and default PA-Sharpe regime cells with missing values during label-aligned
+  assignment.
+
 - Continue geometric NumPy NAV paths after interior missing returns, matching the established
   pandas gap-filling policy while preserving leading and trailing missing regions.
 
