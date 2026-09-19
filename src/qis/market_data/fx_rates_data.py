@@ -41,7 +41,6 @@ from typing import Tuple, Union, Optional, Dict, Literal
 
 from qis.market_data.fx_hedging import compute_performance_of_local_ccy_asset_in_reference_ccy
 
-
 @dataclass
 class FxRatesData:
     """
@@ -212,7 +211,8 @@ class FxRatesData:
             reference_ccy: Reference currency of the pair.
             time_period: Optional date filter applied to the daily return before
                 compounding.
-            freq: Optional resampling of the output NAV (``None`` keeps daily).
+            freq: Optional period-end reporting frequency. Each completed period uses its final
+                available NAV; ``None`` keeps daily values.
 
         Returns:
             Series of NAV levels (starting at 1.0), at daily or ``freq`` cadence.
@@ -224,7 +224,7 @@ class FxRatesData:
             total_return = time_period.locate(total_return)
         nav = qis.returns_to_nav(total_return, is_log_returns=False)
         if freq is not None:
-            nav = nav.asfreq(freq).ffill()
+            nav = qis.df_asfreq(df=nav, freq=freq)
         return nav
 
     def get_carry_fx_return_nav(self,
@@ -259,7 +259,8 @@ class FxRatesData:
             reference_ccy: Reference currency of the pair.
             is_normalise_by_spot_vol: Apply the vol-matching adjustment.
             time_period: Optional filter applied before normalisation.
-            freq: Optional resample of the output NAV.
+            freq: Optional period-end reporting frequency. Each completed period uses its final
+                available NAV; ``None`` keeps daily values.
             is_causal: If True, use expanding-window statistics to
                 avoid look-ahead (recommended for backtests).
 
@@ -290,7 +291,7 @@ class FxRatesData:
 
         nav = qis.returns_to_nav(carry_return, is_log_returns=False)
         if freq is not None:
-            nav = nav.asfreq(freq).ffill()
+            nav = qis.df_asfreq(df=nav, freq=freq)
         return nav
 
     def build_local_cash_nav(self,

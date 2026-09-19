@@ -290,11 +290,14 @@ def test_new_panel_frames_match_independent_ewma_references(report_inputs) -> No
     expected_alpha = (
         direct_alpha.iloc[:, 0] * qis.get_annualization_factor('ME')
     ).rename('Ex-post alpha (EWMA 36m, annualised)')
+    expected_alpha.index.name = strategy_nav.index.name
     pd.testing.assert_series_equal(report_alpha, expected_alpha, rtol=1e-12, atol=0.0)
     np.testing.assert_allclose(report_beta.iloc[0], 1.0, rtol=0.0, atol=0.0)
+    expected_beta = direct_beta.iloc[:, 0].rename('Ex-post beta (EWMA 36m)')
+    expected_beta.index.name = strategy_nav.index.name
     pd.testing.assert_series_equal(
         report_beta,
-        direct_beta.iloc[:, 0].rename('Ex-post beta (EWMA 36m)'),
+        expected_beta,
         rtol=1e-12,
         atol=0.0,
     )
