@@ -7,6 +7,7 @@ the NumPy implementation independent from the already-tested pandas branch.
 """
 # packages
 import numpy as np
+import pytest
 from numpy.typing import NDArray
 
 # qis
@@ -48,6 +49,89 @@ def _assert_array_close(actual: object, expected: NDArray[np.float64]) -> None:
         rtol=_TOLERANCE,
         atol=_TOLERANCE,
     )
+
+
+# =============================================================================
+# Geometric compounding and missing histories
+# =============================================================================
+@pytest.mark.parametrize("is_log_returns", [False, True])
+@pytest.mark.parametrize("ffill_between_nans", [False, True])
+def test_numpy_geometric_nav_resumes_after_an_interior_gap(
+    is_log_returns: bool,
+    ffill_between_nans: bool,
+) -> None:
+    """Resume geometric compounding after a missing return without mutating input."""
+    simple_returns = np.array([0.00, 0.10, np.nan, 0.20])
+    returns = np.log1p(simple_returns) if is_log_returns else simple_returns.copy()
+    original_returns = returns.copy()
+    expected_nav = np.array([1.00, 1.10, 1.10 if ffill_between_nans else np.nan, 1.32])
+
+    actual_nav = returns_to_nav(
+        returns=returns,
+        ffill_between_nans=ffill_between_nans,
+        is_log_returns=is_log_returns,
+    )
+
+    _assert_array_close(actual_nav, expected_nav)
+    np.testing.assert_array_equal(returns, original_returns)
+
+
+def test_numpy_geometric_nav_preserves_each_missing_history_boundary() -> None:
+    """Fill only interior gaps while preserving leading, trailing, and empty regions."""
+    returns = np.array(
+        [
+            [0.00, 0.00, np.nan, 0.00, np.nan],
+            [0.10, 0.10, 0.00, 0.10, np.nan],
+            [-0.05, np.nan, 0.20, 0.20, np.nan],
+            [0.02, 0.20, np.nan, np.nan, np.nan],
+            [0.03, -0.10, -0.10, np.nan, np.nan],
+        ]
+    )
+    original_returns = returns.copy()
+    expected_nav = np.array(
+        [
+            [1.000000, 1.000, np.nan, 1.00, np.nan],
+            [1.100000, 1.100, 1.000, 1.10, np.nan],
+            [1.045000, 1.100, 1.200, 1.32, np.nan],
+            [1.065900, 1.320, 1.200, np.nan, np.nan],
+            [1.097877, 1.188, 1.080, np.nan, np.nan],
+        ]
+    )
+
+    actual_nav = returns_to_nav(returns=returns)
+
+    _assert_array_close(actual_nav, expected_nav)
+    np.testing.assert_array_equal(returns, original_returns)
+
+
+def test_numpy_geometric_nav_scales_from_each_first_finite_value_after_gaps() -> None:
+    """Apply per-column initial scaling after independently resumable compounding."""
+    returns = np.array(
+        [
+            [0.00, np.nan],
+            [0.10, 0.20],
+            [np.nan, -0.10],
+            [0.20, 0.00],
+        ]
+    )
+    original_returns = returns.copy()
+    expected_nav = np.array(
+        [
+            [100.0, np.nan],
+            [110.0, 200.0],
+            [np.nan, 180.0],
+            [132.0, 180.0],
+        ]
+    )
+
+    actual_nav = returns_to_nav(
+        returns=returns,
+        init_value=np.array([100.0, 200.0]),
+        ffill_between_nans=False,
+    )
+
+    _assert_array_close(actual_nav, expected_nav)
+    np.testing.assert_array_equal(returns, original_returns)
 
 
 # =============================================================================

@@ -842,7 +842,8 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
             observations remain missing. Takes precedence over init_period
         freq: Resampling frequency
         constant_trade_level: If True, use arithmetic cumsum; if False, use geometric compounding
-        ffill_between_nans: Forward-fill NAV between NaN returns
+        ffill_between_nans: Forward-fill NAV between NaN returns while preserving leading and
+            trailing missing regions, including for NumPy inputs
         is_log_returns: If True, convert from log returns
 
     Returns:
@@ -869,7 +870,16 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
             strategy_nav = returns.cumsum(skipna=True, axis=0).add(1.0)
     else:
         if isinstance(returns, np.ndarray):
-            strategy_nav = np.cumprod(1.0+returns, axis=0)
+            observed_returns = ~np.isnan(returns)
+            # Missing observations contribute no growth; the output mask independently controls
+            # whether an interior gap is displayed or left missing.
+            strategy_nav = np.cumprod(np.where(observed_returns, 1.0 + returns, 1.0), axis=0)
+            if ffill_between_nans:
+                has_prior = np.logical_or.accumulate(observed_returns, axis=0)
+                has_later = np.logical_or.accumulate(observed_returns[::-1], axis=0)[::-1]
+                strategy_nav = np.where(has_prior & has_later, strategy_nav, np.nan)
+            else:
+                strategy_nav = np.where(observed_returns, strategy_nav, np.nan)
         else:
             strategy_nav = returns.add(1.0).cumprod(skipna=True)
 

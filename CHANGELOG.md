@@ -5,6 +5,13 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Continue geometric NumPy NAV paths after interior missing returns, matching the established
+  pandas gap-filling policy while preserving leading and trailing missing regions.
+
 ## [5.30.2] - 2026-09-14
 
 ### Added
