@@ -234,6 +234,36 @@ class PortfolioData:
         if self.ticker is None:
             self.ticker = str(self.nav.name)
 
+    def _get_nav_for_report_index(
+        self,
+        report_index: pd.Index,
+        report_name: str,
+    ) -> pd.Series:
+        """Return NAV aligned to an identical, unique report index.
+
+        Args:
+            report_index: Row labels of the numerator being normalized.
+            report_name: User-facing name used in validation errors.
+
+        Returns:
+            NAV reindexed into the numerator's row order.
+
+        Raises:
+            ValueError: If either index is non-unique or their label sets differ.
+        """
+        if not self.nav.index.is_unique:
+            raise ValueError(f"NAV index must contain unique labels for {report_name}")
+        if not report_index.is_unique:
+            raise ValueError(f"{report_name} report index must contain unique labels")
+
+        if report_index.size != self.nav.index.size or not report_index.isin(
+            self.nav.index
+        ).all():
+            raise ValueError(
+                f"NAV index and {report_name} report index must contain identical labels"
+            )
+        return self.nav.reindex(report_index)
+
     def set_ticker(self, ticker: str) -> PortfolioData:
         self.ticker = ticker
         self.nav = self.nav.rename(ticker)
@@ -586,14 +616,33 @@ class PortfolioData:
                   roll_period: Optional[int] = 260,
                   freq: Optional[str] = None
                   ) -> Union[pd.DataFrame, pd.Series]:
+        """Return realized costs in raw currency or NAV-normalized units.
+
+        Args:
+            is_agg: Aggregate costs across instruments when true.
+            is_grouped: Aggregate instruments using the portfolio's group metadata.
+            time_period: Optional date interval applied after aggregation.
+            add_total: Add a portfolio-total column to non-aggregate results.
+            is_unit_based_traded_volume: Normalize currency costs by NAV when true. Normalized
+                costs require identical unique NAV and cost row labels and align NAV by label.
+            roll_period: Optional trailing observation count used to sum costs.
+            freq: Optional resampling frequency applied before the rolling sum.
+
+        Returns:
+            Cost series or frame retaining the report row labels.
+
+        Raises:
+            ValueError: If normalized costs and NAV do not have identical unique row labels.
+        """
 
         if is_unit_based_traded_volume is None:
             is_unit_based_traded_volume = True
         costs = self.realized_costs
         if is_unit_based_traded_volume:
-            costs = costs.divide(self.nav.to_numpy(), axis=0)
+            nav = self._get_nav_for_report_index(costs.index, "cost")
+            costs = costs.divide(nav, axis=0)
         if is_agg:
-            costs = pd.Series(np.nansum(costs, axis=1), index=self.nav.index, name=self.nav.name)
+            costs = pd.Series(np.nansum(costs, axis=1), index=costs.index, name=self.nav.name)
         elif is_grouped:  # agg by groups
             costs = dfg.agg_df_by_groups_ax1(costs,
                                              group_data=self.group_data,
@@ -612,14 +661,6 @@ class PortfolioData:
         if time_period is not None:
             costs = time_period.locate(costs)
         return costs
-
-    def compute_mcap_participation(self,
-                                   mcap: pd.DataFrame,
-                                   trade_level: float = 100000000
-                                   ) -> pd.DataFrame:
-        exposure = (self.units.multiply(self.prices)).divide(self.nav.to_numpy(), axis=0)
-        participation = trade_level * exposure.divide(mcap)
-        return participation
 
     def compute_volume_participation(self,
                                      volumes: pd.DataFrame,

@@ -170,6 +170,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Align NAV-normalized portfolio costs by row label, and reject missing, extra, or duplicate NAV
+  and cost-report labels instead of pairing values positionally.
+
 - Unified periodic NAV-level sampling in `returns_to_nav`, `PortfolioData`,
   `MultiPortfolioData`, and both `FxRatesData` NAV methods through `df_asfreq`. Completed periods
   now use the latest available level at the boundary, exact-boundary missing values follow the
@@ -490,6 +493,9 @@ batch and also shifts later sample columns.
   `split_to_samples()` for the `TrendFollowingSystems` consumer.
 
 ### Removed
+
+- Removed the unused `PortfolioData.compute_mcap_participation()` method. Market-cap participation
+  had no callers in the public package stack and no maintained reporting path.
 
 - Removed the unused public `TrainLivePeriod` and `TrainLiveSamples` containers and the legacy
   module-level `split_to_train_live_samples()` and `get_data_samples_df()` helpers;
