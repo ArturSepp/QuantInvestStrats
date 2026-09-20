@@ -28,6 +28,7 @@ matplotlib.use('Agg')  # the build host has no display; must precede any qis imp
 DOCS_DIR = Path(__file__).parent
 REPO_ROOT = DOCS_DIR.parent
 sys.path.insert(0, str(REPO_ROOT.joinpath('src')))
+sys.path.insert(0, str(DOCS_DIR.joinpath('_ext')))
 
 project = 'qis'
 author = 'Artur Sepp'
@@ -44,6 +45,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
     'myst_parser',
+    'qis_indexing',
 ]
 
 # the house convention is Google-style; factorlasso uses numpydoc and is documented separately
