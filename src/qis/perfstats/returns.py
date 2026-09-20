@@ -249,12 +249,16 @@ def compute_total_return(prices: Union[pd.DataFrame, pd.Series]) -> Union[np.nda
     """Compute total return from first to last price.
 
     Args:
-        prices: Price time series. Valid uniquely dated histories are interpreted chronologically
+        prices: Numeric price time series. Valid uniquely dated histories are interpreted
+            chronologically, and pandas nullable floating values are supported
 
     Returns:
-        Array of total returns for DataFrame, float for Series
+        Array of total returns for DataFrame, float for Series, using each history's first and
+        last finite prices
     """
     prices = _chronological_prices(prices=prices)
+    # Convert extension scalars locally so endpoint checks receive np.nan rather than pd.NA.
+    prices = prices.astype(float)
     if len(prices.index) == 1:
         if isinstance(prices, pd.DataFrame):
             return np.full(len(prices.columns), fill_value=np.nan)
