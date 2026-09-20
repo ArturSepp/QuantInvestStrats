@@ -198,6 +198,9 @@ batch and also shifts later sample columns.
 - Interpreted valid uniquely dated price histories chronologically throughout total-return,
   elapsed-time, annualized-return, and performance-table endpoint calculations.
 
+- Normalized nullable floating inputs in `compute_total_return` so Series and DataFrame histories
+  use their first and last finite prices without ambiguous `pd.NA` failures.
+
 - Made `find_upto_date_from_datetime_index` select the latest eligible finite timestamp from
   unsorted inputs instead of returning a future, stale, or `NaT` entry.
 
