@@ -1,8 +1,26 @@
 version: 2
 
 updates:
-  - package-ecosystem: github-actions
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: weekly
+      interval: "weekly"
+      day: "monday"
+      time: "03:17"
+      timezone: "Etc/UTC"
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:47"
+      timezone: "Etc/UTC"
+    groups:
+      github-actions:
+        patterns: ["*"]
     open-pull-requests-limit: 5
