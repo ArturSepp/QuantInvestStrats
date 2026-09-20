@@ -5,6 +5,14 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Make `df_to_weight_allocation_sum1` reject signed Series and DataFrame rows whose
+  numerically zero net sum makes finite sum-to-one normalization impossible, while
+  preserving the established zero allocation for zero-gross rows.
+
 ## [5.30.2] - 2026-09-14
 
 ### Added

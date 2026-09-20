@@ -208,13 +208,53 @@ def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd
             the resulting weight is zero
 
     Returns:
-        weights in the same shape, each row summing to one
+        weights in the same shape, each row summing to one, or to zero when the input row has no
+            gross exposure
+
+    Raises:
+        ValueError: if signed values have positive gross exposure but a net sum numerically equal
+            to zero, because no finite proportional sum-to-one normalization exists
     """
     if isinstance(df, pd.Series):
-        weights = df.divide(np.nansum(df.to_numpy(dtype=float), axis=0)).fillna(0.0)
+        values = df.to_numpy(dtype=float, na_value=np.nan)
+        net_sum = float(np.nansum(values))
+        gross_sum = float(np.nansum(np.abs(values)))
+        # Compare net with gross exposure so the cancellation tolerance is scale independent.
+        is_cancelling = (
+            gross_sum > 0.0
+            and np.isfinite(net_sum)
+            and np.isfinite(gross_sum)
+            and np.isclose(net_sum / gross_sum, 0.0)
+        )
+        if is_cancelling:
+            raise ValueError(
+                "signed values have positive gross exposure but a net sum close to zero; "
+                "sum-to-one normalization is undefined"
+            )
+        weights = df.divide(net_sum).fillna(0.0)
     else:
-        row_sums = np.nansum(df.to_numpy(dtype=float), axis=1, keepdims=True)
-        weights = df.divide(row_sums).fillna(0.0)
+        values = df.to_numpy(dtype=float, na_value=np.nan)
+        net_sums = np.nansum(values, axis=1, keepdims=True)
+        gross_sums = np.nansum(np.abs(values), axis=1, keepdims=True)
+        has_finite_gross = (
+            (gross_sums > 0.0) & np.isfinite(net_sums) & np.isfinite(gross_sums)
+        )
+        relative_net_sums = np.divide(
+            net_sums,
+            gross_sums,
+            out=np.ones_like(net_sums),
+            where=has_finite_gross,
+        )
+        is_cancelling = np.logical_and(
+            has_finite_gross, np.isclose(relative_net_sums, 0.0)
+        )
+        if np.any(is_cancelling):
+            row = df.index[np.flatnonzero(is_cancelling[:, 0])[0]]
+            raise ValueError(
+                f"row {row!r} has positive gross exposure but a net sum close to zero; "
+                "sum-to-one normalization is undefined"
+            )
+        weights = df.divide(net_sums).fillna(0.0)
     return weights
 
 
