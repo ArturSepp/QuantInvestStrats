@@ -50,6 +50,20 @@ def test_df_to_weight_allocation_sum1_preserves_defined_signed_series() -> None:
     pd.testing.assert_series_equal(scores, original, check_exact=True)
 
 
+def test_df_to_weight_allocation_sum1_preserves_nullable_zero_gross_series() -> None:
+    """Return zeros without relying on nullable 0/0 fill behavior."""
+    scores = pd.Series([0.0, 0.0], index=["first", "second"], dtype="Float64", name="scores")
+    original = scores.copy(deep=True)
+    expected = scores.copy(deep=True)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        actual = qis.df_to_weight_allocation_sum1(scores)
+
+    pd.testing.assert_series_equal(actual, expected, check_exact=True)
+    pd.testing.assert_series_equal(scores, original, check_exact=True)
+
+
 def test_df_to_weight_allocation_sum1_rejects_cancelling_dataframe_row() -> None:
     """Validate every row before division and identify the cancelling labeled row."""
     scores = pd.DataFrame(

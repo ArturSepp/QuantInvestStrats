@@ -231,7 +231,9 @@ def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd
                 "signed values have positive gross exposure but a net sum close to zero; "
                 "sum-to-one normalization is undefined"
             )
-        weights = df.divide(net_sum).fillna(0.0)
+        # Avoid 0/0 because older supported pandas versions retain that NaN in nullable arrays.
+        normalization_sum = net_sum if gross_sum > 0.0 else 1.0
+        weights = df.divide(normalization_sum).fillna(0.0)
     else:
         values = df.to_numpy(dtype=float, na_value=np.nan)
         net_sums = np.nansum(values, axis=1, keepdims=True)
@@ -254,7 +256,8 @@ def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd
                 f"row {row!r} has positive gross exposure but a net sum close to zero; "
                 "sum-to-one normalization is undefined"
             )
-        weights = df.divide(net_sums).fillna(0.0)
+        normalization_sums = np.where(gross_sums > 0.0, net_sums, 1.0)
+        weights = df.divide(normalization_sums).fillna(0.0)
     return weights
 
 
