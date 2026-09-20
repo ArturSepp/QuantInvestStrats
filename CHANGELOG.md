@@ -170,6 +170,9 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Return direct arithmetic P&L from `compute_futures_fx_adjusted_returns` in simple mode, preserving
+  valid futures losses at or below -100% instead of converting them through an undefined logarithm.
+
 - Preserved benchmark conditional means in
   `compute_regimes_pa_perf_table_from_sampled_returns` and
   `RegimeClassifier.compute_regimes_pa_perf_table` when `is_use_benchmark_means=True`, instead of

@@ -354,13 +354,14 @@ def compute_futures_fx_adjusted_returns(prices: pd.DataFrame,
         is_log_returns: return log returns rather than arithmetic ones
 
     Returns:
-        quote-currency returns in the shape of ``prices``
+        Quote-currency returns in the shape of ``prices``. Simple futures P&L is returned
+        directly and may be at or below -100%; log output requires a positive gross payoff.
     """
     price_return = prices / prices.shift(periods=periods) - 1.0
     fx_return = fx_spots / fx_spots.shift(periods=periods) - 1.0
-    returns = np.log(1.0 + price_return + price_return * fx_return)
-    if not is_log_returns:
-        returns = np.expm1(returns)
+    returns = price_return * (1.0 + fx_return)
+    if is_log_returns:
+        returns = np.log(1.0 + returns)
     return returns
 
 
