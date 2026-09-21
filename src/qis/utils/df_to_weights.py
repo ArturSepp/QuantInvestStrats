@@ -215,16 +215,17 @@ def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd
         ValueError: if signed values have positive gross exposure but a net sum numerically equal
             to zero, because no finite proportional sum-to-one normalization exists
     """
+    cancellation_atol = 100.0 * np.finfo(float).eps
     if isinstance(df, pd.Series):
         values = df.to_numpy(dtype=float, na_value=np.nan)
         net_sum = float(np.nansum(values))
         gross_sum = float(np.nansum(np.abs(values)))
-        # Compare net with gross exposure so the cancellation tolerance is scale independent.
+        # Apply a machine-scale tolerance to the dimensionless net-to-gross exposure ratio.
         is_cancelling = (
             gross_sum > 0.0
             and np.isfinite(net_sum)
             and np.isfinite(gross_sum)
-            and np.isclose(net_sum / gross_sum, 0.0)
+            and np.isclose(net_sum / gross_sum, 0.0, rtol=0.0, atol=cancellation_atol)
         )
         if is_cancelling:
             raise ValueError(
@@ -248,7 +249,8 @@ def df_to_weight_allocation_sum1(df: Union[pd.Series, pd.DataFrame]) -> Union[pd
             where=has_finite_gross,
         )
         is_cancelling = np.logical_and(
-            has_finite_gross, np.isclose(relative_net_sums, 0.0)
+            has_finite_gross,
+            np.isclose(relative_net_sums, 0.0, rtol=0.0, atol=cancellation_atol),
         )
         if np.any(is_cancelling):
             row = df.index[np.flatnonzero(is_cancelling[:, 0])[0]]

@@ -50,6 +50,24 @@ def test_df_to_weight_allocation_sum1_preserves_defined_signed_series() -> None:
     pd.testing.assert_series_equal(scores, original, check_exact=True)
 
 
+def test_df_to_weight_allocation_sum1_preserves_nonzero_near_cancelling_series() -> None:
+    """Accept finite proportional weights when the relative net exposure is nonzero."""
+    scores = pd.Series([1.0, -0.99999999], index=["long", "short"], name="scores")
+    original = scores.copy(deep=True)
+    # Exact decimal arithmetic gives a 1e-8 net exposure and these proportional weights.
+    expected = pd.Series([100_000_000.0, -99_999_999.0], index=scores.index, name="scores")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        actual = qis.df_to_weight_allocation_sum1(scores)
+
+    pd.testing.assert_series_equal(actual, expected, rtol=1.0e-8, atol=0.0)
+    assert np.isfinite(actual.to_numpy()).all()
+    assert actual.sum() == 1.0
+    assert actual["short"] / actual["long"] == scores["short"] / scores["long"]
+    pd.testing.assert_series_equal(scores, original, check_exact=True)
+
+
 def test_df_to_weight_allocation_sum1_preserves_nullable_zero_gross_series() -> None:
     """Return zeros without relying on nullable 0/0 fill behavior."""
     scores = pd.Series([0.0, 0.0], index=["first", "second"], dtype="Float64", name="scores")
@@ -86,14 +104,26 @@ def test_df_to_weight_allocation_sum1_rejects_cancelling_dataframe_row() -> None
 def test_df_to_weight_allocation_sum1_preserves_defined_rows() -> None:
     """Keep valid signed proportions and the established zero-gross result."""
     index = pd.Index(
-        ["positive", "signed", "negative-net", "small-positive", "zero", "missing"],
+        [
+            "positive",
+            "signed",
+            "negative-net",
+            "near-cancelling",
+            "small-positive",
+            "zero",
+            "missing",
+        ],
         name="case",
     )
     scores = pd.DataFrame(
         {
-            "first": pd.Series([2.0, 1.0, 1.0, 1.0e-20, 0.0, pd.NA], index=index, dtype="Float64"),
+            "first": pd.Series(
+                [2.0, 1.0, 1.0, 1.0, 1.0e-20, 0.0, pd.NA], index=index, dtype="Float64"
+            ),
             "second": pd.Series(
-                [1.0, -0.5, -2.0, 2.0e-20, 0.0, pd.NA], index=index, dtype="Float64"
+                [1.0, -0.5, -2.0, -0.99999999, 2.0e-20, 0.0, pd.NA],
+                index=index,
+                dtype="Float64",
             ),
         },
         index=index,
@@ -102,10 +132,14 @@ def test_df_to_weight_allocation_sum1_preserves_defined_rows() -> None:
     expected = pd.DataFrame(
         {
             "first": pd.Series(
-                [2.0 / 3.0, 2.0, -1.0, 1.0 / 3.0, 0.0, 0.0], index=index, dtype="Float64"
+                [2.0 / 3.0, 2.0, -1.0, 100_000_000.0, 1.0 / 3.0, 0.0, 0.0],
+                index=index,
+                dtype="Float64",
             ),
             "second": pd.Series(
-                [1.0 / 3.0, -1.0, 2.0, 2.0 / 3.0, 0.0, 0.0], index=index, dtype="Float64"
+                [1.0 / 3.0, -1.0, 2.0, -99_999_999.0, 2.0 / 3.0, 0.0, 0.0],
+                index=index,
+                dtype="Float64",
             ),
         },
         index=index,
@@ -115,11 +149,17 @@ def test_df_to_weight_allocation_sum1_preserves_defined_rows() -> None:
         warnings.simplefilter("error")
         actual = qis.df_to_weight_allocation_sum1(scores)
 
-    pd.testing.assert_frame_equal(actual, expected, rtol=0.0, atol=1.0e-15)
+    pd.testing.assert_frame_equal(actual, expected, rtol=1.0e-8, atol=1.0e-15)
     np.testing.assert_allclose(
-        actual.loc[["positive", "signed", "negative-net", "small-positive"]].sum(axis=1),
-        np.ones(4),
+        actual.loc[["positive", "signed", "negative-net", "near-cancelling", "small-positive"]].sum(
+            axis=1
+        ),
+        np.ones(5),
         rtol=0.0,
         atol=1.0e-15,
+    )
+    assert (
+        actual.loc["near-cancelling", "second"] / actual.loc["near-cancelling", "first"]
+        == scores.loc["near-cancelling", "second"] / scores.loc["near-cancelling", "first"]
     )
     pd.testing.assert_frame_equal(scores, original, check_exact=True)
