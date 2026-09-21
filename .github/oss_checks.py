@@ -37,7 +37,9 @@ def run(args, cwd, *, capture=False, env=None):
     )
     if result.returncode:
         details = result.stderr.decode("utf-8", "replace") if capture else ""
-        raise CheckFailure(f"Command failed ({result.returncode}): {' '.join(map(str, args))}\n{details}")
+        raise CheckFailure(
+            f"Command failed ({result.returncode}): {' '.join(map(str, args))}\n{details}"
+        )
     return result.stdout if capture else b""
 
 
@@ -104,7 +106,7 @@ def export(root, items, destination):
         start = end + 1
         target = destination.joinpath(*safe_path(name).parts)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(result.stdout[start:start + length])
+        target.write_bytes(result.stdout[start : start + length])
         if os.name != "nt" and mode == "100755":
             target.chmod(0o755)
         offset = start + length + 1
@@ -165,16 +167,21 @@ def source_checks(root, changed):
             elif suffix in {".yml", ".yaml", ".cff"}:
                 document = load_yaml(text)
                 if name.startswith(".github/workflows/") and (
-                    not isinstance(document, dict) or not document.get("on") or not document.get("jobs")
+                    not isinstance(document, dict)
+                    or not document.get("on")
+                    or not document.get("jobs")
                 ):
                     raise ValueError("workflow needs nonempty 'on' and 'jobs' mappings")
             elif suffix in {".md", ".rst"}:
                 bad = re.findall(
                     r"https://github\.com/ArturSepp/ArturSepp/blob/main/docs/"
-                    r"documentation_standard\.md#(?!user-content-)([\w-]+)", text
+                    r"documentation_standard\.md#(?!user-content-)([\w-]+)",
+                    text,
                 )
                 if bad:
-                    raise ValueError(f"shared-guide anchors need '#user-content-': {', '.join(bad)}")
+                    raise ValueError(
+                        f"shared-guide anchors need '#user-content-': {', '.join(bad)}"
+                    )
         except (ValueError, SyntaxError, UnicodeError) as exc:
             errors.append(f"{name}: {exc}")
     if errors:
@@ -198,13 +205,20 @@ def metadata_checks(root, changed):
         for block in re.findall(r"@software\{.*?(?=\n\})", readme, re.DOTALL | re.IGNORECASE):
             match = re.search(r"\bversion\s*=\s*[\{\"]([^}\"]+)", block, re.IGNORECASE)
             if match and match[1] != version:
-                raise CheckFailure(f"README.md software citation version {match[1]} must be {version}.")
+                raise CheckFailure(
+                    f"README.md software citation version {match[1]} must be {version}."
+                )
 
 
 def lint(root, changed, lines, config):
     """Run the pinned Ruff, retaining each package's existing lint scope."""
-    paths = [p for p in changed if p.endswith(".py") and (root / p).is_file()
-             and any(fnmatch.fnmatch(p, pattern) for pattern in config["lint_paths"])]
+    paths = [
+        p
+        for p in changed
+        if p.endswith(".py")
+        and (root / p).is_file()
+        and any(fnmatch.fnmatch(p, pattern) for pattern in config["lint_paths"])
+    ]
     if not paths:
         return
     command = [sys.executable, "-m", "ruff", "check", "--output-format", "json"]
@@ -285,7 +299,10 @@ def main():
         print("Remote-only coverage: " + ", ".join(config["remote_only"]))
         print(f"Guide: {GUIDE}")
         return
-    output = args.output_dir or Path(os.environ.get("AGENT_LOCAL_ROOT", tempfile.gettempdir())) / "checks"
+    output = (
+        args.output_dir
+        or Path(os.environ.get("AGENT_LOCAL_ROOT", tempfile.gettempdir())) / "checks"
+    )
     output = output.resolve()
     if output == root or root in output.parents:
         raise CheckFailure("Check output must be outside the source checkout.")
@@ -300,7 +317,9 @@ def main():
             export(root, identities, source)
         config = json.loads((source / PROFILE).read_text(encoding="utf-8"))
         if config["version"] != VERSION:
-            raise CheckFailure("Checker/profile versions differ; rerun the reviewed tooling update.")
+            raise CheckFailure(
+                "Checker/profile versions differ; rerun the reviewed tooling update."
+            )
         if args.profile in {"preflight", "ci"}:
             source_checks(source, changed)
             metadata_checks(source, changed)
@@ -308,32 +327,49 @@ def main():
             if any(p.startswith(".github/workflows/") for p in changed):
                 validator = os.environ.get("OSS_ACTIONLINT")
                 if not validator:
-                    raise CheckFailure("Actionlint is not configured. Run Install-CommitHooks.ps1 -All -SetupTools.")
+                    raise CheckFailure(
+                        "Actionlint is missing. Run Install-CommitHooks.ps1 -All -SetupTools."
+                    )
                 # Explicit files work on source exports without a .git directory.
                 workflows = sorted((source / ".github/workflows").glob("*.y*ml"))
                 run([validator, "-shellcheck=", "-pyflakes=", *workflows], source)
-            if set(changed).intersection({"pyproject.toml", "uv.lock"}) and (source / "uv.lock").exists():
+            if (
+                set(changed).intersection({"pyproject.toml", "uv.lock"})
+                and (source / "uv.lock").exists()
+            ):
                 run([sys.executable, "-m", "uv", "lock", "--check", "--offline"], source)
             for check in config.get("preflight", []):
                 if any(fnmatch.fnmatch(p, pattern) for p in changed for pattern in check["paths"]):
-                    command_profile(source, {"check": [check["command"]]}, "check", args.python, output)
+                    command_profile(
+                        source, {"check": [check["command"]]}, "check", args.python, output
+                    )
         if args.profile in {"docs", "ci"}:
             command_profile(source, config, "docs", args.python, output)
         if args.profile == "ci":
             command_profile(source, config, "tests", args.python, output)
         if not args.working_tree and fingerprint(entries(root, revision)) != digest:
-            raise CheckFailure("Git selection changed during verification; commit again to check the new selection.")
+            raise CheckFailure(
+                "Git selection changed during verification; commit again to check it."
+            )
     if os.environ.get("GITHUB_OUTPUT"):
-        dependency_change = bool(set(changed).intersection({"pyproject.toml", "uv.lock", ".github/workflows/audit.yml"}))
+        dependency_change = bool(
+            set(changed).intersection({"pyproject.toml", "uv.lock", ".github/workflows/audit.yml"})
+        )
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
             handle.write(f"dependencies={str(dependency_change).lower()}\n")
     elapsed = time.monotonic() - started
-    print(f"PASS {args.profile}: {len(changed)} changed paths, tree {digest[:12]}, {elapsed:.1f}s", flush=True)
+    print(
+        f"PASS {args.profile}: {len(changed)} changed paths, tree {digest[:12]}, {elapsed:.1f}s",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":
     try:
         main()
     except (CheckFailure, OSError, KeyError, ValueError) as error:
-        print(f"\nOSS check failed: {error}\nRepair the selected files and retry. Help: {GUIDE}", file=sys.stderr)
+        print(
+            f"\nOSS check failed: {error}\nRepair the selected files and retry. Help: {GUIDE}",
+            file=sys.stderr,
+        )
         sys.exit(1)

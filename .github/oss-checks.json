@@ -4,7 +4,7 @@
   "package": "qis",
   "python_environment": "QuantInvestStrats312",
   "lint_paths": [
-    "src/qis/*.py"
+    "*.py"
   ],
   "preflight": [
     {
