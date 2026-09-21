@@ -55,14 +55,16 @@
     "wheel and sdist",
     "coverage gates",
     "dependency floors and live compatibility",
-    "online link and security health"
+    "online link and security health",
+    "pinned downstream consumer integrations"
   ],
   "lint_changed_lines": true,
   "required_jobs": [
     "preflight",
     "ci",
     "docs",
-    "static"
+    "static",
+    "references"
   ],
   "workflow_inventory": {
     "ci": {
@@ -121,5 +123,43 @@
         "Repo-wide violation count (report only, never fails)"
       ]
     }
-  }
+  },
+  "audit": true,
+  "consumers": [
+    {
+      "repository": "ArturSepp/OptimalPortfolios",
+      "module": "optimalportfolios",
+      "extra": "",
+      "sdk": false,
+      "commit": "28bc6e63d5760ac36b56282a6b49ae190bdc165b"
+    },
+    {
+      "repository": "ArturSepp/StochVolModels",
+      "module": "stochvolmodels",
+      "extra": "research",
+      "sdk": false,
+      "commit": "2d90efba42ed9c8db71c59844208ca7898554686"
+    },
+    {
+      "repository": "ArturSepp/TrendFollowingSystems",
+      "module": "trendfollowing",
+      "extra": "",
+      "sdk": false,
+      "commit": "190dbb8dffdfef6c0d7a8c9db9f7fa0812e3b200"
+    },
+    {
+      "repository": "ArturSepp/privateassets",
+      "module": "privateassets",
+      "extra": "",
+      "sdk": false,
+      "commit": "c03e3eeaf6296709a98c2f88d65afda0d9de3a41"
+    },
+    {
+      "repository": "ArturSepp/OptionChainAnalytics",
+      "module": "option_chain_analytics",
+      "extra": "",
+      "sdk": false,
+      "commit": "d6428227e3d56ac45492747e2ed96d37f6bc9266"
+    }
+  ]
 }

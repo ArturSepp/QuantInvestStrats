@@ -1,0 +1,68 @@
+name: Consumer compatibility
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      consumers: ${{ steps.matrix.outputs.consumers }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - id: matrix
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          consumers = json.loads(Path('.github/oss-checks.json').read_text())['consumers']
+          assert consumers, 'Expected at least one registered consumer'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('consumers=' + json.dumps(consumers) + '\n')
+          PY
+  smoke:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.consumers) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: candidate
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.commit }}
+          path: consumer
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          python-version: "3.12"
+          version: "0.12.13"
+      - name: Use the pinned consumer environment
+        env:
+          EXTRA: ${{ matrix.extra }}
+        run: |
+          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/consumer-env" >> "$GITHUB_ENV"
+          export UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/consumer-env"
+          if [ -n "$EXTRA" ]; then
+            uv sync --project consumer --locked --group test --extra "$EXTRA"
+          else
+            uv sync --project consumer --locked --group test
+          fi
+      - name: Install the terminal-free SDK for the Bloomberg edge
+        if: matrix.sdk
+        run: uv pip install --python "$UV_PROJECT_ENVIRONMENT/bin/python" --index-url https://blpapi.bloomberg.com/repository/releases/python/simple blpapi
+      - name: Install the proposed package over the pinned baseline
+        run: |
+          uv pip install --python "$UV_PROJECT_ENVIRONMENT/bin/python" --reinstall --no-deps ./candidate
+          uv pip check --python "$UV_PROJECT_ENVIRONMENT/bin/python"
+      - name: Import the actual consumer
+        env:
+          IMPORT_NAME: ${{ matrix.module }}
+        run: |
+          cd "$RUNNER_TEMP"
+          "$UV_PROJECT_ENVIRONMENT/bin/python" -c 'import importlib, os; module = importlib.import_module(os.environ["IMPORT_NAME"]); print(module.__file__)'

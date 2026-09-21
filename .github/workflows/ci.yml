@@ -20,8 +20,8 @@ env:
 jobs:
   # The Linux cells cover every supported interpreter.  Windows and macOS run the authoritative
   # 3.12 version to exercise platform paths and plotting backends without multiplying the
-  # eight-to-sixteen-minute suite across a 15-cell Cartesian product.  One Linux cell consumes
-  # uv.lock exactly; the other six resolve current compatible dependencies.
+  # eight-to-sixteen-minute suite across a 15-cell Cartesian product. All change-validation cells use
+  # uv.lock; the scheduled compatibility run resolves current compatible dependencies.
   test:
     name: pytest (core, ${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}

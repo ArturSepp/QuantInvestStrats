@@ -2,6 +2,9 @@
 
 *Author: [Artur Sepp](https://github.com/ArturSepp)*
 
+Project: [qis](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 Create a working branch, select the intended changes, and commit normally. The installed
 hook checks the selected contents. Push the branch, open a pull request, and merge after
 **Required checks** passes. Main is protected; a failing branch does not change main.

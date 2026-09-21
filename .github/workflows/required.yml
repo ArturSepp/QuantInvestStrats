@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       dependencies: ${{ steps.check.outputs.dependencies }}
+      api: ${{ steps.check.outputs.api }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -54,10 +55,37 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.dependencies == 'true'
     uses: ./.github/workflows/audit.yml
+  downstream:
+    needs: preflight
+    if: needs.preflight.outputs.api == 'true'
+    uses: ./.github/workflows/downstream.yml
+  references:
+    name: Introduced documentation references
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Reject confirmed broken new references
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE=$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)
+          fi
+          python .github/check_new_references.py --base "$BASE" --head HEAD --output "$RUNNER_TEMP/reference-health.json"
+      - name: Retain reference-health evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: introduced-reference-health
+          path: ${{ runner.temp }}/reference-health.json
+          if-no-files-found: ignore
   required:
     name: Required checks
     if: always()
-    needs: [preflight, ci, docs, static, audit]
+    needs: [references, downstream, preflight, ci, docs, static, audit]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

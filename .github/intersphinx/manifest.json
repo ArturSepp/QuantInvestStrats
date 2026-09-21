@@ -1,0 +1,33 @@
+{
+  "retrieved_utc": "2026-09-21T09:02:51.314550+00:00",
+  "inventories": {
+    "python": {
+      "source": "https://docs.python.org/3/objects.inv",
+      "sha256": "548d17fc306b22cac531df837e4b4c8b9c72c8312c222fef170aa9be7d1b0bbd",
+      "project": "# Project: Python",
+      "version": "# Version: 3.14",
+      "entries": 19450
+    },
+    "numpy": {
+      "source": "https://numpy.org/doc/stable/objects.inv",
+      "sha256": "d16572c0fac3f941a5eb831f393a18418e90429a7f9e439976f2f01a6b3ee877",
+      "project": "# Project: NumPy",
+      "version": "# Version: 2.5",
+      "entries": 8274
+    },
+    "pandas": {
+      "source": "https://pandas.pydata.org/docs/objects.inv",
+      "sha256": "194ae6ac0b964417c7af69acedb5b3361ac79ccd42e376a4bac74599f91e9be9",
+      "project": "# Project: pandas",
+      "version": "# Version: 3.0.6",
+      "entries": 15968
+    },
+    "matplotlib": {
+      "source": "https://matplotlib.org/stable/objects.inv",
+      "sha256": "1f9b5ee2fcdc39a726003084cdda9f10c7c54c47e01a4ad2ffa57502dec79b82",
+      "project": "# Project: Matplotlib",
+      "version": "# Version: 3.11.2",
+      "entries": 11401
+    }
+  }
+}

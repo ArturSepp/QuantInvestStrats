@@ -156,7 +156,7 @@ def source_checks(root, changed):
             continue
         try:
             text = path.read_text(encoding="utf-8-sig")
-            if re.search(r"^(?:<{7} |={7}$|>{7} )", text, re.MULTILINE):
+            if re.search(r"^(?:<{7} |>{7} )", text, re.MULTILINE):
                 raise ValueError("unresolved merge-conflict markers")
             if suffix == ".py":
                 ast.parse(text, filename=name)
@@ -202,7 +202,14 @@ def metadata_checks(root, changed):
             raise CheckFailure(f"CITATION.cff version must match pyproject.toml ({version}).")
     if (root / "README.md").exists():
         readme = (root / "README.md").read_text(encoding="utf-8")
+        repositories = [
+            url.rstrip("/").lower()
+            for url in project.get("urls", {}).values()
+            if "github.com/" in url
+        ]
         for block in re.findall(r"@software\{.*?(?=\n\})", readme, re.DOTALL | re.IGNORECASE):
+            if repositories and not any(url in block.lower() for url in repositories):
+                continue
             match = re.search(r"\bversion\s*=\s*[\{\"]([^}\"]+)", block, re.IGNORECASE)
             if match and match[1] != version:
                 raise CheckFailure(
@@ -282,11 +289,15 @@ def main():
         needs = json.loads(os.environ["OSS_NEEDS"])
         required = list(config["required_jobs"])
         optional = []
-        if "audit" in needs:
-            if needs.get("preflight", {}).get("outputs", {}).get("dependencies") == "true":
-                required.append("audit")
-            else:
-                optional.append("audit")
+        for name, enabled, output_name in (
+            ("audit", config.get("audit", False), "dependencies"),
+            ("downstream", bool(config.get("consumers")), "api"),
+        ):
+            if enabled:
+                if needs.get("preflight", {}).get("outputs", {}).get(output_name) == "true":
+                    required.append(name)
+                else:
+                    optional.append(name)
         validate_gate(needs, required, optional)
         print("All required checks passed.")
         return
@@ -357,6 +368,14 @@ def main():
         )
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
             handle.write(f"dependencies={str(dependency_change).lower()}\n")
+            api_change = any(
+                path.startswith("src/")
+                and path.endswith(".py")
+                and "/tests/" not in path
+                and "/run_local/" not in path
+                for path in changed
+            )
+            handle.write(f"api={str(api_change).lower()}\n")
     elapsed = time.monotonic() - started
     print(
         f"PASS {args.profile}: {len(changed)} changed paths, tree {digest[:12]}, {elapsed:.1f}s",

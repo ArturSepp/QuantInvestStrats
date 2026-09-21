@@ -12,6 +12,8 @@ Two things are generated at build time rather than checked in:
 """
 
 # packages
+import hashlib
+import json
 import tomllib
 import inspect
 import os
@@ -65,11 +67,19 @@ autodoc_default_options = {'members': True, 'undoc-members': True, 'show-inherit
 myst_enable_extensions = ['colon_fence', 'deflist', 'dollarmath']
 myst_heading_anchors = 3
 
+# Reviewed reference inventories keep strict HTML builds independent of external availability.
+_INVENTORY_DIR = REPO_ROOT / '.github' / 'intersphinx'
+_inventory_manifest = json.loads((_INVENTORY_DIR / 'manifest.json').read_text(encoding='utf-8'))
+for _name, _record in _inventory_manifest['inventories'].items():
+    _inventory = _INVENTORY_DIR / f'{_name}.inv'
+    if hashlib.sha256(_inventory.read_bytes()).hexdigest() != _record['sha256']:
+        raise RuntimeError(f'Reference inventory hash differs from its manifest: {_name}')
+
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    'numpy': ('https://numpy.org/doc/stable/', None),
-    'pandas': ('https://pandas.pydata.org/docs/', None),
-    'matplotlib': ('https://matplotlib.org/stable/', None),
+    'python': ('https://docs.python.org/3', str(_INVENTORY_DIR / 'python.inv')),
+    'numpy': ('https://numpy.org/doc/stable/', str(_INVENTORY_DIR / 'numpy.inv')),
+    'pandas': ('https://pandas.pydata.org/docs/', str(_INVENTORY_DIR / 'pandas.inv')),
+    'matplotlib': ('https://matplotlib.org/stable/', str(_INVENTORY_DIR / 'matplotlib.inv')),
 }
 # SciPy is a runtime dependency, but no public annotation links to its documentation. Omitting its
 # unreliable inventory avoids network-only documentation failures without removing rendered links.

@@ -44,3 +44,4 @@ examples/* linguist-documentation
 *.pickle binary
 *.parquet binary
 .githooks/* text eol=lf
+*.inv -text
