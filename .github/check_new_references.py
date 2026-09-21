@@ -35,11 +35,18 @@ def added_urls(patch):
     for line in patch.splitlines():
         if not line.startswith("+") or line.startswith("+++"):
             continue
-        for candidate in re.findall(r'https?://[^\s<>"\x27]+', line[1:]):
-            # Preserve balanced parentheses inside URLs, removing Markdown's closing wrapper.
-            candidate = candidate.rstrip(".,;]}")
-            while candidate.endswith(")") and candidate.count(")") > candidate.count("("):
-                candidate = candidate[:-1]
+        for candidate in re.findall(r'https?://[^\s<>`"\x27]+', line[1:]):
+            # Stop at the link's closing parenthesis, including when emphasis follows it.
+            depth = 0
+            for index, character in enumerate(candidate):
+                if character == "(":
+                    depth += 1
+                elif character == ")":
+                    if depth == 0:
+                        candidate = candidate[:index]
+                        break
+                    depth -= 1
+            candidate = candidate.rstrip(".,;]}*")
             if (
                 "{" not in candidate
                 and "PACKAGE" not in candidate
