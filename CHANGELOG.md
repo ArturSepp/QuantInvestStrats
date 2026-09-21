@@ -170,6 +170,12 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Normalize covariance matrices through one warning-free kernel when an asset has zero, missing,
+  or round-off-negative variance. EWM estimators and correlation plots now use the same rules:
+  undefined rows remain missing and materially negative variances are rejected. NumPy inputs now
+  honor the documented array return type, PCA rejects undefined unit-variance portfolios, and the
+  Markovian outlier score masks zero variance before division.
+
 - Return direct arithmetic P&L from `compute_futures_fx_adjusted_returns` in simple mode, preserving
   valid futures losses at or below -100% instead of converting them through an undefined logarithm.
 

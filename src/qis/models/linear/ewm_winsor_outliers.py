@@ -315,8 +315,8 @@ def ewm_winsdor_markovian_score(a: np.ndarray,
         current_ewm_ = ewm_lambda * last_ewm + ewm_lambda_1 * a_t
         current_ewm2_ = ewm_lambda * last_ewm2 + ewm_lambda_1 * np.square(a_t-current_ewm_)
 
-        # score_t = np.divide(a_t - last_ewm, np.sqrt(last_ewm2), where=np.greater(last_ewm2, 0.0))
-        score_t = np.where(np.greater(last_ewm2, 0.0), (a_t - last_ewm)/np.sqrt(last_ewm2), np.nan)
+        score_vol = np.sqrt(np.where(np.greater(last_ewm2, 0.0), last_ewm2, np.nan))
+        score_t = (a_t - last_ewm) / score_vol
         is_outlier = np.abs(score_t) >= score_threshold
 
         if is_1d:   # np.where cannot be used

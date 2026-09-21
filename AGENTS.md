@@ -167,19 +167,15 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
 
 ## Methodology and analytics documentation
 
-- Follow [the documentation standard](docs/documentation_standard.md). Methodology articles use
-  a definition-led lead, inputs and notation, methodology, a worked example, implementation in
-  qis, interpretation and limitations, related reading, and verified references. Utility pages
-  use the shorter form defined there.
-- Use Artur Sepp as the confirmed author, linked to `https://github.com/ArturSepp`, after
-  the title. Label the date `First recorded` and link it to the article's earliest available
-  Git commit, following renames and earlier RST sources. This is a repository-history date,
-  not a verified public posting or review date. Omit unavailable dates and affiliations.
-  Include ordinary Markdown links to the qis repository and `CITATION.cff` in every
-  human-authored page. Do not restore author placeholders or claim unperformed verification.
-- Use `$...$` inline and standalone `$$` display blocks, with blank lines around display math.
-  Do not use MyST-only math directives in article prose. Define units, return convention,
-  sampling/estimation frequency, annualisation, and timing where they affect the calculation.
+- Follow the [shared OSS documentation standard](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md)
+  for common article structure, linked Artur Sepp authorship, evidenced First recorded dates,
+  portable Markdown math, citations, and review requirements.
+- Follow [the QIS supplement](docs/documentation_standard.md) for package-specific source
+  ownership, analytical conventions, figure producers, and validation commands. Methodology
+  articles use `Implementation in qis`; utility pages use the shared shorter form.
+- Include ordinary links to the qis repository and `CITATION.cff` in every human-authored page.
+  Define units, return convention, sampling/estimation frequency, annualisation, and timing
+  where they affect the calculation. A source pass does not establish numerical or viewer review.
 - Check revised pages with `python tools/check_docs.py --files docs/<page>.md`. The default
   checks adopted pages and reports pending migration; `--all` requires the entire inventory.
   Run Python tools only after the mandatory C-local setup below. Source checks do not replace

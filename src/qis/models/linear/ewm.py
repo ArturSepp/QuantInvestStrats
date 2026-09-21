@@ -447,12 +447,7 @@ def compute_ewm_covar(a: np.ndarray,
 
         # for covar normalise
         if is_corr:
-            if np.nansum(np.diag(last_covar)) > 1e-10:
-                inv_vol = np.reciprocal(np.sqrt(np.diag(last_covar)))
-                norm = np.outer(inv_vol, inv_vol)
-            else:
-                norm = np.identity(n)
-            covar = norm * last_covar
+            covar, _, _ = npo._covar_to_corr_array(last_covar)
         else:
             covar = last_covar
 
@@ -488,12 +483,7 @@ def compute_ewm_covar_newey_west(a: np.ndarray,
         ewm_nw = ewm0
 
     if is_corr:
-        if np.nansum(np.diag(ewm_nw)) > 1e-10:
-            inv_vol = np.reciprocal(np.sqrt(np.diag(ewm_nw)))
-            norm = np.outer(inv_vol, inv_vol)
-        else:
-            norm = np.identity(a.shape[1])
-        ewm_nw = norm * ewm_nw
+        ewm_nw, _, _ = npo._covar_to_corr_array(ewm_nw)
 
     return ewm_nw
 
@@ -558,12 +548,7 @@ def compute_ewm_covar_tensor(a: np.ndarray,
             last_covar = np.where(np.isfinite(covar), covar, zero_covar)
 
         if is_corr:
-            if np.nansum(np.diag(last_covar)) > 1e-10:
-                inv_vol = np.reciprocal(np.sqrt(np.diag(last_covar)))
-                norm = np.outer(inv_vol, inv_vol)
-            else:
-                norm = np.identity(n)
-            last_covar_ = norm * last_covar
+            last_covar_, _, _ = npo._covar_to_corr_array(last_covar)
         else:
             last_covar_ = last_covar
 
@@ -632,7 +617,8 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
     ewm_vol = np.sqrt(ewm_recursion(a=a_var, ewm_lambda=ewm_lambda,
                                     init_value=npo.nan_func_to_data(a=a_var, func=np.nanmean, axis=0),
                                     nan_backfill=nan_backfill))
-    a_norm = np.divide(a, ewm_vol)
+    safe_ewm_vol = np.where(np.greater(ewm_vol, 0.0), ewm_vol, np.nan)
+    a_norm = a / safe_ewm_vol
 
     # loop over rows
     for idx in range(0, t):  # row in x:
@@ -647,12 +633,7 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
             last_covar = np.where(np.isfinite(covar), covar, zero_covar)
 
         if is_corr:
-            if np.nansum(np.diag(last_covar)) > 1e-10:
-                inv_vol = np.reciprocal(np.sqrt(np.diag(last_covar)))
-                norm = np.outer(inv_vol, inv_vol)
-            else:
-                norm = np.identity(n)
-            last_covar_ = norm * last_covar
+            last_covar_, _, _ = npo._covar_to_corr_array(last_covar)
         else:
             last_covar_ = last_covar
 
@@ -660,7 +641,8 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
             last_covar_ = np.where(np.equal(last_covar_, zero_covar), np.nan, last_covar_)
 
         # normalise to preserve vols for output_covar
-        norm_to_ewm_vols = ewm_vol[idx] / np.sqrt(np.diag(last_covar_))
+        _, normalized_vols, _ = npo._covar_to_corr_array(last_covar_)
+        norm_to_ewm_vols = ewm_vol[idx] / normalized_vols
         output_covar[idx] = last_covar_ * np.outer(norm_to_ewm_vols, norm_to_ewm_vols)
         output_covar_norm[idx] = last_covar_
 

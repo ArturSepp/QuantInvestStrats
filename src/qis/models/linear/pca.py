@@ -16,23 +16,39 @@ w_ij = v_ij / (σ_i sqrt(λ_j)).
 import numpy as np
 import pandas as pd
 import qis.utils.dates as da
+import qis.utils.np_ops as npo
 import qis.models.linear.ewm as ewm
 
 
 def compute_eigen_portfolio_weights(covar: np.ndarray) -> np.ndarray:
     """
-    return weights for pca portolios with unit variance
-    covar = eigen_vectors @ np.diag(eigen_values) @ eigen_vectors.T
-    rows are principal portolio weights ranked
+    Return ranked PCA portfolio weights scaled to unit variance.
+
+    Args:
+        covar: Square covariance matrix with finite, materially positive asset variances.
+
+    Returns:
+        Principal-portfolio weights by row, ranked by descending correlation eigenvalue.
+
+    Raises:
+        ValueError: If an asset variance or correlation eigenvalue cannot support unit-variance
+            scaling.
     """
+    corr = npo.covar_to_corr(covar)
+    if not np.isfinite(corr).all():
+        raise ValueError(
+            "unit-variance eigen-portfolios require finite, positive asset variances"
+        )
     vols = np.sqrt(np.diag(covar))
-    inv_vol = np.reciprocal(vols)
-    norm = np.outer(inv_vol, inv_vol)
-    corr = norm * covar
     eigen_values, eigen_vectors = apply_pca(cmatrix=corr, is_max_sign_positive=True)
-    # eigen_values, eigen_vectors = np.linalg.eigh(corr)
+    eigenvalue_scale = max(1.0, float(np.max(np.abs(eigen_values))))
+    eigenvalue_tolerance = 100.0 * np.finfo(float).eps * eigenvalue_scale
+    if np.any(eigen_values <= eigenvalue_tolerance):
+        raise ValueError(
+            "unit-variance eigen-portfolios require materially positive correlation eigenvalues"
+        )
     scale = np.outer(vols, np.sqrt(eigen_values).T)
-    weights = np.reciprocal(scale) * eigen_vectors
+    weights = eigen_vectors / scale
     return weights.T
 
 

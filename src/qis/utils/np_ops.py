@@ -299,23 +299,71 @@ def to_finite_ratio(x: Union[pd.Series, pd.DataFrame, np.ndarray],
     return x_y
 
 
+@njit
+def _covar_to_corr_array(
+        values: np.ndarray,
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Normalize a square covariance array and return correlation, volatility, validity."""
+    if values.ndim != 2 or values.shape[0] != values.shape[1]:
+        raise ValueError("covariance matrix must be square")
+
+    n = values.shape[0]
+    scale = 0.0
+    for row in range(n):
+        for column in range(n):
+            value = values[row, column]
+            if np.isfinite(value):
+                scale = max(scale, abs(value))
+    tolerance = 100.0 * np.finfo(np.float64).eps * scale
+
+    vols = np.full(n, np.nan)
+    valid_variances = np.zeros(n, dtype=np.bool_)
+    for idx in range(n):
+        variance = values[idx, idx]
+        if np.isfinite(variance):
+            if variance < -tolerance:
+                raise ValueError("covariance diagonal contains materially negative values")
+            if variance > tolerance:
+                vols[idx] = np.sqrt(variance)
+                valid_variances[idx] = True
+
+    corr = np.full_like(values, np.nan)
+    for row in range(n):
+        if valid_variances[row]:
+            for column in range(n):
+                if valid_variances[column] and np.isfinite(values[row, column]):
+                    corr[row, column] = values[row, column] / (vols[row] * vols[column])
+            corr[row, row] = 1.0
+    return corr, vols, valid_variances
+
+
 def covar_to_corr(covar: Union[np.ndarray, pd.DataFrame]) -> Union[np.ndarray, pd.DataFrame]:
     """
     convert a covariance matrix to the corresponding correlation matrix.
 
     Computes ``D^-1 Σ D^-1`` with ``D = diag(sqrt(diag(Σ)))``, so the diagonal becomes one and the
-    off-diagonal entries become correlations.
+    off-diagonal entries become correlations. A zero, non-finite, or round-off-negative variance
+    has no defined correlation, so its row and column are returned as missing without emitting a
+    floating-point warning.
 
     Args:
-        covar: covariance matrix, square and with a positive diagonal
+        covar: Square covariance matrix as an array or labelled DataFrame.
 
     Returns:
-        the correlation matrix, in the same type as the input
+        The correlation matrix in the same container type as the input.
+
+    Raises:
+        ValueError: If the input is not square or contains a materially negative variance.
     """
-    inv_vol = np.reciprocal(np.sqrt(np.diag(covar)))
-    norm = np.outer(inv_vol, inv_vol)
-    covar = covar.multiply(norm)
-    return covar
+    if isinstance(covar, pd.DataFrame):
+        values = covar.to_numpy(dtype=float, na_value=np.nan)
+    else:
+        values = np.asarray(covar, dtype=float)
+    corr, _, _ = _covar_to_corr_array(values)
+
+    if isinstance(covar, pd.DataFrame):
+        return pd.DataFrame(corr, index=covar.index, columns=covar.columns)
+    return corr
 
 
 def np_get_sorted_idx(a: np.ndarray) -> np.ndarray:

@@ -15,125 +15,35 @@ This standard applies to human-authored documentation for
 Use the project's [citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
 when citing the software.
 
-Methodology articles explain an analytical concept before describing its implementation. Write
-in a neutral, definition-led style: identify assumptions, explain the result, and cite the sources
-of substantive methodological claims. Distinguish established methods from qis implementation
-conventions. The author placeholder is deliberate and must remain until those details are supplied.
+This is the QIS supplement to the
+[shared OSS documentation standard](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md).
+The shared guide owns common authoring rules; this page retains QIS-specific examples,
+source ownership, analytics tooling, and verification. General changes belong in the shared
+guide. Existing section headings remain available for incoming links.
 
 ## Article structure
 
-A methodology article has one H1, a visible byline and project/citation links, a short lead, and
-the following H2 sections in order. Use descriptive H3 subsections for individual methods. Existing
-section links can be preserved with named anchors when reorganizing an article.
+Use the shared [article structure](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#article-structure),
+with the H2 `Implementation in qis`. Utility pages use the shared shorter form.
+The QIS checker enforces the eight methodology headings and their order.
 
-| Section | Required content |
-|---|---|
-| Overview | The question the method answers and when it is useful. |
-| Inputs, notation, and assumptions | Symbols, dimensions, units, observation frequency, timing, and data policies. |
-| Methodology | Definitions and equations, followed by their interpretation. |
-| Worked example | Fixed inputs, a small result, and what the result establishes. |
-| Implementation in qis | Public entry points, input/output contract, runnable source, and verification context. |
-| Interpretation and limitations | Assumptions, uncertainty, edge cases, and unsuitable uses. |
-| See also | A small set of relevant methods or guides. |
-| References | Verified method sources and the qis software citation. |
-
-Explain simple versus log returns, annualisation, estimation versus reporting grids, gross versus
-net results, risk-free-rate assumptions, and prior versus current weights wherever relevant.
-A figure or number is not self-explanatory merely because a function name appears beside it.
-
-Installation, navigation, quickstart, gallery, architecture, package comparison, and migration
-history use a **utility form**. They retain one H1, the byline, project/citation links, a useful
-description, and a logical heading hierarchy, but need no empty methodology or equation sections.
-Generated API pages and build-time copies of packaged notes retain their own generating source.
+Explain simple versus log returns, annualisation, estimation versus reporting grids, gross
+versus net results, risk-free-rate assumptions, and prior versus current weights where relevant.
+These are part of the calculation contract, including when a figure illustrates the method.
 
 ## Copyable methodology template
 
-Replace topic placeholders with actual content. Use the confirmed author and repository-date
-format below. Record a tested version only after verifying the actual imported package;
-local metadata, a PyPI release, and an uncommitted checkout can describe different source states.
-
-````markdown
----
-myst:
-  html_meta:
-    description: >-
-      [A factual description of the concept and its qis implementation.]
----
-
-# [Method or analytical concept]
-
-*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [YYYY-MM-DD](https://github.com/ArturSepp/QuantInvestStrats/commit/COMMIT_SHA)*
-
-Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
-
-[Define the concept and its scope in a short lead.]
-
-## Overview
-
-[Purpose and appropriate uses.]
-
-## Inputs, notation, and assumptions
-
-| Symbol or input | Meaning | Units and convention |
-|---|---|---|
-| [symbol] | [definition] | [units, frequency, and timing] |
-
-## Methodology
-
-[Introduce the equations and explain their meaning.]
-
-## Worked example
-
-[Fixed inputs, result, and interpretation; label synthetic data explicitly.]
-
-## Implementation in qis
-
-[Public entry points, ordinary source links, and reproduction instructions.]
-[Record the verified version/source and verification date when available.]
-
-## Interpretation and limitations
-
-[Assumptions, uncertainty, and edge cases.]
-
-## See also
-
-[Related methods and guides.]
-
-## References
-
-- [Verified author, year, title, venue, and DOI or primary-source link.]
-- Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and
-  factsheet reporting in Python.
-  [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
-````
-
-The confirmed author is [Artur Sepp](https://github.com/ArturSepp). Link that name in the
-byline; omit affiliation unless supplied. **First recorded** is the earliest available
-repository commit date for the article, following renames and earlier RST versions where
-applicable. Link the date to that commit, using its full hash. Git history is evidence of
-repository inclusion, not the exact time a page was pushed to GitHub or publicly posted.
-
-Inspect `git log --follow --format="%H %cI" -- docs/<page>.md` and the previous source path.
-Use the earliest entry's committer date, preserving its recorded timezone's calendar date.
-For a Markdown conversion, also check its former RST source so reformatting does not reset
-the article's date. Do not substitute the date of this edit, a release, a file modification,
-or an analytics run. For a new page with no committed history, use
-`*Author: [Artur Sepp](https://github.com/ArturSepp)*` until a repository date is available.
-
-Author date, last substantive review date, data cutoff, and image generation time are separate
-facts. A build must not silently claim that the methodology was reviewed again.
+Copy the [shared methodology template](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#copyable-methodology-template),
+replace `PACKAGE` with `qis` and `REPOSITORY` with `QuantInvestStrats`, and supply the topic.
+Keep the MyST description front matter. Follow the shared
+[authorship and date rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#authorship-and-dates);
+a new uncommitted page uses the linked Artur Sepp byline without a date.
 
 ## Portable equations
 
-The supported targets are GitHub Markdown, the MyST/Sphinx documentation site, and VS Code's
-built-in Markdown preview. They share dollar-delimited math, but do not implement every TeX macro
-identically. Basic CommonMark viewers may show TeX source; provide a rendered-site link when needed.
-See [GitHub math](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions),
-[MyST math](https://myst-parser.readthedocs.io/en/latest/syntax/math.html), and
-[VS Code math preview](https://code.visualstudio.com/docs/languages/markdown#_math-formula-rendering).
+Follow the shared [portable mathematics rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#portable-mathematics).
+The QIS targets are GitHub Markdown, MyST/Sphinx, and VS Code Markdown preview.
 
-Use `$...$` inline and `$$` on separate lines for display math, with blank lines around the block.
 For example, let $p_i$ be an absolute capital share:
 
 $$
@@ -150,32 +60,15 @@ N_{\mathrm{eff}} = \frac{1}{\sum_i p_i^2}.
 $$
 ````
 
-- Keep semantic mathematics out of code spans/fences. Fences are appropriate when showing source,
-  as above. Do not use fenced `{math}` directives or `{math}`/`{eq}` roles in article prose.
-- Place `aligned`, `cases`, or matrices inside a display block. Split long formulas at meaningful
-  equalities. Use a small common vocabulary rather than custom TeX macros.
-- Define symbols before use. Keep one meaning per symbol and use explicit subscripts for timing.
-- Link to the ordinary heading of a derivation; avoid renderer-specific automatic equation labels.
-- Keep complex formulas out of table cells. Use `\lvert`/`\rvert` and `\lVert`/`\rVert` for
-  absolute values and norms where a raw pipe could be parsed as a table separator.
-- Write currency amounts as `USD 100` or `CHF 100` near math. Do not globally unescape paths,
-  URLs, code, or literal TeX examples when repairing a delimiter.
-
 ## References and source ownership
 
-Cite methods at the relevant claim and give full bibliographic entries under References. Verify
-author names, titles, dates, and DOIs against the publisher or another primary source. Use ordinary
-Markdown links so citations work outside Sphinx. A software citation does not replace the source
-of a mathematical method, and a paper citation does not identify the software that produced a chart.
+Apply the shared [reference and example rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#references-and-executable-examples).
+Use QIS's `CITATION.cff` for software metadata. A frozen result also records its actual
+qis version and source commit or content hash.
 
-Use `CITATION.cff` as the software metadata source. A frozen result additionally needs its actual
-qis version and source commit or content hash; a moving `main` link alone cannot reproduce it.
-Do not infer affiliation, publication acceptance, or a version-specific validation from a build.
-
-Keep canonical runnable scripts under their existing example/tool ownership. Provide an ordinary
-source link beside every Sphinx `literalinclude`. Link to a rendered API page or canonical source
-when a generated API file is absent from a checkout. Do not maintain manually copied full scripts.
 Only names in `qis.__all__` are the top-level public API; label internal contributor references.
+Keep canonical scripts under their existing example/tool ownership, with ordinary source links
+beside Sphinx includes. Do not maintain copied full scripts.
 
 Packaged notes under `src/qis/docs/` remain text-only. Their build-time copies are not another
 authoring location. The [Brinson article](brinson_attribution.md) is the explicit exception whose
@@ -221,7 +114,7 @@ python tools/check_docs.py --all
 
 The default validates explicitly adopted pages and names remaining pages as pending. `--files`
 validates the requested revision batch, regardless of adoption status. `--all` is the final full
-migration gate; all 23 current pages have been adopted. Add newly authored pages to the explicit
+migration gate; the current inventory is fully adopted. Add newly authored pages to the explicit
 inventory and adoption set; do not exempt an unknown page by leaving it unlisted.
 
 Run relevant example and documentation tests, plus a strict Sphinx build, from a C-local source

@@ -191,7 +191,10 @@ def plot_corr_matrix_from_covar(covar: pd.DataFrame,
         of diagonal covariance elements. Grid lines are added around each
         cell for better visual separation.
     """
-    corr = npo.covar_to_corr(covar)
+    corr_values, vols, _ = npo._covar_to_corr_array(
+        covar.to_numpy(dtype=float, na_value=np.nan)
+    )
+    corr = pd.DataFrame(corr_values, index=covar.index, columns=covar.columns)
     # add nans to upper diagonal
     mask = np.zeros_like(corr, dtype=bool)
     mask[np.triu_indices_from(mask)] = True
@@ -199,7 +202,6 @@ def plot_corr_matrix_from_covar(covar: pd.DataFrame,
     corr_flt[mask == False] = corr
     # replace diagonal with vol
     mask = np.eye(covar.shape[0], dtype=bool)
-    vols = np.sqrt(np.diag(covar))
     corr_flt[mask] = np.diag(vols)
 
     # Create a custom annotation matrix: empty strings on the diagonal, values off-diagonal
