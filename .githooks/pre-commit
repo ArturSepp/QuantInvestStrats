@@ -1,0 +1,11 @@
+#!/bin/sh
+# GitHub Desktop invokes this through its bundled Git; no activated shell is needed.
+set -eu
+repo=$(git rev-parse --show-toplevel)
+if [ "$(uname -s | cut -c1-5)" = "MINGW" ] || [ "$(uname -s | cut -c1-4)" = "MSYS" ]; then
+    powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$repo/.githooks/Run-Check.ps1" -RepoPath "$repo"
+else
+    echo "OSS hooks require the Windows setup on this checkout. CI still enforces Required checks."
+    echo "Run python .github/oss_checks.py preflight using the pinned tooling on other hosts."
+    exit 1
+fi

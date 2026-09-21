@@ -1,0 +1,68 @@
+name: Required checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: required-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+jobs:
+  preflight:
+    name: Staged-source contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      dependencies: ${{ steps.check.outputs.dependencies }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          python-version: "3.12"
+          version: "0.12.13"
+      - name: Install the checksum-verified workflow validator
+        run: |
+          curl --fail --location --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          echo "OSS_ACTIONLINT=$RUNNER_TEMP/actionlint" >> "$GITHUB_ENV"
+      - name: Prepare the locked package interpreter for package-owned source checks
+        run: uv sync --locked --group test
+      - name: Check selected source and metadata
+        id: check
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE=$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)
+          fi
+          uv run --no-project --with-requirements .github/oss-checks-requirements.txt python .github/oss_checks.py preflight --working-tree --revision HEAD --base "$BASE" --python "$GITHUB_WORKSPACE/.venv/bin/python" --output-dir "$RUNNER_TEMP/oss-checks"
+  ci:
+    uses: ./.github/workflows/ci.yml
+  docs:
+    uses: ./.github/workflows/docs.yml
+  static:
+    uses: ./.github/workflows/static.yml
+  audit:
+    needs: preflight
+    if: needs.preflight.outputs.dependencies == 'true'
+    uses: ./.github/workflows/audit.yml
+  required:
+    name: Required checks
+    if: always()
+    needs: [preflight, ci, docs, static, audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Fail closed unless every applicable component passed
+        env:
+          OSS_NEEDS: ${{ toJSON(needs) }}
+        run: python .github/oss_checks.py gate

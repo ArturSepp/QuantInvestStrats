@@ -1,0 +1,12 @@
+name: External documentation health
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  links:
+    uses: ./.github/workflows/docs.yml
+    with:
+      online: true

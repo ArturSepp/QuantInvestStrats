@@ -1,0 +1,125 @@
+{
+  "version": "1.0.0",
+  "repository": "QuantInvestStrats",
+  "package": "qis",
+  "python_environment": "QuantInvestStrats312",
+  "lint_paths": [
+    "src/qis/*.py"
+  ],
+  "preflight": [
+    {
+      "paths": [
+        "src/qis/__init__.py",
+        "src/qis/api.py"
+      ],
+      "command": [
+        "tools/sync_public_api.py",
+        "--check"
+      ]
+    },
+    {
+      "paths": [
+        "docs/*.md",
+        "tools/check_docs.py",
+        "tools/docs_inventory.json"
+      ],
+      "command": [
+        "tools/check_docs.py"
+      ]
+    }
+  ],
+  "docs": [
+    [
+      "-m",
+      "sphinx",
+      "-E",
+      "-W",
+      "--keep-going",
+      "-b",
+      "html",
+      "docs",
+      "{output}/html"
+    ]
+  ],
+  "tests": [
+    [
+      "-m",
+      "pytest",
+      "-o",
+      "cache_dir={output}/pytest"
+    ]
+  ],
+  "remote_only": [
+    "supported Python/OS matrix",
+    "clean core/extras environments",
+    "wheel and sdist",
+    "coverage gates",
+    "dependency floors and live compatibility",
+    "online link and security health"
+  ],
+  "lint_changed_lines": true,
+  "required_jobs": [
+    "preflight",
+    "ci",
+    "docs",
+    "static"
+  ],
+  "workflow_inventory": {
+    "ci": {
+      "test": [
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "Install uv and Python ${{ matrix.python-version }}",
+        "Sync the core test environment",
+        "Run tests"
+      ],
+      "test-extras": [
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "Install uv and Python",
+        "Sync the locked data and io environment",
+        "Run tests with coverage"
+      ],
+      "wheel": [
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "Install uv and Python",
+        "Build the wheel from the source distribution",
+        "Assert package tests and documentation ship",
+        "Install the wheel into a clean environment",
+        "Run the offline quickstart against the installed wheel",
+        "Run the shipped suite against the installed wheel"
+      ],
+      "stack-policy": [
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4",
+        "Exercise policy regressions",
+        "Check stack imports and optional adapter isolation"
+      ],
+      "lowest-dependencies": [
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4",
+        "Keep the test environment outside the checkout",
+        "Resolve a fresh lowest-direct test environment",
+        "Record installed versions",
+        "Check optional dependencies stay outside package-root import",
+        "Test declared dependency floors without live provider credentials"
+      ]
+    },
+    "docs": {
+      "docs": [
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "Install uv and Python",
+        "Sync documentation environment",
+        "Build HTML with warnings as errors",
+        "Check documentation links"
+      ]
+    },
+    "static": {
+      "lint": [
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "Install uv and Python",
+        "Lint lines changed by this push or pull request",
+        "Check production docstring coverage",
+        "Repo-wide violation count (report only, never fails)"
+      ]
+    }
+  }
+}
