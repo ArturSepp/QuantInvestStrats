@@ -1,5 +1,6 @@
 # SHARED CI CORE v1.0 — T2 — synced 2026-08-22
 name: CI
+run-name: ${{ github.event_name == 'schedule' && 'Dependency compatibility (live resolution)' || 'CI' }}
 
 # Every job only checks out and reads the repository.  Declare the minimum token scope rather
 # than inheriting repository defaults, especially for pull requests that execute changed code.
@@ -7,14 +8,10 @@ permissions:
   contents: read
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  workflow_call:
+  schedule:
+    - cron: "37 3 * * *"
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -23,8 +20,8 @@ env:
 jobs:
   # The Linux cells cover every supported interpreter.  Windows and macOS run the authoritative
   # 3.12 version to exercise platform paths and plotting backends without multiplying the
-  # eight-to-sixteen-minute suite across a 15-cell Cartesian product.  One Linux cell consumes
-  # uv.lock exactly; the other six resolve current compatible dependencies.
+  # eight-to-sixteen-minute suite across a 15-cell Cartesian product. All change-validation cells use
+  # uv.lock; the scheduled compatibility run resolves current compatible dependencies.
   test:
     name: pytest (core, ${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
@@ -60,7 +57,7 @@ jobs:
     - name: Sync the core test environment
       # The primary cell fails if pyproject.toml and uv.lock disagree.  Floating cells upgrade the
       # resolution so compatibility with what a new installer receives remains covered.
-      run: uv sync --group test ${{ matrix.locked && '--locked' || '--upgrade' }}
+      run: uv sync --group test ${{ github.event_name == 'schedule' && '--upgrade' || '--locked' }}
 
     - name: Run tests
       run: uv run --no-sync pytest
@@ -192,6 +189,8 @@ jobs:
         run: python .github/scripts/check_stack_imports.py
 
   lowest-dependencies:
+    # Floor resolution is compatibility maintenance, not a verdict on an unrelated edit.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: lowest direct dependencies (Python 3.10)
     runs-on: ubuntu-latest
     timeout-minutes: 45
