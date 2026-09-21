@@ -23,7 +23,7 @@ guide. Existing section headings remain available for incoming links.
 
 ## Article structure
 
-Use the shared [article structure](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#article-structure),
+Use the shared [article structure](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#user-content-article-structure),
 with the H2 `Implementation in qis`. Utility pages use the shared shorter form.
 The QIS checker enforces the eight methodology headings and their order.
 
@@ -33,15 +33,15 @@ These are part of the calculation contract, including when a figure illustrates 
 
 ## Copyable methodology template
 
-Copy the [shared methodology template](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#copyable-methodology-template),
+Copy the [shared methodology template](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#user-content-copyable-methodology-template),
 replace `PACKAGE` with `qis` and `REPOSITORY` with `QuantInvestStrats`, and supply the topic.
 Keep the MyST description front matter. Follow the shared
-[authorship and date rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#authorship-and-dates);
+[authorship and date rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#user-content-authorship-and-dates);
 a new uncommitted page uses the linked Artur Sepp byline without a date.
 
 ## Portable equations
 
-Follow the shared [portable mathematics rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#portable-mathematics).
+Follow the shared [portable mathematics rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#user-content-portable-mathematics).
 The QIS targets are GitHub Markdown, MyST/Sphinx, and VS Code Markdown preview.
 
 For example, let $p_i$ be an absolute capital share:
@@ -62,7 +62,7 @@ $$
 
 ## References and source ownership
 
-Apply the shared [reference and example rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#references-and-executable-examples).
+Apply the shared [reference and example rules](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#user-content-references-and-executable-examples).
 Use QIS's `CITATION.cff` for software metadata. A frozen result also records its actual
 qis version and source commit or content hash.
 
