@@ -3,6 +3,8 @@ Tests for qis.perfstats.signal_diagnostics — returns-dict API with
 per-asset native-cadence handling.
 """
 # built-in
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,6 +13,8 @@ import pytest
 from qis.perfstats.signal_diagnostics import (
     SignalDiagnosticsColumns,
     SignalDiagnosticsResult,
+    _build_pairs_int_horizon,
+    _build_pairs_string_horizon,
     estimate_signal_diagnostics,
 )
 
@@ -163,6 +167,138 @@ class TestCadenceHandling:
         # 5 QE assets × ~12 sampled dates (10 years × 4 quarters / 3 step ≈ 13)
         # Some lost to rolling window; loose check
         assert 30 < len(q_rows) < 80
+
+
+class TestPairConstruction:
+    """Protect vectorized pair construction and its complete output contract."""
+
+    def test_integer_horizon_avoids_scalar_lookups(self):
+        dates = pd.date_range('2020-01-31', periods=4, freq='ME')
+        returns = pd.DataFrame(
+            {
+                'A': [0.01, 0.02, 0.03, 0.04],
+                'B': [0.05, np.nan, 0.07, 0.08],
+                'C': [0.09, 0.10, 0.11, 0.12],
+            },
+            index=dates,
+        )
+        signal = pd.DataFrame(
+            {
+                'A': [1.0, np.nan, 3.0, 4.0],
+                'B': [10.0, 20.0, 30.0, 40.0],
+                'C': [100.0, 200.0, 300.0, 400.0],
+            },
+            index=dates,
+        )
+        groups = pd.Series({'A': 'first', 'B': 'second', 'C': 'first'})
+
+        # Make the optimization contractual by failing on any per-cell pandas lookup.
+        with patch.object(
+            pd.DataFrame,
+            '_get_value',
+            side_effect=AssertionError('pair construction used a scalar lookup'),
+        ):
+            actual = _build_pairs_int_horizon(
+                asset_returns_dict={'ME': returns},
+                asset_freq={'A': 'ME', 'B': 'ME', 'C': 'ME'},
+                signal_rs_by_freq={'ME': signal},
+                horizon=1,
+                group_data=groups,
+                is_log_returns=True,
+            )
+
+        # Enumerate survivors independently to protect date-major, asset-minor order.
+        expected = pd.DataFrame(
+            {
+                'date': [dates[1], dates[1], dates[2], dates[2], dates[3], dates[3], dates[3]],
+                'asset': ['A', 'C', 'B', 'C', 'A', 'B', 'C'],
+                'asset_freq': ['ME'] * 7,
+                'group': ['first', 'first', 'second', 'first', 'first', 'second', 'first'],
+                'z': [1.0, 100.0, 20.0, 200.0, 3.0, 30.0, 300.0],
+                'r': [0.02, 0.10, 0.07, 0.11, 0.04, 0.08, 0.12],
+            }
+        )
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_numeric_group_labels_preserve_inferred_dtype(self):
+        dates = pd.date_range('2020-01-31', periods=3, freq='ME')
+        returns = pd.DataFrame(
+            {'A': [0.01, 0.02, 0.03], 'B': [0.04, 0.05, 0.06]},
+            index=dates,
+        )
+        signal = pd.DataFrame(
+            {'A': [1.0, 2.0, 3.0], 'B': [4.0, 5.0, 6.0]},
+            index=dates,
+        )
+
+        actual = _build_pairs_int_horizon(
+            asset_returns_dict={'ME': returns},
+            asset_freq={'A': 'ME', 'B': 'ME'},
+            signal_rs_by_freq={'ME': signal},
+            horizon=1,
+            group_data=pd.Series({'A': 10, 'B': 20}),
+            is_log_returns=True,
+        )
+
+        # Construct the complete scalar-path result independently so dtype drift is visible.
+        expected = pd.DataFrame(
+            {
+                'date': [dates[1], dates[1], dates[2], dates[2]],
+                'asset': ['A', 'B', 'A', 'B'],
+                'asset_freq': ['ME'] * 4,
+                'group': [10, 20, 10, 20],
+                'z': [1.0, 4.0, 2.0, 5.0],
+                'r': [0.02, 0.05, 0.03, 0.06],
+            }
+        )
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_string_horizon_avoids_scalar_lookups(self):
+        dates = pd.date_range('2020-01-31', periods=6, freq='ME')
+        returns = pd.DataFrame(
+            {
+                'A': [0.01] * 6,
+                'B': [0.02] * 6,
+                'C': [0.03] * 6,
+            },
+            index=dates,
+        )
+        signal = pd.DataFrame(
+            {
+                'A': [0.0, 0.5, 1.0, 1.5, 2.0, 2.5],
+                'B': [np.nan, np.nan, np.nan, 1.5, 2.0, 2.5],
+                'C': [0.0, 1.5, 3.0, 4.5, 6.0, 7.5],
+            },
+            index=dates,
+        )
+        groups = pd.Series({'A': 'first', 'B': 'second', 'C': 'first'})
+
+        # Make the optimization contractual by failing on any per-cell pandas lookup.
+        with patch.object(
+            pd.DataFrame,
+            '_get_value',
+            side_effect=AssertionError('pair construction used a scalar lookup'),
+        ):
+            actual = _build_pairs_string_horizon(
+                asset_returns_dict={'ME': returns},
+                signal=signal,
+                horizon_freq='QE',
+                group_data=groups,
+                is_log_returns=False,
+            )
+
+        # Derive Q2 returns independently from the three monthly growth factors.
+        expected = pd.DataFrame(
+            {
+                'date': [dates[-1], dates[-1]],
+                'asset': ['A', 'C'],
+                'asset_freq': ['ME', 'ME'],
+                'group': ['first', 'first'],
+                'z': [1.0, 3.0],
+                'r': [(1.01 ** 3) - 1.0, (1.03 ** 3) - 1.0],
+            }
+        )
+        pd.testing.assert_frame_equal(actual, expected)
 
 
 # ───────────────────────────────────────────────────────────────────────────────
