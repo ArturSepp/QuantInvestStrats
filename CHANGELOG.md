@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Add `zero_return_to_nan` to `FxRatesData.compute_fx_adjusted_returns`, defaulting
+  to the existing exact-zero-to-missing behavior. Set it to `False` to retain
+  genuine flat-price returns in covariance and alpha inputs.
+
 ### Fixed
 
 - Make `df_to_weight_allocation_sum1` reject signed Series and DataFrame rows whose

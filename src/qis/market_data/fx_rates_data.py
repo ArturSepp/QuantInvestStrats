@@ -532,7 +532,8 @@ class FxRatesData:
                                         str, Literal['CHF', 'EUR', 'GBP', 'USD']] = 'USD',
                                     freq: Union[str, pd.Series] = 'ME',
                                     is_log_returns: bool = True,
-                                    is_excess_returns: bool = False
+                                    is_excess_returns: bool = False,
+                                    zero_return_to_nan: bool = True
                                     ) -> Dict[str, pd.DataFrame]:
         """Compute per-period returns of a multi-asset panel in a reference ccy.
 
@@ -543,7 +544,7 @@ class FxRatesData:
         covariance estimator and the alpha aggregator in the PM and CMA
         pipelines.
 
-        **Zero-return to NaN substitution** (line ``replace({0.0: np.nan})``):
+        **Zero-return to NaN substitution** (the default):
         step-function PE series (prices constant between quarterly
         appraisal updates) produce zero returns at intra-period dates.
         Downstream β and correlation estimators would otherwise weight
@@ -554,10 +555,9 @@ class FxRatesData:
         sparse observation frequency, which matches the actual
         information arrival pattern.
 
-        Caveat: this is a global exact-zero replacement, so an
-        organically zero return (rare but possible on liquid assets
-        over a single period) will also be converted to NaN. Impact is
-        negligible for rolling estimators with non-trivial window size.
+        This is a global exact-zero replacement, so an organically zero
+        return will also be converted to NaN. Set ``zero_return_to_nan=False``
+        when a zero is a valid observation that must remain in the return panel.
 
         Args:
             prices: Native-ccy price panel (columns are assets).
@@ -571,6 +571,8 @@ class FxRatesData:
                 cash in the selected return convention: simple cash from simple
                 returns, or log1p(cash) from log returns. A principal-only FX hedge
                 leaves local investment gains exposed to terminal FX.
+            zero_return_to_nan: If True (default), treat exact-zero returns as
+                missing observations; if False, retain them as valid returns.
 
         Returns:
             Mapping ``{freq_string: returns_dataframe}``. Single-freq
@@ -588,7 +590,9 @@ class FxRatesData:
                 is_log_returns=is_log_returns,
                 is_excess_returns=is_excess_returns
             )
-            return {freq: fx_adjusted_returns.replace({0.0: np.nan})}
+            if zero_return_to_nan:
+                fx_adjusted_returns = fx_adjusted_returns.replace({0.0: np.nan})
+            return {freq: fx_adjusted_returns}
 
         else:
             # freq is pd.Series with asset-specific frequencies
@@ -608,7 +612,9 @@ class FxRatesData:
                     is_log_returns=is_log_returns,
                     is_excess_returns=is_excess_returns
                 )
-                results[frequency] = fx_adjusted_returns.replace({0.0: np.nan})
+                if zero_return_to_nan:
+                    fx_adjusted_returns = fx_adjusted_returns.replace({0.0: np.nan})
+                results[frequency] = fx_adjusted_returns
             return results
 
     def fetch_local_rates(self,
