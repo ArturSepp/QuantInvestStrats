@@ -5,7 +5,7 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.30.3] - 2026-09-22
 
 ### Added
 
@@ -18,6 +18,48 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Make `df_to_weight_allocation_sum1` reject signed Series and DataFrame rows whose
   numerically zero net sum makes finite sum-to-one normalization impossible, while
   preserving the established zero allocation for zero-gross rows.
+
+- Normalize covariance matrices through one warning-free kernel when an asset has zero, missing,
+  or round-off-negative variance. EWM estimators and correlation plots now use the same rules:
+  undefined rows remain missing and materially negative variances are rejected. NumPy inputs now
+  honor the documented array return type, PCA rejects undefined unit-variance portfolios, and the
+  Markovian outlier score masks zero variance before division.
+
+- Return direct arithmetic P&L from `compute_futures_fx_adjusted_returns` in simple mode, preserving
+  valid futures losses at or below -100% instead of converting them through an undefined logarithm.
+
+- Preserve benchmark conditional means in
+  `compute_regimes_pa_perf_table_from_sampled_returns` and
+  `RegimeClassifier.compute_regimes_pa_perf_table` when `is_use_benchmark_means=True`, instead of
+  replacing their P.a. and default PA-Sharpe regime cells with missing values during label-aligned
+  assignment.
+
+- Continue geometric NumPy NAV paths after interior missing returns, matching the established
+  pandas gap-filling policy while preserving leading and trailing missing regions.
+
+- Align NAV-normalized portfolio costs by row label, and reject missing, extra, or duplicate NAV
+  and cost-report labels instead of pairing values positionally.
+
+- Unify periodic NAV-level sampling in `returns_to_nav`, `PortfolioData`, `MultiPortfolioData`,
+  and both `FxRatesData` NAV methods through `df_asfreq`. Completed periods now use the latest
+  available level at the boundary, exact-boundary missing values follow the requested fill policy,
+  sub-period histories remain empty unless an endpoint is explicitly requested, and already-periodic
+  inputs preserve their existing missing-value masks.
+
+- Align `FxRatesData` spot and domestic-rate panels chronologically so unsorted rows cannot carry
+  future quotes backward and rate updates between spot dates remain available to later FX carry and
+  conversion calculations.
+
+- Interpret valid uniquely dated price histories chronologically throughout total-return,
+  elapsed-time, annualized-return, and performance-table endpoint calculations.
+
+- Normalize nullable floating inputs in `compute_total_return` so Series and DataFrame histories
+  use their first and last finite prices without ambiguous `pd.NA` failures.
+
+### Removed
+
+- Remove the unused `PortfolioData.compute_mcap_participation()` method. Market-cap participation
+  had no callers in the public package stack and no maintained reporting path.
 
 ## [5.30.2] - 2026-09-14
 
@@ -183,43 +225,6 @@ batch and also shifts later sample columns.
   landing pages with the canonical package identity and Read the Docs documentation.
 
 ### Fixed
-
-- Normalize covariance matrices through one warning-free kernel when an asset has zero, missing,
-  or round-off-negative variance. EWM estimators and correlation plots now use the same rules:
-  undefined rows remain missing and materially negative variances are rejected. NumPy inputs now
-  honor the documented array return type, PCA rejects undefined unit-variance portfolios, and the
-  Markovian outlier score masks zero variance before division.
-
-- Return direct arithmetic P&L from `compute_futures_fx_adjusted_returns` in simple mode, preserving
-  valid futures losses at or below -100% instead of converting them through an undefined logarithm.
-
-- Preserved benchmark conditional means in
-  `compute_regimes_pa_perf_table_from_sampled_returns` and
-  `RegimeClassifier.compute_regimes_pa_perf_table` when `is_use_benchmark_means=True`, instead of
-  replacing their P.a. and default PA-Sharpe regime cells with missing values during label-aligned
-  assignment.
-
-- Continue geometric NumPy NAV paths after interior missing returns, matching the established
-  pandas gap-filling policy while preserving leading and trailing missing regions.
-
-- Align NAV-normalized portfolio costs by row label, and reject missing, extra, or duplicate NAV
-  and cost-report labels instead of pairing values positionally.
-
-- Unified periodic NAV-level sampling in `returns_to_nav`, `PortfolioData`,
-  `MultiPortfolioData`, and both `FxRatesData` NAV methods through `df_asfreq`. Completed periods
-  now use the latest available level at the boundary, exact-boundary missing values follow the
-  requested fill policy, sub-period histories remain empty unless an endpoint is explicitly
-  requested, and already-periodic inputs preserve their existing missing-value masks.
-
-- Align `FxRatesData` spot and domestic-rate panels chronologically so unsorted rows cannot carry
-  future quotes backward and rate updates between spot dates remain available to later FX carry and
-  conversion calculations.
-
-- Interpreted valid uniquely dated price histories chronologically throughout total-return,
-  elapsed-time, annualized-return, and performance-table endpoint calculations.
-
-- Normalized nullable floating inputs in `compute_total_return` so Series and DataFrame histories
-  use their first and last finite prices without ambiguous `pd.NA` failures.
 
 - Made `find_upto_date_from_datetime_index` select the latest eligible finite timestamp from
   unsorted inputs instead of returning a future, stale, or `NaT` entry.
@@ -528,9 +533,6 @@ batch and also shifts later sample columns.
   `split_to_samples()` for the `TrendFollowingSystems` consumer.
 
 ### Removed
-
-- Removed the unused `PortfolioData.compute_mcap_participation()` method. Market-cap participation
-  had no callers in the public package stack and no maintained reporting path.
 
 - Removed the unused public `TrainLivePeriod` and `TrainLiveSamples` containers and the legacy
   module-level `split_to_train_live_samples()` and `get_data_samples_df()` helpers;
