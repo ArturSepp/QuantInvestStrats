@@ -32,9 +32,9 @@ def make_app(tmp_path, *, base=BASE, builder='html'):
 
 
 @pytest.mark.parametrize(('base', 'expected_base'), [
-    (BASE, BASE),
-    (BASE.rstrip('/'), BASE),
-    (BASE.replace('/latest/', '/stable/'), BASE),
+    (BASE, BASE.replace('/latest/', '/stable/')),
+    (BASE.rstrip('/'), BASE.replace('/latest/', '/stable/')),
+    (BASE.replace('/latest/', '/stable/'), BASE.replace('/latest/', '/stable/')),
     (BASE.replace('/latest/', '/5.30.0/'), BASE.replace('/latest/', '/5.30.0/')),
 ])
 def test_homepage_canonical_and_sitemap_consolidate_moving_aliases(
@@ -107,7 +107,8 @@ def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
             if tag == 'link' and attrs.get('rel') == 'canonical':
                 self.urls.append(attrs['href'])
 
-    expected = {'index': BASE, 'method': BASE + 'method.html'}
+    stable_base = BASE.replace('/latest/', '/stable/')
+    expected = {'index': stable_base, 'method': stable_base + 'method.html'}
     for name, url in expected.items():
         parser = Canonicals()
         parser.feed((output / f'{name}.html').read_text(encoding='utf-8'))
