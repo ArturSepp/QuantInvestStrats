@@ -106,7 +106,10 @@ def compute_rolling_vols(prices: Union[pd.Series, pd.DataFrame],
                         ) -> Union[pd.Series, pd.DataFrame]:
     log_returns = ret.to_returns(prices=prices, freq=roll_freq, is_log_returns=True, drop_first=False)
     saf = np.sqrt(infer_annualisation_factor_from_df(data=log_returns))
-    vols = saf * log_returns.rolling(roll_periods).apply(lambda x: np.nanstd(x, ddof=1))
+    # Raw windows avoid constructing a labeled Series for every unchanged NumPy reduction.
+    vols = saf * log_returns.rolling(roll_periods).apply(
+        lambda x: np.nanstd(x, ddof=1), raw=True
+    )
     return vols
 
 
@@ -125,15 +128,32 @@ def compute_rolling_sharpes(prices: Union[pd.Series, pd.DataFrame],
                             ) -> Union[pd.Series, pd.DataFrame]:
     log_returns = ret.to_returns(prices=prices, freq=roll_freq, is_log_returns=True, drop_first=False)
     saf = np.sqrt(infer_annualisation_factor_from_df(data=log_returns))
-    sharpes = log_returns.rolling(roll_periods).apply(lambda x: compute_sharpe(x, saf=saf))
+    sharpes = log_returns.rolling(roll_periods).apply(
+        lambda x: _compute_sharpe_from_array(x, saf=saf), raw=True
+    )
     return sharpes
 
 
 def compute_sharpe(log_returns: Union[pd.Series, pd.DataFrame], saf: float = None) -> np.ndarray:
     if saf is None:
         saf = np.sqrt(infer_annualisation_factor_from_df(data=log_returns))
-    mean = np.expm1(np.nanmean(log_returns.to_numpy()))
-    vol = np.nanstd(log_returns.to_numpy(), ddof=1)
+    return _compute_sharpe_from_array(log_returns=log_returns.to_numpy(), saf=saf)
+
+
+def _compute_sharpe_from_array(
+    log_returns: np.ndarray, saf: float
+) -> Union[np.float64, float]:
+    """Compute the established rolling Sharpe formula without rebuilding pandas objects.
+
+    Args:
+        log_returns: One NumPy window of periodic log returns.
+        saf: Square root of the inferred annualisation factor.
+
+    Returns:
+        Annualised rolling Sharpe, or ``nan`` when volatility is not positive.
+    """
+    mean = np.expm1(np.nanmean(log_returns))
+    vol = np.nanstd(log_returns, ddof=1)
     if np.greater(vol, 0.0):
         sharpe = saf * mean / vol
     else:
