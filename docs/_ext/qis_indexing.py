@@ -3,7 +3,8 @@
 Read the Docs serves the default version's sitemap at the domain root. Listing actual
 pages gives crawlers one preferred discovery path instead of just latest/stable roots.
 The moving ``latest`` and ``stable`` aliases describe the same default documentation,
-so both use ``stable`` as their canonical URL. Numbered releases keep their own
+so both use ``latest`` as their canonical URL, matching Read the Docs' root sitemap.
+Numbered releases keep their own
 canonical base URL because their API documentation can differ.
 """
 
@@ -18,14 +19,14 @@ READTHEDOCS_ALIAS_PATHS = {'/en/latest', '/en/stable'}
 
 
 def canonical_baseurl(baseurl: str) -> str:
-    """Consolidate Read the Docs' moving aliases onto the stable URL.
+    """Consolidate Read the Docs' moving aliases onto the latest URL.
 
     Numbered release paths and non-Read-the-Docs deployments remain unchanged.
     """
     parts = urlsplit(baseurl)
     path = parts.path.rstrip('/')
     if parts.netloc.endswith('.readthedocs.io') and path in READTHEDOCS_ALIAS_PATHS:
-        path = '/en/stable'
+        path = '/en/latest'
     return urlunsplit((parts.scheme, parts.netloc, path + '/', parts.query, parts.fragment))
 
 
