@@ -12,7 +12,7 @@ authors:
     orcid: 0000-0002-7038-1748
     affiliation: 1
 affiliations:
-  - name: LGT Bank
+  - name: LGT Bank (Schweiz) AG, Zürich, Switzerland
     index: 1
 date: 28 July 2026
 bibliography: paper.bib
