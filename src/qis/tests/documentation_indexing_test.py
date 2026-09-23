@@ -31,16 +31,21 @@ def make_app(tmp_path, *, base=BASE, builder='html'):
     )
 
 
-@pytest.mark.parametrize('base', [BASE, BASE.rstrip('/'), BASE.replace('/latest/', '/stable/')])
-def test_homepage_canonical_and_sitemap_agree_without_cross_version_redirects(tmp_path, base):
-    """Do not advertise index.html or silently canonicalize release docs to another version."""
+@pytest.mark.parametrize(('base', 'expected_base'), [
+    (BASE, BASE.replace('/latest/', '/stable/')),
+    (BASE.rstrip('/'), BASE.replace('/latest/', '/stable/')),
+    (BASE.replace('/latest/', '/stable/'), BASE.replace('/latest/', '/stable/')),
+    (BASE.replace('/latest/', '/5.30.0/'), BASE.replace('/latest/', '/5.30.0/')),
+])
+def test_homepage_canonical_and_sitemap_consolidate_moving_aliases(
+        tmp_path, base, expected_base):
+    """Use stable for moving aliases while preserving numbered release URLs."""
     app = make_app(tmp_path, base=base)
     context = {'pageurl': base.rstrip('/') + '/index.html'}
     SEO['set_canonical_url'](app, 'index', 'page.html', context, None)
     SEO['write_sitemap'](app, None)
     locations = ElementTree.parse(tmp_path / 'sitemap.xml').findall(
         './/{http://www.sitemaps.org/schemas/sitemap/0.9}loc')
-    expected_base = base.rstrip('/') + '/'
     assert context['pageurl'] == expected_base
     assert {node.text for node in locations} == {
         expected_base, expected_base + 'portfolio_breadth.html',
@@ -102,7 +107,8 @@ def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
             if tag == 'link' and attrs.get('rel') == 'canonical':
                 self.urls.append(attrs['href'])
 
-    expected = {'index': BASE, 'method': BASE + 'method.html'}
+    stable_base = BASE.replace('/latest/', '/stable/')
+    expected = {'index': stable_base, 'method': stable_base + 'method.html'}
     for name, url in expected.items():
         parser = Canonicals()
         parser.feed((output / f'{name}.html').read_text(encoding='utf-8'))

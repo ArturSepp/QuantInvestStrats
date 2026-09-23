@@ -2,17 +2,31 @@
 
 Read the Docs serves the default version's sitemap at the domain root. Listing actual
 pages gives crawlers one preferred discovery path instead of just latest/stable roots.
-Versioned documentation remains available with its own canonical base URL; different
-releases are not redirected to potentially incompatible API documentation.
+The moving ``latest`` and ``stable`` aliases describe the same default documentation,
+so both use ``stable`` as their canonical URL. Numbered releases keep their own
+canonical base URL because their API documentation can differ.
 """
 
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
 
 SITEMAP_NAMESPACE = 'http://www.sitemaps.org/schemas/sitemap/0.9'
+READTHEDOCS_ALIAS_PATHS = {'/en/latest', '/en/stable'}
+
+
+def canonical_baseurl(baseurl: str) -> str:
+    """Consolidate Read the Docs' moving aliases onto the stable URL.
+
+    Numbered release paths and non-Read-the-Docs deployments remain unchanged.
+    """
+    parts = urlsplit(baseurl)
+    path = parts.path.rstrip('/')
+    if parts.netloc.endswith('.readthedocs.io') and path in READTHEDOCS_ALIAS_PATHS:
+        path = '/en/stable'
+    return urlunsplit((parts.scheme, parts.netloc, path + '/', parts.query, parts.fragment))
 
 
 def canonical_url(app: Any, pagename: str) -> str:
@@ -28,7 +42,7 @@ def canonical_url(app: Any, pagename: str) -> str:
     uri = app.builder.get_target_uri(pagename)
     if uri == 'index.html':
         uri = ''
-    return urljoin(app.config.html_baseurl.rstrip('/') + '/', quote(uri, safe='/%'))
+    return urljoin(canonical_baseurl(app.config.html_baseurl), quote(uri, safe='/%'))
 
 
 def set_canonical_url(app: Any, pagename: str, templatename: str,
