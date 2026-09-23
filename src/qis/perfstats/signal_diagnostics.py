@@ -74,6 +74,8 @@ _IC_IR_COLS = [
     'n_dates', 'mean_IC', 'std_IC', 'IC_IR', 'IC_IR_an', 't_stat', 'hit_rate',
 ]
 
+_PAIR_COLUMNS = ['date', 'asset', 'asset_freq', 'group', 'z', 'r']
+
 
 @dataclass
 class SignalDiagnosticsResult:
@@ -205,6 +207,92 @@ def _fit_with_intercept(z: np.ndarray, r: np.ndarray) -> Optional[Dict[str, floa
     }
 
 
+def _pair_frame_from_aligned_values(
+        signal_frame: pd.DataFrame,
+        return_frame: pd.DataFrame,
+        asset_freq: Dict[str, str],
+        group_data: Optional[pd.Series],
+) -> pd.DataFrame:
+    """Stack jointly finite values from identically aligned pair frames.
+
+    Rolling, resampling, and signal-lag rules stay in the two callers. This
+    helper changes only the expensive final projection: ordinary numerical
+    frames are converted to arrays once rather than read through pandas one
+    cell at a time.
+
+    The joint finite mask selects the same signal/return pairs as the former
+    nested loops. Flattening in C order then retains their date-major,
+    asset-minor output order.
+
+    Args:
+        signal_frame: Lagged signal values in regression-date and asset order.
+        return_frame: Forward returns with the same index and columns.
+        asset_freq: Native-frequency lookup by asset.
+        group_data: Optional group-label lookup by asset.
+
+    Returns:
+        Long pair frame retaining date-major, asset-minor input order.
+    """
+    if return_frame.empty or len(return_frame.columns) == 0:
+        return pd.DataFrame(columns=_PAIR_COLUMNS)
+
+    dtypes = [*signal_frame.dtypes, *return_frame.dtypes]
+    if any(isinstance(dtype, pd.api.extensions.ExtensionDtype) for dtype in dtypes):
+        # Nullable scalars have distinct success/error behavior, so keep that established path
+        # rather than letting this performance refactor silently broaden the public contract.
+        rows: List[Dict] = []
+        for date in return_frame.index:
+            for asset in return_frame.columns:
+                z = signal_frame.loc[date, asset]
+                r = return_frame.loc[date, asset]
+                if not (np.isfinite(z) and np.isfinite(r)):
+                    continue
+                rows.append({
+                    'date': date,
+                    'asset': asset,
+                    'asset_freq': asset_freq.get(asset),
+                    'group': group_data.get(asset) if group_data is not None else None,
+                    'z': float(z),
+                    'r': float(r),
+                })
+        return pd.DataFrame(rows, columns=_PAIR_COLUMNS)
+
+    # Convert each aligned frame once; the old nested loop paid pandas indexing cost per pair.
+    signal_values = signal_frame.to_numpy()
+    return_values = return_frame.to_numpy()
+    finite = np.isfinite(signal_values) & np.isfinite(return_values)
+    if not finite.any():
+        return pd.DataFrame(columns=_PAIR_COLUMNS)
+
+    n_dates, n_assets = finite.shape
+    assets = return_frame.columns.to_numpy()
+    # C-order flattening preserves the established date-major, asset-minor row order.
+    selected = finite.ravel()
+    dates = np.repeat(return_frame.index.to_numpy(), n_assets)[selected]
+    asset_values = np.tile(assets, n_dates)[selected]
+    freq_values = np.tile(
+        np.asarray([asset_freq.get(asset) for asset in assets], dtype=object),
+        n_dates,
+    )[selected]
+    if group_data is None:
+        group_values = np.full(int(selected.sum()), None, dtype=object)
+    else:
+        selected_group_values = np.tile(
+            np.asarray([group_data.get(asset) for asset in assets], dtype=object),
+            n_dates,
+        )[selected]
+        # Infer from surviving labels just as the former scalar row construction did.
+        group_values = pd.Series(selected_group_values.tolist())
+    return pd.DataFrame({
+        'date': dates,
+        'asset': asset_values,
+        'asset_freq': freq_values,
+        'group': group_values,
+        'z': signal_values.ravel()[selected].astype(float, copy=False),
+        'r': return_values.ravel()[selected].astype(float, copy=False),
+    })
+
+
 def _build_pairs_int_horizon(
         asset_returns_dict: Dict[str, pd.DataFrame],
         asset_freq: Dict[str, str],
@@ -227,7 +315,7 @@ def _build_pairs_int_horizon(
     Cross-sectional normalisation across the universe happens
     downstream after pooling.
     """
-    rows: List[Dict] = []
+    pair_frames: List[pd.DataFrame] = []
     for freq, returns_df in asset_returns_dict.items():
         if returns_df is None or returns_df.empty:
             continue
@@ -251,19 +339,18 @@ def _build_pairs_int_horizon(
         common = cum_fwd.index.intersection(sig_lag.index)
         # Non-overlapping: every h-th date in this asset's native cadence
         sampled = common[::horizon]
-        for d in sampled:
-            for asset in assets_here:
-                z = sig_lag.loc[d, asset]
-                r = cum_fwd.loc[d, asset]
-                if not (np.isfinite(z) and np.isfinite(r)):
-                    continue
-                rows.append({
-                    'date': d, 'asset': asset, 'asset_freq': freq,
-                    'group': group_data.get(asset) if group_data is not None else None,
-                    'z': float(z), 'r': float(r),
-                })
-    return pd.DataFrame(rows, columns=['date', 'asset', 'asset_freq',
-                                       'group', 'z', 'r'])
+        # Batch only final extraction; cadence, compounding, and lag rules above are unchanged.
+        pairs = _pair_frame_from_aligned_values(
+            signal_frame=sig_lag.loc[sampled, assets_here],
+            return_frame=cum_fwd.loc[sampled, assets_here],
+            asset_freq=asset_freq,
+            group_data=group_data,
+        )
+        if not pairs.empty:
+            pair_frames.append(pairs)
+    if not pair_frames:
+        return pd.DataFrame(columns=_PAIR_COLUMNS)
+    return pd.concat(pair_frames, ignore_index=True)
 
 
 def _build_pairs_string_horizon(
@@ -294,7 +381,7 @@ def _build_pairs_string_horizon(
         nav.iloc[0] = nav.iloc[0].where(nav.iloc[0].notna(), 1.0)
         per_freq_nav.append(nav)
     if not per_freq_nav:
-        return pd.DataFrame(columns=['date', 'asset', 'asset_freq', 'group', 'z', 'r'])
+        return pd.DataFrame(columns=_PAIR_COLUMNS)
     full_nav = pd.concat(per_freq_nav, axis=1, sort=True).sort_index().ffill()
     # Resample to horizon_freq
     nav_rs = full_nav.resample(horizon_freq).last().ffill()
@@ -305,22 +392,14 @@ def _build_pairs_string_horizon(
         ret_rs = nav_rs.pct_change()
     sig_rs = signal.resample(horizon_freq).last().shift(1)
     common = ret_rs.index.intersection(sig_rs.index)
-    rows: List[Dict] = []
-    for d in common:
-        for asset in ret_rs.columns:
-            if asset not in sig_rs.columns:
-                continue
-            z = sig_rs.loc[d, asset]
-            r = ret_rs.loc[d, asset]
-            if not (np.isfinite(z) and np.isfinite(r)):
-                continue
-            rows.append({
-                'date': d, 'asset': asset, 'asset_freq': asset_freq.get(asset),
-                'group': group_data.get(asset) if group_data is not None else None,
-                'z': float(z), 'r': float(r),
-            })
-    return pd.DataFrame(rows, columns=['date', 'asset', 'asset_freq',
-                                       'group', 'z', 'r'])
+    assets = [asset for asset in ret_rs.columns if asset in sig_rs.columns]
+    # Share the final projection so string and integer horizons keep one ordering contract.
+    return _pair_frame_from_aligned_values(
+        signal_frame=sig_rs.loc[common, assets],
+        return_frame=ret_rs.loc[common, assets],
+        asset_freq=asset_freq,
+        group_data=group_data,
+    )
 
 
 def _apply_cross_sectional_normalisation(
