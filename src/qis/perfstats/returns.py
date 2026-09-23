@@ -798,7 +798,8 @@ def compute_net_navs_ex_perf_man_fees(navs: Union[pd.Series, pd.DataFrame],
     """Compute net NAVs after management and performance fees.
 
     Args:
-        navs: Gross NAV time series
+        navs: Gross NAV time series. Fillable missing values are forward-filled before returns
+            are calculated, preserving the historical flat-return treatment of price gaps.
         man_fee: Annual management fee
         perf_fee: Performance fee rate on profits above HWM
         perf_fee_frequency: Performance fee crystallization frequency
@@ -806,7 +807,9 @@ def compute_net_navs_ex_perf_man_fees(navs: Union[pd.Series, pd.DataFrame],
     Returns:
         Net NAV time series after fees
     """
-    gross_returns = navs.pct_change()
+    # State the historical pandas default explicitly so dependency versions cannot choose the
+    # missing-price return policy.
+    gross_returns = navs.ffill().pct_change(fill_method=None)
     net_returns = []
     if isinstance(navs, pd.Series):
         net_returns = compute_net_return_ex_perf_man_fees(gross_return=gross_returns,
