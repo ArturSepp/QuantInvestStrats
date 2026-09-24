@@ -58,7 +58,13 @@ class EwmLinearModel(LinearModel):
             is_x_correlated: Whether to use diagonal (True) or full covariance matrix.
             mean_adj_type: Type of mean adjustment to apply.
             init_type: Initialization method for EWM.
+
+        Raises:
+            ValueError: If the factor and asset return index labels or order do not match exactly.
         """
+        if not self.x.index.equals(self.y.index):
+            raise ValueError("x and y pandas index labels and order must match exactly")
+
         x = self.x
         y = self.y
         if span is not None:
