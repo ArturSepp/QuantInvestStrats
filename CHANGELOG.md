@@ -25,6 +25,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Make `truncate_prior_to_start` return the complete Series or DataFrame when `start` predates the
   history, instead of raising while trying to construct a nonexistent prior anchor.
 
+- Align pandas error magnitudes by row and column labels in `plot_errorbar`, rejecting missing,
+  extra, or duplicate error labels instead of attaching uncertainty positionally.
+
 - Restore `truncate_prior_to_start` for Series inputs on supported pandas versions while preserving
   the prior anchor and Series metadata.
 
