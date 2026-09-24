@@ -230,6 +230,10 @@ batch and also shifts later sample columns.
 
 ### Fixed
 
+- Apply the selected `NanBackfill` policy to both EWM moments in
+  `compute_ewm_xy_beta_tensor`, preventing missing factor observations from changing betas through
+  inconsistent numerator and denominator state.
+
 - Made `find_upto_date_from_datetime_index` select the latest eligible finite timestamp from
   unsorted inputs instead of returning a future, stale, or `NaT` entry.
 

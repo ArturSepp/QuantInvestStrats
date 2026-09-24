@@ -658,10 +658,22 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
                                is_x_correlated: bool = True,  # computation of [x,x]
                                nan_backfill: NanBackfill = NanBackfill.FFILL
                                ) -> np.ndarray:
-    """
-    compute ewm cross matrices with x*y using outer product = dim[x] * dim[y]
-    the dimension of tensor is [t, x, y]
-    njit
+    """Compute an EWM beta tensor from factor and asset returns.
+
+    Args:
+        x: Factor returns with shape ``(time,)`` or ``(time, factors)``.
+        y: Asset returns with shape ``(time,)`` or ``(time, assets)``.
+        span: Optional EWM span overriding ``ewm_lambda``.
+        ewm_lambda: EWM decay when ``span`` is not supplied.
+        warmup_period: Last time position masked during estimator warm-up.
+        is_x_correlated: Whether to invert the full factor cross-moment matrix.
+        nan_backfill: Missing-observation policy applied to both EWM moments in the beta ratio.
+
+    Returns:
+        EWM betas with shape ``(time, factors, assets)``.
+
+    Raises:
+        TypeError: If an input is not one- or two-dimensional, or time dimensions differ.
     """
     if not x.ndim in [1, 2] or not y.ndim in [1, 2]:
         raise TypeError("Expected 1- or 2-dimensional NumPy array for x and y")
@@ -705,10 +717,15 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
 
         # covar matrix
         covar_xx = ewm_lambda_1 * np.outer(row_x, row_x) + ewm_lambda * last_covar_xx
-        if nan_backfill:
-            covar_xx = np.where(np.isfinite(covar_xx), covar_xx, ewm_lambda * last_covar_xx)
-        else:
-            covar_xx = np.where(np.isfinite(covar_xx), covar_xx, last_covar_xx)
+        # A missing factor row must age both moments identically so their ratio stays coherent.
+        if nan_backfill == NanBackfill.FFILL:
+            fill_value = last_covar_xx
+        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+            fill_value = ewm_lambda * last_covar_xx
+        else:  # use zero fill
+            fill_value = np.zeros_like(last_covar_xx)
+
+        covar_xx = np.where(np.isfinite(covar_xx), covar_xx, fill_value)
         last_covar_xx = covar_xx
 
         if t > warmup_period:
