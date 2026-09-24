@@ -389,8 +389,8 @@ def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],
 
     Args:
         df: frame or series with a sorted date index
-        start: first date to keep. When it is not in the index, the last entry before it is
-            prepended
+        start: first date to keep. A date before the history returns the complete input. When a
+            date within the history is not in the index, the last entry before it is prepended
 
     Returns:
         the truncated data, in the same type as the input
@@ -401,17 +401,20 @@ def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],
     if isinstance(df, pd.DataFrame):
         df_ = df.loc[start:, :]
         if df_.index[0] != start:
-            # take last row before cutoff date
-            row_before = df.loc[:start, :].iloc[-1, :].to_frame().T
-            df_ = pd.concat([row_before, df_], axis=0)
+            df_before = df.loc[:start, :]
+            if not df_before.index.empty:
+                # take last row before cutoff date
+                row_before = df_before.iloc[-1, :].to_frame().T
+                df_ = pd.concat([row_before, df_], axis=0)
 
     elif isinstance(df, pd.Series):
         df_ = df.loc[start:]
         if df_.index[0] != start:
-            # take last row before cutoff date
             ds_before = df.loc[:start]
-            row_before = ds_before.iloc[[-1]]
-            df_ = pd.concat([row_before, df_], axis=0)
+            if not ds_before.index.empty:
+                # take last row before cutoff date
+                row_before = ds_before.iloc[[-1]]
+                df_ = pd.concat([row_before, df_], axis=0)
     else:
         raise NotImplementedError(f"{type(df)}")
     return df_
