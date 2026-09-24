@@ -15,6 +15,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Make `truncate_prior_to_start` return the complete Series or DataFrame when `start` predates the
+  history, instead of raising while trying to construct a nonexistent prior anchor.
+
 - Restore `truncate_prior_to_start` for Series inputs on supported pandas versions while preserving
   the prior anchor and Series metadata.
 

@@ -1,9 +1,41 @@
-"""Regression tests for Series truncation with a retained prior anchor."""
+"""Regression tests for truncation boundaries and retained prior anchors."""
 
 import pandas as pd
 import pytest
 
 import qis
+
+
+@pytest.mark.parametrize("as_frame", (False, True), ids=("series", "dataframe"))
+def test_truncate_prior_to_start_before_history_preserves_complete_input(
+    as_frame: bool,
+) -> None:
+    """Return the complete input when no observation precedes the cutoff.
+
+    Args:
+        as_frame: Convert the representative Series to the DataFrame branch.
+    """
+    index = pd.date_range(
+        "2024-01-01",
+        periods=3,
+        freq="D",
+        tz="UTC",
+        name="observation_date",
+    )
+    series = pd.Series([1.0, pd.NA, 3.0], index=index, dtype="Float64", name="price")
+    data = series.to_frame() if as_frame else series
+    original = data.copy(deep=True)
+    start = index[0] - pd.Timedelta(days=1)
+    expected = data.loc[start:]
+
+    actual = qis.truncate_prior_to_start(data, start=start)
+
+    if as_frame:
+        pd.testing.assert_frame_equal(actual, expected)
+        pd.testing.assert_frame_equal(data, original)
+    else:
+        pd.testing.assert_series_equal(actual, expected)
+        pd.testing.assert_series_equal(data, original)
 
 
 @pytest.mark.parametrize(
