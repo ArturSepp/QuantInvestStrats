@@ -15,6 +15,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Restore `truncate_prior_to_start` for Series inputs on supported pandas versions while preserving
+  the prior anchor and Series metadata.
+
 - Preserve `compute_net_navs_ex_perf_man_fees` forward-filled gross-NAV gaps across pandas
   versions, so an interior missing price produces a flat return followed by the full cumulative
   return instead of truncating the net-NAV path.

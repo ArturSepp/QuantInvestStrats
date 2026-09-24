@@ -410,8 +410,8 @@ def truncate_prior_to_start(df: Union[pd.DataFrame, pd.Series],
         if df_.index[0] != start:
             # take last row before cutoff date
             ds_before = df.loc[:start]
-            row_before = pd.Series(ds_before.iloc[-1], index=[ds_before.index[-1]], name=df.name)
-            df_ = row_before.append(df_)
+            row_before = ds_before.iloc[[-1]]
+            df_ = pd.concat([row_before, df_], axis=0)
     else:
         raise NotImplementedError(f"{type(df)}")
     return df_
