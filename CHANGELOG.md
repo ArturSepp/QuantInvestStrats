@@ -15,6 +15,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Preserve `compute_net_navs_ex_perf_man_fees` forward-filled gross-NAV gaps across pandas
+  versions, so an interior missing price produces a flat return followed by the full cumulative
+  return instead of truncating the net-NAV path.
+
 - Make `df_to_weight_allocation_sum1` reject signed Series and DataFrame rows whose
   numerically zero net sum makes finite sum-to-one normalization impossible, while
   preserving the established zero allocation for zero-gross rows.
