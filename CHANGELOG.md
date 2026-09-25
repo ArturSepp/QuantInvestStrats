@@ -39,6 +39,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   factor cross-moment matrix.
 - Execute the Python worked examples of every methodology article in the test suite, offline,
   so a calculation change that invalidates a documented number fails.
+- Organise the methodology articles as the qis analytics handbook in six parts, with a new
+  Notation and conventions chapter that reserves one meaning per symbol and writes the
+  annualisation factor as AN. Every methodology article now opens its inputs section with the same
+  seven-row convention card, and `tools/check_docs.py` enforces the card, one transpose and
+  operator style, and TeX rather than plain-text formulas.
+- Add a single bibliography page. Every methodology reference is a numbered verbatim entry of it,
+  enforced by `documentation_bibliography_test.py`, and the software is cited one way.
+- Render `> **Insight.**` and `> **Pitfall.**` blockquotes as admonitions in the Sphinx site
+  through the new `qis_callouts` extension.
 
 ## [5.30.3] - 2026-09-22
 

@@ -33,6 +33,16 @@ stress anchors and owns their economic interpretation. This guide describes the 
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Log-return loadings and shocks; simple-return P&L |
+| Sampling grid | The caller's covariance snapshot; the example uses weekly `W-WED` returns |
+| Annualisation | Annual covariance and residual variances; band widths scale with $\sqrt{\tau}$ |
+| Mean adjustment | Zero-mean Gaussian conditioning |
+| Timing | Exposures and covariance frozen at the risk date |
+| Output units | Currency P&L and decimal fractions of NAV |
+| qis default | `horizon_years` is required; `confidence=0.95` |
+
 Let $n$ be the number of assets, $k$ the number of factors and $m$ the number of scenarios.
 
 | Input | Shape and labels | Convention |
@@ -41,18 +51,18 @@ Let $n$ be the number of assets, $k$ the number of factors and $m$ the number of
 | `covariance`, $\Sigma$ | Factors by the same ordered factors, $k\times k$ | Annualised log-return covariance for bands |
 | `residual_variances`, $d$ | Series in asset order, length $n$ | Annual independent asset residual variances, not volatilities |
 | `amounts`, $a$ | Series in asset order | Signed MTM in one reference currency; shorts are negative |
-| `nav`, $N$ | Positive finite scalar | Explicit portfolio NAV in that currency |
+| `nav`, $V$ | Positive finite scalar | Explicit portfolio NAV in that currency |
 | `factor_log_shocks`, $Z$ | Scenarios by factors, $m\times k$ | Decimal log-return shocks |
 | `adjustments`, $\delta$ | Scenarios by assets, $m\times n$ | Optional additional asset log returns |
-| `horizon_years`, $T$ | Positive scalar | One month is $1/12$ |
+| `horizon_years`, $\tau$ | Positive scalar | One month is $1/12$ |
 | `confidence`, $c$ | Scalar strictly between zero and one | 95% is `0.95` |
 
-Let $w_i=a_i/N$ be the signed portfolio weight and $R_s$ the simple NAV return under scenario $s$.
+Let $w_i=a_i/V$ be the signed portfolio weight and $R_s$ the simple NAV return under scenario $s$.
 In the method below, $A$ and $F$ index anchored and free factors; $C$ is conditional factor
 covariance, $\Omega_{\mid A}$ is conditional asset covariance, $e$ is the factor exposure vector,
 and $v$ is annual portfolio variance. The subscript $F$ denotes free factors, not a forward price.
 
-Weights are $w_i=a_i/N$. They are **not renormalised** to net or gross exposure.
+Weights are $w_i=a_i/V$. They are **not renormalised** to net or gross exposure.
 Every modelled asset must have a loading row, even when that row is all zero.
 A zero-loading cash position still needs an explicit residual variance, normally zero.
 Coverage decisions, proxy selection, unsmoothing, private-asset priors and estimation quality
@@ -204,8 +214,8 @@ No coupons, carry, rebalancing or parameter changes are added automatically.
 Portfolio return and asset attribution as fractions of NAV are
 
 $$
-R_s=\frac{\sum_i\operatorname{PnL}_{si}}{N},
-\qquad A^{\mathrm{asset}}_{si}=\frac{\operatorname{PnL}_{si}}{N}.
+R_s=\frac{\sum_i\operatorname{PnL}_{si}}{V},
+\qquad \operatorname{Attr}^{\mathrm{asset}}_{si}=\frac{\operatorname{PnL}_{si}}{V}.
 $$
 
 For additive factor attribution define the continuous scaling function
@@ -217,9 +227,9 @@ q(g)&=
 (\exp(g)-1)/g,&g\ne0,\\
 1,&g=0,
 \end{cases}\\
-C_{sj}&=\sum_i a_i B_{ij}z_{sj}q(g_{si}),\\
-C_{s,\mathrm{adj}}&=\sum_i a_i\delta_{si}q(g_{si}),\\
-\sum_j C_{sj}+C_{s,\mathrm{adj}}&=\sum_i\operatorname{PnL}_{si}.
+\operatorname{PnL}^{\mathrm{factor}}_{sj}&=\sum_i a_i B_{ij}z_{sj}q(g_{si}),\\
+\operatorname{PnL}^{\mathrm{adj}}_{s}&=\sum_i a_i\delta_{si}q(g_{si}),\\
+\sum_j \operatorname{PnL}^{\mathrm{factor}}_{sj}+\operatorname{PnL}^{\mathrm{adj}}_{s}&=\sum_i\operatorname{PnL}_{si}.
 \end{aligned}
 $$
 
@@ -284,11 +294,11 @@ qis builds the conditioned asset/factor snapshot and delegates portfolio aggrega
 `RiskModel`. Residuals are independent across assets and independent of factors; a full residual
 covariance is not an input to this API. Annual variances add; their square-root volatilities do not.
 
-For central probability $c$, horizon $T$ in years and standard-normal quantile $\Phi^{-1}$,
+For central probability $c$, horizon $\tau$ in years and standard-normal quantile $\Phi^{-1}$,
 
 $$
 [L_s,U_s]
-=R_s\ \pm\ \Phi^{-1}\!\left(\frac{1+c}{2}\right)\sqrt{T v}.
+=R_s\ \pm\ \Phi^{-1}\!\left(\frac{1+c}{2}\right)\sqrt{\tau v}.
 $$
 
 For $c=0.95$, the multiplier is approximately 1.96. One month uses $\sqrt{1/12}$.
@@ -391,9 +401,9 @@ owns conditioning, valuation and the band contract.
 |---|---|
 | `portfolio_return` | Supplied or computed scenario centre |
 | `lower_bound`, `upper_bound` | Pointwise prediction bounds |
-| `residual_vol_horizon` | $\sqrt{T v_{\mathrm{idio}}}$ |
-| `conditional_factor_vol_horizon` | $\sqrt{T v_{\mathrm{factor}}}$ |
-| `conditional_vol_horizon` | $\sqrt{T v}$ |
+| `residual_vol_horizon` | $\sqrt{\tau v_{\mathrm{idio}}}$ |
+| `conditional_factor_vol_horizon` | $\sqrt{\tau v_{\mathrm{factor}}}$ |
+| `conditional_vol_horizon` | $\sqrt{\tau v}$ |
 | `band_half_width` | Normal quantile times horizon total volatility |
 
 The result also retains the full annual `conditional_factor_covariance`, annual idiosyncratic,
@@ -552,33 +562,12 @@ _included/stress_testing
 
 ## References
 
-1. Anderson, T. W. (2003). *An Introduction to Multivariate Statistical Analysis*, 3rd edition.
-   Wiley. Section 2.5: conditional distributions of the multivariate normal.
-2. Mardia, K. V., Kent, J. T., and Bibby, J. M. (1979). *Multivariate Analysis*. Academic Press.
-   Chapter 3: normal distribution theory, including the conditional distribution.
-3. Kupiec, P. H. (1998). Stress testing in a value at risk framework.
-   *Journal of Derivatives*, 6(1), 7–24.
-   [Publisher page](https://doi.org/10.3905/jod.1998.408008). The origin of conditional
-   factor stress: fixed factors, free factors completed by the covariance regression.
-4. Kim, J., and Finger, C. C. (2000). A stress test to incorporate correlation breakdown.
-   *Journal of Risk*, 2(3).
-   [Publisher page](https://www.risk.net/journal-risk/2161074/stress-test-incorporate-correlation-breakdown).
-   Conditional covariance of the free factors and a broken-correlation regime, productised as
-   the RiskMetrics predictive stress test.
-5. Breuer, T., Jandačka, M., Rheinberger, K., and Summer, M. (2009). How to find plausible,
-   severe and useful stress scenarios. *International Journal of Central Banking*, 5(3), 205–224.
-   [PDF](https://www.ijcb.org/journal/ijcb09q3a7.pdf). Mahalanobis plausibility of a scenario.
-6. Glasserman, P., Kang, C., and Kang, W. (2015). Stress scenario selection by empirical
-   likelihood. *Quantitative Finance*, 15(1), 25–41.
-   [DOI: 10.1080/14697688.2014.926019](https://doi.org/10.1080/14697688.2014.926019).
-7. Rebonato, R. (2010). *Coherent Stress Testing: A Bayesian Approach to the Analysis of
-   Financial Stress*. Wiley. Causal conditioning as an alternative to covariance regression.
-8. Boyer, B. H., Gibson, M. S., and Loretan, M. (1999). Pitfalls in tests for changes in
-   correlations. Federal Reserve Board, International Finance Discussion Papers 597.
-   [PDF](https://www.federalreserve.gov/pubs/ifdp/1997/597/ifdp597.pdf). Sample correlations
-   conditioned on one variable change without any change in dependence.
-9. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-   Software, MIT licence. The proportional log-component P&L allocation and baseline-exposure
-   band are implementation conventions described above. Use
-   [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
-   and identify the version/source used for a calculation.
+1. Anderson, T. W. (2003). *An Introduction to Multivariate Statistical Analysis*, 3rd edition. Wiley. Section 2.5: conditional distributions of the multivariate normal.
+2. Mardia, K. V., Kent, J. T., and Bibby, J. M. (1979). *Multivariate Analysis*. Academic Press. Chapter 3: normal distribution theory, including the conditional distribution.
+3. Kupiec, P. H. (1998). Stress testing in a value at risk framework. *Journal of Derivatives*, 6(1), 7–24. [DOI: 10.3905/jod.1998.408008](https://doi.org/10.3905/jod.1998.408008). The origin of conditional factor stress: fixed factors, free factors completed by the covariance regression.
+4. Kim, J., and Finger, C. C. (2000). A stress test to incorporate correlation breakdown. *Journal of Risk*, 2(3). [Publisher page](https://www.risk.net/journal-risk/2161074/stress-test-incorporate-correlation-breakdown). Conditional covariance of the free factors and a broken-correlation regime, productised as the RiskMetrics predictive stress test.
+5. Breuer, T., Jandačka, M., Rheinberger, K., and Summer, M. (2009). How to find plausible, severe and useful stress scenarios. *International Journal of Central Banking*, 5(3), 205–224. [PDF](https://www.ijcb.org/journal/ijcb09q3a7.pdf). Mahalanobis plausibility of a scenario.
+6. Glasserman, P., Kang, C., and Kang, W. (2015). Stress scenario selection by empirical likelihood. *Quantitative Finance*, 15(1), 25–41. [DOI: 10.1080/14697688.2014.926019](https://doi.org/10.1080/14697688.2014.926019).
+7. Rebonato, R. (2010). *Coherent Stress Testing: A Bayesian Approach to the Analysis of Financial Stress*. Wiley. Causal conditioning as an alternative to covariance regression.
+8. Boyer, B. H., Gibson, M. S., and Loretan, M. (1999). Pitfalls in tests for changes in correlations. Federal Reserve Board, International Finance Discussion Papers 597. [PDF](https://www.federalreserve.gov/pubs/ifdp/1997/597/ifdp597.pdf). Sample correlations conditioned on one variable change without any change in dependence.
+9. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff). The proportional log-component P&L allocation and baseline-exposure band are implementation conventions described above.

@@ -38,6 +38,16 @@ Define the method before its implementation.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Not applicable |
+| Sampling grid | Supplied dates |
+| Annualisation | None |
+| Mean adjustment | None |
+| Timing | Weights at each date |
+| Output units | Count |
+| qis default | Not applicable |
+
 Let $p_i$ be an absolute capital share.
 
 ## Methodology
@@ -97,6 +107,13 @@ def test_complete_article_and_short_utility_page_pass():
     ('$$\n\nThis count', '$$\nThis count', 'blank line after'),
     ('$p_i$', '{math}`p_i`', 'ordinary equation-section links'),
     ('$p_i$', '\\(p_i\\)', 'portable mathematics'),
+    ('| Convention | This article |', '| Setting | Value |', 'convention card'),
+    ('| Timing | Weights at each date |\n', '', 'convention card rows'),
+    ('| Output units |', '| Units |', 'convention card rows'),
+    ('Let $p_i$', 'Let $p^\\intercal$', 'transpose'),
+    ('Let $p_i$', 'Let $p^\\mathsf{T}$', 'transpose'),
+    ('Let $p_i$', 'Let $\\mathrm{Var}(p)$', 'operatorname'),
+    ('Let $p_i$', 'Let sqrt(p) and', 'not plain text'),
 ])
 def test_article_defects_are_rejected(before, after, message):
     source = HEADER + SECTIONS

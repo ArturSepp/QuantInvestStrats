@@ -37,6 +37,16 @@ Changing the denominator does not turn one numerator into the other.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Not applicable: turnover is formed from weight or unit changes |
+| Sampling grid | Dates of the supplied holdings or targets; reports resample and roll-sum |
+| Annualisation | None per observation; `vols` are already annualised |
+| Mean adjustment | Not applicable |
+| Timing | Each row is the change from the previous dated row |
+| Output units | Two-sided fraction of NAV or of gross exposure |
+| qis default | `EXECUTED_NOTIONAL_NAV`; `PortfolioData.get_turnover(roll_period=260)` |
+
 | Symbol or input | Meaning | Units and contract |
 |---|---|---|
 | $w^*_{i,t}$ / `input_weights` | Target weight | Signed decimal fraction; dated rows and asset columns |
@@ -100,10 +110,10 @@ maintaining unchanged exposure when a unit's notional changes.
 
 [Sepp and Lucic (2026), Definition 4.5 and equation 4.15](https://arxiv.org/html/2607.19497v1#S4.SS4)
 define volatility-normalised turnover using periodic volatility $\sigma_{i,t}$ and
-annualisation factor $a$:
+annualisation factor $\mathrm{AN}$:
 
 $$
-U_{i,t}=\sqrt{a}\,\sigma_{i,t}
+U_{i,t}=\sqrt{\mathrm{AN}}\,\sigma_{i,t}
 \left|w^*_{i,t}-w^*_{i,t-1}\right|.
 $$
 
@@ -113,7 +123,7 @@ $$
 U_{i,t}=\sigma^{\mathrm{ann}}_{i,t}
 \left|w^*_{i,t}-w^*_{i,t-1}\right|,
 \qquad
-\sigma^{\mathrm{ann}}_{i,t}=\sqrt{a}\,\sigma_{i,t}.
+\sigma^{\mathrm{ann}}_{i,t}=\sqrt{\mathrm{AN}}\,\sigma_{i,t}.
 $$
 
 This weights target changes by instrument risk. It includes changes caused by the target rule's
@@ -312,9 +322,5 @@ its market sample is separate from the fixed arithmetic example above.
 
 ## References
 
-1. Sepp, A., and Lucic, V. (2026).
-   [The Science and Practice of Trend-Following Systems](https://arxiv.org/abs/2607.19497).
-   Definition 4.5 and equation 4.15; qis accepts annualised volatility in the equivalent formula.
-2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-   Software, MIT licence. Citation metadata:
-   [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Sepp, A., and Lucic, V. (2026). The Science and Practice of Trend-Following Systems. Working paper. [arXiv:2607.19497](https://arxiv.org/abs/2607.19497). Definition 4.5 and equation 4.15; qis accepts annualised volatility in the equivalent formula.
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

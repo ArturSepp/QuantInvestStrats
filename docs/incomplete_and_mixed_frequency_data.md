@@ -40,6 +40,16 @@ gaps, `SCM_GLD` includes stale marks, `SCM_BCOM` has a delisted tail, and `SAL_P
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Simple and log returns, stated per function |
+| Sampling grid | Declared per asset or sleeve; storage dates are not information dates |
+| Annualisation | Per sleeve, from its own grid |
+| Mean adjustment | Not applicable |
+| Timing | An asset that becomes available is admitted at the next scheduled rebalance |
+| Output units | Weights as fractions of NAV; decimal returns |
+| qis default | `to_returns(ffill_nans=True)`; `generate_static_weights_schedule(is_rescale_to_live_universe=True)` |
+
 | Symbol or input | Meaning | Units or convention |
 |---|---|---|
 | $P_{i,t}$ | Observed price or NAV for asset $i$ | Positive finite level; NaN denotes unavailable |
@@ -222,8 +232,5 @@ and trailing gaps; that display-oriented convention is not a liquidation or deli
 
 ## References
 
-1. Lo, A. W. (2002). [The Statistics of Sharpe Ratios](https://alo.mit.edu/publications/page/18/).
-   *Financial Analysts Journal*, 58(4), 36–52. Estimation and time aggregation with serial dependence.
-2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-   Software, MIT licence. Use [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
-   and identify the version/source used for a calculation.
+1. Lo, A. W. (2002). The Statistics of Sharpe Ratios. *Financial Analysts Journal*, 58(4), 36–52. [DOI: 10.2469/faj.v58.n4.2453](https://doi.org/10.2469/faj.v58.n4.2453). Estimation and time aggregation with serial dependence.
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

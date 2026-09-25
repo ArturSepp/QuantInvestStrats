@@ -42,6 +42,16 @@ This is an illustrative book, not a reconstruction of a client portfolio or its 
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Weekly log returns for estimation; factor shocks are log returns; P&L is revalued in currency |
+| Sampling grid | Weekly `W-WED` for the risk model; complete monthly vectors for historical replay |
+| Annualisation | Annual covariance, 52 weekly periods per year; the band horizon $\tau_{\mathrm{h}}$ is one month |
+| Mean adjustment | None: EWMA moments about zero, `MeanAdjType.NONE` |
+| Timing | Holdings, loadings and option terms frozen at the valuation date $t_0$ |
+| Output units | USD P&L and decimal fractions of the net marked value $V$ |
+| qis default | EWMA span 52; 95% bounds exported alongside one- and two-sigma bands |
+
 | Input or symbol | Meaning | Convention |
 |---|---|---|
 | $t_0$ | Frozen valuation date | Default 2025-12-31; actual latest complete close at/before the requested cutoff |
@@ -53,10 +63,10 @@ This is an illustrative book, not a reconstruction of a client portfolio or its 
 | $z$ | Scenario factor vector | Log returns; supplied simple bumps are converted by `log1p` |
 | $n_l$, $m$ | Signed option contracts and contract multiplier | Negative contracts for shorts; 100 shares/contract |
 | $K_l$, $\tau_l$ | Strike and remaining maturity | USD/share and ACT/365 years at $t_0$ |
-| $r$, $q$ | Pricing rate and dividend yield | Assumed continuous 4% and 0%, held fixed in stresses |
+| $r_{\mathrm{d}}$, $q$ | Pricing rate and dividend yield | Assumed continuous 4% and 0%, held fixed in stresses |
 | $\sigma_l$ | Pricing volatility | Assumed annual lognormal IV, not a downloaded option quote |
-| $N$ | Reporting denominator | Current marked stock value plus signed option marks; positive USD amount |
-| $T$ | Conditional-band horizon | One month, $1/12$ year; it does not advance option maturity |
+| $V$ | Reporting denominator | Current marked stock value plus signed option marks; positive USD amount |
+| $\tau_{\mathrm{h}}$ | Conditional-band horizon | One month, $1/12$ year; it does not advance option maturity |
 
 ### Data and cache policy
 
@@ -98,12 +108,12 @@ premium and downside skew; neither is calibrated to a historical option surface.
 
 ### 1. Estimate the joint EWMA risk model
 
-Write $u_t=(x_t^\top,y_t^\top)^\top$. With span $s=52$, zero initial moments and no mean
+Write $\xi_t=(x_t^\top,y_t^\top)^\top$. With span $N=52$, zero initial moments and no mean
 subtraction, the EWMA moment recursion is
 
 $$
-\lambda=1-\frac{2}{s+1},\qquad
-M_t=\lambda M_{t-1}+(1-\lambda)u_tu_t^\top,\qquad M_0=0.
+\lambda=1-\frac{2}{N+1},\qquad
+M_t=\lambda M_{t-1}+(1-\lambda)\xi_t\xi_t^\top,\qquad M_0=0.
 $$
 
 The latest joint regression and annual factor covariance are
@@ -116,10 +126,10 @@ The model uses the complete factor covariance, not four independent univariate r
 It fits no intercept: moments are about zero, not de-meaned covariances. This is the explicit
 `MeanAdjType.NONE` convention, and no drift or estimated alpha is added to a stress.
 The latest $B$ is applied to the estimation sample to calculate residuals
-$\epsilon_t=y_t-Bx_t$ and their EWMA second moments:
+$\varepsilon_t=y_t-Bx_t$ and their EWMA second moments:
 
 $$
-d_i=52(1-\lambda)\sum_{j=0}^{n-1}\lambda^j\epsilon_{i,n-j}^2,
+d_i=52(1-\lambda)\sum_{j=0}^{T-1}\lambda^j\varepsilon_{i,T-j}^2,
 \qquad
 \Sigma_Y=B\Sigma_F B^\top+\operatorname{diag}(d).
 $$
@@ -165,17 +175,17 @@ the result as realised portfolio performance.
 
 ### 3. Price the options with VOP
 
-For each contract define the forward $F=S\exp((r-q)\tau)$ and discount factor
-$D=\exp(-r\tau)$. The European Black-Scholes-Merton formulas are
+For each contract define the forward $\mathrm{Fwd}=S\exp((r_{\mathrm{d}}-q)\tau)$ and discount factor
+$\mathrm{DF}=\exp(-r_{\mathrm{d}}\tau)$. The European Black-Scholes-Merton formulas are
 
 $$
-d_1=\frac{\log(F/K)+\tfrac12\sigma^2\tau}{\sigma\sqrt{\tau}},
+d_1=\frac{\log(\mathrm{Fwd}/K)+\tfrac12\sigma^2\tau}{\sigma\sqrt{\tau}},
 \qquad d_2=d_1-\sigma\sqrt{\tau},
 $$
 
 $$
-C=D\left[F\Phi(d_1)-K\Phi(d_2)\right],\qquad
-P=D\left[K\Phi(-d_2)-F\Phi(-d_1)\right].
+v^{\mathrm{call}}=\mathrm{DF}\left[\mathrm{Fwd}\,\Phi(d_1)-K\Phi(d_2)\right],\qquad
+v^{\mathrm{put}}=\mathrm{DF}\left[K\Phi(-d_2)-\mathrm{Fwd}\,\Phi(-d_1)\right].
 $$
 
 Here $\Phi$ is the standard normal distribution function. VOP's compiled forward-grid
@@ -188,7 +198,7 @@ The option holding change and total portfolio return are
 
 $$
 \Delta V_l(z)=n_lm\left[v_l(S_i(z))-v_l(S_i(0))\right],\qquad
-R(z)=\frac{\sum_l\Delta V_l(z)}{N}.
+R(z)=\frac{\sum_l\Delta V_l(z)}{V}.
 $$
 
 Stocks use their signed share counts and spot changes. Option marks are negative for short
@@ -202,11 +212,11 @@ is zero. Zero shock gives zero P&L and preserves all fifteen source marks.
 ### 4. Convert Greeks correctly and measure convexity
 
 VOP returns **discounted forward delta** but **undiscounted forward gamma**. If
-$c=\exp((r-q)\tau)$, their spot equivalents are
+$c=\exp((r_{\mathrm{d}}-q)\tau)$, their spot equivalents are
 
 $$
 \Delta_S=c\Delta_F^{\mathrm{VOP}},\qquad
-\Gamma_S=Dc^2\Gamma_F^{\mathrm{VOP}}.
+\Gamma_S=\mathrm{DF}\,c^2\Gamma_F^{\mathrm{VOP}}.
 $$
 
 Multiplying gamma by the discount factor twice, omitting the forward-to-spot chain rule,
@@ -240,11 +250,11 @@ $$
 $$
 
 At each scenario re-evaluate the option deltas and form
-$e(z)=B^\top J(z)/N$. For horizon $T=1/12$ year, QIS computes
+$e(z)=B^\top J(z)/V$. For horizon $\tau_{\mathrm{h}}=1/12$ year, QIS computes
 
 $$
-v(z)=T\left[e(z)^\top\Sigma_{\mid A}e(z)
-+\sum_i\left(\frac{J_i(z)}{N}\right)^2d_i\right].
+v(z)=\tau_{\mathrm{h}}\left[e(z)^\top\Sigma_{F\mid A}e(z)
++\sum_i\left(\frac{J_i(z)}{V}\right)^2d_i\right].
 $$
 
 The standard report displays $R(z)\pm\sqrt{v(z)}$ and $R(z)\pm2\sqrt{v(z)}$.
@@ -391,15 +401,9 @@ Ordinary source link:
 
 ## References
 
-1. Black, F., and Scholes, M. (1973). The Pricing of Options and Corporate Liabilities.
-   *Journal of Political Economy*, 81(3), 637-654.
-   [DOI: 10.1086/260062](https://doi.org/10.1086/260062).
-2. Kupiec, P. H. (1998). Stress testing in a value at risk framework.
-   *Journal of Derivatives*, 6(1), 7-24.
-   [DOI: 10.3905/jod.1998.408008](https://doi.org/10.3905/jod.1998.408008).
-3. Anderson, T. W. (2003). *An Introduction to Multivariate Statistical Analysis*, 3rd edition.
-   Wiley. Section 2.5: conditional distributions of the multivariate normal.
-4. Sepp, A. [VanillaOptionPricers](https://github.com/ArturSepp/VanillaOptionPricers),
-   software and forward-price/Greek implementation. Example verified with version 2.2.0.
-5. Aroussi, R., and contributors. [yfinance download API](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html).
-6. Sepp, A., and qis contributors. [qis software and citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Black, F., and Scholes, M. (1973). The Pricing of Options and Corporate Liabilities. *Journal of Political Economy*, 81(3), 637–654. [DOI: 10.1086/260062](https://doi.org/10.1086/260062).
+2. Kupiec, P. H. (1998). Stress testing in a value at risk framework. *Journal of Derivatives*, 6(1), 7–24. [DOI: 10.3905/jod.1998.408008](https://doi.org/10.3905/jod.1998.408008).
+3. Anderson, T. W. (2003). *An Introduction to Multivariate Statistical Analysis*, 3rd edition. Wiley. Section 2.5: conditional distributions of the multivariate normal.
+4. Sepp, A. VanillaOptionPricers. Software. [Repository](https://github.com/ArturSepp/VanillaOptionPricers). Forward-price and Greek implementation; the example was verified with version 2.2.0.
+5. Aroussi, R., and contributors. yfinance. Software. [Download API](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html).
+6. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

@@ -31,6 +31,16 @@ holdings are not substituted for the allocation decision.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Caller's choice of simple or log returns, stated explicitly |
+| Sampling grid | Native return rows; breadth is evaluated only on target-weight dates |
+| Annualisation | None: counts and ratios are scale-free |
+| Mean adjustment | None: EWM second moment about zero |
+| Timing | Point in time: covariance dated at or before each weight date |
+| Output units | Counts and dimensionless ratios |
+| qis default | `span=36` return rows; `position_threshold=1e-4` |
+
 | Symbol or input | Meaning | Convention |
 |---|---|---|
 | $i,t$ | Asset and evaluation date | Evaluate only on supplied target-weight dates. |
@@ -82,12 +92,12 @@ capital shares, and absolute Euler-risk shares are the specific qis conventions 
 
 ### Effective independent assets
 
-For the point-in-time correlation matrix of risk-measurable assets, let $\lambda_{j,t}$ be its
-non-negative eigenvalues and $u_{j,t}=\lambda_{j,t}/\sum_k\lambda_{k,t}$. The participation ratio
+For the point-in-time correlation matrix of risk-measurable assets, let $\nu_{j,t}$ be its
+non-negative eigenvalues and $\pi_{j,t}=\nu_{j,t}/\sum_k\nu_{k,t}$. The participation ratio
 
 $$
 N^{\mathrm{universe}}_{\mathrm{eff},t}
-= \frac{1}{\sum_j u_{j,t}^{2}}
+= \frac{1}{\sum_j \pi_{j,t}^{2}}
 $$
 
 is the effective number of independent correlation directions. It equals the asset count for an
@@ -277,10 +287,6 @@ For a Markdown viewer without Sphinx roles, use the
 
 ## References
 
-- Hill, M. O. (1973). Diversity and evenness: a unifying notation and its consequences.
-  *Ecology*, 54(2), 427–432. [Publisher record](https://doi.org/10.2307/1934352).
-  This supplies the effective-number construction, not a portfolio performance model.
-- Tasche, D. (2008 revision). Capital allocation to business units and sub-portfolios: the Euler
-  principle. [Author's paper](https://arxiv.org/abs/0708.2542).
-- Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet
-  reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Hill, M. O. (1973). Diversity and evenness: a unifying notation and its consequences. *Ecology*, 54(2), 427–432. [DOI: 10.2307/1934352](https://doi.org/10.2307/1934352). This supplies the effective-number construction, not a portfolio performance model.
+2. Tasche, D. (2008). Capital allocation to business units and sub-portfolios: the Euler principle. Working paper. [arXiv:0708.2542](https://arxiv.org/abs/0708.2542).
+3. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

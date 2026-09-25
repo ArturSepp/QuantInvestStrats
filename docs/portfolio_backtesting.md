@@ -30,9 +30,19 @@ drift, implementation lags, unavailable assets, and costs visible.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Simple price returns; NAV accumulates held units and cash |
+| Sampling grid | The native price index |
+| Annualisation | Annual funding, fee and carry rates accrue ACT/365 over elapsed days |
+| Mean adjustment | Not applicable |
+| Timing | A dated target executes at the first price at or after its date, plus `weight_implementation_lag` observations; units are held over $(t,t+1]$ |
+| Output units | NAV and costs in currency; weights as fractions of NAV |
+| qis default | `rebalancing_freq='QE'`, no lag, no costs, `initial_nav=100` |
+
 | Symbol or input | Meaning | Units and timing |
 |---|---|---|
-| $p_{i,t}$ / `prices` | Price of asset $i$ | Monetary value per asset unit; unique non-missing dates in a `DatetimeIndex`, unique asset columns |
+| $P_{i,t}$ / `prices` | Price of asset $i$ | Monetary value per asset unit; unique non-missing dates in a `DatetimeIndex`, unique asset columns |
 | $w^*_{i,t}$ / `weights` | Target capital fraction | Signed decimal weights; named inputs align by ticker, arrays/lists are positional |
 | $u_{i,t}$ | Units held after execution on date $t$ | Shares or model units |
 | $C_t$ | Cash balance after execution and costs | NAV currency; negative cash can represent funding |
@@ -69,16 +79,16 @@ must be supplied consistently when constructing derivative reporting objects.
 With no external flows, costs, fees, funding, or carry over an interval, wealth evolves as:
 
 $$
-V_t=\sum_i u_{i,t}p_{i,t}+C_t,
+V_t=\sum_i u_{i,t}P_{i,t}+C_t,
 \qquad
-V_{t+1}-V_t=\sum_i u_{i,t}(p_{i,t+1}-p_{i,t}).
+V_{t+1}-V_t=\sum_i u_{i,t}(P_{i,t+1}-P_{i,t}).
 $$
 
 The units in the second expression are the positions established at $t$, held over $[t,t+1]$.
 Their realised weights at the next mark are:
 
 $$
-w_{i,t+1}=\frac{u_{i,t}p_{i,t+1}}{V_{t+1}}.
+w_{i,t+1}=\frac{u_{i,t}P_{i,t+1}}{V_{t+1}}.
 $$
 
 Those weights drift even when no new target has been supplied. Averaging each period's asset
@@ -90,9 +100,9 @@ Let $V_t^-$ be wealth marked at the current prices, after applicable funding, fe
 but before the trade. For an executable target in the default sizing mode:
 
 $$
-u_{i,t}=\frac{V_t^-w^*_{i,t}}{p_{i,t}},
+u_{i,t}=\frac{V_t^-w^*_{i,t}}{P_{i,t}},
 \qquad
-K_t=\sum_i \kappa_{i,t}p_{i,t}
+K_t=\sum_i \kappa_{i,t}P_{i,t}
 \left|u_{i,t}-u_{i,t^-}\right|.
 $$
 
@@ -255,12 +265,5 @@ example, and the separate Yahoo SPY/TLT illustration.
 
 ## References
 
-1. Sepp, A., and qis contributors.
-   [Backtester accounting and execution](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/backtester.py).
-   Authoritative source for the implementation conventions described here.
-2. Sepp, A., and Lucic, V. (2026).
-   [The Science and Practice of Trend-Following Systems](https://arxiv.org/abs/2607.19497).
-   Definition 4.5 and equation 4.15 concern volatility-normalised turnover.
-3. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-   Software, MIT licence. Citation metadata:
-   [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Sepp, A., and Lucic, V. (2026). The Science and Practice of Trend-Following Systems. Working paper. [arXiv:2607.19497](https://arxiv.org/abs/2607.19497). Definition 4.5 and equation 4.15 concern volatility-normalised turnover.
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

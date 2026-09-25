@@ -173,6 +173,10 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
 - Follow [the QIS supplement](docs/documentation_standard.md) for package-specific source
   ownership, analytical conventions, figure producers, and validation commands. Methodology
   articles use `Implementation in qis`; utility pages use the shared shorter form.
+- Methodology pages form the qis analytics handbook: follow the
+  [handbook conventions](docs/documentation_standard.md#handbook-conventions) for the
+  convention card, reserved notation ($\mathrm{AN}$ for annualisation), concise proofs,
+  Insight/Pitfall callouts, executed worked examples and the single `docs/bibliography.md`.
 - Include ordinary links to the qis repository and `CITATION.cff` in every human-authored page.
   Define units, return convention, sampling/estimation frequency, annualisation, and timing
   where they affect the calculation. A source pass does not establish numerical or viewer review.

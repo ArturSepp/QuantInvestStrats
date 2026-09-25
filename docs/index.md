@@ -25,59 +25,87 @@ Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats
 1. [Install qis](install.md). The core installation command is `python -m pip install qis`.
 2. Follow the [offline quickstart](quickstart.md) for a first chart, portfolio backtest,
    performance table and benchmark-relative results.
-3. Browse the [factsheet gallery](gallery.md) to choose a report, and read the
-   [reproducibility guide](reproducibility.md) before interpreting or comparing results.
+3. Browse the [factsheet gallery](gallery.md) to choose a report, and read
+   [Notation and conventions](notation_and_conventions.md) before interpreting or comparing
+   results.
 
 After installation, the quickstart calculations use fixed synthetic data without network access
 or optional extras. The complete portfolio workflow lives in
 [`examples/getting_started/offline_quickstart.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/getting_started/offline_quickstart.py).
 The quickstart page includes that source and provides links for Markdown viewers.
 
-## Performance and reporting
+## The qis analytics handbook
+
+The methodology chapters form one book. Each chapter defines its method with formulas and
+concise proofs, states its conventions in a seven-row convention card, works a small example
+whose numbers the test suite checks, and links to the functions that implement it. Symbols
+keep one meaning throughout; see [Notation and conventions](notation_and_conventions.md) and
+the [bibliography](bibliography.md).
+
+### Part I: Foundations
+
+- [Notation and conventions](notation_and_conventions.md): reserved symbols, simple and log
+  returns, per-annum returns, annualisation, excess returns and timing.
+- [Reporting frequency and annualisation](frequency_convention_note.md):
+  sampling grids, the variance ratio and interpretation of reported statistics.
+- [Incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md):
+  missing observations, instrument lifetimes and differing reporting schedules.
+
+### Part II: Performance measurement
 
 - [Performance analytics and Sharpe conventions](performance_analytics_and_sharpe.md):
   return, volatility, drawdown and risk-adjusted performance measures.
-- [Reporting-frequency methodology](frequency_convention_note.md):
-  sampling grids, annualisation and interpretation of reported statistics.
-- [Factsheets and reporting](factsheets_and_reporting.md):
-  inputs, report types and the calculation conventions used by the reporting workflow.
-- [Factsheet reference](factsheets.md):
-  call patterns, configuration, output objects and PDF saving.
 
-## Portfolio accounting and risk
+### Part III: Estimation
+
+- [Resampling and reproducibility](reproducibility.md):
+  the stationary bootstrap and what an unstated sampling convention costs.
+- [Private-asset unsmoothing](private_asset_unsmoothing.md):
+  serial correlation, return reconstruction and de-levering.
+
+### Part IV: Portfolios
 
 - [Portfolio backtesting](portfolio_backtesting.md):
   decisions, execution timing, held units and portfolio histories.
 - [Turnover conventions](turnover_conventions.md):
   traded notional, transaction costs and turnover reporting.
-- [Portfolio breadth](portfolio_breadth.md):
-  effective instrument counts and concentration.
+
+### Part V: Risk
+
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md):
   ex-ante risk estimates and realised tracking error and information ratio.
-- [Brinson attribution](brinson_attribution.md):
-  allocation, selection and interaction effects against a benchmark.
-
-## Estimation and market data
-
-- [Model-layer attribution](model_layer_attribution.md):
-  risk, signal and integration layers, with factor and feature contribution methods.
+- [Portfolio breadth](portfolio_breadth.md): effective instrument counts and concentration.
 - [Factor stress testing](stress_testing.md):
   specified factor shocks, valuation changes and prediction bands.
+- [Instrument portfolios and stress reports](portfolio_stress.md):
+  funded assets, options and futures in one stress interface.
 - [Stress testing with options](stress_testing_with_options.md):
   five stocks, ten short VOP-priced options and a four-ETF EWMA risk model.
-- [Incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md):
-  missing observations, instrument lifetimes and differing reporting schedules.
-- [Private-asset unsmoothing](private_asset_unsmoothing.md):
-  serial correlation, return reconstruction and estimation limitations.
 - [FX hedging and market data](fx_hedging_and_market_data.md):
   currency conversion, hedging assumptions and data contracts.
 
-## Implementation and reference
+### Part VI: Attribution
 
-- [Software design](software_design.md): module ownership, public API and dependency boundaries.
-- [Package comparison](package_comparison.md): documented workflows in qis and related libraries.
+- [Brinson attribution](brinson_attribution.md):
+  allocation, selection and interaction effects against a benchmark.
+- [Model-layer attribution](model_layer_attribution.md):
+  risk, signal and integration layers, with factor and feature contribution methods.
+
+## Reporting guides
+
+- [Factsheets and reporting](factsheets_and_reporting.md):
+  inputs, report types and the calculation conventions used by the reporting workflow.
+- [Factsheet reference](factsheets.md):
+  call patterns, configuration, output objects and PDF saving.
+- [Factsheet gallery](gallery.md): the four report types on fixed synthetic data.
+
+## Reference
+
 - [API reference](api/index.rst): function and class documentation.
   [Public API source catalog](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/api.py).
+- [Bibliography](bibliography.md): every work cited by the handbook, in one style.
+- [Software design](software_design.md): module ownership, public API and dependency boundaries.
+- [Package comparison](package_comparison.md): documented workflows in qis and related libraries.
 - [API migration history](REMOVED_5_0.md): renamed and removed symbols, with current module imports.
 - [Documentation standard](documentation_standard.md): article, equation, citation and figure rules.
 
@@ -108,16 +136,71 @@ the articles; the source links remain usable when reading this page in a checkou
 install
 quickstart
 gallery
-Reproducibility <reproducibility>
 ```
 
 ```{toctree}
 :hidden:
 :maxdepth: 1
-:caption: Performance and reporting
+:caption: Part I - Foundations
+
+notation_and_conventions
+Reporting frequency and annualisation <frequency_convention_note>
+incomplete_and_mixed_frequency_data
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+:caption: Part II - Performance measurement
 
 performance_analytics_and_sharpe
-Reporting-frequency methodology <frequency_convention_note>
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+:caption: Part III - Estimation
+
+Resampling and reproducibility <reproducibility>
+Private-asset unsmoothing <private_asset_unsmoothing>
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+:caption: Part IV - Portfolios
+
+Portfolio backtesting <portfolio_backtesting>
+Turnover conventions <turnover_conventions>
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+:caption: Part V - Risk
+
+Tracking error and risk <tracking_error_and_risk>
+Portfolio breadth <portfolio_breadth>
+Factor stress testing <stress_testing>
+Instrument portfolios and stress reports <portfolio_stress>
+Stress testing with options <stress_testing_with_options>
+FX hedging and market data <fx_hedging_and_market_data>
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+:caption: Part VI - Attribution
+
+Brinson attribution <brinson_attribution>
+Model-layer attribution <model_layer_attribution>
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+:caption: Reporting guides
+
 factsheets_and_reporting
 Factsheet reference <factsheets>
 ```
@@ -125,37 +208,12 @@ Factsheet reference <factsheets>
 ```{toctree}
 :hidden:
 :maxdepth: 1
-:caption: Portfolio accounting and risk
+:caption: Reference
 
-Portfolio backtesting <portfolio_backtesting>
-Turnover conventions <turnover_conventions>
-Portfolio breadth <portfolio_breadth>
-Tracking error and risk <tracking_error_and_risk>
-Brinson attribution <brinson_attribution>
-```
-
-```{toctree}
-:hidden:
-:maxdepth: 1
-:caption: Estimation and market data
-
-Model-layer attribution <model_layer_attribution>
-Factor stress testing <stress_testing>
-Instrument portfolios and stress reports <portfolio_stress>
-Stress testing with options <stress_testing_with_options>
-incomplete_and_mixed_frequency_data
-Private-asset unsmoothing <private_asset_unsmoothing>
-FX hedging and market data <fx_hedging_and_market_data>
-```
-
-```{toctree}
-:hidden:
-:maxdepth: 1
-:caption: Implementation and reference
-
+api/index
+bibliography
 software_design
 Package comparison <package_comparison>
-api/index
 REMOVED_5_0
 documentation_standard
 Sharpe convention summary <_included/sharpe_conventions>

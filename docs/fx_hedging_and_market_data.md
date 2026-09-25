@@ -33,6 +33,16 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Simple returns; log output is $\log(1+R_t)$ of the complete payoff |
+| Sampling grid | The `freq` grid of the pair calculation, default `ME` |
+| Annualisation | Annual rates are divided by $\mathrm{AN}$; the CIP period is $\Delta=1/\mathrm{AN}$ |
+| Mean adjustment | Not applicable |
+| Timing | Hedge ratio and forward premium set at $t-1$ apply to the return at $t$ |
+| Output units | Decimal returns in the reference currency |
+| qis default | `hedge_ratio` has no default: 0 is unhedged, 1 hedges the opening principal; `freq='ME'` |
+
 | Symbol or input | Meaning | Units or convention |
 |---|---|---|
 | `fx_spots` | Spot panel by currency | USD per one unit of each currency; USD column is 1 |
@@ -40,7 +50,7 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 | $P_t$ | Asset price in local currency | Positive level on a dated index |
 | $r^{L}_t$, $r^{FX}_t$ | Local asset and cross-rate returns over $[t-1,t]$ | Simple periodic returns |
 | $y^L_t$, $y^R_t$ | Local and reference short rates | Annualised decimal rates |
-| $a$, $\Delta$ | Periods per year and CIP period | $\Delta=1/a$, selected from `freq` |
+| $\mathrm{AN}$, $\Delta$ | Periods per year and CIP period | $\Delta=1/\mathrm{AN}$, selected from `freq` |
 | $f_t$ | qis local/reference cash-growth premium | Simple fraction; inverse quote to $F_t/S_t-1$ |
 | $F_t$ | Forward fixed at $t$ for the next period | Reference per local, same direction as $S_t$ |
 | $h_t$ | Local opening principal sold forward | Fraction; 0 unhedged, 1 principal hedge |
@@ -288,9 +298,5 @@ Local CSV loading reads supplied files; it does not itself update market observa
 
 ## References
 
-1. Borio, C., McCauley, R., McGuire, P., and Sushko, V. (2016).
-   [Covered interest parity lost: understanding the cross-currency basis](https://www.bis.org/publications/qr-201609/covered-interest-parity-lost-understanding-cross-currency-basis).
-   *BIS Quarterly Review*, September. No-arbitrage cash/forward relation and limits of frictionless CIP.
-2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-   Software, MIT licence. Use [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
-   and identify the version/source used for a calculation.
+1. Borio, C., McCauley, R., McGuire, P., and Sushko, V. (2016). Covered interest parity lost: understanding the cross-currency basis. *BIS Quarterly Review*, September. [Publisher page](https://www.bis.org/publications/qr-201609/covered-interest-parity-lost-understanding-cross-currency-basis). No-arbitrage cash/forward relation and limits of frictionless CIP.
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

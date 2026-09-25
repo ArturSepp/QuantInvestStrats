@@ -31,6 +31,38 @@ Explain simple versus log returns, annualisation, estimation versus reporting gr
 versus net results, risk-free-rate assumptions, and prior versus current weights where relevant.
 These are part of the calculation contract, including when a figure illustrates the method.
 
+## Handbook conventions
+
+The methodology articles form the *qis analytics handbook*. Beyond the shared structure, every
+article follows these rules; `tools/check_docs.py` and the documentation tests enforce the
+mechanical ones.
+
+- **Convention card.** The first table under `Inputs, notation, and assumptions` has the header
+  `| Convention | This article |` and exactly these rows, in order: Return basis, Sampling grid,
+  Annualisation, Mean adjustment, Timing, Output units, qis default. The
+  [notation chapter](notation_and_conventions.md) defines each row.
+- **Reserved notation.** Symbols listed in the notation chapter keep one meaning in every
+  article. The annualisation factor is $\mathrm{AN}$, set upright as one symbol. A local
+  symbol is declared in the article's notation table and never reuses a reserved one. Write
+  the transpose as `\top` and variance or covariance as `\operatorname{Var}` and
+  `\operatorname{Cov}`; the checker rejects `\mathsf{T}`, `\intercal`, `\mathrm{Var}` and
+  plain-text formulas such as `Sigma_` or `sqrt(`.
+- **Results and concise proofs.** State a result in a paragraph opening with a bold
+  **Definition.**, **Identity.** or **Proposition.** label, and follow each identity or
+  proposition with a short **Proof.** paragraph ending in $\square$. Cite a longer derivation
+  instead of reproducing it.
+- **Insight and Pitfall callouts.** Write `> **Insight.** ...` or `> **Pitfall.** ...` as an
+  ordinary blockquote. `docs/_ext/qis_callouts.py` renders these as admonitions in Sphinx;
+  other viewers show a readable quotation.
+- **Executed worked examples.** Every `python` block of a methodology article runs, offline,
+  in `src/qis/tests/documentation_examples_test.py`. Put a comment line
+  `<!-- docs-test: skip -->` immediately before a schematic block that cannot run.
+- **One bibliography.** [The bibliography](bibliography.md) holds every cited work once, in one
+  style. An article's References section is a numbered list whose items begin with a
+  bibliography entry verbatim, optionally followed by a note, and it includes the software
+  citation. `src/qis/tests/documentation_bibliography_test.py` enforces the match.
+- **Spelling.** Prose uses British spelling; Python names keep their published American spelling.
+
 ## Copyable methodology template
 
 Copy the [shared methodology template](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#user-content-copyable-methodology-template),

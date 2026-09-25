@@ -36,6 +36,16 @@ absolute return or low total portfolio volatility.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Simple or log returns via `is_log_returns`; the difference is formed before estimation |
+| Sampling grid | `freq` of the ex-post estimators, default `ME`; covariance dates for ex-ante risk |
+| Annualisation | Ex post: $\sqrt{\mathrm{AN}}$ from the return index; ex ante: the covariance scale |
+| Mean adjustment | Whole-sample TE is demeaned; the EWMA TE is a second moment about zero |
+| Timing | Ex-ante weights as of each covariance date; ex-post estimates are descriptive |
+| Output units | Decimal TE in the units of the covariance or annualised; dimensionless IR |
+| qis default | `compute_ewma_realised_tracking_error(freq='ME', ewma_span=36)` on simple returns |
+
 | Symbol or input | Meaning | Units and alignment |
 |---|---|---|
 | $w_p,w_b$ | Portfolio and benchmark weights | Decimal capital fractions; asset labels must match the covariance universe |
@@ -43,7 +53,7 @@ absolute return or low total portfolio volatility.
 | $\Sigma$ | Asset-return covariance | Periodic or annualised fractional covariance; state which |
 | $x_t=r_{p,t}-r_{b,t}$ | Realised active return | Difference of returns using the same convention and grid |
 | $s(x)$ | Sample standard deviation | `ddof=1`; NaNs omitted per column |
-| $a$ | Periods per year | Inferred from the return-difference index; 12 for regular month-end observations |
+| $\mathrm{AN}$ | Periods per year | Inferred from the return-difference index; 12 for regular month-end observations |
 | `ewma_span` | EWMA span | Count of sampled return periods, not calendar days |
 
 Supply positive NAVs over an explicitly aligned sample. Choose simple or log returns with
@@ -62,7 +72,7 @@ For the active weights and covariance at the same risk date:
 
 $$
 \mathrm{TE}_{\mathrm{ex\ ante}}
-=\sqrt{d^\mathsf{T}\Sigma d}.
+=\sqrt{d^{\top}\Sigma d}.
 $$
 
 `RiskModel` applies no annualisation. An annualised covariance produces annualised tracking
@@ -105,9 +115,9 @@ qis does not silently repair inconsistent model views.
 For a regularly sampled active-return series, the whole-sample estimators are:
 
 $$
-\widehat{\mathrm{TE}}=\sqrt{a}\,s(x),
+\widehat{\mathrm{TE}}=\sqrt{\mathrm{AN}}\,s(x),
 \qquad
-\widehat{\mathrm{IR}}=\frac{\sqrt{a}\,\overline{x}}{s(x)}.
+\widehat{\mathrm{IR}}=\frac{\sqrt{\mathrm{AN}}\,\overline{x}}{s(x)}.
 $$
 
 TE is in annualised return units; IR is dimensionless. The difference must be formed before
@@ -238,9 +248,5 @@ for readers using a Markdown viewer without Sphinx roles.
 
 ## References
 
-1. Roll, R. (1992). [A Mean/Variance Analysis of Tracking Error](https://www.anderson.ucla.edu/documents/areas/fac/finance/1992-2.pdf).
-   *The Journal of Portfolio Management*, 18(4), 13–22.
-   [DOI: 10.3905/jpm.1992.701922](https://doi.org/10.3905/jpm.1992.701922).
-2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-   Software, MIT licence. Citation metadata:
-   [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Roll, R. (1992). A Mean/Variance Analysis of Tracking Error. *The Journal of Portfolio Management*, 18(4), 13–22. [DOI: 10.3905/jpm.1992.701922](https://doi.org/10.3905/jpm.1992.701922). [Author's copy](https://www.anderson.ucla.edu/documents/areas/fac/finance/1992-2.pdf).
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

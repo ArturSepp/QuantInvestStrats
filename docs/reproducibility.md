@@ -35,16 +35,26 @@ than isolating a single code change while holding every other detail constant.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Synthetic arithmetic periodic returns |
+| Sampling grid | Integer positions; no calendar |
+| Annualisation | Linear, $\mathrm{AN}=260$, a fixed teaching convention |
+| Mean adjustment | Not applicable |
+| Timing | Not applicable: resampling of a fixed sample |
+| Output units | Basis points per period and annualised percentage points |
+| qis default | `generate_bootstrapped_indices`: `BootstrapType.IID`, `block_size=30`, `min_block_size=1` |
+
 | Symbol or input | Meaning | Value in this experiment |
 |---|---|---|
 | $n$ | Number of source observations | 250 ordered periods |
 | $M$ | Number of resampled paths | 400 |
-| $H$ | Observations in each path | 250 |
+| $K$ | Observations in each path | 250 |
 | $b$ | Mean geometric block length before any floor | 20 periods |
 | $p$ | Probability of ending a geometric block | $1/b=0.05$ |
 | $J_{t,m}$ | Zero-based source index at output position $t$ in path $m$ | Integer from 0 to 249 |
 | $x_i$ | Synthetic periodic return observation | Decimal arithmetic return |
-| $A$ | Linear annualisation factor for the mean | 260 periods per year |
+| $\mathrm{AN}$ | Linear annualisation factor for the mean | 260 periods per year |
 | Index seed | Numba random state used by each sampler | 7 |
 | Return seed | NumPy default-generator seed for the source series | 3 |
 
@@ -76,7 +86,7 @@ J_k=(U+k)\bmod n,
 \qquad k=0,\ldots,L-1.
 $$
 
-Concatenate independently drawn blocks until the output contains $H$ observations, trimming
+Concatenate independently drawn blocks until the output contains $K$ observations, trimming
 only the last block to the requested output length. Trimming at the **output** boundary is
 necessary; truncating a block at the **source** boundary changes the sampling rule.
 
@@ -94,11 +104,11 @@ illustration cleaner.
 
 ### Measuring draw frequencies
 
-Let $C_i$ be the number of times source observation $i$ appears across all $MH$ output positions.
+Let $C_i$ be the number of times source observation $i$ appears across all $MK$ output positions.
 Its relative draw frequency is
 
 $$
-f_i=\frac{nC_i}{MH},
+f_i=\frac{nC_i}{MK},
 \qquad
 \frac{1}{n}\sum_{i=0}^{n-1}f_i=1.
 $$
@@ -114,8 +124,8 @@ The average resampled mean, source mean and their difference are
 $$
 \begin{aligned}
 \bar x^*
-  &=\frac{1}{MH}\sum_{m=1}^{M}\sum_{t=1}^{H}x_{J_{t,m}}
-   =\sum_{i=0}^{n-1}\frac{C_i}{MH}x_i,\\
+  &=\frac{1}{MK}\sum_{m=1}^{M}\sum_{t=1}^{K}x_{J_{t,m}}
+   =\sum_{i=0}^{n-1}\frac{C_i}{MK}x_i,\\
 \bar x&=\frac{1}{n}\sum_{i=0}^{n-1}x_i,\\
 \delta&=\bar x^*-\bar x.
 \end{aligned}
@@ -125,7 +135,7 @@ The count-weighted expression independently checks the direct resampled-array ca
 Here “bias” labels the measured difference $\delta$ for one fixed source and one finite set
 of draws; it is not an exact expectation over all random sources and seeds.
 
-The table reports $10^4\delta$ in basis points per period and $100A\delta$ in annualised
+The table reports $10^4\delta$ in basis points per period and $100\,\mathrm{AN}\,\delta$ in annualised
 percentage points. This is **linear annualisation of a mean-return difference**, not a
 compounded annual return, CAGR, Sharpe ratio or probability of profit.
 
@@ -148,7 +158,7 @@ uniform in this finite experiment; it is not exactly uniform.
 
 Apply those same index arrays to the changing-drift source:
 
-| Convention | Resampled mean | Bias per period | Bias annualised, $A=260$ |
+| Convention | Resampled mean | Bias per period | Bias annualised, $\mathrm{AN}=260$ |
 |---|---:|---:|---:|
 | Historical truncating | 13.62 bp | **+0.83 bp** | **+2.15%** |
 | Circular | 12.67 bp | −0.12 bp | −0.32% |
@@ -270,8 +280,5 @@ script ran; source checks, numerical checks and visual review serve different pu
 
 ## References
 
-- Politis, D. N., and Romano, J. P. (1994). The Stationary Bootstrap. *Journal of the American
-  Statistical Association*, 89(428), 1303–1313.
-  [Publisher record and DOI](https://doi.org/10.1080/01621459.1994.10476870).
-- Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet
-  reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Politis, D. N., and Romano, J. P. (1994). The Stationary Bootstrap. *Journal of the American Statistical Association*, 89(428), 1303–1313. [DOI: 10.1080/01621459.1994.10476870](https://doi.org/10.1080/01621459.1994.10476870).
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

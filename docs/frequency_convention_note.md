@@ -44,16 +44,26 @@ difference from an accidental mismatch between estimates.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Log returns for the aggregation identities; tables follow `PerfParams.return_type` |
+| Sampling grid | The reporting grid: `B`, `W-WED`, `ME` or `QE` |
+| Annualisation | $\mathrm{AN}_f$ = 252, 52, 12 or 4; report windows count 260, 52, 12 or 4 per year |
+| Mean adjustment | Population identities; the estimators are those of the performance chapter |
+| Timing | Not applicable: reporting configuration |
+| Output units | Annualised decimals and dimensionless ratios |
+| qis default | Monthly reporting; the long preset for spans over `long_threshold_years=5` |
+
 | Symbol or setting | Definition |
 |---|---|
-| $f$, $m_f$ | Sampling frequency and its annualisation factor from `qis.get_annualization_factor`: business daily 252, weekly 52, monthly 12 or quarterly 4. |
+| $f$, $\mathrm{AN}_f$ | Sampling frequency and its annualisation factor from `qis.get_annualization_factor`: business daily 252, weekly 52, monthly 12 or quarterly 4. |
 | $r_t$ | Simple return over one observation period, in decimal units. |
-| $x_t = \log(1+r_t)$ | Log return, additive over adjacent periods when wealth is positive. |
+| $\ell_t = \log(1+r_t)$ | Log return, additive over adjacent periods when wealth is positive. |
 | $\hat\sigma_f$ | Sample standard deviation at frequency $f$, for the stated return convention. |
-| $k$, $S_k$ | Number of adjacent periods and their aggregate log return, $S_k = \sum_{i=1}^{k}x_i$. |
-| $\rho_j$, $\mathrm{VR}(k)$ | Lag-$j$ autocorrelation of $x_t$ and its $k$-period variance ratio. |
-| $\gamma_1$, $\kappa$ | Population skewness and excess kurtosis of a one-period log return. |
-| $N_{\min}$ | Target minimum observation count for the trailing correlation window; default 12. |
+| $k$, $S_k$ | Number of adjacent periods and their aggregate log return, $S_k = \sum_{i=1}^{k}\ell_i$. |
+| $\rho_j$, $\mathrm{VR}(k)$ | Lag-$j$ autocorrelation of $\ell_t$ and its $k$-period variance ratio. |
+| $\gamma_1$, $\gamma_2$ | Population skewness and excess kurtosis of a one-period log return. |
+| $n_{\min}$ | Target minimum observation count for the trailing correlation window; default 12. |
 
 The variance-ratio identity assumes covariance stationarity and finite variance.
 The higher-moment scaling below additionally assumes independent, identically
@@ -82,7 +92,7 @@ change the presets and should be described in the report.
 The usual annualised volatility estimate is
 
 $$
-\hat\sigma_{\mathrm{ann}}(f) = \hat\sigma_f\sqrt{m_f}.
+\hat\sigma_{\mathrm{ann}}(f) = \hat\sigma_f\sqrt{\mathrm{AN}_f}.
 $$
 
 Under independent additive increments, population variance scales with elapsed
@@ -97,11 +107,11 @@ returns, the variance ratio is
 
 $$
 \mathrm{VR}(k)
-= \frac{\mathrm{Var}(S_k)}{k\,\mathrm{Var}(x_t)}
+= \frac{\operatorname{Var}(S_k)}{k\,\operatorname{Var}(\ell_t)}
 = 1 + 2\sum_{j=1}^{k-1}\left(1-\frac{j}{k}\right)\rho_j.
 $$
 
-When the coarse annualisation factor is $m_f/k$, its population annualised
+When the coarse annualisation factor is $\mathrm{AN}_f/k$, its population annualised
 log-return volatility equals the fine-frequency value times
 $\sqrt{\mathrm{VR}(k)}$. Sample estimates need not satisfy that identity exactly.
 A positive weighted sum of autocorrelations raises the variance ratio above one;
@@ -132,7 +142,7 @@ Counts are periods of the indicated grid, shown as **long · short**.
 | Monthly | `ME` | 36 · 12 | 36 · 12 | quarterly · monthly | 12 |
 | Quarterly | `QE` | 12 · 4 | 12 · 4 | quarterly · monthly | 4 |
 
-The last column sizes windows and spans only. It is not the annualisation factor $m_f$:
+The last column sizes windows and spans only. It is not the annualisation factor $\mathrm{AN}_f$:
 a daily preset uses 260-observation windows, while its volatility is annualised with 252.
 
 The volatility and variance parameters are exponentially weighted spans; the
@@ -176,7 +186,7 @@ moments, additive aggregation gives
 
 $$
 \mathrm{skew}(S_k) = \frac{\gamma_1}{\sqrt{k}}, \qquad
-\mathrm{excess\ kurtosis}(S_k) = \frac{\kappa}{k}.
+\mathrm{excess\ kurtosis}(S_k) = \frac{\gamma_2}{k}.
 $$
 
 These are population identities, not exact relations between sample statistics.
@@ -192,10 +202,10 @@ The multi-asset report widens its trailing correlation window using
 
 $$
 \mathrm{trailing\ years}
-= \max\left(1,\left\lceil\frac{N_{\min}}{m_f}\right\rceil\right).
+= \max\left(1,\left\lceil\frac{n_{\min}}{\mathrm{AN}_f}\right\rceil\right).
 $$
 
-With the default $N_{\min}=12$, the nominal window is one year at daily, weekly
+With the default $n_{\min}=12$, the nominal window is one year at daily, weekly
 and monthly frequency and three years at quarterly frequency. This rule applies
 to the trailing correlation panel, not to every rolling statistic or recent
 performance table. Missing data and a short history can still leave fewer than
@@ -288,15 +298,7 @@ including the three labelled Sharpe variants, see
 
 ## References
 
-- Getmansky, M., Lo, A. W., and Makarov, I. (2004).
-  [An econometric model of serial correlation and illiquidity in hedge fund returns](https://doi.org/10.1016/j.jfineco.2004.04.001).
-  *Journal of Financial Economics*, 74(3), 529–609.
-- Lo, A. W. (2002).
-  [The Statistics of Sharpe Ratios](https://doi.org/10.2469/faj.v58.n4.2453).
-  *Financial Analysts Journal*, 58(4), 36–52.
-- Lo, A. W., and MacKinlay, A. C. (1988).
-  [Stock Market Prices Do Not Follow Random Walks: Evidence from a Simple Specification Test](https://doi.org/10.1093/rfs/1.1.41).
-  *Review of Financial Studies*, 1(1), 41–66.
-- [qis source and project documentation](https://github.com/ArturSepp/QuantInvestStrats).
-  Cite the software version used through
-  [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Getmansky, M., Lo, A. W., and Makarov, I. (2004). An econometric model of serial correlation and illiquidity in hedge fund returns. *Journal of Financial Economics*, 74(3), 529–609. [DOI: 10.1016/j.jfineco.2004.04.001](https://doi.org/10.1016/j.jfineco.2004.04.001).
+2. Lo, A. W. (2002). The Statistics of Sharpe Ratios. *Financial Analysts Journal*, 58(4), 36–52. [DOI: 10.2469/faj.v58.n4.2453](https://doi.org/10.2469/faj.v58.n4.2453).
+3. Lo, A. W., and MacKinlay, A. C. (1988). Stock Market Prices Do Not Follow Random Walks: Evidence from a Simple Specification Test. *Review of Financial Studies*, 1(1), 41–66. [DOI: 10.1093/rfs/1.1.41](https://doi.org/10.1093/rfs/1.1.41).
+4. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

@@ -39,16 +39,26 @@ Choose the transformation from the economic question:
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Simple returns for de-levering; simple or log returns, retained throughout, for unsmoothing |
+| Sampling grid | The reporting grid of each sleeve, `freq`, for example `QE` |
+| Annualisation | Financing rates are divided by $\mathrm{AN}$ periods per year |
+| Mean adjustment | EWMA mean with `InitType.X0` for rolling fits; full-sample fit for the static filter |
+| Timing | Coefficients estimated through $t-1$ are applied to the return at $t$ |
+| Output units | Decimal returns and reconstructed NAV levels |
+| qis default | `compute_ar_unsmoothed_prices(ar_order=2, freq='QE', span=40, warmup_period=8)` on log returns |
+
 | Symbol or input | Meaning | Units or convention |
 |---|---|---|
 | $x_t$ | Observed return supplied to an unsmoother | Simple or log; retain one basis throughout the filter |
-| $u_t$ | Filter-adjusted return on that same basis | Decimal simple return or log return |
+| $r^{u}_t$ | Filter-adjusted return on that same basis | Decimal simple return or log return |
 | $q$ | AR lag order | Number of observations, not calendar days |
 | $b_{j,t}$ | Estimated coefficient on observed lag $j$ | Dimensionless; rolling estimate dated $t$ |
-| $s_t=\sum_{j=1}^{q}b_{j,t}$ | Coefficient sum | Controls the inversion denominator |
+| $\Theta_t=\sum_{j=1}^{q}b_{j,t}$ | Coefficient sum | Controls the inversion denominator |
 | $L$ | Debt divided by equity | Nonnegative scalar; $L=0.5$ corresponds to 1.5x assets/equity |
-| $y_t$, $a$ | Annual financing rate and periods per year | Decimal annual rate; e.g. $a=12$ monthly |
-| $c_t=y_t/a$ | Financing cost for the return period | Simple periodic rate under the helper's convention |
+| $y_t$, $\mathrm{AN}$ | Annual financing rate and periods per year | Decimal annual rate; e.g. $\mathrm{AN}=12$ monthly |
+| $c_t=y_t/\mathrm{AN}$ | Financing cost for the return period | Simple periodic rate under the helper's convention |
 | $r^{V}_t$, $r^{A}_t$ | Vehicle and unlevered asset returns | **Simple** periodic returns |
 
 Use date-indexed Series/DataFrames, with columns identifying assets. The price-level wrapper
@@ -59,7 +69,7 @@ grid and is not a fixed-length window.
 Annual financing quotes supplied as a Series are aligned from observations at or before each
 return date, with **no additional one-period shift** in `delever_returns`. The caller must supply
 the quote applicable to that period; a quote first known at its end is not automatically an
-opening financing rate. Missing leading quotes remain unavailable. The helper divides by $a$,
+opening financing rate. Missing leading quotes remain unavailable. The helper divides by $\mathrm{AN}$,
 rather than applying an elapsed-day accrual.
 
 ## Methodology
@@ -89,7 +99,7 @@ The rolling engine estimates the observed return jointly on its first $q$ lags. 
 coefficients, its inversion is
 
 $$
-u_t=
+r^{u}_t=
 \frac{x_t-\sum_{j=1}^{q}b_{j,t-1}x_{t-j}}
      {1-\sum_{j=1}^{q}b_{j,t-1}}.
 $$
@@ -128,7 +138,7 @@ be labelled as a skipped correction.
 `unsmooth_returns_glm` uses constant coefficients $\theta_j$ in the same observed-lag inversion:
 
 $$
-u_t=
+r^{u}_t=
 \frac{x_t-\sum_{j=1}^{q}\theta_j x_{t-j}}
      {1-\sum_{j=1}^{q}\theta_j}.
 $$
@@ -150,10 +160,10 @@ There are two current boundary behaviours to inspect:
   that tolerance instead returns the input unchanged with severe/infinite diagnostics. Always
   request diagnostics before accepting a static result.
 
-For coefficient sum $s<1$, the diagnostic `vol_inflation_factor` is $1/(1-s)$: the multiplier on
+For coefficient sum $\Theta<1$, the diagnostic `vol_inflation_factor` is $1/(1-\Theta)$: the multiplier on
 the filter numerator. It is **not generally the ratio of output to input sample volatility**,
 because subtracting correlated lagged returns also changes numerator variance.
-`is_severe` flags $\lvert s\rvert>0.95$; a negative sum can lack the intended smoothing
+`is_severe` flags $\lvert \Theta\rvert>0.95$; a negative sum can lack the intended smoothing
 interpretation even when that flag is false.
 
 ## Worked example
@@ -283,11 +293,5 @@ work on a core install.
 
 ## References
 
-1. Getmansky, M., Lo, A. W., and Makarov, I. (2004).
-   [An econometric model of serial correlation and illiquidity in hedge fund returns](https://web.mit.edu/Alo/www/Papers/JFE2004Pub.pdf).
-   *Journal of Financial Economics*, 74, 529–609.
-   [DOI: 10.1016/j.jfineco.2004.04.001](https://doi.org/10.1016/j.jfineco.2004.04.001).
-   Smoothing model and illiquidity interpretation; the AR implementation distinction is stated above.
-2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-   Software, MIT licence. Use [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
-   and identify the version/source used for a calculation.
+1. Getmansky, M., Lo, A. W., and Makarov, I. (2004). An econometric model of serial correlation and illiquidity in hedge fund returns. *Journal of Financial Economics*, 74(3), 529–609. [DOI: 10.1016/j.jfineco.2004.04.001](https://doi.org/10.1016/j.jfineco.2004.04.001). [Author's copy](https://web.mit.edu/Alo/www/Papers/JFE2004Pub.pdf). Smoothing model and illiquidity interpretation; the AR implementation distinction is stated above.
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

@@ -32,6 +32,16 @@ the page forms and links to scripts for regenerating their analytics.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Simple returns build levels; table volatility uses log returns |
+| Sampling grid | The reporting preset grid; running drawdowns use the native path |
+| Annualisation | $\mathrm{AN}$ of the base grid: 252, 52, 12 or 4 |
+| Mean adjustment | Sample moments, demeaned, as in the performance statistics |
+| Timing | Units are held between rebalancings; weights at $t$ apply over $(t,t+1]$ |
+| Output units | Decimal returns, dimensionless ratios and two-sided turnover |
+| qis default | `factsheet(reporting_frequency='monthly')`; the long preset for spans over five years |
+
 ### Inputs and the four report archetypes
 
 | Input | Selected report | Benchmark information |
@@ -236,8 +246,5 @@ generate figures, supporting tables and provenance together.
 
 ## References
 
-- qis contributors. [Factsheet dispatch and output contract](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/factsheet_facade.py)
-  and [reporting presets](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/config.py).
-  Primary implementation sources for the conventions on this page.
-- Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet
-  reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Bacon, C. R. (2008). *Practical Portfolio Performance Measurement and Attribution*, 2nd edition. Wiley. The performance-measurement conventions behind factsheet statistics.
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

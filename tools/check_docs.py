@@ -26,11 +26,26 @@ ARTICLE_HEADINGS = (
     'See also',
     'References',
 )
+# Every methodology article states the same seven conventions, in this order, as the first table
+# of "Inputs, notation, and assumptions", so a reader can compare chapters row by row.
+CONVENTION_HEADER = '| Convention | This article |'
+CONVENTION_ROWS = (
+    'Return basis', 'Sampling grid', 'Annualisation', 'Mean adjustment', 'Timing',
+    'Output units', 'qis default',
+)
+# Notation fixed by the Notation and conventions chapter: one transpose and one operator style,
+# and formulas in TeX rather than plain text.
+LEGACY_NOTATION = (
+    (re.compile(r'\\(?:mathsf\{T\}|intercal)'), 'Write the transpose as \\top.'),
+    (re.compile(r'\\mathrm\{(?:Var|Cov)\}'), 'Write Var and Cov with \\operatorname.'),
+    (re.compile(r'(?<!\\)\b(?:Sigma_|sqrt\()'), 'Write formulas as TeX, not plain text.'),
+)
 METHODOLOGY_PAGES = frozenset({
     'brinson_attribution.md', 'factsheets_and_reporting.md', 'frequency_convention_note.md',
     'fx_hedging_and_market_data.md', 'incomplete_and_mixed_frequency_data.md',
-    'model_layer_attribution.md', 'performance_analytics_and_sharpe.md',
-    'portfolio_backtesting.md', 'portfolio_breadth.md', 'private_asset_unsmoothing.md',
+    'model_layer_attribution.md', 'notation_and_conventions.md',
+    'performance_analytics_and_sharpe.md', 'portfolio_backtesting.md', 'portfolio_breadth.md',
+    'private_asset_unsmoothing.md',
     'reproducibility.md', 'stress_testing.md', 'stress_testing_with_options.md',
     'tracking_error_and_risk.md',
     'turnover_conventions.md',
@@ -38,7 +53,7 @@ METHODOLOGY_PAGES = frozenset({
 UTILITY_PAGES = frozenset({
     'documentation_standard.md', 'factsheets.md', 'gallery.md', 'index.md', 'install.md',
     'package_comparison.md', 'quickstart.md', 'REMOVED_5_0.md', 'software_design.md',
-    'portfolio_stress.md',
+    'portfolio_stress.md', 'bibliography.md',
 })
 # Adoption is explicit. Do not infer it from a byline or let new pages evade the inventory.
 ADOPTED_PAGES = frozenset({
@@ -51,7 +66,7 @@ ADOPTED_PAGES = frozenset({
     'model_layer_attribution.md', 'reproducibility.md',
     'factsheets_and_reporting.md', 'factsheets.md', 'gallery.md',
     'install.md', 'quickstart.md', 'software_design.md', 'package_comparison.md',
-    'REMOVED_5_0.md', 'portfolio_stress.md',
+    'REMOVED_5_0.md', 'portfolio_stress.md', 'notation_and_conventions.md', 'bibliography.md',
 })
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
@@ -219,7 +234,47 @@ def check_document(text: str, *, methodology: bool) -> list[Issue]:
         sections = [title for _, level, title in headings if level == 2]
         if sections != list(ARTICLE_HEADINGS):
             issues.append(Issue(1, 'Use each required methodology H2 once, in the standard order.'))
+        issues.extend(check_convention_card(visible))
+        for number, line in visible:
+            without_code = re.sub(r'(`+).*?\1', '', line)
+            for pattern, message in LEGACY_NOTATION:
+                if pattern.search(without_code):
+                    issues.append(Issue(number, message))
     return issues
+
+
+def check_convention_card(visible: list[tuple[int, str]]) -> list[Issue]:
+    """Require the seven-row convention card as the first table of the inputs section.
+
+    Args:
+        visible: numbered prose lines, as returned by ``prose_lines``
+
+    Returns:
+        Issues for a missing card or for rows that differ from ``CONVENTION_ROWS``.
+    """
+    inputs = '## Inputs, notation, and assumptions'
+    start = next((i for i, (_, line) in enumerate(visible) if line.strip() == inputs), None)
+    if start is None:
+        return []  # the section-order check already reports the missing heading
+    section = []
+    for number, line in visible[start + 1:]:
+        if HEADING.match(line) and line.startswith('## '):
+            break
+        section.append((number, line.strip()))
+    tables = [i for i, (_, line) in enumerate(section) if line.startswith('|')]
+    if not tables or section[tables[0]][1] != CONVENTION_HEADER:
+        line = section[tables[0]][0] if tables else visible[start][0]
+        return [Issue(line, 'Start the inputs section with a convention card: '
+                            + CONVENTION_HEADER)]
+    rows = []
+    for _, line in section[tables[0] + 2:]:
+        if not line.startswith('|'):
+            break
+        rows.append(line.strip('|').split('|')[0].strip())
+    if tuple(rows) != CONVENTION_ROWS:
+        return [Issue(section[tables[0]][0],
+                      'Use the convention card rows: ' + ', '.join(CONVENTION_ROWS) + '.')]
+    return []
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

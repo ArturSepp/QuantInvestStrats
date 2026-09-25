@@ -48,6 +48,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'myst_parser',
     'qis_indexing',
+    'qis_callouts',
 ]
 
 # the house convention is Google-style; factorlasso uses numpydoc and is documented separately

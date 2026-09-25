@@ -32,13 +32,23 @@ the three numbers need not agree.
 
 ## Inputs, notation, and assumptions
 
+| Convention | This article |
+|---|---|
+| Return basis | Simple returns for the p.a. and arithmetic numerators; volatility on `PerfParams.return_type` returns, log by default |
+| Sampling grid | `freq_vol` for volatility and ratios, default `ME`; `freq_drawdown` for drawdowns, default daily; native endpoints for visible returns |
+| Annualisation | $\sqrt{\mathrm{AN}}$ of the sampled grid for volatility; 365.25-day years for p.a. returns |
+| Mean adjustment | Demeaned sample standard deviation, `ddof=1` |
+| Timing | Descriptive, full sample; the cash rate is lagged one observation |
+| Output units | Decimal returns and volatilities; dimensionless ratios |
+| qis default | `PerfParams()`: `freq='ME'`, `return_type=ReturnTypes.LOG`, zero cash rate |
+
 | Symbol or input | Meaning | Units or convention |
 |---|---|---|
 | $P_t$ | Positive price or NAV at time $t$ | Any consistent scale per asset; columns identify assets or strategies |
 | $r_t$ | Simple periodic return | Decimal fraction |
 | $\ell_t$ | Log periodic return | Log price ratio |
 | $s(x)$ | Sample standard deviation of a return series | `ddof=1` |
-| $a$ | Periods per year used for sampled risk | 12 for `ME`; inferred from the sampled index |
+| $\mathrm{AN}$ | Periods per year used for sampled risk | 12 for `ME`; inferred from the sampled index |
 | $v_t$ | Returns selected for table volatility | Log by default; simple with `ReturnTypes.RELATIVE` |
 | $Y$ | Elapsed years between the ratio's sampled endpoints | Calendar days divided by 365.25 |
 | `rates_data` | Cash rate used by excess-return calculations | Annualised decimal rate, applied with a one-period lag |
@@ -74,7 +84,7 @@ r_t=\frac{P_t}{P_{t-1}}-1,
 \qquad
 \ell_t=\log\left(\frac{P_t}{P_{t-1}}\right),
 \qquad
-\sigma_v=\sqrt{a}\,s(v).
+\sigma_v=\sqrt{\mathrm{AN}}\,s(v).
 $$
 
 Simple returns compound through time; log returns add through time. Neither permits unrestricted
@@ -83,10 +93,10 @@ addition of asset log returns to obtain a portfolio log return.
 ### The three Sharpe objects
 
 Let $P_s,P_e$ be the first and last complete sampled boundaries for a particular asset.
-The table's p.a. return helper uses the following $C$ on that support:
+The table's p.a. return helper uses the following $R_{\mathrm{pa}}$ on that support:
 
 $$
-C=
+R_{\mathrm{pa}}=
 \begin{cases}
 (P_e/P_s)^{1/Y}-1, & Y>1,\\
 P_e/P_s-1, & 0<Y\leq 1.
@@ -100,11 +110,11 @@ offers `annualize_less_1y=True` for linear scaling, but the static table does no
 The zero-rate static-table ratios are:
 
 $$
-S_{\mathrm{PA}}=\frac{C}{\sigma_v},
+\mathrm{SR}_{\mathrm{pa}}=\frac{R_{\mathrm{pa}}}{\sigma_v},
 \qquad
-S_{\mathrm{arith}}=\frac{\sqrt{a}\,\overline r}{s(r)},
+\mathrm{SR}_{\mathrm{arith}}=\frac{\sqrt{\mathrm{AN}}\,\overline r}{s(r)},
 \qquad
-S_{\mathrm{log}}=\frac{\log(1+C)}{\sigma_v}.
+\mathrm{SR}_{\log}=\frac{\log(1+R_{\mathrm{pa}})}{\sigma_v}.
 $$
 
 | Convention | Full-table columns | Interpretation |
@@ -116,7 +126,7 @@ $$
 The p.a. and log columns share `VOL`. Consequently, switching `return_type` to
 `ReturnTypes.RELATIVE` also changes the denominator of the log-labelled ratio. It does not
 change the arithmetic family's matched simple-return denominator. Even with log volatility,
-calendar-year endpoint scaling need not exactly equal scaling the sample mean by $a$.
+calendar-year endpoint scaling need not exactly equal scaling the sample mean by $\mathrm{AN}$.
 
 The `_RF0` column assumes zero cash return. Excess p.a./log columns replace the numerator with
 the corresponding compounded excess-return measure and retain the selected table volatility.
@@ -138,13 +148,13 @@ prices explicitly before calling that branch when a different grid is required. 
 uses an exponentially weighted estimator rather than a fixed-window sample standard deviation.
 
 Rolling `SHARPE` does not read `PerfParams`. Its current helper uses log returns and
-$\sqrt{a}\,[\exp(\overline{\ell})-1]/s(\ell)$ within each window. This is a separate reporting
+$\sqrt{\mathrm{AN}}\,[\exp(\overline{\ell})-1]/s(\ell)$ within each window. This is a separate reporting
 calculation from the three static-table ratios above.
 
 Running drawdown measures the loss from the running observed peak:
 
 $$
-D_t=\frac{P_t}{\max_{s\leq t}P_s}-1.
+D_t=\frac{P_t}{\max_{t'\leq t}P_{t'}}-1.
 $$
 
 `compute_rolling_drawdowns` starts at the first valid price and carries the drawdown state over
@@ -255,9 +265,5 @@ is included in the documentation site.
 
 ## References
 
-1. Sharpe, W. F. (1994). [The Sharpe Ratio](https://web.stanford.edu/~wfsharpe/art/sr/SR.htm).
-   *The Journal of Portfolio Management*, 21(1), 49–58. The historical differential-return
-   definition and its time-aggregation assumptions.
-2. Sepp, A., and qis contributors. [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-   Software, MIT licence. Use [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
-   for citation metadata and identify the version/source used for a calculation.
+1. Sharpe, W. F. (1994). The Sharpe Ratio. *The Journal of Portfolio Management*, 21(1), 49–58. [Author's copy](https://web.stanford.edu/~wfsharpe/art/sr/SR.htm). The historical differential-return definition and its time-aggregation assumptions.
+2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
