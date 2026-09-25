@@ -14,6 +14,35 @@ from typing import List, Union, Tuple, Optional
 import qis.plots.utils as put
 
 
+def _require_matching_error_labels(error_labels: pd.Index,
+                                   estimate_labels: pd.Index,
+                                   axis_name: str
+                                   ) -> None:
+    """Require one error axis to identify every estimate exactly once."""
+    if error_labels.has_duplicates:
+        raise ValueError(f'y_std_errors {axis_name} must not contain duplicate labels')
+    if (len(error_labels) != len(estimate_labels)
+            or not error_labels.isin(estimate_labels).all()
+            or not estimate_labels.isin(error_labels).all()):
+        raise ValueError(
+            f'y_std_errors {axis_name} must contain exactly the same labels as df {axis_name}'
+        )
+
+
+def _align_y_std_errors(df: pd.DataFrame,
+                        y_std_errors: Union[float, pd.Series, pd.DataFrame]
+                        ) -> Union[float, pd.Series, pd.DataFrame]:
+    """Validate and align labelled error magnitudes to plotted estimates."""
+    if isinstance(y_std_errors, pd.Series):
+        _require_matching_error_labels(y_std_errors.index, df.index, 'index')
+        return y_std_errors.reindex(df.index)
+    if isinstance(y_std_errors, pd.DataFrame):
+        _require_matching_error_labels(y_std_errors.index, df.index, 'index')
+        _require_matching_error_labels(y_std_errors.columns, df.columns, 'columns')
+        return y_std_errors.reindex(index=df.index, columns=df.columns)
+    return y_std_errors
+
+
 def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   y_std_errors: Union[float, pd.Series, pd.DataFrame] = 0.5,
                   exact: Union[pd.Series, pd.DataFrame] = None,  # can add exact solution
@@ -34,7 +63,21 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
                   ax: plt.Subplot = None,
                   **kwargs
                   ) -> Optional[plt.Figure]:
+    """Plot labelled point estimates with optional error and reference values.
 
+    Args:
+        df: Point estimates, plotted as one series per column.
+        y_std_errors: Scalar error magnitude, a Series shared across columns, or a DataFrame with
+            one error series per estimate column. Pandas errors must have unique labels that match
+            the estimate rows exactly; DataFrame errors must also match the estimate columns.
+        exact: Optional exact values overlaid as scatter points.
+
+    Returns:
+        A newly created figure, or ``None`` when drawing on a supplied axis.
+
+    Raises:
+        ValueError: If labelled errors contain duplicate, missing, or extra row or column labels.
+    """
 
     if ax is None:
         fig, ax = plt.subplots()
@@ -52,6 +95,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
     else:
         raise TypeError(f"unsupported data type {type(df)}")
 
+    y_std_errors = _align_y_std_errors(df=df, y_std_errors=y_std_errors)
     columns = df.columns
 
     if colors is None:
@@ -59,7 +103,7 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
 
     for idx, column in enumerate(columns):
         if isinstance(y_std_errors, pd.DataFrame):
-            yerr = y_std_errors[column].to_numpy()  # columnwese
+            yerr = y_std_errors[column].to_numpy()
         elif isinstance(y_std_errors, pd.Series):
             yerr = y_std_errors.to_numpy()
         else:
