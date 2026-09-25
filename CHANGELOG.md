@@ -13,6 +13,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   cost divided by the preceding NAV. It previously subtracted a trailing 260-period sum of costs
   divided by current NAV, which left the first 259 rows missing and overstated later cost drag.
   Net contributions of a portfolio without fees, funding or carry now sum to its NAV return.
+- Make `compute_autocorr_df` return the requested `num_lags`; any value other than 20 previously
+  raised a shape error because the lag count was not passed to the estimator.
 
 ### Changed
 

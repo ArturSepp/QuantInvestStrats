@@ -83,10 +83,20 @@ def compute_autocorr_df(df: Union[pd.Series, pd.DataFrame],
                         axis: int = 0
                         ) -> pd.DataFrame:
     """
-    compute auto correlation columns wise and return df with lags = index
-    default is axis = 0
+    lagged Pearson autocorrelation of each column, with the lag as the index.
+
+    Lag ``k`` correlates ``x[k:]`` with ``x[:-k]`` over the overlapping observations, each segment
+    with its own mean; lag 0 is one by definition. Missing values are not handled.
+
+    Args:
+        df: observations in rows, one series per column
+        num_lags: number of lags returned, from 0 to ``num_lags - 1``
+        axis: retained for compatibility; the computation is always along the rows
+
+    Returns:
+        autocorrelations indexed by lag, as a Series for a Series input
     """
-    acf = compute_path_autocorr(a=df.to_numpy())
+    acf = compute_path_autocorr(a=df.to_numpy(), num_lags=num_lags)
     if isinstance(df, pd.Series):
         df = pd.Series(data=acf, index=np.arange(0, num_lags), name=df.name)
     else:
