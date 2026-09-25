@@ -58,8 +58,10 @@ def compute_brinson_attribution_table(
         group_order: Preferred group order; other observed groups are appended.
         total_column: Name reserved for the total row and effect-series total column.
         is_exclude_interaction_term: Include interaction in selection when True.
-        strategy_name: Strategy label in summary column headers.
-        benchmark_name: Benchmark label in summary column headers.
+        strategy_name: Strategy label in summary column headers. Matching strategy and
+            benchmark labels are qualified by portfolio role.
+        benchmark_name: Benchmark label in summary column headers. Matching strategy and
+            benchmark labels are qualified by portfolio role.
         is_linked: Link period effects to compounded active return when True.
 
     Returns:
@@ -115,6 +117,9 @@ def compute_brinson_attribution_table(
         active = allocation + selection + interaction
         sp = sp.mul((1.0 + rp).cumprod().shift(1, fill_value=1.0), axis=0)
         bp = bp.mul((1.0 + rb).cumprod().shift(1, fill_value=1.0), axis=0)
+    if strategy_name == benchmark_name:
+        strategy_name = f'{strategy_name} (Strategy)'
+        benchmark_name = f'{benchmark_name} (Benchmark)'
     return_label = 'Return Total' if is_linked else 'Return Sum'
     totals = pd.DataFrame({
         f'{strategy_name}\nWeight Ave': sw.mean(),
