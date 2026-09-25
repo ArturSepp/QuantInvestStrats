@@ -292,7 +292,7 @@ including the three labelled Sharpe variants, see
 ## See also
 
 - [Factsheets and reporting](factsheets_and_reporting.md).
-- [Performance analytics and Sharpe](performance_analytics_and_sharpe.md).
+- [Sharpe ratios: conventions and inference](performance_analytics_and_sharpe.md).
 - [Incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md).
 - [Private-asset unsmoothing](private_asset_unsmoothing.md).
 

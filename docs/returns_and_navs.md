@@ -381,6 +381,17 @@ accounting, and no hurdle rate. `qis.compute_net_navs_ex_perf_man_fees(navs, ...
 the gross NAVs, takes simple returns, applies the recursion column by column, and rebuilds a net
 NAV that starts at 1.
 
+![Gross NAV of synthetic US equity rising from 100 to 227 over 21 years, and the dashed net NAV after a 2% management fee and a 20% performance fee ending at 131](images/handbook_fee_navs.png)
+
+[Open full-resolution preview](images/handbook_fee_navs.png).
+
+The exhibit applies the recursion with $f_{\mathrm{man}}=2\%$, $f_{\mathrm{perf}}=20\%$ and annual
+crystallisation to the synthetic US equity index, rebased to 100. Gross assets grow to 226.8 and
+the net NAV to 131.2, a compound 4.0% a year against 1.3%: fees take two thirds of the gross
+return. The gap widens fastest in rising years, when both fees are charged, and keeps widening in
+falling years through the management fee alone. A falling year also leaves the high-water mark in
+place, so the recovery that follows is free of performance fees only up to that mark.
+
 ### Leverage and financing
 
 **Identity (constant leverage).** A vehicle with equity $E$ borrows $LE$ at a periodic cost $c_t$
@@ -908,7 +919,7 @@ and the backtest cash recursion is in
 - [Portfolio backtesting](portfolio_backtesting.md): the cash recursion that uses the funding and
   fee conventions tabulated above.
 - [The performance-statistic catalogue](performance_statistics.md) and
-  [Performance analytics and Sharpe conventions](performance_analytics_and_sharpe.md).
+  [Sharpe ratios: conventions and inference](performance_analytics_and_sharpe.md).
 - [Drawdowns and time under water](drawdowns.md) and
   [Risk-adjusted returns and volatility targeting](risk_adjusted_returns.md).
 - {doc}`to_returns API <api/generated/qis.to_returns>`,

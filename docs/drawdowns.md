@@ -717,7 +717,7 @@ Contract details:
 
 ## See also
 
-- [Performance analytics and Sharpe conventions](performance_analytics_and_sharpe.md)
+- [Sharpe ratios: conventions and inference](performance_analytics_and_sharpe.md)
 - [The performance-statistic catalogue](performance_statistics.md)
 - [Risk-adjusted returns and volatility targeting](risk_adjusted_returns.md)
 - [Returns, NAVs, excess returns, fees and leverage](returns_and_navs.md)

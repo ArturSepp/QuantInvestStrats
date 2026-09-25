@@ -24,10 +24,10 @@ return columns retain native observed endpoints. The arithmetic pair is computed
     SR = sqrt(af) E[r] / sqrt(Var[r])
 
 computed inside ``compute_risk_table`` so numerator and denominator share one return series.
-Every excess variant needs ``PerfParams.rates_data``; without it those columns are undefined.
+Every excess variant uses ``PerfParams.rates_data``; without it each equals its zero-rate column.
 ``PerfParams.sharpe_convention`` labels which object a *regime* Sharpe reports and is read in
-``qis/perfstats/regime_classifier.py``, not here. Full reconciliation in
-``qis/docs/sharpe_conventions.md``.
+``qis/perfstats/regime_classifier.py``, not here. Summary in ``qis/docs/sharpe_conventions.md``;
+derivations in the handbook chapter on Sharpe ratios.
 
 Drawdowns live here too - ``compute_rolling_drawdowns``, ``compute_max_current_drawdown``,
 ``compute_drawdowns_stats_table`` for the episode table. Regime-conditional versions of these
@@ -935,7 +935,7 @@ def compute_sharpe_arithmetic(returns: Union[pd.Series, pd.DataFrame],
                               ) -> Union[float, pd.Series]:
     """
     canonical arithmetic Sharpe ratio, SR = sqrt(af) * E[r] / sqrt(Var[r]) on periodic
-    simple excess returns (Sharpe 1994 plug-in estimator, sharpe_conventions.md section 1A)
+    simple excess returns (Sharpe 1994 plug-in estimator, docs/performance_analytics_and_sharpe.md)
     af defaults to the annualization factor inferred from the return index
     """
     if not isinstance(returns, (pd.Series, pd.DataFrame)):

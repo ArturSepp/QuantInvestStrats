@@ -48,6 +48,31 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   enforced by `documentation_bibliography_test.py`, and the software is cited one way.
 - Render `> **Insight.**` and `> **Pitfall.**` blockquotes as admonitions in the Sphinx site
   through the new `qis_callouts` extension.
+- Add thirteen handbook chapters: returns, NAVs, fees and leverage; the performance-statistic
+  catalogue, with one formula for every `PerfStat` column; drawdowns and time under water; alpha,
+  beta and benchmark-relative performance; regime-conditional performance; exponentially
+  weighted estimators; covariance, correlation and principal components; serial dependence;
+  regression and HAC inference; risk-adjusted returns and volatility targeting; signal
+  diagnostics; portfolio risk and Euler contributions; and factor risk models.
+- Rewrite the Sharpe chapter as Sharpe ratios: conventions and inference, covering every
+  Sharpe-type estimator in qis and the sampling error of the ratio. Extend the reproducibility
+  article into Resampling and the bootstrap, keeping its case study. Convert the instrument
+  portfolio stress page to the methodology template. Model-layer attribution now links to the
+  estimation chapters instead of re-deriving them.
+- Shorten the packaged `qis/docs/sharpe_conventions.md` to a convention summary that points to
+  the handbook chapter; the decision-record text is retired. The regime chapter replaces its
+  approximation of the per-annum regime residual with an exact derivation.
+- Add eleven handbook figures produced by `tools/docs_analytics/handbook.py` on the frozen
+  synthetic universe. Each figure has an independent numerical check and is registered, with its
+  parameters and conventions, in the documentation analytics manifest.
+- Add 46 works to the bibliography, grouped by topic and marked pending a publisher check.
+- Link each core capability on the API reference page to the chapters that derive its formulas,
+  and print the PDF as one book titled The qis analytics handbook.
+- Test that every core analytics symbol is named in a methodology chapter, that every `PerfStat`
+  member appears in the catalogue, and that the reporting-preset tables agree with
+  `fetch_default_report_kwargs`.
+- Correct the `PerfStat` module docstring: without `rates_data` the excess columns equal their
+  zero-rate counterparts rather than being undefined.
 
 ## [5.30.3] - 2026-09-22
 

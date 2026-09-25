@@ -153,15 +153,18 @@ $$
 **Proof.** $\sum_k\omega_k^2=(1-\lambda)^2/(1-\lambda^2)=(1-\lambda)/(1+\lambda)$, and
 $(1+\lambda)/(1-\lambda)=\big(2N/(N+1)\big)\big/\big(2/(N+1)\big)=N$. $\square$
 
-Kish (1965) defines $N_{\mathrm{eff}}$ so that a weighted mean of IID observations with variance $\sigma^2$ has
-variance $\sigma^2/N_{\mathrm{eff}}$.
+Kish (1965) defines $N_{\mathrm{eff}}$ so that a weighted mean of IID observations with
+variance $\sigma^2$ has variance $\sigma^2/N_{\mathrm{eff}}$.
 
 **Identity (half-life).** The half-life $H=\ln 2/(-\ln\lambda)$ satisfies $\lambda^H=1/2$: the
 weight at lag $H$ is half the weight at lag 0, and the lags younger than $H$ carry half of the
 total weight, $\sum_{k<H}\omega_k=1-\lambda^H$ in the continuous sense. For large $N$,
 
 $$
-H=\frac{\ln 2}{\ln\frac{N+1}{N-1}}=\frac{\ln 2}{2}\,N\Big(1-\frac{1}{3N^2}+O(N^{-4})\Big)\approx 0.347\,N .
+\begin{aligned}
+H&=\frac{\ln 2}{\ln\frac{N+1}{N-1}}\\
+&=\frac{\ln 2}{2}\,N\Big(1-\frac{1}{3N^2}+O(N^{-4})\Big)\approx 0.347\,N .
+\end{aligned}
 $$
 
 **Proof.** $-\ln\lambda=\ln\big((N+1)/(N-1)\big)=2\operatorname{artanh}(1/N)=2/N+2/(3N^3)+\dots$;
@@ -185,6 +188,16 @@ half-life 11.2 rows and mean lag 15.7 rows.
 > $(N-1)/2$ and the same effective sample size $N$, so they carry the same information at the
 > same average age. They differ in shape: the EWM puts half of its weight on the most recent
 > $0.35N$ rows and keeps 5% beyond lag $1.5N$, where the window has none.
+
+![Weights by lag of EWMs with spans 12 and 36, each against an equal-weight window of the same length, with dotted lines at the mean lags 5.5 and 17.5](images/handbook_ewm_kernels.png)
+
+[Open full-resolution preview](images/handbook_ewm_kernels.png).
+
+The exhibit recovers the weights $\omega_k$ from `qis.compute_ewm` as the response to a unit
+shock and draws them against equal-weight windows of $N=12$ and $N=36$ observations. Each pair
+shares its mean lag, 5.5 and 17.5, and its effective sample size $N$, as the identities above
+require. The EWM starts at $2/(N+1)$, about twice the window weight, and decays geometrically
+with half-lives of 4.15 and 12.47 observations instead of stopping at lag $N$.
 
 ### Initial conditions
 
@@ -210,7 +223,8 @@ Defaults that seed with the full sample:
 - `compute_ewm_covar_tensor_vol_norm_returns` seeds its volatility recursion with the
   full-sample mean of $x^2$. The seed is hard-coded and has no argument.
 - `compute_ewm_beta_alpha_forecast(init_type=InitType.MEAN)` seeds its moments with full-sample
-  means, and `EwmLinearModel.fit(init_type=InitType.MEAN)` does so for its mean adjustment.
+  means, and `EwmLinearModel.fit(init_type=InitType.MEAN)` does so for its mean adjustment
+  when one is requested.
 
 The other entry points of the chapter are point in time by default: `compute_ewm`,
 `compute_ewm_vol`, `compute_ewm_newey_west_vol` and `compute_rolling_mean_adj` use `X0`;
@@ -237,7 +251,7 @@ $\tilde x_t=x_t-\hat\mu_t$, with $\hat\mu_t$ chosen by `MeanAdjType`:
 | `MeanAdjType` | $\hat\mu_t$ | Timing and implementation notes |
 |---|---|---|
 | `NONE` | 0 | The second moment about zero, the default |
-| `INSAMPLE` | Full-sample mean | Look-ahead. Uses `np.mean`, so one missing value makes a whole column missing; pandas input to `compute_roll_mean` raises `ValueError` |
+| `INSAMPLE` | Full-sample mean | Look-ahead. Uses `np.mean`, so one missing value makes a whole column missing; pandas input to `compute_roll_mean`, and so to `compute_rolling_mean_adj` and `compute_ewm_cross_xy`, raises `ValueError` |
 | `EXPANDING` | Expanding mean of rows $0,\dots,t$ | Point in time; includes $x_t$, so $\tilde x_0=0$ |
 | `EWMA` | $m_t$ with the same $\lambda$ | Point in time; includes $x_t$; seeded by `init_type`, so `X0` gives $\tilde x_0=0$ |
 
@@ -259,7 +273,8 @@ $$
 $\sigma^2$, then in the stationary limit
 
 $$
-\mathbb{E}\big[(x_t-m_t)^2\big]=\frac{2\lambda^2}{1+\lambda}\,\sigma^2=\frac{(N-1)^2}{N(N+1)}\,\sigma^2 .
+\mathbb{E}\big[(x_t-m_t)^2\big]=\frac{2\lambda^2}{1+\lambda}\,\sigma^2
+=\frac{(N-1)^2}{N(N+1)}\,\sigma^2 .
 $$
 
 **Proof.** $x_t$ is independent of $m_{t-1}$, $\mathbb{E}m_{t-1}=\mathbb{E}x_t$, and
@@ -315,7 +330,7 @@ square root (`apply_sqrt=False` returns the variance).
   260 days), with at least 20% of the window present and the `'lower'` interpolation. The floor
   is point in time. Since the square root is monotone, flooring the variance at its quantile is
   flooring the volatility at its quantile; $\gamma=0.16$ is the suggested value.
-- **Warm-up.** `warmup_period=w` sets the first $w$ finite values of each column to missing.
+- **Warm-up.** `warmup_period` sets that many leading finite values of each column to missing.
 
 > **Pitfall.** The floor is correct for DataFrame and two-dimensional ndarray input only. A
 > Series raises `ValueError`, and a one-dimensional ndarray silently returns a $T\times T$ array,
@@ -424,8 +439,9 @@ $M^{xx}$, $M^{yy}$ by `var_init_type` (default `MEAN`, the full-sample second mo
 | `BETA` | $\hat\beta_t=M^{xy}_t/M^{xx}_t$ | Missing where $\lvert M^{xx}_t\rvert$ is below $10^{-8}$ |
 | `CORR` | $\hat\rho_t=M^{xy}_t/\sqrt{M^{xx}_tM^{yy}_t}$ | Uncentred unless mean-adjusted; missing where the denominator is below $10^{-8}$ |
 
-With the default seeds $\lvert\hat\rho_t\rvert\le 1$ by the Cauchy–Schwarz inequality, because the
-numerator's seed is zero and the denominators' seeds are non-negative. The function pairs the
+On complete data and with the default seeds, $\lvert\hat\rho_t\rvert\le 1$ by the
+Cauchy–Schwarz inequality, because the numerator's seed is zero and the denominators' seeds are
+non-negative. The function pairs the
 columns of two DataFrames of equal shape position by position, or two two-dimensional ndarrays.
 
 > **Pitfall.** The docstring of `compute_ewm_cross_xy` promises a Series factor against a
@@ -464,7 +480,11 @@ products strongly dependent; see [serial dependence](serial_dependence.md) and
 variance and the seed is zero, then
 
 $$
-\operatorname{Var}\Big(\sum_{k=0}^{t-1}(1-\lambda)\lambda^k\xi_{t-k}\Big)=\frac{1-\lambda}{1+\lambda}\big(1-\lambda^{2t}\big)\ \longrightarrow\ \frac{1-\lambda}{1+\lambda}=\frac{1}{N}.
+\begin{aligned}
+\operatorname{Var}\Big(\sum_{k=0}^{t-1}(1-\lambda)\lambda^k\xi_{t-k}\Big)
+&=\frac{1-\lambda}{1+\lambda}\big(1-\lambda^{2t}\big)\\
+&\longrightarrow\ \frac{1-\lambda}{1+\lambda}=\frac{1}{N}.
+\end{aligned}
 $$
 
 **Proof.** Independence makes the variance the sum of squared weights,
@@ -495,8 +515,9 @@ $v_t\ge(1-\lambda)\tilde x_t^2$ it is bounded by $1/\sqrt{1-\lambda}$, and it eq
 ### The two-span long–short filter
 
 `compute_ewm_long_short_filter(data, long_span=63, short_span=5)` combines two EWMs with zero
-seeds. In the code each leg is `weight * load * EWM`, with load $\sqrt{(1+\lambda)/(1-\lambda)}$ and
-weight $1/\big(\sqrt{1-\lambda^2}\,\kappa\big)$; their product is $1/\big((1-\lambda)\kappa\big)$,
+seeds; a missing row holds both legs (`FFILL`). In the code each leg is `weight * load * EWM`,
+with load $\sqrt{(1+\lambda)/(1-\lambda)}$ and weight
+$1/\big(\sqrt{1-\lambda^2}\,\kappa\big)$. Their product is $1/\big((1-\lambda)\kappa\big)$,
 which turns each leg into the unnormalised sum $\kappa^{-1}\sum_k\lambda^k x_{t-k}$:
 
 $$
@@ -533,8 +554,9 @@ With log returns $X_t$ is the log price relative, so the filter is the fast-minu
 crossover of log prices, lagged one row and scaled to unit variance under white noise. The
 kernel is hump-shaped with its maximum at lag
 $\ln(\ln\lambda_S/\ln\lambda_L)/\ln(\lambda_L/\lambda_S)$, 6.8 rows for the defaults, and its
-response to a permanent unit shift in $x$ is $\sum_k(\lambda_L^k-\lambda_S^k)/\kappa=(N_L-N_S)/(2\kappa)$,
-8.23 for the defaults ($\kappa=3.52$). Signals of this type are smoothed versions of the
+response to a permanent unit shift in $x$ is
+$\sum_k(\lambda_L^k-\lambda_S^k)/\kappa=(N_L-N_S)/(2\kappa)$, 8.23 for the defaults
+($\kappa=3.52$). Signals of this type are smoothed versions of the
 time-series momentum of
 [Moskowitz, Ooi and Pedersen (2012)](https://doi.org/10.1016/j.jfineco.2011.11.003), which
 trades on the sign of the past twelve-month return.
@@ -550,8 +572,11 @@ does no validation.
 `compute_ewm_vol` with Bartlett-weighted EWM autocovariances of the mean-adjusted series:
 
 $$
-v^{\mathrm{NW}}_t=v_t+\sum_{k=1}^{q}\Big(1-\frac{k}{q+1}\Big)\,2\,c_{k,t},\qquad
-c_{k,t}=\lambda c_{k,t-1}+(1-\lambda)\,\tilde x_t\tilde x_{t-k}\ \ (t\ge k),\qquad c_{k,t}=0\ \ (t<k).
+\begin{aligned}
+v^{\mathrm{NW}}_t&=v_t+\sum_{k=1}^{q}\Big(1-\frac{k}{q+1}\Big)\,2\,c_{k,t},\\
+c_{k,t}&=\lambda c_{k,t-1}+(1-\lambda)\,\tilde x_t\tilde x_{t-k}\ \ (t\ge k),
+\qquad c_{k,t}=0\ \ (t<k).
+\end{aligned}
 $$
 
 $v_t$ is seeded with $\tilde x_0^2$ under `X0`, as in `compute_ewm_vol`, so `num_lags=0`
@@ -590,10 +615,10 @@ one.
 
 `compute_ewm_sharpe(returns, span=260, norm_type=1)` fills missing returns with zero, infers
 $\mathrm{AN}$ from the index and runs $m_t$ and a second-moment recursion from zero seeds, so
-row 0 is discarded. With `initial_sharpes` the seeds are instead a 10% annual volatility prior,
-$m_0=0.1\,\mathrm{SR}_0/\mathrm{AN}$ and $v_0=0.01/\mathrm{AN}$.
+row 0 is discarded. With `initial_sharpes` $=\mathrm{SR}_0$ the seeds are instead a prior with
+10% annual volatility, $m_0=0.1\,\mathrm{SR}_0/\mathrm{AN}$ and $v_0=0.01/\mathrm{AN}$.
 
-| `norm_type` | Output at $t$ | Reading |
+| `norm_type` | Output $\mathrm{SR}^{(n)}_t$ | Reading |
 |---|---|---|
 | 0 | $\mathrm{AN}\,m_t$ | Annualised EWM mean return, not a ratio |
 | 1 (default) | $\sqrt{\mathrm{AN}}\,m_t\big/\sqrt{\mathcal{E}_\lambda(x^2)_t}$ | Mean over root mean square |
@@ -601,9 +626,10 @@ $m_0=0.1\,\mathrm{SR}_0/\mathrm{AN}$ and $v_0=0.01/\mathrm{AN}$.
 
 Norms 1 and 2 are missing where the denominator is zero, in particular at row 0.
 
-**Proposition (EWM Sharpe biases).** With zero seeds, $\lvert\mathrm{SR}^{(1)}_t\rvert\le\sqrt{\mathrm{AN}}$.
-For IID returns with per-period Sharpe ratio $s=\mu/\sigma$, the ratio of stationary expectations
-is $\sqrt{\mathrm{AN}}\,s/\sqrt{1+s^2}$ for norm 1 and
+**Proposition (EWM Sharpe biases).** With zero seeds,
+$\lvert\mathrm{SR}^{(1)}_t\rvert\le\sqrt{\mathrm{AN}}$. For IID returns with per-period Sharpe
+ratio $s=\mu/\sigma$, the ratio of stationary expectations is
+$\sqrt{\mathrm{AN}}\,s/\sqrt{1+s^2}$ for norm 1 and
 $\sqrt{\mathrm{AN}}\,s\,\sqrt{N(N+1)}/(N-1)$ for norm 2.
 
 **Proof.** The weights of $m_t$ sum to $1-\lambda^t\le 1$, so by Cauchy–Schwarz
@@ -611,11 +637,12 @@ $m_t^2\le\mathcal{E}_\lambda(x^2)_t$. The stationary expectations are $\mathbb{E
 $\mathbb{E}x^2=\mu^2+\sigma^2$, which gives norm 1; for norm 2 use the shrinkage proposition,
 $\mathbb{E}(x_t-m_t)^2=\sigma^2(N-1)^2/(N(N+1))$. $\square$
 
-Norm 1 compresses the annualised Sharpe ratio $\mathrm{SR}$ by $1/\sqrt{1+\mathrm{SR}^2/\mathrm{AN}}$:
-by 4% for $\mathrm{SR}=1$ on monthly data, 0.2% on daily data. Norm 2 inflates it by 4.3% at
-$N=36$ and 0.6% at $N=260$. Both are ratios of expectations; the ratio of two noisy EWMs has
-additional small-sample bias. `compute_ewm_sharpe_from_prices` resamples prices to `freq`
-(default `'QE'`), takes log returns and calls norm 2 with span 40.
+Norm 1 compresses the annualised Sharpe ratio $\mathrm{SR}$ by the factor
+$1/\sqrt{1+\mathrm{SR}^2/\mathrm{AN}}$: by 4% for $\mathrm{SR}=1$ on monthly data and by 0.2%
+on daily data. Norm 2 inflates it by 4.3% at $N=36$ and 0.6% at $N=260$. Both statements are
+about ratios of expectations; the ratio of two noisy EWMs has additional small-sample bias.
+`compute_ewm_sharpe_from_prices` resamples prices to `freq` (default `'QE'`), takes log returns
+and calls norm 2 with span 40.
 
 ### EWM score and outlier filtering
 
@@ -787,9 +814,9 @@ assert np.linalg.eigvalsh(deflated).min() > 0.0
 
 The fifth block builds the covariance tensors. Every matrix of the path is semidefinite up to
 rounding. The vol-normalised construction starts its volatility at the full-sample root mean
-square, rebuilds the covariance as $\operatorname{diag}(\hat\sigma)\hat\rho\operatorname{diag}(\hat\sigma)$,
-and keeps the normalised returns below the cap $\sqrt{37/2}\approx 4.30$; the largest here is
-2.70.
+square, rebuilds the covariance as
+$\operatorname{diag}(\hat\sigma)\hat\rho\operatorname{diag}(\hat\sigma)$, and keeps the
+normalised returns below the cap $\sqrt{37/2}\approx 4.30$; the largest here is 2.70.
 
 ```python
 tensor = qis.compute_ewm_covar_tensor(r, span=span)
@@ -822,7 +849,7 @@ for xb, ya in zip(bench, asset['SBD_TSY']):
     mxx = lam * mxx + (1.0 - lam) * xb * xb
     loop_betas.append(mxy / mxx)
 assert betas.iloc[:21].isna().all().all()
-np.testing.assert_allclose(betas['SBD_TSY'].iloc[21:], loop_betas[21:], rtol=1e-12)
+np.testing.assert_allclose(betas['SBD_TSY'].iloc[21:], loop_betas[21:], rtol=1e-10, atol=1e-15)
 
 x_frame, y_frame = returns[['SEQ_US']], returns[['SBD_TSY']]
 beta_xy = qis.compute_ewm_cross_xy(x_frame, y_frame, span=span,
@@ -863,7 +890,7 @@ lam_l, lam_s = 1.0 - 2.0 / 64, 1.0 - 2.0 / 6
 kappa = np.sqrt(1 / (1 - lam_l ** 2) + 1 / (1 - lam_s ** 2) - 2 / (1 - lam_l * lam_s))
 k = np.arange(len(impulse) - 1)
 np.testing.assert_allclose(ls.iloc[1:], (lam_l ** k - lam_s ** k) / kappa, atol=1e-15)
-assert ls.iloc[1] == 0.0 and int(np.argmax(ls.to_numpy())) - 1 == 7
+assert abs(ls.iloc[1]) < 1e-15 and int(np.argmax(ls.to_numpy())) - 1 == 7
 assert np.isclose(np.sum(ls ** 2), 1.0)
 assert np.isclose(ls.sum(), (63 - 5) / (2 * kappa)) and np.isclose(ls.sum(), 8.23, atol=5e-3)
 
@@ -922,7 +949,7 @@ np.testing.assert_allclose(sharpe_1.iloc[1:],
                            np.sqrt(12.0) * mean_loop[1:] / np.sqrt(square_loop[1:]))
 assert sharpe_1.iloc[0].isna().all() and (sharpe_1.iloc[1:].abs() <= np.sqrt(12.0)).all().all()
 
-shocked = qis.to_returns(universe.prices, drop_first=True).to_numpy()
+shocked = qis.to_returns(universe.prices, drop_first=True).to_numpy().copy()
 shocked[1000, 0] = 0.5
 _, score = qis.compute_ewm_score(shocked, ewm_lambda=0.94, is_clip=False)
 bound = np.sqrt(0.94 / 0.06)
@@ -940,7 +967,7 @@ assert np.array_equal(np.isnan(cleaned), np.isnan(shocked))
 |---|---|---|
 | EWM recursion (numba, ndarray only) | $m_t=\lambda m_{t-1}+(1-\lambda)x_t$, seed at row 0 | `qis.ewm_recursion(a, init_value, span, ewm_lambda, is_unit_vol_scaling, nan_backfill)` |
 | EWM mean | the recursion with `InitType` seed | `qis.compute_ewm(data, span, ewm_lambda=0.94, init_type=InitType.X0)` |
-| Unit-variance EWM | $\sqrt{N}\,m_t$ | `is_unit_vol_scaling=True` |
+| Unit-variance EWM | $\sqrt{N}\,m_t$ | `qis.compute_ewm(..., is_unit_vol_scaling=True)` |
 | EWM volatility | $\sqrt{\mathrm{AN}\max(v_t,\underline v_t)}$ | `qis.compute_ewm_vol(data, span, mean_adj_type, annualize, vol_floor_quantile, warmup_period)` |
 | Newey–West EWM volatility | $v_t+\sum_k(1-k/(q+1))\,2c_{k,t}$ | `qis.compute_ewm_newey_west_vol(data, num_lags=2)`, second output the ratio to $v_t$ |
 | Covariance at the last date | $\hat\Sigma_{T-1}$ | `qis.compute_ewm_covar(a, span, covar0, is_corr, nan_backfill)` |

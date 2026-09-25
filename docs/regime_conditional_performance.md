@@ -715,7 +715,7 @@ regime-switching estimation.
 
 ## See also
 
-- [Performance analytics and Sharpe conventions](performance_analytics_and_sharpe.md)
+- [Sharpe ratios: conventions and inference](performance_analytics_and_sharpe.md)
 - [The performance-statistic catalogue: every PerfStat column](performance_statistics.md)
 - [Alpha, beta and benchmark-relative performance](benchmark_relative_performance.md)
 - [Covariance, correlation and principal components](covariance_correlation_pca.md)

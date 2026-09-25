@@ -232,9 +232,9 @@ class SharpeConvention(Enum):
     """
     which Sharpe ratio numerator a statistic reports.
 
-    The three are different numbers on the same data, not roundings of each other, so every
-    Sharpe object in qis is labelled with the convention it used. Full derivation and
-    reconciliation in ``qis/docs/sharpe_conventions.md``.
+    The three are different numbers on the same data, not roundings of each other, so a Sharpe
+    ratio should be quoted with its convention. Summary in ``qis/docs/sharpe_conventions.md``;
+    derivations in the handbook chapter on Sharpe ratios.
 
     Attributes:
         PA: compound annual excess return over annualised volatility. The reporting default

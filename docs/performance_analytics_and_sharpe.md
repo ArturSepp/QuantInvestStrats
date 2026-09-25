@@ -81,7 +81,7 @@ conventions are defined in [notation and conventions](notation_and_conventions.m
 | $\gamma_3$, $\gamma_4$ | Skewness and kurtosis of periodic returns | $\gamma_4=3$ for the normal; not excess kurtosis |
 | $\rho_k$ | Autocorrelation of periodic returns at lag $k$ | Dimensionless |
 | $q$, $\eta(q)$ | Aggregation horizon in periods; Lo's time-aggregation factor | Count; $\eta(q)=\sqrt{q}$ without autocorrelation |
-| $g$, $\pi_g$, $\bar r_g$ | Regime index, its frequency among classified periods, and the conditional mean return | Classifier grid |
+| $g$, $p_g$, $\bar r_g$ | Regime index, its frequency among classified periods, and the conditional mean return | Classifier grid |
 | $x_t$, $\hat\mu_t$, $\hat\sigma_{1,t}$, $\hat\sigma_{2,t}$ | Input return of an EWM ratio, its EWM mean, and the two EWM scale estimates | Periodic |
 
 ### Inputs and sampling support
@@ -253,6 +253,17 @@ relative amount of the order of the periodic volatility. This raises the p.a. an
 about $\mathrm{SR}\,(\gamma_3 s(r)/2+\bar r)$, of the order of one percent of the ratio on
 monthly data (0.7% in the worked example).
 
+![Scatter of the arithmetic minus p.a. Sharpe ratio against annualised volatility for ten synthetic assets, with the dashed line of half the volatility](images/handbook_sharpe_wedge.png)
+
+[Open full-resolution preview](images/handbook_sharpe_wedge.png).
+
+The exhibit plots $\mathrm{SR}_{\mathrm{arith}}-\mathrm{SR}_{\mathrm{pa}}$ for the ten synthetic
+assets against their volatility, with the first-order wedge $\sigma_r/2$ dashed. Equity and
+commodity indices, whose Sharpe ratios are near zero, sit on the line. The bond, hedge-fund and
+private-equity indices sit below it because their Sharpe ratios of 0.45 to 0.72 make the factor
+$1-\mathrm{SR}_{\log}^2$ matter: at $\mathrm{SR}_{\log}=0.72$ it halves the wedge. The remaining
+gap, at most 0.006, is the lower log volatility of assumption (iii).
+
 **Proposition (rankings).** For two assets $A$ and $B$ with small Sharpe ratios,
 
 $$
@@ -330,7 +341,7 @@ zero-rate Sharpe ratio.
 | Table, arithmetic | $\sqrt{\mathrm{AN}}\,\bar r/s(r)$ | Simple (excess) returns on `freq_vol` | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS`; select by name |
 | Arithmetic helper | $\sqrt{\mathrm{AN}}\,\bar x/s(x)$ | Returns supplied by the caller; $\mathrm{AN}$ inferred unless `af` is given | Internal `qis.perfstats.perf_stats.compute_sharpe_arithmetic`; not called by the table |
 | Regime, `SharpeConvention.PA` | Patched regime p.a. return over $\sigma_v$ | Classifier grid for regime returns; `freq_vol` for $\sigma_v$ | `qis.compute_bnb_regimes_pa_perf_table`, `qis.plot_regime_data` |
-| Regime, `ARITHMETIC` | $\sqrt{\mathrm{AN}}\,\pi_g\bar r_g/s(r)$ | Classifier grid, simple returns by default | As above |
+| Regime, `ARITHMETIC` | $\sqrt{\mathrm{AN}}\,p_g\bar r_g/s(r)$ | Classifier grid, simple returns by default | As above |
 | Regime, `LOG` | The same on $\log(1+r_t)$ | Classifier grid | As above |
 | Returns-level regime split | As `ARITHMETIC` or `LOG` | Caller's returns, explicit `af` | Internal `qis.perfstats.regime_classifier.compute_regime_sharpe_decomposition`; rejects `PA` |
 | Rolling | $\sqrt{\mathrm{AN}}\,(e^{\bar\ell}-1)/s(\ell)$ within each window | Log returns on `roll_freq` | `qis.compute_rolling_perf_stat` with `RollingPerfStat.SHARPE`; rolling panels of factsheets |
@@ -392,21 +403,21 @@ of the active return: the Sharpe (1994) differential return with a non-cash benc
 ### Regime-conditional Sharpe ratios
 
 **Identity (additive regime decomposition).** Partition the $T$ periods into regimes $g$ with
-frequencies $\pi_g=T_g/T$ and conditional means $\bar r_g$. Then
+frequencies $p_g=T_g/T$ and conditional means $\bar r_g$. Then
 
 $$
-\frac{\sqrt{\mathrm{AN}}\,\bar r}{s(r)}=\sum_g\frac{\sqrt{\mathrm{AN}}\,\pi_g\,\bar r_g}{s(r)} .
+\frac{\sqrt{\mathrm{AN}}\,\bar r}{s(r)}=\sum_g\frac{\sqrt{\mathrm{AN}}\,p_g\,\bar r_g}{s(r)} .
 $$
 
-**Proof.** $\sum_g\pi_g\bar r_g=\sum_g\frac{T_g}{T}\cdot\frac{1}{T_g}\sum_{t\in g}r_t=\bar r$;
+**Proof.** $\sum_gp_g\bar r_g=\sum_g\frac{T_g}{T}\cdot\frac{1}{T_g}\sum_{t\in g}r_t=\bar r$;
 divide by the common $s(r)$. $\square$
 
 `SharpeConvention.ARITHMETIC` computes these terms on the classifier's sampled returns, and
 `SharpeConvention.LOG` the same on $\log(1+r_t)$; both add up exactly to the total ratio of their
 convention on that grid. The compound numerator has no such identity, because
 $e^{\sum_g z_g}-1\neq\sum_g(e^{z_g}-1)$. The `PA` branch forms
-$\exp(\mathrm{AN}\,\pi_g\bar r_g)-1$ from mean simple returns, allocates the gap between their
-sum and the visible `PA_RETURN` across regimes in proportion to $\pi_g$, and divides by `VOL`.
+$\exp(\mathrm{AN}\,p_g\bar r_g)-1$ from mean simple returns, allocates the gap between their
+sum and the visible `PA_RETURN` across regimes in proportion to $p_g$, and divides by `VOL`.
 Its bars therefore add up to `PA_RETURN` divided by `VOL`, which differs from `SHARPE_RF0` when
 the native endpoints are off the `freq_vol` grid. Classifier grids, partial periods and the
 patch are treated in [regime-conditional performance](regime_conditional_performance.md).
@@ -820,7 +831,7 @@ assert np.isclose(information_ratio.iloc[0], 0.301, atol=5e-4)
 | Table volatility | $\sigma_v=\sqrt{\mathrm{AN}}\,s(v)$ | `PerfStat.VOL`; `PerfParams.freq_vol`, `PerfParams.return_type` |
 | P.a. return | $R_{\mathrm{pa}}$ | `PerfStat.PA_RETURN` (native endpoints), `qis.compute_pa_return` |
 | Cash accrual and excess returns | $r^{f}_t$, $\tilde r_t$ | `qis.compute_excess_returns`, `qis.compute_pa_excess_compounded_returns` |
-| Regime Sharpe ratios | $\sqrt{\mathrm{AN}}\,\pi_g\bar r_g/s(r)$ or patched p.a. | `PerfParams.sharpe_convention`, `qis.SharpeConvention`, `qis.compute_bnb_regimes_pa_perf_table`, `qis.plot_regime_data` |
+| Regime Sharpe ratios | $\sqrt{\mathrm{AN}}\,p_g\bar r_g/s(r)$ or patched p.a. | `PerfParams.sharpe_convention`, `qis.SharpeConvention`, `qis.compute_bnb_regimes_pa_perf_table`, `qis.plot_regime_data` |
 | Rolling Sharpe ratio | $\sqrt{\mathrm{AN}}\,(e^{\bar\ell}-1)/s(\ell)$ per window | `qis.compute_rolling_perf_stat` with `qis.RollingPerfStat.SHARPE` |
 | EWM Sharpe ratios | $\mathrm{AN}\,\hat\mu_t$; $\sqrt{\mathrm{AN}}\,\hat\mu_t/\hat\sigma_{k,t}$ | `qis.compute_ewm_sharpe(norm_type=0, 1, 2)`, `qis.compute_ewm_sharpe_from_prices` |
 | Tracking error and information ratio | $\sqrt{\mathrm{AN}}\,s(r_p-r_b)$; $\sqrt{\mathrm{AN}}\,\overline{(r_p-r_b)}/s(r_p-r_b)$ | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |

@@ -64,7 +64,7 @@ total exposure, which is also the beta a long-horizon investor experiences.
 | $\hat\rho^{\mathrm{acf}}_k$ | Standard sample ACF, full-sample mean and variance | statsmodels `acf` |
 | $\hat\rho^{\mathrm{P}}_k$ | Lagged Pearson correlation of overlapping segments | `compute_path_lagged_corr` |
 | $\bar x$, $\bar x^{+}_k$, $\bar x^{-}_k$ | Full-sample mean; means of $x_{k+1},\dots,x_T$ and of $x_1,\dots,x_{T-k}$ | Units of $x$ |
-| $u_t$, $Q$, $d^{\pm}_k$, $Q^{\pm}_k$ | $x_t-\bar x$; its sum of squares; segment-mean shifts $\bar x^{\pm}_k-\bar x$; segment sums of squares about their own means | Units of $x$ and its square |
+| $\check x_t$, $Q$, $d^{\pm}_k$, $Q^{\pm}_k$ | $x_t-\bar x$; its sum of squares; segment-mean shifts $\bar x^{\pm}_k-\bar x$; segment sums of squares about their own means | Units of $x$ and its square |
 | $\hat\gamma_k$, $\xi_i$ | Standard sample autocovariance with divisor $T$; arbitrary real weights in a quadratic form | Units of $x^2$; dimensionless |
 | $Q_{\mathrm{BP}}$, $Q_{\mathrm{LB}}$ | Box–Pierce and Ljung–Box statistics | Approximately $\chi^2_K$ under the null |
 | $\phi$, $\eta_t$ | AR(1) coefficient and innovation | $\lvert\phi\rvert<1$; $\eta_t$ white noise |
@@ -89,8 +89,10 @@ total exposure, which is also the beta a long-horizon investor experiences.
 Population results assume covariance stationarity and finite variance; the sampling results
 state their own additional assumptions. Every lag counts rows of the index as supplied, so the
 calendar meaning of a lag is the grid's: one row is a business day on `B` and a month on `ME`.
-Resample to the intended grid first, and do not forward-fill returns before estimating
-autocorrelation, because a filled row is a zero return that manufactures dependence.
+Resample to the intended grid first. Filling gaps manufactures dependence: a forward-filled
+return repeats a value and adds positive autocorrelation, and a forward-filled price (the
+default in `qis.to_returns`) produces a zero return followed by a catch-up return, which is the
+staleness the Dimson regression detects.
 
 ## Methodology
 
@@ -136,8 +138,8 @@ $$
 This is `np.corrcoef(x[k:], x[:-k])` inside `qis.compute_path_lagged_corr`. Lag 0 is set to one
 without computation.
 
-**Identity (Pearson versus standard ACF).** Let $u_t=x_t-\bar x$,
-$Q=\sum_{t=1}^{T}u_t^2$, $d^{\pm}_k=\bar x^{\pm}_k-\bar x$, and let $Q^{+}_k$ and $Q^{-}_k$ be the
+**Identity (Pearson versus standard ACF).** Let $\check x_t=x_t-\bar x$,
+$Q=\sum_{t=1}^{T}\check x_t^2$, $d^{\pm}_k=\bar x^{\pm}_k-\bar x$, and let $Q^{+}_k$ and $Q^{-}_k$ be the
 sums of squares of the two segments about their own means. Then
 
 $$
@@ -146,9 +148,9 @@ $$
 \qquad Q^{+}_k\le Q,\quad Q^{-}_k\le Q .
 $$
 
-**Proof.** Write $x_t-\bar x^{+}_k=u_t-d^{+}_k$ and $x_{t-k}-\bar x^{-}_k=u_{t-k}-d^{-}_k$. Because
-$\sum_{t=k+1}^{T}u_t=(T-k)d^{+}_k$ and $\sum_{t=k+1}^{T}u_{t-k}=(T-k)d^{-}_k$, expanding the
-product gives $\sum_{t=k+1}^{T}u_tu_{t-k}-(T-k)d^{+}_kd^{-}_k$, and the first sum is
+**Proof.** Write $x_t-\bar x^{+}_k=\check x_t-d^{+}_k$ and $x_{t-k}-\bar x^{-}_k=\check x_{t-k}-d^{-}_k$. Because
+$\sum_{t=k+1}^{T}\check x_t=(T-k)d^{+}_k$ and $\sum_{t=k+1}^{T}\check x_{t-k}=(T-k)d^{-}_k$, expanding the
+product gives $\sum_{t=k+1}^{T}\check x_t\check x_{t-k}-(T-k)d^{+}_kd^{-}_k$, and the first sum is
 $Q\,\hat\rho^{\mathrm{acf}}_k$. A segment's sum of squares about its own mean is at most its sum
 of squares about $\bar x$, which is at most $Q$. $\square$
 
@@ -164,10 +166,10 @@ The identity separates the two differences:
   affine images of each other, whereas $\hat\rho^{\mathrm{acf}}_k$ with $T=100$ is 0.97, 0.85 and
   0.70 at lags 1, 5 and 10.
 
-The standard ACF has one structural advantage. Padding $u_t$ with zeros outside $1,\dots,T$
+The standard ACF has one structural advantage. Padding $\check x_t$ with zeros outside $1,\dots,T$
 gives
-$\sum_{i,j}\xi_i\xi_j\hat\gamma_{\lvert i-j\rvert}=T^{-1}\sum_t\big(\sum_i\xi_iu_{t-i}\big)^2\ge0$
-for $\hat\gamma_k=T^{-1}\sum_{t>k}u_tu_{t-k}$, so its autocorrelation sequence is always a valid
+$\sum_{i,j}\xi_i\xi_j\hat\gamma_{\lvert i-j\rvert}=T^{-1}\sum_t\big(\sum_i\xi_i\check x_{t-i}\big)^2\ge0$
+for $\hat\gamma_k=T^{-1}\sum_{t>k}\check x_t\check x_{t-k}$, so its autocorrelation sequence is always a valid
 (positive semi-definite) one. The lagged Pearson sequence carries no such guarantee: in short
 samples with many lags its Toeplitz matrix often has a negative eigenvalue.
 
@@ -191,8 +193,9 @@ is $\pm1.96/\sqrt{T}$.
 $\sigma^4$, and $\mathbb{E}[x_tx_{t-k}x_sx_{s-j}]=0$ unless $t=s$ and $k=j$, because otherwise
 some index appears exactly once. The products are therefore uncorrelated across $t$ and across
 lags, and the lag-$k$ sum $\sum_{t>k}x_tx_{t-k}$ has variance $(T-k)\sigma^4$; a central limit
-theorem for $K$-dependent sequences gives joint normality. The denominators converge to $\sigma^2$, the mean corrections are of
-order $1/T$, and the two estimators differ by the factor $1+O(k/T)$. $\square$
+theorem for $K$-dependent sequences gives joint normality. The denominators converge to
+$\sigma^2$, the mean corrections are of order $1/T$, and the two estimators differ by the
+factor $1+O(k/T)$. $\square$
 
 The band is $\pm0.25$ for 60 monthly returns, $\pm0.18$ for 120, and $\pm0.04$ for ten years of
 daily data. The independence assumption matters for the band: if $x_t$ is a martingale
@@ -315,6 +318,17 @@ volatilities is $\sqrt{(1+\theta)/(1-\theta)}$.
 > martingale, such as a fund NAV or a private-asset index, is more often a measurement artefact
 > (stale marks, appraisal smoothing, asynchronous closes) than an exploitable forecast. The
 > Dimson regression below separates the two: a stale series loads on lagged market returns.
+
+![Autocorrelations at lags 1 to 8 of monthly synthetic US equity returns and of their AR(1)-smoothed version, against the theoretical decay 0.6 to the power k and the white-noise band](images/handbook_smoothed_acf.png)
+
+[Open full-resolution preview](images/handbook_smoothed_acf.png).
+
+The exhibit applies the smoothing filter with $\theta=0.6$ to the monthly log returns of the
+synthetic US equity index and estimates both autocorrelation functions with
+`qis.compute_autocorr_df`. The liquid series stays inside the white-noise band
+$\pm1.96/\sqrt{T}=\pm0.124$ at every lag. The smoothed series has a lag-one autocorrelation of
+0.57 against the theoretical $\theta=0.6$, and follows $\theta^k$ until it enters the band at lag
+three. Nothing about the underlying returns changed; the dependence is created by the filter.
 
 ### Autocorrelation at longer horizons
 

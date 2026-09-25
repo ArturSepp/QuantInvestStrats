@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Seven fixed-sample synthetic exhibits: focused gallery previews and model-layer attribution, with common typography and recorded calculation conventions.",
+  "description": "Eighteen fixed-sample synthetic exhibits: focused gallery previews, model-layer attribution and one teaching figure per handbook chapter, with common typography and recorded calculation conventions.",
   "dependencies": [
     "numpy",
     "pandas",
@@ -118,6 +118,97 @@
         "shapley_identity",
         "displayed_bridge_matches_components"
       ]
+    },
+    "handbook": {
+      "module": "tools.docs_analytics.handbook",
+      "callable": "produce",
+      "fixture": "qis.datasets.generate_synthetic_universe",
+      "parameters": {
+        "start": "2005-01-03",
+        "end": "2025-12-31",
+        "seed": 20260725,
+        "ewm_spans": [
+          12,
+          36
+        ],
+        "smoothing_theta": 0.6,
+        "acf_lags": 8,
+        "regime_assets": [
+          "SEQ_US",
+          "SBD_TSY",
+          "SCM_GLD",
+          "SAL_HF"
+        ],
+        "bootstrap_n": 250,
+        "bootstrap_paths": 400,
+        "bootstrap_block": 20,
+        "bootstrap_seed": 7,
+        "man_fee": 0.02,
+        "perf_fee": 0.2,
+        "benchmark": "SEQ_US",
+        "regression_asset": "SBD_HY",
+        "allocation": {
+          "SEQ_US": 0.5,
+          "SBD_TSY": 0.3,
+          "SBD_IG": 0.1,
+          "SCM_GLD": 0.1
+        },
+        "risk_start": "2021-01-01",
+        "vol_span": 33,
+        "vol_target": 0.1,
+        "vol_regimes": [
+          [
+            "2008-09-01",
+            "2009-06-30",
+            2.5
+          ],
+          [
+            "2020-03-01",
+            "2020-06-30",
+            3.0
+          ],
+          [
+            "2013-01-01",
+            "2016-12-31",
+            0.6
+          ]
+        ]
+      },
+      "conventions": {
+        "data": "Synthetic, fixed sample without quirks; not observed market performance",
+        "returns": "Stated per exhibit: monthly log or simple, quarterly regime grid, daily targeting",
+        "annualisation": "AN = 12 monthly, 4 quarterly, 252 daily as set by qis frequency maps",
+        "rate_basis": "Zero cash rate; no risk-free-rate data",
+        "cost_basis": "Gross returns except the fee exhibit: 2% management, 20% performance fee",
+        "teaching_constructions": "Volatility regimes scale SEQ_US returns in the targeting exhibit; the truncating bootstrap draw comes from the example",
+        "checks": "Each exhibit has an independent closed-form or numpy check of its plotted values"
+      },
+      "tables": [
+        "ewm_kernels",
+        "pca_eigenvalues",
+        "smoothed_acf",
+        "sharpe_wedge",
+        "drawdown_path",
+        "regime_sharpe",
+        "bootstrap_frequencies",
+        "fee_navs",
+        "benchmark_regression",
+        "risk_contributions",
+        "vol_targeting"
+      ],
+      "checks": [
+        "ewm_kernels",
+        "pca_eigenvalues",
+        "smoothed_acf",
+        "sharpe_wedge",
+        "drawdown_path",
+        "regime_sharpe",
+        "bootstrap_frequencies",
+        "fee_navs",
+        "benchmark_regression",
+        "risk_contributions",
+        "vol_targeting"
+      ]
     }
   },
   "assets": [
@@ -162,6 +253,72 @@
       "document": "docs/model_layer_attribution.md",
       "path": "docs/images/model_feature_attribution_simulated.png",
       "producer": "model_layer"
+    },
+    {
+      "id": "handbook_ewm_kernels",
+      "document": "docs/ewm_estimators.md",
+      "path": "docs/images/handbook_ewm_kernels.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_pca_eigenvalues",
+      "document": "docs/covariance_correlation_pca.md",
+      "path": "docs/images/handbook_pca_eigenvalues.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_smoothed_acf",
+      "document": "docs/serial_dependence.md",
+      "path": "docs/images/handbook_smoothed_acf.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_sharpe_wedge",
+      "document": "docs/performance_analytics_and_sharpe.md",
+      "path": "docs/images/handbook_sharpe_wedge.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_drawdown",
+      "document": "docs/drawdowns.md",
+      "path": "docs/images/handbook_drawdown.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_regime_sharpe",
+      "document": "docs/regime_conditional_performance.md",
+      "path": "docs/images/handbook_regime_sharpe.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_bootstrap_frequencies",
+      "document": "docs/reproducibility.md",
+      "path": "docs/images/handbook_bootstrap_frequencies.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_fee_navs",
+      "document": "docs/returns_and_navs.md",
+      "path": "docs/images/handbook_fee_navs.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_benchmark_regression",
+      "document": "docs/benchmark_relative_performance.md",
+      "path": "docs/images/handbook_benchmark_regression.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_risk_contributions",
+      "document": "docs/risk_contributions.md",
+      "path": "docs/images/handbook_risk_contributions.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_vol_targeting",
+      "document": "docs/risk_adjusted_returns.md",
+      "path": "docs/images/handbook_vol_targeting.png",
+      "producer": "handbook"
     }
   ],
   "non_analytics": [

@@ -61,6 +61,15 @@ mechanical ones.
   style. An article's References section is a numbered list whose items begin with a
   bibliography entry verbatim, optionally followed by a note, and it includes the software
   citation. `src/qis/tests/documentation_bibliography_test.py` enforces the match.
+- **Coverage.** Every analytics symbol in the `CORE_API` groups of `src/qis/api.py` is named in a
+  methodology article, and every `PerfStat` member has an entry in the
+  [performance-statistic catalogue](performance_statistics.md);
+  `src/qis/tests/documentation_coverage_test.py` enforces both. `docs/conf.py` links each core
+  group on the API page to the articles listed for it in `CAPABILITY_CHAPTERS`.
+- **Teaching figures.** A chapter figure comes from `tools/docs_analytics/handbook.py` on the
+  frozen synthetic universe, carries an independent numerical check, and is registered in the
+  analytics manifest like every other preview. Its caption states the question, the numbers the
+  reader should take away, and the qis call that produced them.
 - **Spelling.** Prose uses British spelling; Python names keep their published American spelling.
 
 ## Copyable methodology template
@@ -104,7 +113,8 @@ beside Sphinx includes. Do not maintain copied full scripts.
 
 Packaged notes under `src/qis/docs/` remain text-only. Their build-time copies are not another
 authoring location. The [Brinson article](brinson_attribution.md) is the explicit exception whose
-complete methodology lives in top-level `docs/`; its packaged note remains a pointer.
+complete methodology lives in top-level `docs/`; its packaged note remains a pointer. The
+packaged Sharpe note is a short convention summary that points to the Sharpe chapter.
 
 ## Figures and analytical results
 

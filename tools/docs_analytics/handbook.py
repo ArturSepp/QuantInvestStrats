@@ -100,7 +100,8 @@ def pca_eigenvalues(params: dict):
         footer='Bars: eigenvalues of the sample correlation matrix, labelled with their variance '
                'share.\nDashed: (1 + sqrt(n/T))^2, the largest eigenvalue expected from '
                'uncorrelated noise.')
-    return fig, table, check, {'noise_edge': float(edge), 'first_share': float(table['share'].iloc[0])}
+    return fig, table, check, {'noise_edge': float(edge),
+                               'first_share': float(table['share'].iloc[0])}
 
 
 def smoothed_acf(params: dict):
@@ -108,13 +109,13 @@ def smoothed_acf(params: dict):
     prices = _universe(params)
     liquid = qis.to_returns(prices['SEQ_US'], freq='ME', is_log_returns=True,
                             drop_first=True).dropna()
-    phi = params['smoothing_phi']
+    theta = params['smoothing_theta']
     smoothed = np.empty(len(liquid))
     smoothed[0] = liquid.iloc[0]
     for i in range(1, len(liquid)):
-        smoothed[i] = (1.0 - phi) * liquid.iloc[i] + phi * smoothed[i - 1]
+        smoothed[i] = (1.0 - theta) * liquid.iloc[i] + theta * smoothed[i - 1]
     panel = pd.DataFrame({'Liquid (SEQ_US)': liquid.to_numpy(),
-                          f'Smoothed, phi = {phi}': smoothed}, index=liquid.index)
+                          rf'Smoothed, $\theta$ = {theta}': smoothed}, index=liquid.index)
     num_lags = params['acf_lags'] + 1
     acf = qis.compute_autocorr_df(panel, num_lags=num_lags)
     reference = pd.DataFrame({column: [1.0] + [
@@ -127,8 +128,8 @@ def smoothed_acf(params: dict):
     width = 0.38
     for offset, color, column in zip((-width / 2, width / 2), SERIES, table.columns):
         ax.bar(table.index + offset, table[column], width=width, color=color, label=column)
-    ax.plot(table.index, phi ** table.index.to_numpy(), color=MUTED, linewidth=1.5,
-            linestyle=':', marker='o', markersize=4, label=f'AR(1) theory: {phi}^k')
+    ax.plot(table.index, theta ** table.index.to_numpy(), color=MUTED, linewidth=1.5,
+            linestyle=':', marker='o', markersize=4, label=rf'AR(1) theory: ${theta}^k$')
     for level in (band, -band):
         ax.axhline(level, color=MUTED, linewidth=1.0, linestyle='--')
     ax.set_xlabel('Lag in months')
@@ -138,9 +139,9 @@ def smoothed_acf(params: dict):
     handbook_exhibit(
         fig, title='Smoothing creates autocorrelation',
         subtitle=f'Synthetic monthly log returns | 2005-2025 | teaching AR(1) smoothing, '
-                 f'phi = {phi}',
+                 f'theta = {theta}',
         footer=f'Dashed: approximate 95% band for white noise, +/-1.96/sqrt(T) = +/-{band:.3f}.'
-               '\nThe smoothed series is (1-phi) r_t + phi times its own previous value.')
+               '\nThe smoothed series is (1-theta) r_t + theta times its own previous value.')
     return fig, table, check, {'band': float(band),
                                'smoothed_lag1': float(table.iloc[0, 1])}
 
@@ -311,8 +312,9 @@ def fee_navs(params: dict):
         fig, title='Fees compound into the NAV',
         subtitle='Synthetic US equity (SEQ_US) | daily | annual crystallisation above the '
                  'high-water mark',
-        footer='Net NAV from qis.compute_net_navs_ex_perf_man_fees. Performance fees accrue only '
-               'above the\nhigh-water mark, so they are paid in recovering years, not in drawdowns.')
+        footer='Net NAV from qis.compute_net_navs_ex_perf_man_fees. The performance fee is '
+               'charged only on gains\nabove the high-water mark, so no fee is paid for a year '
+               'that ends below it.')
     return fig, table.resample('W-FRI').last(), check, {
         'terminal_gross': float(gross.iloc[-1]), 'terminal_net': float(net.iloc[-1])}
 

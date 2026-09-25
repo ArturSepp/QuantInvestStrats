@@ -69,7 +69,7 @@ regime columns in [Regime-conditional performance](regime_conditional_performanc
 | $R^{\mathrm{smp}}_{\mathrm{pa}}$, $\tilde R^{\mathrm{smp}}_{\mathrm{pa}}$ | Per-annum and excess per-annum return from $b_0$ to $b_1$ | Decimal; the ratio numerators |
 | $v_k$ | `freq_vol` returns in the `return_type` basis, $k=1,\ldots,T$ | Log returns by default |
 | $r_k$, $\tilde r_k$ | `freq_vol` simple returns and simple excess returns | Decimal per period |
-| $u_t$ | Simple returns on the `freq_drawdown` grid | Daily by default |
+| $r^{\mathrm{dd}}_t$ | Simple returns on the `freq_drawdown` grid | Daily by default |
 | $x_k$ | A generic sample: `freq_skewness` returns in the risk table, one supplied column in the descriptive table | Units of the input |
 | $T$ | Number of observations of the sample at hand; `NUM_OBS` for $v_k$ | Count |
 | $\mathrm{AN}$, $\mathrm{AN}_{\mathrm{reg}}$, $\mathrm{AN}_{\mathrm{c}}$ | Periods per year of `freq_vol`, of `freq_reg` and of a regime classifier's grid | 12 for `ME`, 4 for `QE` |
@@ -192,8 +192,8 @@ asset's own observations, `freq_vol`, `freq_drawdown`, `freq_skewness` and `freq
 | `MAX_DD_VOL` | `Max DD/Vol` | $\mathrm{MDD}/\sigma_v$; zero if $\sigma_v=0$ | `freq_drawdown` over `freq_vol` | ratio |
 | `SKEWNESS` | `Skewness` | $G_1$; missing if $T\le 2$ | `freq_skewness`, `return_type` | dimensionless |
 | `KURTOSIS` | `Kurtosis` | $G_2$ (excess); missing if $T\le 3$ | `freq_skewness`, `return_type` | dimensionless |
-| `WORST` | `Worst` | $\min_t u_t$ | `freq_drawdown`, simple | decimal per period |
-| `BEST` | `Best` | $\max_t u_t$ | `freq_drawdown`, simple | decimal per period |
+| `WORST` | `Worst` | $\min_t r^{\mathrm{dd}}_t$ | `freq_drawdown`, simple | decimal per period |
+| `BEST` | `Best` | $\max_t r^{\mathrm{dd}}_t$ | `freq_drawdown`, simple | decimal per period |
 
 #### Descriptive tables: `compute_desc_table` and `compute_desc_freq_table`
 
@@ -417,7 +417,7 @@ rolling value and a table value of the same window differ by 4% before any sampl
 > years of months. The worked example's skewness of 0.29 and excess kurtosis of −0.29 come from
 > Gaussian paths, and neither is distinguishable from zero.
 
-`WORST` and `BEST` are the minimum and maximum simple returns $u_t$ on the `freq_drawdown` grid.
+`WORST` and `BEST` are the minimum and maximum simple returns $r^{\mathrm{dd}}_t$ on the `freq_drawdown` grid.
 When that grid is calendar days and the input is business days, weekend rows carry forward-filled
 prices and zero returns, so `WORST` is at most zero and `BEST` at least zero.
 
@@ -688,7 +688,7 @@ np.testing.assert_allclose(max_dd_monthly / vol, [-2.64, -1.70], atol=5e-3)
 | Regime Sharpe convention | PA, arithmetic or log | `qis.SharpeConvention` |
 | Risk-adjusted table | All risk-adjusted columns | `qis.compute_ra_perf_table(prices, perf_params=None)` |
 | Visible return columns | $\mathrm{TR}$, $R_{\mathrm{pa}}$, $\tilde R_{\mathrm{pa}}$, $Y$ | `qis.compute_performance_table(prices, perf_params)` |
-| Risk columns | $\sigma_v$, $\sigma^{-}$, $\mathrm{MDD}$, $G_1$, $G_2$, $\min u_t$, arithmetic family | `qis.compute_risk_table(prices, perf_params=None)` |
+| Risk columns | $\sigma_v$, $\sigma^{-}$, $\mathrm{MDD}$, $G_1$, $G_2$, $\min r^{\mathrm{dd}}_t$, arithmetic family | `qis.compute_risk_table(prices, perf_params=None)` |
 | Downside volatility | $\sqrt{\mathrm{AN}}\,s(v\mid v<0)$ | internal `_safe_downside_vol` in `qis/perfstats/perf_stats.py` |
 | Maximum and current drawdown | $\min_t D_t$, last $D_t$ | `qis.compute_max_current_drawdown` |
 | Benchmark columns | $\hat\alpha$, $\mathrm{AN}_{\mathrm{reg}}\hat\alpha$, $\hat\beta$, $R^2$, p-value | `qis.compute_ra_perf_table_with_benchmark(prices, benchmark, benchmark_price, perf_params)` |

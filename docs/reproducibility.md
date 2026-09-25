@@ -313,6 +313,17 @@ retained `while next_row < index_length - 1` loop can also leave the last output
 initial zero when a fill ends one position early. The published legacy row includes this
 behaviour. Neither sampler is changed to make the illustration cleaner.
 
+![Relative draw frequency of each of 250 source positions under the truncating and the circular stationary bootstrap, with the truncating sampler drawing the first positions about ten times less often than uniform](images/handbook_bootstrap_frequencies.png)
+
+[Open full-resolution preview](images/handbook_bootstrap_frequencies.png).
+
+The exhibit counts how often each of $n=250$ source positions is drawn over 400 stationary
+bootstrap paths with mean block length 20, relative to the uniform expectation of one. The
+truncating sampler draws the first position with relative frequency 0.11 and the whole start of
+the sample far below one, because a row near the start can only be reached by a block that begins
+there. The circular sampler draws it with frequency 0.98, and all positions scatter around one
+with the dispersion of 400 finite paths.
+
 ### Cross-sectional and paired resampling
 
 For a panel, $x_h$ is the row vector of all assets $i$ at source row $h$. Every scheme resamples

@@ -41,19 +41,23 @@ LEGACY_NOTATION = (
     (re.compile(r'(?<!\\)\b(?:Sigma_|sqrt\()'), 'Write formulas as TeX, not plain text.'),
 )
 METHODOLOGY_PAGES = frozenset({
-    'brinson_attribution.md', 'factsheets_and_reporting.md', 'frequency_convention_note.md',
+    'benchmark_relative_performance.md', 'brinson_attribution.md',
+    'covariance_correlation_pca.md', 'drawdowns.md', 'ewm_estimators.md',
+    'factor_risk_models.md', 'factsheets_and_reporting.md', 'frequency_convention_note.md',
     'fx_hedging_and_market_data.md', 'incomplete_and_mixed_frequency_data.md',
     'model_layer_attribution.md', 'notation_and_conventions.md',
-    'performance_analytics_and_sharpe.md', 'portfolio_backtesting.md', 'portfolio_breadth.md',
-    'private_asset_unsmoothing.md',
-    'reproducibility.md', 'stress_testing.md', 'stress_testing_with_options.md',
-    'tracking_error_and_risk.md',
-    'turnover_conventions.md',
+    'performance_analytics_and_sharpe.md', 'performance_statistics.md',
+    'portfolio_backtesting.md', 'portfolio_breadth.md', 'portfolio_stress.md',
+    'private_asset_unsmoothing.md', 'regime_conditional_performance.md',
+    'regression_and_hac.md', 'reproducibility.md', 'returns_and_navs.md',
+    'risk_adjusted_returns.md', 'risk_contributions.md', 'serial_dependence.md',
+    'signal_diagnostics.md', 'stress_testing.md', 'stress_testing_with_options.md',
+    'tracking_error_and_risk.md', 'turnover_conventions.md',
 })
 UTILITY_PAGES = frozenset({
     'documentation_standard.md', 'factsheets.md', 'gallery.md', 'index.md', 'install.md',
     'package_comparison.md', 'quickstart.md', 'REMOVED_5_0.md', 'software_design.md',
-    'portfolio_stress.md', 'bibliography.md',
+    'bibliography.md',
 })
 # Adoption is explicit. Do not infer it from a byline or let new pages evade the inventory.
 ADOPTED_PAGES = frozenset({
@@ -67,6 +71,11 @@ ADOPTED_PAGES = frozenset({
     'factsheets_and_reporting.md', 'factsheets.md', 'gallery.md',
     'install.md', 'quickstart.md', 'software_design.md', 'package_comparison.md',
     'REMOVED_5_0.md', 'portfolio_stress.md', 'notation_and_conventions.md', 'bibliography.md',
+    'returns_and_navs.md', 'performance_statistics.md', 'drawdowns.md',
+    'benchmark_relative_performance.md', 'regime_conditional_performance.md',
+    'ewm_estimators.md', 'covariance_correlation_pca.md', 'serial_dependence.md',
+    'regression_and_hac.md', 'risk_adjusted_returns.md', 'signal_diagnostics.md',
+    'risk_contributions.md', 'factor_risk_models.md',
 })
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')

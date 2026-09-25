@@ -79,7 +79,7 @@ the whole-sample estimators and links to that chapter for the rest.
 | $\hat\sigma_b^2$ | Benchmark variance with divisor $T$, $S_{bb}/T$ | Per period squared |
 | $q$, $Q$ | Benchmark index and number of benchmarks in the attribution | $q=1,\ldots,Q$ |
 | $\beta_{i,q,t}$, $\beta_{p,q,t}$ | EWMA beta of instrument $i$ and of the portfolio to benchmark $q$ at $t$ | Uses returns up to and including $t$ |
-| $m_t$, $C_{i,t}$, $V_t$ | EWMA mean, cross-moment vector and benchmark second-moment matrix | Local to the EWMA recursion |
+| $m_t$, $C_{i,t}$, $\Gamma_t$ | EWMA mean, cross-moment vector and benchmark second-moment matrix | Local to the EWMA recursion |
 | $A_{q,t}$ | Return attributed to benchmark $q$ over $(t-1,t]$ | Decimal per period |
 | $\eta_t$ | Attribution residual, the column `Alpha` | Decimal per period |
 | $\lambda$, $N$ | EWM decay and span, $\lambda=1-2/(N+1)$ | `factor_beta_span` or `span` is $N$ |
@@ -364,8 +364,8 @@ $$
 \begin{aligned}
 m_t&=\lambda\,m_{t-1}+(1-\lambda)\,\ell_t,\qquad \check\ell_t=\ell_t-m_t,\\
 C_{i,t}&=\lambda\,C_{i,t-1}+(1-\lambda)\,\check\ell_{b,t}\,\check\ell_{i,t},\\
-V_t&=\lambda\,V_{t-1}+(1-\lambda)\,\check\ell_{b,t}\,\check\ell_{b,t}^{\top},\\
-\beta_{i,t}&=V_t^{-1}C_{i,t},
+\Gamma_t&=\lambda\,\Gamma_{t-1}+(1-\lambda)\,\check\ell_{b,t}\,\check\ell_{b,t}^{\top},\\
+\beta_{i,t}&=\Gamma_t^{-1}C_{i,t},
 \end{aligned}
 $$
 
@@ -381,7 +381,7 @@ Implementation details of `qis.compute_portfolio_ewm_benchmark_betas`:
 - Because $m_t$ includes $\ell_t$, $\check\ell_t=\lambda(\ell_t-m_{t-1})$. The factor $\lambda^2$
   cancels between $C$ and $V$, so the beta equals the one demeaned by the previous EWMA mean.
 - Betas are missing on the first 21 dates of the grid, the start date and the first 20 returns
-  (warm-up, `warmup_period=20`). A singular $V_t$ falls back to its diagonal; a missing return
+  (warm-up, `warmup_period=20`). A singular $\Gamma_t$ falls back to its diagonal; a missing return
   carries both moments forward.
 - $\beta_{i,t}$ uses returns up to and including $t$ and is known at the close of $t$.
 
@@ -394,8 +394,8 @@ $$
 If the weights are constant over the EWMA memory and the portfolio log return is approximated by
 $\sum_i w_i\ell_{i,t}$, this is the EWMA beta of the portfolio itself.
 
-**Proof.** $V_t$ does not depend on the dependent series, and the EWMA demeaning and $C_{i,t}$ are
-linear in it. Hence $V_t^{-1}C_t$ of a fixed linear combination of instruments is the same
+**Proof.** $\Gamma_t$ does not depend on the dependent series, and the EWMA demeaning and $C_{i,t}$ are
+linear in it. Hence $\Gamma_t^{-1}C_t$ of a fixed linear combination of instruments is the same
 combination of their betas. $\square$
 
 Both conditions are approximations. Weighted log returns are not the portfolio log return (see

@@ -318,7 +318,7 @@ warns and falls back to 252, so resample to an explicit grid before estimating.
 ## See also
 
 - [Reporting frequency and annualisation](frequency_convention_note.md)
-- [Performance analytics and Sharpe conventions](performance_analytics_and_sharpe.md)
+- [Sharpe ratios: conventions and inference](performance_analytics_and_sharpe.md)
 - [Incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md)
 - [Portfolio backtesting](portfolio_backtesting.md)
 - [Bibliography](bibliography.md)

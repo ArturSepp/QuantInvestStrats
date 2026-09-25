@@ -43,7 +43,7 @@ Three results carry the chapter:
    in the response. Additive attribution of alphas across layers is exact because of it.
 2. **Quadratic-form inference.** The Bartlett HAC covariance is a quadratic form in the scores
    and is positive semidefinite for every lag count. The variance of a linear contrast of alphas
-   is therefore $c^{\top}\hat\Sigma c$, and it equals the variance obtained by fitting the
+   is therefore $c^{\top}\hat\Sigma_{\alpha}c$, and it equals the variance obtained by fitting the
    contrast series directly.
 3. **Point-in-time EWM betas are prefix regressions.** The ratio of zero-seeded EWM moments at
    date $t$ is the weighted least-squares slope through the origin on the rows up to $t$, with
@@ -75,15 +75,21 @@ Three results carry the chapter:
 | $q$, $\kappa_k$ | Bartlett lag count and weight $1-k/(q+1)$ | Rows; `hac_lags` capped at $T-1$ |
 | $\hat S$ | Bartlett-weighted long-run cross-product of the scores | Positive semidefinite |
 | $\hat\Sigma_{\theta}$ | Estimated covariance matrix of $\hat\theta$ | Per-period units |
+| $\hat\Theta$, $\hat\Sigma_{\Theta}$, $\hat\Sigma_{\alpha}$ | Stacked coefficients of $J$ equations, their joint covariance, and its $J\times J$ intercept block | Ordered by equation, then intercept and slope |
 | $\gamma$, $z_{\gamma}$ | Confidence level and normal quantile $\Phi^{-1}((1+\gamma)/2)$ | `confidence_level`, default 0.95 |
 | $\Phi$ | Standard normal distribution function | |
 | $\omega_t$, $\Omega$ | Objective weight $\lambda^{T-1-t}$ of row $t=0,\ldots,T-1$; $\Omega=\operatorname{diag}(\omega_t)$ | Latest row has weight one |
 | $T_{\mathrm{eff}}$ | Kish effective sample size of the weights | Rows |
 | $J$, $c$ | Number of equations fitted jointly; contrast vector in $\mathbb{R}^{J}$ | |
-| $K$ | Number of factors | |
+| $K$, $f$ | Number of factors; factor index | |
+| $A$ | Weighted cross-product $X^{\top}\Omega X$ | Bread of the WLS sandwich is $A^{-1}$ |
+| $G_t$ | Moving sum of $q+1$ consecutive scores | Used in the positive-semidefiniteness proof |
 | $M_t$, $C_t$, $B_t$ | EWM factor second moment ($K\times K$), cross moment ($K\times J$), loadings $M_t^{-1}C_t$ | Point in time at $t$ |
 | $\mathcal{E}_t[z]$ | EWM recursion $\lambda\mathcal{E}_{t-1}[z]+(1-\lambda)z_t$, seeded at the first row | Seed set by `InitType` |
 | $m^{y}_t$ | EWM mean $\mathcal{E}_t[y]$ seeded at $y_0$ | Point in time |
+| $\eta_t$ | First-stage residual $y_t-\hat\beta_tx_t$ of the one-factor EWM fit | Periodic return units |
+| $a_t$, $h$ | Linear-model alpha $y_t-\sum_fB_{f,t-h}x_{f,t}$; loading lag | $h=1$ point in time, $h=0$ in sample |
+| $\phi$ | AR(1) coefficient of the residuals in the examples | Dimensionless |
 
 The estimators assume that rows are consecutive observations in time order, that $X$ has full
 column rank, and that the regressors are exogenous, $\mathbb{E}[x_t\varepsilon_t]=0$. The HAC
@@ -312,7 +318,8 @@ $T=240$, 5 at $T=520$ and 8 at $T=2520$. No qis estimator calls it by default; p
 > data. For AR(1) errors with coefficient $\phi$ and a regressor independent of them, the long-run
 > variance of the intercept score is $(1+\phi)/(1-\phi)$ times its variance, while the Bartlett
 > estimator with $q$ lags targets $1+2\sum_{k=1}^{q}\kappa_k\phi^k$. At $\phi=0.6$ the first is 4
-> and the second, for $q=3$, is 2.37: the standard error is too small by a factor of about 1.30.
+> and the second, for $q=3$, is 2.37: when the regressor's mean is small relative to its
+> volatility, the alpha standard error is too small by a factor of about 1.30.
 
 ### Weighted least squares with geometric weights
 
@@ -363,7 +370,9 @@ and use $1-\lambda^{2T}=(1-\lambda^T)(1+\lambda^T)$ and $1-\lambda^2=(1-\lambda)
 Finally $\lambda=(N-1)/(N+1)$ gives $(1+\lambda)/(1-\lambda)=N$. $\square$
 
 $T_{\mathrm{eff}}$ is below $N$ for every finite $T$ and approaches it geometrically: $T=239$ and
-$N=36$ give 35.9999. The estimator reports it as `effective_nobs` and requires it to exceed two.
+$N=36$ give 35.9999. The estimator reports it as `effective_nobs` and requires it to exceed two;
+it also raises `ValueError` with fewer than three common finite rows, a regressor that does not
+vary, or a response that is constant.
 It is not the degrees of freedom of the small-sample factor, which is $T/(T-2)$ with the raw row
 count, as in a statsmodels WLS fit.
 
@@ -438,14 +447,14 @@ since row $t$ does. To decompose return $t$ ex ante, apply $B_{t-1}$ to $x_t$;
 `LinearModel.get_factor_alpha(lag=1)` does exactly that.
 
 **Identity (diagonal versus full inversion).** With $B^{\mathrm{full}}_t=M_t^{-1}C_t$ and
-$B^{\mathrm{diag}}_t=\operatorname{diag}(M_t)^{-1}C_t$, row $k$ of the loadings satisfies
+$B^{\mathrm{diag}}_t=\operatorname{diag}(M_t)^{-1}C_t$, the row of factor $f$ satisfies
 
 $$
-B^{\mathrm{diag}}_{t,k}=B^{\mathrm{full}}_{t,k}
-+\sum_{l\ne k}\frac{(M_t)_{kl}}{(M_t)_{kk}}\,B^{\mathrm{full}}_{t,l}.
+B^{\mathrm{diag}}_{t,f}=B^{\mathrm{full}}_{t,f}
++\sum_{f'\ne f}\frac{(M_t)_{ff'}}{(M_t)_{ff}}\,B^{\mathrm{full}}_{t,f'}.
 $$
 
-**Proof.** $C_t=M_tB^{\mathrm{full}}_t$; divide row $k$ by $(M_t)_{kk}$. $\square$
+**Proof.** $C_t=M_tB^{\mathrm{full}}_t$; divide row $f$ by $(M_t)_{ff}$. $\square$
 
 The diagonal version runs $K$ separate one-factor regressions and absorbs the exposure to
 correlated factors, the omitted-variable term above. It equals the full version only when the
@@ -470,18 +479,20 @@ The implementation adds four rules.
 `qis.EwmLinearModel.fit(span=31, ewm_lambda=0.94, is_x_correlated=True,
 mean_adj_type=MeanAdjType.NONE, init_type=InitType.MEAN, warmup_period=20)` requires identical
 factor and asset indexes and stores one $(T\times J)$ loadings frame per factor. With
-`mean_adj_type` other than `NONE` it first subtracts a rolling mean from both panels, seeded by
-`init_type`, and overwrites the model's `x` and `y` with the demeaned panels, so later calls to
-`get_factor_alpha` and `get_model_ewm_r2` see demeaned returns. `MeanAdjType.EWMA` subtracts the
-running mean $m_s$ at each row $s$, so the result is point in time given a point-in-time seed but
-is not a prefix regression with an intercept. `qis.estimate_ewm_factor_model` fits the same model
+`mean_adj_type` other than `NONE` it first subtracts a mean from both panels and overwrites the
+model's `x` and `y` with the demeaned panels, so later calls to `get_factor_alpha` and
+`get_model_ewm_r2` see demeaned returns. `MeanAdjType.INSAMPLE` subtracts the full-sample mean,
+`EXPANDING` the expanding mean, and `EWMA` the running EWM mean $m_s$ at each row $s$, seeded by
+`init_type`. The `EWMA` result is point in time only with a point-in-time seed, and it is not a
+prefix regression with an intercept, because each row is centred on its own running mean. `qis.estimate_ewm_factor_model` fits the same model
 on `W-WED` log returns with span 26.
 
 #### One-factor alpha, prediction and $R^2$
 
 `qis.compute_ewm_beta_alpha_forecast(x_data, y_data, span=None, ewm_lambda=0.94,
 mean_adj_type=MeanAdjType.NONE, init_type=InitType.MEAN, beta_init_value=None, annualize=False)`
-regresses each asset on one factor (a Series broadcast to every asset, or paired columns). Let
+regresses each asset on one factor (a Series broadcast to every asset, or paired columns); when
+the indexes differ, the assets are reindexed to the factor index with a forward fill. Let
 $\mathcal{E}_t$ be the qis recursion: its value at the first row is the seed, which replaces the
 first observation, and later rows follow
 $\mathcal{E}_t[z]=\lambda\mathcal{E}_{t-1}[z]+(1-\lambda)z_t$. With
@@ -514,8 +525,8 @@ Two properties of the defaults matter:
 
 - **The default seed looks ahead.** With `InitType.MEAN`, $\mathcal{E}_0[xy]$ and
   $\mathcal{E}_0[x^2]$ are full-sample means, so $\hat\beta_0=\sum_tx_ty_t/\sum_tx_t^2$ is the
-  full-sample slope through the origin. Its influence decays like $\lambda^t$ but never vanishes,
-  and the residual-mean and variance seeds are full-sample means too. `InitType.X0` is point in
+  full-sample slope through the origin. Its weight decays like $\lambda^t$ but is present at
+  every date, and the residual-mean and variance seeds are full-sample means too. `InitType.X0` is point in
   time and gives $\hat\beta_0=y_0/x_0$.
 - **The "forecast" is a fitted value.** $\hat\beta_t$ and $\hat\alpha_t$ both use row $t$. An
   ex-ante prediction of $y_t$ is $\hat\beta_{t-1}x_t+\hat\alpha_{t-1}$, which the caller forms by
@@ -533,7 +544,8 @@ R^2_t=\operatorname{clip}_{[0,1]}\Big(1-
 \frac{\mathcal{E}_t\big[(y-\hat y-\hat\alpha)^2\big]}{\mathcal{E}_t\big[(y-m^{y})^2\big]}\Big),
 $$
 
-with the alpha seeded at its first finite value (`InitType.X0`) and both variances seeded at zero.
+with the alpha seeded at its first-row value (`InitType.X0`, zero when that row is missing) and
+both variances seeded at zero.
 It is point in time whenever $\hat y$ is, for example the lag-one explained return of a
 `LinearModel`.
 
@@ -543,10 +555,10 @@ It is point in time whenever $\hat y$ is, for example the lag-one explained retu
 explained return) with
 
 $$
-a_t=y_t-\sum_{k=1}^{K}B_{k,t-\ell}\,x_{k,t},\qquad \ell\in\{0,1\},
+a_t=y_t-\sum_{f=1}^{K}B_{f,t-h}\,x_{f,t},\qquad h\in\{0,1\},
 $$
 
-where the loadings are forward-filled onto the factor index and shifted by `lag` $=\ell$. Lag one
+where the loadings are forward-filled onto the factor index and shifted by `lag` $=h$. Lag one
 is point in time; lag zero is in sample. There is no intercept: $a_t$ contains whatever mean of
 $y$ the factors do not explain. With `span`, the alpha is smoothed to $\mathcal{E}_t[a]$.
 
@@ -699,7 +711,7 @@ design = np.column_stack([np.ones(T), bench])
 coef = np.linalg.solve(design.T @ design, design.T @ fund)
 resid = fund - design @ coef
 classical_se = np.sqrt(resid @ resid / (T - 2) * np.linalg.inv(design.T @ design)[0, 0])
-hac_se = {}
+hac_se, hac_pvalue = {}, {}
 for q in (0, 3, 4):
     coef_q, cov_q, meat_q, scores = bartlett_sandwich(design, fund, q)
     result = estimate_ols_alpha_beta_hac(x=bench, y=fund, hac_lags=q)
@@ -715,13 +727,16 @@ for q in (0, 3, 4):
     moving = np.array([padded[t:t + q + 1].sum(axis=0) for t in range(T + q)])
     np.testing.assert_allclose(moving.T @ moving / (q + 1), meat_q, rtol=1e-10)
     assert np.linalg.eigvalsh(meat_q).min() > 0.0
-    hac_se[q] = result.alpha_hac_se
+    hac_se[q], hac_pvalue[q] = result.alpha_hac_se, result.alpha_pvalue
 
 assert round(coef[0], 4) == 0.0046 and round(coef[1], 3) == 0.829
 assert round(np.corrcoef(resid[1:], resid[:-1])[0, 1], 2) == 0.47
 np.testing.assert_allclose([classical_se, hac_se[0], hac_se[3], hac_se[4]],
                            [0.00113, 0.00114, 0.00163, 0.00169], atol=5e-6)
 assert round(hac_se[3] / classical_se, 2) == 1.44
+classical_pvalue = 2 * stats.t.sf(coef[0] / classical_se, df=T - 2)
+assert round(hac_pvalue[3], 3) == 0.004 and round(classical_pvalue, 4) == 0.0001
+assert round(hac_pvalue[3] / classical_pvalue, -1) == 60
 
 # lag rule and the population target of a three-lag Bartlett estimator
 assert newey_west_lag_rule(T) == int(np.floor(4 * (T / 100) ** (2 / 9))) == 4
@@ -740,7 +755,7 @@ np.testing.assert_allclose(estimate_hac_mean(fund, hac_lags=0).hac_se,
 ```
 
 The alpha HAC p-value at $q=3$ is 0.004 against a classical 0.0001: the conclusion survives, but
-the evidence is weaker by two orders of magnitude.
+the p-value is about 60 times larger.
 
 ### EWMA-WLS with a joint contrast
 
@@ -855,7 +870,8 @@ beta_mean_bumped = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=bu
                                                        span=36)[0]
 np.testing.assert_allclose(beta_mean.iloc[0], x_b @ y_a / (x_b @ x_b), rtol=1e-8)
 assert round(beta_mean['SEQ_EU'].iloc[0], 3) == 1.289
-assert (beta_mean.iloc[0] - beta_mean_bumped.iloc[0]).abs().min() > 1e-4
+np.testing.assert_allclose((beta_mean.iloc[0] - beta_mean_bumped.iloc[0]).abs(), 0.0002,
+                           atol=1e-5)
 
 beta_x0 = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=assets, span=36,
                                               init_type=InitType.X0)[0]
@@ -924,8 +940,8 @@ assert round(r2_oos['SEQ_EU'].iloc[-1], 3) == 0.410
 |---|---|---|
 | OLS fit, prediction and legend label | $(X^{\top}X)^{-1}X^{\top}y$ | `qis.fit_multivariate_ols(x, y, fit_intercept=True, verbose=True)`, returns (prediction, params, label) |
 | Scalar OLS statistics for tables | $\hat\alpha$, $\hat\beta$, $R^2$, classical p-value | internal `qis.utils.regression.estimate_ols_alpha_beta`; `PerfStat.ALPHA`, `ALPHA_AN`, `BETA`, `R2`, `ALPHA_PVALUE` of `qis.compute_ra_perf_table_with_benchmark` |
-| OLS with Bartlett HAC for alpha | $\frac{T}{T-2}(X^{\top}X)^{-1}\hat S(X^{\top}X)^{-1}$ | internal `qis.utils.regression.estimate_ols_alpha_beta_hac(x, y, hac_lags=3, confidence_level=0.95)`, returns `OlsAlphaBetaHacResult` |
-| Mean with Bartlett HAC | $\hat S/(T(T-1))$ | internal `qis.utils.regression.estimate_hac_mean(y, hac_lags=3, confidence_level=0.95)`, returns `HacMeanResult` |
+| OLS with Bartlett HAC for alpha | $\hat\Sigma_{\theta}$ with $p=2$, normal reference | internal `qis.utils.regression.estimate_ols_alpha_beta_hac(x, y, hac_lags=3, confidence_level=0.95)`, returns `OlsAlphaBetaHacResult` |
+| Mean with Bartlett HAC | $\hat\Sigma_{\theta}$ with $p=1$ | internal `qis.utils.regression.estimate_hac_mean(y, hac_lags=3, confidence_level=0.95)`, returns `HacMeanResult` |
 | Lag rule | $\lfloor 4(T/100)^{2/9}\rfloor$ | internal `qis.utils.regression.newey_west_lag_rule(nobs)` |
 | Geometric WLS with stacked HAC | $(X^{\top}\Omega X)^{-1}X^{\top}\Omega y$, $\hat\Sigma_{\Theta}$, $T_{\mathrm{eff}}$ | `qis.estimate_ewma_alpha_beta_hac(x, y, span=36.0, hac_lags=3, confidence_level=0.95)`, returns `qis.EwmaAlphaBetaHacResult` |
 | Legend annualisation | $e^{\mathrm{AN}\hat\alpha}-1$ | internal `qis.utils.regression.reg_model_params_to_str(..., alpha_an_factor=None)`, via `qis.plot_scatter` |
@@ -934,7 +950,7 @@ assert round(r2_oos['SEQ_EU'].iloc[-1], 3) == 0.410
 | Linear model loadings | $B_t$ per factor | `qis.EwmLinearModel.fit(span=31, is_x_correlated=True, init_type=InitType.MEAN, warmup_period=20)`; `qis.estimate_ewm_factor_model` |
 | One-factor EWM alpha, prediction, $R^2$ | centred, seeds from `init_type` | `qis.compute_ewm_beta_alpha_forecast(..., init_type=InitType.MEAN)` |
 | EWM alpha and $R^2$ of a prediction | centred, X0 and zero seeds | `qis.compute_ewm_alpha_r2_given_prediction` |
-| Linear-model alpha | $y_t-\sum_kB_{k,t-\ell}x_{k,t}$ | `qis.LinearModel.get_factor_alpha(lag=1, span=None)` |
+| Linear-model alpha | $y_t-\sum_fB_{f,t-h}x_{f,t}$ | `qis.LinearModel.get_factor_alpha(lag=1, span=None)` |
 | Linear-model $R^2$ | $1-\mathcal{E}_t[a^2]/\mathcal{E}_t[y^2]$, uncentred | `qis.LinearModel.get_model_ewm_r2(span=52, lag=0)` |
 
 The OLS, HAC and EWMA-WLS code is in

@@ -61,21 +61,28 @@ observation.
 | $\delta$ / `weight_lag` | Rows between the volatility estimate and the return it scales | Default 1; `None` or 0 means no lag |
 | $x_t$ | Risk-adjusted return | Risk units when $\sigma_{\mathrm{tgt}}=1$ |
 | $w^{*}_t$ | Volatility-targeting weight decided at $t$ | Multiple of NAV, held over $(t,t+1]$ |
-| $\kappa$ | Kurtosis of standardised returns | 3 for a normal law |
+| $r^{\mathrm{vt}}_t$, $\sigma_{\mathrm{ann}}$ | Return of the targeted position; annual volatility target | Per period; per annum |
+| $z_t$, $\kappa$ | Standardised return $r_t/\sigma$ and its kurtosis | $\kappa=3$ for a normal law |
+| $Y_t$ | EWM of $z_t^2$, so that $\hat\sigma^2_t=\sigma^2Y_t$ | Dimensionless |
+| $\mu_x$ | Mean of $x_t$: the per-period Sharpe ratio when $\sigma_{\mathrm{tgt}}=1$ | Risk units |
 | $\theta$, $W$ | `vol_floor_quantile`, `vol_floor_quantile_roll_period` | Probability; rows |
 | $h$ | Summation horizon of the rolling functions (their `span`) | Rows |
 | $J$, $n_J$ | A calendar period of `freq` and its number of observations | |
 | $\mathrm{AN}_f$ | Annualisation factor of `freq` | `qis.get_annualization_factor(freq)` |
 | $X^{(h)}_t$, $X^{f}_{J}$ | Normalised rolling and calendar sums of $x_t$ | Risk units |
-| $\lambda_m$, $N_m$ | Decay and span of the momentum EWM | `momentum_span` |
+| $R^{(h)}_t$, $\hat\sigma^{(h)}_t$, $\lambda_h$ | Rolling $h$-row return sum, its EWM volatility and decay | Per $h$ rows; $\lambda_h=1-2/(h+1)$ |
+| $\lambda_m$, $N_m$, $m_t$ | Decay, span and state of the momentum EWM | `momentum_span`; $m=0$ before the first finite $x_t$ |
+| $N_v$ | Volatility span of the momentum and filter functions | `vol_span` |
 | $\lambda_L$, $\lambda_S$, $N_L$, $N_S$ | Decays and spans of the long and short filter legs | `long_span`, `short_span` |
-| $c_k$ | Filter weight on $x_{t-k}$ | Dimensionless |
+| $c_k$, $k^{*}$ | Filter weight on $x_{t-k}$; lag of the largest weight | Dimensionless; rows |
 | $Q$ | Unit-variance normaliser of the long–short filter | Dimensionless |
 | $M_t$, $F_t$ | Momentum signal and long–short filter output | Risk units |
 | $y$, $y_0$, $b$ / `loc`, `scale` | Signal, centre and scale of a signal map | $b$ is in signal units for the normal and Laplace maps and in squared signal units for `ExpCDF` |
 | $q$, $p_{+}$, $p_{-}$ | `tail_level`, `slope_right`, `slope_left` | Weight levels |
 | $d_{+}$, $d_{-}$ | `tail_decay_right`, `tail_decay_left` | Signal units |
-| $g(y)$, $\Phi$ | Signal-to-weight map; standard normal CDF | |
+| $\eta$, $v$ | Standardised signal $(y-y_0)/b$; `ExpCDF` coordinate $(y-y_0)/(1.25\sqrt{b})$ | Dimensionless |
+| $\omega_{+}$, $\omega_{-}$ | Internal `ExpCDF` scales (`scale_positive`, `scale_negative`) | Squared signal units |
+| $g(y)$, $\Phi$ | Signal-to-weight map; standard normal CDF | Weight |
 
 The propositions assume a regular sampling grid, returns whose conditional mean is negligible
 relative to their volatility, and, where stated, serially uncorrelated standardised returns. The
@@ -94,24 +101,28 @@ $$
 \hat\sigma^2_{t_0}=r_{t_0}^2 .
 $$
 
-The seed is the first squared return (`InitType.X0`). If the first row is missing, the recursion
-starts at the first finite return $t_1$ from a zero state, so $\hat\sigma^2_{t_1}=(1-\lambda)r_{t_1}^2$.
-A missing return inside the sample holds the state (`NanBackfill.FFILL`). An explicit `init_value`
-replaces the seed, and $r_{t_0}$ then does not enter the recursion. With `mean_adj_type` other than
-`NONE`, $r_t$ is replaced by $r_t$ minus an expanding or EWM mean (same $\lambda$) through $t$, or by
-$r_t$ minus the full-sample mean for `INSAMPLE`.
+The seed is the first squared return (`InitType.X0`). If the first row is missing, the
+recursion starts at the first finite return $t_1$ from a zero state, so
+$\hat\sigma^2_{t_1}=(1-\lambda)r_{t_1}^2$. A missing return inside the sample holds the state
+(`NanBackfill.FFILL`). An explicit `init_value` replaces the seed, and $r_{t_0}$ then does not
+enter the recursion. With `mean_adj_type` other than `NONE`, $r_t$ is replaced by $r_t$ minus an
+expanding or EWM mean (same $\lambda$) through $t$, or by $r_t$ minus the full-sample mean for
+`INSAMPLE`.
 
-Two optional masks act on the estimate. With `vol_floor_quantile` $\theta$, the variance is floored
-at its own rolling $\theta$-quantile over the last $W$ rows (pandas `interpolation="lower"`, at
-least $0.2W$ observations), which, the square root being monotone, floors $\hat\sigma_t$ at the
-same quantile of itself. With `warmup_period` $n$, the first $n$ finite estimates are set to
-missing. Neither is on by default. The EWM estimators, their mean age and effective sample size
-are derived in [Exponentially weighted estimators](ewm_estimators.md).
+Two optional adjustments act on the estimate. With `vol_floor_quantile` $\theta$, the variance is
+floored at its own rolling $\theta$-quantile over the last $W$ rows (pandas
+`interpolation="lower"`, at least $0.2W$ observations), which, the square root being monotone,
+floors $\hat\sigma_t$ at the same quantile of itself. The window includes $t$, so the floor is
+point in time. With `warmup_period`, that many leading finite estimates are set to missing.
+Neither is on by default. The default decay $\lambda=0.94$ is the RiskMetrics choice for daily
+volatility (J.P. Morgan and Reuters, 1996). The EWM estimators, their mean age and effective
+sample size are derived in [Exponentially weighted estimators](ewm_estimators.md).
 
-> **Pitfall.** The seed is one observation. The first risk-adjusted return is $r_{t_0+1}/\lvert r_{t_0}\rvert$,
-> which can be arbitrarily large, and a leading missing row (the `qis.to_returns` default) makes
-> the first estimate smaller still by the factor $\sqrt{1-\lambda}$, about 0.24 at $\lambda=0.94$.
-> Use `warmup_period` of at least the span, or discard the first span of output.
+> **Pitfall.** The seed is one observation. The first risk-adjusted return is
+> $r_{t_0+1}/\lvert r_{t_0}\rvert$, which can be arbitrarily large, and a leading missing row (the
+> `qis.to_returns` default) makes the first estimate smaller still by the factor
+> $\sqrt{1-\lambda}$, about 0.24 at $\lambda=0.94$. Use `warmup_period` of at least the span, or
+> discard the first span of output.
 
 ### Risk-adjusted returns
 
@@ -119,18 +130,20 @@ are derived in [Exponentially weighted estimators](ewm_estimators.md).
 
 $$
 x_t=\sigma_{\mathrm{tgt}}\,\frac{r_t}{\hat\sigma_{t-\delta}},
-\qquad \delta=\texttt{weight\_lag}=1 \text{ by default},
 $$
 
-with $\sigma_{\mathrm{tgt}}$ equal to `vol_target`, or 1 when it is `None`. The division is taken only
-where $\hat\sigma$ is finite and positive; elsewhere $x_t$ is missing. The function returns the
-triple $(x_t,\ \sigma_{\mathrm{tgt}}/\hat\sigma_{t-\delta},\ \hat\sigma_t)$: the second element is the
-weight dated at the return it scales, already lagged. With `is_log_returns_to_arithmetic=True` the
-numerator becomes $e^{r_t}-1$, while $\hat\sigma$ is still estimated on the supplied (log) returns.
+with $\delta$ equal to `weight_lag` (1 by default) and $\sigma_{\mathrm{tgt}}$ equal to `vol_target`,
+or 1 when it is `None`. The division is taken only where $\hat\sigma$ is finite and positive;
+elsewhere $x_t$ is missing. The function returns the triple
+$(x_t,\ \sigma_{\mathrm{tgt}}/\hat\sigma_{t-\delta},\ \hat\sigma_t)$: the second element is the weight
+dated at the return it scales, already lagged. With `is_log_returns_to_arithmetic=True` the
+numerator becomes $e^{r_t}-1$, while $\hat\sigma$ is still estimated on the supplied (log)
+returns.
 
-**Proposition (unit conditional variance).** Suppose $\mathbb{E}[r_t\mid\mathcal{F}_{t-1}]=0$ and
-$\operatorname{Var}(r_t\mid\mathcal{F}_{t-1})=\sigma^2_{t\mid t-1}$. If the scale equals the true
-conditional volatility, $\hat\sigma_{t-1}=\sigma_{t\mid t-1}$, then $x_t=r_t/\hat\sigma_{t-1}$ satisfies
+**Proposition (unit conditional variance).** Suppose $\mathbb{E}[r_t\mid\mathcal{F}_{t-1}]=0$
+and $\operatorname{Var}(r_t\mid\mathcal{F}_{t-1})=\sigma^2_{t\mid t-1}$. If the scale equals the
+true conditional volatility, $\hat\sigma_{t-1}=\sigma_{t\mid t-1}$, then
+$x_t=r_t/\hat\sigma_{t-1}$ satisfies
 
 $$
 \mathbb{E}[x_t\mid\mathcal{F}_{t-1}]=0,
@@ -141,7 +154,8 @@ $$
 $$
 
 **Proof.** $\hat\sigma_{t-1}$ is $\mathcal{F}_{t-1}$-measurable, so it leaves the conditional
-expectation: $\operatorname{Var}(r_t/\hat\sigma_{t-1}\mid\mathcal{F}_{t-1})=\sigma^2_{t\mid t-1}/\hat\sigma^2_{t-1}=1$,
+expectation:
+$\operatorname{Var}(r_t/\hat\sigma_{t-1}\mid\mathcal{F}_{t-1})=\sigma^2_{t\mid t-1}/\hat\sigma^2_{t-1}=1$,
 and likewise the conditional mean is zero. For $s<t$, $x_s$ is $\mathcal{F}_{t-1}$-measurable and
 $\mathbb{E}[x_tx_s]=\mathbb{E}\big[x_s\,\mathbb{E}[x_t\mid\mathcal{F}_{t-1}]\big]=0$. $\square$
 
@@ -152,8 +166,8 @@ on daily data.
 
 **Proposition (estimation noise inflates the realised variance).** Let $r_t=\sigma z_t$ with
 constant $\sigma$ and i.i.d. $z_t$, $\mathbb{E}z_t^2=1$, $\mathbb{E}z_t^4=\kappa$, and let
-$\hat\sigma^2_{t-1}=\sigma^2Y_{t-1}$ with the stationary EWM $Y_{t-1}=(1-\lambda)\sum_{k\ge0}\lambda^k z^2_{t-1-k}$.
-Then
+$\hat\sigma^2_{t-1}=\sigma^2Y_{t-1}$ with the stationary EWM
+$Y_{t-1}=(1-\lambda)\sum_{k\ge0}\lambda^k z^2_{t-1-k}$. Then
 
 $$
 \mathbb{E}[x_t^2]=\mathbb{E}\big[Y_{t-1}^{-1}\big]\ \ge\ 1,
@@ -161,9 +175,10 @@ $$
 \mathbb{E}[x_t^2]\approx 1+(\kappa-1)\frac{1-\lambda}{1+\lambda}=1+\frac{\kappa-1}{N}.
 $$
 
-**Proof.** $z_t$ is independent of $Y_{t-1}$, so $\mathbb{E}[x_t^2]=\mathbb{E}[z_t^2]\,\mathbb{E}[1/Y_{t-1}]$.
-Since $\mathbb{E}Y=1$ and $1/y$ is convex, Jensen's inequality gives $\mathbb{E}[1/Y]\ge1$. A
-second-order expansion of $1/y$ at 1 gives $\mathbb{E}[1/Y]\approx1+\operatorname{Var}(Y)$, and
+**Proof.** $z_t$ is independent of $Y_{t-1}$, so
+$\mathbb{E}[x_t^2]=\mathbb{E}[z_t^2]\,\mathbb{E}[1/Y_{t-1}]$. Since $\mathbb{E}Y=1$ and $1/y$ is
+convex, Jensen's inequality gives $\mathbb{E}[1/Y]\ge1$. A second-order expansion of $1/y$ at 1
+gives $\mathbb{E}[1/Y]\approx1+\operatorname{Var}(Y)$, and
 $\operatorname{Var}(Y)=(1-\lambda)^2(\kappa-1)\sum_k\lambda^{2k}=(\kappa-1)(1-\lambda)/(1+\lambda)$.
 Finally $(1-\lambda)/(1+\lambda)=1/N$ for $\lambda=1-2/(N+1)$. $\square$
 
@@ -171,15 +186,16 @@ For normal returns and the default $\lambda=0.94$ the second moment is about 1.0
 volatility runs about 3% above target. Fat tails raise the inflation, although the
 second-order approximation then overstates it; a volatility floor or a longer span lowers it.
 
-**Proposition (look-ahead bound).** With $\delta=0$ (`weight_lag=0` or `None`) and no floor, every
-risk-adjusted return after the seed obeys
+**Proposition (look-ahead bound).** With $\delta=0$ (`weight_lag=0` or `None`) and
+`MeanAdjType.NONE`, every risk-adjusted return obeys
 
 $$
-\lvert x_t\rvert=\sigma_{\mathrm{tgt}}\frac{\lvert r_t\rvert}{\hat\sigma_t}\le\frac{\sigma_{\mathrm{tgt}}}{\sqrt{1-\lambda}}=\sigma_{\mathrm{tgt}}\sqrt{\frac{N+1}{2}} .
+\lvert x_t\rvert=\sigma_{\mathrm{tgt}}\frac{\lvert r_t\rvert}{\hat\sigma_t}
+\le\frac{\sigma_{\mathrm{tgt}}}{\sqrt{1-\lambda}}=\sigma_{\mathrm{tgt}}\sqrt{\frac{N+1}{2}} .
 $$
 
-**Proof.** $\hat\sigma^2_t=\lambda\hat\sigma^2_{t-1}+(1-\lambda)r_t^2\ge(1-\lambda)r_t^2$. At the seed,
-$\lvert x_{t_0}\rvert=\sigma_{\mathrm{tgt}}$. $\square$
+**Proof.** $\hat\sigma^2_t=\lambda\hat\sigma^2_{t-1}+(1-\lambda)r_t^2\ge(1-\lambda)r_t^2$, and a floor
+only raises $\hat\sigma_t$. At an $r_{t_0}^2$ seed, $\lvert x_{t_0}\rvert=\sigma_{\mathrm{tgt}}$. $\square$
 
 > **Pitfall.** `weight_lag=0` divides a return by a volatility that already contains it. The
 > result is not tradeable and has artificially thin tails: at $\lambda=0.94$ no normalised return
@@ -205,31 +221,46 @@ $\sigma_{\mathrm{tgt}}\,\sigma_{t+1\mid t}/\hat\sigma_t$. The unmanaged asset ca
 $\sigma_{t+1\mid t}$ itself, which moves with the volatility regime; the targeted position moves
 only with the ratio of true to estimated volatility. That ratio departs from one for two reasons:
 estimation noise, which inflates realised variance by about $(\kappa-1)/N$ as shown above, and
-the lag of the EWM after a volatility jump. The mean age of the EWM is $\lambda/(1-\lambda)=(N-1)/2$
-periods, 15.7 days at $\lambda=0.94$, so after a jump the position stays over-levered for several
-weeks. The worked example shows both effects.
+the lag of the EWM after a volatility jump. The mean age of the EWM is
+$\lambda/(1-\lambda)=(N-1)/2$ periods, 15.7 days at $\lambda=0.94$, so after a jump the position
+stays over-levered for several weeks. The worked example shows both effects.
 
-`compute_ra_returns` has no leverage cap: $w^{*}_t$ grows without bound as $\hat\sigma_t$ falls. The
-only bound in the code is indirect: with a floor, $w^{*}_t\le\sigma_{\mathrm{tgt}}/\hat\sigma^{\mathrm{floor}}_t$.
-A cap must be applied to the weights by the caller before execution. Executing the weights, with
-held units, implementation lags and costs, is the job of `qis.backtest_model_portfolio`, described
-in [Portfolio backtesting](portfolio_backtesting.md); turnover of volatility-scaled weights is
+`compute_ra_returns` has no leverage cap: $w^{*}_t$ grows without bound as $\hat\sigma_t$ falls.
+The only bound in the code is indirect: with a floor,
+$w^{*}_t\le\sigma_{\mathrm{tgt}}/\hat\sigma^{\mathrm{floor}}_t$. A cap must be applied to the
+weights by the caller before execution. Executing the weights, with held units, implementation
+lags and costs, is the job of `qis.backtest_model_portfolio`, described in
+[Portfolio backtesting](portfolio_backtesting.md); turnover of volatility-scaled weights is
 treated in [Two-sided turnover conventions](turnover_conventions.md).
 
-> **Insight.** Volatility targeting changes the mean return only through timing:
-> $\mathbb{E}[w^{*}_t r_{t+1}]=\mathbb{E}[w^{*}_t]\,\mathbb{E}[r_{t+1}]+\operatorname{Cov}(w^{*}_t,r_{t+1})$.
-> With constant volatility the covariance vanishes and the strategy is a constant-leverage copy
-> of the asset, with the same Sharpe ratio. A Sharpe-ratio gain requires that returns be
-> relatively poor when volatility is high.
+> **Insight.** Volatility targeting changes the mean return only through timing. The mean of
+> $w^{*}_t r_{t+1}$ is $\mathbb{E}[w^{*}_t]\,\mathbb{E}[r_{t+1}]$ plus the timing term
+> $\operatorname{Cov}(w^{*}_t,r_{t+1})$. With constant volatility and i.i.d. returns the
+> covariance vanishes, and because $\mathbb{E}[w^{*2}_t]\ge\mathbb{E}[w^{*}_t]^2$ the noise in the
+> weights only adds variance: the Sharpe ratio can fall but not rise. A gain requires returns
+> that are relatively poor when volatility is high.
 
 The empirical record is specific on this point. Moreira and Muir (2017) scale factor returns by
 the inverse of the previous month's realised *variance*, not volatility, and report positive
-alphas against the unmanaged factors for many equity factors. Harvey et al. (2018) find that
-volatility targeting raises Sharpe ratios for risk assets such as equities and credit, which they
-link to the leverage effect, but has a negligible effect on the Sharpe ratio of bonds,
-currencies and commodities. They also find that it reduces the likelihood of extreme returns
-across asset classes. Neither result is a property of the construction: both are sample
+alphas against the unmanaged factors for the market and many other factors. Harvey et al.
+(2018) find that volatility targeting raises Sharpe ratios for risk assets such as equities and
+credit, which they link to the leverage effect, but has a negligible effect on the Sharpe ratio
+of bonds, currencies and commodities. They also find that it reduces the likelihood of extreme
+returns across asset classes. Neither result is a property of the construction: both are sample
 evidence, before the costs of the extra turnover and subject to leverage limits.
+
+![Trailing three-month realised volatility of synthetic US equity with teaching volatility regimes, between 8% and 58%, and of the same asset targeted to 10%, which stays close to 10% with short spikes and dips at regime changes](images/handbook_vol_targeting.png)
+
+[Open full-resolution preview](images/handbook_vol_targeting.png).
+
+The exhibit scales the daily returns of the synthetic US equity index by stated teaching regimes
+(2.5 times from September 2008 to June 2009, 3 times from March to June 2020, 0.6 times over
+2013–2016) and targets 10% a year: `compute_ra_returns` receives the per-period target
+$0.10/\sqrt{252}$ with `span=33` and a one-day weight lag. The trailing three-month volatility of the asset has a median
+of 16.5% with a standard deviation of 7.1 points; the targeted series has a median of 10.4% with a
+standard deviation of 0.8 points. The residual deviations sit at the regime changes: realised
+volatility overshoots while the EWM catches up with a jump and undershoots after the regime ends,
+the lag effect described above.
 
 ### Normalised sums of risk-adjusted returns
 
@@ -240,19 +271,22 @@ summing, and in what they divide by.
 `ewm_lambda` and sums it over a rolling window of $h$ rows (its `span`):
 
 $$
-X^{(h)}_t=\frac{1}{\sqrt{h}}\sum_{j=0}^{h-1}x_{t-j}\quad(\texttt{is\_norm=True}),
+X^{(h)}_t=\frac{1}{\sqrt{h}}\sum_{j=0}^{h-1}x_{t-j},
 \qquad X^{(1)}_t=x_t .
 $$
+
+The factor $1/\sqrt{h}$ is applied with the default `is_norm=True`.
 
 **Definition (normalise, then sum by calendar period).** `qis.compute_sum_freq_ra_returns`
 computes $x_t$ (its `span` is the volatility span) and, for `freq` other than `'B'` or `'D'`, sums
 it within each calendar period $J$ of `freq`:
 
 $$
-X^{f}_{J}=\frac{1}{\sqrt{\mathrm{AN}_f}}\sum_{t\in J}x_t\quad(\texttt{is\_norm=True}).
+X^{f}_{J}=\frac{1}{\sqrt{\mathrm{AN}_f}}\sum_{t\in J}x_t .
 $$
 
-For `'B'` and `'D'` it returns $x_t$ unchanged.
+The factor is applied with the default `is_norm=True`. For `'B'` and `'D'` it returns $x_t$
+unchanged.
 
 **Definition (sum, then normalise).** `qis.compute_rolling_ra_returns` with $h>1$ sums the returns
 first, $R^{(h)}_t=\sum_{j=0}^{h-1}r_{t-j}$, estimates the EWM volatility $\hat\sigma^{(h)}_t$ of the
@@ -266,9 +300,10 @@ The exponential map applies with the default `is_log_returns_to_arithmetic=True`
 log returns. With $h=1$ it returns $x_t$ with decay `ewm_lambda_eod`. The weight lag is one row,
 not $h$ rows, and the first finite sum starts the variance from a zero state.
 
-**Proposition (square root of the horizon).** If $x_{t-h+1},\ldots,x_t$ are uncorrelated with unit
-variance, then $\operatorname{Var}\big(\sum_{j=0}^{h-1}x_{t-j}\big)=h$, so $X^{(h)}_t$ has unit variance.
-For overlapping windows, $\operatorname{Corr}\big(X^{(h)}_t,X^{(h)}_{t+j}\big)=(h-j)/h$ for $0\le j<h$.
+**Proposition (square root of the horizon).** If $x_{t-h+1},\ldots,x_t$ are uncorrelated with
+unit variance, then $\operatorname{Var}\big(\sum_{j=0}^{h-1}x_{t-j}\big)=h$, so $X^{(h)}_t$ has unit
+variance. For overlapping windows,
+$\operatorname{Corr}\big(X^{(h)}_t,X^{(h)}_{t+j}\big)=(h-j)/h$ for $0\le j<h$.
 
 **Proof.** The variance of a sum is the sum of all covariances; only the $h$ unit variances
 survive. Two windows $j$ rows apart share $h-j$ terms, so their covariance is $(h-j)/h$ after
@@ -276,19 +311,21 @@ normalisation by $\sqrt{h}\sqrt{h}$. $\square$
 
 The first proposition of this chapter supplies the premise: correctly scaled risk-adjusted
 returns are serially uncorrelated with unit variance. The second statement is why overlapping
-sums need autocorrelation-robust inference; see [Serial dependence and autocorrelation](serial_dependence.md)
-and [Regression and HAC inference](regression_and_hac.md).
+sums need autocorrelation-robust inference; see
+[Serial dependence and autocorrelation](serial_dependence.md) and
+[Regression and HAC inference](regression_and_hac.md).
 
-> **Pitfall.** `compute_sum_freq_ra_returns` divides by $\sqrt{\mathrm{AN}_f}$, the number of periods of
-> `freq` *per year*, not by $\sqrt{n_J}$, the number of observations *per period*. For
-> unit-variance daily terms, $\operatorname{Var}(X^{f}_{J})=n_J/\mathrm{AN}_f\approx 252/\mathrm{AN}_f^2$, a
-> standard deviation of about 0.31 weekly, 1.32 monthly and 3.97 quarterly. For unit variance, call
-> it with `is_norm=False` and divide by the square root of the per-period observation count.
+> **Pitfall.** `compute_sum_freq_ra_returns` divides by $\sqrt{\mathrm{AN}_f}$, the number of
+> periods of `freq` *per year*, not by $\sqrt{n_J}$, the number of observations *per period*. For
+> unit-variance daily terms,
+> $\operatorname{Var}(X^{f}_{J})=n_J/\mathrm{AN}_f\approx 252/\mathrm{AN}_f^2$, a standard deviation
+> of about 0.31 weekly, 1.32 monthly and 3.97 quarterly. For unit variance, call it with
+> `is_norm=False` and divide by the square root of the per-period observation count.
 
 The word `span` also changes meaning: it is the volatility span in `compute_ra_returns` and
-`compute_sum_freq_ra_returns`, but the summation horizon $h$ in `compute_sum_rolling_ra_returns` and
-`compute_rolling_ra_returns`, where the volatility decay is `ewm_lambda`, `ewm_lambda_eod`, or
-derived from $h$.
+`compute_sum_freq_ra_returns`, but the summation horizon $h$ in
+`compute_sum_rolling_ra_returns` and `compute_rolling_ra_returns`, where the volatility decay is
+`ewm_lambda`, `ewm_lambda_eod`, or derived from $h$.
 
 ### Momentum signals from EWM filters on risk-adjusted returns
 
@@ -296,7 +333,8 @@ Time-series momentum takes a long position after positive past returns and a sho
 negative returns. Moskowitz, Ooi and Pedersen (2012) document it across futures markets, using
 the sign of the past twelve-month excess return and sizing each position by the inverse of an
 ex-ante EWM volatility. qis builds smooth versions of the signal on risk-adjusted returns, so
-that one signal scale applies to every asset.
+that one signal scale applies to every asset; Sepp and Lucic (2026) treat trend-following systems
+built on such volatility-normalised signals.
 
 **Identity (EWM unit-variance load).** For $\lambda=1-2/(N+1)$,
 
@@ -307,7 +345,8 @@ $$
 **Proof.** $1-\lambda=2/(N+1)$ and $1+\lambda=2N/(N+1)$; their ratio is $N$. $\square$
 
 **Definition (EWM momentum).** `qis.compute_ewm_ra_returns_momentum` computes $x_t$ with
-$\sigma_{\mathrm{tgt}}=1$, decay $1-2/(\texttt{vol\_span}+1)$ and lag `weight_shift`, then
+$\sigma_{\mathrm{tgt}}=1$, decay $1-2/(N_v+1)$ with $N_v$ equal to `vol_span`, and lag
+`weight_shift`, then
 
 $$
 m_t=\lambda_m m_{t-1}+(1-\lambda_m)\,x_t,
@@ -332,25 +371,29 @@ Q^2=\frac{1}{1-\lambda_L^2}+\frac{1}{1-\lambda_S^2}-\frac{2}{1-\lambda_L\lambda_
 $$
 
 In code the long leg is $\sqrt{N_L}\,\mathrm{EWM}_{\lambda_L}(x)/(\sqrt{1-\lambda_L^2}\,Q)$, and
-$\sqrt{N_L}(1-\lambda_L)/\sqrt{1-\lambda_L^2}=1$, so each leg contributes $\sum_k\lambda^k x_{t-k}/Q$.
-With `short_span=None` the output is the single-leg filter $M_t$ above, with $\lambda_L$ in place of
-$\lambda_m$. `qis.compute_ewm_long_short_filter` validates the spans, applies the kernel, and blanks
-the first `warmup_period` finite outputs. `qis.compute_ewm_long_short_filtered_ra_returns` first
-normalises the returns with `compute_ra_returns(span=vol_span, vol_target=None, weight_lag=weight_lag)`
-and then applies the filter. Defaults are $N_L=63$, $N_S=5$, `vol_span=31`, `warmup_period=21`.
+$\sqrt{N_L}(1-\lambda_L)/\sqrt{1-\lambda_L^2}=1$, so each leg contributes
+$\sum_k\lambda^k x_{t-k}/Q$. With `short_span=None` the output is the single-leg filter $M_t$
+above, with $\lambda_L$ in place of $\lambda_m$. `qis.compute_ewm_long_short_filter` validates the
+spans, applies the kernel, and blanks the first `warmup_period` finite outputs.
+`qis.compute_ewm_long_short_filtered_ra_returns` first normalises the returns with
+`compute_ra_returns` at span `vol_span`, a unit target and lag `weight_lag`, and then applies the
+filter. Defaults are $N_L=63$, $N_S=5$, `vol_span=31`, `warmup_period=21`.
 
 **Proposition (unit-variance filters).** If $x_t$ is serially uncorrelated with unit variance,
 then $\operatorname{Var}(M_t)=\operatorname{Var}(F_t)=1$ in the stationary limit, because
 $\sum_{k\ge0}c_k^2=1$ for both kernels.
 
-**Proof.** For the single leg, $\sum_k(1-\lambda_m^2)\lambda_m^{2k}=1$. For the long–short kernel,
-expanding the square and summing three geometric series gives
-$\sum_k(\lambda_L^k-\lambda_S^k)^2=\frac{1}{1-\lambda_L^2}+\frac{1}{1-\lambda_S^2}-\frac{2}{1-\lambda_L\lambda_S}=Q^2$.
+**Proof.** For the single leg, $\sum_k(1-\lambda_m^2)\lambda_m^{2k}=1$. For the long–short
+kernel, expanding the square and summing three geometric series,
+$\sum_k\lambda_L^{2k}+\sum_k\lambda_S^{2k}-2\sum_k(\lambda_L\lambda_S)^k$, gives exactly $Q^2$.
 The variance of a weighted sum of uncorrelated unit-variance terms is the sum of squared
 weights. $\square$
 
-Two properties follow from the kernel. First, $c_0=(1-1)/Q=0$: the two-leg output at $t$ does not
-load on $x_t$, so it is known one row early. Second, $c_k$ is hump-shaped with its peak at
+The unit-variance scaling of a single EWM, and its variance before the stationary limit is
+reached, are derived in [Exponentially weighted estimators](ewm_estimators.md).
+
+Two properties follow from the kernel. First, $c_0=(1-1)/Q=0$: the two-leg output at $t$ does
+not load on $x_t$, so it is known one row early. Second, $c_k$ is hump-shaped with its peak at
 
 $$
 k^{*}=\frac{\ln(\ln\lambda_S/\ln\lambda_L)}{\ln(\lambda_L/\lambda_S)},
@@ -385,14 +428,14 @@ the single-leg output uses $x_t$; either is applied over $(t,t+1]$.
 ### Signal-to-weight maps
 
 `qis.map_signal_to_weight` maps a signal $y$ to a weight through one of the three members of
-`qis.SignalMapType`. With $u=(y-y_0)/b$:
+`qis.SignalMapType`. With $\eta=(y-y_0)/b$:
 
 **Definition (`NormalCDF` and `LaplaceCDF`).**
 
 $$
-g_{\mathrm{N}}(y)=2\,\Phi(u)-1,
+g_{\mathrm{N}}(y)=2\,\Phi(\eta)-1,
 \qquad
-g_{\mathrm{L}}(y)=\operatorname{sign}(u)\big(1-e^{-\lvert u\rvert}\big).
+g_{\mathrm{L}}(y)=\operatorname{sign}(\eta)\big(1-e^{-\lvert \eta\rvert}\big).
 $$
 
 Both are odd about $y_0$, bounded in $(-1,1)$ and linear near the centre, with slopes
@@ -400,9 +443,9 @@ $\sqrt{2/\pi}/b\approx0.80/b$ and $1/b$. The Laplace map approaches its bound ex
 normal map approaches it faster, like a Gaussian tail. They ignore `tail_level`, the slopes and
 the tail decays.
 
-**Definition (`ExpCDF`).** With tail level $q$, anchor levels $p_{+}$ for $y\ge y_0$ and $p_{-}$ for
-$y<y_0$, the code sets $s_{\pm}=1.5625\,b/\ln\big(q/(q-p_{\pm})\big)$ and returns
-$g(y)=\pm q\big(1-e^{-(y-y_0)^2/s_{\pm}}\big)$, which is
+**Definition (`ExpCDF`).** With tail level $q$, anchor levels $p_{+}$ for $y\ge y_0$ and $p_{-}$
+for $y<y_0$, the code sets $\omega_{\pm}=1.5625\,b/\ln\big(q/(q-p_{\pm})\big)$ and returns
+$g(y)=\pm q\big(1-e^{-(y-y_0)^2/\omega_{\pm}}\big)$, which is
 
 $$
 g_{\mathrm{E}}(y)=\pm\,q\Big[1-\Big(1-\frac{p_{\pm}}{q}\Big)^{v^2}\Big],
@@ -412,10 +455,13 @@ $$
 
 It requires $q>p_{+}$ and $q>p_{-}$ and raises `ValueError` otherwise.
 
-**Identity (anchor).** $g_{\mathrm{E}}(y_0\pm1.25\sqrt{b})=\pm p_{\pm}$, and $g_{\mathrm{E}}\to\pm q$ as $y\to\pm\infty$.
+**Identity (anchor).** $g_{\mathrm{E}}(y_0\pm1.25\sqrt{b})=\pm p_{\pm}$, and
+$g_{\mathrm{E}}\to\pm q$ as $y\to\pm\infty$.
 
-**Proof.** Substituting $s_{\pm}$, $e^{-(y-y_0)^2/s_{\pm}}=\big((q-p_{\pm})/q\big)^{(y-y_0)^2/(1.5625\,b)}$;
-at $\lvert y-y_0\rvert=1.25\sqrt{b}$ the exponent is 1 and $g=\pm p_{\pm}$. $\square$
+**Proof.** Substituting $\omega_{\pm}$,
+$e^{-(y-y_0)^2/\omega_{\pm}}=\big((q-p_{\pm})/q\big)^{(y-y_0)^2/(1.5625\,b)}$; at
+$\lvert y-y_0\rvert=1.25\sqrt{b}$ the exponent is 1 and $g=\pm p_{\pm}$. As $y\to\pm\infty$ the
+power vanishes. $\square$
 
 The constant $1.5625=1.25^2$ is not documented in the source; its only effect is to place the
 anchor at $1.25\sqrt{b}$. Despite their names, `slope_right` and `slope_left` are not derivatives:
@@ -441,19 +487,21 @@ are not independent. If only one decay is given, the tail treatment is skipped w
 
 `qis.compute_returns_transform` dispatches over `qis.ReturnsTransform`:
 
-- `ROLLING_RA_RETURNS` returns `compute_rolling_ra_returns(returns, span=rolling_ra_returns_span, weight_shift=1)`,
-  the sum-then-normalise transform with $h=31$ by default and the log-to-simple map on.
-- `EWMA_RETURNS_MOMENTUM` returns `compute_ewm_ra_returns_momentum(returns, momentum_span, vol_span, weight_shift=1)`
-  with defaults 31 and 33. These differ from the defaults of the underlying function (63 and 31).
+- `ROLLING_RA_RETURNS` calls `compute_rolling_ra_returns` with `span=rolling_ra_returns_span`
+  and `weight_shift=1`: the sum-then-normalise transform with $h=31$ by default and the
+  log-to-simple map on.
+- `EWMA_RETURNS_MOMENTUM` calls `compute_ewm_ra_returns_momentum` with `momentum_span`,
+  `vol_span` and `weight_shift=1`, whose defaults here are 31 and 33. These differ from the
+  defaults of the underlying function, 63 and 31.
 
 Any other value raises `TypeError`.
 
 `qis.get_paired_rareturns_signals` aligns risk-adjusted returns with a signal for predictive
 diagnostics. With `is_nonoverlapping=True` it pairs $X^{f}_{J}$ from `compute_sum_freq_ra_returns`
-(with the normalisation of the pitfall above) with the last signal value of the previous period,
-`signal.resample(freq).last().shift(1)`. With `is_nonoverlapping=False` it pairs $X^{(h)}_t$ with
-`signal.shift(1)`, the signal at $t-1$. `is_mean_adjust_returns=True` subtracts an expanding mean,
-which is point in time.
+(with the normalisation of the pitfall above, and the log-to-simple map on by default) with the
+last signal value of the previous period, `signal.resample(freq).last().shift(1)`. With
+`is_nonoverlapping=False` it pairs $X^{(h)}_t$ with `signal.shift(1)`, the signal at $t-1$.
+`is_mean_adjust_returns=True` subtracts an expanding mean, which is point in time.
 
 > **Pitfall.** In the overlapping mode the window of $X^{(h)}_t$ covers $(t-h,t]$, so a signal
 > dated $t-1$ has already seen $h-1$ of its $h$ returns. A momentum signal paired this way
@@ -472,7 +520,8 @@ the average of the previous variance and the new squared return. The seed is $0.
 volatility path is 1%, 5%, 5%, 5% and $\sqrt{0.0013}\approx3.61\%$. Dividing each return by the
 previous volatility gives 7, −1, 1 and −0.2 risk units. The first value, 7, is the one-observation
 seed at work. With a per-period target of 2% the weights are 2 and then 0.4. Without the lag the
-normalised returns are 1, 1.4, −1, 1 and −0.28, all within the look-ahead bound $\sqrt{2}$.
+normalised returns are 1, 1.4, −1, 1 and −0.28, all within the look-ahead bound $\sqrt{2}$. The
+normalised two-row sums of 7, −1, 1 and −0.2 are $6/\sqrt{2}$, 0 and $0.8/\sqrt{2}$.
 
 ```python
 import numpy as np
@@ -580,13 +629,15 @@ predicted = target * np.sqrt(1.0 + 2.0 * (1.0 - lam) / (1.0 + lam))
 np.testing.assert_allclose([calm, predicted], [0.154, 0.155], atol=0.001)
 ```
 
-The same numbers come out of the backtester. Target weights dated $t$ are $\sigma_{\mathrm{tgt}}/\hat\sigma_t$,
-the third output inverted, not the already lagged second output. Executed at the close of $t$
+The same numbers come out of the backtester. Target weights dated $t$ are
+$\sigma_{\mathrm{tgt}}/\hat\sigma_t$, the third output inverted, not the already lagged second
+output. Executed at the close of $t$
 with no implementation lag, no costs and daily rebalancing, the portfolio's daily returns equal
 the risk-adjusted returns to machine precision.
 
 ```python
-nav = pd.concat([pd.Series([100.0], index=universe.prices.index[:1]), 100.0 * (1.0 + asset).cumprod()])
+nav = pd.concat([pd.Series([100.0], index=universe.prices.index[:1]),
+                 100.0 * (1.0 + asset).cumprod()])
 target_weights = (target / np.sqrt(AN) / ewm_vol).to_frame('REGIME')
 portfolio = qis.backtest_model_portfolio(prices=nav.to_frame('REGIME'), weights=target_weights,
                                          weight_implementation_lag=0)
@@ -612,9 +663,10 @@ np.testing.assert_allclose([pooled, 1.0 + 2.0 / (2.0 / (1.0 - lam) - 1.0)], [1.0
 
 The filter weights are read off an impulse response. A unit impulse at the second row (the
 first row seeds the recursion and does not enter it) returns $c_k$ at row $k+1$. For spans 63 and
-5, $Q\approx3.522$, $c_0=0$, the peak is at lag 7, and the squared weights sum to 1. The
-single-leg filter and the momentum signal share the kernel $\sqrt{1-\lambda^2}\,\lambda^k$ with
-$c_0=\sqrt{1-\lambda^2}\approx0.248$ for span 63.
+5, $Q\approx3.522$, $c_0=0$, the peak is at lag 7, and the squared weights sum to 1. The weights
+themselves sum to $(63-5)/(2Q)\approx8.23$, so a per-period Sharpe ratio of $0.5/\sqrt{252}$ gives
+a mean output of 0.26. The single-leg filter and the momentum signal share the kernel
+$\sqrt{1-\lambda^2}\,\lambda^k$ with $c_0=\sqrt{1-\lambda^2}\approx0.248$ for span 63.
 
 ```python
 n = 4000
@@ -629,11 +681,14 @@ np.testing.assert_allclose(kernel, (lam_l ** lags - lam_s ** lags) / q_norm, ato
 np.testing.assert_allclose([q_norm, np.sum(kernel ** 2)], [3.522, 1.0], atol=1e-3)
 assert abs(np.sum(kernel ** 2) - 1.0) < 1e-12 and abs(kernel[0]) < 1e-15
 assert np.argmax(kernel) == 7
-np.testing.assert_allclose(np.sum(kernel) * 0.5 / np.sqrt(252), 0.259, atol=1e-3)  # drift gain
+np.testing.assert_allclose(np.sum(kernel), (63 - 5) / (2 * q_norm), rtol=1e-12)  # drift gain
+np.testing.assert_allclose([np.sum(kernel), np.sum(kernel) * 0.5 / np.sqrt(252)], [8.23, 0.26],
+                           atol=0.005)
 
 single = qis.compute_ewm_long_short_filter(data=impulse, long_span=63, short_span=None,
                                            warmup_period=None).to_numpy()[1:]
 np.testing.assert_allclose(single, np.sqrt(1 - lam_l ** 2) * lam_l ** lags, atol=1e-14)
+np.testing.assert_allclose(single[0], 0.248, atol=5e-4)
 assert abs(np.sum(single ** 2) - 1.0) < 1e-12
 
 # the momentum signal of risk-adjusted returns uses the same single-leg kernel
@@ -644,7 +699,7 @@ np.testing.assert_allclose(momentum[1:], single, atol=1e-14)
 ```
 
 The maps are checked against their closed forms: the normal map against the error function, the
-Laplace map against $1-e^{-\lvert u\rvert}$, and `ExpCDF` against its anchor, where a signal of
+Laplace map against $1-e^{-\lvert \eta\rvert}$, and `ExpCDF` against its anchor, where a signal of
 $1.25\sqrt{b}$ returns the anchor level. With the default $q=1$, $p_{\pm}=0.5$ and $b=4$, a signal
 of 2.5 maps to 0.5 and a signal of 5 to $1-0.5^4=0.9375$. With both tail decays set to 1, a signal
 of 3 is faded from 0.98 to 0.13.
@@ -715,21 +770,24 @@ Contract details:
   returned with its original column order.
 - `compute_ewm_long_short` is a numba kernel on arrays that assumes validated spans and needs an
   explicit `init_value`; `compute_ewm_long_short_filter` is the validated wrapper for pandas input.
-- The recursion is seeded on the first row, so a finite first observation is stored as the seed
-  and does not enter the filter. The risk-adjusted inputs have a missing first row, so the issue
-  does not arise inside `compute_ewm_long_short_filtered_ra_returns`.
+- `compute_ewm_long_short_filter` seeds both legs with zero on the first row. A finite
+  observation in that row is overwritten by the seed and never enters the filter, which is why
+  the worked example places its impulse in the second row. Risk-adjusted inputs have a missing
+  first row, so the issue does not arise inside `compute_ewm_long_short_filtered_ra_returns`.
 - `qis.SignalAggType` belongs to `qis.ewm_xy_convolution` and is not used by these functions.
 
 The example
 [vol_target_and_trend.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/vol_target_and_trend.py)
 sweeps volatility-targeting and trend strategies over spans through helpers in
 [qis_delta1.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/strats/qis_delta1.py).
-Its volatility-target strategy divides an annualised EWM volatility of log returns into the annual
-target and applies the result to simple returns with a one-row lag; this reproduces
-`compute_ra_returns(log_returns, span=vol_span, vol_target=vol_target/sqrt(vol_af), is_log_returns_to_arithmetic=True)`.
-It annualises with `vol_af=260`, whereas qis annualises business-day statistics with 252. Its trend
-strategy multiplies a unit-variance EWM signal of risk-adjusted returns by the inverse volatility,
-the continuous analogue of the volatility-scaled sign of Moskowitz, Ooi and Pedersen (2012).
+Its volatility-target strategy divides an annualised EWM volatility of log returns into the
+annual target and applies the result to simple returns with a one-row lag. This reproduces
+`compute_ra_returns` on log returns with `span=vol_span`, `is_log_returns_to_arithmetic=True` and
+a per-period target equal to the annual target over $\sqrt{260}$: the example annualises with
+`vol_af=260`, whereas qis annualises business-day statistics with 252. Its trend strategy
+multiplies a unit-variance EWM signal of risk-adjusted returns by the inverse volatility and the
+per-period target, the continuous analogue of the volatility-scaled sign of Moskowitz, Ooi and
+Pedersen (2012).
 [optimal_leverage.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/optimal_leverage.py)
 is a closed-form mean-variance illustration of leverage and beta targets and does not call the
 functions of this chapter.
@@ -759,9 +817,10 @@ functions of this chapter.
 - **Volatility floor on a Series.** `vol_floor_quantile` works on a DataFrame; on a pandas Series
   the floor is broadcast to a square array and `compute_ra_returns` raises `ValueError`. Pass a
   one-column DataFrame.
-- **Evidence is not a theorem.** Moreira and Muir (2017) and Harvey et al. (2018) report
-  sample-specific gains, concentrated in equity and credit. Volatility targeting reliably
-  stabilises volatility; its effect on the Sharpe ratio depends on the asset.
+- **Evidence is not a theorem.** Moreira and Muir (2017) and Harvey et al. (2018) report sample
+  evidence, and in Harvey et al. (2018) the Sharpe-ratio gains are concentrated in equities and
+  credit. Volatility targeting reliably stabilises volatility; its effect on the Sharpe ratio
+  depends on the asset.
 
 ## See also
 

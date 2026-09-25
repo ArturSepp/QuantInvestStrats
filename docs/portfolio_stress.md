@@ -819,7 +819,7 @@ conditioning is in
 | 4 | `InstrumentPortfolio` | Holdings, model/position dates, quote and FX registries, positive reporting denominator | `get_mtm`, `get_pnl`, batch `evaluate` and current `response_jacobian` |
 | 5 | `StressScenarios` | Factor/family anchors, simple/log convention and completion policy | Complete factor log-shock vectors; independent or jointly conditional |
 | 6 | `run_portfolio_stress_test` | Portfolio, requests, optional monthly history and named grids | Detached `PortfolioStressResult`: full valuations, exposures, local risk, attribution and audit tables |
-| 7 | `generate_portfolio_stress_report` | Completed result and `StressReportConfig` | Twelve analysis PDF pages, optional coverage, final notation guide, all numerical tables and artifact hashes |
+| 7 | `generate_portfolio_stress_report` | Completed result and `StressReportConfig` | Twelve analysis PDF pages, optional coverage, final notation guide, all numerical tables and artefact hashes |
 
 FX quotes are `Underlying` objects quoted in the reference currency per unit of local currency
 (for example `fx_rates["EUR"]` at 1.20 USD per EUR) with a REFERENCE response; the reference

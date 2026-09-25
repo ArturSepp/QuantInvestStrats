@@ -196,7 +196,7 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
     sharpe_convention = perf_params.sharpe_convention if perf_params is not None \
         and hasattr(perf_params, 'sharpe_convention') else SharpeConvention.PA
     if sharpe_convention in (SharpeConvention.ARITHMETIC, SharpeConvention.LOG):
-        # additive regime Sharpe (sharpe_conventions.md sections 1 and 4): under ARITHMETIC,
+        # additive regime Sharpe (docs/regime_conditional_performance.md): under ARITHMETIC,
         # sr_s = sqrt(af) * p_s * m_s / std(r) on the sampled simple returns; under LOG the same
         # construction on log(1+r). In both, sum_s sr_s equals the total Sharpe of the convention
         # exactly by linearity of the mean, so the pa additivity patch above does not apply, and
@@ -947,7 +947,7 @@ def compute_regime_sharpe_decomposition(returns: Union[pd.Series, pd.DataFrame],
                                         ) -> Union[pd.Series, pd.DataFrame]:
     """
     returns-level additive regime Sharpe decomposition, sr_s = sqrt(af) * p_s * m_s / std
-    (sharpe_conventions.md sections 1 and 4)
+    (derived in docs/regime_conditional_performance.md)
 
     the standalone counterpart of the regime-Sharpe branch of
     compute_regimes_pa_perf_table_from_sampled_returns for callers that hold periodic

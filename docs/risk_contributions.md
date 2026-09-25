@@ -42,7 +42,7 @@ effective number of risk contributors; neither result is repeated here.
 Three results carry the chapter: Euler's theorem makes contributions add up exactly; the
 contribution of a position equals its standalone risk times its correlation with the portfolio,
 so hedges contribute negatively; and the sum of standalone risks bounds diversified risk from
-above, which is why an undiversified VaR always exceeds a correlated one for the same inputs.
+above, which is why an undiversified VaR is never below a correlated one for the same inputs.
 
 ## Inputs, notation, and assumptions
 
@@ -82,11 +82,15 @@ above, which is why an undiversified VaR always exceeds a correlated one for the
 | $x_{i,t}$, $x_{p,t}$ | P&L contribution of instrument $i$; portfolio P&L | Decimal fraction of the preceding NAV |
 
 The covariance is an input, not an estimate made by the contribution functions: its units,
-frequency, return basis and information set are the caller's. The static functions align a
-labelled weight Series to the covariance index, fill missing weights with zero and silently drop
-weights outside the covariance universe. `RiskModel` instead rejects material out-of-universe
-weights in strict mode. Contributions are defined for $\sigma_p>0$; a non-positive quadratic form,
-which a covariance that is not positive semi-definite can produce, returns zeros.
+frequency, return basis and information set are the caller's.
+`compute_portfolio_risk_contributions` and its two ratio variants align a labelled weight Series
+to the covariance index, fill missing weights with zero and silently drop weights outside the
+covariance universe. `RiskModel` instead rejects material out-of-universe weights in strict mode.
+Contributions are defined for $\sigma_p>0$; a non-positive quadratic form, which a covariance that
+is not positive semi-definite can produce, returns zeros. Dated covariance matrices for these
+functions and for `RiskModel` are usually produced by `qis.estimate_rolling_ewma_covar`, which
+returns one annualised matrix per rebalancing date; its estimator is the subject of the
+[covariance chapter](covariance_correlation_pca.md).
 
 ## Methodology
 
@@ -170,6 +174,17 @@ equals $\rho_{i,p}\sigma_i\sigma_p$. Substitute into the definitions. $\square$
 A contribution is therefore the standalone risk $\lvert w_i\rvert\sigma_i$ scaled by a signed
 correlation with the portfolio. It never exceeds the standalone risk in absolute value.
 
+![Paired bars of capital weight and share of portfolio volatility for a 50/30/10/10 allocation to US equity, Treasuries, investment-grade credit and gold, with equity carrying 94% of the risk](images/handbook_risk_contributions.png)
+
+[Open full-resolution preview](images/handbook_risk_contributions.png).
+
+The exhibit applies `qis.compute_portfolio_risk_contributions` to a 50/30/10/10 allocation to
+synthetic US equity, Treasuries, investment-grade credit and gold, with the covariance of monthly
+log returns over 2021–2025. The portfolio volatility is 8.8%. Equity holds half of the capital
+and 94% of the risk; the Treasury sleeve, with 30% of the capital, contributes 1%, because its
+volatility is a third of equity's and its correlation with equity is slightly negative, −0.16.
+A balanced capital allocation can be an equity allocation in risk terms.
+
 ### Interpretation as expected loss contributions
 
 [Litterman (1996)](#references) reads the largest contributions as the portfolio's hot spots and a
@@ -218,8 +233,8 @@ typically carries more than 100% of the risk.
 
 > **Insight.** A hedge can reduce volatility while its own standalone volatility is large. Its
 > Euler contribution is negative, and the positions it hedges carry more than the whole
-> portfolio risk between them. Standalone shares, which are always positive, report the
-> opposite picture.
+> portfolio risk between them. Standalone shares, which are always positive, report the hedge
+> as a source of risk instead.
 
 Risk budgeting chooses weights so that $\kappa_i$ equals a prescribed budget $b_i$; risk parity is
 the case $b_i=1/n$ ([Roncalli, 2013](#references)). qis computes the diagnostics; constructing such
@@ -240,7 +255,8 @@ $$
 \qquad
 \sigma_b=\sqrt{w_b^{\top}\Sigma w_b},
 \qquad
-\sum_i\mathrm{rc}^{\mathrm{legacy}}_i=\frac{\mathrm{TE}^2}{\sigma_b}=\mathrm{TE}\cdot\frac{\mathrm{TE}}{\sigma_b}.
+\sum_i\mathrm{rc}^{\mathrm{legacy}}_i=\frac{\mathrm{TE}^2}{\sigma_b}
+=\mathrm{TE}\cdot\frac{\mathrm{TE}}{\sigma_b}.
 $$
 
 Each legacy contribution is the Euler TE contribution multiplied by $\mathrm{TE}/\sigma_b$, so the
@@ -267,7 +283,9 @@ $\Psi=\operatorname{diag}(\psi_1,\ldots,\psi_n)$ they return
 $$
 \mathrm{TE}^2=e^{\top}\Sigma_x e+d^{\top}\Psi d,
 \qquad
-m=\underbrace{2B^{\top}\Sigma_x e}_{\text{systematic}}+\underbrace{2\Psi d}_{\text{idiosyncratic}}=\nabla_{w_p}\mathrm{TE}^2 .
+m=\underbrace{2B^{\top}\Sigma_x e}_{\text{systematic}}
++\underbrace{2\Psi d}_{\text{idiosyncratic}}
+=\nabla_{w_p}\mathrm{TE}^2 .
 $$
 
 The implied asset covariance is $B^{\top}\Sigma_x B+\Psi$. Both functions take arrays, apply no
@@ -305,7 +323,9 @@ and `is_return_vol=True` returns $\sqrt{\mathrm{AN}\,\hat\sigma^2_{p,t}}$. The w
 over $(t-1,t]$ meet a covariance updated by the return $r_t$ they earn. The estimate is the EWM
 variance of the held portfolio as of $t$, not a forecast for $(t,t+1]$; that forecast would pair
 $w_t$ with $\hat\Sigma_t$. Missing returns and weights are set to zero before the recursion, so a
-gap decays the covariance rather than holding it.
+gap decays the covariance rather than holding it. The optional `mean_adj_type` demeans the returns
+first: `MeanAdjType.EXPANDING` and `MeanAdjType.EWMA` are point in time, while
+`MeanAdjType.INSAMPLE` subtracts the full-sample mean and is forward-looking.
 
 **Implementation contract (seed).** The recursion does not start from zero. Its seed
 $\hat\Sigma_0$ is the *final* state of an EWM covariance run over the whole sample, and inside
@@ -318,7 +338,8 @@ optional mean adjustment.
 **Proposition (weight of the seed).** Unrolling the recursion,
 
 $$
-\hat\Sigma_t=(1-\lambda)\sum_{k=0}^{t-1}\lambda^{k}\,r_{t-k}r_{t-k}^{\top}+\lambda^{t}\,\hat\Sigma_0 ,
+\hat\Sigma_t=(1-\lambda)\sum_{k=0}^{t-1}\lambda^{k}\,r_{t-k}r_{t-k}^{\top}
++\lambda^{t}\,\hat\Sigma_0 ,
 $$
 
 so the seed's weight at row $t$ is $\lambda^{t}$, which falls below $\delta$ once
@@ -341,15 +362,15 @@ same dates, `annualize=True`, and beside it the EWM volatility of the portfolio'
 The two columns, `instrument weighted vol` and `strategy returns vol`, differ by drift between
 grid dates, the return basis and the seed.
 
-For dated covariance matrices estimated elsewhere, `compute_ex_anti_portfolio_vol_implied_by_covar`
-and `compute_risk_contributions_implied_by_covar` evaluate $\sigma_p$ and $\mathrm{RC}_i$ on each
-covariance date. With `freq` set they use realised weights on that grid and the latest covariance
-at or before each date, which is point in time. With `freq=None` they take the input weights
-(the realised weights when the input was not a DataFrame), reindex them to the covariance dates by
-exact date and forward-fill across covariance dates only. A weight is used only if it is dated on
-a covariance date: weights dated before or between covariance dates are ignored, and covariance
-dates before the first exact match return zero risk. `normalise=True` rescales each row of
-contributions to sum to one.
+For dated covariance matrices estimated elsewhere, the `PortfolioData` methods
+`compute_ex_anti_portfolio_vol_implied_by_covar` and `compute_risk_contributions_implied_by_covar`
+evaluate $\sigma_p$ and $\mathrm{RC}_i$ on each covariance date. With `freq` set they use realised
+weights on that grid and the latest covariance at or before each date, which is point in time.
+With `freq=None` they take the input weights (the realised weights when the input was not a
+DataFrame), reindex them to the covariance dates by exact date and forward-fill across covariance
+dates only. A weight is used only if it is dated on a covariance date: weights dated before or
+between covariance dates are ignored, and covariance dates before the first exact match return
+zero risk. `normalise=True` rescales each row of contributions to sum to one.
 
 ### Parametric value at risk
 
@@ -415,10 +436,10 @@ weights.
 
 > **Pitfall.** The proposition holds for one pair $(w,\hat\Sigma)$. The two qis functions do not
 > share one: the correlated figure lags the weights by one period and seeds its covariance from
-> the full sample, while the undiversified figure uses same-date weights and a point-in-time EWM
-> volatility (seeded from the first row, which is zero when the first return is missing). During
-> warm-up and on rebalancing dates the reported undiversified figure can therefore fall below the
-> correlated one.
+> the full sample, while the undiversified figure uses same-date weights and a point-in-time
+> `compute_ewm_vol` estimate (seeded from the first row, which is zero when the first return is
+> missing). During warm-up and on rebalancing dates the reported undiversified figure can
+> therefore fall below the correlated one.
 
 `limit_weights_to_max_var_limit(weights, vols, max_var_limit_bp=25.0, annualization_factor=260)`
 takes annualised volatilities $\sigma_i$, converts them to one day with $\sqrt{260}$, and caps
@@ -431,10 +452,10 @@ w_i\leftarrow\operatorname{sign}(w_i)\,\frac{L_{\mathrm{bp}}\sqrt{260}}{10^{4}z_
 \quad\text{if }\mathrm{VaR}^{\mathrm{bp}}_i>L_{\mathrm{bp}} .
 $$
 
-The cap is per instrument and ignores correlation. The 260 is a window convention, while qis
-annualises business-day volatilities with $\mathrm{AN}=252$; with volatilities annualised on 252
-the one-day VaR is understated by the factor $\sqrt{252/260}\approx0.985$, and the cap is about
-1.6% looser than the nominal limit.
+The cap is per instrument and ignores correlation. The default 260 follows the business-day
+window convention, while qis annualises business-day volatilities with $\mathrm{AN}=252$. With
+volatilities annualised on 252, the one-day VaR is understated by the factor
+$\sqrt{252/260}\approx0.985$, and a capped position carries a VaR about 1.6% above the limit.
 
 ### Realised P&L risk attribution
 
@@ -451,8 +472,9 @@ $$
 
 where the sum runs over the $T_i$ dates with a non-zero contribution and the standard deviation
 uses `ddof=0`. This is the `AttributionMetric.PNL_RISK` panel of the strategy factsheet. The
-shares are non-negative, ignore correlation and sum to one by normalisation; the sum of the
-standalone volatilities exceeds the portfolio volatility, so no risk measure is being allocated.
+shares are non-negative, ignore correlation and sum to one by normalisation. The standalone
+volatilities add up to more than the portfolio volatility whenever the instruments are imperfectly
+correlated, so no risk measure is being allocated.
 
 **Proposition (ex-post Euler decomposition).** With sample covariances,
 
@@ -789,7 +811,8 @@ Container contracts:
   weights by one row and fills missing values with zero before calling it.
 - `compute_portfolio_correlated_var_by_groups` returns a DataFrame;
   `compute_portfolio_independent_var_by_ac` returns the instrument DataFrame and the aggregate,
-  which is a Series when `group_data` is `None`. Both apply `time_period` after estimation, so the warm-up can lie before the window.
+  which is a Series when `group_data` is `None`. Both apply `time_period` after estimation, so
+  the warm-up can lie before the window.
 - `VAR99 = 2.3263` is a module constant of `qis.portfolio.risk.ewm_covar_risk`, not an export.
 
 Sources:

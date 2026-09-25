@@ -486,6 +486,16 @@ a structured target with an estimated optimal intensity, which gives an invertib
 conditioned matrix; it is an alternative to apply outside qis. Factor-structured covariance is
 covered in [factor risk models](factor_risk_models.md).
 
+![Bar chart of the ten eigenvalues of the monthly correlation matrix of the synthetic universe, the first explaining 40% of the variance, with the dashed noise edge at 1.44](images/handbook_pca_eigenvalues.png)
+
+[Open full-resolution preview](images/handbook_pca_eigenvalues.png).
+
+The exhibit decomposes the correlation matrix of $T=251$ monthly log returns of the $n=10$
+synthetic assets with `qis.apply_pca`. The first component explains 40% of the variance and the
+second 19%; both lie above the noise edge $\nu_{+}=(1+\sqrt{q})^2=1.44$. The third, at 13%, lies
+just below it, and the remaining seven are indistinguishable from what uncorrelated series of
+this length would produce. Two or three independent directions, not ten, drive this universe.
+
 ## Worked example
 
 The first four blocks use hand-checkable matrices. The last four use the frozen synthetic
