@@ -28,8 +28,9 @@ Factsheet settings are driven by two independent axes:
 
 1. **Data sampling frequency** — `ReportingFrequency` ∈ {`DAILY`, `WEEKLY`, `MONTHLY`,
    `QUARTERLY`}. Each maps to a pandas resampling grid (`B`, `W-WED`, `ME`, `QE`); every `freq_*`
-   field uses that grid, and rolling windows / EWM spans are annualised from the grid's
-   periods-per-year (260 / 52 / 12 / 4).
+   field uses that grid, and rolling windows / EWM spans are sized from the grid's
+   periods-per-year (260 / 52 / 12 / 4). Volatility and Sharpe ratios are annualised separately
+   by `get_annualization_factor`, which gives 252 for `B` and 52 / 12 / 4 for the others.
 2. **Reported time span** — long vs short horizon. This sets window *lengths*, the returns-heatmap
    and x-axis frequency, and the regime-classification frequency:
    - **long** — vol / var / sharpe 3y (daily uses 1y, since a 3y window is too slow on daily

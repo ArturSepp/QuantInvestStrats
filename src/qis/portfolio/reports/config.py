@@ -101,7 +101,8 @@ class ReportingFrequency(Enum):
     The value of each member is the pandas resampling rule.
 
     Attributes:
-        DAILY: business days, 'B', 260 periods per year
+        DAILY: business days, 'B'. Windows and EWM spans count 260 periods per year; return
+            statistics annualise with ``get_annualization_factor('B')``, which is 252
         WEEKLY: Wednesdays, 'W-WED', 52 per year
         MONTHLY: month ends, 'ME', 12 per year
         QUARTERLY: quarter ends, 'QE', 4 per year

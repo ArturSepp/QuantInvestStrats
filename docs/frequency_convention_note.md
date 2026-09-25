@@ -46,7 +46,7 @@ difference from an accidental mismatch between estimates.
 
 | Symbol or setting | Definition |
 |---|---|
-| $f$, $m_f$ | Sampling frequency and its annualisation factor: business daily 260, weekly 52, monthly 12 or quarterly 4 in the presets. |
+| $f$, $m_f$ | Sampling frequency and its annualisation factor from `qis.get_annualization_factor`: business daily 252, weekly 52, monthly 12 or quarterly 4. |
 | $r_t$ | Simple return over one observation period, in decimal units. |
 | $x_t = \log(1+r_t)$ | Log return, additive over adjacent periods when wealth is positive. |
 | $\hat\sigma_f$ | Sample standard deviation at frequency $f$, for the stated return convention. |
@@ -125,12 +125,15 @@ correction for either effect.
 The configuration derives the following presets from frequency and horizon.
 Counts are periods of the indicated grid, shown as **long · short**.
 
-| Reporting frequency | Sampling grid | Vol / Sharpe span or window | Beta span | Regime grid | Periods/year |
+| Reporting frequency | Sampling grid | Vol / Sharpe span or window | Beta span | Regime grid | Window periods/year |
 |---|---|---|---|---|---|
 | Daily | `B` | 260 · 260 | 780 · 260 | quarterly · monthly | 260 |
 | Weekly | `W-WED` | 156 · 52 | 156 · 52 | quarterly · monthly | 52 |
 | Monthly | `ME` | 36 · 12 | 36 · 12 | quarterly · monthly | 12 |
 | Quarterly | `QE` | 12 · 4 | 12 · 4 | quarterly · monthly | 4 |
+
+The last column sizes windows and spans only. It is not the annualisation factor $m_f$:
+a daily preset uses 260-observation windows, while its volatility is annualised with 252.
 
 The volatility and variance parameters are exponentially weighted spans; the
 Sharpe parameter is a rolling window. Matching their counts does not make their

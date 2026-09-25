@@ -14,7 +14,7 @@ qis changes is scoped to a separate work stream.
 ## 1. The three Sharpe objects
 
 Let `P_0, ..., P_M` be a NAV sampled at `M` periods over `T` years, with
-annualization factor `a = M/T` (`a = 4` quarterly, `12` monthly, `260` daily).
+annualization factor `a = M/T` (`a = 4` quarterly, `12` monthly, `252` business daily).
 Simple periodic returns are `r_m = P_m/P_{m-1} - 1`, log returns are
 `l_m = ln(P_m/P_{m-1})`, and all returns are in excess of cash. Three Sharpe
 definitions are in institutional use:
@@ -31,7 +31,10 @@ definitions are in institutional use:
 **(P) Per-annum (compound / geometric) Sharpe** (the CAGR over annualized vol):
 
     C_pa   = (P_M / P_0)^(1/T) - 1
-    SR_pa  = C_pa / [sqrt(a) * std(r_m)]
+    SR_pa  = C_pa / [sqrt(a) * std(x_m)]
+
+where `x_m` are the table's `PerfParams.return_type` returns: log returns `l_m` by default,
+simple returns `r_m` with `ReturnTypes.RELATIVE`.
 
 In a static risk-adjusted table, `P_0, ..., P_M` are the complete `freq_vol`
 boundaries used by the volatility denominator. The visible `PA_RETURN` and
@@ -228,7 +231,10 @@ unchanged while ratio-only numerators share the denominator's complete
 probabilities p_s and conditional means m_s of the sampled periodic returns r:
 
 - **PA (default).** Compound per-annum regime returns, patched so the regime
-  p.a. returns sum to the total p.a. return, divided by the annualized vol. This
+  p.a. returns sum to the total p.a. return, divided by the annualized vol. qis
+  computes `C_s = exp(a p_s m_s) - 1` from mean simple returns `m_s` and allocates
+  the residual `C_pa - sum_s C_s` in proportion to the regime frequencies `p_s`,
+  not by the equal split `c` of Section 4. This
   keeps all pre-existing outputs byte-stable and matches the reporting default of
   Section 3.2.
 - **ARITHMETIC.** sr_s = sqrt(af) * p_s * m_s / std(r) on simple returns. By

@@ -55,9 +55,11 @@ class EwmLinearModel(LinearModel):
         Args:
             span: Span for EWM calculation.
             ewm_lambda: Decay parameter for EWM.
-            is_x_correlated: Whether to use diagonal (True) or full covariance matrix.
+            is_x_correlated: If True, invert the full factor cross-moment matrix; if False, use
+                its diagonal only, which treats the factors as uncorrelated.
             mean_adj_type: Type of mean adjustment to apply.
             init_type: Initialization method for EWM.
+            warmup_period: Number of initial observations whose betas are left missing.
 
         Raises:
             ValueError: If the factor and asset return index labels or order do not match exactly.

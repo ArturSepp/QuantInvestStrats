@@ -141,7 +141,8 @@ frequencies, windows, annualisation and labels together when overriding them.
 
 ## Reporting frequency
 
-The base grids are `B`, `W-WED`, `ME` and `QE`, with annualisation factors 260, 52, 12 and 4.
+The base grids are `B`, `W-WED`, `ME` and `QE`. Window and span lengths count 260, 52, 12 and 4
+periods per year; return statistics annualise with 252, 52, 12 and 4 periods per year.
 Native-path drawdowns, sampled risk tables, regime bins and heatmaps have distinct roles;
 a monthly reporting choice does not imply monthly sampling for every visible panel.
 

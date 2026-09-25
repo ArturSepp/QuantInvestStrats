@@ -5,6 +5,28 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Label the rolling Sharpe statistic `RollingPerfStat.SHARPE` as "Sharpe ratio" in plot titles
+  and legends; it previously read "Sharp ratio".
+
+### Documentation
+
+- Correct statements that business-daily statistics are annualised with 260 periods per year.
+  Volatility and Sharpe ratios use `get_annualization_factor('B')`, which is 252; 260 remains the
+  number of observations per year used to size daily report windows and EWM spans.
+- Correct the packaged Sharpe note: the p.a. Sharpe denominator is the volatility of the
+  `PerfParams.return_type` returns (log by default), and regime p.a. residuals are allocated in
+  proportion to regime frequencies.
+- State in the `PerfStat` docstring that the Sharpe columns are fixed per convention and that
+  `PerfParams.sharpe_convention` applies to regime-conditional Sharpe ratios only.
+- Correct the `EwmLinearModel.fit` description of `is_x_correlated`: `True` inverts the full
+  factor cross-moment matrix.
+- Execute the Python worked examples of every methodology article in the test suite, offline,
+  so a calculation change that invalidates a documented number fails.
+
 ## [5.30.3] - 2026-09-22
 
 ### Added

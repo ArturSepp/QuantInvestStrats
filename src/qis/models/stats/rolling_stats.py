@@ -34,7 +34,7 @@ class RollingPerfStat(Enum):
     TOTAL_RETURNS = ('Total returns', '{:.2%}')
     PA_RETURNS = ('Pa returns', '{:.2%}')
     VOL = ('Volatility', '{:.2%}')
-    SHARPE = ('Sharp ratio', '{:.2f}')
+    SHARPE = ('Sharpe ratio', '{:.2f}')
     SKEW = ('Skeweness', '{:.2f}')
     EWMA_VOL = ('EWMA vol', '{:.2%}')
 

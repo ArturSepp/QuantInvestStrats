@@ -85,7 +85,10 @@ class PerfStat(ColVar, Enum):
     being reapplied at each call site.
 
     Members whose name ends in ``_RF0`` use a zero risk-free rate; the excess variants need
-    ``PerfParams.rates_data``. Sharpe members follow ``PerfParams.sharpe_convention``.
+    ``PerfParams.rates_data``. The Sharpe members are fixed columns, one family per convention:
+    ``SHARPE_RF0``/``SHARPE_EXCESS`` (p.a.), ``SHARPE_LOG_AN``/``SHARPE_LOG_EXCESS`` (log) and
+    ``SHARPE_ARITH``/``SHARPE_ARITH_EXCESS`` (arithmetic). ``PerfParams.sharpe_convention`` does
+    not change them; it selects the convention of the regime-conditional Sharpe ratios.
     """
     START_DATE = ColVar(name='Start date', short_n='Start\ndate', value_type=ValueType.DATE)
     END_DATE = ColVar(name='End date', short_n='End\ndate', value_type=ValueType.DATE)

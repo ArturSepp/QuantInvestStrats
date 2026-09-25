@@ -181,7 +181,8 @@ def infer_annualisation_factor_from_df(data: Union[pd.DataFrame, pd.Series]) -> 
     """
     the number of periods per year implied by a frame's index frequency.
 
-    The factor volatility is scaled by: 260 for business days, 12 for month-ends, and so on. It is
+    The factor volatility is scaled by: 252 for business days (``BUS_DAYS_PER_YEAR``), 12 for
+    month-ends, and so on, as returned by ``get_annualization_factor``. It is
     inferred rather than assumed, because getting it wrong rescales every reported volatility and
     Sharpe ratio silently.
 

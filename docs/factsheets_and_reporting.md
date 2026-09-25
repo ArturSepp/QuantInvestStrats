@@ -76,12 +76,15 @@ Three time scales matter: the native observation path, the base grid for sampled
 and the regime/heatmap bins. The reporting preset coordinates their settings; it does not
 resample every visible curve to one common grid.
 
-| Reporting choice | Base grid | Periods per year |
-|---|---|---:|
-| Daily | Business day (`B`) | 260 |
-| Weekly | Wednesday week-end (`W-WED`) | 52 |
-| Monthly | Month-end (`ME`) | 12 |
-| Quarterly | Quarter-end (`QE`) | 4 |
+| Reporting choice | Base grid | Window periods per year | Annualisation factor |
+|---|---|---:|---:|
+| Daily | Business day (`B`) | 260 | 252 |
+| Weekly | Wednesday week-end (`W-WED`) | 52 | 52 |
+| Monthly | Month-end (`ME`) | 12 | 12 |
+| Quarterly | Quarter-end (`QE`) | 4 | 4 |
+
+Window lengths and EWM spans are sized from the window column. Volatility and Sharpe ratios
+are annualised with `qis.get_annualization_factor`, which gives 252 for business days.
 
 The facade infers the full available reporting span when `time_period` is omitted.
 A span **greater than** `long_threshold_years` (default 5.0) selects the long preset;

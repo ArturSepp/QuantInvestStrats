@@ -218,6 +218,8 @@ Compute one result for each layer with that layer's own target-weight schedule, 
 ordered mapping to the comparison plot. This is schematic: the four result objects must first be
 computed from the corresponding layer's actual inputs, rather than copied from the example above.
 
+<!-- docs-test: skip -->
+
 ```python
 layer_results = {
     "Static benchmark": static_breadth,

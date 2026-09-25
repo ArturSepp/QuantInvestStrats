@@ -4,8 +4,9 @@ the documented core of the qis public API.
 Public means exported from ``src/qis/__init__.py``. That set is what may be imported, and it does
 not change here. This module records a smaller set - the core - which is what the documentation
 promises: every name in ``CORE_API`` carries an ``Args`` or ``Attributes`` block, is
-demonstrated in the cookbook, and is what the paper describes. The rest stay exported and
-usable, with no prose promise and no stability guarantee beyond the CHANGELOG.
+demonstrated in the documentation or the runnable examples, and is what the paper
+describes. The rest stay exported and usable, with no prose promise and no stability
+guarantee beyond the CHANGELOG.
 
 The boundary is measured, not chosen. Every consumer in the stack was parsed for attribute
 references and ``from qis import`` targets, and a symbol is core when a published package
@@ -21,8 +22,8 @@ the repository disagree. The version of this docstring written on 2026-07-26 car
 counts and four of them were wrong within a day.
 
 Five bootstrap symbols are promoted by intent rather than by measurement: today only ``rosaa``
-calls them, but resampling is one of the capabilities the cookbook and the paper describe, and
-the FAJ replication code migrates onto them.
+calls them, but resampling is one of the capabilities the documentation and the paper
+describe, and the FAJ replication code migrates onto them.
 
 Grouping is by capability rather than by defining module, so moving a symbol between subpackages
 costs no documentation change. ``docs/conf.py`` renders these groups directly.
@@ -243,7 +244,7 @@ CORE_API: Dict[str, Tuple[str, ...]] = {
     ),
     # rosaa is the consumer, and it reached eleven symbols through six deep imports because only
     # five were exported. The six are exported now, and the capability is core: a private
-    # production consumer is still a consumer, and the cookbook has a page for it.
+    # production consumer is still a consumer, and the documentation has a page for it.
     'Market data and FX': (
         'FxRatesData', 'FactorsData', 'load_fx_rates_data', 'get_aligned_fx_spots',
         'compute_local_and_fx_return', 'compute_performance_of_local_ccy_asset_in_reference_ccy',
