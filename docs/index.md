@@ -46,6 +46,8 @@ the [bibliography](bibliography.md).
 
 - [Notation and conventions](notation_and_conventions.md): reserved symbols, simple and log
   returns, per-annum returns, annualisation, excess returns and timing.
+- [Returns, NAVs, excess returns, fees and leverage](returns_and_navs.md): from prices to
+  returns and back, cash-rate deduction, fee crystallisation and levered returns.
 - [Reporting frequency and annualisation](frequency_convention_note.md):
   sampling grids, the variance ratio and interpretation of reported statistics.
 - [Incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md):
@@ -53,13 +55,29 @@ the [bibliography](bibliography.md).
 
 ### Part II: Performance measurement
 
-- [Performance analytics and Sharpe conventions](performance_analytics_and_sharpe.md):
-  return, volatility, drawdown and risk-adjusted performance measures.
+- [The performance-statistic catalogue](performance_statistics.md): one formula for every
+  column of the performance table.
+- [Sharpe ratios: conventions and inference](performance_analytics_and_sharpe.md):
+  the Sharpe conventions of qis, the volatility drag between them and their sampling error.
+- [Drawdowns and time under water](drawdowns.md): running and maximum drawdowns, episodes,
+  Calmar ratios and their dependence on the grid and the horizon.
+- [Alpha, beta and benchmark-relative performance](benchmark_relative_performance.md):
+  the single-index regression, alpha inference, EWMA betas and beta attribution.
+- [Regime-conditional performance](regime_conditional_performance.md): benchmark regimes and
+  the additive decomposition of the Sharpe ratio.
 
 ### Part III: Estimation
 
-- [Resampling and reproducibility](reproducibility.md):
-  the stationary bootstrap and what an unstated sampling convention costs.
+- [Exponentially weighted estimators](ewm_estimators.md): spans, half-lives, effective sample
+  sizes, initialisation and EWM volatility and covariance.
+- [Covariance, correlation and principal components](covariance_correlation_pca.md):
+  estimation, masking, eigen-decomposition and the noise floor.
+- [Serial dependence and autocorrelation](serial_dependence.md): autocorrelation functions,
+  their standard errors and lagged betas.
+- [Regression and HAC inference](regression_and_hac.md): OLS and EWMA regressions with
+  heteroskedasticity- and autocorrelation-consistent standard errors.
+- [Resampling and the bootstrap](reproducibility.md): IID, block and stationary bootstraps, and
+  what an unstated sampling convention costs.
 - [Private-asset unsmoothing](private_asset_unsmoothing.md):
   serial correlation, return reconstruction and de-levering.
 
@@ -69,9 +87,17 @@ the [bibliography](bibliography.md).
   decisions, execution timing, held units and portfolio histories.
 - [Turnover conventions](turnover_conventions.md):
   traded notional, transaction costs and turnover reporting.
+- [Risk-adjusted returns and volatility targeting](risk_adjusted_returns.md): scaling returns
+  by lagged volatility estimates and what targeting does to realised risk.
+- [Signal diagnostics: information coefficient and information ratio](signal_diagnostics.md):
+  rank correlations of signals with forward returns and their aggregation.
 
 ### Part V: Risk
 
+- [Portfolio risk and Euler contributions](risk_contributions.md): marginal, total and relative
+  risk contributions and their grouping.
+- [Factor risk models](factor_risk_models.md): EWMA factor models, betas, residual risk and the
+  model covariance.
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md):
   ex-ante risk estimates and realised tracking error and information ratio.
 - [Portfolio breadth](portfolio_breadth.md): effective instrument counts and concentration.
@@ -144,6 +170,7 @@ gallery
 :caption: Part I - Foundations
 
 notation_and_conventions
+returns_and_navs
 Reporting frequency and annualisation <frequency_convention_note>
 incomplete_and_mixed_frequency_data
 ```
@@ -153,7 +180,11 @@ incomplete_and_mixed_frequency_data
 :maxdepth: 1
 :caption: Part II - Performance measurement
 
+performance_statistics
 performance_analytics_and_sharpe
+drawdowns
+benchmark_relative_performance
+regime_conditional_performance
 ```
 
 ```{toctree}
@@ -161,7 +192,11 @@ performance_analytics_and_sharpe
 :maxdepth: 1
 :caption: Part III - Estimation
 
-Resampling and reproducibility <reproducibility>
+ewm_estimators
+covariance_correlation_pca
+serial_dependence
+regression_and_hac
+Resampling and the bootstrap <reproducibility>
 Private-asset unsmoothing <private_asset_unsmoothing>
 ```
 
@@ -172,6 +207,8 @@ Private-asset unsmoothing <private_asset_unsmoothing>
 
 Portfolio backtesting <portfolio_backtesting>
 Turnover conventions <turnover_conventions>
+risk_adjusted_returns
+signal_diagnostics
 ```
 
 ```{toctree}
@@ -179,6 +216,8 @@ Turnover conventions <turnover_conventions>
 :maxdepth: 1
 :caption: Part V - Risk
 
+risk_contributions
+factor_risk_models
 Tracking error and risk <tracking_error_and_risk>
 Portfolio breadth <portfolio_breadth>
 Factor stress testing <stress_testing>

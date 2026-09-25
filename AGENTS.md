@@ -186,7 +186,7 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
   numerical verification, strict Sphinx builds, or inspection in the supported Markdown viewers.
 - Register every displayed analytics figure in `tools/docs_analytics/manifest.json`. Regenerate
   the full bundle with `python -m tools.docs_analytics.run --all --output-dir <new-local-bundle>`.
-  Follow its README to review and publish all seven previews with their provenance; verify them
+  Follow its README to review and publish all 18 previews with their provenance; verify them
   with `python -m tools.docs_analytics.publish --verify --repo <checkout>`. Record the producer,
   sample, conventions and actual qis source version. Keep captions and displayed numbers tied
   to the same computed result.

@@ -136,6 +136,47 @@ Futures require a separate exposure model: currency translation applies to P&L r
 a fully funded cash-asset principal. Use `compute_futures_fx_adjusted_returns` for that convention,
 and `compute_cash_fx_adjusted_returns` for funded cash exposures.
 
+### Mean-variance optimal hedge ratio
+
+`compute_fx_optimal_hedge` chooses the hedge ratio from a one-period mean-variance trade-off on
+the log-return legs. Write the local return as a regression on the FX return,
+$\ell^{L}_t=\beta\,\ell^{FX}_t+\varepsilon_t$, with $\varepsilon_t$ uncorrelated with
+$\ell^{FX}_t$. Selling $h$ units of local currency forward earns $-h\,\ell^{FX}_t$ and costs the
+annualised forward carry $c$, so to first order the hedged reference-currency return is
+
+$$
+R_t(h)\approx(1+\beta-h)\,\ell^{FX}_t+\varepsilon_t-h\,c .
+$$
+
+**Proposition (optimal hedge ratio).** Maximising
+$\mathbb{E}[R(h)]-\lambda\operatorname{Var}(R(h))$ over $h$, with FX variance $\sigma^2_{FX}$ and
+risk aversion $\lambda$, gives
+
+$$
+h^{*}=1+\beta-\frac{c}{2\lambda\,\sigma^{2}_{FX}} .
+$$
+
+**Proof.** The objective is $-h\,c-\lambda\big[(1+\beta-h)^2\sigma^2_{FX}+\sigma^2_\varepsilon\big]$
+plus terms free of $h$. It is concave in $h$; setting its derivative
+$-c+2\lambda(1+\beta-h)\sigma^2_{FX}$ to zero gives $h^{*}$. $\square$
+
+The two limiting cases are returned alongside the optimum. `Beta Hedge` is $1+\beta$, which
+removes the FX exposure implied by the regression. `Max Carry` is $1-c/(2\lambda\sigma^2_{FX})$,
+which ignores the beta and tilts away from a full principal hedge when hedging is expensive.
+All three ratios are clipped to `min_max_hedge`, $[0,1]$ by default.
+
+The inputs are point-in-time EWMA estimates on the `freq` grid. `compute_fx_vol_beta`
+estimates $\beta$ with `qis.compute_ewm_cross_xy` and the annualised $\sigma_{FX}$ with
+`qis.compute_ewm_vol`, both with EWMA mean adjustment and span 36 by default. The variance
+recursion is seeded with $0.08^2/12$, the monthly variance of an 8% annual volatility, on every
+grid. The carry $c$ is the
+short-forward cost $f/(1+f)$ divided by the period length $\Delta=1/\mathrm{AN}$. The default
+$\lambda=4/3$ is a modelling choice, not an estimate.
+
+> **Pitfall.** The optimum rises one-for-one with $\beta$. A positive local-on-FX beta, common
+> for foreign equities viewed from a funding currency, can call for a hedge ratio above one
+> before the clip; the clip then hides how far the unconstrained optimum sits from the bound.
+
 ### Total and excess returns
 
 The panel helpers form excess returns using the reference currency's simple cash accrual $c_t$:
@@ -205,6 +246,18 @@ assert isclose(covered_cash.iloc[-1], 0.004, abs_tol=1e-12)
 ```
 
 ## Implementation in qis
+
+| Quantity | Formula | qis entry point |
+|---|---|---|
+| FX and domestic-rate panel | $S_t$, $y^L_t$, $y^R_t$ | `qis.FxRatesData`, `qis.load_fx_rates_data` |
+| Cross rates aligned to assets | $S_t$ per asset currency | `qis.get_aligned_fx_spots` |
+| Local and FX legs | $r^{L}_t$, $r^{FX}_t$ or their logs | `qis.compute_local_and_fx_return` |
+| Hedged reference-currency NAV | $R_t$ at hedge ratio $h$ | `qis.compute_performance_of_local_ccy_asset_in_reference_ccy` |
+| Cash and futures translation | funded vs P&L-only exposure | `qis.compute_cash_fx_adjusted_returns`, `qis.compute_futures_fx_adjusted_returns` |
+| FX volatility and beta | $\sigma_{FX}$, $eta$ | `qis.compute_fx_vol_beta` |
+| Optimal, beta and carry hedges | $h^{*}$, $1+eta$, $1-c/(2\lambda\sigma^2_{FX})$ | `qis.compute_fx_optimal_hedge` |
+| Panel of assets and its report | hedged NAVs and statistics | `qis.compute_multi_asset_fx_hedging`, `qis.run_asset_fx_hedging_report`, `qis.plot_multi_asset_fx_hedging_report` |
+| Factor price levels | validated factor panel | `qis.FactorsData` |
 
 ### Minimal offline example
 

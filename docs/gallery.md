@@ -22,7 +22,7 @@ government bonds (`SBD_TSY`), investment-grade bonds (`SBD_IG`) and gold (`SCM_G
 `SBM_6040` is the synthetic market reference. These are teaching examples of reporting behavior.
 
 The [published provenance record](images/analytics_manifest.json) identifies the sample, seeds,
-calculation settings, actual source version and content hashes for all seven documentation images.
+calculation settings, actual source version and content hashes for all 18 documentation images.
 The [analytics scripts](https://github.com/ArturSepp/QuantInvestStrats/tree/main/tools/docs_analytics)
 also reproduce the complete reports. Fixed sample dates do not indicate current market performance.
 

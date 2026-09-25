@@ -187,6 +187,7 @@ def source_fingerprint(root: Path = ROOT) -> dict:
     paths.update((root / 'tools/docs_analytics').glob('*.py'))
     paths.update((root / 'tools/docs_analytics').glob('*.json'))
     paths.add(root / 'examples/portfolios/model_layer_attribution_simulated.py')
+    paths.add(root / 'examples/models/bootstrap_convention.py')
     paths.add(root / 'pyproject.toml')
     for pattern in ('*lock*', 'requirements*.txt'):
         paths.update(root.glob(pattern))

@@ -22,7 +22,7 @@ MANIFEST = json.loads((RUNNER.parent / 'manifest.json').read_text(encoding='utf-
 
 
 def test_registered_images_cover_documentation():
-    assert len(RUN['load_manifest']()['assets']) == 7
+    assert len(RUN['load_manifest']()['assets']) == 18
 
 
 @pytest.mark.parametrize('source', [

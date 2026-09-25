@@ -114,7 +114,7 @@ the comparison rather than only naming a file. Keep figures readable at normal p
 provide access to full-resolution factsheets when a small preview cannot show every panel.
 
 The [batch producer registry](https://github.com/ArturSepp/QuantInvestStrats/tree/main/tools/docs_analytics)
-covers all seven current previews. One command regenerates their images, supporting CSVs and
+covers all 18 current previews. One command regenerates their images, supporting CSVs and
 provenance. Review the bundle, then use the publisher described in its README to validate the
 complete set before updating the allowlisted previews and their shared provenance record.
 `python -m tools.docs_analytics.publish --verify --repo <checkout>` checks published image hashes.

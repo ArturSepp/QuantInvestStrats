@@ -853,7 +853,7 @@ not a promise that every helper is exported as `qis.<name>`.
 The three previews use the dedicated simulation and are registered to the
 [model-layer producer](https://github.com/ArturSepp/QuantInvestStrats/blob/main/tools/docs_analytics/model_layer.py).
 The [batch runner instructions](https://github.com/ArturSepp/QuantInvestStrats/blob/main/tools/docs_analytics/README.md)
-describe how to regenerate all seven documentation analytics images with their tables and
+describe how to regenerate all 18 documentation analytics images with their tables and
 source fingerprints in one run. The [published provenance record](images/analytics_manifest.json)
 identifies the actual source version, parameters, checks and image hashes. These previews share
 the gallery's typography while preserving the simulation and computed values. Their fixed sample

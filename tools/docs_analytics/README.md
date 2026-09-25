@@ -1,6 +1,6 @@
 # Reproducible documentation analytics
 
-This repository-only tool generates all seven analytics images referenced by the documentation,
+This repository-only tool generates all 18 analytics images referenced by the documentation,
 their supporting CSV tables, and a provenance record. It uses qis calculations and offline synthetic
 inputs. The package does not import this tooling.
 
@@ -40,8 +40,9 @@ mirrors are excluded.
 
 A complete bundle contains:
 
-- `images/*.png`: the seven existing preview filenames, saved at 150 dpi.
-- `tables/gallery/*.csv` and `tables/model_layer/*.csv`: inputs and supporting computed values.
+- `images/*.png`: the 18 preview filenames, saved at 150 dpi.
+- `tables/gallery/*.csv`, `tables/model_layer/*.csv` and `tables/handbook/*.csv`: inputs and
+  supporting computed values.
 - `analytics_manifest.json`: generation timestamp, fixed sample dates, parameters, conventions,
   Python and package versions, imported qis path, effective source hashes, output hashes and
   dimensions, numerical check results and summary values.
@@ -50,7 +51,8 @@ The record distinguishes `qis_source_version` (the exported project's version) f
 `dependencies.qis` (installed distribution metadata); these may differ when running current
 source through an older installed environment. The import path must belong to the source export.
 
-The source fingerprint covers qis Python source, producer code, the model-layer example,
+The source fingerprint covers qis Python source, producer code, the model-layer and bootstrap
+convention examples,
 project metadata and available root lock/requirements files. This identifies a dirty source
 export without pretending that HEAD or a distribution version identifies its contents.
 Hashes of the input CSVs identify the data used. Supporting tables preserve full floating-point
@@ -78,6 +80,13 @@ They are new teaching exhibits, not numerical regressions against the old screen
 intervals. It preserves that simulation's known layer and feature effects and calls its existing
 independent identity/design checks. Tables and figures share the same computed attribution
 objects. This named fixture is an exception to the market-panel fixture rule.
+
+[handbook.py](handbook.py) draws one teaching exhibit for each of eleven methodology chapters
+from the frozen synthetic universe (seed 20260725, 2005–2025, no quirks). Two exhibits use an
+explicitly stated teaching construction on top of it: the volatility-targeting figure scales the
+US equity returns by recorded volatility regimes, and the bootstrap figure compares the qis draw
+with the truncating draw of `examples/models/bootstrap_convention.py`. Each exhibit has an
+independent check against a closed form or a direct numpy calculation, named after its table.
 
 A producer returns figures keyed by preview filename, tables keyed by the manifest table name,
 Boolean checks, actual parameters and result summaries. Unexpected output sets or unsuccessful
@@ -128,8 +137,8 @@ the figures and supporting CSVs. Publish the reviewed bundle using an explicit t
 ~~~
 
 Set `$targetCheckout` to the intended repository path; use the C-local export first to review the
-rendered site. The publisher validates all 23 bundle outputs and requires the target's producer
-source and manifest to match. It copies all seven allowlisted PNGs together and writes
+rendered site. The publisher validates every bundle output and requires the target's producer
+source and manifest to match. It copies all 18 allowlisted PNGs together and writes
 `docs/images/analytics_manifest.json` last. Supporting CSVs stay in the build bundle.
 
 The publisher saves previous files in a new C-local backup directory beside the bundle and

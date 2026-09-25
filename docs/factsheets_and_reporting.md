@@ -51,6 +51,14 @@ the page forms and links to scripts for regenerating their analytics.
 | `MultiPortfolioData` | Multiple strategies | Store the reference price panel on the object for regime and beta panels. |
 | `MultiPortfolioData` with `kind='strategy_benchmark'` | Strategy versus benchmark portfolio | The first two portfolios are the default pair; the object's reference price panel supplies market regimes/betas. |
 
+`qis.factsheet` dispatches each archetype to a generator that can also be called directly:
+`qis.generate_multi_asset_factsheet` for a price universe, `qis.generate_strategy_factsheet`
+for one `PortfolioData`, `qis.generate_multi_portfolio_factsheet` for several strategies, and
+`qis.generate_strategy_benchmark_factsheet_plt` for a strategy against a benchmark portfolio,
+whose exposure panel uses `qis.plot_exposures_strategy_vs_benchmark_stack`. Direct calls take
+their windows and grids from a preset such as `qis.FACTSHEET_CONFIG_DAILY_DATA_SHORT_PERIOD`
+or from `qis.fetch_default_report_kwargs`.
+
 Use a sorted `DatetimeIndex` and meaningful, unique string column names. Prices and NAVs
 are positive levels by default. On the **multi-asset path only**,
 `data_is_returns=True` treats both the pandas input and any separately supplied

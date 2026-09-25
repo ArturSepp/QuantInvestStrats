@@ -202,3 +202,36 @@ def model_exhibit(figure, *, title, subtitle, footer):
     figure.axes[0].set_position((0.10, 0.235, 0.86, 0.57))
     figure.axes[0].tick_params(axis='x', labelrotation=0)
     return figure
+
+
+# Validated categorical slots 1-3 (blue, orange, aqua) of the reference palette; aqua sits below
+# 3:1 contrast on white, so every figure also separates series by line style or direct labels.
+SERIES = ('#2a78d6', '#eb6834', '#1baf7a')
+
+
+def handbook_exhibit(figure, *, title, subtitle, footer, size=(10.0, 6.4)):
+    """Frame a handbook figure: common size, title block, caption line and recessive axes.
+
+    Args:
+        figure: Matplotlib figure whose axes already hold the plotted data
+        title: bold figure title
+        subtitle: sample and convention line under the title
+        footer: one or two caption lines under the plot
+        size: figure size in inches
+
+    Returns:
+        the same figure, restyled without changing any plotted data
+    """
+    figure.set_size_inches(*size)
+    _frame(figure, title, subtitle, footer)
+    figure.subplots_adjust(left=0.10, right=0.97, top=0.84, bottom=0.20, hspace=0.35,
+                           wspace=0.25)
+    for ax in figure.axes:
+        ax.grid(True, color=GRID, linewidth=0.8)
+        ax.set_axisbelow(True)
+        legend = ax.get_legend()
+        if legend is not None:
+            legend.get_frame().set_edgecolor(GRID)
+            for text in legend.get_texts():
+                text.set_fontsize(11)
+    return figure

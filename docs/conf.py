@@ -107,6 +107,12 @@ html_baseurl = (os.environ.get("READTHEDOCS_CANONICAL_URL")
                 or "https://quantinveststrats.readthedocs.io/en/latest/")
 html_static_path = []
 
+# The PDF prints the methodology chapters as one book. xelatex reads the Unicode minus signs,
+# arrows and Greek letters of the prose directly, where pdflatex needs a mapping for each.
+latex_engine = 'xelatex'
+latex_documents = [('index', 'qis.tex', 'The qis analytics handbook', author, 'manual')]
+latex_elements = {'papersize': 'a4paper'}
+
 # suppress the warning autosummary emits for symbols that are re-exported under a short name
 suppress_warnings = ['autosummary']
 
@@ -146,6 +152,27 @@ deprecation path.
 
 SECTION_ORDER = ['Enums', 'Dataclasses', 'Classes', 'Functions']
 
+# the handbook chapters that derive the formulas behind each core capability; the API page links
+# to them so that a reader of a signature is one click from its methodology
+CAPABILITY_CHAPTERS: Dict[str, List[str]] = {
+    'Instrument portfolio stress': ['portfolio_stress', 'stress_testing_with_options'],
+    'Performance statistics': ['performance_statistics', 'performance_analytics_and_sharpe',
+                               'drawdowns', 'benchmark_relative_performance', 'returns_and_navs',
+                               'signal_diagnostics', 'turnover_conventions'],
+    'Portfolio and backtesting': ['portfolio_backtesting', 'risk_contributions',
+                                  'factor_risk_models', 'tracking_error_and_risk',
+                                  'portfolio_breadth'],
+    'Factor stress testing': ['stress_testing'],
+    'Factsheets and reporting': ['factsheets_and_reporting', 'frequency_convention_note'],
+    'EWM estimation': ['ewm_estimators', 'covariance_correlation_pca', 'risk_adjusted_returns'],
+    'Market data and FX': ['fx_hedging_and_market_data'],
+    'Regime reporting': ['regime_conditional_performance'],
+    'Bootstrap': ['reproducibility'],
+    'Unsmoothing': ['private_asset_unsmoothing', 'serial_dependence'],
+    'Dates, schedules and annualisation': ['frequency_convention_note',
+                                           'notation_and_conventions'],
+}
+
 
 def _classify(name: str,
               obj: Any,
@@ -175,6 +202,7 @@ def _autosummary_block(names: List[str],
                        underline: str,
                        title: str,
                        count_label: str,
+                       chapters: List[str] = (),
                        ) -> List[str]:
     """
     Render one titled autosummary block.
@@ -184,6 +212,7 @@ def _autosummary_block(names: List[str],
         underline: the character to underline the title with, which sets the heading level
         title: section heading
         count_label: the noun after the count, e.g. ``'documented'``
+        chapters: handbook pages, without suffix, that explain the methodology of the block
 
     Returns:
         rst lines
@@ -191,8 +220,11 @@ def _autosummary_block(names: List[str],
     # rst is whitespace-significant: the blank line after the option block is what makes the
     # entries content rather than options, and without it the toctree stays empty
     lines = [f"{title}\n{underline * len(title)}\n\n",
-             f"{len(names)} {count_label}.\n\n",
-             ".. autosummary::\n   :toctree: generated\n   :nosignatures:\n\n"]
+             f"{len(names)} {count_label}.\n\n"]
+    if chapters:
+        links = ', '.join(f':doc:`/{page}`' for page in chapters)
+        lines.append(f"Methodology: {links}.\n\n")
+    lines.append(".. autosummary::\n   :toctree: generated\n   :nosignatures:\n\n")
     lines.extend(f"   qis.{name}\n" for name in names)
     lines.append("\n")
     return lines
@@ -221,7 +253,8 @@ def _write_api_index() -> None:
         if len(listed) == 0:
             continue
         lines.extend(_autosummary_block(names=listed, underline='~', title=capability,
-                                        count_label='symbols'))
+                                        count_label='symbols',
+                                        chapters=CAPABILITY_CHAPTERS.get(capability, [])))
 
     lines.append(REST_HEADING)
     sections: Dict[str, List[str]] = {key: [] for key in SECTION_ORDER}
