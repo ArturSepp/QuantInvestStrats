@@ -90,8 +90,9 @@ def adjust_returns_with_factor_lag(returns: pd.DataFrame,
         mean_adj_type: How to demean returns / factor lags before beta
             estimation. The shift itself uses the raw factor differences, so the
             correction stays mean-preserving regardless.
-        warmup_period: Initial periods masked before the first valid beta, then
-            back-filled (mirrors ``adjust_returns_with_ar``). None disables.
+        warmup_period: Initial periods masked before the first valid beta. Masked coefficients
+            remain missing so future estimates cannot revise an earlier prefix. None disables
+            this outer mask.
         max_value_for_beta: Upper bound on the lagged-beta SUM
             ``L = sum_{l>=1} b_l`` (the shifted amount). The lagged betas are
             rescaled by ``bound / L`` to preserve direction. Bounds the
@@ -134,10 +135,10 @@ def adjust_returns_with_factor_lag(returns: pd.DataFrame,
     # Demean y and the factor lags consistently for beta estimation only.
     if mean_adj_type != MeanAdjType.NONE:
         f_adj = [compute_rolling_mean_adj(data=f_raw[l], mean_adj_type=mean_adj_type,
-                                          span=span, init_type=InitType.MEAN)
+                                          span=span, init_type=InitType.X0)
                  for l in range(p + 1)]
         y_adj = compute_rolling_mean_adj(data=returns, mean_adj_type=mean_adj_type,
-                                         span=span, init_type=InitType.MEAN)
+                                         span=span, init_type=InitType.X0)
     else:
         f_adj, y_adj = f_raw, returns
 
@@ -179,8 +180,9 @@ def adjust_returns_with_factor_lag(returns: pd.DataFrame,
         betas = [compute_ewm(data=b, span=span) for b in betas]
 
     if warmup_period is not None:
+        # Backward fill would publish a future coefficient into the unavailable warm-up prefix.
         betas = [set_nans_for_warmup_period(a=b, warmup_period=warmup_period)
-                 .reindex(index=returns.index).bfill() for b in betas]
+                 .reindex(index=returns.index) for b in betas]
 
     # Shift: lagged betas (no look-ahead) times raw factor differences.
     betas_l = [b.shift(1) for b in betas]
