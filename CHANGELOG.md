@@ -15,6 +15,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Validate `plot_errorbar` error labels before creating a figure, so invalid inputs do not leave
+  an open pyplot figure behind.
+
 - Make all `compute_turnover` conventions process uniquely dated inputs chronologically and reject
   duplicate or `NaT` dates, so row permutations cannot change reported turnover.
 
