@@ -15,6 +15,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Keep `adjust_returns_with_factor_lag` point-in-time by seeding EWMA means from the first
+  observation and leaving warm-up coefficients unavailable, so later observations cannot revise
+  earlier corrected returns or diagnostics.
+
 - Validate `plot_errorbar` error labels before creating a figure, so invalid inputs do not leave
   an open pyplot figure behind.
 
