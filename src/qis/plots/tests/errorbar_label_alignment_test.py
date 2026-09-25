@@ -124,3 +124,18 @@ def test_plot_errorbar_rejects_inexact_frame_error_labels(
 
     with pytest.raises(ValueError, match=f"y_std_errors {axis_name}"):
         plot_errorbar(df=estimates, y_std_errors=errors)
+
+
+def test_plot_errorbar_invalid_labels_do_not_create_figure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject invalid labels before allocating a pyplot figure."""
+    estimates = pd.Series([10.0, 20.0], index=["a", "b"])
+    errors = pd.Series([1.0, 2.0], index=["a", "a"])
+
+    def fail_if_called() -> None:
+        pytest.fail("figure created before error-label validation")
+
+    monkeypatch.setattr(plt, "subplots", fail_if_called)
+    with pytest.raises(ValueError, match="y_std_errors index"):
+        plot_errorbar(df=estimates, y_std_errors=errors)

@@ -79,6 +79,15 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
         ValueError: If labelled errors contain duplicate, missing, or extra row or column labels.
     """
 
+    if not df.empty:
+        if isinstance(df, pd.Series):
+            df = df.to_frame()
+        elif not isinstance(df, pd.DataFrame):
+            raise TypeError(f"unsupported data type {type(df)}")
+
+        # Validate before creating a figure so rejected labels leave no open pyplot state.
+        y_std_errors = _align_y_std_errors(df=df, y_std_errors=y_std_errors)
+
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -88,14 +97,6 @@ def plot_errorbar(df: Union[pd.Series, pd.DataFrame],
         warnings.warn('df is empty: no data to plot')
         return fig
 
-    if isinstance(df, pd.DataFrame):
-        pass
-    elif isinstance(df, pd.Series):
-        df = df.to_frame()
-    else:
-        raise TypeError(f"unsupported data type {type(df)}")
-
-    y_std_errors = _align_y_std_errors(df=df, y_std_errors=y_std_errors)
     columns = df.columns
 
     if colors is None:
