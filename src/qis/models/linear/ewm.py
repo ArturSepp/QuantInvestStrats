@@ -969,9 +969,28 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                ) -> Tuple[Union[pd.DataFrame, pd.Series, np.ndarray],
                                           Union[pd.DataFrame, pd.Series, np.ndarray]]:
     """
-    implementation of newey west vol estimator
-    implementation of ewm recursion for variance/volatility computation
-    vol_floor_quantile_roll_period will replace ewma estimate with quantile vol if vol < quantile vol
+    exponentially weighted Newey-West variance or volatility.
+
+    The EWM variance ``v_t`` of ``compute_ewm_vol`` is corrected for serial correlation with
+    Bartlett-weighted EWM autocovariances,
+    ``v_t + sum_{m=1}^{L} (1 - m / (L + 1)) * 2 * EWM(x_t x_{t-m})``, all with the same decay.
+
+    Args:
+        data: observations in rows
+        num_lags: Bartlett lag count ``L``; 0 returns the EWM variance itself
+        span: EWM span; overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        ewm_lambda: EWM decay used when ``span`` is None
+        mean_adj_type: mean subtracted before the second moments are formed
+        init_type: seed of the variance recursion, applied to the squared observations
+        init_value: explicit seed of the variance recursion
+        apply_sqrt: return a volatility rather than a variance
+        annualize: multiply the variance by the annualisation factor
+        annualization_factor: explicit annualisation factor; inferred from the index if None
+        warmup_period: number of initial observations set to NaN
+        nan_backfill: treatment of missing observations in the variance recursion
+
+    Returns:
+        the corrected estimate and its ratio to the uncorrected EWM variance
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 
@@ -986,29 +1005,34 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                      init_type=init_type,
                                      nan_backfill=nan_backfill)
 
-    # initial conditions
+    # the variance recursion runs on squared observations, so it is seeded on that scale
+    a_squared = np.square(a)
     if init_value is None:
-        init_value = set_init_dim1(data=a, init_type=init_type)
+        init_value = set_init_dim1(data=a_squared, init_type=init_type)
 
     if isinstance(data, pd.Series) or (isinstance(data, np.ndarray) and data.ndim == 1):
         ewm_lambda = float(ewm_lambda)
         if isinstance(init_value, np.ndarray):
             init_value = float(init_value)
 
-    ewm0 = ewm_recursion(a=np.square(a), ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+    ewm0 = ewm_recursion(a=a_squared, ewm_lambda=ewm_lambda, init_value=init_value,
+                         nan_backfill=nan_backfill)
 
     if num_lags == 0:
         ewm_nw = ewm0
         nw_ratio = np.ones_like(ewm0)
     else:
         nw_adjustment = np.zeros_like(ewm0)
-        # compute m recursions
+        # the lag recursion works on columns, so a single series is treated as one column
+        is_1d = a.ndim == 1
+        a_2d = a.reshape(-1, 1) if is_1d else a
         for m in np.arange(1, num_lags+1):
             # lagged value
-            a_m = np.empty_like(a)
-            a_m[m:] = a[:-m]
-            a_m[:m] = np.nan
-            ewm_m = matrix_recursion(a=a, a_m=a_m, span=span)
+            a_m = np.full_like(a_2d, np.nan, dtype=float)
+            a_m[m:] = a_2d[:-m]
+            ewm_m = matrix_recursion(a=a_2d, a_m=a_m, ewm_lambda=ewm_lambda)
+            if is_1d:
+                ewm_m = ewm_m[:, 0]
             nw_adjustment += (1.0-m/(num_lags+1))*ewm_m
 
         ewm_nw = ewm0 + nw_adjustment

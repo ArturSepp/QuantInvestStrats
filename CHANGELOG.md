@@ -15,6 +15,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Net contributions of a portfolio without fees, funding or carry now sum to its NAV return.
 - Make `compute_autocorr_df` return the requested `num_lags`; any value other than 20 previously
   raised a shape error because the lag count was not passed to the estimator.
+- Seed the variance recursion of `compute_ewm_newey_west_vol` with the squared first
+  observation, as `compute_ewm_vol` does; it was seeded with the unsquared value. The lag terms now
+  use an explicitly supplied `ewm_lambda` instead of the 0.94 default, and a Series input with
+  lags no longer fails. With `num_lags=0` the estimator equals the EWM variance exactly.
 
 ### Changed
 
