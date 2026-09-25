@@ -28,6 +28,10 @@ but their effects need not sum to the integrated result. The integration term re
 difference on a stated benchmark basis. Annualised mean log-return contributions add exactly;
 they are not additive compounded returns.
 
+The estimators are derived in [Regression and HAC inference](regression_and_hac.md) and
+[Exponentially weighted estimators](ewm_estimators.md). This chapter adds the layer definitions,
+the exact return bridge, the contrasts between layers and feature runs, and the result objects.
+
 Start with the [exact return bridge](#the-exact-return-bridge), then choose
 [full-sample inference](#full-sample-olshac-inference),
 [lagged realised alpha](#lagged-no-look-ahead-ewma-beta-realised-and-cumulative-alpha), or a
@@ -53,24 +57,34 @@ counterfactual layer NAVs required here.
 
 | Convention | This article |
 |---|---|
-| Return basis | Log returns of the layer NAVs |
-| Sampling grid | `freq`: `QE` for full-sample attribution, `ME` for the endpoint EWMA regression |
-| Annualisation | Linear, $\mathrm{AN}\,\hat\alpha$; betas and $R^2$ are not annualised |
-| Mean adjustment | OLS with intercept; rolling betas use point-in-time EWMA means |
-| Timing | Full-sample fits are descriptive; lagged EWMA betas are applied one period later |
-| Output units | Annualised log-return contributions; dimensionless betas |
-| qis default | Bartlett HAC with `hac_lags=3`, `confidence_level=0.95`; EWMA span 36 |
+| Return basis | Log returns of the supplied layer NAVs; no cash or risk-free return is subtracted |
+| Sampling grid | `freq`: `QE` for full-sample attribution, `ME` for the EWMA estimators and feature attribution |
+| Annualisation | Linear, $\mathrm{AN}\,\hat\alpha$ and $\mathrm{AN}$ times mean components; Sharpe-contribution volatilities scale by $\sqrt{\mathrm{AN}}$; betas and $R^2$ are not annualised |
+| Mean adjustment | OLS and WLS fit an intercept; lagged betas use point-in-time EWMA means (`MeanAdjType.EWMA`) |
+| Timing | Full-sample and endpoint fits are descriptive; lagged EWMA betas are applied `beta_lag` periods after estimation |
+| Output units | Annualised log-return contributions; dimensionless betas; periodic HAC standard errors |
+| qis default | `compute_model_layer_alpha_beta_attribution(freq='QE', hac_lags=3, confidence_level=0.95)`; EWMA estimators use `freq='ME'`, span 36, `beta_lag=1`, `beta_init_value=1.0` |
 
-| Symbol or input | Meaning | Units and timing |
+| Symbol or input | Meaning | Units and convention |
 |---|---|---|
-| $V_L(t)$ | Positive NAV of layer $L$ | Common currency, dates and valuation basis |
-| $B,R,S,F,I$ | Benchmark, risk, signal, full model and integration | $I$ is a return residual, not a supplied NAV |
-| $r_L(t)$ | Log change in the layer NAV | Decimal per retained observation at `freq` |
-| $\alpha_L,\beta_L$ | Regression intercept and benchmark slope | Periodic log return and dimensionless exposure |
-| $a_L(t),c(t)$ | Realised alpha component and net-minus-gross cost drag | Periodic log-return contributions |
+| $V_{L,t}$ | Positive NAV of layer $L$ at $t$ | Common currency, dates and valuation basis |
+| $B,R,S,F,F^{\mathrm{net}}$ | Benchmark, risk layer, signal layer, gross and net full model | Supplied NAVs; $F^{\mathrm{net}}$ is optional |
+| $I$, $C$ | Integration and trading-cost drag | Return differences, not supplied NAVs |
+| $\ell_{L,t}$ | Log return of layer $L$ over $(t-1,t]$ | Decimal per period of `freq`; every return in this chapter is a log return |
+| $\bar\ell_L$, $\bar\ell^{\,\omega}_L$ | Sample mean and $\omega$-weighted mean of $\ell_{L,t}$ | Per period |
+| $\alpha_L,\beta_L,\varepsilon_{L,t}$ | Intercept, benchmark slope and residual of layer $L$ | $\alpha$ per period; $\beta$ dimensionless |
+| $a_{L,t}$ | Alpha component of layer $L$ in a return bridge | Periodic log return |
+| $\mathcal{A}_{L,t}$ | Cumulative alpha component $\sum_{t'\le t}a_{L,t'}$ | Log-return points, not a wealth index |
+| $\hat\beta_{L,t}$, $b_{L,t}$, $\beta_0$, $h$ | EWM beta after return $t$; beta applied to return $t$; prior; lag | $b_{L,t}=\hat\beta_{L,t-h}$ or $\beta_0$; `beta_init_value` 1.0, `beta_lag` 1 |
+| $N,\lambda$ | EWM span and decay, $\lambda=1-2/(N+1)$ | `span` or `beta_span`, default 36 |
+| $\mathcal{E}_t[z]$ | EWM of a series $z$ through $t$, seeded at its first row | Same span as the betas |
+| $\omega_t$, $T_{\mathrm{eff}}$ | Geometric WLS weight $\lambda^{T-1-t}$; Kish effective sample size | Latest row has weight one |
 | $T,\mathrm{AN}$ | Retained observations and periods per year | `ME` uses $\mathrm{AN}=12$; `QE` uses $\mathrm{AN}=4$ |
-| $N,\lambda$ | EWMA span and decay | Observations and dimensionless decay |
-| $q$ | Bartlett HAC lag count | Retained return observations |
+| $q$, $\gamma$, $z_{\gamma}$ | Bartlett lag count, confidence level, normal quantile $\Phi^{-1}((1+\gamma)/2)$ | `hac_lags` (3), `confidence_level` (0.95) |
+| $\hat\Sigma_{\alpha}$, $c$, $x_t$ | Joint HAC covariance of layer alphas; contrast vector; regressor row $(1,\ell_{B,t})^{\top}$ | Ordered $(F,R,S)$ |
+| $\hat\mu_K$, $\pi_K$, $\sigma_B$, $\sigma_{F^{*}}$ | Annualised mean of bridge component $K$, its Sharpe contribution; benchmark and endpoint-model volatility | $K\in\{\mathrm{sys},R,S,I,C\}$; $F^{*}$ is $F^{\mathrm{net}}$ when supplied, else $F$ |
+| $\ell^{(0)}_{L,t}$, $\ell^{(1)}_{L,t}$, $\Delta_{L,t}$ | Layer return without and with one feature; their difference | Log return of a NAV ratio |
+| $\mathcal{M}$, $n$; $\mathcal{C}$, $\mathcal{D}$; $\ell^{\mathcal{C}}_{L,t}$, $d^{\mathcal{C}}_{L,t}$, $\phi_{f,L,t}$ | Feature set and its size; coalitions; coalition return, Harsanyi dividend, Shapley effect of feature $f$ | $\varnothing$ is production; periodic log returns |
 
 Frequency and annualisation must describe the NAVs supplied. Full-sample attribution defaults
 to quarter-end; the endpoint EWMA regression defaults to month-end. The examples explicitly
@@ -89,15 +103,16 @@ The inputs are four NAV series and an optional fifth:
 Each layer $L$ is converted at frequency `freq` to log returns,
 
 $$
-r_L(t) = \log V_L(t) - \log V_L(t-1),
-\qquad t = 1, \dots, T.
+\ell_{L,t}=\log V_{L,t}-\log V_{L,t-1},
+\qquad t=1,\dots,T.
 $$
 
-The residual definition makes the within-period bridge exact. Log returns additionally sum
-across time, so cumulative contributions and their annualised means reconcile on the same scale.
-This does not make the log return of an arbitrary portfolio a weighted sum of its sleeves' log
-returns. Reported annualised means are not compounded annual growth rates; exponentiating each
-component separately destroys additivity.
+The residual definition below makes the within-period bridge exact. Log returns additionally
+[sum across time](notation_and_conventions.md#simple-and-log-returns), so cumulative
+contributions and their annualised means reconcile on the same scale. This does not make the log
+return of an arbitrary portfolio a weighted sum of its sleeves' log returns. Reported annualised
+means are not compounded annual growth rates; exponentiating each component separately destroys
+additivity.
 
 The common sample is set before any resampling. The NAVs are trimmed to the range between the
 latest first valid observation and the earliest last valid observation, forward-filled inside
@@ -106,98 +121,108 @@ than the others therefore shortens the sample for every layer, and no layer cont
 forward-filled returns outside its own history. Any date on which a periodic return is still not
 finite is dropped for all layers.
 
-The integration return is the log-return residual of the full model against the sum of the risk and signal
-layers run on their own, and the trading-cost drag is the difference between the net and gross full
-models,
+**Definition (integration return and cost drag).** The integration return is the log-return
+residual of the full model against the sum of the risk and signal layers run on their own, and
+the trading-cost drag is the difference between the net and gross full models,
 
 $$
-r_I(t) = r_F(t) - r_R(t) - r_S(t), \qquad c(t) = r_F^{\mathrm{net}}(t) - r_F(t).
+\ell_{I,t}=\ell_{F,t}-\ell_{R,t}-\ell_{S,t},
+\qquad
+\ell_{C,t}=\ell_{F^{\mathrm{net}},t}-\ell_{F,t}.
 $$
 
 ## Methodology
 
 ### Full-sample OLS layer regressions
 
-For each layer $L \in \{R, S, I, F, F^{\mathrm{net}}\}$ the function estimates the
-full-sample regression on the benchmark,
+**Definition (layer regression).** For each layer $L\in\{R,S,I,F,F^{\mathrm{net}}\}$,
+`qis.compute_model_layer_alpha_beta_attribution` fits
 
 $$
-r_L(t) = \alpha_L + \beta_L \, r_B(t) + \epsilon_L(t),
+\ell_{L,t}=\alpha_L+\beta_L\,\ell_{B,t}+\varepsilon_{L,t}
 $$
 
-by ordinary least squares. With $\bar r_L$ the sample mean over the common sample,
-
-$$
-\hat\beta_L = \frac{\sum_{t=1}^T (r_L(t) - \bar r_L)(r_B(t) - \bar r_B)}{\sum_{t=1}^T (r_B(t) - \bar r_B)^2},
-\qquad
-\hat\alpha_L = \bar r_L - \hat\beta_L \, \bar r_B.
-$$
-
-The benchmark row of the regression table is fixed at $\hat\alpha_B = 0$ and
-$\hat\beta_B = 1$ rather than estimated. The annualised alpha is $\mathrm{AN} \hat\alpha_L$
-with $\mathrm{AN}$ the number of periods per year implied by `freq`. Beta, $R^2$ and the
-periodic standard error are not annualised. Annualisation is linear because $\hat\alpha_L$
-is a mean log return, and a mean log return scales with the number of periods.
+by [ordinary least squares with an intercept](regression_and_hac.md#ordinary-least-squares) on
+the common sample, so $\hat\alpha_L=\bar\ell_L-\hat\beta_L\bar\ell_B$. The integration return is
+regressed as a layer of its own. The benchmark row of the table is fixed at $\hat\alpha_B=0$ and
+$\hat\beta_B=1$ rather than estimated. Alpha is
+[annualised](regression_and_hac.md#alpha-annualisation) linearly, $\mathrm{AN}\,\hat\alpha_L$,
+because a mean log return scales with the number of periods; beta, $R^2$ and the periodic
+standard error are not annualised.
 
 ### The exact return bridge
 
-The gross full-model return is separated into systematic return $s_F$ and three alpha
-components: risk $a_R$, signal $a_S$, and integration $a_I$.
+**Definition (return bridge).** The gross full-model return is separated into the systematic
+return $\hat\beta_F\,\ell_{B,t}$ and three alpha components, risk $a_{R,t}$, signal $a_{S,t}$
+and integration $a_{I,t}$:
 
 $$
 \begin{aligned}
-s_F(t) &= \hat\beta_F \, r_B(t), \\
-a_R(t) &= r_R(t) - \hat\beta_R \, r_B(t), \\
-a_S(t) &= r_S(t) - \hat\beta_S \, r_B(t), \\
-a_I(t) &= r_F(t) - \hat\beta_F \, r_B(t) - a_R(t) - a_S(t).
+a_{R,t}&=\ell_{R,t}-\hat\beta_R\,\ell_{B,t},\\
+a_{S,t}&=\ell_{S,t}-\hat\beta_S\,\ell_{B,t},\\
+a_{I,t}&=\ell_{F,t}-\hat\beta_F\,\ell_{B,t}-a_{R,t}-a_{S,t}.
 \end{aligned}
 $$
 
-The fourth line defines the integration alpha as the residual, so the identity
+**Identity (exact bridge).** In every period,
 
 $$
-r_F(t) = \hat\beta_F \, r_B(t) + a_R(t) + a_S(t) + a_I(t)
+\ell_{F,t}=\hat\beta_F\,\ell_{B,t}+a_{R,t}+a_{S,t}+a_{I,t},
+\qquad
+\ell_{F^{\mathrm{net}},t}=\ell_{F,t}+\ell_{C,t}.
 $$
 
-holds in every period by construction. When a net NAV is supplied,
-$r_F^{\mathrm{net}}(t) = r_F(t) + c(t)$ extends the identity to the net return. Three
-properties turn this bookkeeping into an estimator.
+**Proof.** The first equation rearranges the definition of $a_{I,t}$; the second rearranges the
+definition of $\ell_{C,t}$. $\square$
+
+Three properties turn this bookkeeping into an estimator.
 
 #### Linearity: the integration term is an estimated alpha
 
-On the common sample, the integration coefficients are exact linear combinations of the layer
-coefficients,
+**Proposition (integration coefficients).** On the common sample,
 
 $$
-\hat\beta_I = \hat\beta_F - \hat\beta_R - \hat\beta_S, \qquad
-\hat\alpha_I = \hat\alpha_F - \hat\alpha_R - \hat\alpha_S,
+\hat\beta_I=\hat\beta_F-\hat\beta_R-\hat\beta_S,
+\qquad
+\hat\alpha_I=\hat\alpha_F-\hat\alpha_R-\hat\alpha_S,
+\qquad
+a_{I,t}=\hat\alpha_I+\hat\varepsilon_{I,t}.
 $$
 
-and the residual bridge term is the beta-adjusted integration return,
-$a_I(t) = r_I(t) - \hat\beta_I \, r_B(t) = \hat\alpha_I + \hat\epsilon_I(t)$. The reason is
-that the OLS estimator $(X^{\top}X)^{-1} X^{\top} y$ with
-$X = [\mathbf{1}, r_B]$ is linear in $y$ for a fixed regressor matrix, and all layer
-regressions share the regressor matrix because they share the common sample. The residual vector
-is linear in $y$ for the same reason, so
-$\hat\epsilon_I = \hat\epsilon_F - \hat\epsilon_R - \hat\epsilon_S$. This is why the
-function regresses the integration return as an additional layer and reports its beta, alpha and
-interval on the same footing as the observed layers. The integration alpha is not an unexplained
-plug. It is the OLS alpha of the log-return series $r_F - r_R - r_S$.
+**Proof.** All layer regressions share one design $[\mathbf{1},\ell_B]$, because they share the
+common sample, and OLS coefficients and residuals are
+[linear in the response](regression_and_hac.md#linearity-in-the-response). Applied to
+$\ell_I=\ell_F-\ell_R-\ell_S$ this gives the first two equations and
+$\hat\varepsilon_I=\hat\varepsilon_F-\hat\varepsilon_R-\hat\varepsilon_S$. Substituting the
+bridge definitions gives
+$a_{I,t}=\ell_{I,t}-(\hat\beta_F-\hat\beta_R-\hat\beta_S)\,\ell_{B,t}$, which is
+$\ell_{I,t}-\hat\beta_I\,\ell_{B,t}=\hat\alpha_I+\hat\varepsilon_{I,t}$. $\square$
+
+This is why the function regresses the integration return as an additional layer and reports its
+beta, alpha and interval on the same footing as the observed layers. The integration alpha is not
+an unexplained plug. It is the OLS alpha of the log-return series $\ell_F-\ell_R-\ell_S$.
 
 #### Bar heights are OLS alphas
 
-The annualised sample mean of each alpha component equals the annualised OLS alpha of its layer,
+**Identity (bar heights).** The annualised sample mean of each alpha component equals the
+annualised OLS alpha of its layer, and the four annualised components add to the annualised mean
+full-model return:
 
 $$
-\frac{\mathrm{AN}}{T} \sum_{t=1}^T a_L(t) = \mathrm{AN} \, \hat\alpha_L, \qquad L \in \{R, S, I\},
+\frac{\mathrm{AN}}{T}\sum_{t=1}^{T}a_{L,t}=\mathrm{AN}\,\hat\alpha_L,\quad L\in\{R,S,I\},
+\qquad
+\mathrm{AN}\big(\hat\beta_F\bar\ell_B+\hat\alpha_R+\hat\alpha_S+\hat\alpha_I\big)
+=\mathrm{AN}\,\bar\ell_F .
 $$
 
-because OLS residuals have zero sample mean when the regression includes an intercept. The
-annualised systematic component equals $\mathrm{AN} \hat\beta_F \bar r_B$, and the four annualised
-components sum to $A(\hat\beta_F \bar r_B + \hat\alpha_R + \hat\alpha_S + \hat\alpha_I) =
-A(\hat\beta_F \bar r_B + \hat\alpha_F) = A \bar r_F$. The return bridge and the regression table
-are therefore one object: the bars of a bridge chart are the annualised alphas, and the whiskers
-on them are the intervals of those same alphas.
+**Proof.** $a_{L,t}=\hat\alpha_L+\hat\varepsilon_{L,t}$ for $L\in\{R,S\}$ by the definition of
+the residual, and for $L=I$ by the previous proposition. OLS residuals have zero sample mean when
+the regression includes an intercept, which gives the first equation. By linearity
+$\hat\alpha_R+\hat\alpha_S+\hat\alpha_I=\hat\alpha_F=\bar\ell_F-\hat\beta_F\bar\ell_B$, which gives
+the second. $\square$
+
+The return bridge and the regression table are therefore one object: the bars of a bridge chart
+are the annualised alphas, and the whiskers on them are the intervals of those same alphas.
 
 #### Invariance to the excess-return basis
 
@@ -206,127 +231,110 @@ represent funded total returns or an already specified excess-return strategy. T
 concerns subtracting the **benchmark log return**, not an arbitrary risk-free series. Those are
 different transformations; the latter need not leave regression alphas unchanged.
 
-Replace the signal-layer return by its excess over the benchmark,
-$r_S'(t) = r_S(t) - r_B(t)$. Every alpha, every residual, every HAC standard error, every
-confidence bound and every p-value is unchanged. Two betas move, and their $R^2$ with them,
+**Proposition (benchmark-excess invariance).** Replace the signal-layer return by its excess
+over the benchmark, $\ell'_{S,t}=\ell_{S,t}-\ell_{B,t}$. Every alpha, residual, HAC standard
+error, confidence bound and p-value is unchanged, and two betas move, with their $R^2$:
+$\hat\beta'_S=\hat\beta_S-1$ and $\hat\beta'_I=\hat\beta_I+1$. The same holds for the risk
+layer.
 
-$$
-\hat\beta_S' = \hat\beta_S - 1, \qquad \hat\beta_I' = \hat\beta_I + 1.
-$$
+**Proof.** The benchmark regressed on itself has intercept 0, slope 1 and zero residuals. By
+linearity, subtracting $\ell_B$ from a response subtracts 0 from its alpha, 1 from its beta and
+nothing from its residuals, and the integration response $\ell_F-\ell_R-\ell'_S$ gains $\ell_B$.
+The HAC covariance depends on the regressor and the residuals only. $\square$
 
-The benchmark regressed on itself has intercept 0, slope 1 and zero residuals, so subtracting
-$r_B$ from a layer subtracts 0 from its alpha, 1 from its beta and nothing from its
-residuals, and the HAC covariance depends on the regressor and the residuals only. The same holds
-for the risk layer.
-
-The invariance settles how to read the integration beta. A fully invested signal layer carries a
-benchmark beta near one, as does the risk layer. Adding the two as total returns doubles the
-benchmark exposure, so the integration beta is near $-1$ by construction, for example
-$0.85 - 1.05 - 1.00 = -1.20$. On the excess basis for the signal layer the same integration term
-has beta near $-0.20$, with identical alphas and intervals. The integration term is a
-log-return residual, not a tradeable portfolio, and its beta must be interpreted on the stated total-return or benchmark-excess basis.
+> **Insight.** The invariance settles how to read the integration beta. A fully invested signal
+> layer carries a benchmark beta near one, as does the risk layer. Adding the two as total
+> returns doubles the benchmark exposure, so the integration beta is near $-1$ by construction,
+> for example $0.85-1.05-1.00=-1.20$. On the excess basis for the signal layer the same
+> integration term has beta near $-0.20$, with identical alphas and intervals. The integration
+> term is a log-return residual, not a tradeable portfolio.
 
 ### Additive cumulative alpha with fixed full-sample betas
 
 The annualised alpha table answers how much each component contributed on average. The same
-`component_returns` output also shows when the contribution accumulated. For return date $t_k$,
-define the cumulative alpha contribution of layer $L$ by
+`component_returns` output also shows when the contribution accumulated.
+
+**Identity (additive cumulative alpha).** Let
+$\mathcal{A}_{L,t}=\sum_{t'=1}^{t}a_{L,t'}$ for $L\in\{R,S,I\}$, and let the cumulative total model
+alpha be $\mathcal{A}_{F,t}=\sum_{t'=1}^{t}\big(\ell_{F,t'}-\hat\beta_F\,\ell_{B,t'}\big)$. Then at
+every date
 
 $$
-C_L(t_k)=\sum_{t=1}^{k} a_L(t), \qquad L \in \{R,S,I\}.
+\mathcal{A}_{F,t}=\mathcal{A}_{R,t}+\mathcal{A}_{S,t}+\mathcal{A}_{I,t}.
 $$
 
-Because the bridge identity holds in every period, the cumulative total model alpha
-$C_F(t_k) = \sum_{t=1}^{k} \big(r_F(t) - \hat\beta_F \, r_B(t)\big)$ is additive at every date,
+**Proof.** Sum the exact bridge over $t'\le t$. $\square$
 
-$$
-C_F(t_k)=C_R(t_k)+C_S(t_k)+C_I(t_k).
-$$
+No new regression is run for this chart: the full-sample OLS betas behind `Risk Layer Alpha`,
+`Signal Layer Alpha` and `Integration Alpha` stay fixed, and the chart cumulatively sums those
+exact periodic components. The runnable workflow below produces percentage-point paths with an
+explicit 0% origin one attribution period before the first return. The vertical axis is
+cumulative log-return contribution, not a wealth index, and the paths are descriptive because
+their betas are full-sample estimates; they are not point-in-time alpha forecasts.
 
-No new regression is run for this chart. The full-sample OLS betas used to construct
-`Risk Layer Alpha`, `Signal Layer Alpha` and `Integration Alpha` remain fixed, and the chart simply
-cumulatively sums those exact periodic components. The runnable workflow below produces
-percentage-point paths with an explicit 0% origin one attribution period before the first return.
-
-The vertical axis is cumulative log-return contribution in percentage points. It is not a wealth
-index. In particular, do not use `100 * exp(cumsum(alpha))` for an additive alpha-attribution
-chart. That construction is a compounded pseudo-NAV: its components reconcile multiplicatively,
-whereas the alpha bridge is defined and interpreted additively. The cumulative paths are
-descriptive because their betas are full-sample estimates; they are not point-in-time alpha
-forecasts.
+> **Pitfall.** Do not plot `100 * exp(cumsum(alpha))` for an additive alpha-attribution chart.
+> That construction is a compounded pseudo-NAV: its components reconcile multiplicatively,
+> whereas the alpha bridge is defined and interpreted additively.
 
 ### Lagged no-look-ahead EWMA-beta realised and cumulative alpha
 
 Use the rolling estimator when the question is how alpha accumulated under betas that were
-available before each realised return. For the default span $N=36$, QIS uses
-$\lambda=1-2/(N+1)$ and removes a same-span point-in-time EWMA mean from the benchmark and each
-layer. For a generic return $x_t$, the mean recursion is
+available before each realised return.
+
+**Definition (lagged realised components).** For $L\in\{R,S,F\}$, let $\hat\beta_{L,t}$ be the
+EWM beta of $\ell_L$ on $\ell_B$ after observing return $t$, with span $N$ (`beta_span`, default
+36), and let $b_{L,t}=\hat\beta_{L,t-h}$ be the beta applied to return $t$, with lag $h$
+(`beta_lag`, default 1) and the prior $\beta_0$ (`beta_init_value`, default 1) substituted while
+that estimate is missing. The realised components are
 
 $$
-m_t^x=\lambda m_{t-1}^x+(1-\lambda)x_t, \qquad \tilde x_t=x_t-m_t^x.
-$$
-
-The beta estimate after observing date $t$ is the ratio of EWMA cross moment to EWMA benchmark
-variance,
-
-$$
-\begin{aligned}
-q_t^{BL}&=\lambda q_{t-1}^{BL}+(1-\lambda)\tilde r_B(t)\tilde r_L(t),\\
-q_t^{BB}&=\lambda q_{t-1}^{BB}+(1-\lambda)\tilde r_B(t)^2,\\
-\hat\beta_L(t)&=\frac{q_t^{BL}}{q_t^{BB}}.
-\end{aligned}
-$$
-
-The estimator uses `MeanAdjType.EWMA`, the point-in-time `InitType.X0` initial condition, and an
-explicit beta prior (one by default). `MeanAdjType.INSAMPLE` is rejected because subtracting a
-full-sample mean would introduce look-ahead. Under EWMA mean adjustment and `InitType.X0`, the
-first centered observation is zero, so the first estimated beta is deliberately retained as
-missing. The applied beta remains finite: QIS uses the prior until a lagged estimate is available.
-
-With the default one-period lag, the beta estimated at $t-1$ is applied to return $t$,
-
-$$
-\tilde\beta_L(t)=\hat\beta_L(t-1), \qquad
-a_L(t)=r_L(t)-\tilde\beta_L(t)r_B(t),
-$$
-
-with the prior substituted before the first lagged finite estimate. Thus return $t$ may update
-$\hat\beta_L(t)$, but it cannot change the beta applied to itself. Total and integration alpha are
-
-$$
-a_F(t)=r_F(t)-\tilde\beta_F(t)r_B(t), \qquad
-a_I(t)=a_F(t)-a_R(t)-a_S(t),
-$$
-
-so $a_F(t)=a_R(t)+a_S(t)+a_I(t)$ at every date. The expanding annualised estimate through $t_k$
-is $\mathrm{AN} k^{-1}\sum_{t=1}^{k}a_L(t)$. The post-warm-up exhibit is different: it is the unannualised
-cumulative sum $\sum a_L(t)$ after a chosen base date, with an explicit zero row on that date.
-
-For a current estimate that gives more weight to recent realised alpha, QIS applies the same EWMA
-span to these step-ahead residuals. With $N=36$ and
-$\lambda=1-2/(N+1)$,
-
-$$
-\bar a_L(t)=\lambda\bar a_L(t-1)+(1-\lambda)a_L(t),
+a_{L,t}=\ell_{L,t}-b_{L,t}\,\ell_{B,t},\quad L\in\{R,S,F\},
 \qquad
-\bar\alpha_L^{\mathrm{ann}}(t)=\mathrm{AN}\bar a_L(t).
+a_{I,t}=a_{F,t}-a_{R,t}-a_{S,t},
 $$
 
-This is a point-in-time EWMA of realised OOS alpha. It is not the contemporaneous alpha forecast
-returned by the lower-level beta routine, and it does not refit a 36-observation in-sample
-regression. Because EWMA is linear, total alpha continues to equal risk-layer alpha plus
-signal-layer alpha plus integration alpha at every date. The current estimate is the final row of
-the EWMA path. It is a responsive point estimate, not a confidence interval; a 36-period EWMA has
-less effective information than the full-sample HAC regression.
+and with a net NAV the net total alpha is $a_{F,t}+\ell_{C,t}$, on the unchanged gross-model beta.
 
-The runnable workflow below uses a 36-month EWMA beta, lags it by one month, allows 12 monthly returns
-for estimator warm-up, and then accumulates realised alpha from the next month:
+**Identity (lagged bridge).** In every period
+$\ell_{F,t}=b_{F,t}\,\ell_{B,t}+a_{R,t}+a_{S,t}+a_{I,t}$, and $b_{L,t}$ uses returns up to $t-h$
+only.
+
+**Proof.** The first statement rearranges the definitions of $a_{F,t}$ and $a_{I,t}$. The second
+holds because $\hat\beta_{L,t-h}$ comes from EWM recursions over rows up to $t-h$ with
+point-in-time seeds and centring, and $\beta_0$ is a constant. $\square$
+
+Thus return $t$ may update $\hat\beta_{L,t}$, but it cannot change the beta applied to itself.
+The betas are those of `qis.compute_ewm_beta_alpha_forecast` with
+`mean_adj_type=MeanAdjType.EWMA` and `init_type=InitType.X0`: ratios of EWM moments about
+point-in-time EWMA means of the same span, derived in
+[point-in-time EWM regressions](regression_and_hac.md#point-in-time-ewm-regressions) and
+[mean adjustment](ewm_estimators.md#mean-adjustment). `MeanAdjType.INSAMPLE` is rejected because
+a full-sample mean looks ahead. Under the `X0` seed the first centred return is zero, so the first
+estimated beta is deliberately missing; a missing estimate after the first finite one raises.
+
+> **Pitfall.** The prior is more than a fallback. It replaces the first informative observation,
+> so the first finite estimate equals $\beta_0$ exactly, and then acts as the seed of both moment
+> recursions. Like any [seed](ewm_estimators.md#initial-conditions) it keeps weight $\lambda^{k}$
+> in the estimate $k$ returns later, above 5% for about $1.5N=54$ returns at $N=36$, so early
+> realised alpha depends on `beta_init_value`.
+
+The expanding annualised estimate through $t$ is $\mathrm{AN}\,t^{-1}\sum_{t'\le t}a_{L,t'}$. The
+post-warm-up exhibit is the unannualised cumulative sum of $a_{L,t'}$ after a chosen base date,
+with an explicit zero row on that date; with a one-period lag qis checks that the first accrued
+return uses the beta available on the base date. The current estimate is
+$\mathrm{AN}\,\mathcal{E}_t[a_L]$, the same-span
+[EWM](ewm_estimators.md#the-recursion-and-its-weights) of the step-ahead residuals seeded with
+`InitType.X0`. It is a point-in-time EWMA of realised
+out-of-sample alpha, not the contemporaneous alpha forecast of the lower-level beta routine and
+not a refitted 36-observation regression, and linearity keeps it additive across layers. It is a
+point estimate, not a confidence interval, and its
+[effective sample size](ewm_estimators.md#span-mean-lag-effective-sample-size-and-half-life) is
+the span.
 
 `estimated_betas` records estimates after each return; `applied_betas` records the betas actually
-used for each return. That distinction is the audit for the one-period lag. The result also exposes
-the exact periodic `component_returns`, cumulative alpha from inception, the estimator settings,
-and `mean_adj_type`. The post-warm-up result records the base date, first accrued alpha date and the
-same settings.
+used for each return, which is the audit for the lag. The runnable workflow below uses a 36-month
+EWMA beta, lags it by one month, allows 12 monthly returns for estimator warm-up, and accumulates
+realised alpha from the next month.
 
 ### Current endpoint geometric EWMA-WLS regression
 
@@ -336,79 +344,50 @@ This is an endpoint descriptive regression: every return in the sample is used t
 single alpha and beta shown at the final date. It must therefore not be substituted for the
 lagged-beta realised attribution above.
 
-The default endpoint exhibit converts all NAVs to common-sample monthly log returns with
-`freq='ME'`. For $t=0,\ldots,T-1$, counting retained monthly observations from oldest to newest,
-the span-$N$ objective weight is
+**Definition (endpoint EWMA-WLS attribution).** On common-sample log returns (monthly at the
+default `freq='ME'`), qis constructs $\ell_I=\ell_F-\ell_R-\ell_S$ and fits
+$\ell_{L,t}=\alpha_L+\beta_L\,\ell_{B,t}+\varepsilon_{L,t}$ for $L\in\{R,S,I,F\}$, and
+$F^{\mathrm{net}}$ when supplied, jointly with `qis.estimate_ewma_alpha_beta_hac`: weighted least
+squares with the common weights $\omega_t=\lambda^{T-1-t}$ on returns $t=0,\ldots,T-1$ from oldest
+to newest, so that the latest has weight one, and a stacked-score Bartlett HAC covariance.
 
-$$
-w_t=\lambda^{T-1-t}, \qquad \lambda=1-\frac{2}{N+1}.
-$$
+The normal equations, the weighted $R^2$, the statsmodels $T/(T-2)$ correction and the Kish (1965)
+effective sample size $T_{\mathrm{eff}}=N(1-\lambda^{T})/(1+\lambda^{T})$ are derived in
+[weighted least squares with geometric weights](regression_and_hac.md#weighted-least-squares-with-geometric-weights).
+At $N=36$, $\lambda=35/37\simeq0.9459$, and the 240 monthly returns of the simulated example give
+`effective_nobs` 35.9999. A value displayed as 36.0 does not mean a hard 36-month window, since all
+$T$ returns enter, and it is not the degrees of freedom of the correction. Three layer-specific
+properties follow.
 
-Thus the latest month has weight one. With the default $N=36$,
-$\lambda=35/37\simeq0.9459$. The reported Kish effective sample size is
-
-$$
-T_{\mathrm{eff}}=\frac{\left(\sum_t w_t\right)^2}{\sum_t w_t^2}.
-$$
-
-Equivalently,
-
-$$
-T_{\mathrm{eff}}=N\frac{1-\lambda^T}{1+\lambda^T}.
-$$
-
-For a long history it approaches 36; for a finite history it is smaller. Thus “effective sample
-size 36.0” does not mean that QIS discards older observations or fits a 36-month hard window. All
-$T$ returns enter with geometric weights; for example, $T=260$ and $N=36$ give
-$T_{\mathrm{eff}}=35.999962$, which displays as 36.0. The value is an information-concentration
-diagnostic, not the degrees of freedom used in the statsmodels-compatible HAC correction.
-
-Let $X=[\mathbf 1,r_B]$, $W=\operatorname{diag}(w_0,\ldots,w_{T-1})$, and first construct
-$r_I=r_F-r_R-r_S$. The columns of $Y=[r_R,r_S,r_I,r_F]$ contain the observed layer returns plus
-this exact integration response. The common EWMA-WLS coefficient matrix is
-
-$$
-\hat\Theta=(X^{\top}WX)^{-1}X^{\top}WY.
-$$
-
-Inference uses weighted regression scores $w_t x_t\hat\epsilon_L(t)$. QIS stacks those scores
-across the risk, signal, integration and full-model equations before applying a Bartlett HAC kernel
-with three lags by default. It uses the same $T/(T-2)$ correction as a two-parameter statsmodels WLS
-fit and a normal reference distribution. The full joint covariance retains cross-equation terms.
-In exact arithmetic,
-
-$$
-\begin{aligned}
-\hat\alpha_I&=\hat\alpha_F-\hat\alpha_R-\hat\alpha_S,\\
-\widehat{\operatorname{Var}}(\hat\alpha_I)
-  &=\hat V_{II}=c^{\top}\hat V_{RSF}c,\\
-c&=(-1,-1,1)^{\top}.
-\end{aligned}
-$$
-
-Fitting the precomputed integration response in the joint system is algebraically equivalent to
-the contrast but avoids cancellation when the component equations are nearly collinear or returns
-use very small units. Using the joint covariance, rather than a sum of three marginal variances,
-gives integration its valid confidence interval. Each return bridge contribution uses the same
-EWMA-WLS alpha as its interval, so the alpha bar is exactly the midpoint of its lower and upper
-confidence bounds, up to floating-point rounding.
+- **Integration is a contrast.** With fixed weights the linearity argument above carries over,
+  and the [integration-variance proposition](#full-sample-olshac-inference) holds with weighted
+  scores. Fitting the precomputed integration response is algebraically equivalent to the
+  contrast but avoids cancellation when the component equations are nearly collinear or returns
+  use very small units.
+- **Bars are the WLS alphas.** The WLS normal equations with an intercept give
+  $\sum_t\omega_t\hat\varepsilon_{L,t}=0$, so the $\omega$-weighted mean of each alpha component is
+  its WLS alpha, exactly the midpoint of its own confidence interval up to rounding.
+- **The covariances are stored.** `annualised_alpha_covariance` holds the $\mathrm{AN}^2$-scaled
+  joint covariance of the risk, signal and integration alphas, and `parameter_covariance` the
+  periodic alpha and beta covariance of the directly observed layers.
 
 The endpoint return bridge remains exact in every period: systematic return is
-$\hat\beta_F r_B$, risk and signal contributions are their beta-adjusted returns, and integration
-is the residual required to reconstruct $r_F$. Its displayed annualised bars are geometrically
-weighted means of those periodic log-return components. Supplying `full_model_net_nav` adds the
-realised trading-cost drag and a net endpoint; it does not estimate a fee inside QIS.
+$\hat\beta_F\,\ell_{B,t}$, risk and signal contributions are their beta-adjusted returns, and
+integration is the residual required to reconstruct $\ell_{F,t}$. Its displayed annualised bars are
+$\omega$-weighted means of those periodic log-return components. Supplying `full_model_net_nav`
+adds the realised trading-cost drag and a net endpoint; it does not estimate a fee inside qis.
 
 The final endpoint bar makes that regression identity visible. It starts with gross-model
-systematic return $\hat\beta_F\bar r_B$, applies realised trading-cost drag when a net NAV is
-present, and then adds gross total alpha $\hat\alpha_F$. The label above the bar is gross return
-without a net NAV and net return with one. The black gross-alpha interval is translated by the
-systematic and cost segments, so its midpoint is the displayed endpoint. The beta and $R^2$ rows
-under this bar therefore come from the gross `Full Model` regression, as do its alpha and interval.
-The risk, signal and integration alpha bars also show their own regression $R^2$ below beta.
-The standalone Systematic bar uses that same gross `Full Model` regression $R^2$: it reports the
-fit of the observed full model to the benchmark, not the tautological $R^2=1$ obtained by
-regressing the constructed series $\hat{\beta}_F r_B$ back on $r_B$.
+systematic return $\mathrm{AN}\,\hat\beta_F\bar\ell^{\,\omega}_B$, applies realised trading-cost
+drag when a net NAV is present, and then adds gross total alpha $\mathrm{AN}\,\hat\alpha_F$. The
+label above the bar is gross return without a net NAV and net return with one. The black
+gross-alpha interval is translated by the systematic and cost segments, so its midpoint is the
+displayed endpoint. The beta and $R^2$ rows under this bar therefore come from the gross
+`Full Model` regression, as do its alpha and interval. The risk, signal and integration alpha
+bars also show their own regression $R^2$ below beta. The standalone Systematic bar uses that same
+gross `Full Model` regression $R^2$: it reports the fit of the observed full model to the
+benchmark, not the tautological $R^2=1$ obtained by regressing the constructed series
+$\hat\beta_F\,\ell_B$ back on $\ell_B$.
 
 An EWMA interval is not guaranteed to be narrower than its full-sample OLS/HAC counterpart.
 Recency weighting usually reduces effective information, and the weighted residual variance,
@@ -419,18 +398,18 @@ more responsively; it is not a mechanical confidence-band shrinkage method.
 
 `compute_model_layer_rolling_ewma_regression_alpha` repeats the same geometric EWMA-WLS fit on
 every expanding prefix for which the joint regression is nonsingular. At date $t$, it uses only
-returns through $t$, with weights $w_{j,t}=\lambda^{t-j}$. It returns annualised `Total Model
-Alpha`, `Risk Layer Alpha`, `Signal Layer Alpha`, and `Integration Alpha`, plus `Total Model Net
-Alpha` when the supplied attribution has a net NAV. Linearity gives
+returns through $t$, with weights $\omega_{t',t}=\lambda^{t-t'}$ for $t'\le t$. It returns
+annualised `Total Model Alpha`, `Risk Layer Alpha`, `Signal Layer Alpha`, and `Integration Alpha`, plus
+`Total Model Net Alpha` when the supplied attribution has a net NAV. Linearity gives
 
 $$
-\hat\alpha_F(t)=\hat\alpha_R(t)+\hat\alpha_S(t)+\hat\alpha_I(t)
+\hat\alpha_{F,t}=\hat\alpha_{R,t}+\hat\alpha_{S,t}+\hat\alpha_{I,t}
 $$
 
-at every plotted date. Its final gross row is checked directly against the `Full Model`, `Risk
-Layer`, `Signal Layer`, and `Integration` rows of the current regression table. This path is
+at every plotted date. Its final gross row is checked directly against the `Full Model`,
+`Risk Layer`, `Signal Layer`, and `Integration` rows of the current regression table. This path is
 descriptive and contemporaneous: unlike lagged-beta realised attribution, return $t$ participates
-in the regression displayed at $t$. Accordingly, the generic QIS plot title calls this an
+in the regression displayed at $t$. Accordingly, the generic qis plot title calls this an
 annualised model-layer alpha path, not an out-of-sample alpha estimate.
 `plot_model_layer_rolling_ewma_regression_alpha(..., start_date=...)` still estimates every
 expanding prefix from the complete history and only then clips the displayed path. Its `avg` and
@@ -438,21 +417,27 @@ expanding prefix from the complete history and only then clips the displayed pat
 
 #### Common-denominator EWMA Sharpe contributions
 
-`compute_model_layer_ewma_sharpe_contributions` uses the annualised return and alpha estimates from
-the current EWMA return bridge. The benchmark reference uses benchmark EWMA volatility, while all
-model contributions use one common endpoint-model EWMA volatility:
+**Definition (common-denominator contributions).**
+`compute_model_layer_ewma_sharpe_contributions` divides the annualised means $\hat\mu_K$ of the
+current EWMA return bridge by one common endpoint-model volatility,
+$\pi_K=\hat\mu_K/\sigma_{F^{*}}$, and the benchmark reference by benchmark volatility,
+$\mathrm{SR}_B=\hat\mu_B/\sigma_B$. Here $K$ runs over the systematic return, the risk, signal
+and integration alphas and the optional cost drag $C$, and $F^{*}$ is the net model when supplied
+and the gross model otherwise.
 
-$$
-S_B=\frac{\bar r_B^{\mathrm{ann}}}{\sigma_B^{\mathrm{EWMA}}}, \qquad
-C_j=\frac{\bar r_j^{\mathrm{ann}}}{\sigma_{F^*}^{\mathrm{EWMA}}}, \qquad
-S_{F^*}=\sum_j C_j,
-$$
+**Identity (additive Sharpe bridge).**
+$\sum_K\pi_K=\hat\mu_{F^{*}}/\sigma_{F^{*}}=\mathrm{SR}_{F^{*}}$, and each alpha contribution
+has the sign of its alpha.
 
-where $j$ runs over systematic return, risk alpha, signal alpha, integration alpha and optional
-realised cost drag, and $F^*$ is the net model when supplied and gross otherwise. Both volatility
-series use the attribution span and the QIS centred EWMA-volatility recursion. Because every model
-term has the same positive denominator, the bridge is additive and each alpha contribution retains
-the sign of its alpha. These are contribution ratios, not standalone sleeve Sharpes.
+**Proof.** By the exact bridge the numerators add to $\hat\mu_{F^{*}}$, and every model term has
+the same positive denominator. $\square$
+
+These are contribution ratios, not standalone sleeve Sharpes. Both volatilities are the final row
+of `qis.compute_ewm_vol` with the attribution span, `MeanAdjType.EWMA` and `InitType.ZERO`,
+annualised by $\sqrt{\mathrm{AN}}$ ([EWM volatility](ewm_estimators.md#volatility-and-annualisation)).
+For IID returns EWMA centring makes them about 4% low at $N=36$
+([mean adjustment](ewm_estimators.md#mean-adjustment)), which raises every ratio alike and leaves
+additivity intact.
 
 The older `compute_model_layer_ewma_stage_sharpes` remains available as a separate diagnostic. It
 computes the EWMA Sharpe path after adding risk, signal and integration returns sequentially. Its
@@ -462,152 +447,163 @@ common-denominator measure instead.
 
 `compute_model_layer_in_sample_sharpe_contributions` uses the identical two-denominator
 construction with the exact full-sample alpha-attribution numerators and full-sample annualised
-log-return volatilities. For a return frequency with annualisation factor $\mathrm{AN}$,
-$\sigma=\sqrt{\mathrm{AN}}\,\operatorname{std}(r,\mathrm{ddof}=1)$. It therefore reports full-history
+log-return volatilities, $\sigma=\sqrt{\mathrm{AN}}\,s(\ell)$. It therefore reports full-history
 realised return per unit of full-history realised risk, with no EWMA window in either numerator or
 denominator. The endpoint bar in both public Sharpe plots is split into systematic, optional
 realised cost, and combined alpha contributions.
 
 The return and Sharpe bridges use the final endpoint, while the rolling-alpha figure shows every
-displayed estimable prefix. The return-bridge, rolling-alpha, EWMA-Sharpe and in-sample-Sharpe plot functions accept `detailed_mode=False` for a clean export
-without title, subtitle or methodology footnote.
+displayed estimable prefix. The return-bridge, rolling-alpha, EWMA-Sharpe and in-sample-Sharpe
+plot functions accept `detailed_mode=False` for a clean export without title, subtitle or
+methodology footnote.
 
 ### Full-sample OLS/HAC inference
 
-Alpha inference uses a Bartlett-kernel heteroskedasticity and autocorrelation consistent (HAC)
-covariance with $q$ lags (`hac_lags`, default 3), the statsmodels small-sample correction,
-a normal reference distribution and a two-sided interval at `confidence_level` (default 0.95).
-With $x_t = (1, r_B(t))^{\top}$ and OLS residuals $\hat\epsilon_L(t)$,
+Alpha inference in `compute_model_layer_alpha_beta_attribution` uses the Bartlett HAC covariance
+of [HAC covariance of the OLS coefficients](regression_and_hac.md#hac-covariance-of-the-ols-coefficients):
+$q$ lags (`hac_lags`, default 3, capped at $T-1$), the statsmodels `use_correction=True` factor
+$T/(T-2)$, a normal reference distribution, and a two-sided interval at level $\gamma$
+(`confidence_level`, default 0.95). Each layer, integration included, is its own regression; the
+table reports the periodic $\mathrm{se}(\hat\alpha_L)$ as `Alpha HAC SE`, the two-sided normal
+p-value, and the annualised interval
 
 $$
-\begin{aligned}
-\hat\Gamma_k
-  &=\sum_{t=k+1}^{T}x_t\,\hat\epsilon_L(t)\,\hat\epsilon_L(t-k)\,x_{t-k}^{\top},\\
-\hat S
-  &=\hat\Gamma_0+\sum_{k=1}^{q}
-    \Big(1-\frac{k}{q+1}\Big)
-    \big(\hat\Gamma_k+\hat\Gamma_k^{\top}\big).
-\end{aligned}
+\mathrm{AN}\big(\hat\alpha_L\pm z_{\gamma}\,\mathrm{se}(\hat\alpha_L)\big),
 $$
 
-$$
-\begin{aligned}
-\widehat{\operatorname{Var}}(\hat\alpha_L,\hat\beta_L)
-  &=\frac{T}{T-2}(X^{\top}X)^{-1}\hat S(X^{\top}X)^{-1},\\
-\mathrm{se}(\hat\alpha_L)&=\sqrt{\widehat{\operatorname{Var}}_{11}}.
-\end{aligned}
-$$
+with $z_{\gamma}=1.960$ at the default level. The estimator is the internal
+`qis.utils.regression.estimate_ols_alpha_beta_hac`, which `src/qis/utils/tests/regression_test.py`
+checks against a hand-rolled Newey and West matrix calculation. The default of three lags is
+fixed for any frequency; the internal `qis.utils.regression.newey_west_lag_rule(nobs)` returns the
+rule of thumb associated with Newey and West (1994), four for the 240 monthly returns of the
+simulated example. The result records `freq`, `hac_lags` and `confidence_level`, so a table or a
+footnote can quote the settings that produced it.
 
-The factor $T/(T-2)$ is the `use_correction=True` degrees-of-freedom adjustment for two
-regressors. The annualised interval and the p-value are
-
-$$
-\begin{aligned}
-\mathrm{CI}_{95\%}(\mathrm{AN}\hat\alpha_L)
-  &=\mathrm{AN}\big(\hat\alpha_L\pm z_{0.975}\,\mathrm{se}(\hat\alpha_L)\big),\\
-p_L&=2\big(1-\Phi(\lvert\hat\alpha_L\rvert/\mathrm{se}(\hat\alpha_L))\big).
-\end{aligned}
-$$
-
-with $z_{0.975} = 1.960$ at the default level. The generic estimator lives in
-`qis.utils.regression` as `estimate_ols_alpha_beta_hac`, and
-`src/qis/utils/tests/regression_test.py` checks it against a hand-rolled Newey and West matrix
-calculation. The lag count is a choice. The default of three is fixed for any frequency, and
-`qis.utils.regression.newey_west_lag_rule(nobs)` returns the Newey and West rule
-$\lfloor 4 (T/100)^{2/9} \rfloor$ for callers who prefer it, which gives four at
-$T = 240$ and three at $T = 86$. The result records `freq`, `hac_lags` and
-`confidence_level`, so a table or a footnote can quote the settings that produced it.
-
-The interval of the integration alpha carries the covariance between the layers. Let
-$\hat V$ be the joint HAC covariance of $(\hat\alpha_F, \hat\alpha_R, \hat\alpha_S)$
-built from the stacked score process with the same kernel and correction. Then the HAC variance
-of $\hat\alpha_I$ from its own regression equals
+**Proposition (integration variance).** Let $\hat\Sigma_{\alpha}$ be the joint HAC covariance of
+$(\hat\alpha_F,\hat\alpha_R,\hat\alpha_S)$ built from the stacked scores with the same kernel and
+correction. The HAC variance of $\hat\alpha_I$ from its own regression is
 
 $$
-\widehat{\operatorname{Var}}(\hat\alpha_I) = c^{\top} \hat V c, \qquad c = (1, -1, -1)^{\top},
+\widehat{\operatorname{Var}}(\hat\alpha_I)=c^{\top}\hat\Sigma_{\alpha}\,c,
+\qquad
+c=(1,-1,-1)^{\top},
 $$
 
-because each HAC estimator is a quadratic form in the scores $x_t \hat\epsilon_L(t)$, and
-the integration scores are the linear combination $c$ of the three layer scores. A wide
-integration interval is a statement about the joint estimation error of three layers, not a
-computational artefact. The three intervals on a bridge chart are marginal intervals. They are
-not independent, and their widths do not add. The interval of the total alpha
-$\mathrm{AN}\hat\alpha_F$ is the `Full Model` row of the table.
+and the same holds for the endpoint EWMA-WLS fit with weighted scores.
+
+**Proof.** By the integration-coefficients proposition the integration scores
+$x_t\hat\varepsilon_{I,t}$, with $x_t=(1,\ell_{B,t})^{\top}$, are the combination $c$ of the three
+layer scores. The HAC estimator is a quadratic form in the scores with a shared bread and
+correction, so this is the
+[variance of a linear contrast](regression_and_hac.md#weighted-least-squares-with-geometric-weights)
+with unit weights for OLS. $\square$
+
+A wide integration interval is a statement about the joint estimation error of three layers, not
+a computational artefact; adding three marginal variances instead would ignore the cross-layer
+covariances. The three intervals on a bridge chart are marginal intervals. They are not
+independent, and their widths do not add. The interval of the total alpha
+$\mathrm{AN}\,\hat\alpha_F$ is the `Full Model` row of the table.
 
 The kernel follows [Newey and West (1987)](https://www.nber.org/papers/t0055);
 the correction and lag-rule convention follow the [statsmodels HAC implementation](https://www.statsmodels.org/stable/generated/statsmodels.stats.sandwich_covariance.cov_hac.html).
 
 ### Measuring the impact of a model feature
 
-The same bridge isolates the effect of one feature $\phi$ on the risk side and on the
-signal side. Let subscript 0 denote the model without the feature and subscript 1 the model with
-it. For each layer $L \in \{R, S, F\}$ the feature return is
-$\Delta_L(t) = r_{L,1}(t) - r_{L,0}(t)$, which is the log return of the NAV ratio
-$N_{L,1}(t) / N_{L,0}(t)$. Regressing it on the benchmark gives
-$\hat\alpha_{\Delta L} = \hat\alpha_{L,1} - \hat\alpha_{L,0}$ and
-$\hat\beta_{\Delta L} = \hat\beta_{L,1} - \hat\beta_{L,0}$ by linearity, with the HAC
-interval of the difference from a single regression. The feature's total effect decomposes
-exactly into a risk-side, a signal-side and an integration effect,
+The same bridge isolates the effect of one model feature on the risk side and on the signal side.
+With superscripts $(0)$ and $(1)$ for the model without and with the feature, the feature return
+of layer $L\in\{R,S,F\}$ is $\Delta_{L,t}=\ell^{(1)}_{L,t}-\ell^{(0)}_{L,t}$, the log return of
+the NAV ratio $V^{(1)}_{L,t}/V^{(0)}_{L,t}$.
+
+**Proposition (feature decomposition).** On a common sample, regressing $\Delta_L$ on the
+benchmark gives $\hat\alpha_{\Delta L}=\hat\alpha^{(1)}_L-\hat\alpha^{(0)}_L$ and
+$\hat\beta_{\Delta L}=\hat\beta^{(1)}_L-\hat\beta^{(0)}_L$, with the HAC interval of the
+difference from a single regression, and the feature's total effect decomposes exactly into a
+risk-side, a signal-side and an integration effect,
 
 $$
-\hat\alpha_{\Delta F} = \hat\alpha_{\Delta R} + \hat\alpha_{\Delta S} + \hat\alpha_{\Delta I}.
+\hat\alpha_{\Delta F}=\hat\alpha_{\Delta R}+\hat\alpha_{\Delta S}+\hat\alpha_{\Delta I},
+\qquad
+\Delta_{I,t}=\Delta_{F,t}-\Delta_{R,t}-\Delta_{S,t}=\ell^{(1)}_{I,t}-\ell^{(0)}_{I,t}.
 $$
+
+**Proof.** Linearity in the response on one design gives the differences of coefficients. The
+decomposition is the integration-coefficients proposition applied to the responses $\Delta_R$,
+$\Delta_S$ and $\Delta_F$. $\square$
 
 In code this is one call with the benchmark NAV and the three ratio NAVs in place of the layer
-NAVs. The `Integration` row then gives $\hat\alpha_{\Delta I}$ without further work, since
-$\Delta_F - \Delta_R - \Delta_S = r_{I,1} - r_{I,0}$.
+NAVs; the `Integration` row then gives $\hat\alpha_{\Delta I}$. Two conditions apply. The two
+models of each layer must share the same date index, because a date missing from one NAV makes the
+ratio missing there and the forward fill then replaces a return difference by a level jump. And
+the identity between the ratio regression and the difference of two separate attributions holds
+only when both land on the same common sample. A feature that changes only the covariance
+estimator has $\Delta_{S,t}\equiv0$, and its effect is read from the risk and integration rows. A
+feature that changes only a signal has $\Delta_{R,t}\equiv0$.
 
-Two conditions apply. The two models of each layer must share the same date index, because a
-date missing from one NAV makes the ratio missing there and the forward fill then replaces a
-return difference by a level jump. And the identity between the ratio regression and the
-difference of two separate attributions holds only when both land on the same common sample, so
-subtracting two regression tables is not a substitute: the standard-error and interval columns
-of a table difference have no meaning. A feature that changes only the covariance estimator has
-$\Delta_S \equiv 0$, and its effect is read from the risk and integration rows. A feature
-that changes only a signal has $\Delta_R \equiv 0$.
+> **Pitfall.** Subtracting two regression tables is not a substitute for the ratio regression:
+> the standard-error and interval columns of a table difference have no meaning, because the
+> standard error of a difference is not a difference of standard errors.
 
 ### Alpha/beta attribution by multiple model features
 
 `qis.compute_model_feature_alpha_beta_attribution` extends the single-feature ratio analysis to a
 complete factorial experiment. A scenario is keyed by the `frozenset` of features enabled in that
 run; the empty coalition is the production baseline. For $n$ features, all $2^n$ coalitions must be
-supplied, and every coalition must use the same benchmark path.
+supplied, and every coalition must use the same benchmark path. The scenario NAVs are aligned on
+the intersection of their dates, without forward filling, and rebased to one; a benchmark that
+differs by more than $10^{-10}$ between coalitions raises.
 
-For this feature experiment, let $N$ be the set of all features and $v_L(V)$ the log return
-in layer $L$ for coalition $V$. QIS first computes the Harsanyi dividend for every non-empty
-coalition $U$,
-
-$$
-d_L(U)=\sum_{V\subseteq U}(-1)^{|U|-|V|}v_L(V).
-$$
-
-Singleton dividends are direct feature effects; larger coalitions are interactions. Their sum is
-the joint all-features-versus-production effect. QIS then assigns the interactions without an
-arbitrary feature order using the Shapley value,
+**Definition (factorial and Shapley effects).** Let $\mathcal{M}$ be the set of the $n$ features
+and $\ell^{\mathcal{C}}_{L,t}$ the log return of layer $L$ in the run with coalition
+$\mathcal{C}\subseteq\mathcal{M}$ enabled, $\ell^{\varnothing}_{L,t}$ being production. For a
+non-empty $\mathcal{C}$ the Harsanyi dividend is the factorial effect, and for a feature $f$ the
+[Shapley value](https://www.rand.org/pubs/papers/P295.html) is its order-free feature effect:
 
 $$
-\phi_{i,L}=\sum_{V\subseteq N\setminus\{i\}}
-\frac{|V|!(n-|V|-1)!}{n!}
-\left[v_L(V\cup\{i\})-v_L(V)\right].
+\begin{aligned}
+d^{\mathcal{C}}_{L,t}&=\sum_{\mathcal{D}\subseteq\mathcal{C}}
+  (-1)^{\lvert\mathcal{C}\rvert-\lvert\mathcal{D}\rvert}\,\ell^{\mathcal{D}}_{L,t},\\
+\phi_{f,L,t}&=\sum_{\mathcal{D}\subseteq\mathcal{M}\setminus\{f\}}
+  \frac{\lvert\mathcal{D}\rvert!\,(n-\lvert\mathcal{D}\rvert-1)!}{n!}
+  \big(\ell^{\mathcal{D}\cup\{f\}}_{L,t}-\ell^{\mathcal{D}}_{L,t}\big).
+\end{aligned}
 $$
 
-For two features the Shapley effect of feature $i$ is the average of its effect with and without
-the other feature, $\phi_{i,L} = d_L(\{i\}) + \tfrac{1}{2} d_L(\{1, 2\})$, so each feature
-receives half of the interaction. Both decompositions are calculated pathwise from NAV products,
-so the factorial effects and the Shapley feature paths independently reconstruct the joint log
-return at every observation. Each
-Shapley path is passed to `compute_model_layer_alpha_beta_attribution`; its alpha, beta and HAC
-interval are therefore estimated from one effect-return series rather than by subtracting two
-regression tables.
+Singleton dividends are direct effects and larger coalitions interactions. qis forms each effect
+as a product of scenario NAVs raised to these coefficients, so its log return is the stated
+combination at every observation.
+
+**Proposition (reconstruction of the joint effect).** At every date,
+
+$$
+\sum_{\varnothing\ne\mathcal{C}\subseteq\mathcal{M}}d^{\mathcal{C}}_{L,t}
+=\sum_{f\in\mathcal{M}}\phi_{f,L,t}
+=\ell^{\mathcal{M}}_{L,t}-\ell^{\varnothing}_{L,t}.
+$$
+
+**Proof.** The dividends are the Möbius transform of $\mathcal{C}\mapsto\ell^{\mathcal{C}}_{L,t}$,
+whose inverse gives
+$\ell^{\mathcal{M}}_{L,t}=\sum_{\mathcal{C}\subseteq\mathcal{M}}d^{\mathcal{C}}_{L,t}$ with
+$d^{\varnothing}_{L,t}=\ell^{\varnothing}_{L,t}$. The Shapley value splits each dividend
+equally among the members of its coalition,
+$\phi_{f,L,t}=\sum_{\mathcal{C}\ni f}d^{\mathcal{C}}_{L,t}/\lvert\mathcal{C}\rvert$, so the
+Shapley effects sum to the same total, the efficiency property of Shapley (1952). $\square$
+
+For two features $f$ and $g$ the dividend representation gives
+$\phi_{f,L,t}=d^{\{f\}}_{L,t}+\tfrac12\,d^{\{f,g\}}_{L,t}$, the average of the feature's effect
+without and with the other feature: each feature receives half of the interaction.
+
+Each Shapley path is passed to `compute_model_layer_alpha_beta_attribution`; its alpha, beta and
+HAC interval are therefore estimated from one effect-return series rather than by subtracting two
+regression tables, and by the feature-decomposition proposition its total alpha splits exactly
+into risk, signal and integration effects. The return rows of the summary have no regressor; their
+intervals are Bartlett HAC intervals of a mean with the $T/(T-1)$ correction (the internal
+`qis.utils.regression.estimate_hac_mean`, a special case in
+[HAC covariance](regression_and_hac.md#hac-covariance-of-the-ols-coefficients)).
 
 When net full-model NAVs are supplied, they must be present in every coalition. The summary then
 includes both gross and net total-return intervals and the net-model regression. Scenario
-construction remains outside QIS: the caller decides what enabling a feature means and supplies
-the resulting NAVs.
-
-
-The allocation uses the [Shapley value](https://www.rand.org/pubs/papers/P295.html).
-Interactions are calculated for the supplied experiment.
+construction remains outside qis: the caller decides what enabling a feature means and supplies
+the resulting NAVs. Interactions are calculated for the supplied experiment.
 
 ## Worked example
 
@@ -766,22 +762,22 @@ Full Model      0.00260   0.03126  0.85966  0.83225  0.00354       0.00089      
 Full Model Net  0.00248   0.02976  0.85966  0.83225  0.00550       0.00089          0.00875           0.05077
 ```
 
-The annualised mean log-return components in percent are benchmark return 5.05, systematic return 4.34,
-risk-layer alpha 1.23, signal-layer alpha 2.74, integration alpha −0.85, full-model return 7.47,
-trading-cost drag −0.15 and net return 7.32. The identity checks print residuals of order
-$10^{-15}$ or smaller for linearity and bar heights, and the excess-basis run changes no
+The annualised mean log-return components in percent are benchmark return 5.05, systematic
+return 4.34, risk-layer alpha 1.23, signal-layer alpha 2.74, integration alpha −0.85, full-model
+return 7.47, trading-cost drag −0.15 and net return 7.32. The identity checks print residuals of
+order $10^{-15}$ or smaller for linearity and bar heights, and the excess-basis run changes no
 alpha, standard error, bound or p-value while shifting the signal-layer beta by exactly −1 and the
 integration beta by exactly +1. The lag-rule check moves from three to four Bartlett lags and
 changes the interval half-widths by at most 5 basis points per year, from 122 to 126 for the risk
-layer and from 210 to 215 for the full model. The headline directions in this illustration remain the same, but
-marginal significance and reported bounds still depend on the lag choice.
+layer and from 210 to 215 for the full model. The headline directions in this illustration remain
+the same, but marginal significance and reported bounds still depend on the lag choice.
 
 ![Annualised model-layer return bridge showing systematic return, layer alphas, trading costs and net return with HAC intervals](images/model_layer_attribution_simulated.png)
 
 [Open full-resolution preview](images/model_layer_attribution_simulated.png).
 
-Read the exhibit left to right. The benchmark's annualised mean log return was 5.05%. The full model runs at
-$\hat\beta_F = 0.86$, so its systematic return is 4.34%, and the 0.71% gap between the two
+Read the exhibit left to right. The benchmark's annualised mean log return was 5.05%. The full
+model runs at $\hat\beta_F = 0.86$, so its systematic return is 4.34%, and the 0.71% gap between the two
 blue bars is the systematic return given up by running below beta one. The risk layer added
 1.23% of alpha with an interval that just excludes zero (p = 0.048). The signal layer added
 2.74% with an interval of 0.64% to 4.85%. The integration alpha is −0.85% with an interval of
@@ -836,8 +832,21 @@ not a tuning recommendation. One colour is retained for every bar belonging to t
 so the viewer follows a feature across layers rather than mistaking the layers for independent
 experiments.
 
-
 ## Implementation in qis
+
+| Quantity | Formula | qis entry point |
+|---|---|---|
+| Common-sample layer log returns | $\ell_{L,t}=\log V_{L,t}-\log V_{L,t-1}$ on the intersection of valid ranges | `periodic_returns` of every result |
+| Full-sample layer regressions and intervals | OLS of $\ell_L$ on $\ell_B$; $\mathrm{AN}(\hat\alpha_L\pm z_{\gamma}\,\mathrm{se})$ | `qis.compute_model_layer_alpha_beta_attribution`, `regression_table` |
+| Exact return bridge | $\ell_{F,t}=\hat\beta_F\ell_{B,t}+a_{R,t}+a_{S,t}+a_{I,t}$ | `component_returns`, `annualised_components` |
+| Lagged realised alpha | $a_{L,t}=\ell_{L,t}-b_{L,t}\ell_{B,t}$ with $b_{L,t}=\hat\beta_{L,t-h}$ | `qis.compute_model_layer_ewma_alpha_attribution` |
+| Current EWMA of realised alpha | $\mathrm{AN}\,\mathcal{E}_t[a_L]$ | `current_ewma_annualised_alpha` property |
+| Post-warm-up cumulative alpha | Sum of $a_{L,t'}$ after a base date, zero on it | `qis.compute_model_layer_cumulative_alpha_after_warmup` |
+| Endpoint EWMA-WLS attribution | WLS with $\omega_t=\lambda^{T-1-t}$; stacked Bartlett HAC | `qis.compute_model_layer_ewma_regression_attribution` |
+| Expanding-prefix EWMA-WLS alpha | $\mathrm{AN}\,\hat\alpha_{L,t}$ with $\omega_{t',t}=\lambda^{t-t'}$ | `qis.compute_model_layer_rolling_ewma_regression_alpha` |
+| Common-denominator Sharpe contributions | $\pi_K=\hat\mu_K/\sigma_{F^{*}}$, $\mathrm{SR}_B=\hat\mu_B/\sigma_B$ | `qis.compute_model_layer_ewma_sharpe_contributions`, `qis.compute_model_layer_in_sample_sharpe_contributions` |
+| Sequential stage Sharpes | EWM Sharpe of cumulative bridge stages | `qis.compute_model_layer_ewma_stage_sharpes` |
+| Factorial and Shapley feature effects | $d^{\mathcal{C}}_{L,t}$, $\phi_{f,L,t}$, then the layer attribution of each | `qis.compute_model_feature_alpha_beta_attribution` |
 
 The runnable workflow covers the public attribution entry points. Plot a result with
 `qis.plot_model_layer_ewma_return_bridge`, `qis.plot_model_layer_rolling_ewma_regression_alpha`,
@@ -881,7 +890,7 @@ endpoint is not a market-data freshness claim.
 
 `annualised_components`
 : $\mathrm{AN}$ times the column means of `component_returns`. These are the bar heights of a return
-  bridge, and by the bar-height property the three alpha entries equal the annualised alphas in
+  bridge, and by the bar-height identity the three alpha entries equal the annualised alphas in
   `regression_table`.
 
 `freq`, `hac_lags`, `confidence_level`
@@ -925,7 +934,7 @@ attributions separate:
 
 Every value in `feature_attributions` is a normal `ModelLayerAlphaBetaAttribution`. Consequently,
 the additive cumulative-alpha construction above applies without modification to one feature's
-Shapley effect. The runnable workflow below constructs the corresponding `risk_span_alpha_paths`.
+Shapley effect. The runnable workflow constructs the corresponding `risk_span_alpha_paths`.
 
 The resulting total path answers when the Shapley-allocated alpha effect of `beta_span`
 accumulated. Its three component paths show whether that effect came through the risk layer, the
@@ -947,7 +956,8 @@ paths are additive log-return percentage points, not compounded feature NAVs.
 - The default lag count of three applies at any frequency. At the default quarterly frequency
   three lags span nine months, and `newey_west_lag_rule` gives the sample-size rule instead.
   Normal-reference HAC inference is asymptotic. Small samples, structural breaks and strong
-  dependence can make nominal 95% intervals unreliable.
+  dependence can make nominal 95% intervals unreliable; see
+  [serial dependence](serial_dependence.md) for diagnosing persistent residuals.
 - The common sample is the intersection of the layers' valid ranges. A short layer shortens the
   sample for every layer, so check `periodic_returns.index` when a layer has a late start or an
   early end.
@@ -990,6 +1000,10 @@ paths are additive log-return percentage points, not compounded feature NAVs.
 - {doc}`Generated cumulative result API <api/generated/qis.ModelLayerCumulativeAlphaAttribution>`
 - {doc}`Generated feature API <api/generated/qis.compute_model_feature_alpha_beta_attribution>`
 - {doc}`Generated feature result API <api/generated/qis.ModelFeatureAlphaBetaAttribution>`
+- [Regression and HAC inference](regression_and_hac.md): OLS, linearity, Bartlett HAC, lag rule and EWMA-WLS
+- [Exponentially weighted estimators](ewm_estimators.md): spans, seeds, mean adjustment and EWM volatility
+- [Alpha, beta and benchmark-relative performance](benchmark_relative_performance.md)
+- [Serial dependence and autocorrelation](serial_dependence.md)
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)
 - [Simulated example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/model_layer_attribution_simulated.py)
 - [Performance and Sharpe conventions](performance_analytics_and_sharpe.md)
@@ -997,7 +1011,9 @@ paths are additive log-return percentage points, not compounded feature NAVs.
 
 ## References
 
-1. Newey, W. K., and West, K. D. (1987). A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix. *Econometrica*, 55(3), 703–708. [Working paper and published-version record](https://www.nber.org/papers/t0055).
-2. Shapley, L. S. (1952). *A Value for N-Person Games*. RAND, P-295. [Original report](https://www.rand.org/pubs/papers/P295.html). Published in *Contributions to the Theory of Games II* (1953); [publisher's reprint record](https://doi.org/10.1515/9781400829156-012).
-3. statsmodels developers. statsmodels. Software. [HAC covariance documentation](https://www.statsmodels.org/stable/generated/statsmodels.stats.sandwich_covariance.cov_hac.html).
-4. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Kish, L. (1965). *Survey Sampling*. Wiley. Defines the effective sample size reported for the geometric weights.
+2. Newey, W. K., and West, K. D. (1987). A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix. *Econometrica*, 55(3), 703–708. [Working paper and published-version record](https://www.nber.org/papers/t0055).
+3. Newey, W. K., and West, K. D. (1994). Automatic Lag Selection in Covariance Matrix Estimation. *The Review of Economic Studies*, 61(4), 631–653. [DOI: 10.2307/2297912](https://doi.org/10.2307/2297912). The lag rule of thumb returned by `newey_west_lag_rule` is associated with this paper.
+4. Shapley, L. S. (1952). *A Value for N-Person Games*. RAND, P-295. [Original report](https://www.rand.org/pubs/papers/P295.html). Published in *Contributions to the Theory of Games II* (1953); [publisher's reprint record](https://doi.org/10.1515/9781400829156-012).
+5. statsmodels developers. statsmodels. Software. [HAC covariance documentation](https://www.statsmodels.org/stable/generated/statsmodels.stats.sandwich_covariance.cov_hac.html).
+6. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
