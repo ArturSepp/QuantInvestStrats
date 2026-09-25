@@ -15,6 +15,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Make `EwmLinearModel.fit` reject non-matching factor and asset return index labels or order before
+  positional EWM estimation, preventing date-misaligned panels from producing incorrect betas or
+  model state.
+
 - Make `truncate_prior_to_start` return the complete Series or DataFrame when `start` predates the
   history, instead of raising while trying to construct a nonexistent prior anchor.
 
