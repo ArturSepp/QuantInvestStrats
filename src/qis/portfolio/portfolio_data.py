@@ -171,7 +171,8 @@ class PortfolioData:
         turnover_unit_notional: value of one unit for turnover. Defaults to ``prices`` for cash
             instruments; derivative backtests should supply contract notionals
         turnover_computation_type: default turnover convention for this portfolio
-        instrument_pnl: net pnl by instrument
+        instrument_pnl: arithmetic pnl contribution by instrument. When reconstructed from
+            ``prices`` and ``weights`` it is gross of trading costs
         realized_costs: trading costs actually incurred, by instrument
         input_weights: the target weights as supplied, kept for reference against ``weights``
         is_rebalancing: flag per date marking where rebalancing took place
@@ -345,10 +346,32 @@ class PortfolioData:
                             is_compounded: bool = False,
                             freq: Optional[str] = None
                             ) -> pd.DataFrame:
+        """Arithmetic P&L contribution of each instrument per period.
+
+        Args:
+            add_total: Insert a leading ``Total`` column summing the instruments.
+            time_period: Optional date interval applied after the net adjustment.
+            is_net: Deduct each period's realised trading cost by instrument. The cost is divided
+                by the preceding NAV, the capital base of the arithmetic contributions, so for a
+                portfolio without fees, funding or carry the net contributions sum to the NAV
+                return of each period. The opening trade is paid out of the baseline NAV and is
+                not deducted from a return.
+            is_unit_based_traded_volume: Normalise currency costs by the preceding NAV when true;
+                when false, deduct the currency costs unscaled.
+            is_compounded: Apply ``expm1`` to the result.
+            freq: Optional resampling frequency; contributions are summed within each bin.
+
+        Returns:
+            Instrument P&L contributions indexed by date.
+        """
         pnl = self.instrument_pnl.copy()
         if is_net:
-            costs = self.get_costs(add_total=False, is_unit_based_traded_volume=is_unit_based_traded_volume)
-            pnl = pnl.subtract(costs)
+            costs = self.get_costs(add_total=False, is_unit_based_traded_volume=False,
+                                   roll_period=None)
+            if is_unit_based_traded_volume:
+                costs = costs.divide(self.nav.shift(1), axis=0)
+            # the first row has no preceding NAV: its opening cost is already in the baseline NAV
+            pnl = pnl.subtract(costs.fillna(0.0))
         if add_total:
             pnl.insert(loc=0, value=pnl.sum(axis=1), column='Total')
         if time_period is not None:
@@ -915,8 +938,8 @@ class PortfolioData:
         Returns:
             Arithmetic instrument return contributions and their applied weight panel.
         """
-        # get_instruments_pnl(is_net=True) uses rolling current-NAV costs; Brinson needs
-        # individual realised costs on the same preceding-NAV basis as arithmetic returns.
+        # Brinson deducts individual realised costs on the preceding-NAV basis of the arithmetic
+        # returns, which is also the convention of get_instruments_pnl(is_net=True).
         pnl = self.get_instruments_pnl(is_net=False)
         weights = self.weights.shift(1)
         if is_net:

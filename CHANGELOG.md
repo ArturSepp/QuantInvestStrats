@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Make `PortfolioData.get_instruments_pnl(is_net=True)` deduct each period's realised trading
+  cost divided by the preceding NAV. It previously subtracted a trailing 260-period sum of costs
+  divided by current NAV, which left the first 259 rows missing and overstated later cost drag.
+  Net contributions of a portfolio without fees, funding or carry now sum to its NAV return.
+
 ### Changed
 
 - Label the rolling Sharpe statistic `RollingPerfStat.SHARPE` as "Sharpe ratio" in plot titles
