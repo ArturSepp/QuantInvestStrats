@@ -58,10 +58,13 @@ different purposes:
   A normalised return index or a contract's near-zero initial accounting value is not that notional.
 - If units already measure exposure in portfolio currency, the per-unit notional may be 1.
 
-Supply dated, consistently ordered observations. Executed modes align the notional panel to the
-units' dates and columns; they do not infer missing market values. All unit columns must be
-present. The caller is responsible for compatible currencies, actual contract quantities, and
-economically meaningful notionals.
+For dated inputs, `compute_turnover` orders each input chronologically on a local object before
+computing changes or aligning companions. Physical row order therefore does not change turnover,
+and caller-owned objects are not reordered. Duplicate or `NaT` dates are rejected because they do
+not define one unambiguous temporal transition. Executed modes align the notional panel to the
+units' dates and columns; they do not infer missing market values. All unit columns must be present.
+The caller is responsible for compatible currencies, actual contract quantities, and economically
+meaningful notionals.
 
 The first output row is normally missing because no preceding holding or target exists.
 Include an explicit prior flat row if an opening trade should appear in a turnover series.
@@ -117,9 +120,10 @@ This weights target changes by instrument risk. It includes changes caused by th
 signal and sizing estimates, but excludes realised holding drift and execution effects.
 It is a theoretical comparison measure, not executed market volume.
 
-`vols` and `input_weights` must have identical indexes, columns, and column order. Negative
-volatilities are rejected; warm-up NaNs propagate. qis neither lags nor annualises `vols` here.
-Supply a point-in-time panel appropriate for the target decision.
+After dated rows are ordered chronologically, `vols` and `input_weights` must have identical
+indexes, columns, and column order. Negative volatilities are rejected; warm-up NaNs propagate.
+qis neither lags nor annualises `vols` here. Supply a point-in-time panel appropriate for the
+target decision.
 
 Each output still corresponds to one target-change interval. Using annualised volatility does
 not by itself sum or annualise a turnover history. Group and time aggregation remain separate.

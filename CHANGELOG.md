@@ -15,6 +15,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Make all `compute_turnover` conventions process uniquely dated inputs chronologically and reject
+  duplicate or `NaT` dates, so row permutations cannot change reported turnover.
+
 - Make `EwmLinearModel.fit` reject non-matching factor and asset return index labels or order before
   positional EWM estimation, preventing date-misaligned panels from producing incorrect betas or
   model state.

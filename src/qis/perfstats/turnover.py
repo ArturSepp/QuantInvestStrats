@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import warnings
 from enum import Enum
-from typing import Optional
+from typing import Optional, TypeVar
 
 import pandas as pd
+
+
+_PandasObject = TypeVar('_PandasObject', pd.DataFrame, pd.Series)
 
 
 class TurnoverComputationType(str, Enum):
@@ -73,6 +76,20 @@ def _require_frame(data: Optional[pd.DataFrame], name: str) -> pd.DataFrame:
     return data
 
 
+def _chronological_dated_input(data: _PandasObject, name: str) -> _PandasObject:
+    """Validate and chronologically order one dated turnover input."""
+    if not isinstance(data.index, pd.DatetimeIndex):
+        return data
+    if data.index.hasnans:
+        raise ValueError(f"{name} index must not contain NaT")
+    if data.index.has_duplicates:
+        raise ValueError(f"{name} index must not contain duplicate dates")
+    if not data.index.is_monotonic_increasing:
+        # Dated changes describe chronology, never the caller's physical row storage.
+        return data.sort_index(kind='stable')
+    return data
+
+
 def _align_unit_notional(units: pd.DataFrame,
                          unit_notional: pd.DataFrame
                          ) -> pd.DataFrame:
@@ -130,6 +147,8 @@ def compute_turnover(
     as an explicit proxy for backtests that do not carry executed holdings. Volatility-normalized
     weight turnover is ``annualized_volatility[t] * abs(weight[t] - weight[t-1])``. It uses target
     weights rather than drifted holdings because it is a theoretical signal-turnover measure.
+    Dated inputs are ordered chronologically on local objects before changes or alignment;
+    non-dated indexes retain their supplied row order.
 
     Args:
         computation_type: Holdings and denominator convention. The default is executed traded
@@ -141,40 +160,49 @@ def compute_turnover(
         input_weights: Requested target weights. Required by ``TARGET_WEIGHTS`` and
             ``VOLATILITY_NORMALIZED_WEIGHTS``.
         vols: Annualized fractional volatility for each target weight. Required by
-            ``VOLATILITY_NORMALIZED_WEIGHTS`` and required to have exactly the same index,
-            columns, and column order as ``input_weights``. Warm-up NaNs are preserved.
+            ``VOLATILITY_NORMALIZED_WEIGHTS`` and required to have exactly the same dated index
+            after chronological ordering, columns, and column order as ``input_weights``.
+            Warm-up NaNs are preserved.
 
     Returns:
-        Per-instrument two-sided turnover on the input index. The first row is normally missing
-        because no preceding holding is available.
+        Per-instrument two-sided turnover on the input index, ordered chronologically for dated
+        inputs. The first row is normally missing because no preceding holding is available.
 
     Raises:
         TypeError: If a required input is not a pandas object of the expected type.
         ValueError: If ``unit_notional`` does not contain every unit column, if ``vols`` is not
-            exactly aligned or contains negative values, or if the computation type is
-            unsupported.
+            exactly aligned or contains negative values, if an applicable dated input contains
+            duplicate or ``NaT`` dates, or if the computation type is unsupported.
     """
     computation_type = TurnoverComputationType(computation_type)
     if computation_type == TurnoverComputationType.TARGET_WEIGHTS:
         input_weights = _require_frame(input_weights, 'input_weights')
+        input_weights = _chronological_dated_input(input_weights, 'input_weights')
         return input_weights.diff(1).abs()
 
     if computation_type == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS:
         input_weights = _require_frame(input_weights, 'input_weights')
         vols = _require_frame(vols, 'vols')
+        input_weights = _chronological_dated_input(input_weights, 'input_weights')
+        vols = _chronological_dated_input(vols, 'vols')
         _validate_vols_alignment(input_weights=input_weights, vols=vols)
         return input_weights.diff(1).abs().multiply(vols)
 
     units = _require_frame(units, 'units')
     unit_notional = _require_frame(unit_notional, 'unit_notional')
+    units = _chronological_dated_input(units, 'units')
+    unit_notional = _chronological_dated_input(unit_notional, 'unit_notional')
     unit_notional = _align_unit_notional(units=units, unit_notional=unit_notional)
-    traded_notional = units.diff(1).abs().multiply(unit_notional)
-
     if computation_type == TurnoverComputationType.EXECUTED_NOTIONAL_NAV:
         if not isinstance(nav, pd.Series):
             raise TypeError(
                 "nav must be a pandas Series for EXECUTED_NOTIONAL_NAV turnover"
             )
+        nav = _chronological_dated_input(nav, 'nav')
+
+    traded_notional = units.diff(1).abs().multiply(unit_notional)
+
+    if computation_type == TurnoverComputationType.EXECUTED_NOTIONAL_NAV:
         return _divide_by_denominator(
             traded_notional=traded_notional,
             denominator=nav,
