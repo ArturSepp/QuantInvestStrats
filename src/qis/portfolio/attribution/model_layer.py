@@ -1042,7 +1042,7 @@ def compute_model_layer_ewma_alpha_attribution(
     The applied betas also use the prior while no lagged estimate exists. With the default EWMA mean
     adjustment and ``InitType.X0``, the first centred observation is zero, so the first estimated
     beta remains NaN for audit while applied betas remain finite. Alpha is the realised
-    step-ahead beta-adjusted log return; the EWMA alpha forecast returned by the lower-level
+    step-ahead beta-adjusted log return; the contemporaneous EWMA alpha returned by the lower-level
     estimator is deliberately not used.
 
     Args:

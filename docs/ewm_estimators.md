@@ -90,7 +90,7 @@ The chapter answers five questions.
 | $\eta$ | Normalising constant of `compute_ewm_std1_norm` | Dimensionless |
 | $c$ | Volatility floor of the EWM score; a score threshold in the outlier filters | Units of $x$; dimensionless |
 | $z_t$ | EWM score | Dimensionless |
-| $h$ | Horizon of `ewm_xy_convolution` | Rows, from `get_annualization_factor(freq)` |
+| $h$ | Horizon of `ewm_xy_convolution` | A whole number of rows, from `get_annualization_factor(freq)` |
 
 Rows are counted from $t=0$, the first row of the input. Unless stated otherwise the input is a
 panel without missing rows; the section on missing data states what changes when it has them.
@@ -223,21 +223,20 @@ By the unrolled recursion the seed keeps weight $\lambda^{t-t_0+1}$ at row $t$. 
 after $\ln 20/(-\ln\lambda)\approx 1.5N$ rows: 54 rows at $N=36$, 389 at $N=260$. Until then a
 full-sample seed leaks later information into early estimates.
 
-Defaults that seed with the full sample:
-
-- `compute_ewm_cross_xy(var_init_type=InitType.MEAN)` seeds the denominators $M^{xx}$ and
-  $M^{yy}$ of `CrossXyType.BETA` and `CrossXyType.CORR` with full-sample second moments, and
-  `ewm_xy_convolution` inherits this default.
-- `EwmLinearModel.fit(init_type=InitType.MEAN)` seeds its mean adjustment with full-sample
-  means when one is requested.
+One default seeds with the full sample: `compute_ewm_cross_xy(var_init_type=InitType.MEAN)`
+seeds the denominators $M^{xx}$ and $M^{yy}$ of `CrossXyType.BETA` and `CrossXyType.CORR` with
+full-sample second moments. `ewm_xy_convolution` does not inherit it: it passes
+`var_init_type=InitType.ZERO`, and `var_init_type=InitType.MEAN` restores the former seed.
 
 The other entry points of the chapter are point in time by default: `compute_ewm`,
 `compute_ewm_vol`, `compute_ewm_newey_west_vol`, `compute_rolling_mean_adj`,
-`compute_ewm_beta_alpha_forecast` and the vol-normalised covariance tensor use `X0`;
-`compute_ewm_sharpe`, `compute_ewm_long_short_filter`, `compute_one_factor_ewm_betas` and the
-covariance functions start from zero. Before this release the vol-normalised tensor seeded its
-volatility with the full-sample mean of $x^2$ and `compute_ewm_beta_alpha_forecast` defaulted to
-`MEAN`, which made its first beta the full-sample slope through the origin.
+`compute_ewm_beta_alpha_forecast`, the optional mean adjustment of `EwmLinearModel.fit` and the
+vol-normalised covariance tensor use `X0`; `compute_ewm_sharpe`, `compute_ewm_long_short_filter`,
+`compute_one_factor_ewm_betas`, the moments of `ewm_xy_convolution` and the covariance functions
+start from zero. Before this release the vol-normalised tensor seeded its volatility with the
+full-sample mean of $x^2$, `EwmLinearModel.fit` seeded its mean adjustment with full-sample means,
+and `compute_ewm_beta_alpha_forecast` defaulted to `MEAN`, which weighted its first beta towards
+the full-sample slope through the origin.
 
 `InitType.VAR` seeds a second-moment recursion with the full-sample variance of the observations:
 in `compute_ewm_vol` and `compute_ewm_newey_west_vol` the seed is $\operatorname{Var}(\tilde x)$,
@@ -498,14 +497,18 @@ Before this release the default seed was `MEAN`, the prediction used $\hat\beta_
 $\hat\alpha_t$, and the beta moments ignored `nan_backfill`.
 
 `ewm_xy_convolution(returns, freq, signals, convolution_type)` measures lagged dependence at a
-horizon of $h$ rows, $h$ being `get_annualization_factor(freq)`: 252 for `'B'`, 12 for `'ME'`.
-The input is assumed daily, so `freq='ME'` means 12 rows, not one month. The decay is
+horizon of $h$ rows, $h$ being `get_annualization_factor(freq)` as a whole number: 252 for
+`'B'`, 52 for `'W-WED'`, 12 for `'ME'`, 4 for `'QE'`. Every frequency with a whole-number factor
+runs; one without raises `ValueError`. The input is assumed daily, so `freq='ME'` means 12 rows,
+not one month. The decay is
 $\lambda=1-2/(h+1)$ (0.2 when $h=1$). Returns are optionally divided by their `compute_ewm_vol`
 volatility at decay 0.94 lagged one row (`is_ra_returns=True`) and summed over $h$ rows,
 $R_t=\sum_{j=0}^{h-1}r_{t-j}$. `ConvolutionType.AUTO_CORR` correlates $R_{t-h}$ with $R_t$;
 `SIGNAL_CORR` and `SIGNAL_BETA` correlate or regress $R_t$ on the signal (its last value or its
-$h$-row mean) shifted by $h$ rows. The call is `compute_ewm_cross_xy` with its default seeds, so
-the denominators carry the full-sample `MEAN` seed. Overlapping $h$-row sums make consecutive
+$h$-row mean) shifted by $h$ rows. The call is `compute_ewm_cross_xy` with the zero seed of the
+cross moment and `var_init_type=InitType.ZERO` for the denominators, so every estimate is point
+in time; before this release the denominators carried the full-sample `MEAN` seed of
+`compute_ewm_cross_xy`. Overlapping $h$-row sums make consecutive
 products strongly dependent; see [serial dependence](serial_dependence.md) and
 [signal diagnostics](signal_diagnostics.md).
 

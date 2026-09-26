@@ -160,10 +160,11 @@ def compute_data_pca_r2(data: pd.DataFrame,
     explained-variance shares through time, from an EWM correlation or covariance tensor.
 
     Runs :func:`qis.compute_ewm_covar_tensor` on the rows of ``data`` as supplied, uncentred
-    (no mean removed), from a zero seed and with the kernel's default forward fill of missing
-    entries, then applies :func:`compute_pca_r2` on each sampling date. A sampling date takes the
-    last row on or before it, so every row of the output is point in time. Missing values are
-    held rather than skipped, so fill or align a ragged panel first.
+    (no mean removed), from a zero seed and with the kernel's default
+    ``NanBackfill.DEFLATED_FFILL``, then applies :func:`compute_pca_r2` on each sampling date. A
+    sampling date takes the last row on or before it, so every row of the output is point in
+    time. A missing value counts as a zero observation, which keeps every matrix positive
+    semidefinite, so align a ragged panel first when a gap means a missing price.
 
     Args:
         data: returns, rows are dates and columns are assets

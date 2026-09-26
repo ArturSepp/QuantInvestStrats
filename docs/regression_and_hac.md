@@ -85,9 +85,10 @@ Three results carry the chapter:
 | $A$ | Weighted cross-product $X^{\top}\Omega X$ | Bread of the WLS sandwich is $A^{-1}$ |
 | $G_t$ | Moving sum of $q+1$ consecutive scores | Used in the positive-semidefiniteness proof |
 | $M_t$, $C_t$, $B_t$ | EWM factor second moment ($K\times K$), cross moment ($K\times J$), loadings $M_t^{-1}C_t$ | Point in time at $t$ |
-| $\mathcal{E}_t[z]$ | EWM recursion $\lambda\mathcal{E}_{t-1}[z]+(1-\lambda)z_t$, seeded at the first row | Seed set by `InitType` |
-| $m^{y}_t$ | EWM mean $\mathcal{E}_t[y]$ seeded at $y_0$ | Point in time |
+| $\mathcal{E}_t[z]$ | EWM recursion $\lambda\mathcal{E}_{t-1}[z]+(1-\lambda)z_t$ from a seed, the state before the first finite $z_t$ | Seed set by `InitType` |
+| $m^{y}_t$ | EWM mean $\mathcal{E}_t[y]$ seeded with the first finite $y_t$ | Point in time |
 | $\eta_t$ | First-stage residual $y_t-\hat\beta_tx_t$ of the one-factor EWM fit | Periodic return units |
+| $t_0$, $t_1$, $\beta_0$ | First row with finite data; first row with a non-zero factor return; beta prior `beta_init_value` | Rows; dimensionless |
 | $a_t$, $h$ | Linear-model alpha $y_t-\sum_fB_{f,t-h}x_{f,t}$; loading lag | $h=1$ point in time, $h=0$ in sample |
 | $\mathcal{T}_t$, $n_t(s)$ | Rows up to $t$ on which $a$ and $y$ are finite; number of those rows after row $s$ | Weight $\lambda^{n_t(s)}$ in the linear-model $R^2$ |
 | $\phi$ | AR(1) coefficient of the residuals in the examples | Dimensionless |
@@ -96,8 +97,8 @@ The estimators assume that rows are consecutive observations in time order, that
 column rank, and that the regressors are exogenous, $\mathbb{E}[x_t\varepsilon_t]=0$. The HAC
 covariance also assumes weakly dependent scores whose autocovariances beyond lag $q$ are small.
 OLS and EWMA-WLS drop every row in which any variable is not finite, so two responses with
-different missing patterns are fitted on different samples. The EWM recursions instead hold their
-state across a missing value (`NanBackfill.FFILL`).
+different missing patterns are fitted on different samples. The EWM recursions of this chapter
+instead hold their state across a missing value by default (`NanBackfill.FFILL`).
 
 ## Methodology
 
@@ -470,15 +471,17 @@ The implementation adds four rules.
 
 - **Warm-up.** $B_t$ is NaN for $t\le$ `warmup_period` (default 20): the first 21 rows are
   missing.
-- **Singular and small moments.** If inverting $M_t$ fails, the diagonal inverse is used. If the
-  smallest diagonal element of $M_t$ is at most $10^{-8}$, an absolute threshold in squared return
-  units, the inverse is replaced by the identity and $B_t=C_t$, a cross moment rather than a beta.
+- **Degenerate moments.** A factor whose second moment $(M_t)_{ff}$ is not strictly positive
+  gets NaN loadings, and the other factors are solved from the reduced system. The reduced $M_t$
+  is rescaled to unit diagonal, and when its smallest eigenvalue is below $10^{-12}$ times the
+  largest, $B_t$ is NaN. The test does not depend on the units of the factors, and a loading is
+  never replaced by a cross moment or a diagonal fit.
 - **Missing values.** With `NanBackfill.FFILL` a missing factor row holds both $M_t$ and $C_t$. A
   missing response holds its column of $C_t$ while $M_t$ keeps updating.
-- **One factor.** `qis.compute_one_factor_ewm_betas(x, y, span=None, ewm_lambda=0.94)` returns the
-  $K=1$ slice as a frame, requires identical indexes and uses the fixed warm-up of 20 rows. Without
-  a span the decay 0.94 applies, the daily RiskMetrics value (J.P. Morgan and Reuters, 1996),
-  which corresponds to a span of about 32.
+- **One factor.** `qis.compute_one_factor_ewm_betas(x, y, span=None, ewm_lambda=0.94,
+  nan_backfill=NanBackfill.FFILL, warmup_period=20)` returns the $K=1$ slice as a frame and
+  requires identical indexes. Without a span the decay 0.94 applies, the daily RiskMetrics value
+  (J.P. Morgan and Reuters, 1996), which corresponds to a span of about 32.
 
 `qis.EwmLinearModel.fit(span=31, ewm_lambda=0.94, is_x_correlated=True,
 mean_adj_type=MeanAdjType.NONE, init_type=InitType.X0, warmup_period=20)` requires identical
@@ -497,47 +500,55 @@ span 26.
 #### One-factor alpha, prediction and $R^2$
 
 `qis.compute_ewm_beta_alpha_forecast(x_data, y_data, span=None, ewm_lambda=0.94,
-mean_adj_type=MeanAdjType.NONE, init_type=InitType.MEAN, beta_init_value=None, annualize=False)`
-regresses each asset on one factor (a Series broadcast to every asset, or paired columns); when
-the indexes differ, the assets are reindexed to the factor index with a forward fill. Let
-$\mathcal{E}_t$ be the qis recursion: its value at the first row is the seed, which replaces the
-first observation, and later rows follow
-$\mathcal{E}_t[z]=\lambda\mathcal{E}_{t-1}[z]+(1-\lambda)z_t$. With
-$\operatorname{clip}_{[0,1]}$ truncating to the unit interval, per asset
+mean_adj_type=MeanAdjType.NONE, init_type=InitType.X0, beta_init_value=None, annualize=False,
+nan_backfill=NanBackfill.FFILL)` regresses each asset on one factor (a Series broadcast to every
+asset, or paired columns); when the indexes differ, the assets are reindexed to the factor index
+with a forward fill. Let $\mathcal{E}_t$ be the qis recursion
+$\mathcal{E}_t[z]=\lambda\mathcal{E}_{t-1}[z]+(1-\lambda)z_t$, started from a seed that is the
+state before the first finite $z_t$; that first observation updates the seed like any later one.
+With $\operatorname{clip}_{[0,1]}$ truncating to the unit interval, per asset
 
 $$
 \begin{aligned}
 \hat\beta_t&=\frac{\mathcal{E}_t[xy]}{\mathcal{E}_t[x^2]},
 \qquad \eta_t=y_t-\hat\beta_tx_t,
 \qquad \hat\alpha_t=\mathcal{E}_t[\eta],\\
-\hat y_t&=\hat\beta_tx_t+\hat\alpha_t,
-\qquad \hat\sigma^2_{\varepsilon,t}=\mathcal{E}_t\big[(y-\hat y)^2\big],\\
+\hat y_t&=\hat\beta_{t-1}x_t+\hat\alpha_{t-1},
+\qquad \hat\sigma^2_{\varepsilon,t}=\mathcal{E}_t\big[(\eta-\hat\alpha)^2\big],\\
 R^2_t&=\operatorname{clip}_{[0,1]}\Big(1-
 \frac{\hat\sigma^2_{\varepsilon,t}}{\mathcal{E}_t\big[(y-m^{y})^2\big]}\Big).
 \end{aligned}
 $$
 
-It returns $(\hat\beta,\hat\alpha,\hat y,\mathcal{E}[x^2],\hat\sigma^2_{\varepsilon},R^2)$. The
-$R^2$ is centred: the residual is taken about the EWM alpha and $y$ about its EWM mean $m^y$,
-which is seeded at $y_0$, with the denominator seeded at zero. The first four recursions, and
-the optional demeaning under `mean_adj_type`, are seeded by `init_type`. `annualize=True`
-multiplies $\mathcal{E}[x^2]$, $\hat\sigma^2_{\varepsilon}$ and the $R^2$ denominator by
-$\mathrm{AN}$ inferred from the index, leaving $R^2$ unchanged. Beta is NaN where
-$\mathcal{E}_t[x^2]$ is within $10^{-8}$ of zero. `beta_init_value` replaces the first finite,
-non-zero factor observation by a one-observation prior, so the first finite beta equals the
-prior. The two moment recursions always carry a missing value forward (`NanBackfill.FFILL`); the
-`nan_backfill` argument reaches only the demeaning, alpha, residual and $R^2$ recursions.
+It returns $(\hat\beta,\hat\alpha,\hat y,\mathcal{E}[x^2],\hat\sigma^2_{\varepsilon},R^2)$, the
+factor second moment labelled with the asset columns. The prediction $\hat y_t$ is the
+one-step-ahead forecast: the beta and alpha estimated through $t-1$, applied to the factor return
+at $t$; it is missing on the first row. The residual variance and $R^2$ are in-sample
+diagnostics of the fitted residual $\eta_t-\hat\alpha_t$, which uses row $t$. The $R^2$ is
+centred: the residual is taken about the EWM alpha and $y$ about its EWM mean $m^y$, with the
+denominator seeded at zero. The moment, alpha and residual-variance recursions, and the optional
+demeaning under `mean_adj_type`, are seeded by `init_type` (`InitType.VAR` reads as `MEAN` for
+the means). `annualize=True` multiplies $\mathcal{E}[x^2]$, $\hat\sigma^2_{\varepsilon}$ and the
+$R^2$ denominator by $\mathrm{AN}$ inferred from the index, leaving $R^2$ unchanged. Beta is NaN
+where $\mathcal{E}_t[x^2]$ is not strictly positive, a test that does not depend on the units of
+the data. `beta_init_value` $=\beta_0$ is a one-observation prior on row $t_1$, the first with a
+finite, non-zero factor return: it seeds both moments and replaces the pair $(x_{t_1},y_{t_1})$
+by $(x_{t_1},\beta_0x_{t_1})$, so the first finite beta equals $\beta_0$, which keeps weight
+$\lambda^{t-t_1}$ in both moments at row $t$. Every recursion, the two moments included, follows
+`nan_backfill`.
 
-Two properties of the defaults matter:
+Two properties matter:
 
-- **The default seed looks ahead.** With `InitType.MEAN`, $\mathcal{E}_0[xy]$ and
-  $\mathcal{E}_0[x^2]$ are full-sample means, so $\hat\beta_0=\sum_tx_ty_t/\sum_tx_t^2$ is the
-  full-sample slope through the origin. Its weight decays like $\lambda^t$ but is present at
-  every date, and the residual-mean and variance seeds are full-sample means too. `InitType.X0` is point in
-  time and gives $\hat\beta_0=y_0/x_0$.
-- **The "forecast" is a fitted value.** $\hat\beta_t$ and $\hat\alpha_t$ both use row $t$. An
-  ex-ante prediction of $y_t$ is $\hat\beta_{t-1}x_t+\hat\alpha_{t-1}$, which the caller forms by
-  lagging the outputs.
+- **The default seed is point in time.** With `InitType.X0` each moment starts at its first
+  observation, so $\hat\beta_{t_0}=y_{t_0}/x_{t_0}$ on the first finite row $t_0$ and no output
+  uses a later row. `InitType.MEAN`, the default until the handbook follow-up, seeds
+  $\mathcal{E}[xy]$ and $\mathcal{E}[x^2]$ with full-sample means. The seed keeps weight
+  $\lambda^{t-t_0+1}$ at row $t$, so the first beta mixes the full-sample slope through the origin
+  with the first observation, and the residual-mean and variance seeds are full-sample means too.
+- **The prediction is a forecast; beta and alpha are not.** $\hat y_t$ uses $y$ only up to
+  $t-1$, whereas $\hat\beta_t$ and $\hat\alpha_t$ both use row $t$: an exposure applied to row
+  $t$ must be lagged by one period. Until the handbook follow-up the prediction was the same-date
+  fitted value $\hat\beta_tx_t+\hat\alpha_t$.
 
 #### Alpha and $R^2$ given a prediction
 
@@ -551,8 +562,8 @@ R^2_t=\operatorname{clip}_{[0,1]}\Big(1-
 \frac{\mathcal{E}_t\big[(y-\hat y-\hat\alpha)^2\big]}{\mathcal{E}_t\big[(y-m^{y})^2\big]}\Big),
 $$
 
-with the alpha seeded at its first-row value (`InitType.X0`, zero when that row is missing) and
-both variances seeded at zero.
+with the alpha seeded with the first finite residual (`InitType.X0`) and both variances seeded
+at zero.
 It is point in time whenever $\hat y$ is, for example the lag-one explained return of a
 `LinearModel`.
 
@@ -585,11 +596,12 @@ in-sample loadings; `lag=1` gives the point-in-time ratio. Until the handbook fo
 numerator started from a zero seed after the warm-up while the denominator had run since the
 first row, which pushed the first values after the warm-up towards one.
 
-> **Pitfall.** Three defaults leak or overstate. `InitType.MEAN`, the default seed of
-> `compute_ewm_beta_alpha_forecast`, uses full-sample means. The prediction of
-> `compute_ewm_beta_alpha_forecast` uses the same row it predicts. `get_model_ewm_r2` defaults to
-> in-sample loadings. For backtests, pass `init_type=InitType.X0`, lag betas and alphas by one
-> period, and use `lag=1`. `EwmLinearModel.fit` seeds its demeaning with `InitType.X0` by default.
+> **Pitfall.** Two defaults are in sample. The beta and alpha of
+> `compute_ewm_beta_alpha_forecast` use the row they are dated, and `get_model_ewm_r2` defaults
+> to lag-zero loadings. For backtests, lag betas and alphas by one period, as the returned
+> prediction does, and use `lag=1`. Keep the point-in-time `InitType.X0` seed, the default of
+> both `compute_ewm_beta_alpha_forecast` and `EwmLinearModel.fit`: `InitType.MEAN` uses
+> full-sample means.
 
 > **Insight.** A point-in-time EWM beta is an endpoint EWMA-WLS slope without the intercept. The
 > last row of `compute_one_factor_ewm_betas` equals the slope of
@@ -882,30 +894,36 @@ np.testing.assert_allclose(one_factor.iloc[-1], (omega * x_b) @ y_a / (omega @ x
 assert round(one_factor['SEQ_EU'].iloc[-1], 3) == 1.037 and round(wls.beta['Core'], 3) == 1.026
 ```
 
-### Look-ahead in the default seed
+### Look-ahead in a full-sample seed
 
-With the default `InitType.MEAN`, the first beta of `compute_ewm_beta_alpha_forecast` is the
-full-sample slope through the origin, 1.289 for `SEQ_EU`, although only one month has been
-observed. Adding 10% to the final month's returns moves that first beta by about 0.0002. With
+With `init_type=InitType.MEAN`, the default until the handbook follow-up, the moments of
+`compute_ewm_beta_alpha_forecast` start from full-sample means. The seed keeps weight $\lambda$
+at the first row, so the first beta of `SEQ_EU`, 1.362, is a weighted ratio of the full-sample
+slope through the origin, 1.289, and the first month, although only one month has been observed.
+Adding 10% to the final month's returns moves that first beta by about 0.00019. With the default
 `InitType.X0` every beta before the final month is unchanged, and the first beta is $y_0/x_0$.
 
 ```python
 from qis import InitType
 
-beta_mean = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=assets, span=36)[0]
+beta_mean = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=assets, span=36,
+                                                init_type=InitType.MEAN)[0]
 bumped = assets.copy()
 bumped.iloc[-1] = bumped.iloc[-1] + 0.10
-beta_mean_bumped = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=bumped,
-                                                       span=36)[0]
-np.testing.assert_allclose(beta_mean.iloc[0], x_b @ y_a / (x_b @ x_b), rtol=1e-8)
-assert round(beta_mean['SEQ_EU'].iloc[0], 3) == 1.289
-np.testing.assert_allclose((beta_mean.iloc[0] - beta_mean_bumped.iloc[0]).abs(), 0.0002,
-                           atol=1e-5)
+beta_mean_bumped = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=bumped, span=36,
+                                                       init_type=InitType.MEAN)[0]
+# the full-sample mean seeds keep weight lambda and the first observation enters with 1 - lambda
+lam36 = 1.0 - 2.0 / 37.0
+seeded = ((lam36 * (x_b @ y_a) / len(x_b) + (1.0 - lam36) * x_b[0] * y_a[0])
+          / (lam36 * (x_b @ x_b) / len(x_b) + (1.0 - lam36) * x_b[0] ** 2))
+np.testing.assert_allclose(beta_mean.iloc[0], seeded, rtol=1e-8)
+assert round(x_b @ y_a[:, 0] / (x_b @ x_b), 3) == 1.289
+assert round(beta_mean['SEQ_EU'].iloc[0], 3) == 1.362
+np.testing.assert_allclose((beta_mean.iloc[0] - beta_mean_bumped.iloc[0]).abs(), 0.00019,
+                           atol=5e-6)
 
-beta_x0 = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=assets, span=36,
-                                              init_type=InitType.X0)[0]
-beta_x0_bumped = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=bumped, span=36,
-                                                     init_type=InitType.X0)[0]
+beta_x0 = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=assets, span=36)[0]
+beta_x0_bumped = qis.compute_ewm_beta_alpha_forecast(x_data=bench_m, y_data=bumped, span=36)[0]
 np.testing.assert_array_equal(beta_x0.iloc[:-1], beta_x0_bumped.iloc[:-1])
 np.testing.assert_allclose(beta_x0.iloc[0], y_a[0] / x_b[0], rtol=1e-12)
 ```
@@ -914,9 +932,9 @@ np.testing.assert_allclose(beta_x0.iloc[0], y_a[0] / x_b[0], rtol=1e-12)
 
 The last block reproduces the two $R^2$ definitions independently. The uncentred
 `get_model_ewm_r2` is a ratio of two geometrically weighted sums over the same rows, computed here
-by direct summation. For the centred $R^2$, a loop mirrors the qis recursion: the seed replaces
-the first row, and a series that starts missing starts from a zero seed at its first finite
-value. The in-sample `get_model_ewm_r2` is 0.750 for `SEQ_EU` in November 2007, the first month
+by direct summation. For the centred $R^2$, a loop mirrors the qis recursion: the seed is the
+state before a column's first finite value, which then updates it, and the alpha is seeded with
+the first finite residual (`InitType.X0`). The in-sample `get_model_ewm_r2` is 0.750 for `SEQ_EU` in November 2007, the first month
 after the warm-up, where it is the single-month ratio $1-a^2/y^2$, and 0.512 in December 2025.
 Before the handbook follow-up the misaligned seeds reported 0.999 in November 2007. The centred
 $R^2$ of the lag-one, point-in-time prediction from `compute_ewm_alpha_r2_given_prediction` is
@@ -931,16 +949,18 @@ def ewm_path(values, seeds, decay):
         for t in range(values.shape[0]):
             value = values[t, j]
             if np.isnan(state):
-                if np.isfinite(value):
-                    state = seeds[j] if t == 0 else decay * seeds[j] + (1 - decay) * value
+                if np.isfinite(value):  # the seed is the state before the first value
+                    state = decay * seeds[j] + (1 - decay) * value
             elif np.isfinite(value):
                 state = decay * state + (1 - decay) * value
             out[t, j] = state
     return out
 
 
-def first_row_seed(values):
-    return np.where(np.isfinite(values[0]), values[0], 0.0)
+def first_finite_seed(values):
+    """InitType.X0: the first finite value of each column."""
+    first = np.argmax(np.isfinite(values), axis=0)
+    return values[first, np.arange(values.shape[1])]
 
 
 # uncentred, in-sample R2 of LinearModel: weighted sums over the same rows
@@ -964,7 +984,7 @@ alpha_oos, r2_oos = qis.compute_ewm_alpha_r2_given_prediction(y_data=assets,
                                                               y_prediction=explained_lag1,
                                                               span=36)
 resid_1 = y_a - explained_lag1.to_numpy()
-alpha_path = ewm_path(resid_1, first_row_seed(resid_1), lam)
+alpha_path = ewm_path(resid_1, first_finite_seed(resid_1), lam)
 resid_var = ewm_path((resid_1 - alpha_path) ** 2, np.zeros(3), lam)
 y_var = ewm_path((y_a - ewm_path(y_a, y_a[0], lam)) ** 2, np.zeros(3), lam)
 np.testing.assert_allclose(alpha_oos, alpha_path, rtol=1e-9)
@@ -983,10 +1003,10 @@ assert round(r2_oos['SEQ_EU'].iloc[-1], 3) == 0.410
 | Lag rule | $\lfloor 4(T/100)^{2/9}\rfloor$ | internal `qis.utils.regression.newey_west_lag_rule(nobs)` |
 | Geometric WLS with stacked HAC | $(X^{\top}\Omega X)^{-1}X^{\top}\Omega y$, $\hat\Sigma_{\Theta}$, $T_{\mathrm{eff}}$ | `qis.estimate_ewma_alpha_beta_hac(x, y, span=36.0, hac_lags=3, confidence_level=0.95)`, returns `qis.EwmaAlphaBetaHacResult` |
 | Legend annualisation | $\mathrm{AN}\,\hat\alpha$ | internal `qis.utils.regression.reg_model_params_to_str(..., alpha_an_factor=None)`, via `qis.plot_scatter` |
-| EWM loadings tensor | $B_t=M_t^{-1}C_t$ | `qis.compute_ewm_xy_beta_tensor(x, y, span=None, ewm_lambda=0.94, warmup_period=20, is_x_correlated=True)` |
-| One-factor EWM betas | $\mathcal{E}_t[xy]/\mathcal{E}_t[x^2]$, zero seeds | `qis.compute_one_factor_ewm_betas(x, y, span=None, ewm_lambda=0.94)` |
+| EWM loadings tensor | $B_t=M_t^{-1}C_t$, NaN where singular | `qis.compute_ewm_xy_beta_tensor(x, y, span=None, ewm_lambda=0.94, warmup_period=20, is_x_correlated=True)` |
+| One-factor EWM betas | $\mathcal{E}_t[xy]/\mathcal{E}_t[x^2]$, zero seeds | `qis.compute_one_factor_ewm_betas(x, y, span=None, ewm_lambda=0.94, warmup_period=20)` |
 | Linear model loadings | $B_t$ per factor | `qis.EwmLinearModel.fit(span=31, is_x_correlated=True, init_type=InitType.X0, warmup_period=20)`; `qis.estimate_ewm_factor_model` |
-| One-factor EWM alpha, prediction, $R^2$ | centred, seeds from `init_type` | `qis.compute_ewm_beta_alpha_forecast(..., init_type=InitType.MEAN)` |
+| One-factor EWM alpha, forecast, $R^2$ | $\hat y_t=\hat\beta_{t-1}x_t+\hat\alpha_{t-1}$; centred $R^2$; seeds from `init_type` | `qis.compute_ewm_beta_alpha_forecast(..., init_type=InitType.X0)` |
 | EWM alpha and $R^2$ of a prediction | centred, X0 and zero seeds | `qis.compute_ewm_alpha_r2_given_prediction` |
 | Linear-model alpha | $y_t-\sum_fB_{f,t-h}x_{f,t}$ | `qis.LinearModel.get_factor_alpha(lag=1, span=None)` |
 | Linear-model $R^2$ | $1-\sum\lambda^{n_t(s)}a_s^2/\sum\lambda^{n_t(s)}y_s^2$ on common rows, uncentred | `qis.LinearModel.get_model_ewm_r2(span=52, lag=0)` |
@@ -1030,10 +1050,11 @@ API pages: {doc}`fit_multivariate_ols <api/generated/qis.fit_multivariate_ols>`,
 - **Failure modes differ by helper.** `estimate_ols_alpha_beta` warns and returns NaN when a fit
   fails or is not identified, so a table shows a missing value; the HAC helpers raise
   `ValueError`.
-- **Units matter for EWM betas.** `compute_ewm_xy_beta_tensor` replaces the inverse by the
-  identity when a factor's EWM second moment is at most $10^{-8}$, which returns a cross moment
-  for very low-volatility factors; `compute_ewm_beta_alpha_forecast` returns NaN in the same
-  regime. Scale such series before regressing.
+- **Degenerate EWM betas are missing, not replaced.** `compute_ewm_xy_beta_tensor` and
+  `compute_ewm_beta_alpha_forecast` give NaN for a factor with no variance and, in the tensor,
+  for a numerically singular system; their tests are scale free, so a low-volatility factor needs
+  no rescaling. Before the handbook follow-up the tensor replaced the inverse by the identity
+  below an absolute $10^{-8}$ and reported a cross moment as a beta.
 - **Uncentred and centred $R^2$ differ.** `get_model_ewm_r2` is uncentred and in sample by
   default, and it is noisy for about one span after the warm-up, when few rows enter it; the $R^2$
   of `compute_ewm_beta_alpha_forecast` and `compute_ewm_alpha_r2_given_prediction` is centred. Do

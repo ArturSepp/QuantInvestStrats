@@ -30,7 +30,7 @@ sub-questions, and their numbers need not agree.
 |---|---|---|
 | Full-sample alpha, beta, $R^2$ and alpha p-value against a benchmark | `qis.compute_ra_perf_table_with_benchmark` | `PerfStat.ALPHA`, `ALPHA_AN`, `BETA`, `R2`, `ALPHA_PVALUE` columns |
 | Whole-sample tracking error and information ratio of active returns | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` | TE and IR per column |
-| Time-varying one-factor beta and alpha of return series | `qis.compute_ewm_beta_alpha_forecast` | EWMA beta, alpha, prediction and $R^2$ frames |
+| Time-varying one-factor beta and alpha of return series | `qis.compute_ewm_beta_alpha_forecast` | EWMA beta, alpha, one-step-ahead prediction and $R^2$ frames |
 | Holdings-based portfolio beta to one or several benchmarks | `qis.compute_portfolio_ewm_benchmark_betas`, `PortfolioData.compute_portfolio_benchmark_betas` | Portfolio beta per benchmark and date |
 | Each period's return split into benchmark contributions and a residual | `qis.compute_portfolio_benchmark_ewm_beta_alpha_attribution`, `qis.compute_benchmarks_beta_attribution_from_prices`, `qis.compute_benchmarks_beta_attribution_from_returns`, `PortfolioData.compute_portfolio_benchmark_attribution` | Additive contributions plus an `Alpha` column |
 
@@ -290,11 +290,11 @@ Other degenerate cases:
 
 - Fewer than two joint observations: `ALPHA`, `BETA`, `R2` and `ALPHA_PVALUE` are missing.
 - Exactly two: a perfect fit with $R^2=1$ and a missing p-value.
-- An exception inside the fit: a warning and `(0, 0, 0, 0)`. The p-value of 0 reads as highly
-  significant; check the warning log before trusting a zero row.
-- A benchmark with zero returns over the sample: beta 0 and alpha equal to the mean return.
-- A benchmark whose sampled returns are all equal and non-zero currently raises `IndexError`:
-  statsmodels treats the regressor as the constant and returns a single coefficient.
+- A benchmark whose sampled returns do not vary, zero returns included, leaves alpha and beta
+  unidentified: qis warns and the four statistics are missing. An exception inside the fit gives
+  the same warning and missing values, so a zero in the table is an estimate, never a failed
+  fit. Until the handbook follow-up a failed fit returned `(0, 0, 0, 0)`, a zero-return
+  benchmark gave beta 0, and a constant non-zero benchmark raised `IndexError`.
 
 ### Active return, tracking error and information ratio
 
@@ -377,14 +377,16 @@ set of one-benchmark betas.
 
 Implementation details of `qis.compute_portfolio_ewm_benchmark_betas`:
 
-- The means start from zero at the first finite return (`InitType.X0` with a missing first
-  return); $C$ and $V$ start from zero. The normalisation $1-\lambda^{t}$ is common to $C$ and
-  $V$ and cancels in the ratio.
+- The means are seeded with the first finite return (`InitType.X0`), so the first centred
+  return is zero; $C$ and $\Gamma$ start from zero. The normalisation $1-\lambda^{t}$ is common
+  to $C$ and $\Gamma$ and cancels in the ratio.
 - Because $m_t$ includes $\ell_t$, $\check\ell_t=\lambda(\ell_t-m_{t-1})$. The factor $\lambda^2$
   cancels between $C$ and $V$, so the beta equals the one demeaned by the previous EWMA mean.
 - Betas are missing on the first 21 dates of the grid, the start date and the first 20 returns
-  (warm-up, `warmup_period=20`). A singular $\Gamma_t$ falls back to its diagonal; a missing return
-  carries both moments forward.
+  (warm-up, `warmup_period=20`). A benchmark with no centred variance gets a missing beta and the
+  others come from the reduced system; a numerically singular $\Gamma_t$, whose unit-diagonal
+  rescaling has an eigenvalue ratio below $10^{-12}$, gives missing betas. There is no diagonal
+  fall-back. A missing return carries both moments forward.
 - $\beta_{i,t}$ uses returns up to and including $t$ and is known at the close of $t$.
 
 **Proposition (portfolio beta).** qis reports
@@ -426,12 +428,14 @@ $$
 $$
 
 where $\mathrm{EWM}_t$ is the recursion $m_t=\lambda m_{t-1}+(1-\lambda)z_t$ applied to the
-bracketed series $z_t$. The residual inside $\alpha_{i,t}$ uses the same-date beta, and the
-returned prediction $\beta_{i,t}r_{b,t}+\alpha_{i,t}$ uses $r_{i,t}$ through both terms; it is a
-fit, not a forecast, unless the caller shifts it. The default `init_type=InitType.MEAN` seeds
-the recursions with full-sample means, so early values depend on later data. Use
-`InitType.X0` or `beta_init_value` for a point-in-time path, and shift the beta by one period
-before applying it, as the model-layer attribution does
+bracketed series $z_t$. The residual inside $\alpha_{i,t}$ uses the same-date beta, so
+$\beta_{i,t}$ and $\alpha_{i,t}$ use $r_{i,t}$. The returned prediction is the one-step-ahead
+forecast $\beta_{i,t-1}r_{b,t}+\alpha_{i,t-1}$: it uses the benchmark return at $t$ but asset
+returns only up to $t-1$, and it is missing on the first row. The default
+`init_type=InitType.X0` seeds every recursion with its first observation, so every output is point
+in time; `InitType.MEAN`, the default until the handbook follow-up, seeds with full-sample means,
+so early values depend on later data. A beta used as an exposure is still shifted by one period
+before it is applied, as the model-layer attribution does
 ([Model-layer attribution](model_layer_attribution.md)).
 
 ### Beta attribution of returns
@@ -630,9 +634,9 @@ lam = 1.0 - 2.0 / (span + 1.0)
 
 
 def ewm_beta(y, x, warmup=20):
-    """EWMA-demeaned beta of y on x; the recursions start from zero."""
+    """EWMA-demeaned beta of y on x: X0 means, moments from zero."""
     beta = np.full(len(x), np.nan)
-    m_x = m_y = c = v = 0.0
+    m_x, m_y, c, v = x[1], y[1], 0.0, 0.0  # the means start at the first return
     for t in range(1, len(x)):
         m_x = lam * m_x + (1.0 - lam) * x[t]
         m_y = lam * m_y + (1.0 - lam) * y[t]
@@ -710,7 +714,7 @@ Defaults verified with `inspect.signature`:
 | `qis.compute_portfolio_benchmark_ewm_beta_alpha_attribution` | `freq_beta=None`, `factor_beta_span=63`, `residual_name='Alpha'` |
 | `PortfolioData.compute_portfolio_benchmark_betas` | `freq_beta='B'`, `factor_beta_span=63` |
 | `PortfolioData.compute_portfolio_benchmark_attribution` | `freq_beta='B'`, `factor_beta_span=63` |
-| `qis.compute_ewm_beta_alpha_forecast` | `span=None`, `ewm_lambda=0.94`, `mean_adj_type=MeanAdjType.NONE`, `init_type=InitType.MEAN`, `beta_init_value=None`, `annualize=False` |
+| `qis.compute_ewm_beta_alpha_forecast` | `span=None`, `ewm_lambda=0.94`, `mean_adj_type=MeanAdjType.NONE`, `init_type=InitType.X0`, `beta_init_value=None`, `annualize=False`, `nan_backfill=NanBackfill.FFILL` |
 
 Both `PortfolioData` methods default to business-day betas with span 63, so a beta chart and an
 attribution chart drawn with their defaults describe the same betas. The strategy factsheet

@@ -336,11 +336,14 @@ are in [Exponentially weighted estimators](ewm_estimators.md). Three consequence
    $(M_{fr,t})_{qi}/(M_{ff,t})_{qq}$ on each factor. In the noise-free case this is
    $\operatorname{diag}(M_{ff,t})^{-1}M_{ff,t}B^{\top}$, which equals $B^{\top}$ only when the
    weighted factor sample is orthogonal. Otherwise it carries omitted-variable bias.
-3. **Numerical fall-backs.** A singular $M_{ff,t}$ is inverted on its diagonal. If the smallest
-   diagonal element of $M_{ff,t}$ is at most $10^{-8}$, qis replaces the inverse by the identity,
-   so the reported value is the cross moment $M_{fr,t}$ itself, not a slope. On decimal returns
-   this triggers only for a factor with a per-period volatility near $10^{-4}$ or below. Missing
-   values hold the previous moment element by element.
+3. **Degenerate moments give NaN.** A factor whose second moment $(M_{ff,t})_{qq}$ is not
+   strictly positive, for example before its first non-zero return, gets NaN loadings, and the
+   other factors are solved from the reduced system. The reduced matrix is rescaled to unit
+   diagonal, and when its smallest eigenvalue is below $10^{-12}$ times the largest every loading
+   dated $t$ is NaN. The test is scale free: rescaling a factor, even to a per-period volatility
+   of $10^{-5}$, rescales its loadings inversely and changes nothing else. A loading is never
+   replaced by a cross moment or by a diagonal fit. Missing values hold the previous moment
+   element by element.
 
 `mean_adj_type` chooses the regression. `MeanAdjType.NONE`, the default, regresses through the
 origin on moments about zero. `MeanAdjType.EWMA` and `MeanAdjType.EXPANDING` first subtract a
@@ -349,9 +352,10 @@ that EWM mean and has no effect under `NONE`. Its default, `InitType.X0`, seeds 
 observation, so every loading dated $t$ uses returns up to $t$ only. The demeaned panels serve the
 moments only: the model's `x` and `y` keep the returns as supplied. `InitType.MEAN`, the default
 until the handbook follow-up and still available, seeds with the full-sample mean and so leaks
-later data into early estimates with weight $\lambda^t$, about 0.26 at the first reported loading
-for span 31 ($\lambda^{21}$). On monthly synthetic returns with span 36 the two seeds differed by
-up to 0.28 in beta at the first reported loading and by less than 0.01 three spans later.
+later data into the mean at position $t$ with weight $\lambda^{t+1}$, about 0.24 at the first
+reported loading for span 31 ($\lambda^{22}$). On monthly synthetic returns with span 36 the two
+seeds differ by up to 0.26 in beta at the first reported loading and by less than 0.01 three
+spans later.
 
 `estimate_ewm_factor_model(asset_prices, factor_prices, freq='W-WED', span=26,
 mean_adj_type=MeanAdjType.NONE)` is the price-level entry point. It forms log returns on the

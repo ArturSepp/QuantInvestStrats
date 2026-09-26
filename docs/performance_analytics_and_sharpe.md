@@ -361,9 +361,9 @@ present. Over a full-sample window it equals `SHARPE_LOG_AN` times
 $\frac{e^{\bar\ell}-1}{\bar\ell}\cdot\frac{\mathrm{AN}\,Y}{T}\approx 1+\bar\ell/2$, a fourth
 formula that agrees with the log column to a fraction of a percent on monthly data.
 
-**EWM ratios.** With decay $\lambda=1-2/(N+1)$ for span $N$, missing returns set to zero, and
-initial state $\hat\mu_0=\hat\sigma^2_{1,0}=\hat\sigma^2_{2,0}=0$ at the first row, whose
-return is not used,
+**EWM ratios.** With decay $\lambda=1-2/(N+1)$ for span $N$, missing returns set to zero, and a
+zero state $\hat\mu=\hat\sigma^2_1=\hat\sigma^2_2=0$ before the first row, whose return then
+enters with weight $1-\lambda$ like any later one,
 
 $$
 \begin{aligned}
@@ -799,12 +799,12 @@ assert np.isclose(rolling_full, 0.495, atol=5e-4)
 factor = np.expm1(log_r.mean()) / log_r.mean() * 12.0 * years / num_returns
 assert np.isclose(rolling_full, factor * column(qis.PerfStat.SHARPE_LOG_AN), rtol=1e-12)
 
-# EWM Sharpe ratio, norm_type=2: recursions from a zero state; the first return is not used
+# EWM Sharpe ratio, norm_type=2: the zero state precedes the first row, which enters as zero
 log_monthly = qis.to_returns(prices=gold, freq='ME', is_log_returns=True)  # first row is NaN
 ewm_sharpe = qis.compute_ewm_sharpe(returns=log_monthly.to_frame(), span=36, norm_type=2)
 lam = 1.0 - 2.0 / (36.0 + 1.0)
 ewm_mean = ewm_var = 0.0
-for x_t in np.nan_to_num(log_monthly.to_numpy())[1:]:
+for x_t in np.nan_to_num(log_monthly.to_numpy()):
     ewm_mean = lam * ewm_mean + (1.0 - lam) * x_t
     ewm_var = lam * ewm_var + (1.0 - lam) * (x_t - ewm_mean) ** 2
 assert np.isclose(ewm_sharpe.iloc[-1, 0], np.sqrt(12.0) * ewm_mean / np.sqrt(ewm_var),

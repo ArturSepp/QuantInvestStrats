@@ -35,7 +35,7 @@ Three questions separate the estimators, and the qis functions answer them diffe
 | Common-sample covariance or correlation | `compute_masked_covar_corr` on a panel without NaN | Sample mean | Yes | No: full sample |
 | Pairwise-complete covariance or correlation | `compute_masked_covar_corr` on a panel with NaN | Overlap means of each pair | Not guaranteed | No: full sample |
 | EWM covariance on rebalancing dates | `estimate_rolling_ewma_covar` | Previous date's EWM mean, with an $N/(N+1)$ rescaling | Yes | Yes |
-| Uncentred EWM correlation paths | `compute_ewm_corr_df`, `compute_ewm_corr_single`, `compute_data_pca_r2` | None | Yes, on gap-free input | Yes |
+| Uncentred EWM correlation paths | `compute_ewm_corr_df`, `compute_ewm_corr_single`, `compute_data_pca_r2` | None | Yes | Yes |
 
 The spectral layer works on any symmetric matrix: `apply_pca` and `compute_pca_r2` for eigenvalues
 and explained-variance shares, `compute_eigen_portfolio_weights` for unit-variance principal
@@ -227,9 +227,9 @@ this section states how the function uses them.
 2. **Demeaning.** With `demean=True`, the residual is the one-step forecast error
    $e_t=x_t-m_{t-1}$ against the EWM mean of the previous date,
    $m_t=\lambda m_{t-1}+(1-\lambda)x_t$, with $\lambda=1-2/(N+1)$ and $N$ = `span` in units of
-   `returns_freq`. The mean is seeded with the first row of returns, so the first residual is
-   zero; for an asset whose returns start later the previous mean is zero, so its first residual
-   is its first return. With `demean=False`, $e_t=x_t$: the second moment about zero.
+   `returns_freq`. The mean is seeded with each asset's first return (`InitType.X0`), so every
+   asset's first residual is zero, whether its returns start on the first row or later. With
+   `demean=False`, $e_t=x_t$: the second moment about zero.
 3. **Recursion.** Starting from $\hat\Sigma_0=0$,
 
    $$
@@ -251,8 +251,11 @@ this section states how the function uses them.
 The option `is_apply_vol_normalised_returns=True` rebuilds the matrix as
 $\operatorname{diag}(\tilde\sigma_t)\,\tilde\rho_t\operatorname{diag}(\tilde\sigma_t)$, where
 $\tilde\sigma_t$ is the EWM volatility of $\sqrt{c_N}\,e_t$ and $\tilde\rho_t$ the EWM correlation
-of $e_{i,t}/\tilde\sigma_{i,t}$. That volatility recursion is seeded with the full-sample mean of
-its squared input, a look-ahead that decays like $\lambda^t$.
+of $e_{i,t}/\tilde\sigma_{i,t}$. That volatility recursion is seeded, point in time, with each
+asset's first squared input (`InitType.X0`). Under `demean=True` that input is the zero first
+residual, so $\tilde\sigma$ starts at zero and the entries of an asset are missing on its first
+return date. Until the handbook follow-up the seed was the full-sample mean of the squared input,
+a look-ahead.
 
 **Identity (the EWM mean includes the current return).**
 $x_t-m_t=\lambda\,(x_t-m_{t-1})$.
@@ -304,17 +307,23 @@ that starts $K$ returns later has $\hat\Sigma_{ij}$ and $\hat\Sigma_{jj}$ scaled
 $1-\lambda^{K}$ while $\hat\Sigma_{ii}$ is not, which biases $\hat\rho_{ij}$ towards zero by
 $\sqrt{1-\lambda^{K}}$.
 
-**Proposition (the EWM covariance is PSD).** Under `ZERO_FILL`, $\hat\Sigma_t$ is PSD at every $t$.
+**Proposition (the EWM covariance is PSD).** Under `ZERO_FILL` and under `DEFLATED_FFILL`,
+$\hat\Sigma_t$ is PSD at every $t$.
 
 **Proof.** Without missing values $\hat\Sigma_t$ is a positive combination of the PSD matrices
 $e_se_s^{\top}$. When some assets are missing at $t$, let $\tilde e_t$ be $e_t$ with those
-entries set to zero and $P$ the diagonal projector that zeroes them; the update is
+entries set to zero and $P$ the diagonal projector that zeroes them. Under `DEFLATED_FFILL` the
+update is $\lambda\hat\Sigma_{t-1}+(1-\lambda)\tilde e_t\tilde e_t^{\top}$, a positive
+combination of PSD matrices; under `ZERO_FILL` it is
 $P\big(\lambda\hat\Sigma_{t-1}+(1-\lambda)\tilde e_t\tilde e_t^{\top}\big)P$, a congruence of a
 PSD matrix. $\square$
 
-The default policy of the lower-level kernel `compute_ewm_covar_tensor` is `NanBackfill.FFILL`,
-which holds the entries of a missing asset while the others update. Like the pairwise estimator,
-it mixes entries of different ages and can lose PSD; it is safe only on gap-free input.
+The default policy of the lower-level kernels `compute_ewm_covar` and `compute_ewm_covar_tensor`
+is `NanBackfill.DEFLATED_FFILL`: a missing return counts as a zero return, so the entries of a
+missing asset decay by $\lambda$ and every matrix stays PSD. `NanBackfill.FFILL`, the default
+until the handbook follow-up, holds those entries while the others update. Like the pairwise
+estimator it mixes entries of different ages and can lose PSD, so it is safe only on gap-free
+input.
 
 > **Pitfall.** Without a `time_period`, `estimate_rolling_ewma_covar` returns a matrix for every
 > rebalancing date from the first one, and the recursion starts from zero. With the default span
@@ -409,7 +418,7 @@ inside a repeated eigenvalue is not unique at all.
 
 `compute_data_pca_r2` applies `compute_pca_r2` through time to the uncentred EWM correlation
 tensor (`is_corr=True`) or second-moment tensor (`is_corr=False`) with decay `ewm_lambda`, zero
-seed and forward fill. It samples the dates of `time_period.to_pd_datetime_index(freq)`, whole
+seed and the PSD-safe `DEFLATED_FFILL` policy. It samples the dates of `time_period.to_pd_datetime_index(freq)`, whole
 data span by default, taking the last row on or before each date, so each row is point in time.
 
 > **Insight.** PCA of a covariance matrix ranks directions by variance and is dominated by the
@@ -852,9 +861,12 @@ API reference:
 - The EWM covariance starts from zero, and when demeaned it is rescaled by $c_N$ to be unbiased
   for iid returns. Both factors cancel in correlations of assets with a common start; a late
   starter's correlations are biased towards zero until $\lambda^{K}$ is small.
-- On return panels with gaps, `compute_ewm_corr_df` and `compute_data_pca_r2` hold stale entries
-  under the default forward fill and can produce correlations outside $[-1,1]$. Fill or align the
-  panel first; `qis.to_returns` forward-fills prices by default.
+- On return panels with gaps, `compute_ewm_corr_df` and `compute_data_pca_r2` treat a missing
+  return as a zero return, which keeps every matrix PSD but pulls the correlations of an asset
+  with gaps towards zero, and those of a delisted asset decay to zero. Under `NanBackfill.FFILL`,
+  the default until the handbook follow-up, they held stale entries and could produce
+  correlations outside $[-1,1]$. Align the panel first when a gap means a missing price rather
+  than a zero return; `qis.to_returns` forward-fills prices by default.
 - `estimate_rolling_ewma_covar` estimates on log returns. Portfolio variance $w^{\top}\Sigma w$
   with capital weights is exact for a covariance of simple returns; with log returns it is an
   approximation whose error is of higher order in the per-period volatility.

@@ -56,6 +56,7 @@ observation.
 | $r_t$ / `returns` | Return over $(t-1,t]$ | Decimal per period |
 | $\lambda$, $N$ / `ewm_lambda`, `span` | Decay and span of the volatility EWM | $\lambda=1-2/(N+1)$; default $\lambda=0.94$, so $N\approx 32.3$ |
 | $\hat\sigma_t$ | EWM volatility from returns through $t$ | Per period |
+| $t_0$, $v_0$ / `init_value` | First row with a finite return; optional variance prior, the state before $t_0$ | Row; squared per-period units |
 | $\sigma_{t\mid t-1}$ | True conditional volatility of $r_t$ given information through $t-1$ | Per period |
 | $\mathcal{F}_{t}$ | Information available at $t$ | |
 | $\sigma_{\mathrm{tgt}}$ / `vol_target` | Volatility target | Per period; `None` means 1 |
@@ -93,7 +94,7 @@ code assumes nothing: it applies the recursions to whatever rows it receives.
 
 ### EWM volatility inside the normalisation
 
-**Definition.** Let $t_0$ be the first row of the input. `compute_ra_returns` calls
+**Definition.** Let $t_0$ be the first row with a finite return. `compute_ra_returns` calls
 `qis.compute_ewm_vol` with `annualize=False`, which runs
 
 $$
@@ -102,11 +103,12 @@ $$
 \hat\sigma^2_{t_0}=r_{t_0}^2 .
 $$
 
-The seed is the first squared return (`InitType.X0`). If the first row is missing, the
-recursion starts at the first finite return $t_1$ from a zero state, so
-$\hat\sigma^2_{t_1}=(1-\lambda)r_{t_1}^2$. A missing return inside the sample holds the state
-(`NanBackfill.FFILL`). An explicit `init_value` replaces the seed, and $r_{t_0}$ then does not
-enter the recursion. With `mean_adj_type` other than `NONE`, $r_t$ is replaced by $r_t$ minus an
+The seed, the state before $t_0$, is the first squared return (`InitType.X0`), and the update
+at $t_0$ leaves it there, so a leading missing row, the `qis.to_returns` default, changes
+nothing. A missing return inside the sample holds the state (`NanBackfill.FFILL`). An explicit
+`init_value` $v_0$ is a prior: $\hat\sigma^2_{t_0}=\lambda v_0+(1-\lambda)r_{t_0}^2$, and $v_0$
+keeps weight $\lambda^{t-t_0+1}$ at row $t$. With `mean_adj_type` other than `NONE`, $r_t$ is
+replaced by $r_t$ minus an
 expanding or EWM mean (same $\lambda$) through $t$, or by $r_t$ minus the full-sample mean for
 `INSAMPLE`.
 
@@ -120,10 +122,10 @@ volatility (J.P. Morgan and Reuters, 1996). The EWM estimators, their mean age a
 sample size are derived in [Exponentially weighted estimators](ewm_estimators.md).
 
 > **Pitfall.** The seed is one observation. The first risk-adjusted return is
-> $r_{t_0+1}/\lvert r_{t_0}\rvert$, which can be arbitrarily large, and a leading missing row (the
-> `qis.to_returns` default) makes the first estimate smaller still by the factor
-> $\sqrt{1-\lambda}$, about 0.24 at $\lambda=0.94$. Use `warmup_period` of at least the span, or
-> discard the first span of output.
+> $r_{t_0+1}/\lvert r_{t_0}\rvert$, which can be arbitrarily large. Use `warmup_period` of at least
+> the span, or discard the first span of output. Until the handbook follow-up a leading missing
+> row, the `qis.to_returns` default, made the first estimate smaller still by the factor
+> $\sqrt{1-\lambda}$, about 0.24 at $\lambda=0.94$.
 
 ### Risk-adjusted returns
 
@@ -300,7 +302,7 @@ $$
 
 The exponential map applies with the default `is_log_returns_to_arithmetic=True`, which assumes
 log returns. With $h=1$ it returns $x_t$ with decay `ewm_lambda_eod`. The weight lag is one row,
-not $h$ rows, and the first finite sum starts the variance from a zero state.
+not $h$ rows, and the variance starts at the square of the first finite sum (`InitType.X0`).
 
 **Proposition (square root of the horizon).** If $x_{t-h+1},\ldots,x_t$ are uncorrelated with
 unit variance, then $\operatorname{Var}\big(\sum_{j=0}^{h-1}x_{t-j}\big)=h$, so $X^{(h)}_t$ has unit
@@ -688,8 +690,9 @@ np.testing.assert_allclose([pooled, 1.0 + 2.0 / (2.0 / (1.0 - lam) - 1.0)], [1.0
 
 ### Unit-variance filters and signal maps
 
-The filter weights are read off an impulse response. A unit impulse at the second row (the
-first row seeds the recursion and does not enter it) returns $c_k$ at row $k+1$. For spans 63 and
+The filter weights are read off an impulse response. A unit impulse at the second row returns
+$c_k$ at row $k+1$, and the same impulse at the first row returns $c_k$ at row $k$: the zero seed
+is the state before the first row, which enters the filter like any other. For spans 63 and
 5, $Q\approx3.522$, $c_0=0$, the peak is at lag 7, and the squared weights sum to 1. The weights
 themselves sum to $(63-5)/(2Q)\approx8.23$, so a per-period Sharpe ratio of $0.5/\sqrt{252}$ gives
 a mean output of 0.26. The single-leg filter and the momentum signal share the kernel
@@ -705,6 +708,9 @@ lam_l, lam_s = 1.0 - 2.0 / 64.0, 1.0 - 2.0 / 6.0
 q_norm = np.sqrt(1 / (1 - lam_l ** 2) + 1 / (1 - lam_s ** 2) - 2 / (1 - lam_l * lam_s))
 lags = np.arange(n - 1)
 np.testing.assert_allclose(kernel, (lam_l ** lags - lam_s ** lags) / q_norm, atol=1e-14)
+first_row = qis.compute_ewm_long_short_filter(data=impulse.shift(-1).fillna(0.0), long_span=63,
+                                              short_span=5, warmup_period=None).to_numpy()
+np.testing.assert_allclose(first_row[:-1], kernel, atol=1e-14)  # the first row enters too
 np.testing.assert_allclose([q_norm, np.sum(kernel ** 2)], [3.522, 1.0], atol=1e-3)
 assert abs(np.sum(kernel ** 2) - 1.0) < 1e-12 and abs(kernel[0]) < 1e-15
 assert np.argmax(kernel) == 7
@@ -846,10 +852,9 @@ Contract details:
   returned with its original column order.
 - `compute_ewm_long_short` is a numba kernel on arrays that assumes validated spans and needs an
   explicit `init_value`; `compute_ewm_long_short_filter` is the validated wrapper for pandas input.
-- `compute_ewm_long_short_filter` seeds both legs with zero on the first row. A finite
-  observation in that row is overwritten by the seed and never enters the filter, which is why
-  the worked example places its impulse in the second row. Risk-adjusted inputs have a missing
-  first row, so the issue does not arise inside `compute_ewm_long_short_filtered_ra_returns`.
+- `compute_ewm_long_short_filter` starts both legs from a zero state before each column's first
+  finite observation, which enters the filter like any later one. Until the handbook follow-up a
+  finite observation in the first row was overwritten by the seed and never entered the filter.
 - `qis.SignalAggType` belongs to `qis.ewm_xy_convolution` and is not used by these functions.
 
 The example
@@ -890,9 +895,6 @@ functions of this chapter.
 - **Overlap.** Rolling sums are autocorrelated by construction: the overlapping pairs of
   `get_paired_rareturns_signals` are forward looking but share $h-1$ returns with their
   neighbours, so use every $h$-th pair or an autocorrelation-robust standard error.
-- **Volatility floor on a Series.** `vol_floor_quantile` works on a DataFrame; on a pandas Series
-  the floor is broadcast to a square array and `compute_ra_returns` raises `ValueError`. Pass a
-  one-column DataFrame.
 - **Evidence is not a theorem.** Moreira and Muir (2017) and Harvey et al. (2018) report sample
   evidence, and in Harvey et al. (2018) the Sharpe-ratio gains are concentrated in equities and
   credit. Volatility targeting reliably stabilises volatility; its effect on the Sharpe ratio

@@ -312,11 +312,12 @@ point-in-time EWMA means of the same span, derived in
 a full-sample mean looks ahead. Under the `X0` seed the first centred return is zero, so the first
 estimated beta is deliberately missing; a missing estimate after the first finite one raises.
 
-> **Pitfall.** The prior is more than a fallback. It replaces the first informative observation,
-> so the first finite estimate equals $\beta_0$ exactly, and then acts as the seed of both moment
-> recursions. Like any [seed](ewm_estimators.md#initial-conditions) it keeps weight $\lambda^{k}$
-> in the estimate $k$ returns later, above 5% for about $1.5N=54$ returns at $N=36$, so early
-> realised alpha depends on `beta_init_value`.
+> **Pitfall.** The prior is more than a fallback. It replaces the first informative observation
+> and [seeds](ewm_estimators.md#initial-conditions) both moment recursions, so the first finite
+> estimate equals $\beta_0$ exactly and the prior is the whole state of both moments on that
+> date. It keeps weight $\lambda^{k}$ in the estimate $k$ returns later, as much as
+> $(N+1)/2=18.5$ ordinary returns of its date and above 5% for about $1.5N=54$ returns at $N=36$,
+> so early realised alpha depends on `beta_init_value`.
 
 The expanding annualised estimate through $t$ is $\mathrm{AN}\,t^{-1}\sum_{t'\le t}a_{L,t'}$. The
 post-warm-up exhibit is the unannualised cumulative sum of $a_{L,t'}$ after a chosen base date,
@@ -325,7 +326,7 @@ return uses the beta available on the base date. The current estimate is
 $\mathrm{AN}\,\mathcal{E}_t[a_L]$, the same-span
 [EWM](ewm_estimators.md#the-recursion-and-its-weights) of the step-ahead residuals seeded with
 `InitType.X0`. It is a point-in-time EWMA of realised
-out-of-sample alpha, not the contemporaneous alpha forecast of the lower-level beta routine and
+out-of-sample alpha, not the contemporaneous EWM alpha of the lower-level beta routine and
 not a refitted 36-observation regression, and linearity keeps it additive across layers. It is a
 point estimate, not a confidence interval, and its
 [effective sample size](ewm_estimators.md#span-mean-lag-effective-sample-size-and-half-life) is
