@@ -2,7 +2,11 @@
 principal component analysis of a covariance or correlation matrix, and what is built on it.
 
 ``apply_pca`` is the primitive: ``np.linalg.eigh`` on a symmetric matrix, reordered from the
-largest eigenvalue down, with a sign convention so that loadings do not flip between refits.
+largest eigenvalue down, with a sign convention for each eigenvector. The default convention
+makes the largest-magnitude loading positive; it pins the sign only while that loading keeps its
+identity, so a near tie between the two largest loadings can still flip an eigenvector between
+refits, and a repeated eigenvalue has no unique eigenvectors at all. ``eigen_signs`` sets the sign
+of each eigenvector's first loading instead.
 ``compute_pca_r2`` turns the eigenvalues into variance shares, raw or cumulative, and
 ``compute_data_pca_r2`` runs that through time over an EWM tensor of the input, correlation unless
 ``is_corr`` is False, sampled at ``freq``, one row per date and one column per component.
@@ -63,17 +67,26 @@ def apply_pca(cmatrix: np.ndarray,
     Eigenvectors are columns: ``cmatrix @ vectors[:, i] == values[i] * vectors[:, i]``.
 
     The sign of an eigenvector is arbitrary, which makes loadings flip between refits. Two
-    conventions are offered to pin it down.
+    conventions are offered to pin it down; each flips whole eigenvectors (columns), so the
+    result remains an eigen-decomposition. Neither can rule out every flip: under the default,
+    a near tie in magnitude between the two largest loadings of opposite sign lets the sign
+    change between refits, and eigenvectors of a repeated eigenvalue are not unique.
 
     Args:
         cmatrix: symmetric covariance or correlation matrix, shape (n, n)
         is_max_sign_positive: flip each eigenvector so its largest-magnitude element is
             positive. Ignored when ``eigen_signs`` is given
-        eigen_signs: explicit sign per eigenvector, shape (n,); use to carry the sign
-            convention of a previous fit forward so loadings stay comparable across dates
+        eigen_signs: explicit sign per eigenvector, shape (n,), entry ``j`` for the ``j``-th
+            eigenvector in descending order. Eigenvector ``j`` is flipped when its first
+            loading (asset 0) has the opposite sign to ``eigen_signs[j]``; a zero first loading
+            or a zero sign leaves it unchanged. Use to carry the convention of a previous fit
+            forward so loadings stay comparable across dates
 
     Returns:
         (eigenvalues, eigenvectors), descending by eigenvalue, eigenvectors as columns
+
+    Raises:
+        ValueError: if ``eigen_signs`` does not have one entry per eigenvector
     """
     # from sample covar_model
     eig_vals, eig_vecs = np.linalg.eigh(cmatrix)
@@ -100,17 +113,35 @@ def apply_pca(cmatrix: np.ndarray,
 
     elif eigen_signs is not None:
 
-        # eigen_vectors = eigen_signs * eigen_vectors
+        eigen_signs = np.asarray(eigen_signs, dtype=float).reshape(-1)
+        if eigen_signs.shape[0] != eigen_vectors.shape[1]:
+            raise ValueError(f"eigen_signs must have one entry per eigenvector: expected "
+                             f"{eigen_vectors.shape[1]}, got {eigen_signs.shape[0]}")
+        # flip whole eigenvectors (columns) whose first loading disagrees with the target sign
         signed_eigen_vectors = eigen_vectors.copy()
-        for idx, eigen_vector in enumerate(eigen_vectors):
-            if np.sign(eigen_vector[0]) != eigen_signs[idx]:
-               signed_eigen_vectors[idx] = - eigen_vector
+        for idx in range(eigen_vectors.shape[1]):
+            if np.sign(eigen_vectors[0, idx]) * np.sign(eigen_signs[idx]) < 0.0:
+                signed_eigen_vectors[:, idx] = - eigen_vectors[:, idx]
         eigen_vectors = signed_eigen_vectors
 
     return eigen_values, eigen_vectors
 
 
-def compute_pca_r2(cmatrix: np.ndarray, is_cumulative: bool = False) -> (np.ndarray, np.ndarray):
+def compute_pca_r2(cmatrix: np.ndarray, is_cumulative: bool = False) -> np.ndarray:
+    """
+    explained-variance shares of the eigenvalues of a symmetric matrix.
+
+    The shares are ``nu_j / sum_k nu_k`` with the eigenvalues ``nu_j`` of :func:`apply_pca` in
+    descending order. They lie in [0, 1] and sum to one only for a positive semi-definite input;
+    a negative eigenvalue, as a pairwise-complete matrix can have, gives a negative share.
+
+    Args:
+        cmatrix: symmetric covariance or correlation matrix, shape (n, n)
+        is_cumulative: return the cumulative shares ``sum_{k<=j} nu_k / sum_k nu_k`` instead
+
+    Returns:
+        the shares, shape (n,), largest component first
+    """
     eigen_values, _ = apply_pca(cmatrix=cmatrix)
     if is_cumulative:
         out = np.cumsum(eigen_values) / np.sum(eigen_values)
@@ -125,7 +156,26 @@ def compute_data_pca_r2(data: pd.DataFrame,
                         ewm_lambda: float = 0.94,
                         is_corr: bool = True
                         ) -> pd.DataFrame:
+    """
+    explained-variance shares through time, from an EWM correlation or covariance tensor.
 
+    Runs :func:`qis.compute_ewm_covar_tensor` on the rows of ``data`` as supplied, uncentred
+    (no mean removed), from a zero seed and with the kernel's default forward fill of missing
+    entries, then applies :func:`compute_pca_r2` on each sampling date. A sampling date takes the
+    last row on or before it, so every row of the output is point in time. Missing values are
+    held rather than skipped, so fill or align a ragged panel first.
+
+    Args:
+        data: returns, rows are dates and columns are assets
+        freq: frequency of the sampling dates generated over ``time_period``
+        time_period: span of the sampling dates. None uses the span of ``data``
+        ewm_lambda: EWM decay of the tensor
+        is_corr: decompose the correlation tensor. False decomposes the second-moment tensor,
+            whose components are dominated by the most volatile assets
+
+    Returns:
+        one row per sampling date and one column per component, ``PC1`` to ``PCn``
+    """
     corr_tensor_txy = ewm.compute_ewm_covar_tensor(a=data.to_numpy(),
                                                      ewm_lambda=ewm_lambda,
                                                      is_corr=is_corr)

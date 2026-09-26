@@ -186,10 +186,11 @@ def plot_corr_matrix_from_covar(covar: pd.DataFrame,
             otherwise None when plotting on provided axes.
 
     Note:
-        The function converts the covariance matrix to correlations using
-        npo.covar_to_corr() and extracts volatilities as the square root
-        of diagonal covariance elements. Grid lines are added around each
-        cell for better visual separation.
+        The function converts the covariance matrix to correlations with the
+        internal kernel ``npo._covar_to_corr_array``, the one ``qis.covar_to_corr``
+        uses, and takes the volatilities it returns, the square roots of the
+        diagonal covariance elements, in the units of ``covar``. Grid lines are
+        added around each cell for better visual separation.
     """
     corr_values, vols, _ = npo._covar_to_corr_array(
         covar.to_numpy(dtype=float, na_value=np.nan)

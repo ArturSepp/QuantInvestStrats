@@ -7,11 +7,15 @@ rolling return lagged by the horizon (``AUTO_CORR``), or the signal (``SIGNAL_CO
 enters at its last value or as its mean over the horizon, and ``estimates_smoothing_lambda``
 smooths the resulting series of estimates.
 
-The horizon is ``get_annualization_factor`` of ``freq`` - 252 for ``'B'``, 12 for ``'ME'`` - and
-that one number is used three ways: rows summed into the rolling return, lag applied to x, and span
-behind the EWM decay. It counts rows of the input, which is assumed daily, not periods of ``freq``;
-where the factor is one the decay falls back to 0.2 and the returns are left unsummed.
-``is_ra_returns`` divides returns by the EWM volatility lagged one period first.
+The horizon is ``get_annualization_factor`` of ``freq`` - 252 for ``'B'``, 12 for ``'ME'`` - taken
+as an integer number of rows, and that one number is used three ways: rows summed into the rolling
+return, lag applied to x, and span behind the EWM decay. It counts rows of the input, which is
+assumed daily, not periods of ``freq``; where the factor is one (``'YE'``) the decay falls back to
+0.2 and the returns are left unsummed. ``is_ra_returns`` divides returns by the EWM volatility
+lagged one period first.
+
+The cross moment and both second moments are EWM recursions seeded at zero from their first
+finite row, so an estimate dated t uses rows up to t only.
 """
 # packages
 import numpy as np
@@ -41,20 +45,47 @@ def ewm_xy_convolution(returns: pd.DataFrame,
                        signal_agg_type: SignalAggType = SignalAggType.LAST_VALUE,
                        is_ra_returns: bool = False,
                        estimates_smoothing_lambda: float = None,
-                       mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE
+                       mean_adj_type: ewm.MeanAdjType = ewm.MeanAdjType.NONE,
+                       var_init_type: ewm.InitType = ewm.InitType.ZERO
                        ) -> pd.DataFrame:
     """
-    ewm convolution, typical case:
-    y is return, x is signal
-    span defines the las the
-    assumed frequency is daily
+    EWM correlation or beta of rolling h-row returns with their own lag or with a signal.
+
+    The horizon h is ``get_annualization_factor(freq)`` as an integer number of rows of
+    ``returns``, which are assumed daily: 252 for ``'B'``, 12 for ``'ME'``, 4 for ``'QE'``. y is
+    the rolling sum of the last h returns; x is y lagged by h rows (``AUTO_CORR``) or the signal
+    lagged by h rows (``SIGNAL_CORR``, ``SIGNAL_BETA``). The EWM decay is
+    ``1 - 2 / (h + 1)``. When h is one the returns are not summed and the decay is 0.2.
+
+    Args:
+        returns: returns, rows are dates and columns are assets
+        freq: frequency whose annualisation factor sets the horizon h
+        signals: signals aligned to ``returns``; required for the signal convolution types
+        convolution_type: what x is, and whether a correlation or a beta is returned
+        signal_agg_type: a signal enters at its last value or as its mean over h rows
+        is_ra_returns: divide returns by their EWM volatility (lambda 0.94) lagged one row first
+        estimates_smoothing_lambda: if given, smooth the output with a further EWM of this decay
+        mean_adj_type: mean removed from x and y before the moments; none by default
+        var_init_type: seed of the EWM second moments of x and y. The default
+            ``InitType.ZERO`` is point in time, like the zero seed of the cross moment;
+            ``InitType.MEAN`` seeds them with full-sample means, which looks ahead
+
+    Returns:
+        the EWM estimates, indexed like ``returns``; NaN until x and y are both available
+
+    Raises:
+        ValueError: if ``freq`` does not give a whole number of rows of at least one, or
+            ``convolution_type`` is not implemented
     """
-
     signal_span = get_annualization_factor(freq=freq)
+    horizon = int(np.round(signal_span))
+    if horizon < 1 or not np.isclose(signal_span, horizon):
+        raise ValueError(f"freq={freq} gives a horizon of {signal_span} rows; "
+                         f"a whole number of at least one row is required")
 
-    if not np.isclose(signal_span, 1):
-        ewm_lambda = 1.0 - 2.0 / (signal_span + 1.0)
-    else:  # take 1.5 for frequency of business day
+    if horizon > 1:
+        ewm_lambda = 1.0 - 2.0 / (horizon + 1.0)
+    else:  # take span 1.5 for a one-row horizon
         ewm_lambda = 0.5 / 2.5
 
     if is_ra_returns:
@@ -76,10 +107,9 @@ def ewm_xy_convolution(returns: pd.DataFrame,
         else:
             returns = returns_np
 
-    # rolling returns by the span
-    if not np.isclose(signal_span, 1):
-        # norm_factor = np.sqrt(signal_span)
-        rolling_returns = returns.rolling(signal_span).sum()
+    # rolling returns by the horizon, an integer number of rows
+    if horizon > 1:
+        rolling_returns = returns.rolling(horizon).sum()
     else:
         rolling_returns = returns
 
@@ -87,17 +117,17 @@ def ewm_xy_convolution(returns: pd.DataFrame,
         if signal_agg_type == SignalAggType.LAST_VALUE:
             agg_signal = signals
         elif signal_agg_type == SignalAggType.MEAN:
-            agg_signal = signals.rolling(signal_span).mean()
+            agg_signal = signals.rolling(horizon).mean()
         else:
             raise TypeError(f"unknown {signal_agg_type}")
 
         agg_signal = agg_signal.reindex(index=rolling_returns.index, method='ffill')
-        agg_signal = agg_signal.shift(signal_span)  # shift backrard by the span
+        agg_signal = agg_signal.shift(horizon)  # shift backward by the horizon
     else:
         agg_signal = None
 
     if convolution_type == ConvolutionType.AUTO_CORR:
-        x_data = rolling_returns.shift(signal_span) # shift backward by the span
+        x_data = rolling_returns.shift(horizon)  # shift backward by the horizon
         y_data = rolling_returns
         cross_xy_type = ewm.CrossXyType.CORR
 
@@ -114,12 +144,14 @@ def ewm_xy_convolution(returns: pd.DataFrame,
     else:
         raise ValueError(f"{convolution_type} is not implemented")
 
-    # compute ewm cross
+    # compute ewm cross; the second moments get a point-in-time seed by default, rather than the
+    # full-sample mean that compute_ewm_cross_xy uses unless told otherwise
     corr = ewm.compute_ewm_cross_xy(x_data=x_data,
                                     y_data=y_data,
                                     ewm_lambda=ewm_lambda,
                                     cross_xy_type=cross_xy_type,
-                                    mean_adj_type=mean_adj_type)
+                                    mean_adj_type=mean_adj_type,
+                                    var_init_type=var_init_type)
 
     if estimates_smoothing_lambda is not None:
         corr = ewm.compute_ewm(data=corr, ewm_lambda=estimates_smoothing_lambda)

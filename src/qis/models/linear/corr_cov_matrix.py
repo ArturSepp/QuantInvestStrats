@@ -5,9 +5,9 @@ correlation and covariance estimation on the EWM engine, in the shapes a caller 
 returns taken at ``returns_freq``, sampled on a ``rebalancing_freq`` schedule, one matrix per
 rebalancing date and annualised unless ``apply_an_factor`` is False. ``compute_masked_covar_corr``
 is the single-matrix path for a ragged panel - each pair is computed on the observations both
-series have, which uses all the data and is not guaranteed positive semi-definite.
-``compute_ewm_corr_df`` unstacks the correlation tensor into one column per pair, with
-``CorrMatrixOutput`` choosing which pairs come back.
+series have, about the means of that overlap, which uses all the data and is not guaranteed
+positive semi-definite. ``compute_ewm_corr_df`` unstacks the correlation tensor into one column
+per pair, with ``CorrMatrixOutput`` choosing which pairs come back.
 
 ``span`` is in units of ``returns_freq``, not days, and the estimation and rebalancing frequencies
 are separate arguments because one sets the sampling error and the other the turnover. The
@@ -47,15 +47,27 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
     because the estimation frequency sets the sampling error and the rebalancing frequency sets the
     turnover.
 
+    The recursion starts from a zero matrix, so the first matrices are scaled down by the
+    warm-up factor ``1 - lambda^K`` after ``K`` returns; pass a ``time_period`` that starts a
+    few spans after the first price when the early dates matter. Missing returns reset the
+    affected entries to zero (``NanBackfill.ZERO_FILL``), which keeps every matrix positive
+    semi-definite.
+
     Args:
         prices: price levels, one column per asset. NaN is tolerated
-        time_period: restrict the output dates. None uses the full sample
+        time_period: restrict the output to rebalancing dates on or after its start and on or
+            before its end; a missing bound is not applied. None uses the full sample. The
+            estimation always runs from the first price
         returns_freq: frequency the returns are computed at
         rebalancing_freq: frequency the covariance is sampled at
         span: EWM span in units of ``returns_freq``
         is_apply_vol_normalised_returns: estimate the correlation on vol-normalised returns and
             rebuild the covariance from it, which stops a single volatile asset dominating
-        demean: subtract the EWM mean before estimating. False takes the second moment about zero
+        demean: remove the EWM mean before estimating. The residual is the one-step forecast
+            error ``x_t - m_{t-1}`` against the EWM mean of the previous date, so it is point in
+            time, and the matrix is multiplied by ``N / (N + 1) = (1 + lambda) / 2``, which makes
+            it unbiased for iid returns once the seed is forgotten. False takes the second moment
+            about zero
         apply_an_factor: annualise, so the matrix is in annual units
 
     Returns:
@@ -65,7 +77,13 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
     returns = ret.to_returns(prices=prices, is_log_returns=True, drop_first=True, freq=returns_freq)
     returns_np = returns.to_numpy()
     if demean:
-        x = returns_np - ewm.compute_ewm(returns_np, span=span)
+        # the EWM mean m_t includes x_t, so x_t - m_t = lambda (x_t - m_{t-1}): dividing by lambda
+        # gives the one-step forecast error against the prior mean m_{t-1} (zero on the seed row).
+        # Its steady-state covariance for iid returns is 2 / (1 + lambda) Sigma, so the residual is
+        # scaled by sqrt((1 + lambda) / 2) to make the covariance unbiased.
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+        prior_mean_residual = (returns_np - ewm.compute_ewm(returns_np, span=span)) / ewm_lambda
+        x = np.sqrt(0.5 * (1.0 + ewm_lambda)) * prior_mean_residual
     else:
         x = returns_np
 
@@ -83,12 +101,15 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
         an_factor = infer_annualisation_factor_from_df(data=returns)
     else:
         an_factor = 1.0
-    if time_period is not None:
-        start_date = time_period.start.tz_localize(tz=returns.index.tz)  # make sure tz is alined with rebalancing_schedule
-    else:
-        start_date = rebalancing_schedule.index[0]
+    start_date = rebalancing_schedule.index[0]
+    end_date = rebalancing_schedule.index[-1]
+    if time_period is not None:  # make sure tz is aligned with rebalancing_schedule
+        if time_period.start is not None:
+            start_date = time_period.start.tz_localize(tz=returns.index.tz)
+        if time_period.end is not None:
+            end_date = time_period.end.tz_localize(tz=returns.index.tz)
     for idx, (date, value) in enumerate(rebalancing_schedule.items()):
-        if value and date >= start_date:
+        if value and start_date <= date <= end_date:
             covar_t = pd.DataFrame(covar_tensor_txy[idx], index=tickers, columns=tickers)
             covars[date] = an_factor*covar_t
     return covars
@@ -122,8 +143,12 @@ def compute_masked_covar_corr(data: Union[np.ndarray, pd.DataFrame],
 
     A ragged panel has no common sample: dropping rows with any missing value can discard most of
     the history, and filling with zero biases the estimate towards zero. Each pair is computed on
-    the observations both series have, which uses all the data at the cost of a matrix that is not
-    guaranteed positive semi-definite. Check before feeding it to an optimiser.
+    the observations both series have, about the means of that overlap, which uses all the data at
+    the cost of a matrix that is not guaranteed positive semi-definite. Check before feeding it to
+    an optimiser. On a panel with NaN the covariance equals pandas ``DataFrame.cov`` (and, with
+    ``bias=True``, the same sums divided by the overlap count ``n_ij`` rather than ``n_ij - 1``)
+    and the correlation equals ``DataFrame.corr``; a pair without enough common observations is
+    NaN. Without NaN the common-sample ``np.cov`` or ``np.corrcoef`` is used.
 
     Args:
         data: returns, rows are dates and columns are assets
@@ -144,9 +169,17 @@ def compute_masked_covar_corr(data: Union[np.ndarray, pd.DataFrame],
     else:
         raise ValueError(f"unsuported type {type(data)}")
 
-    if np.any(np.isnan(data_np)):  # applay masked arrays
+    if np.any(np.isnan(data_np)):  # pairwise-complete estimation
         if is_covar:
-            covar = np.ma.cov(np.ma.masked_invalid(data_np), rowvar=False, bias=bias, allow_masked=True).data
+            # pandas centres each pair on its overlap means and divides by n_ij - 1; a pair with
+            # fewer than two common observations is NaN. np.ma.cov centred each series on its
+            # own full-history mean and dropped the mask, returning 0 for pairs with no overlap.
+            covar = pd.DataFrame(data_np).cov().to_numpy()
+            if bias:
+                observed = np.isfinite(data_np).astype(float)
+                n_ij = observed.T @ observed
+                covar = covar * np.divide(n_ij - 1.0, n_ij, out=np.full_like(n_ij, np.nan),
+                                          where=n_ij > 0.0)
         else:
             # Masked corrcoef can normalise a pairwise covariance with full-history variances,
             # producing correlations outside [-1, 1] for ragged histories.
@@ -217,6 +250,18 @@ def corr_to_pivot_row(pivot: np.ndarray,
 
 
 class CorrMatrixOutput(Enum):
+    """
+    which pairs of a correlation matrix :func:`compute_ewm_corr_df` returns as columns.
+
+    Attributes:
+        FULL: every pair below the diagonal, (i, j) with j < i, named ``"<column i> - <column j>"``
+            and ordered by i, then j
+        TOP_ROW: the pairs of the first column with every later column, named
+            ``"<column 0> - <column j>"``
+        SUB_TOP: the same pairs, names and order as ``FULL``. The first row it skips has no pair
+            below the diagonal, so the two members coincide; retained for compatibility, and
+            used by :func:`compute_ewm_corr_single`
+    """
     FULL = 1
     TOP_ROW = 2
     SUB_TOP = 3
@@ -230,7 +275,24 @@ def compute_ewm_corr_df(df: pd.DataFrame,
                         init_type: ewm.InitType = ewm.InitType.ZERO
                         ) -> pd.DataFrame:
     """
-    compute ewm corr as and output as xi-xj pandas j>i, i = 0,..
+    uncentred EWM correlation of every requested pair of columns, one column per pair.
+
+    Runs ``S_t = lambda S_{t-1} + (1 - lambda) x_t x_t'`` on the rows of ``df`` without removing
+    a mean, from the seed ``init_value``, and normalises each matrix to a correlation. With the
+    default zero seed the first row is the sign of ``x_i x_j``, so the path needs a warm-up.
+
+    Args:
+        df: returns, rows are dates and columns are assets
+        corr_matrix_output: which pairs are returned: ``FULL`` gives (i, j) with j < i, named
+            ``"<column i> - <column j>"``; see :class:`CorrMatrixOutput`
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        ewm_lambda: EWM decay, used when ``span`` is None
+        init_value: seed matrix, shape (n, n). None uses ``init_type``
+        init_type: seed when ``init_value`` is None; ``InitType.ZERO`` and ``InitType.X0``
+            both give a zero matrix
+
+    Returns:
+        the correlation paths, indexed like ``df``
     """
     if init_value is None:
         init_value = ewm.set_init_dim2(data=df.to_numpy(), init_type=init_type)
@@ -269,10 +331,24 @@ def compute_ewm_corr_single(returns: pd.DataFrame,
                             time_period: da.TimePeriod = None
                             ) -> pd.Series:
     """
-    plot correlation all time series in correlation matrix  as row
+    uncentred EWM correlation path of a two-column return panel.
+
+    The two-column case of :func:`compute_ewm_corr_df`, with its zero seed.
+
+    Args:
+        returns: returns with exactly two columns
+        ewm_lambda: EWM decay, used when ``span`` is None
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        time_period: restrict the output dates; the estimation runs over the whole sample
+
+    Returns:
+        the correlation path, named ``"<second column> - <first column>"``
+
+    Raises:
+        ValueError: if ``returns`` does not have exactly two columns
     """
     if len(returns.columns) != 2:
-        raise ValueError("should be two columns {returns.columns}")
+        raise ValueError(f"should be two columns {returns.columns}")
 
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (1.0 + span)
@@ -288,6 +364,22 @@ def compute_ewm_corr_single(returns: pd.DataFrame,
 
 
 def matrix_regularization(covar: np.ndarray, cut: float = 1e-5) -> np.ndarray:
+    """
+    eigenvalue clipping of a symmetric matrix: eigenvalues at or below ``cut`` are set to zero.
+
+    Rebuilds ``Q diag(nu_j 1{nu_j > cut}) Q'`` from ``np.linalg.eigh``, which reads only the
+    lower triangle. With ``cut=0`` this is the Frobenius-nearest positive semi-definite matrix.
+    The result is singular whenever an eigenvalue was clipped, and clipping raises the
+    diagonal, so renormalise a clipped correlation matrix with ``qis.covar_to_corr``.
+
+    Args:
+        covar: symmetric matrix, shape (n, n)
+        cut: absolute eigenvalue threshold, in the units of ``covar``. The default ``1e-5`` is
+            small for an annualised covariance but comparable to daily variances
+
+    Returns:
+        the clipped matrix, shape (n, n)
+    """
     eig_vals, eig_vecs = np.linalg.eigh(covar)
     eig_vals_alpha = np.where(np.greater(eig_vals, cut), eig_vals, 0.0)
     covar_a = eig_vecs @ np.diag(eig_vals_alpha) @ eig_vecs.T

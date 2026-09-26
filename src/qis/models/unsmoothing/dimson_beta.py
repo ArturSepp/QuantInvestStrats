@@ -1,9 +1,10 @@
 """
 Dimson (1979) aggregated-coefficient beta for non-synchronous / smoothed returns.
 
-Stand-alone qis function. Suggested home: qis/perfstats/returns.py (alongside
-the leverage helpers) or a qis/models regression module. Pure numpy/pandas, no
-qis dependency, so it can also be imported directly.
+``estimate_dimson_beta`` regresses each asset on the contemporaneous and ``num_lags`` lagged
+market returns by OLS and sums the market slopes. The lag side only is implemented, which is the
+relevant one when the asset is stale relative to a liquid index. Standard errors are classical
+(homoskedastic, not HAC). Pure numpy/pandas, exported as ``qis.estimate_dimson_beta``.
 """
 # packages
 import numpy as np
@@ -33,6 +34,10 @@ def estimate_dimson_beta(asset_returns: Union[pd.Series, pd.DataFrame],
     convention is used for asset and market, so total returns are the natural
     input when the goal is to detect smoothing in the raw reported series.
 
+    Standard errors are classical: ``sigma^2 (X'X)^{-1}`` with ``sigma^2`` the residual sum of
+    squares over ``n_obs - num_lags - 2``. The residuals of a stale series are autocorrelated,
+    so treat the t-statistics as screening statistics.
+
     Args:
         asset_returns: asset return panel, one column per asset, at the same frequency as
             ``market_returns``. Monthly for a quarter-smoothing test with L=3
@@ -44,9 +49,14 @@ def estimate_dimson_beta(asset_returns: Union[pd.Series, pd.DataFrame],
 
     Returns:
         one row per asset, with columns ``beta_0`` the contemporaneous slope, ``beta_dimson``
-        the aggregated slope, ``smoothing_ratio`` their ratio (NaN when ``b_0`` is near zero),
+        the aggregated slope, ``smoothing_ratio`` their ratio (NaN when ``|b_0| <= 1e-8``),
         ``t_beta_0``, ``sum_lag_beta`` the sum of the lagged slopes, ``t_sum_lag`` its t-stat,
-        ``ar1`` the first-order autocorrelation of the asset return, ``r2``, and ``n_obs``
+        ``ar1`` the first-order autocorrelation of the asset return, ``r2``, ``n_obs``,
+        ``se_beta_dimson`` the standard error of ``beta_dimson`` and ``t_beta_dimson`` its
+        t-stat. With ``num_lags=0`` there is no lagged slope: ``sum_lag_beta`` is 0,
+        ``t_sum_lag`` is NaN, and ``beta_dimson``, ``t_beta_dimson`` equal ``beta_0``,
+        ``t_beta_0``. An asset with fewer than ``max(min_obs, num_lags + 3)`` joint
+        observations gets NaN everywhere except ``n_obs``
 
     Raises:
         ValueError: if ``market_returns`` is not a pd.Series, or ``num_lags`` is negative
@@ -69,7 +79,8 @@ def estimate_dimson_beta(asset_returns: Union[pd.Series, pd.DataFrame],
         if n < max(min_obs, num_lags + 3):
             out[col] = dict(beta_0=np.nan, beta_dimson=np.nan, smoothing_ratio=np.nan,
                             t_beta_0=np.nan, sum_lag_beta=np.nan, t_sum_lag=np.nan,
-                            ar1=np.nan, r2=np.nan, n_obs=n)
+                            ar1=np.nan, r2=np.nan, n_obs=n,
+                            se_beta_dimson=np.nan, t_beta_dimson=np.nan)
             continue
 
         y = df['y'].to_numpy(dtype=float)
@@ -92,6 +103,7 @@ def estimate_dimson_beta(asset_returns: Union[pd.Series, pd.DataFrame],
         sum_lag = float(c_lag @ b)
         se_beta_0 = float(np.sqrt(cov_b[1, 1]))
         se_sum_lag = float(np.sqrt(c_lag @ cov_b @ c_lag)) if num_lags >= 1 else np.nan
+        se_dimson = float(np.sqrt(c_all @ cov_b @ c_all))
 
         out[col] = dict(
             beta_0=beta_0,
@@ -104,6 +116,8 @@ def estimate_dimson_beta(asset_returns: Union[pd.Series, pd.DataFrame],
             r2=(1.0 - float(resid @ resid) / float(np.sum((y - y.mean()) ** 2))
                 if np.sum((y - y.mean()) ** 2) > 0 else np.nan),
             n_obs=n,
+            se_beta_dimson=se_dimson,
+            t_beta_dimson=(beta_dimson / se_dimson if se_dimson > 0 else np.nan),
         )
 
     return pd.DataFrame.from_dict(out, orient='index')
