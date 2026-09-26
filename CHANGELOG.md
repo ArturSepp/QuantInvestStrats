@@ -17,6 +17,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Make `generate_rebalancing_indicators` leave an empty part out of its concatenation when every
   rebalancing date falls off the given index, which pandas 2.3 deprecates. The indicators are
   unchanged.
+- Make `plot_line(df, x=..., y=...)` generate one legend entry for the rendered y series instead
+  of also describing the x-coordinate column as a plotted series. Wide-form and hue legends are
+  unchanged.
 
 ## [5.31.0] - 2026-09-26
 

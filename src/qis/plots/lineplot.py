@@ -44,6 +44,9 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
     x: str = None: x column
     y: str = None: y column
     hue: str = None: hue
+
+    In explicit x/y mode without a hue, the generated legend describes only the rendered y
+    series; the x column supplies coordinates rather than another plotted series.
     """
 
     if ax is None:
@@ -62,6 +65,7 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
     else:
         raise TypeError(f"unsuported data type {type(df)}")
 
+    legend_data = df
     if x is not None:
         if y is None:
             raise ValueError(f"y column must be given with x column")
@@ -70,10 +74,11 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
                 df = df[[x, y, hue]]
             else:
                 df = df[[x, y]]
+                legend_data = df[[y]]
 
     if colors is None:
         if hue is None:
-            colors = put.get_n_colors(n=len(df.columns), **kwargs)
+            colors = put.get_n_colors(n=len(legend_data.columns), **kwargs)
         else:
             colors = put.get_n_colors(n=len(df[hue].unique()), **kwargs)
 
@@ -88,7 +93,9 @@ def plot_line(df: Union[pd.Series, pd.DataFrame],
     if legend_loc is not None:
         if legend_labels is None:
             if hue is None:
-                legend_labels = put.get_legend_lines(data=df, legend_stats=legend_stats, var_format=yvar_format)
+                legend_labels = put.get_legend_lines(
+                    data=legend_data, legend_stats=legend_stats, var_format=yvar_format
+                )
             else:
                 h, legend_labels = ax.get_legend_handles_labels()
         put.set_legend(ax=ax,
