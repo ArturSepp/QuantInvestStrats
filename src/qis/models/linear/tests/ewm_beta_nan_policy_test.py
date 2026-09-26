@@ -11,8 +11,12 @@ from qis.models.linear.ewm import NanBackfill, compute_ewm_xy_beta_tensor
     [
         (NanBackfill.FFILL, [2.0, 2.0 / 3.0, 2.0 / 3.0, 134.0 / 73.0]),
         (NanBackfill.DEFLATED_FFILL, [2.0, 2.0 / 3.0, 2.0 / 3.0, 262.0 / 137.0]),
-        (NanBackfill.ZERO_FILL, [2.0, 2.0 / 3.0, 0.0, 2.0]),
-        (NanBackfill.NAN_FILL, [2.0, 2.0 / 3.0, 0.0, 2.0]),
+        # ZERO_FILL resets both moments to zero at the gap: the factor then has no variance
+        # and its beta is undefined. The estimator used to divide by the identity there and
+        # report the zero cross moment as a beta of 0.0; it now reports NaN. NAN_FILL carries
+        # the same reset state and reports the gap itself as NaN.
+        (NanBackfill.ZERO_FILL, [2.0, 2.0 / 3.0, np.nan, 2.0]),
+        (NanBackfill.NAN_FILL, [2.0, 2.0 / 3.0, np.nan, 2.0]),
     ],
 )
 def test_missing_factor_applies_policy_to_both_beta_moments(

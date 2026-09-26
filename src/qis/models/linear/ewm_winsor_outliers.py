@@ -6,7 +6,11 @@ optional log transform, a cut on the full-sample standard deviation, then a cut 
 ``OutlierPolicyTypes`` holds the ready-made policies. ``ewm_insample_winsorising`` cuts that score
 at ``quantile_cut`` from each tail instead, with ``ReplacementType`` deciding what a rejected point
 becomes - the EWM mean, NaN, or the corresponding quantile. ``compute_ewm_score`` is the shared
-scoring step, clipping ``ewm_vol`` from below at its own ``clip_quantile``.
+scoring step, clipping ``ewm_vol`` from below at its own ``clip_quantile``, column by column.
+
+The score is contemporaneous: m_t and v_t include x_t, so |score| <= sqrt(λ/(1-λ)), 3.96 at
+λ = 0.94, however extreme x_t is, and a move of k standard deviations scores about
+λ k / sqrt(λ + (1-λ) k^2) (see ``score_of_move``). A score cut must sit below that bound to act.
 
 Those three read the whole sample - the mean and volatility are contemporaneous and the quantiles
 full-sample - so they clean a descriptive exhibit, not a backtest path.
@@ -14,6 +18,7 @@ full-sample - so they clean a descriptive exhibit, not a backtest path.
 state at t-1 and returns the cleaned series alongside that state and the score.
 """
 # packages
+import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -23,6 +28,14 @@ from qis.models.linear.ewm import compute_ewm, compute_ewm_vol
 
 
 class ReplacementType(Enum):
+    """
+    what a rejected observation becomes.
+
+    Attributes:
+        EWMA_MEAN: the EWM mean of the cleaned data at that date
+        NAN: a missing value
+        QUANTILES: the full-sample quantile of the data on the side it was cut
+    """
     EWMA_MEAN = 1
     NAN = 2
     QUANTILES = 3
@@ -43,9 +56,47 @@ class OutlierPolicy(NamedTuple):
     nan_replacement_type: ReplacementType = ReplacementType.NAN
 
 
+def score_of_move(num_std: float, ewm_lambda: float = 0.94) -> float:
+    """EWM score of an observation ``num_std`` standard deviations from a zero-mean state.
+
+    ``compute_ewm_score`` measures x_t against an EWM mean and volatility that already contain
+    x_t. From a state with mean 0 and second moment sigma^2, an observation k sigma away moves the
+    mean to (1-λ) k sigma and the second moment to (λ + (1-λ) k^2) sigma^2, so it scores
+    ``λ k / sqrt(λ + (1-λ) k^2)``. The score increases with k towards ``λ / sqrt(1-λ)``, 3.84 at
+    λ = 0.94, which is how a threshold in standard deviations translates into a threshold on
+    the score.
+
+    Args:
+        num_std: size of the move in standard deviations of the state
+        ewm_lambda: EWM decay of the score
+
+    Returns:
+        the score of that move
+    """
+    return ewm_lambda * num_std / np.sqrt(ewm_lambda + (1.0 - ewm_lambda) * num_std ** 2)
+
+
+# the EWM score cut of the soft presets: the score of a 10-standard-deviation move at λ = 0.94
+_TEN_STD_SCORE = score_of_move(num_std=10.0, ewm_lambda=0.94)
+
+
 class OutlierPolicyTypes(OutlierPolicy, Enum):
     """
-    defined policy type
+    ready-made outlier policies.
+
+    The EWM score is contemporaneous and bounded by sqrt(λ/(1-λ)) = 3.96 at λ = 0.94, so the soft
+    presets cut it at the score of a 10-standard-deviation move, ``score_of_move(10) = 3.57``,
+    rather than at 10, a level the score can never reach.
+
+    Attributes:
+        HARD_CEIL_POLICY: drop values below 1e-4 and above the full-sample mean plus 10
+            full-sample standard deviations
+        RANGE_CEIL_POLICY: the same cuts as HARD_CEIL_POLICY
+        SOFT_RANGE_CEIL_POLICY: drop values below 1e-8, above the mean plus 10 standard
+            deviations, and with an EWM score above that of a 10-standard-deviation move
+        SOFT_POSITIVE_LOG_POLICY: drop values below 1e-8, then apply the EWM score cut of
+            SOFT_RANGE_CEIL_POLICY to the log of the data
+        NONE: no policy
     """
     HARD_CEIL_POLICY = OutlierPolicy(abs_floor=0.0001,
                                      std_abs_ceil=10.0)
@@ -54,12 +105,12 @@ class OutlierPolicyTypes(OutlierPolicy, Enum):
                                       std_abs_ceil=10.0)
 
     SOFT_RANGE_CEIL_POLICY = OutlierPolicy(abs_floor=1e-8,
-                                           std_ewm_ceil=10.0,
+                                           std_ewm_ceil=_TEN_STD_SCORE,
                                            std_ewm_floor=None,
                                            std_abs_ceil=10.0)
 
     SOFT_POSITIVE_LOG_POLICY = OutlierPolicy(abs_floor=1e-8,
-                                             std_ewm_ceil=10.0,
+                                             std_ewm_ceil=_TEN_STD_SCORE,
                                              std_ewm_floor=None,
                                              is_log_transform=True)
     NONE = None
@@ -68,9 +119,33 @@ class OutlierPolicyTypes(OutlierPolicy, Enum):
 def filter_outliers(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     outlier_policy: OutlierPolicy
                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+    """Remove outliers by the cuts of an ``OutlierPolicy``, applied in a fixed order.
 
-    np.seterr(invalid='ignore')  # off warnings
+    The order is: absolute ceiling and floor; the optional log transform; a cut at the
+    full-sample mean plus ``std_abs_ceil`` (or ``std_abs_floor``) full-sample standard
+    deviations; a cut of the contemporaneous EWM score of the cleaned data at ``std_ewm_ceil``
+    and ``std_ewm_floor``; the inverse log. Rejected points become NaN, or the EWM mean with
+    ``ReplacementType.EWMA_MEAN``. Invalid-value warnings are silenced for the duration of the
+    call only. The cuts use the whole sample: descriptive cleaning, not a backtest path.
 
+    Args:
+        data: observations, time along the first axis
+        outlier_policy: the cuts; see ``OutlierPolicyTypes`` for presets
+
+    Returns:
+        the cleaned data, same container as ``data``
+
+    Raises:
+        TypeError: for an unsupported container, or a log transform without ``abs_floor``
+    """
+    with np.errstate(invalid='ignore'):  # local: numpy's error state is restored on exit
+        return _filter_outliers(data=data, outlier_policy=outlier_policy)
+
+
+def _filter_outliers(data: Union[pd.DataFrame, pd.Series, np.ndarray],
+                     outlier_policy: OutlierPolicy
+                     ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+    """The body of :func:`filter_outliers`."""
     if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
         orig_data = data.to_numpy()
     elif isinstance(data, np.ndarray):
@@ -168,7 +243,26 @@ def ewm_insample_winsorising(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                              quantile_cut: float = 0.025,
                              nan_replacement_type: ReplacementType = ReplacementType.EWMA_MEAN
                              ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+    """Winsorise each column at full-sample quantiles of its EWM score.
 
+    Points whose score lies below the ``quantile_cut`` or above the ``1 - quantile_cut``
+    quantile of the column's scores are replaced as ``nan_replacement_type`` says. The quantiles
+    ignore missing values, so a column with gaps is winsorised like any other. The quantiles use
+    the whole sample: descriptive cleaning, not a backtest path.
+
+    Args:
+        data: observations, time along the first axis
+        ewm_lambda: EWM decay of the score
+        quantile_cut: tail probability cut on each side
+        nan_replacement_type: ``EWMA_MEAN`` (default), ``NAN``, or ``QUANTILES`` for the
+            full-sample quantile of the data on the side that was cut
+
+    Returns:
+        the winsorised data, same container as ``data``
+
+    Raises:
+        TypeError: for an unsupported container or replacement type
+    """
     if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
         np_data = data.to_numpy()
     elif isinstance(data, np.ndarray):
@@ -179,9 +273,12 @@ def ewm_insample_winsorising(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     # 1 compute ewm score
     ewm_mean, score = compute_ewm_score(data=np_data, ewm_lambda=ewm_lambda)
 
-    lower_quantile = np.quantile(score, quantile_cut, axis=0)
-    upper_quantile = np.quantile(score, 1.0-quantile_cut, axis=0)
-    # print(f"lower_quantile={lower_quantile}, upper_quantile={upper_quantile}")
+    with warnings.catch_warnings():  # an all-nan column has nan quantiles and is left as is
+        warnings.simplefilter('ignore', RuntimeWarning)
+        lower_quantile = np.nanquantile(score, quantile_cut, axis=0)
+        upper_quantile = np.nanquantile(score, 1.0-quantile_cut, axis=0)
+        data_lower = np.nanquantile(np_data, quantile_cut, axis=0)
+        data_upper = np.nanquantile(np_data, 1.0-quantile_cut, axis=0)
 
     if nan_replacement_type == ReplacementType.EWMA_MEAN:
         replacement_cond = np.logical_or(score < lower_quantile, score > upper_quantile)
@@ -192,8 +289,8 @@ def ewm_insample_winsorising(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         winsor_data = np.where(replacement_cond, np.full_like(np_data, np.nan), np_data)
 
     elif nan_replacement_type == ReplacementType.QUANTILES:
-        winsor_data = np.where(score < lower_quantile, np.quantile(np_data, quantile_cut, axis=0), np_data)
-        winsor_data = np.where(score > upper_quantile, np.quantile(np_data, 1.0-quantile_cut, axis=0), winsor_data)
+        winsor_data = np.where(score < lower_quantile, data_lower, np_data)
+        winsor_data = np.where(score > upper_quantile, data_upper, winsor_data)
     else:
         raise TypeError('replacement_type not implemented')
 
@@ -209,12 +306,29 @@ def compute_ewm_score(data: np.ndarray,
                       ewm_lambda: Union[float, np.ndarray] = 0.94,
                       is_clip: bool = True,
                       clip_quantile: float = 0.16
-                      ) -> (np.ndarray, np.ndarray):
+                      ) -> Tuple[np.ndarray, np.ndarray]:
+    """Contemporaneous EWM score ``(x_t - m_t) / max(sigma_t, c)`` of each column.
 
+    ``m_t`` is the ``X0``-seeded EWM mean and ``sigma_t`` the EWM volatility about zero of
+    :func:`compute_ewm_vol`; both include x_t, so the score is bounded by sqrt(λ/(1-λ)). ``c`` is
+    the full-sample ``clip_quantile`` quantile of the column's own ``sigma``, a look-ahead floor.
+
+    Args:
+        data: observations, shape (t,) or (t, n)
+        ewm_lambda: EWM decay of the mean and the volatility
+        is_clip: floor the volatility of each column at its ``clip_quantile`` quantile
+        clip_quantile: quantile level of that floor
+
+    Returns:
+        the EWM mean and the score, each shaped like ``data``; the score is NaN where x_t is
+    """
     ewm_mean = compute_ewm(data=data, ewm_lambda=ewm_lambda)
     ewm_vol = compute_ewm_vol(data=data, ewm_lambda=ewm_lambda)
-    if is_clip:  # remove small values below 1 _ std quantile
-        ewm_vol = np.clip(a=ewm_vol, a_min=np.nanquantile(ewm_vol, clip_quantile), a_max=None)
+    if is_clip:  # floor each column's vol at its own clip_quantile quantile
+        with warnings.catch_warnings():  # an all-nan column has no floor
+            warnings.simplefilter('ignore', RuntimeWarning)
+            vol_floor = np.nanquantile(ewm_vol, clip_quantile, axis=0)
+        ewm_vol = np.fmax(ewm_vol, vol_floor)
     non_nan_cond = np.isfinite(data)
     # NumPy 2.x: explicit out= so masked positions are deterministic nan.
     diff = np.subtract(data, ewm_mean)
@@ -255,6 +369,7 @@ def ewm_winsdor_markovian_score(a: np.ndarray,
     if x[t] is nan:
     ewm[t] = ewm[t-1]
     ewm2[t] = ewm2[t-1]
+    and the cleaned value is nan; an outlier's cleaned value is the previous cleaned value
 
     assumption is that no np.nan value is returned from the function
 
@@ -318,19 +433,21 @@ def ewm_winsdor_markovian_score(a: np.ndarray,
         score_vol = np.sqrt(np.where(np.greater(last_ewm2, 0.0), last_ewm2, np.nan))
         score_t = (a_t - last_ewm) / score_vol
         is_outlier = np.abs(score_t) >= score_threshold
+        # an outlier or a missing observation leaves the state unchanged
+        is_hold = np.logical_or(is_outlier, np.logical_not(np.isfinite(a_t)))
 
         if is_1d:   # np.where cannot be used
-            if is_outlier:
+            if is_hold:
                 current_ewm = last_ewm
                 current_ewm2 = last_ewm2
-                clean_a_ = clean_a[t-1]
+                clean_a_ = clean_a[t-1] if is_outlier else a_t
             else:
                 current_ewm = current_ewm_
                 current_ewm2 = current_ewm2_
                 clean_a_ = a_t
         else:
-            current_ewm = np.where(is_outlier, current_ewm_, last_ewm)
-            current_ewm2 = np.where(is_outlier, current_ewm2_, last_ewm2)
+            current_ewm = np.where(is_hold, last_ewm, current_ewm_)
+            current_ewm2 = np.where(is_hold, last_ewm2, current_ewm2_)
             clean_a_ = np.where(is_outlier, clean_a[t-1], a_t)
 
         ewm[t] = last_ewm = current_ewm

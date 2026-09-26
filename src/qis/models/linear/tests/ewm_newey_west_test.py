@@ -3,7 +3,8 @@
 The variance recursion runs on squared observations and must be seeded on that scale, so with no
 lag terms the estimator is exactly the EWM variance. Each lag term is the Bartlett-weighted EWM
 of ``x_t x_{t-m}``, doubled for the two sides of the autocovariance, using the same decay as the
-variance.
+variance and scaled by ``lambda^(m/2)``, the geometric mean of the EWM weights of the two dates
+it pairs, which makes the estimator positive semidefinite.
 """
 
 # packages
@@ -26,7 +27,12 @@ def _returns() -> pd.DataFrame:
 
 
 def _reference(x: np.ndarray, ewm_lambda: float, num_lags: int) -> np.ndarray:
-    """Newey-West EWM variance by explicit loops, seeded with the first squared observation."""
+    """Newey-West EWM variance by explicit loops, seeded with the first squared observation.
+
+    The lag-m term carries the factor ``ewm_lambda ** (m / 2)``. Before this release the lag
+    terms were unscaled, and the estimator could turn negative (see
+    ``ewm_covariance_newey_west_psd_test.py``); the expected values changed with the fix.
+    """
     variance = np.empty_like(x)
     variance[0] = x[0] ** 2
     for t in range(1, len(x)):
@@ -37,7 +43,7 @@ def _reference(x: np.ndarray, ewm_lambda: float, num_lags: int) -> np.ndarray:
         for t in range(1, len(x)):
             product = x[t] * x[t - m] if t >= m else np.zeros_like(x[t])
             cross[t] = ewm_lambda * cross[t - 1] + (1.0 - ewm_lambda) * product
-        adjustment += (1.0 - m / (num_lags + 1)) * 2.0 * cross
+        adjustment += (1.0 - m / (num_lags + 1)) * 2.0 * ewm_lambda ** (m / 2) * cross
     return variance + adjustment
 
 

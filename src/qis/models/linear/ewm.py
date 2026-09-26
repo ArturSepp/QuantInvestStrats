@@ -11,18 +11,24 @@ through λ = 1 - 2/(span + 1). That is the pandas span-to-decay mapping, but the
 run unadjusted, so it matches ``.ewm(span=..., adjust=False)`` and not the ``.ewm()`` default.
 The column-wise path takes a vector decay, one per column; the covariance kernels take a scalar.
 
+The seed is the state before a column's first finite observation, s_{t0-1}, and every finite
+observation, the first included, updates it. Rows before the first observation are NaN.
+
 Four enums carry the conventions, and they are the arguments worth getting right:
 
     ``NanBackfill`` what the recursion carries across a missing observation: ``FFILL`` holds the
-        last state, ``DEFLATED_FFILL`` decays it by λ, ``ZERO_FILL`` resets it to zero.
-        ``NAN_FILL`` is honoured only by the covariance tensors and is zero fill elsewhere
+        last state, ``DEFLATED_FFILL`` decays it by λ (a missing value is a zero observation),
+        ``ZERO_FILL`` resets it to zero, and ``NAN_FILL`` resets it to zero and reports NaN at
+        the gap. The covariance functions default to ``DEFLATED_FFILL``, which keeps every
+        matrix positive semidefinite; the column-wise functions default to ``FFILL``
     ``MeanAdjType`` which mean is removed before a second moment is taken. ``NONE`` is the
         second moment about zero, the usual choice for returns; ``INSAMPLE`` subtracts the
         full-sample mean and is forward-looking, so descriptive exhibits only, never inside a
         backtest; ``EXPANDING`` and ``EWMA`` are point-in-time given a point-in-time seed
-    ``InitType`` how the recursion is seeded - and ``MEAN`` and ``VAR`` seed it with full-sample
-        statistics, so they carry the same look-ahead near the start of the sample as
-        ``INSAMPLE`` does throughout. ``CrossXyType`` selects covariance, beta or correlation
+    ``InitType`` how the recursion is seeded - ``ZERO`` and ``X0`` are point in time, while
+        ``MEAN`` and ``VAR`` seed it with full-sample statistics, so they carry the same
+        look-ahead near the start of the sample as ``INSAMPLE`` does throughout.
+        ``CrossXyType`` selects covariance, beta or correlation
 
 Two layers, and the difference matters at the call site. ``compute_ewm`` and ``compute_ewm_vol``
 are wrappers: they take pandas or ndarray, preserve the container, and handle the NaN policy,
@@ -54,27 +60,54 @@ class NanBackfill(Enum):
 
     The recursion ``s_t = (1-λ) x_t + λ s_{t-1}`` has no value to carry forward at a NaN, so a
     policy is required. Which one is right depends on whether the gap means "no observation
-    arrived" or "the series is genuinely absent here".
+    arrived" or "the series is genuinely absent here". Every policy applies only after a
+    column's first finite observation: before it the output is NaN under all four. In a
+    covariance or beta recursion the policy applies entry by entry, to the entries whose update
+    involves a missing value.
 
     Attributes:
-        FFILL: carry the last non-NaN state forward unchanged. The base case: a continuous
-            series with occasional gaps, where a missing print does not mean the level moved
-        DEFLATED_FFILL: carry the last non-NaN state forward scaled by λ, so a long gap decays
-            towards zero rather than holding a stale level indefinitely
-        ZERO_FILL: substitute zero. Needed where the recursion cannot start otherwise, and the
-            usual choice for return series, where a missing return is economically zero
-        NAN_FILL: run the recursion with ZERO_FILL, then put NaN back at the gaps, so the output
-            flags where the input was missing. Equivalent to DEFLATED_FFILL for the non-NaN
-            values that follow
+        FFILL: hold the last state, ``s_t = s_{t-1}``: time stops for the series. The default of
+            the column-wise functions. In a covariance matrix with gaps that differ across
+            assets it can break positive semidefiniteness
+        DEFLATED_FFILL: decay the last state, ``s_t = λ s_{t-1}``, which is exactly the update
+            with the missing observation replaced by zero. The usual reading for a return series,
+            where a missing return is economically zero; it keeps covariance matrices positive
+            semidefinite and is the default of the covariance functions
+        ZERO_FILL: reset the state to zero, ``s_t = 0``: the history is erased and the next
+            observation restarts the recursion at ``(1-λ) x_t``. For a series that is genuinely
+            absent at the gap
+        NAN_FILL: carry the state as ZERO_FILL does, and report NaN at the gap instead of the
+            zero state, so the output flags where the input was missing. A genuine zero estimate
+            is reported as zero
     """
-    FFILL = 1   # use last nonnan value
-    DEFLATED_FFILL = 2  #  use last nonnan value * lambda
-    ZERO_FILL = 3  # use zero value: nans must be filled by zero otherwise the recursion cannot start
-    NAN_FILL = 4  # use nan value: for recursion we use ZERO_FILL then we substitute zeros with nans:
-    # it corresponds to DEFLATED_FFILL for subsequent non nans
+    FFILL = 1  # hold the last state
+    DEFLATED_FFILL = 2  # decay the last state by lambda: a missing value is a zero observation
+    ZERO_FILL = 3  # reset the state to zero
+    NAN_FILL = 4  # reset the state to zero and report nan at the gap
 
 
 class InitType(Enum):
+    """
+    how an EWM recursion is seeded when no explicit ``init_value`` is given.
+
+    The seed is the state before a column's first finite observation; that observation then
+    updates it, ``s_{t0} = λ seed + (1-λ) x_{t0}``. The seed keeps weight ``λ^(t-t0+1)`` at row
+    ``t``, below 5% after about ``1.5 N`` rows for span ``N``, so a full-sample seed leaks later
+    information into the early estimates.
+
+    Attributes:
+        ZERO: seed zero. Point in time; the early estimates are shrunk towards zero by the
+            factor ``1 - λ^(t-t0+1)``
+        X0: seed with the column's first finite observation (its square, or cross product, in a
+            second-moment recursion), so ``s_{t0} = x_{t0}``. Point in time and the qis default;
+            it is pandas ``adjust=False``
+        MEAN: seed with the full-sample mean of the series the recursion runs on (for a
+            variance, the mean of ``x^2``). Uses the whole sample: look-ahead
+        VAR: seed a second-moment recursion with the full-sample variance of the observations
+            (a covariance for a cross moment). Look-ahead. A mean recursion cannot take it:
+            ``compute_ewm`` and ``compute_rolling_mean_adj`` raise ``ValueError``, and where the
+            same ``init_type`` also seeds a mean adjustment that mean is seeded with ``MEAN``
+    """
     ZERO = 1
     X0 = 2
     MEAN = 3
@@ -105,49 +138,181 @@ class MeanAdjType(Enum):
 
 
 class CrossXyType(Enum):
+    """
+    which cross statistic ``compute_ewm_cross_xy`` returns.
+
+    Attributes:
+        COVAR: the EWM cross moment ``M^{xy}`` (a covariance only if the inputs are centred)
+        BETA: ``M^{xy} / M^{xx}``, the EWM regression slope of y on x through the origin
+        CORR: ``M^{xy} / sqrt(M^{xx} M^{yy})``, an uncentred correlation unless mean-adjusted
+    """
     COVAR = 1
     BETA = 2
     CORR = 3
 
 
+def _njit_cached(func):
+    """``njit`` with an on-disk cache, compiled in memory when no cache location is writable.
+
+    Only for kernels that call no jitted function outside this module: numba does not
+    invalidate a cached function when a callee in another file changes.
+    """
+    try:
+        return njit(cache=True)(func)
+    except RuntimeError:  # numba raises at decoration when it finds no writable cache location
+        return njit(func)
+
+
+def _first_finite(x: np.ndarray) -> Union[float, np.ndarray]:
+    """First finite value of a 1-d array, or of each column of a 2-d array; 0 where none."""
+    finite = np.isfinite(x)
+    if x.ndim == 1:
+        idx = np.flatnonzero(finite)
+        return float(x[idx[0]]) if idx.size > 0 else 0.0
+    first = np.argmax(finite, axis=0)
+    values = x[first, np.arange(x.shape[1])]
+    return np.where(finite.any(axis=0), values, 0.0).astype(float)
+
+
 def set_init_dim1(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                   init_type: InitType = InitType.X0
                   ) -> Union[float, np.ndarray]:
+    """Seed of an EWM recursion run on ``data``, one value per column.
 
+    Args:
+        data: the series the recursion runs on: observations for a mean, squares or cross
+            products for a second moment
+        init_type: ``ZERO`` gives 0; ``X0`` the first finite value of each column; ``MEAN`` the
+            full-sample ``nanmean``; ``VAR`` the full-sample ``nanvar`` (``ddof=0``) of ``data``
+            itself. A column with no finite value is seeded with 0
+
+    Returns:
+        a float for 1-d data, an array with one seed per column otherwise
+
+    Raises:
+        TypeError: if ``init_type`` is not an ``InitType``
+    """
     x = npo.to_finite_np(data=data, fill_value=np.nan)
+    has_data = np.isfinite(x).any(axis=0)
 
     if init_type == InitType.ZERO:
-        init_value = np.zeros_like(x[0])
+        init_value = np.zeros_like(x[0], dtype=float)
     elif init_type == InitType.X0:
-        init_value = np.where(np.isnan(x[0])==False, x[0], 0.0)
-    elif init_type == InitType.MEAN:
-        init_value = np.nanmean(x, axis=0)
-        init_value = np.where(np.isnan(init_value) == False, init_value, 0.0)
-    elif init_type == InitType.VAR:
-        init_value = np.nanvar(x, axis=0)
+        init_value = _first_finite(x)
+    elif init_type in (InitType.MEAN, InitType.VAR):
+        func = np.nanmean if init_type == InitType.MEAN else np.nanvar
+        with warnings.catch_warnings():  # an empty column is seeded with zero below
+            warnings.simplefilter('ignore', RuntimeWarning)
+            init_value = func(x, axis=0)
+        init_value = np.where(has_data, init_value, 0.0)
     else:
-        raise TypeError(f"in set_initial_condition: unsuported init_type")
+        raise TypeError(f"in set_init_dim1: unsupported init_type={init_type}")
 
-    return init_value
+    if x.ndim == 1:
+        return float(init_value)
+    return np.asarray(init_value, dtype=float)
 
 
 def set_init_dim2(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                   init_type: InitType = InitType.X0
                   ) -> np.ndarray:
+    """Seed matrix of an EWM covariance recursion: zeros for ``ZERO`` and ``X0``.
 
+    Args:
+        data: observations, shape (t, n)
+        init_type: ``ZERO`` or ``X0``; both give the (n, n) zero matrix, because the matrix
+            recursions update at the first row from their seed
+
+    Returns:
+        the (n, n) seed matrix
+
+    Raises:
+        TypeError: for ``MEAN`` or ``VAR``
+    """
     x = npo.to_finite_np(data=data, fill_value=np.nan)
-    cross = np.transpose(x) @ x
-    if init_type == InitType.ZERO:
-        init_value = np.zeros((cross.shape[0], cross.shape[1]))
-    elif init_type == InitType.X0:
-        init_value = np.zeros((cross.shape[0], cross.shape[1]))
+    n = 1 if x.ndim == 1 else x.shape[1]
+    if init_type in (InitType.ZERO, InitType.X0):
+        init_value = np.zeros((n, n))
     else:
-        raise TypeError(f"in set_initial_condition_dim2: unsuported init_type")
+        raise TypeError("in set_initial_condition_dim2: unsupported init_type")
 
     return init_value
 
 
-@njit
+def _second_moment_init(x: np.ndarray,
+                        y: np.ndarray,
+                        init_type: InitType
+                        ) -> Union[float, np.ndarray]:
+    """Seed of the EWM second moment of ``x * y`` on the scale of that product.
+
+    ``VAR`` gives the full-sample (co)variance of the observations about their means over the
+    rows where both are finite; the other types apply :func:`set_init_dim1` to the product.
+    """
+    if init_type != InitType.VAR:
+        return set_init_dim1(data=np.multiply(x, y), init_type=init_type)
+    both = np.isfinite(x) & np.isfinite(y)
+    xm = np.where(both, x, np.nan)
+    ym = np.where(both, y, np.nan)
+    with warnings.catch_warnings():  # an empty column is seeded with zero below
+        warnings.simplefilter('ignore', RuntimeWarning)
+        covar = np.nanmean((xm - np.nanmean(xm, axis=0)) * (ym - np.nanmean(ym, axis=0)), axis=0)
+    covar = np.where(both.any(axis=0), covar, 0.0)
+    return float(covar) if np.ndim(x) == 1 else np.asarray(covar, dtype=float)
+
+
+def _mean_init_type(init_type: InitType) -> InitType:
+    """Seed of a mean recursion when ``init_type`` also seeds a variance: VAR maps to MEAN."""
+    return InitType.MEAN if init_type == InitType.VAR else init_type
+
+
+def _check_mean_init_type(init_type: InitType, name: str) -> None:
+    """A mean recursion cannot be seeded with a variance."""
+    if init_type == InitType.VAR:
+        raise ValueError(f"{name}: InitType.VAR seeds a second-moment recursion; a mean "
+                         f"recursion takes ZERO, X0 or MEAN")
+
+
+def _to_decay(span: Optional[Union[float, np.ndarray]],
+              ewm_lambda: Union[float, np.ndarray]
+              ) -> Union[float, np.ndarray]:
+    """``lambda = 1 - 2 / (span + 1)`` when ``span`` is given, else ``ewm_lambda``."""
+    if span is None:
+        return ewm_lambda
+    if isinstance(span, np.ndarray):
+        return 1.0 - 2.0 / (span.astype(float) + 1.0)
+    return 1.0 - 2.0 / (span + 1.0)
+
+
+def _kernel_args(a: np.ndarray,
+                 init_value: Union[float, np.ndarray],
+                 ewm_lambda: Union[float, np.ndarray]
+                 ) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
+    """Seed and decay in the types the numba kernel needs: floats for a 1-d array, and a seed
+    vector with one entry per column for a 2-d array."""
+    if a.ndim == 1:
+        seed = float(np.asarray(init_value, dtype=float).reshape(-1)[0])
+        decay = float(np.asarray(ewm_lambda, dtype=float).reshape(-1)[0])
+        return seed, decay
+    seed = np.broadcast_to(np.asarray(init_value, dtype=float), (a.shape[1],)).copy()
+    if isinstance(ewm_lambda, np.ndarray):
+        return seed, ewm_lambda.astype(float)
+    return seed, float(ewm_lambda)
+
+
+def _run_ewm(a: np.ndarray,
+             init_value: Union[float, np.ndarray],
+             ewm_lambda: Union[float, np.ndarray],
+             nan_backfill: NanBackfill = NanBackfill.FFILL,
+             is_unit_vol_scaling: bool = False
+             ) -> np.ndarray:
+    """:func:`ewm_recursion` on a float array with the seed and decay typed for numba."""
+    a = np.asarray(a, dtype=float)
+    seed, decay = _kernel_args(a=a, init_value=init_value, ewm_lambda=ewm_lambda)
+    return ewm_recursion(a=a, init_value=seed, ewm_lambda=decay, nan_backfill=nan_backfill,
+                         is_unit_vol_scaling=is_unit_vol_scaling)
+
+
+@_njit_cached
 def ewm_recursion(a: np.ndarray,
                   init_value: Union[float, np.ndarray],
                   span: Union[float, np.ndarray] = None,
@@ -158,78 +323,88 @@ def ewm_recursion(a: np.ndarray,
                   ) -> np.ndarray:
 
     """
-    compute ewm using recursion:
-    ewm[t] = (1-lambda) * x[t] + lambda*ewm[t-1]
+    exponentially weighted moving average by the recursion ``s_t = λ s_{t-1} + (1-λ) x_t``.
 
-    assumption is that non np.nan value is returned from the function
+    ``init_value`` is the state before a column's first finite observation, and every finite
+    observation, the first included, updates it: ``s_{t0} = λ init_value + (1-λ) x_{t0}``. So
+    ``init_value = x_{t0}`` gives ``s_{t0} = x_{t0}`` (pandas ``adjust=False``) and a zero seed
+    gives ``(1-λ) x_{t0}``, whether the column starts on row 0 or later. After the start a
+    missing observation (or a non-finite update) follows ``nan_backfill``, see
+    :class:`NanBackfill`.
 
-    data: numpy with dimension = t*n
-    ewm_lambda: float or ndarray of dimension n
-    init_value: initial value of dimension n
-    start_from_first_nonan: start filling nans only from the first non-nan in underlying data: recomended because
-                            it avoids backfilling of init_value
-    is_unit_vol_scaling: outputs are scaled to have var(ewm)=1 (for gaussian data with zero corrs)
+    Args:
+        a: observations, shape (t,) or (t, n)
+        init_value: the seed, a float for 1-d ``a`` and a float or an (n,) array for 2-d ``a``
+        span: if given, overrides ``ewm_lambda`` via ``λ = 1 - 2 / (span + 1)``
+        ewm_lambda: decay in [0, 1), a float or one per column
+        is_start_from_first_nonan: True (the default) keeps each column NaN until its first
+            finite observation and applies the seed there. False applies the seed before row 0
+            and the missing-value policy from row 0 on
+        is_unit_vol_scaling: multiply the output by ``sqrt((1+λ)/(1-λ))``, which gives unit
+            variance for IID unit-variance input in the stationary limit
+        nan_backfill: the missing-observation policy after the start
+
+    Returns:
+        the EWM path, same shape as ``a``
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
 
     ewm_lambda_1 = 1.0 - ewm_lambda
-
-    is_1d = (a.ndim == 1)  # or a.shape[1] == 1)
-
-    # initialize all
+    is_nan_fill = nan_backfill == NanBackfill.NAN_FILL
     ewm = np.full_like(a, fill_value=np.nan, dtype=np.double)
 
-    if is_start_from_first_nonan:
-        if is_1d:  # cannot use np.where
-            ewm[0] = init_value if np.isfinite(a[0]) else np.nan
-        else:
-            ewm[0] = np.where(np.isfinite(a[0]), init_value, np.nan)
-    else:
-        ewm[0] = init_value
-    last_ewm = ewm[0]
-
-    # recurse from 1
-    for t in np.arange(1, a.shape[0]):
-        a_t = a[t]
-
-        if is_start_from_first_nonan:
-            # detect starting nonnans for when last ewma was np.nan and a_t is finite
-            if is_1d:  # cannot use np.where
-                if np.isfinite(last_ewm)==False and np.isfinite(a_t)==True:  # trick: if last_ewm is nan
-                    last_ewm = init_value
+    if a.ndim == 1:
+        state = init_value
+        started = not is_start_from_first_nonan
+        for t in range(a.shape[0]):
+            a_t = a[t]
+            if not started:
+                if not np.isfinite(a_t):
+                    continue  # before the first observation the output stays nan
+                started = True
+            current_ewm = ewm_lambda * state + ewm_lambda_1 * a_t
+            if np.isfinite(current_ewm):
+                state = current_ewm
+                ewm[t] = state
             else:
-                new_nonnans = np.logical_and(np.isfinite(last_ewm)==False, np.isfinite(a_t)==True)
-                if np.any(new_nonnans):
-                    last_ewm = np.where(new_nonnans, init_value, last_ewm)
-
-        # do the step
-        current_ewm = ewm_lambda * last_ewm + ewm_lambda_1 * a_t
-
-        # fill nan-values
-        if is_1d:   # np.where cannot be used
-            if not np.isfinite(current_ewm):
                 if nan_backfill == NanBackfill.FFILL:
-                    current_ewm = last_ewm
+                    pass
                 elif nan_backfill == NanBackfill.DEFLATED_FFILL:
-                    current_ewm = ewm_lambda*last_ewm
-                else:  # use zero fill
-                    current_ewm = 0.0
-        else:
+                    state = ewm_lambda * state
+                else:  # ZERO_FILL and NAN_FILL reset the state
+                    state = 0.0
+                if not is_nan_fill:
+                    ewm[t] = state
+    else:
+        n = a.shape[1]
+        state = np.empty(n)
+        state[:] = init_value
+        started = np.zeros(n, dtype=np.bool_)
+        if not is_start_from_first_nonan:
+            started[:] = True
+        zeros = np.zeros(n)
+        nans = np.full(n, np.nan)
+        for t in range(a.shape[0]):
+            a_t = a[t]
+            started = np.logical_or(started, np.isfinite(a_t))
+            current_ewm = ewm_lambda * state + ewm_lambda_1 * a_t
+            is_updated = np.isfinite(current_ewm)
             if nan_backfill == NanBackfill.FFILL:
-                fill_value = last_ewm
+                fill_value = state
             elif nan_backfill == NanBackfill.DEFLATED_FFILL:
-                fill_value = ewm_lambda*last_ewm
-            else:  # use zero fill
-                fill_value = np.zeros_like(last_ewm)
-
-            current_ewm = np.where(np.isfinite(current_ewm), current_ewm, fill_value)
-
-        ewm[t] = last_ewm = current_ewm
+                fill_value = ewm_lambda * state
+            else:  # ZERO_FILL and NAN_FILL reset the state
+                fill_value = zeros
+            state = np.where(started, np.where(is_updated, current_ewm, fill_value), state)
+            if is_nan_fill:
+                ewm[t] = np.where(np.logical_and(started, is_updated), state, nans)
+            else:
+                ewm[t] = np.where(started, state, nans)
 
     if is_unit_vol_scaling:
-        if ewm_lambda >= 1.0:
-            raise ValueError(f"ewm_lambda must be < 1, got {ewm_lambda}")
+        if np.any(np.asarray(ewm_lambda) >= 1.0):
+            raise ValueError("ewm_lambda must be < 1 for unit-variance scaling")
         vol_ratio = np.sqrt((1 + ewm_lambda) / (1 - ewm_lambda))
         ewm = vol_ratio * ewm
 
@@ -273,7 +448,7 @@ def _validate_long_short_spans(long_span, short_span):
                              f"got short_span={short_span}, long_span={long_span}")
 
 
-@njit
+@_njit_cached
 def compute_ewm_long_short(a: np.ndarray,
                            init_value: Union[float, np.ndarray],
                            long_span: Union[float, np.ndarray] = 63,
@@ -296,6 +471,9 @@ def compute_ewm_long_short(a: np.ndarray,
         and the leg weights divide by zero.
       * the unstable end is LARGE spans: ``span -> inf`` drives ``lambda -> 1`` and
         the ``(1 - lambda)`` terms in the loads/weights toward zero.
+
+    Both legs start from ``init_value`` as the state before the first observation, so the
+    first finite row enters the filter; the weight at lag 0 is zero with two legs.
 
     @njit kernel: assumes pre-validated spans (no f-string raises inside njit), so
     direct callers should validate first or use compute_ewm_long_short_filter.
@@ -337,19 +515,27 @@ def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series, np.ndarra
       * if ``short_span`` is given, ``short_span < long_span``: equal spans collapse
         the unit-variance normaliser to 0 (division by zero) and a larger
         ``short_span`` inverts the band-pass.
+
+    Args:
+        data: observations, time along the first axis; a 1-d ndarray is accepted
+        long_span: span of the slow leg
+        short_span: span of the fast leg; None uses the long leg alone
+        warmup_period: number of leading finite values of each column set to NaN
+
+    Returns:
+        the unit-variance filter, same container and shape as ``data``
+
+    Raises:
+        ValueError: if the spans violate the limits above
     """
 
     _validate_long_short_spans(long_span=long_span, short_span=short_span)
 
-    if isinstance(data, pd.DataFrame):
-        data_np = data.to_numpy()
-        init_value = np.zeros(data_np.shape[1])
-    elif isinstance(data, pd.Series):
-        data_np = data.to_numpy()
+    data_np = np.asarray(npo.to_finite_np(data=data, fill_value=np.nan), dtype=float)
+    if data_np.ndim == 1:  # numba needs a float seed for a single series
         init_value = 0.0
     else:
-        data_np = data
-        init_value = np.zeros_like(data[0])
+        init_value = np.zeros(data_np.shape[1])
 
     ls_filter = compute_ewm_long_short(a=data_np,
                                        init_value=init_value,
@@ -367,6 +553,27 @@ def compute_ewm_long_short_filter(data: Union[pd.DataFrame, pd.Series, np.ndarra
     return ls_filter
 
 
+@_njit_cached
+def _covar_update(last_covar: np.ndarray,
+                  product: np.ndarray,
+                  ewm_lambda: Union[float, np.ndarray],
+                  nan_backfill: NanBackfill
+                  ) -> Tuple[np.ndarray, np.ndarray]:
+    """One step of the matrix recursion with the missing-value policy applied entry by entry.
+
+    Returns the new state and the mask of entries whose update was finite.
+    """
+    covar = (1.0 - ewm_lambda) * product + ewm_lambda * last_covar
+    is_updated = np.isfinite(covar)
+    if nan_backfill == NanBackfill.FFILL:
+        fill_value = last_covar
+    elif nan_backfill == NanBackfill.DEFLATED_FFILL:
+        fill_value = ewm_lambda * last_covar
+    else:  # ZERO_FILL and NAN_FILL reset the entry
+        fill_value = np.zeros_like(last_covar)
+    return np.where(is_updated, covar, fill_value), is_updated
+
+
 @njit
 def compute_ewm_covar(a: np.ndarray,
                       b: np.ndarray = None,
@@ -374,13 +581,14 @@ def compute_ewm_covar(a: np.ndarray,
                       ewm_lambda: float = 0.94,
                       covar0: np.ndarray = None,
                       is_corr: bool = False,
-                      nan_backfill: NanBackfill = NanBackfill.FFILL
+                      nan_backfill: NanBackfill = NanBackfill.DEFLATED_FFILL
                       ) -> np.ndarray:
     """
     exponentially weighted covariance matrix at the final observation.
 
     Runs ``S_t = (1 - lambda) x_t x_t' + lambda S_{t-1}`` over the sample and returns the last
     state, not the path; use :func:`compute_ewm_covar_tensor` for the time series of matrices.
+    The matrix recursion updates at the first row from ``covar0``.
 
     Args:
         a: observations, shape (t, n) or (n,) for a single cross-section
@@ -390,22 +598,26 @@ def compute_ewm_covar(a: np.ndarray,
         ewm_lambda: decay in [0, 1); ignored when ``span`` is given
         covar0: seed matrix, shape (n, n); non-finite entries are treated as zero. Zeros when
             None
-        is_corr: normalise the result to a correlation matrix
-        nan_backfill: how a missing observation is carried — hold the previous matrix, or
-            hold it decayed by ``ewm_lambda``
+        is_corr: normalise the result to a correlation matrix, for 1-d input as well
+        nan_backfill: how a missing observation is carried, entry by entry; see
+            :class:`NanBackfill`. The default ``DEFLATED_FFILL`` treats a missing value as a
+            zero observation and keeps the matrix positive semidefinite; ``FFILL`` does not
+            when the gaps differ across assets. ``NAN_FILL`` reports NaN at the entries of the
+            assets missing on the last row
 
     Returns:
         covariance matrix, shape (n, n)
+
+    Raises:
+        ValueError: if ``b`` is given with a shape different from ``a``
     """
     if b is None:
         b = a
-    else:  # must use numba >= 0.61.2
-        assert a.shape[0] == b.shape[0]
-        assert a.shape[1] == b.shape[1]
+    elif a.shape != b.shape:
+        raise ValueError("a and b must have the same shape")
 
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-    ewm_lambda_1 = 1.0 - ewm_lambda
 
     if a.ndim == 1:  # ndarry
         n = a.shape[0]
@@ -413,44 +625,25 @@ def compute_ewm_covar(a: np.ndarray,
         n = a.shape[1]  # array of ndarray
 
     if covar0 is None:
-        covar = np.zeros((n, n))
+        last_covar = np.zeros((n, n))
     else:
-        covar = np.where(np.isfinite(covar0), covar0, 0.0)
+        last_covar = np.where(np.isfinite(covar0), covar0, 0.0)
+    is_updated = np.ones((n, n), dtype=np.bool_)
 
-    last_covar = covar
-    if a.ndim == 1:  # ndarry array
-        r_ij = np.outer(a, b)
-        covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-        if nan_backfill == NanBackfill.FFILL:
-            fill_value = last_covar
-        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
-            fill_value = ewm_lambda * last_covar
-        else:  # use zero fill
-            fill_value = np.zeros_like(last_covar)
-
-        covar = last_covar = np.where(np.isfinite(covar), covar, fill_value)
-
+    if a.ndim == 1:  # a single cross-section: one update
+        last_covar, is_updated = _covar_update(last_covar, np.outer(a, b), ewm_lambda,
+                                               nan_backfill)
     else:  # loop over rows
-        t = a.shape[0]
-        for idx in range(0, t):  # row in x:
-            r_ij = np.outer(a[idx], b[idx])
-            covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
+        for idx in range(0, a.shape[0]):
+            last_covar, is_updated = _covar_update(last_covar, np.outer(a[idx], b[idx]),
+                                                   ewm_lambda, nan_backfill)
 
-            if nan_backfill == NanBackfill.FFILL:
-                fill_value = last_covar
-            elif nan_backfill == NanBackfill.DEFLATED_FFILL:
-                fill_value = ewm_lambda*last_covar
-            else:  # use zero fill
-                fill_value = np.zeros_like(last_covar)
-
-            last_covar = np.where(np.isfinite(covar), covar, fill_value)
-
-        # for covar normalise
-        if is_corr:
-            covar, _, _ = npo._covar_to_corr_array(last_covar)
-        else:
-            covar = last_covar
-
+    if is_corr:
+        covar, _, _ = npo._covar_to_corr_array(last_covar)
+    else:
+        covar = last_covar.copy()
+    if nan_backfill == NanBackfill.NAN_FILL:
+        covar = np.where(is_updated, covar, np.nan)
     return covar
 
 
@@ -461,23 +654,44 @@ def compute_ewm_covar_newey_west(a: np.ndarray,
                                  ewm_lambda: float = 0.94,
                                  covar0: np.ndarray = None,
                                  is_corr: bool = False,
-                                 nan_backfill: NanBackfill = NanBackfill.FFILL
+                                 nan_backfill: NanBackfill = NanBackfill.DEFLATED_FFILL
                                  ) -> np.ndarray:
     """
-    implementation of newey west covar estimator
+    exponentially weighted Newey-West covariance matrix at the final observation.
+
+    ``S_T + sum_{k=1}^{L} (1 - k / (L + 1)) λ^(k/2) (C_k + C_k')``, where ``S_T`` is
+    :func:`compute_ewm_covar` and ``C_k`` the EWM of ``x_t x_{t-k}'`` from a zero seed, all with
+    the same decay. The factor ``λ^(k/2)`` is the geometric mean of the EWM weights of the two
+    dates a lag-k product pairs; with it the estimator is a quadratic form with the Bartlett
+    kernel and is positive semidefinite for complete data and for ``DEFLATED_FFILL`` gaps.
+
+    Args:
+        a: observations, shape (t, n)
+        num_lags: Bartlett lag count ``L``; 0 returns :func:`compute_ewm_covar`
+        span: if given, overrides ``ewm_lambda`` for every term
+        ewm_lambda: decay in [0, 1) of every term when ``span`` is None
+        covar0: seed of ``S``; zeros when None
+        is_corr: normalise the result to a correlation matrix
+        nan_backfill: missing-observation policy of every term; see :class:`NanBackfill`
+
+    Returns:
+        the Newey-West covariance matrix, shape (n, n)
     """
-    ewm0 = compute_ewm_covar(a=a, span=span, ewm_lambda=ewm_lambda, covar0=covar0, is_corr=False, nan_backfill=nan_backfill)
-    # compute m recursions
+    if span is not None:
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    ewm0 = compute_ewm_covar(a=a, ewm_lambda=ewm_lambda, covar0=covar0, is_corr=False,
+                             nan_backfill=nan_backfill)
     if num_lags > 0:
         nw_adjustment = np.zeros_like(ewm0)
-        for m in np.arange(1, num_lags+1):
+        for m in range(1, num_lags + 1):
             # lagged value
             a_m = np.empty_like(a)
             a_m[m:] = a[:-m]
             a_m[:m] = np.nan
-            ewm_m1 = compute_ewm_covar(a=a, b=a_m, span=span)
-            # ewm_m2 = compute_ewm_covar(a=a_m, b=a, span=span)
-            nw_adjustment += (1.0-m/(num_lags+1))*(ewm_m1 + np.transpose(ewm_m1))
+            ewm_m1 = compute_ewm_covar(a=a, b=a_m, ewm_lambda=ewm_lambda,
+                                       nan_backfill=nan_backfill)
+            weight = (1.0 - m / (num_lags + 1)) * ewm_lambda ** (0.5 * m)
+            nw_adjustment += weight * (ewm_m1 + np.transpose(ewm_m1))
         ewm_nw = ewm0 + nw_adjustment
     else:
         ewm_nw = ewm0
@@ -494,7 +708,7 @@ def compute_ewm_covar_tensor(a: np.ndarray,
                              ewm_lambda: float = 0.94,
                              covar0: np.ndarray = None,
                              is_corr: bool = False,
-                             nan_backfill: NanBackfill = NanBackfill.FFILL
+                             nan_backfill: NanBackfill = NanBackfill.DEFLATED_FFILL
                              ) -> np.ndarray:
     """
     exponentially weighted covariance matrix at every date, as a 3-d tensor.
@@ -509,7 +723,10 @@ def compute_ewm_covar_tensor(a: np.ndarray,
         ewm_lambda: decay in [0, 1); ignored when ``span`` is given
         covar0: seed matrix, shape (n, n); zeros when None
         is_corr: normalise each matrix to a correlation matrix
-        nan_backfill: how a missing observation is carried
+        nan_backfill: how a missing observation is carried, entry by entry. The default
+            ``DEFLATED_FFILL`` treats it as a zero observation and keeps every matrix positive
+            semidefinite; ``FFILL`` can break that when gaps differ across assets.
+            ``NAN_FILL`` reports NaN at the entries of the assets missing on that row
 
     Returns:
         covariance tensor, shape (t, n, n), one matrix per observation date
@@ -519,41 +736,31 @@ def compute_ewm_covar_tensor(a: np.ndarray,
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-    ewm_lambda_1 = 1.0 - ewm_lambda
 
     if not a.ndim == 2:
-        raise ValueError(f"only 2-d arrays are supported")
+        raise ValueError("only 2-d arrays are supported")
 
     t = a.shape[0]
     n = a.shape[1]  # array of ndarray
-    zero_covar = np.zeros((n, n))
 
     if covar0 is None:
-        covar = zero_covar
+        last_covar = np.zeros((n, n))
     else:
-        covar = np.where(np.isfinite(covar0), covar0, zero_covar)
+        last_covar = np.where(np.isfinite(covar0), covar0, 0.0)
 
     output_covar = np.empty((t, n, n))
-    last_covar = covar
     # loop over rows
     for idx in range(0, t):  # row in x:
         row = a[idx]
-        r_ij = np.outer(row, row)
-        covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-        if nan_backfill == NanBackfill.FFILL:
-            last_covar = np.where(np.isfinite(covar), covar, last_covar)
-        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
-            last_covar = np.where(np.isfinite(covar), covar, ewm_lambda * last_covar)
-        else:  # use zero fill
-            last_covar = np.where(np.isfinite(covar), covar, zero_covar)
-
+        last_covar, is_updated = _covar_update(last_covar, np.outer(row, row), ewm_lambda,
+                                               nan_backfill)
         if is_corr:
             last_covar_, _, _ = npo._covar_to_corr_array(last_covar)
         else:
             last_covar_ = last_covar
 
-        if nan_backfill == NanBackfill.NAN_FILL:  # fill zeros with nans
-            last_covar_ = np.where(np.equal(last_covar_, zero_covar), np.nan, last_covar_)
+        if nan_backfill == NanBackfill.NAN_FILL:  # report the gaps, keep genuine zeros
+            last_covar_ = np.where(is_updated, last_covar_, np.nan)
 
         output_covar[idx] = last_covar_
 
@@ -566,7 +773,7 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
                                               ewm_lambda: float = 0.94,
                                               covar0: np.ndarray = None,
                                               is_corr: bool = False,
-                                              nan_backfill: NanBackfill = NanBackfill.FFILL
+                                              nan_backfill: NanBackfill = NanBackfill.DEFLATED_FFILL
                                               ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     EWM covariance tensor computed on vol-normalised returns, with the vols returned alongside.
@@ -574,48 +781,53 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
     Two-step estimator: each series is divided by its own EWM volatility, the correlation is
     estimated on the normalised series, and the covariance is rebuilt as ``D C D`` with ``D`` the
     diagonal of vols. Normalising first stops a single volatile asset dominating the correlation
-    estimate, which the direct covariance recursion does not avoid.
+    estimate, which the direct covariance recursion does not avoid. The volatility recursion is
+    seeded, point in time, with each column's first finite squared return (``InitType.X0``), so
+    the first vol of a column is the absolute value of its first return.
 
     Args:
         a: returns, rows are dates and columns are assets. 2-d only
-        span: EWM span. Takes precedence over ``ewm_lambda``. An array applies a span per asset
+        span: EWM span. Takes precedence over ``ewm_lambda``
         ewm_lambda: decay used when ``span`` is None
-        covar0: initial covariance. None starts from zero
-        is_corr: return the correlation tensor rather than the covariance in the first output
-        nan_backfill: how a missing observation is handled in the recursion; see
+        covar0: initial covariance of the normalised returns. None starts from zero
+        is_corr: return the correlation tensor of the normalised returns as the second output
+            instead of their covariance. The first output is the covariance either way
+        nan_backfill: how a missing observation is handled in both recursions; see
             :class:`NanBackfill`
 
     Returns:
-        the covariance (or correlation) tensor of shape ``(t, n, n)``, the normalised-return
-        covariance tensor, and the EWM vols of shape ``(t, n)``
+        the covariance tensor of shape ``(t, n, n)``, the normalised-return covariance (or, with
+        ``is_corr``, correlation) tensor, and the EWM vols of shape ``(t, n)``
 
     Raises:
         ValueError: if ``a`` is not 2-d
     """
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-    ewm_lambda_1 = 1.0 - ewm_lambda
 
     if not a.ndim == 2:
-        raise ValueError(f"only 2-d arrays are supported")
+        raise ValueError("only 2-d arrays are supported")
 
     t = a.shape[0]
     n = a.shape[1]  # array of ndarray
-    zero_covar = np.zeros((n, n))
 
     if covar0 is None:
-        covar = zero_covar
+        last_covar = np.zeros((n, n))
     else:
-        covar = np.where(np.isfinite(covar0), covar0, zero_covar)
+        last_covar = np.where(np.isfinite(covar0), covar0, 0.0)
 
     output_covar_norm = np.empty((t, n, n))
     output_covar = np.empty((t, n, n))
-    last_covar = covar
 
-    # compute vols
+    # point-in-time vols: the variance recursion is seeded with the first finite squared return
     a_var = np.square(a)
-    ewm_vol = np.sqrt(ewm_recursion(a=a_var, ewm_lambda=ewm_lambda,
-                                    init_value=npo.nan_func_to_data(a=a_var, func=np.nanmean, axis=0),
+    init_var = np.zeros(n)
+    for column in range(n):
+        for row in range(t):
+            if np.isfinite(a_var[row, column]):
+                init_var[column] = a_var[row, column]
+                break
+    ewm_vol = np.sqrt(ewm_recursion(a=a_var, init_value=init_var, ewm_lambda=ewm_lambda,
                                     nan_backfill=nan_backfill))
     safe_ewm_vol = np.where(np.greater(ewm_vol, 0.0), ewm_vol, np.nan)
     a_norm = a / safe_ewm_vol
@@ -623,22 +835,15 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
     # loop over rows
     for idx in range(0, t):  # row in x:
         row = a_norm[idx]
-        r_ij = np.outer(row, row)
-        covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-        if nan_backfill == NanBackfill.FFILL:
-            last_covar = np.where(np.isfinite(covar), covar, last_covar)
-        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
-            last_covar = np.where(np.isfinite(covar), covar, ewm_lambda * last_covar)
-        else:  # use zero fill
-            last_covar = np.where(np.isfinite(covar), covar, zero_covar)
-
+        last_covar, is_updated = _covar_update(last_covar, np.outer(row, row), ewm_lambda,
+                                               nan_backfill)
         if is_corr:
             last_covar_, _, _ = npo._covar_to_corr_array(last_covar)
         else:
             last_covar_ = last_covar
 
-        if nan_backfill == NanBackfill.NAN_FILL:  # fill zeros with nans
-            last_covar_ = np.where(np.equal(last_covar_, zero_covar), np.nan, last_covar_)
+        if nan_backfill == NanBackfill.NAN_FILL:  # report the gaps, keep genuine zeros
+            last_covar_ = np.where(is_updated, last_covar_, np.nan)
 
         # normalise to preserve vols for output_covar
         _, normalized_vols, _ = npo._covar_to_corr_array(last_covar_)
@@ -649,7 +854,42 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
     return output_covar, output_covar_norm, ewm_vol
 
 
-# @njit
+# relative eigenvalue threshold below which the unit-diagonal factor moment matrix is singular
+_BETA_SINGULAR_RCOND = 1e-12
+
+
+def _solve_betas(covar_xx: np.ndarray,
+                 cross_xy: np.ndarray,
+                 is_x_correlated: bool
+                 ) -> np.ndarray:
+    """Betas ``covar_xx^{-1} cross_xy`` with a scale-free singularity test.
+
+    A factor whose second moment is not strictly positive carries no information: its betas are
+    NaN and the others are solved from the reduced system. The reduced matrix is rescaled to
+    unit diagonal, so the singularity test does not depend on the units of the factors; when its
+    smallest eigenvalue is below ``_BETA_SINGULAR_RCOND`` times the largest, the system is
+    singular and every beta is NaN.
+    """
+    betas = np.full(cross_xy.shape, np.nan)
+    diag = np.diag(covar_xx)
+    valid = np.flatnonzero(np.isfinite(diag) & (diag > 0.0))
+    if valid.size == 0:
+        return betas
+    scale = 1.0 / np.sqrt(diag[valid])
+    cross_v = cross_xy[valid]
+    if is_x_correlated and valid.size > 1:
+        unit_diag = covar_xx[np.ix_(valid, valid)] * np.outer(scale, scale)
+        if not np.all(np.isfinite(unit_diag)):
+            return betas
+        eigenvalues = np.linalg.eigvalsh(unit_diag)
+        if eigenvalues[0] <= _BETA_SINGULAR_RCOND * eigenvalues[-1]:
+            return betas
+        betas[valid] = scale[:, None] * np.linalg.solve(unit_diag, scale[:, None] * cross_v)
+    else:
+        betas[valid] = cross_v * np.square(scale)[:, None]
+    return betas
+
+
 def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
                                y: np.ndarray,  # asset returns
                                span: Union[int, np.ndarray] = None,
@@ -660,14 +900,23 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
                                ) -> np.ndarray:
     """Compute an EWM beta tensor from factor and asset returns.
 
+    The cross moment ``E[x y']`` and the factor second moment ``E[x x']`` run the zero-seeded
+    matrix recursion, which updates at the first row, and ``beta_t = E[x x']_t^{-1} E[x y']_t``.
+    The singularity test is scale free: a factor with a non-positive second moment gets NaN
+    betas while the other factors are solved from the reduced system, and a reduced system whose
+    unit-diagonal rescaling is numerically singular gives NaN betas. A beta is never replaced by
+    the raw cross moment.
+
     Args:
         x: Factor returns with shape ``(time,)`` or ``(time, factors)``.
         y: Asset returns with shape ``(time,)`` or ``(time, assets)``.
         span: Optional EWM span overriding ``ewm_lambda``.
         ewm_lambda: EWM decay when ``span`` is not supplied.
         warmup_period: Last time position masked during estimator warm-up.
-        is_x_correlated: Whether to invert the full factor cross-moment matrix.
+        is_x_correlated: Whether to invert the full factor cross-moment matrix; False uses its
+            diagonal, one-factor betas for each factor.
         nan_backfill: Missing-observation policy applied to both EWM moments in the beta ratio.
+            ``NAN_FILL`` reports NaN where the factor or the asset is missing on that row.
 
     Returns:
         EWM betas with shape ``(time, factors, assets)``.
@@ -675,7 +924,7 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
     Raises:
         TypeError: If an input is not one- or two-dimensional, or time dimensions differ.
     """
-    if not x.ndim in [1, 2] or not y.ndim in [1, 2]:
+    if x.ndim not in [1, 2] or y.ndim not in [1, 2]:
         raise TypeError("Expected 1- or 2-dimensional NumPy array for x and y")
     if x.shape[0] != y.shape[0]:
         raise TypeError("first time series dimension of x and y must be equal")
@@ -685,7 +934,6 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
         is_x_correlated = False  # for 1-d factor no need to compute outer product
     else:
         nx = x.shape[1]
-    inv_t1 = np.diag(np.ones(nx))
     last_covar_xx = np.zeros((nx, nx))
     if y.ndim == 1:
         ny = 1
@@ -699,52 +947,20 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
 
     if span is not None:
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-    ewm_lambda_1 = 1.0 - ewm_lambda
     for t in range(nt):  # over time index
         row_x = x[t]  # time series row
         row_y = y[t]
-        cross_xy = ewm_lambda_1 * np.outer(row_x, row_y) + ewm_lambda * last_cross_xy
-
-        if nan_backfill == NanBackfill.FFILL:
-            fill_value = last_cross_xy
-        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
-            fill_value = ewm_lambda * last_cross_xy
-        else:  # use zero fill
-            fill_value = np.zeros_like(last_cross_xy)
-
-        cross_xy = np.where(np.isfinite(cross_xy), cross_xy, fill_value)
-        last_cross_xy = cross_xy
-
-        # covar matrix
-        covar_xx = ewm_lambda_1 * np.outer(row_x, row_x) + ewm_lambda * last_covar_xx
         # A missing factor row must age both moments identically so their ratio stays coherent.
-        if nan_backfill == NanBackfill.FFILL:
-            fill_value = last_covar_xx
-        elif nan_backfill == NanBackfill.DEFLATED_FFILL:
-            fill_value = ewm_lambda * last_covar_xx
-        else:  # use zero fill
-            fill_value = np.zeros_like(last_covar_xx)
-
-        covar_xx = np.where(np.isfinite(covar_xx), covar_xx, fill_value)
-        last_covar_xx = covar_xx
+        last_cross_xy, is_cross_updated = _covar_update(last_cross_xy, np.outer(row_x, row_y),
+                                                        ewm_lambda, nan_backfill)
+        last_covar_xx, _ = _covar_update(last_covar_xx, np.outer(row_x, row_x), ewm_lambda,
+                                         nan_backfill)
 
         if t > warmup_period:
-            # if np.trace(covar_xx) > 1e-8:
-            if np.min(np.diag(covar_xx)) > 1e-8:
-                if is_x_correlated:  # use inversion
-                    try:
-                        inv_t = np.linalg.inv(covar_xx)
-                    except np.linalg.LinAlgError:  # "Singular matrix": #LinAlgError("Singular matrix")
-                        inv_t = np.diag(np.reciprocal(np.diag(covar_xx)))
-                    inv_t = np.ascontiguousarray(inv_t)  # to remove numpy warning
-                else:
-                    # reciprocal of diagonal elements
-                    inv_t = np.diag(np.reciprocal(np.diag(covar_xx)))
-            else:
-                inv_t = inv_t1
-
-            inv_t = np.where(np.isfinite(inv_t), inv_t, inv_t1)
-            betas_t = inv_t @ cross_xy
+            betas_t = _solve_betas(covar_xx=last_covar_xx, cross_xy=last_cross_xy,
+                                   is_x_correlated=is_x_correlated)
+            if nan_backfill == NanBackfill.NAN_FILL:
+                betas_t = np.where(is_cross_updated, betas_t, np.nan)
         else:
             betas_t = beta_nan
 
@@ -757,19 +973,38 @@ def compute_one_factor_ewm_betas(x: pd.Series,
                                  y: pd.DataFrame,
                                  span: Union[int, np.ndarray] = None,
                                  ewm_lambda: float = 0.94,
-                                 nan_backfill: NanBackfill = NanBackfill.FFILL
+                                 nan_backfill: NanBackfill = NanBackfill.FFILL,
+                                 warmup_period: int = 20
                                  ) -> pd.DataFrame:
-    """
-    ewm betas of y wrt factor 1-d x
+    """EWM betas of every asset column on one factor.
+
+    ``beta_t = E[x y]_t / E[x^2]_t`` from zero-seeded recursions that update at the first row,
+    with no mean adjustment; see :func:`compute_ewm_xy_beta_tensor`.
+
+    Args:
+        x: factor returns
+        y: asset returns, one column per asset, on the same index as ``x``
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        ewm_lambda: decay in [0, 1); ignored when ``span`` is given
+        nan_backfill: missing-observation policy of both moments; see :class:`NanBackfill`
+        warmup_period: rows ``t <= warmup_period`` are NaN, to suppress the unstable start.
+            The default 20 masks the first 21 rows
+
+    Returns:
+        betas with the index and columns of ``y``; NaN where the factor has no variance
+
+    Raises:
+        ValueError: if the indices of ``x`` and ``y`` differ
     """
     if not x.index.equals(y.index):
-        raise ValueError("x.index={x.index} is not equal to y.index={y.index}")
+        raise ValueError(f"x.index={x.index} is not equal to y.index={y.index}")
 
     x_np = npo.to_finite_np(data=x, fill_value=np.nan)
     y_np = npo.to_finite_np(data=y, fill_value=np.nan)
 
     betas_ts = compute_ewm_xy_beta_tensor(x=x_np, y=y_np, span=span,
                                           ewm_lambda=ewm_lambda,
+                                          warmup_period=warmup_period,
                                           nan_backfill=nan_backfill)
     # the x factor dimension is 1, we get slice [t, y] using [:, 0, :]
     one_factor_ewm_betas = pd.DataFrame(data=betas_ts[:, 0, :], index=y.index, columns=y.columns)
@@ -788,42 +1023,40 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     exponentially weighted moving average of a t-by-n panel.
 
     Implements the recursion ``m_t = (1 - lambda) x_t + lambda m_{t-1}``, evaluated column-wise
-    by the numba kernel :func:`ewm_recursion`. The container type of ``data`` is preserved.
+    by the numba kernel :func:`ewm_recursion`. The seed is the state before each column's first
+    finite observation, and that observation updates it, so with the default ``X0`` seed the
+    result is pandas ``ewm(adjust=False)`` column by column, however late a column starts. The
+    container type of ``data`` is preserved.
 
     Args:
         data: observations, time along the first axis
         span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``, the same
             correspondence pandas uses
         ewm_lambda: decay in [0, 1); higher is smoother. Ignored when ``span`` is given
-        init_value: explicit seed m_0; overrides ``init_type``
-        init_type: how m_0 is seeded when ``init_value`` is None — the first observation,
-            zero, or the sample mean
+        init_value: explicit seed, the state before the first observation; overrides
+            ``init_type``
+        init_type: how the seed is set when ``init_value`` is None — the first observation
+            (``X0``), zero, or the full-sample mean (look-ahead); see :class:`InitType`
         is_unit_vol_scaling: rescale the output to unit unconditional variance
         nan_backfill: how the recursion carries over missing observations
 
     Returns:
         smoothed data, same container and shape as ``data``
+
+    Raises:
+        ValueError: if ``init_type`` is ``InitType.VAR``, a variance seed for a mean
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 
     if init_value is None:
+        _check_mean_init_type(init_type=init_type, name='compute_ewm')
         init_value = set_init_dim1(data=a, init_type=init_type)
 
-    # important for numba to have uniform data
-    if isinstance(data, pd.Series) or (isinstance(data, np.ndarray) and data.ndim == 1):
-        ewm_lambda = float(ewm_lambda)
-        if isinstance(init_value, np.ndarray):
-            init_value = float(init_value)
-
-    if span is not None:
-        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-
-    ewm = ewm_recursion(a=a,
-                        span=None,
-                        ewm_lambda=ewm_lambda,
-                        init_value=init_value,
-                        is_unit_vol_scaling=is_unit_vol_scaling,
-                        nan_backfill=nan_backfill)
+    ewm = _run_ewm(a=a,
+                   init_value=init_value,
+                   ewm_lambda=_to_decay(span=span, ewm_lambda=ewm_lambda),
+                   nan_backfill=nan_backfill,
+                   is_unit_vol_scaling=is_unit_vol_scaling)
 
     if isinstance(data, pd.DataFrame):  # return of data type
         ewm = pd.DataFrame(data=ewm, index=data.index, columns=data.columns)
@@ -832,6 +1065,34 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         ewm = pd.Series(data=ewm, index=data.index, name=data.name)
 
     return ewm
+
+
+def _annualise(ewm: np.ndarray,
+               data: Union[pd.DataFrame, pd.Series, np.ndarray],
+               annualize: bool,
+               annualization_factor: Optional[float]
+               ) -> np.ndarray:
+    """Multiply a variance path by the annualisation factor when asked."""
+    if annualize or annualization_factor is not None:
+        if annualization_factor is None:
+            if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
+                annualization_factor = infer_annualisation_factor_from_df(data=data)
+            else:
+                warnings.warn("in compute_ewm  annualization_factor for np array default is 1")
+                annualization_factor = 1.0
+        ewm = annualization_factor * ewm
+    return ewm
+
+
+def _wrap_like(values: np.ndarray,
+               data: Union[pd.DataFrame, pd.Series, np.ndarray]
+               ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+    """Return ``values`` in the container of ``data``."""
+    if isinstance(data, pd.DataFrame):
+        return pd.DataFrame(data=values, index=data.index, columns=data.columns)
+    if isinstance(data, pd.Series):
+        return pd.Series(data=values, index=data.index, name=data.name)
+    return values
 
 
 def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
@@ -852,9 +1113,10 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     exponentially weighted volatility, or variance when ``apply_sqrt`` is False.
 
     Runs the EWM recursion on squared observations: ``v_t = (1 - lambda) x_t^2 + lambda
-    v_{t-1}``. Whether the result is a volatility per period or per annum depends on
-    ``annualize``, and the annualisation factor is inferred from the index frequency for
-    pandas input.
+    v_{t-1}``, seeded before each column's first finite observation, which then updates the
+    seed; with the default ``X0`` seed the first variance is the first squared observation.
+    Whether the result is a volatility per period or per annum depends on ``annualize``, and the
+    annualisation factor is inferred from the index frequency for pandas input.
 
     Args:
         data: observations, time along the first axis
@@ -862,14 +1124,20 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         ewm_lambda: decay in [0, 1); ignored when ``span`` is given
         mean_adj_type: how the mean is removed before squaring. NONE treats the data as
             already centred, which is the usual choice for returns
-        init_type: how the recursion is seeded when ``init_value`` is None
-        init_value: explicit seed for the variance recursion
+        init_type: how the recursion is seeded when ``init_value`` is None, on the scale of the
+            squares: ``X0`` the first squared observation, ``ZERO`` zero, ``MEAN`` the
+            full-sample mean square and ``VAR`` the full-sample variance of the observations
+            (both look-ahead). It also seeds an EWMA mean adjustment, with ``VAR`` read as
+            ``MEAN`` there
+        init_value: explicit seed for the variance recursion, the state before the first
+            observation
         apply_sqrt: return volatility rather than variance
         annualize: scale to annual terms
         annualization_factor: periods per year; inferred from the index for pandas input,
             and defaults to 1 with a warning for a bare ndarray
         vol_floor_quantile: floor the estimate at this rolling quantile of itself, so a quiet
-            sample does not produce a vol that collapses toward zero. 0.16 is a usual choice
+            sample does not produce a vol that collapses toward zero. 0.16 is a usual choice.
+            Works for a Series, a DataFrame and 1-d or 2-d arrays
         vol_floor_quantile_roll_period: lookback for that quantile, in periods
         warmup_period: number of leading observations set to nan, so an estimate is not
             reported before the recursion has data
@@ -879,79 +1147,107 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         volatility or variance, same container and shape as ``data``
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
-
-    if span is not None:
-        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    ewm_lambda = _to_decay(span=span, ewm_lambda=ewm_lambda)
 
     if mean_adj_type != MeanAdjType.NONE:
         a = compute_rolling_mean_adj(data=a,
                                      mean_adj_type=mean_adj_type,
                                      ewm_lambda=ewm_lambda,
-                                     init_type=init_type,
+                                     init_type=_mean_init_type(init_type),
                                      nan_backfill=nan_backfill)
 
-    # initial conditions
-    a = np.square(a)
+    # the variance recursion runs on squared observations and is seeded on that scale
     if init_value is None:
-        init_value = set_init_dim1(data=a, init_type=init_type)
-
-    if isinstance(data, pd.Series) or (isinstance(data, np.ndarray) and data.ndim == 1):
-        ewm_lambda = float(ewm_lambda)
-        if isinstance(init_value, np.ndarray):
-            init_value = float(init_value)
-
-    ewm = ewm_recursion(a=a, ewm_lambda=ewm_lambda, init_value=init_value, nan_backfill=nan_backfill)
+        init_value = _second_moment_init(x=a, y=a, init_type=init_type)
+    ewm = _run_ewm(a=np.square(a), init_value=init_value, ewm_lambda=ewm_lambda,
+                   nan_backfill=nan_backfill)
 
     # apply quantile
     if vol_floor_quantile is not None:
-        ewm_pd = pd.DataFrame(ewm)
-        ewm_quantiles = ewm_pd.rolling(vol_floor_quantile_roll_period,
-                                       min_periods=int(0.2*vol_floor_quantile_roll_period)
-                                       ).quantile(vol_floor_quantile, interpolation="lower")
+        ewm_2d = ewm.reshape(-1, 1) if ewm.ndim == 1 else ewm
+        ewm_quantiles = pd.DataFrame(ewm_2d).rolling(
+            vol_floor_quantile_roll_period,
+            min_periods=int(0.2*vol_floor_quantile_roll_period)
+        ).quantile(vol_floor_quantile, interpolation="lower")
         vol_floor = ewm_quantiles.to_numpy()
-        ewm = np.where(np.less(ewm, vol_floor), vol_floor, ewm)
+        ewm_2d = np.where(np.less(ewm_2d, vol_floor), vol_floor, ewm_2d)
+        ewm = ewm_2d[:, 0] if ewm.ndim == 1 else ewm_2d
 
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
         ewm = npo.set_nans_for_warmup_period(a=ewm, warmup_period=warmup_period)
 
-    if annualize or annualization_factor is not None:
-        if annualization_factor is None:
-            if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-                annualization_factor = infer_annualisation_factor_from_df(data=data)
-            else:
-                warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
-                annualization_factor = 1.0
-        ewm = annualization_factor * ewm
+    ewm = _annualise(ewm=ewm, data=data, annualize=annualize,
+                     annualization_factor=annualization_factor)
 
     if apply_sqrt:
         ewm = np.sqrt(ewm)
 
-    if isinstance(data, pd.DataFrame):
-        ewm = pd.DataFrame(data=ewm, index=data.index, columns=data.columns)
-    elif isinstance(data, pd.Series):
-        ewm = pd.Series(data=ewm, index=data.index, name=data.name)
-    return ewm
+    return _wrap_like(values=ewm, data=data)
 
 
-@njit
-def matrix_recursion(a: np.ndarray,
-                     a_m: np.ndarray,
-                     span: Optional[Union[float, np.ndarray]] = None,
-                     ewm_lambda: Union[float, np.ndarray] = 0.94
-                     ) -> np.ndarray:
-    if span is not None:
-        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-    ewm_lambda_1 = 1.0 - ewm_lambda
-    t = a.shape[0]
-    last_covar = np.zeros((a.shape[1], a.shape[1]))
-    ewm_m = np.zeros_like(a_m)
-    for idx in range(0, t):
-        r_ij = np.outer(a[idx], a_m[idx])
-        covar = ewm_lambda_1 * r_ij + ewm_lambda * last_covar
-        fill_value = last_covar
-        last_covar = np.where(np.isfinite(covar), covar, fill_value)
-        ewm_m[idx, :] = np.diag(last_covar) + np.diag(np.transpose(last_covar))
-    return ewm_m
+@_njit_cached
+def _newey_west_variance(a: np.ndarray,
+                         init_value: np.ndarray,
+                         ewm_lambda: np.ndarray,
+                         num_lags: int,
+                         nan_backfill: NanBackfill
+                         ) -> Tuple[np.ndarray, np.ndarray]:
+    """EWM variance and EWM Newey-West variance of every column of ``a`` (t, n).
+
+    ``v^NW_t = v_t + sum_k (1 - k/(L+1)) 2 λ^(k/2) c_{k,t}``, with ``c_{k,t}`` the zero-seeded
+    EWM of ``x_t x_{t-k}``. The lag partner of an observation is the k-th previous observation
+    of the current run: ``FFILL`` skips a gap (time stops), ``DEFLATED_FFILL`` makes it a zero
+    observation, and ``ZERO_FILL`` and ``NAN_FILL`` reset every state and the lag history. Under
+    each policy the estimator is a quadratic form with the Bartlett kernel plus the non-negative
+    seed term, so it is never negative for a non-negative seed.
+    """
+    t, n = a.shape
+    variance = np.full((t, n), np.nan)
+    nw_variance = np.full((t, n), np.nan)
+    cross = np.zeros(num_lags)
+    history = np.full(num_lags, np.nan)
+    for column in range(n):
+        lam = ewm_lambda[column]
+        state = init_value[column]
+        cross[:] = 0.0
+        history[:] = np.nan
+        started = False
+        for row in range(t):
+            x = a[row, column]
+            if not started:
+                if not np.isfinite(x):
+                    continue
+                started = True
+            if not np.isfinite(x):
+                if nan_backfill == NanBackfill.FFILL:  # time stops for the series
+                    variance[row, column] = variance[row - 1, column]
+                    nw_variance[row, column] = nw_variance[row - 1, column]
+                    continue
+                elif nan_backfill == NanBackfill.DEFLATED_FFILL:  # a zero observation
+                    x = 0.0
+                else:  # ZERO_FILL and NAN_FILL erase the history
+                    state = 0.0
+                    cross[:] = 0.0
+                    history[:] = np.nan
+                    if nan_backfill == NanBackfill.ZERO_FILL:
+                        variance[row, column] = 0.0
+                        nw_variance[row, column] = 0.0
+                    continue
+            state = lam * state + (1.0 - lam) * x * x
+            nw = state
+            for k in range(num_lags):
+                partner = history[k]
+                product = x * partner if np.isfinite(partner) else 0.0
+                cross[k] = lam * cross[k] + (1.0 - lam) * product
+                weight = (1.0 - (k + 1.0) / (num_lags + 1.0)) * 2.0 * lam ** (0.5 * (k + 1.0))
+                nw += weight * cross[k]
+            for k in range(num_lags - 1, 0, -1):
+                history[k] = history[k - 1]
+            if num_lags > 0:
+                history[0] = x
+            variance[row, column] = state
+            nw_variance[row, column] = nw
+    return variance, nw_variance
 
 
 def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
@@ -973,7 +1269,11 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
     The EWM variance ``v_t`` of ``compute_ewm_vol`` is corrected for serial correlation with
     Bartlett-weighted EWM autocovariances,
-    ``v_t + sum_{m=1}^{L} (1 - m / (L + 1)) * 2 * EWM(x_t x_{t-m})``, all with the same decay.
+    ``v_t + sum_{m=1}^{L} (1 - m / (L + 1)) * 2 * λ^(m/2) * EWM(x_t x_{t-m})``, all with the same
+    decay. The factor ``λ^(m/2)`` is the geometric mean of the EWM weights of the two dates a
+    lag-m product pairs: with it the estimator is a quadratic form in the EWM-weighted
+    observations with the Bartlett kernel, which is positive semidefinite, so the corrected
+    variance is never negative.
 
     Args:
         data: observations in rows
@@ -981,92 +1281,61 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         span: EWM span; overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
         ewm_lambda: EWM decay used when ``span`` is None
         mean_adj_type: mean subtracted before the second moments are formed
-        init_type: seed of the variance recursion, applied to the squared observations
+        init_type: seed of the variance recursion, applied to the squared observations; see
+            :func:`compute_ewm_vol`
         init_value: explicit seed of the variance recursion
         apply_sqrt: return a volatility rather than a variance
         annualize: multiply the variance by the annualisation factor
         annualization_factor: explicit annualisation factor; inferred from the index if None
         warmup_period: number of initial observations set to NaN
-        nan_backfill: treatment of missing observations in the variance recursion
+        nan_backfill: treatment of missing observations in the variance and in every lag term:
+            ``FFILL`` holds the estimate and pairs each observation with the previous
+            observed ones, ``DEFLATED_FFILL`` treats a gap as a zero observation, and
+            ``ZERO_FILL`` and ``NAN_FILL`` restart the estimator after the gap
 
     Returns:
-        the corrected estimate and its ratio to the uncorrected EWM variance
+        the corrected estimate and its ratio to the uncorrected EWM variance; the ratio is NaN
+        where the EWM variance is not positive
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
-
-    if span is not None:
-        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    ewm_lambda = _to_decay(span=span, ewm_lambda=ewm_lambda)
 
     if mean_adj_type != MeanAdjType.NONE:
         a = compute_rolling_mean_adj(data=a,
                                      mean_adj_type=mean_adj_type,
-                                     span=span,
                                      ewm_lambda=ewm_lambda,
-                                     init_type=init_type,
+                                     init_type=_mean_init_type(init_type),
                                      nan_backfill=nan_backfill)
 
     # the variance recursion runs on squared observations, so it is seeded on that scale
-    a_squared = np.square(a)
     if init_value is None:
-        init_value = set_init_dim1(data=a_squared, init_type=init_type)
+        init_value = _second_moment_init(x=a, y=a, init_type=init_type)
 
-    if isinstance(data, pd.Series) or (isinstance(data, np.ndarray) and data.ndim == 1):
-        ewm_lambda = float(ewm_lambda)
-        if isinstance(init_value, np.ndarray):
-            init_value = float(init_value)
+    # the kernel works on columns, so a single series is treated as one column
+    is_1d = a.ndim == 1
+    a_2d = np.asarray(a.reshape(-1, 1) if is_1d else a, dtype=float)
+    ncols = a_2d.shape[1]
+    seed = np.broadcast_to(np.asarray(init_value, dtype=float), (ncols,)).copy()
+    decay = np.broadcast_to(np.asarray(ewm_lambda, dtype=float), (ncols,)).copy()
+    ewm0, ewm_nw = _newey_west_variance(a_2d, seed, decay, int(num_lags), nan_backfill)
+    if is_1d:
+        ewm0, ewm_nw = ewm0[:, 0], ewm_nw[:, 0]
 
-    ewm0 = ewm_recursion(a=a_squared, ewm_lambda=ewm_lambda, init_value=init_value,
-                         nan_backfill=nan_backfill)
-
-    if num_lags == 0:
-        ewm_nw = ewm0
-        nw_ratio = np.ones_like(ewm0)
-    else:
-        nw_adjustment = np.zeros_like(ewm0)
-        # the lag recursion works on columns, so a single series is treated as one column
-        is_1d = a.ndim == 1
-        a_2d = a.reshape(-1, 1) if is_1d else a
-        for m in np.arange(1, num_lags+1):
-            # lagged value
-            a_m = np.full_like(a_2d, np.nan, dtype=float)
-            a_m[m:] = a_2d[:-m]
-            ewm_m = matrix_recursion(a=a_2d, a_m=a_m, ewm_lambda=ewm_lambda)
-            if is_1d:
-                ewm_m = ewm_m[:, 0]
-            nw_adjustment += (1.0-m/(num_lags+1))*ewm_m
-
-        ewm_nw = ewm0 + nw_adjustment
-        # NumPy 2.x: explicit out= so masked positions (ewm0<=0) are deterministic nan.
-        nw_ratio = np.divide(
-            ewm_nw, ewm0,
-            out=np.full_like(ewm_nw, np.nan, dtype=float),
-            where=ewm0 > 0.0,
-        )
-        nw_ratio = np.where(nw_ratio > 0.0, nw_ratio, 1.0)
+    # NumPy 2.x: explicit out= so masked positions (ewm0<=0 or nan) are deterministic nan.
+    nw_ratio = np.divide(ewm_nw, ewm0, out=np.full_like(ewm_nw, np.nan, dtype=float),
+                         where=np.greater(np.nan_to_num(ewm0, nan=0.0), 0.0))
 
     if warmup_period is not None:   # set to nan first nonnan in warmup_period
         ewm_nw = npo.set_nans_for_warmup_period(a=ewm_nw, warmup_period=warmup_period)
         nw_ratio = npo.set_nans_for_warmup_period(a=nw_ratio, warmup_period=warmup_period)
 
-    if annualize or annualization_factor is not None:
-        if annualization_factor is None:
-            if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-                annualization_factor = infer_annualisation_factor_from_df(data=data)
-            else:
-                warnings.warn(f"in compute_ewm  annualization_factor for np array default is 1")
-                annualization_factor = 1.0
-        ewm_nw = annualization_factor * ewm_nw
+    ewm_nw = _annualise(ewm=ewm_nw, data=data, annualize=annualize,
+                        annualization_factor=annualization_factor)
 
     if apply_sqrt:
         ewm_nw = np.sqrt(ewm_nw)
 
-    if isinstance(data, pd.DataFrame):
-        ewm_nw = pd.DataFrame(data=ewm_nw, index=data.index, columns=data.columns)
-        nw_ratio = pd.DataFrame(data=nw_ratio, index=data.index, columns=data.columns)
-    elif isinstance(data, pd.Series):
-        ewm_nw = pd.Series(data=ewm_nw, index=data.index, name=data.name)
-        nw_ratio = pd.Series(data=nw_ratio, index=data.index, name=data.name)
-    return ewm_nw, nw_ratio
+    return _wrap_like(values=ewm_nw, data=data), _wrap_like(values=nw_ratio, data=data)
 
 
 def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],
@@ -1076,33 +1345,39 @@ def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                       init_value: Union[float, np.ndarray] = None,
                       nan_backfill: NanBackfill = NanBackfill.FFILL
                       ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+    """
+    mean path of each column under a mean-adjustment convention, same shape as the input.
 
+    Args:
+        data: observations, time along the first axis
+        mean_adj_type: ``NONE`` gives zeros; ``INSAMPLE`` the full-sample mean of each column,
+            ignoring missing values and repeated on every row, which is forward-looking and
+            belongs in descriptive exhibits, never inside a backtest; ``EXPANDING`` the
+            expanding mean up to each row; ``EWMA`` the EWM mean, point in time
+        span: EWMA span; overrides ``ewm_lambda``
+        ewm_lambda: EWMA decay
+        init_value: EWMA seed; the first observation when None
+        nan_backfill: EWMA missing-observation policy
+
+    Returns:
+        the mean path, same container and shape as ``data``
+
+    Raises:
+        TypeError: for an unsupported container or ``mean_adj_type``
     """
-    compute rolling mean by columns
-    the output has the same dimension as input
-    """
-    if not (isinstance(data, pd.DataFrame) or isinstance(data, pd.Series) or isinstance(data, np.ndarray)):
+    if not isinstance(data, (pd.DataFrame, pd.Series, np.ndarray)):
         raise TypeError(f"unsupported type {type(data)}")
 
     if mean_adj_type == MeanAdjType.NONE:
-        if isinstance(data, np.ndarray):
-            mean = np.zeros_like(data)
-        else:
-            mean_nd = np.zeros_like(data.to_numpy())
-            if isinstance(data, pd.DataFrame):
-                mean = pd.DataFrame(data=mean_nd, index=data.index, columns=data.columns)
-            else:
-                mean = pd.Series(data=mean_nd, index=data.index, name=data.name)
+        values = np.asarray(data, dtype=float)
+        mean = _wrap_like(values=np.zeros_like(values), data=data)
 
-    elif mean_adj_type == MeanAdjType.INSAMPLE:
-        if isinstance(data, np.ndarray):
-            mean = np.mean(data, axis=0, keepdims=True)
-        else:
-            mean_nd = np.mean(data.to_numpy(), axis=0, keepdims=True)
-            if isinstance(data, pd.DataFrame):
-                mean = pd.DataFrame(data=mean_nd, index=data.index, columns=data.columns)
-            else:
-                mean = pd.Series(data=mean_nd, index=data.index, name=data.name)
+    elif mean_adj_type == MeanAdjType.INSAMPLE:  # forward-looking: the full-sample mean
+        values = npo.to_finite_np(data=data, fill_value=np.nan).astype(float)
+        with warnings.catch_warnings():  # an all-nan column has a nan mean
+            warnings.simplefilter('ignore', RuntimeWarning)
+            column_mean = np.nanmean(values, axis=0)
+        mean = _wrap_like(values=np.broadcast_to(column_mean, values.shape).copy(), data=data)
 
     elif mean_adj_type == MeanAdjType.EXPANDING:  # use pandas core
         if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
@@ -1112,6 +1387,8 @@ def compute_roll_mean(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         mean = x.expanding(min_periods=1).mean()  # apply pandas expanding
         if isinstance(data, np.ndarray):  # return of np.ndarray data type
             mean = mean.to_numpy()
+            if data.ndim == 1:
+                mean = mean[:, 0]
 
     elif mean_adj_type == MeanAdjType.EWMA:
         mean = compute_ewm(data=data,
@@ -1133,11 +1410,29 @@ def compute_rolling_mean_adj(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                              init_value: Union[float, np.ndarray, None] = None,
                              nan_backfill: NanBackfill = NanBackfill.FFILL
                              ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
+    """
+    observations minus their mean path under ``mean_adj_type``; see :func:`compute_roll_mean`.
 
+    Args:
+        data: observations, time along the first axis
+        mean_adj_type: which mean is removed; ``INSAMPLE`` is forward-looking
+        span: EWMA span; overrides ``ewm_lambda``
+        ewm_lambda: EWMA decay
+        init_type: EWMA seed when ``init_value`` is None; ``X0`` makes the first centred value 0
+        init_value: explicit EWMA seed
+        nan_backfill: EWMA missing-observation policy
+
+    Returns:
+        the centred data, same container and shape as ``data``
+
+    Raises:
+        ValueError: if ``init_type`` is ``InitType.VAR``, a variance seed for a mean
+    """
     if mean_adj_type == MeanAdjType.NONE:
         x_mean = data
     else:
-        if init_value is None:
+        if init_value is None and mean_adj_type == MeanAdjType.EWMA:
+            _check_mean_init_type(init_type=init_type, name='compute_rolling_mean_adj')
             init_value = set_init_dim1(data=data, init_type=init_type)
 
         mean = compute_roll_mean(data=data,
@@ -1162,14 +1457,42 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                          nan_backfill: NanBackfill = NanBackfill.FFILL
                          ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
-    compute cross ewm for 1-d arrays x and y
-    cross_xy[t] = (1-lambda)*x[t]*y[t] + lambda*cross_xy[t-1]
+    EWM cross moment, beta or correlation of y on x, pair by pair.
 
-    three supported cases:
-    1: x and y are pd.DataFrame with same dimensions: z = x*y
-    2: x is pd.Series, y is pd.DataFrame: ml y=betas*x -> output pandas.dim = pandas.dim y
-    3: both pd.Series -> output series.dim = series.dim y
-    4: both np.nd arrays with same dimension
+    Runs ``M^{xy}_t = (1-λ) x_t y_t + λ M^{xy}_{t-1}`` and, for a ratio, the same recursion on
+    ``x_t^2`` (and ``y_t^2``), each seeded before the first finite product, which then updates
+    the seed. ``BETA`` is ``M^{xy} / M^{xx}`` and ``CORR`` is ``M^{xy} / sqrt(M^{xx} M^{yy})``;
+    a ratio is NaN where its denominator is not strictly positive, a test that does not depend
+    on the units of the data.
+
+    Supported inputs:
+        1. x and y DataFrames of the same shape: columns are paired by position and the output
+           is labelled like y
+        2. x a Series and y a DataFrame: x is paired with every column of y after an inner join
+           of the indices; the output is a DataFrame labelled like y
+        3. x and y Series: paired after an inner join; the output is a Series named like y
+        4. x and y ndarrays of the same shape, 1-d or 2-d; the output is an ndarray
+
+    Args:
+        x_data: factor observations
+        y_data: asset observations
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        ewm_lambda: decay in [0, 1)
+        cross_xy_type: ``COVAR``, ``BETA`` or ``CORR``
+        mean_adj_type: mean removed from x and y first, each on its own index
+        init_type: seed of ``M^{xy}`` (and of an EWMA mean adjustment, with ``VAR`` read as
+            ``MEAN`` there). ``ZERO`` by default
+        var_init_type: seed of ``M^{xx}`` and ``M^{yy}``. The default ``MEAN`` is the
+            full-sample mean square, a look-ahead that damps the ratios in the first
+            ``1.5 N`` rows; ``X0`` or ``ZERO`` is point in time
+        nan_backfill: missing-observation policy of every recursion
+
+    Returns:
+        the EWM cross statistic, in the container described above
+
+    Raises:
+        TypeError: for an unsupported pair of containers, arrays of different shapes or an
+            unknown ``cross_xy_type``
     """
 
     # 1 - adjust by mean
@@ -1179,14 +1502,14 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                                           mean_adj_type=mean_adj_type,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
-                                          init_type=init_type,
+                                          init_type=_mean_init_type(init_type),
                                           nan_backfill=nan_backfill)
 
         y_data = compute_rolling_mean_adj(data=y_data,
                                           mean_adj_type=mean_adj_type,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
-                                          init_type=init_type,
+                                          init_type=_mean_init_type(init_type),
                                           nan_backfill=nan_backfill)
 
     # 2  take gen arrays and convert to ndarray to use with numbas
@@ -1194,86 +1517,72 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
         # should be same dimensions
         x = npo.to_finite_np(data=x_data, fill_value=np.nan)
         y = npo.to_finite_np(data=y_data, fill_value=np.nan)
-        xy = np.multiply(x, y)
+        if x.shape != y.shape:
+            raise TypeError(f"x_data and y_data must have the same shape, "
+                            f"got {x.shape} and {y.shape}")
+        wrap = pd.DataFrame(index=y_data.index, columns=y_data.columns)
 
-    elif isinstance(x_data, pd.DataFrame) and isinstance(y_data, pd.Series):
-        xy = pd.concat([x_data, y_data], axis=1, sort=True, join='inner')
-
-        # it will work even if x_data.name is in y_data.columns
-        x = npo.to_finite_np(data=xy.iloc[:, 0], fill_value=np.nan)
-        y = npo.to_finite_np(data=xy.iloc[:, 1:], fill_value=np.nan)
-
-        # x is array: tile by rows and transpose
-        xn = np.transpose(np.tile(x, (len(y_data.columns), 1)))
-        xy = np.multiply(xn, y)
-
-    elif isinstance(x_data, pd.Series) and isinstance(y_data, pd.Series):
-        xy = pd.concat([x_data, y_data], axis=1, sort=True, join='inner')
-        x = npo.to_finite_np(data=xy.iloc[:, 0], fill_value=np.nan)
-        y = npo.to_finite_np(data=xy.iloc[:, 1], fill_value=np.nan)
-        xy = np.multiply(x, y)
+    elif isinstance(x_data, pd.Series) and isinstance(y_data, (pd.DataFrame, pd.Series)):
+        joint = pd.concat([x_data, y_data], axis=1, sort=True, join='inner')
+        # position 0 is x even if x_data.name is also a column of y_data
+        x = npo.to_finite_np(data=joint.iloc[:, 0], fill_value=np.nan)
+        if isinstance(y_data, pd.DataFrame):
+            y = npo.to_finite_np(data=joint.iloc[:, 1:], fill_value=np.nan)
+            x = np.tile(x.reshape(-1, 1), (1, y.shape[1]))
+            wrap = pd.DataFrame(index=joint.index, columns=y_data.columns)
+        else:
+            y = npo.to_finite_np(data=joint.iloc[:, 1], fill_value=np.nan)
+            wrap = pd.Series(index=joint.index, name=y_data.name, dtype=float)
 
     elif isinstance(x_data, np.ndarray) and isinstance(y_data, np.ndarray):
-        if x_data.shape[1] != y_data.shape[1]:
-            raise TypeError(f"ndarray data must have same number of column")
-        if x_data.shape[0] != y_data.shape[0]:
-            raise TypeError(f"ndarray data must have same number of rows")
-
-        x = x_data
-        y = y_data
-        xy = np.multiply(x_data, y_data)
+        if x_data.shape != y_data.shape:
+            raise TypeError(f"ndarray x_data and y_data must have the same shape, "
+                            f"got {x_data.shape} and {y_data.shape}")
+        x = npo.to_finite_np(data=x_data.astype(float), fill_value=np.nan)
+        y = npo.to_finite_np(data=y_data.astype(float), fill_value=np.nan)
+        wrap = None
 
     else:
-        raise TypeError(f"{type(x_data)}, {type(y_data)}  should be of the same type")
+        raise TypeError(f"x_data of type {type(x_data)} with y_data of type {type(y_data)} is not "
+                        f"supported: pass two DataFrames of the same shape, a Series with a "
+                        f"DataFrame or a Series, or two ndarrays of the same shape")
 
-    init_value_xy = set_init_dim1(data=xy, init_type=init_type)
-    xy_covar = ewm_recursion(a=xy,
-                             span=span,
-                             ewm_lambda=ewm_lambda,
-                             init_value=init_value_xy,
-                             nan_backfill=nan_backfill)
+    ewm_lambda = _to_decay(span=span, ewm_lambda=ewm_lambda)
+    xy_covar = _run_ewm(a=np.multiply(x, y),
+                        init_value=_second_moment_init(x=x, y=y, init_type=init_type),
+                        ewm_lambda=ewm_lambda,
+                        nan_backfill=nan_backfill)
 
     if cross_xy_type == CrossXyType.COVAR:
         cross_xy = xy_covar
 
-    elif cross_xy_type == CrossXyType.BETA:
-        x2 = np.square(x)
-        init_value_x2 = set_init_dim1(data=x2, init_type=var_init_type)
-        x_var = ewm_recursion(a=x2,
-                              span=span,
-                              ewm_lambda=ewm_lambda,
-                              init_value=init_value_x2,
-                              nan_backfill=nan_backfill)
-        divisor = x_var
-        # NumPy 2.x: explicit out= so masked positions (divisor≈0) are deterministic nan.
+    elif cross_xy_type in (CrossXyType.BETA, CrossXyType.CORR):
+        x_var = _run_ewm(a=np.square(x),
+                         init_value=_second_moment_init(x=x, y=x, init_type=var_init_type),
+                         ewm_lambda=ewm_lambda,
+                         nan_backfill=nan_backfill)
+        if cross_xy_type == CrossXyType.BETA:
+            divisor = x_var
+        else:
+            y_var = _run_ewm(a=np.square(y),
+                             init_value=_second_moment_init(x=y, y=y, init_type=var_init_type),
+                             ewm_lambda=ewm_lambda,
+                             nan_backfill=nan_backfill)
+            divisor = np.sqrt(np.multiply(x_var, y_var))
+        # NumPy 2.x: explicit out= so masked positions are deterministic nan; the test is
+        # strictly positive, not close to zero, so it does not depend on the units of the data
         cross_xy = np.divide(
             xy_covar, divisor,
             out=np.full_like(xy_covar, np.nan, dtype=float),
-            where=~np.isclose(divisor, 0.0),
-        )
-
-    elif cross_xy_type == CrossXyType.CORR:
-        x2 = np.square(x)
-        init_value_x2 = set_init_dim1(data=x2, init_type=var_init_type)
-        x_var = ewm_recursion(a=x2, span=span, ewm_lambda=ewm_lambda, init_value=init_value_x2, nan_backfill=nan_backfill)
-        y2 = np.square(y)
-        init_value_y2 = set_init_dim1(data=y2, init_type=var_init_type)
-        y_var = ewm_recursion(a=y2, span=span, ewm_lambda=ewm_lambda, init_value=init_value_y2, nan_backfill=nan_backfill)
-        divisor = np.sqrt(np.multiply(x_var, y_var))
-        # NumPy 2.x: explicit out= so masked positions (divisor≈0) are deterministic nan.
-        cross_xy = np.divide(
-            xy_covar, divisor,
-            out=np.full_like(xy_covar, np.nan, dtype=float),
-            where=~np.isclose(divisor, 0.0),
+            where=np.greater(np.nan_to_num(divisor, nan=0.0), 0.0),
         )
     else:
         raise TypeError(f"unknown cross_xy_type = {cross_xy_type}")
 
-    if isinstance(y_data, pd.Series):
-        cross_xy = pd.Series(data=cross_xy, index=y_data.index, name=y_data.name)
-
-    elif isinstance(y_data, pd.DataFrame):
-        cross_xy = pd.DataFrame(data=cross_xy, index=y_data.index, columns=y_data.columns)
+    if isinstance(wrap, pd.Series):
+        cross_xy = pd.Series(data=cross_xy, index=wrap.index, name=wrap.name)
+    elif isinstance(wrap, pd.DataFrame):
+        cross_xy = pd.DataFrame(data=cross_xy, index=wrap.index, columns=wrap.columns)
 
     return cross_xy
 
@@ -1283,7 +1592,7 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
                                     span: Union[float, np.ndarray] = None,
                                     ewm_lambda: Union[float, np.ndarray] = 0.94,
                                     mean_adj_type: MeanAdjType = MeanAdjType.NONE,
-                                    init_type: InitType = InitType.MEAN,
+                                    init_type: InitType = InitType.X0,
                                     beta_init_value: Optional[
                                         Union[float, np.ndarray]
                                     ] = None,
@@ -1297,27 +1606,40 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
                                         pd.DataFrame,
                                         pd.DataFrame,
                                     ]:
-    """Compute one-factor EWMA beta, alpha, prediction and diagnostics.
+    """Compute one-factor EWMA beta, alpha, one-step-ahead prediction and diagnostics.
 
-    The unseeded path estimates beta as the ratio of exponentially weighted
-    cross-moments. When ``beta_init_value`` is supplied, the first jointly
-    finite, nonzero factor observation is replaced by a one-observation beta
-    prior. This makes the first finite beta equal to the seed and lets later
-    observations update the same cross-moment recursion without look-ahead.
+    Beta is the ratio of exponentially weighted cross-moments,
+    ``beta_t = E[x y]_t / E[x^2]_t``, and alpha the EWMA of the fitted residual
+    ``y_t - beta_t x_t``; both are dated ``t`` and use the observation at ``t``. The prediction
+    is the forecast of ``y_t`` from information up to ``t-1`` and the factor return at ``t``,
+    ``beta_{t-1} x_t + alpha_{t-1}``, and is NaN on the first row. The residual variance and the
+    R-squared are in-sample diagnostics of the fitted residual ``y_t - beta_t x_t - alpha_t``.
+
+    With the default ``InitType.X0`` every recursion is seeded with its first observation, so
+    every output is point in time. ``InitType.MEAN`` and ``InitType.VAR`` seed with full-sample
+    statistics (look-ahead in the first ``1.5 N`` rows).
+
+    When ``beta_init_value`` is supplied, the first jointly finite, nonzero factor observation
+    ``x_f`` is replaced by a one-observation beta prior: both moments are seeded with it and the
+    pair ``(x_f, y_f)`` is replaced by ``(x_f, beta_init_value * x_f)``, so the observed ``y_f``
+    does not enter. The first finite beta equals the prior, which then keeps weight
+    ``lambda^(t-f)`` in both moments and fades as later observations update the recursion,
+    without look-ahead.
 
     Args:
         x_data: Factor-return Series, or one factor-return column per asset.
         y_data: Asset-return columns.
         span: EWMA span. Overrides ``ewm_lambda`` when supplied.
         ewm_lambda: EWMA decay used when ``span`` is None.
-        mean_adj_type: Point-in-time mean-adjustment convention.
-        init_type: Initial condition for unseeded moments and residual alpha.
+        mean_adj_type: Mean-adjustment convention; ``INSAMPLE`` is forward-looking.
+        init_type: Seed of every recursion when no beta prior is given; see :class:`InitType`.
         beta_init_value: Optional scalar or per-asset initial beta prior.
         annualize: Whether to annualize factor and residual variances.
-        nan_backfill: Missing-observation recursion convention.
+        nan_backfill: Missing-observation convention of every recursion.
 
     Returns:
-        Beta, alpha, prediction, factor variance, residual variance and R-squared frames.
+        Beta, alpha, prediction, factor variance (one column per asset), residual variance and
+        R-squared frames, all with the index and columns of ``y_data``.
 
     Raises:
         ValueError: If ``beta_init_value`` cannot broadcast to the asset columns
@@ -1335,14 +1657,14 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
                                           mean_adj_type=mean_adj_type,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
-                                          init_type=init_type,
+                                          init_type=_mean_init_type(init_type),
                                           nan_backfill=nan_backfill)
 
         y_data = compute_rolling_mean_adj(data=y_data,
                                           mean_adj_type=mean_adj_type,
                                           span=span,
                                           ewm_lambda=ewm_lambda,
-                                          init_type=init_type,
+                                          init_type=_mean_init_type(init_type),
                                           nan_backfill=nan_backfill)
 
     # 2  take gen arrays and convert to ndarray to use with numbdas
@@ -1364,12 +1686,15 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
             'in compute_ewm_beta_resid: not implemented types '
             f'{type(x_data)} and {type(y_data)}'
         )
+    x = x.astype(float)
+    y = y.astype(float)
+    ewm_lambda = _to_decay(span=span, ewm_lambda=ewm_lambda)
 
     # compute covar
     xy = np.multiply(x, y)
     x2 = np.square(x)
-    xy_init = set_init_dim1(data=xy, init_type=init_type)
-    x2_init = set_init_dim1(data=x2, init_type=init_type)
+    xy_init = _second_moment_init(x=x, y=y, init_type=init_type)
+    x2_init = _second_moment_init(x=x, y=x, init_type=init_type)
     if beta_init_value is not None:
         try:
             beta_init = np.broadcast_to(
@@ -1400,34 +1725,40 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
             xy[first, column] = beta_init[column] * prior_variance
             x2_init[column] = prior_variance
             xy_init[column] = beta_init[column] * prior_variance
-    xy_covar = ewm_recursion(a=xy, span=span, ewm_lambda=ewm_lambda,
-                             init_value=xy_init)
+    xy_covar = _run_ewm(a=xy, init_value=xy_init, ewm_lambda=ewm_lambda,
+                        nan_backfill=nan_backfill)
 
     # compute x var
-    x_var = ewm_recursion(a=x2, span=span, ewm_lambda=ewm_lambda,
-                          init_value=x2_init)
+    x_var = _run_ewm(a=x2, init_value=x2_init, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill)
 
     # compute beta
-    # NumPy 2.x: explicit out= so masked positions (x_var≈0) are deterministic nan,
-    # not uninitialized memory. This was the original crash site from the OP traceback.
+    # NumPy 2.x: explicit out= so masked positions are deterministic nan, not uninitialized
+    # memory. The test is strictly positive, so it does not depend on the units of the data.
     beta_xy = np.divide(
         xy_covar, x_var,
         out=np.full_like(xy_covar, np.nan, dtype=float),
-        where=~np.isclose(x_var, 0.0),
+        where=np.greater(np.nan_to_num(x_var, nan=0.0), 0.0),
     )
 
-    # alpha and prediction assuming 1-d factor model
-    y_prediction0 = beta_xy * x
-    resid = y - y_prediction0
-    ewm_alpha = ewm_recursion(a=resid, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill,
-                              init_value=set_init_dim1(data=resid, init_type=init_type))
-    y_prediction = y_prediction0 + ewm_alpha
+    # alpha: the EWMA of the fitted residual, point in time given the seeds
+    y_fit0 = beta_xy * x
+    resid = y - y_fit0
+    ewm_alpha = _run_ewm(a=resid,
+                         init_value=set_init_dim1(data=resid, init_type=_mean_init_type(init_type)),
+                         ewm_lambda=ewm_lambda,
+                         nan_backfill=nan_backfill)
 
-    # residual
-    resid = y - y_prediction
-    resid2 = np.square(resid)
-    resid_var = ewm_recursion(a=resid2, span=span, ewm_lambda=ewm_lambda,
-                              init_value=set_init_dim1(data=resid2, init_type=init_type))
+    # one-step-ahead forecast of y_t: beta and alpha estimated to t-1, applied to x_t
+    beta_lagged = np.vstack([np.full((1, beta_xy.shape[1]), np.nan), beta_xy[:-1]])
+    alpha_lagged = np.vstack([np.full((1, ewm_alpha.shape[1]), np.nan), ewm_alpha[:-1]])
+    y_prediction = beta_lagged * x + alpha_lagged
+
+    # in-sample residual of the fit dated t
+    resid = y - (y_fit0 + ewm_alpha)
+    resid_var = _run_ewm(a=np.square(resid),
+                         init_value=_second_moment_init(x=resid, y=resid, init_type=init_type),
+                         ewm_lambda=ewm_lambda,
+                         nan_backfill=nan_backfill)
 
     if annualize:
         an = infer_annualisation_factor_from_df(data=x_data)
@@ -1439,7 +1770,7 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
     alpha = pd.DataFrame(data=ewm_alpha, index=y_data.index, columns=y_data.columns)
     y_prediction = pd.DataFrame(data=y_prediction, index=y_data.index, columns=y_data.columns)
     resid_var = pd.DataFrame(data=resid_var, index=y_data.index, columns=y_data.columns)
-    x_var = pd.DataFrame(data=x_var, index=y_data.index)
+    x_var = pd.DataFrame(data=x_var, index=y_data.index, columns=y_data.columns)
 
     # compute r2
     y_var0 = y_data.subtract(compute_ewm(
@@ -1448,23 +1779,18 @@ def compute_ewm_beta_alpha_forecast(x_data: Union[pd.DataFrame, pd.Series],
         ewm_lambda=ewm_lambda,
         nan_backfill=nan_backfill,
     ))
-    y_var = an * ewm_recursion(
-        a=np.square(y_var0.to_numpy()),
-        span=span,
-        ewm_lambda=ewm_lambda,
+    y_var = an * _run_ewm(
+        a=np.square(y_var0.to_numpy(dtype=float)),
         init_value=np.zeros(len(y_data.columns)),
+        ewm_lambda=ewm_lambda,
         nan_backfill=nan_backfill,
     )
     # NumPy 2.x: work on ndarray with explicit out=; rebuild frame afterwards.
-    resid_var_np = (
-        resid_var.to_numpy(dtype=float)
-        if isinstance(resid_var, pd.DataFrame)
-        else np.asarray(resid_var, dtype=float)
-    )
+    resid_var_np = resid_var.to_numpy(dtype=float)
     ewm_r2_np = 1.0 - np.divide(
         resid_var_np, y_var,
         out=np.full_like(resid_var_np, np.nan),
-        where=np.greater(y_var, 0.0),
+        where=np.greater(np.nan_to_num(y_var, nan=0.0), 0.0),
     )
     ewm_r2 = np.clip(ewm_r2_np, a_min=0.0, a_max=1.0)
     ewm_r2 = pd.DataFrame(data=ewm_r2, index=y_data.index, columns=y_data.columns)
@@ -1478,24 +1804,44 @@ def compute_ewm_alpha_r2_given_prediction(y_data: pd.DataFrame,
                                           ewm_lambda: Union[float, np.ndarray] = 0.94,
                                           nan_backfill: NanBackfill = NanBackfill.FFILL
                                           ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """EWM alpha and R-squared of a given prediction.
+
+    With ``e_t = y_t - prediction_t``, alpha is ``alpha_t = EWM(e)_t`` (``X0`` seed) and
+    ``R2_t = 1 - EWM((e - alpha)^2)_t / EWM((y - EWM(y))^2)_t``, clipped to [0, 1] and NaN
+    where the denominator is not positive. Both second moments start from a zero seed and are
+    centred on contemporaneous EWMAs, so the ratio is an in-sample fit diagnostic, not an
+    out-of-sample R-squared.
+
+    Args:
+        y_data: realised values, one column per series
+        y_prediction: predictions with the index and columns of ``y_data``
+        span: if given, overrides ``ewm_lambda`` via ``lambda = 1 - 2 / (span + 1)``
+        ewm_lambda: decay in [0, 1)
+        nan_backfill: missing-observation policy of every recursion
+
+    Returns:
+        the EWM alpha and the EWM R-squared, both with the index and columns of ``y_data``
     """
-    """
+    ewm_lambda = _to_decay(span=span, ewm_lambda=ewm_lambda)
     # 1 - adjust by mean
     resid = y_data - y_prediction
-    ewm_alpha = compute_ewm(data=resid, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill)
+    ewm_alpha = compute_ewm(data=resid, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill)
     resid0 = resid.subtract(ewm_alpha)
-    resid_var = ewm_recursion(a=np.square(resid0.to_numpy()), span=span, ewm_lambda=ewm_lambda,
-                              init_value=np.zeros(len(y_data.columns)), nan_backfill=nan_backfill)
+    resid_var = _run_ewm(a=np.square(resid0.to_numpy(dtype=float)),
+                         init_value=np.zeros(len(y_data.columns)), ewm_lambda=ewm_lambda,
+                         nan_backfill=nan_backfill)
 
-    y_var0 = y_data.subtract(compute_ewm(data=y_data, span=span, ewm_lambda=ewm_lambda, nan_backfill=nan_backfill))
-    y_var = ewm_recursion(a=np.square(y_var0.to_numpy()), span=span, ewm_lambda=ewm_lambda,
-                          init_value=np.zeros(len(y_data.columns)), nan_backfill=nan_backfill)
+    y_var0 = y_data.subtract(compute_ewm(data=y_data, ewm_lambda=ewm_lambda,
+                                         nan_backfill=nan_backfill))
+    y_var = _run_ewm(a=np.square(y_var0.to_numpy(dtype=float)),
+                     init_value=np.zeros(len(y_data.columns)), ewm_lambda=ewm_lambda,
+                     nan_backfill=nan_backfill)
 
     # NumPy 2.x: explicit out= so masked positions (y_var<=0) are deterministic nan.
     ewm_r2 = 1.0 - np.divide(
         resid_var, y_var,
         out=np.full_like(resid_var, np.nan, dtype=float),
-        where=np.greater(y_var, 0.0),
+        where=np.greater(np.nan_to_num(y_var, nan=0.0), 0.0),
     )
     ewm_r2 = np.clip(ewm_r2, a_min=0.0, a_max=1.0)
     ewm_r2 = pd.DataFrame(data=ewm_r2, index=y_data.index, columns=y_data.columns)
@@ -1508,8 +1854,33 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
                        norm_type: int = 1,
                        initial_sharpes: np.ndarray = None
                        ) -> pd.DataFrame:
+    """Annualised EWM Sharpe-ratio paths of return columns.
 
-    x = npo.to_finite_np(data=returns, fill_value=0.0)
+    Missing returns are set to zero and the annualisation factor ``AN`` is inferred from the
+    index. The EWM mean ``m_t`` and the EWM second moment run from zero seeds (or from the
+    ``initial_sharpes`` prior) as the state before row 0, so the first return enters with weight
+    ``1 - lambda``. The ratio is NaN where its denominator is zero.
+
+    Args:
+        returns: periodic returns, one column per strategy, with a frequency-bearing index
+        span: EWM span of both moments
+        norm_type: ``0`` the annualised EWM mean ``AN m_t``, not a ratio; ``1`` (default)
+            ``sqrt(AN) m_t / sqrt(EWM(r^2)_t)``, the mean over the root mean square, which is
+            the second moment about zero and compresses the Sharpe ratio by
+            ``1 / sqrt(1 + SR^2 / AN)``; ``2`` ``sqrt(AN) m_t / sqrt(EWM((r - m)^2)_t)``, the
+            mean over the EWM deviation from the running mean
+        initial_sharpes: optional annualised Sharpe prior per column; seeds the mean with
+            ``0.1 SR / AN`` and the second moment with ``0.01 / AN``, a 10% annual volatility
+
+    Returns:
+        the EWM Sharpe (or mean, for ``norm_type=0``) paths with the index and columns of
+        ``returns``
+
+    Raises:
+        ValueError: if ``norm_type`` is not 0, 1 or 2
+    """
+    x = npo.to_finite_np(data=returns, fill_value=0.0).astype(float)
+    ewm_lambda = _to_decay(span=span, ewm_lambda=0.94)
     an = infer_annualisation_factor_from_df(data=returns)
     san = np.sqrt(an)
     if initial_sharpes is not None:
@@ -1521,25 +1892,20 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
         initial_var = np.zeros(len(returns.columns))
 
     if norm_type == 0:
-        ewm_mean = ewm_recursion(a=x,
-                                 span=span,
-                                 init_value=initial_mean,
-                                 nan_backfill=NanBackfill.ZERO_FILL)
+        ewm_mean = _run_ewm(a=x, init_value=initial_mean, ewm_lambda=ewm_lambda,
+                            nan_backfill=NanBackfill.ZERO_FILL)
         sharpe = pd.DataFrame(data=an*ewm_mean, index=returns.index, columns=returns.columns)
 
     elif norm_type == 1 or norm_type == 2:
-        ewm_mean = ewm_recursion(a=x,
-                                 span=span,
-                                 init_value=initial_mean,
-                                 nan_backfill=NanBackfill.ZERO_FILL)
+        ewm_mean = _run_ewm(a=x, init_value=initial_mean, ewm_lambda=ewm_lambda,
+                            nan_backfill=NanBackfill.ZERO_FILL)
         if norm_type == 2:
             v = np.square(x-ewm_mean)
         else:
             v = np.square(x)
 
-        ewm_var = ewm_recursion(a=v, span=span,
-                                init_value=initial_var,
-                                nan_backfill=NanBackfill.ZERO_FILL)
+        ewm_var = _run_ewm(a=v, init_value=initial_var, ewm_lambda=ewm_lambda,
+                           nan_backfill=NanBackfill.ZERO_FILL)
         ewm_vol = np.sqrt(ewm_var)
         # NumPy 2.x: explicit out= so masked positions (ewm_vol<=0) are deterministic nan.
         sharpe_np = san * np.divide(
@@ -1578,9 +1944,26 @@ def compute_ewm_std1_norm(data: Union[pd.DataFrame, pd.Series],
                           is_nans_to_zero: bool = True
                           ) -> Union[pd.DataFrame, pd.Series]:
     """
-    given time serise var X_t
-    compute Y_t = ewm(X_t / ewm_vol(X_t))
-    expected std(Y_t) = 1
+    smoothed, volatility-normalised signal with unit standard deviation for IID input.
+
+    With ``x~_t`` the (optionally demeaned) data and ``sigma_t`` its EWM volatility about zero,
+    the output is ``c sqrt(N) EWM(x~ / sigma)_t`` with ``N = (1 + lambda) / (1 - lambda)``, the
+    final EWM starting from a zero seed.
+    Demeaning by the same-span EWMA removes the low-frequency content the final EWM keeps and
+    leaves a standard deviation of ``1 / sqrt(1 + lambda)`` (0.71 at span 260) for IID input, so
+    with ``is_demean=True`` and ``MeanAdjType.EWMA`` the output is multiplied by
+    ``c = sqrt(1 + lambda)``; otherwise ``c = 1``. The output then has unit standard deviation
+    for IID input in the stationary limit, with either setting.
+
+    Args:
+        data: observations, time along the first axis
+        span: EWM span of the mean, the volatility and the smoother
+        mean_adj_type: mean removed when ``is_demean`` is True
+        is_demean: remove the mean before normalising
+        is_nans_to_zero: replace missing outputs, including the warm-up, by zero
+
+    Returns:
+        the normalised signal, same container as ``data``
     """
 
     data_np = npo.to_finite_np(data=data, fill_value=np.nan)
@@ -1597,7 +1980,14 @@ def compute_ewm_std1_norm(data: Union[pd.DataFrame, pd.Series],
     ewm_vol = np.sqrt(ewm_var)
 
     x_std1_norm = npo.to_finite_ratio(x=x_demean, y=ewm_vol, fill_value=np.nan)
-    ewm_std1_norm = compute_ewm(data=x_std1_norm, span=span, is_unit_vol_scaling=True)
+    # the unit-variance scaling sqrt(N) holds for a zero seed: seeding the smoother with its first
+    # observation would give that one normalised value weight 1 and variance N at the start
+    ewm_std1_norm = compute_ewm(data=x_std1_norm, span=span, init_type=InitType.ZERO,
+                                is_unit_vol_scaling=True)
+    if is_demean and mean_adj_type == MeanAdjType.EWMA:
+        # the same-span EWMA demeaning leaves variance 1 / (1 + lambda) for IID input
+        ewm_lambda = _to_decay(span=span, ewm_lambda=0.94)
+        ewm_std1_norm = np.sqrt(1.0 + ewm_lambda) * ewm_std1_norm
 
     if isinstance(data, pd.Series):
         ewm_std1_norm = pd.Series(data=ewm_std1_norm, index=data.index, name=data.name)
