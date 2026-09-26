@@ -50,6 +50,28 @@ jobs:
         run: |
           cp .github/scripts/release_guard.py "$RUNNER_TEMP/release_guard.py"
           python "$RUNNER_TEMP/release_guard.py" checkout --tag "$RELEASE_TAG"
+      - name: Reconcile the tagged root package version in the lockfile
+        run: |
+          uv lock
+          python - <<'PY'
+          import subprocess
+          import tomllib
+          from pathlib import Path
+
+          original = tomllib.loads(subprocess.check_output(["git", "show", "HEAD:uv.lock"], text=True))
+          updated = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
+          version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+          original_root = next(package for package in original["package"] if package["name"] == "qis" and package["source"] == {"editable": "."})
+          updated_root = next(package for package in updated["package"] if package["name"] == "qis" and package["source"] == {"editable": "."})
+          if updated_root["version"] != version:
+              raise SystemExit("The lockfile does not match the tagged project version")
+          original_root["version"] = version
+          if original != updated:
+              raise SystemExit("The lockfile changed beyond the root package version")
+          changed = subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines()
+          if changed not in ([], ["uv.lock"]):
+              raise SystemExit(f"Unexpected tagged source changes: {changed}")
+          PY
       - name: Run the tagged source test suite
         run: |
           uv sync --locked --group test
