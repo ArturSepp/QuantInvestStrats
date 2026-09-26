@@ -23,7 +23,9 @@ complete `freq_vol` boundaries, and `VOL = sqrt(AN) * s(v)` with `v` the
 
 The excess columns replace the numerator by its excess counterpart when `rates_data` is given;
 without it they equal the zero-rate columns. Reporting presets and factsheets show the per-annum
-convention. The arithmetic pair must be selected by name.
+convention. The arithmetic pair must be selected by name. The labels `Sharpe (rf=0)` and
+`Ex Sharpe` denote the per-annum convention but do not say so; they are kept unchanged because
+code selects columns by them, so name the convention next to any number quoted from them.
 
 ## How far apart they are
 
@@ -43,10 +45,14 @@ sampling grid.
 `PerfParams.sharpe_convention` selects the convention of regime-conditional Sharpe ratios only:
 `compute_bnb_regimes_pa_perf_table`, the regime classifiers and `plot_regime_data`. It does not
 change the six table columns. Under `SharpeConvention.ARITHMETIC` and `LOG` the regime
-contributions `sqrt(AN) * p_g * mean_g / s` add up exactly to the Sharpe ratio on the regime
-grid. Under `SharpeConvention.PA`, the default, the per-regime per-annum returns are patched so
-that they add up to the per-annum return, and the residual is allocated in proportion to regime
-frequencies. The derivation is in the handbook chapter
+contributions `sqrt(AN) * p_g * mean_g / s` add up exactly to the Sharpe ratio of that
+convention on the regime grid, whatever the classifier's return type. Under
+`SharpeConvention.PA`, the default, the per-regime per-annum returns are patched so that they
+add up to the visible `PA_RETURN`, with the residual allocated in proportion to regime
+frequencies, and divided by `VOL`; the bars then add up to `PA_RETURN / VOL`, which equals
+`SHARPE_RF0` only when the history starts and ends on `freq_vol` boundaries. No convention
+deducts cash, and the regime column labels (`Bear-Sharpe` and so on) do not carry the
+convention. The derivation is in the handbook chapter
 [Regime-conditional performance](https://quantinveststrats.readthedocs.io/en/latest/regime_conditional_performance.html).
 
 ## Other Sharpe-type estimators

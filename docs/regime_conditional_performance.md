@@ -472,7 +472,9 @@ the patched regime returns are −8.94%, 1.11% and 10.88%; an equal split would 
 2.00% and 10.43%. Divided by the monthly log-return volatility of 16.40%, they give per-annum
 Sharpe contributions of −0.545, 0.068 and 0.663, which add up to `SHARPE_RF0`, 0.186, because
 the history starts and ends on month-ends. The log decomposition of the per-annum return,
-in log units, is −9.45%, 2.49% and 9.96%.
+in log units, is −9.45%, 2.49% and 9.96%. The block also checks that the classifier honours
+`additive_pa_returns_to_pa_total=False`, which returns the unpatched $C_g$, and that
+`PerfStat.BEAR_AVG` and its analogues select the table's average columns.
 
 ```python
 pa_table, pa_datas = classifier.compute_regimes_pa_perf_table(
@@ -490,6 +492,15 @@ np.testing.assert_allclose(pa_datas[qis.RegimeData.REGIME_PA].sum(axis=1), r_pa,
 np.testing.assert_allclose(c_g[0], [-0.0845, 0.0293, 0.1137], atol=5e-5)
 np.testing.assert_allclose(patched[0], [-0.0894, 0.0111, 0.1088], atol=5e-5)
 np.testing.assert_allclose(c_g[0] + delta[0] / 3.0, [-0.0939, 0.0200, 0.1043], atol=5e-5)
+# the classifier passes the patch switch on: False returns the unpatched C_g
+_, raw_datas = classifier.compute_regimes_pa_perf_table(
+    prices=prices, benchmark='Benchmark', perf_params=qis.PerfParams(),
+    additive_pa_returns_to_pa_total=False)
+np.testing.assert_allclose(raw_datas[qis.RegimeData.REGIME_PA], c_g, atol=1e-14)
+# the regime members select the table's columns
+averages = pa_table[[stat.to_str() for stat in (qis.PerfStat.BEAR_AVG, qis.PerfStat.NORMAL_AVG,
+                                                 qis.PerfStat.BULL_AVG)]]
+np.testing.assert_allclose(averages, means.T, atol=1e-15)
 
 # anatomy of the residual: volatility drag plus cross-products of the contributions
 drag = r_pa - np.expm1(x.sum(axis=1))
@@ -563,14 +574,14 @@ np.testing.assert_allclose(simulated, predicted, atol=0.01)
 | Volatility regimes | `q` equal-count buckets of within-period realised volatility | `qis.BenchmarkVolsQuantilesRegime(freq='QE', q=4)` |
 | Frequencies and means | $p_g=T_g/T$, $m_g$ | `qis.compute_mean_freq_regimes` |
 | Regime averages and contributions | $m_g$; $C_g=e^{x_g}-1$, or $x_g$ with `is_report_pa_returns=False` | `qis.compute_regime_avg(freq=...)` |
-| Patched per-annum returns | $\tilde C_g=C_g+p_g\Delta$ | `additive_pa_returns_to_pa_total=True` in `qis.compute_regimes_pa_perf_table_from_sampled_returns` |
-| Benchmark display row | $m_g$ in place of $\tilde C_g$ for the benchmark | `is_use_benchmark_means=True` in the same function |
+| Patched per-annum returns | $\tilde C_g=C_g+p_g\Delta$ | `additive_pa_returns_to_pa_total=True` (default) in the classifiers' `compute_regimes_pa_perf_table` and in `qis.compute_regimes_pa_perf_table_from_sampled_returns` |
+| Benchmark display row | $m_g$ in place of $\tilde C_g$ for the benchmark, display only | `is_use_benchmark_means=True` in `qis.compute_regimes_pa_perf_table_from_sampled_returns` |
 | Arithmetic and log contributions | $\mathrm{SR}_g$, $\mathrm{SR}^{\ell}_g$ | `PerfParams(sharpe_convention=SharpeConvention.ARITHMETIC)` or `LOG` |
 | Per-annum contributions | $\mathrm{SR}^{\mathrm{pa}}_g=\tilde C_g/\hat\sigma_{\mathrm{ann}}$ | `PerfParams()`, `SharpeConvention.PA` |
 | Regime table | all of the above plus the risk-adjusted table | `qis.RegimeClassifier.compute_regimes_pa_perf_table`, `qis.compute_bnb_regimes_pa_perf_table` |
 | Returns-level contributions | $\mathrm{SR}_g$, $\mathrm{SR}^{\ell}_g$ and their total | internal `qis.perfstats.regime_classifier.compute_regime_sharpe_decomposition(returns, benchmark_returns, af)` |
 | Panels | $m_g$; $\tilde C_g$; $\mathrm{SR}_g$ in the selected convention | `qis.RegimeData.REGIME_AVG`, `REGIME_PA`, `REGIME_SHARPE` |
-| Table columns | $m_g$, $\tilde C_g$, $\mathrm{SR}_g$ | `'Bear Average'` (not `PerfStat.BEAR_AVG`), `PerfStat.BEAR_PA`, `PerfStat.BEAR_SHARPE`, and the Normal and Bull analogues; `qis.SD_PERF_COLUMNS` carries the three Sharpe columns |
+| Table columns | $m_g$, $\tilde C_g$, $\mathrm{SR}_g$ | `PerfStat.BEAR_AVG` (`'Bear Average'`), `PerfStat.BEAR_PA`, `PerfStat.BEAR_SHARPE`, and the Normal and Bull analogues; `qis.SD_PERF_COLUMNS` carries the three Sharpe columns |
 | Exhibits | stacked regime bars; boxplots; shading | `qis.plot_regime_data`, `qis.plot_regime_boxplot`, `qis.add_bnb_regime_shadows` |
 
 The classification and tables are in
@@ -594,26 +605,37 @@ Implementation contracts that affect the numbers:
   classifier's `freq`. The Sharpe convention is `perf_params.sharpe_convention`;
   `perf_params=None` means `SharpeConvention.PA`, and the attached table then infers its
   frequency from the price index.
-- **What is fixed on the classifier path.** The three classifiers' table methods pass
-  `is_use_benchmark_means=False`, and the base method does not forward
-  `additive_pa_returns_to_pa_total`, so the per-annum patch is always applied. Both options are
-  honoured only by `compute_regimes_pa_perf_table_from_sampled_returns` called directly.
+- **Options on the classifier path.** The classifiers' `compute_regimes_pa_perf_table` accept
+  `additive_pa_returns_to_pa_total` (default True) and pass it on, so
+  `additive_pa_returns_to_pa_total=False` reports the unpatched $C_g$. The base
+  `RegimeClassifier.compute_regimes_pa_perf_table` also passes its remaining keywords on, among
+  them `is_report_pa_returns=False` for the linear contributions $x_g$. The classifiers' own
+  methods fix `is_use_benchmark_means=False`; that option is set on
+  `compute_regimes_pa_perf_table_from_sampled_returns` called directly. Earlier versions
+  accepted `additive_pa_returns_to_pa_total` on the classifier path but did not forward it.
 - **`is_use_benchmark_means=True`** replaces the benchmark row of the P.a. columns by its
-  periodic conditional means $m_g$, a display choice. Under `SharpeConvention.PA` the
-  benchmark's regime Sharpe values then become $m_g/\hat\sigma_{\mathrm{ann}}$, a periodic mean
-  over an annualised volatility; the arithmetic and log branches are unaffected.
+  periodic conditional means $m_g$, a display choice. The regime Sharpe values are computed
+  before the substitution, so the benchmark's per-annum Sharpe contributions stay
+  $\tilde C_g/\hat\sigma_{\mathrm{ann}}$. Earlier versions divided the displayed periodic means
+  by the annualised volatility.
 - **Missing values.** $p_g$ counts benchmark-classified dates, $m_g$ averages the asset's
   observed returns and $s(r)$ uses all of them, so the table's contributions add up exactly only
-  when the asset is observed on the classified dates and on no others. The internal returns-level function computes every moment per asset
-  over the dates where both the asset and the benchmark are observed, and is exact for any gap
-  pattern. An empty regime has $p_g=0$ and no mean: the table reports a missing contribution,
-  the plot's totals skip it, and the internal function reports zero.
-- **Return type.** The classifier's `return_type` sets the returns behind $m_g$. With the
-  default `ReturnTypes.RELATIVE` they are simple returns; the `LOG` branch applies
-  $\log(1+r)$ to them.
+  when the asset is observed on the classified dates and on no others. The internal
+  returns-level function computes every moment per asset over the dates where both the asset
+  and the benchmark are observed, and is exact for any gap pattern. An empty regime has no
+  mean: the table and the internal function both report a missing contribution, and the plot's
+  totals and the function's total skip it, since an empty regime contributes nothing to the
+  mean.
+- **Return type.** The classifier's `return_type` sets the returns behind $m_g$ and $C_g$. With
+  the default `ReturnTypes.RELATIVE` they are simple returns: the `ARITHMETIC` branch uses them
+  and the `LOG` branch takes $\log(1+r)$. With `ReturnTypes.LOG` they are log returns: the `LOG`
+  branch uses them as they are and the `ARITHMETIC` branch converts them with $e^{\ell}-1$, so
+  each convention decomposes its own Sharpe ratio whatever the classifier's basis.
 - **Column labels.** The average columns are labelled `'Bear Average'`, `'Normal Average'` and
-  `'Bull Average'`; the `PerfStat.BEAR_AVG` family is labelled `'Bear Avg'` and does not select
-  them. The P.a. and Sharpe columns match `PerfStat.BEAR_PA` and `PerfStat.BEAR_SHARPE`.
+  `'Bull Average'`, the labels of the `PerfStat.BEAR_AVG` family; the P.a. and Sharpe columns
+  match `PerfStat.BEAR_PA` and `PerfStat.BEAR_SHARPE`. Every regime member therefore selects a
+  column, for example in `qis.plot_ra_perf_scatter`. The labels do not carry the Sharpe
+  convention; state it with the table.
 - **Exhibits.** `plot_regime_data` passes `prices`, `benchmark` and `perf_params` through to
   the classifier and stacks the chosen `RegimeData` panel; the bar totals are the row sums.
   `add_bnb_regime_shadows` shades each grid interval $(t-1,t]$ in the colour of the regime of
@@ -706,8 +728,8 @@ regime-switching estimation.
   sample.
 - **Conventions differ.** Arithmetic, log and per-annum regime bars are three different numbers
   on the same data. In the worked example the benchmark totals are 0.248, 0.156 and 0.186. State
-  the convention with the exhibit; `plot_regime_data`'s default title, *Conditional Excess
-  Sharpe ratio*, does not make the returns excess of cash.
+  the convention with the exhibit: `plot_regime_data`'s default title, *Conditional Sharpe
+  ratio*, does not name it. No convention deducts cash.
 - **Benchmark dependence.** The regime is a property of the benchmark, and a different
   benchmark gives a different partition. A benchmark back-padded with constant prices adds zero
   returns that crowd the Normal band, and raises `ValueError` if they collapse a quantile edge;

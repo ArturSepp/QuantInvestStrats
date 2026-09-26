@@ -53,7 +53,7 @@ regime columns in [Regime-conditional performance](regime_conditional_performanc
 | Convention | This article |
 |---|---|
 | Return basis | Simple returns for total, per-annum, arithmetic and extreme-return columns; `PerfParams.return_type` returns (log by default) for `VOL`, `DOWNSIDE_VOL`, `AVG_LOG_RETURN`, `SKEWNESS` and `KURTOSIS`; returns in excess of `rates_data` for every excess column |
-| Sampling grid | Native observations for visible return columns; `freq_vol` for volatility, the Sharpe and Sortino numerators and the arithmetic family; `freq_drawdown` for drawdowns, `WORST` and `BEST`; `freq_skewness` for moments; `freq_reg` for regressions |
+| Sampling grid | Native observations for visible return columns; `freq_vol` for volatility, the Sharpe and Sortino numerators and the arithmetic family; `freq_drawdown`, followed by each asset's final observation, for drawdowns, `WORST` and `BEST`; `freq_skewness` for moments; `freq_reg` for regressions |
 | Annualisation | $\mathrm{AN}$ inferred from the sampled `freq_vol` index: $\sqrt{\mathrm{AN}}$ for volatilities, $\mathrm{AN}$ for arithmetic means; 365.25-day years for per-annum returns; moments, drawdowns and extreme returns are not annualised |
 | Mean adjustment | `VOL`: sample mean removed, `ddof=1`; `DOWNSIDE_VOL`: mean of the negative returns removed, `ddof=1`; table moments: bias-corrected $G_1$, $G_2$; descriptive-table and rolling moments: uncorrected $g_1$, $g_2$ |
 | Timing | Full-sample and descriptive: every column uses the whole history, so none is point in time; the cash rate is lagged one observation of the rate series |
@@ -69,7 +69,7 @@ regime columns in [Regime-conditional performance](regime_conditional_performanc
 | $R^{\mathrm{smp}}_{\mathrm{pa}}$, $\tilde R^{\mathrm{smp}}_{\mathrm{pa}}$ | Per-annum and excess per-annum return from $b_0$ to $b_1$ | Decimal; the ratio numerators |
 | $v_k$ | `freq_vol` returns in the `return_type` basis, $k=1,\ldots,T$ | Log returns by default |
 | $r_k$, $\tilde r_k$ | `freq_vol` simple returns and simple excess returns | Decimal per period |
-| $r^{\mathrm{dd}}_t$ | Simple returns on the `freq_drawdown` grid | Daily by default |
+| $r^{\mathrm{dd}}_t$ | Simple returns on the `freq_drawdown` grid, which ends at the asset's final observation $t_1$ | Daily by default |
 | $x_k$ | A generic sample: `freq_skewness` returns in the risk table, one supplied column in the descriptive table | Units of the input |
 | $T$ | Number of observations of the sample at hand; `NUM_OBS` for $v_k$ | Count |
 | $\mathrm{AN}$, $\mathrm{AN}_{\mathrm{reg}}$, $\mathrm{AN}_{\mathrm{c}}$ | Periods per year of `freq_vol`, of `freq_reg` and of a regime classifier's grid | 12 for `ME`, 4 for `QE` |
@@ -105,9 +105,9 @@ available at earlier dates, so it describes a history and must not be used insid
 | `freq` | `None`, stored as `'ME'` | Factsheet panels only, not the table functions | A shortcut that overwrites the fields below |
 | `freq_vol` | `'ME'` | `compute_risk_table`, `compute_ra_perf_table` | `VOL`, `DOWNSIDE_VOL`, `NUM_OBS`, the arithmetic family, the Sharpe and Sortino numerators, and $\mathrm{AN}$ |
 | `freq_skewness` | `'ME'` | `compute_risk_table` | `SKEWNESS` and `KURTOSIS` |
-| `freq_drawdown` | `'D'` | `compute_risk_table` | `MAX_DD`, `CURRENT_DD`, `WORST`, `BEST` and the numerator of `MAX_DD_VOL` |
+| `freq_drawdown` | `'D'` | `compute_risk_table` | `MAX_DD`, `CURRENT_DD`, `WORST`, `BEST` and the numerator of `MAX_DD_VOL`; the grid ends at each asset's final observation |
 | `freq_reg` | `'QE'` | `compute_ra_perf_table_with_benchmark` | `ALPHA`, `ALPHA_AN`, `BETA`, `R2`, `ALPHA_PVALUE` and $\mathrm{AN}_{\mathrm{reg}}$ |
-| `freq_excess_return` | `'ME'` | No calculation | Nothing: excess returns are formed on the grid of the column that uses them |
+| `freq_excess_return` | `'ME'` | No calculation; stored, printed and copied | Nothing: excess returns are formed on the grid of the column that uses them |
 | `return_type` | `ReturnTypes.LOG` | `compute_risk_table` | The basis of $v_k$ and $x_k$: `VOL`, `DOWNSIDE_VOL`, `AVG_LOG_RETURN`, `SKEWNESS`, `KURTOSIS` |
 | `sharpe_convention` | `SharpeConvention.PA` | Regime tables only | `BEAR_SHARPE`, `NORMAL_SHARPE`, `BULL_SHARPE` |
 | `rates_data` | `None` | Performance, risk and benchmark tables | Every excess column, the Sortino and Calmar numerators, and excess regressions |
@@ -132,7 +132,9 @@ carrying the last available price. The visible return columns `TOTAL_RETURN`, `N
 date and price columns, use the native endpoints $t_0$ and $t_1$. The ratio numerators of
 `SHARPE_RF0`, `SHARPE_EXCESS`, `SHARPE_LOG_AN`, `SHARPE_LOG_EXCESS` and `SORTINO_RATIO` use the
 sampled boundaries $b_0$ and $b_1$, the same support as their volatility denominators. The
-numerator of `CALMAR_RATIO` uses the native endpoints.
+numerator of `CALMAR_RATIO` uses the native endpoints, for the same reason: its denominator,
+`MAX_DD`, is measured on the `freq_drawdown` grid up to the asset's final observation $t_1$,
+not between complete `freq_vol` boundaries.
 
 Consequently, `PA_RETURN` divided by `VOL` need not reproduce `SHARPE_RF0`. The two agree only
 when $t_0$ and $t_1$ fall on the `freq_vol` grid. In the worked example below the history starts
@@ -184,16 +186,16 @@ asset's own observations, `freq_vol`, `freq_drawdown`, `freq_skewness` and `freq
 | `SHARPE_ARITH` | `Sharpe Arith` | $\sqrt{\mathrm{AN}}\,\bar r/s(r)$ | `freq_vol`, simple | ratio |
 | `SHARPE_ARITH_EXCESS` | `Ex Sharpe Arith` | $\sqrt{\mathrm{AN}}\,\bar{\tilde r}/s(\tilde r)$ | `freq_vol`, excess | ratio |
 | `VOL` | `Vol` | $\sigma_v=\sqrt{\mathrm{AN}}\,s(v)$ | `freq_vol`, `return_type` | decimal p.a. |
-| `DOWNSIDE_VOL` | `DownVol` | $\sigma^{-}=\sqrt{\mathrm{AN}}\,s(v\mid v<0)$; zero if $T_{-}<2$ | `freq_vol`, `return_type` | decimal p.a. |
-| `SORTINO_RATIO` | `Sortino` | $\tilde R^{\mathrm{smp}}_{\mathrm{pa}}/\sigma^{-}$ | `freq_vol`, excess numerator | ratio |
-| `CALMAR_RATIO` | `Calmar` | $\tilde R_{\mathrm{pa}}/\lvert\mathrm{MDD}\rvert$ | native numerator, `freq_drawdown` | ratio |
-| `MAX_DD` | `Max DD` | $\mathrm{MDD}=\min_t D_t$ | `freq_drawdown` | decimal, at most 0 |
-| `CURRENT_DD` | `Current DD` | $D_t$ at the last observation | `freq_drawdown` | decimal, at most 0 |
-| `MAX_DD_VOL` | `Max DD/Vol` | $\mathrm{MDD}/\sigma_v$; zero if $\sigma_v=0$ | `freq_drawdown` over `freq_vol` | ratio |
+| `DOWNSIDE_VOL` | `DownVol` | $\sigma^{-}=\sqrt{\mathrm{AN}}\,s(v\mid v<0)$; missing if $T_{-}<2$ | `freq_vol`, `return_type` | decimal p.a. |
+| `SORTINO_RATIO` | `Sortino` | $\tilde R^{\mathrm{smp}}_{\mathrm{pa}}/\sigma^{-}$; missing unless $\sigma^{-}>0$ | `freq_vol`, excess numerator | ratio |
+| `CALMAR_RATIO` | `Calmar` | $\tilde R_{\mathrm{pa}}/\lvert\mathrm{MDD}\rvert$; missing if $\mathrm{MDD}=0$ | native numerator, `freq_drawdown` | ratio |
+| `MAX_DD` | `Max DD` | $\mathrm{MDD}=\min_t D_t$ | `freq_drawdown` and $t_1$ | decimal, at most 0 |
+| `CURRENT_DD` | `Current DD` | $D_{t_1}$, at the last observation | `freq_drawdown` and $t_1$ | decimal, at most 0 |
+| `MAX_DD_VOL` | `Max DD/Vol` | $\mathrm{MDD}/\sigma_v$; missing unless $\sigma_v>0$ | `freq_drawdown` over `freq_vol` | ratio |
 | `SKEWNESS` | `Skewness` | $G_1$; missing if $T\le 2$ | `freq_skewness`, `return_type` | dimensionless |
 | `KURTOSIS` | `Kurtosis` | $G_2$ (excess); missing if $T\le 3$ | `freq_skewness`, `return_type` | dimensionless |
-| `WORST` | `Worst` | $\min_t r^{\mathrm{dd}}_t$ | `freq_drawdown`, simple | decimal per period |
-| `BEST` | `Best` | $\max_t r^{\mathrm{dd}}_t$ | `freq_drawdown`, simple | decimal per period |
+| `WORST` | `Worst` | $\min_t r^{\mathrm{dd}}_t$ | `freq_drawdown` and $t_1$, simple | decimal per period |
+| `BEST` | `Best` | $\max_t r^{\mathrm{dd}}_t$ | `freq_drawdown` and $t_1$, simple | decimal per period |
 
 #### Descriptive tables: `compute_desc_table` and `compute_desc_freq_table`
 
@@ -241,7 +243,7 @@ periodic return of the asset in regime $\omega$.
 
 | `PerfStat` | Label | Formula | Grid and basis | Units |
 |---|---|---|---|---|
-| `BEAR_AVG`, `NORMAL_AVG`, `BULL_AVG` | `Bear Avg`, `Normal Avg`, `Bull Avg` | $\bar r_{\mid\omega}$ | classifier grid, simple | decimal per period |
+| `BEAR_AVG`, `NORMAL_AVG`, `BULL_AVG` | `Bear Average`, `Normal Average`, `Bull Average` | $\bar r_{\mid\omega}$ | classifier grid, simple | decimal per period |
 | `BEAR_PA`, `NORMAL_PA`, `BULL_PA` | `Bear P.a.`, `Normal P.a.`, `Bull P.a.` | $e^{\mathrm{AN}_{\mathrm{c}}\,p_{\omega}\,\bar r_{\mid\omega}}-1$, shifted pro rata to sum to $R_{\mathrm{pa}}$ | classifier grid | decimal p.a. |
 | `BEAR_SHARPE`, `NORMAL_SHARPE`, `BULL_SHARPE` | `Bear-Sharpe`, `Normal-Sharpe`, `Bull-Sharpe` | regime p.a. over $\sigma_v$ under `SharpeConvention.PA` | classifier grid, `freq_vol` | ratio |
 
@@ -300,12 +302,13 @@ $T_{-}$ negative returns and $\bar v_{-}$ their mean. Then
 
 $$
 \sigma^{-}=\sqrt{\mathrm{AN}}\,\sqrt{\frac{1}{T_{-}-1}\sum_{k\in\mathcal{N}}\big(v_k-\bar v_{-}\big)^2},
-\qquad \sigma^{-}=0 \text{ if } T_{-}<2 .
+\qquad T_{-}\ge 2 .
 $$
 
-This is the standard deviation of the losses about their own mean. The downside risk of
-Sortino and van der Meer (1991) and the target downside deviation
-of Sortino and Price (1994) measure something else: shortfall below a minimum acceptable return
+With fewer than two negative returns the sample standard deviation is undefined, and
+`DOWNSIDE_VOL` is missing. This is the standard deviation of the losses about their own mean.
+The downside risk of Sortino and van der Meer (1991) and the target downside deviation of
+Sortino and Price (1994) measure something else: shortfall below a minimum acceptable return
 $\theta$, averaged over all observations. Its sample analogue, in the form given by Bacon (2008),
 is
 
@@ -337,17 +340,22 @@ return over $\theta$ divided by $\delta_{\theta}$, so that numerator and denomin
 same target. In qis the numerator is in excess of cash, while the denominator uses a zero
 threshold on total returns in the `return_type` basis, centred on the mean loss.
 
-Two degenerate cases need care. A history with fewer than two negative `freq_vol` returns has
-$\sigma^{-}=0$, and `SORTINO_RATIO` is then reported as infinite. A monotonically rising NAV has
-$\mathrm{MDD}=0$, and `CALMAR_RATIO` is then reported as minus infinity, because the code divides
-minus the numerator by a zero drawdown. Both are undefined, not extreme, values.
+Two degenerate cases are reported as missing values, because both ratios are undefined rather
+than extreme. A history with fewer than two negative `freq_vol` returns has no $\sigma^{-}$, so
+`DOWNSIDE_VOL` and `SORTINO_RATIO` are missing; a positive $\sigma^{-}$ is required for the ratio.
+A NAV that never falls has $\mathrm{MDD}=0$, so `CALMAR_RATIO` is missing. Earlier versions of qis
+reported a zero downside volatility with an infinite Sortino ratio, and a Calmar ratio of minus
+infinity for a positive return, the wrong sign as well as undefined.
 
 ### Drawdowns and the Calmar ratio
 
-The drawdown on the `freq_drawdown` grid is $D_t=P_t/\max_{t'\le t}P_{t'}-1$. `MAX_DD` is its
-minimum over the full history, `CURRENT_DD` its value at the asset's last observation, and
-`MAX_DD_VOL` is $\mathrm{MDD}/\sigma_v$, set to zero when $\sigma_v=0$. Episodes, durations and
-time under water are in [Drawdowns and time under water](drawdowns.md).
+The drawdown on the `freq_drawdown` grid is $D_t=P_t/\max_{t'\le t}P_{t'}-1$. The grid is the
+complete `freq_drawdown` boundaries followed by the asset's final observation $t_1$ when that
+falls between boundaries, so a coarse grid keeps a trailing incomplete period. `MAX_DD` is the
+minimum of $D_t$ over the full history, `CURRENT_DD` its value at $t_1$, and `MAX_DD_VOL` is
+$\mathrm{MDD}/\sigma_v$, missing when $\sigma_v$ is missing (a single sampled return) or zero.
+Episodes, durations and time under water are in
+[Drawdowns and time under water](drawdowns.md).
 
 **Proposition (sub-sampling cannot deepen the maximum drawdown).** Let grid $G'$ observe a
 subset of the prices observed on grid $G$. Then $\mathrm{MDD}_{G'}\ge\mathrm{MDD}_{G}$.
@@ -358,7 +366,10 @@ $\square$
 
 Month-end prices are forward-filled daily prices, so the monthly drawdown is never deeper than
 the daily one, and a business-day history re-sampled to calendar days (`D`) has the same drawdown
-as on business days. The proposition matters because of the default grids.
+as on business days. The final observation that the drawdown grid appends is itself a daily
+price, so the proposition still applies, and on a coarse grid both paths end on the same date:
+`CURRENT_DD` then satisfies the same inequality. The proposition matters because of the default
+grids.
 
 > **Pitfall.** With `PerfParams()` the numerator of `MAX_DD_VOL` is a daily maximum drawdown and
 > its denominator a monthly volatility. The column mixes a daily path statistic with a monthly
@@ -374,12 +385,13 @@ as on business days. The proposition matters because of the default grids.
 
 **Definition (Calmar ratio as implemented).** `CALMAR_RATIO` is
 $\tilde R_{\mathrm{pa}}/\lvert\mathrm{MDD}\rvert$: the native excess per-annum return over the
-full-history maximum drawdown on the `freq_drawdown` grid. Young (1991) defines the ratio on a
-trailing 36-month window: the compound annual return over the window divided by the maximum
-drawdown within it, conventionally measured on month-end NAVs. The qis column differs in three
-ways. Its window is the full history, which can only deepen the drawdown; its drawdown is daily
-by default, which by the proposition above can only deepen it further; and its numerator is in
-excess of cash when `rates_data` is given. A full-history Calmar ratio is therefore smaller in
+full-history maximum drawdown on the `freq_drawdown` grid, and missing when $\mathrm{MDD}=0$.
+Numerator and denominator both run to the asset's final observation. Young (1991) defines the
+ratio on a trailing 36-month window: the compound annual return over the window divided by the
+maximum drawdown within it, conventionally measured on month-end NAVs. The qis column differs in
+three ways. Its window is the full history, which can only deepen the drawdown; its drawdown is
+daily by default, which by the proposition above can only deepen it further; and its numerator is
+in excess of cash when `rates_data` is given. A full-history Calmar ratio is therefore smaller in
 magnitude than a 36-month one on the same fund, and the two are not interchangeable.
 
 ### Higher moments and extreme returns
@@ -452,8 +464,9 @@ D'Agostino and Pearson (1973), computed by `scipy.stats.normaltest`. The statist
 $K^2=Z_1^2+Z_2^2$ adds the squared normalised skewness and kurtosis statistics of
 `scipy.stats.skewtest` and `scipy.stats.kurtosistest`, and is $\chi^2_2$ under normality. qis
 requires at least 20 observations, the size from which SciPy documents the kurtosis test as valid
-(SciPy itself returns a value from 8 observations), and prints the p-value with two decimals
-under the label `P-val`.
+(SciPy itself returns a value from 8 observations), and prints the p-value with the four decimals
+of the member's `ValueType.FLOAT4` under the label `P-val`, so a p-value of 0.004 is not shown as
+0.00.
 
 **Identity (p-value of a two-degree chi-square).** $P(\chi^2_2>K^2)=e^{-K^2/2}$.
 
@@ -481,9 +494,10 @@ The regime columns condition on benchmark regimes. Under the default `SharpeConv
 regime Sharpe is the adjusted regime per-annum return divided by $\sigma_v$; under
 `ARITHMETIC` and `LOG` it is $\mathrm{AN}_{\mathrm{c}}\,p_{\omega}$ times the conditional mean,
 divided by the annualised standard deviation of the same returns, which adds up exactly to the
-full-sample Sharpe ratio of that convention. The regime table labels its average columns
-`Bear Average`, `Normal Average` and `Bull Average`, while `PerfStat.BEAR_AVG.to_str()` is
-`Bear Avg`; the per-annum and Sharpe labels match their members. The decomposition is in
+Sharpe ratio of that convention on the classifier's grid. No convention deducts cash. The regime
+table labels its average columns `Bear Average`, `Normal Average` and `Bull Average`, and every
+regime member's label is a column of that table, so `PerfStat.BEAR_AVG` selects `Bear Average`
+(its label was `Bear Avg` before, which selected nothing). The decomposition is in
 [Regime-conditional performance](regime_conditional_performance.md).
 
 ## Worked example
@@ -508,7 +522,7 @@ recomputed with NumPy or SciPy from the month-end or daily prices.
 | `CALMAR_RATIO` | 0.0064 | 0.270 | Native excess p.a. of 0.29% and 2.96% |
 | `POSITIVE` (months) | 48.3% | 55.9% | Share of positive simple returns |
 | `T_STAT` | 0.59 | 2.41 | `SHARPE_ARITH` of 0.172 and 0.700 times $\sqrt{143/12}$ |
-| `NORMTEST` | 0.28 | 0.34 | $K^2$ of 2.52 and 2.17 |
+| `NORMTEST` | 0.2843 | 0.3387 | $K^2$ of 2.52 and 2.17 |
 
 The first block recomputes the risk-table columns. It also shows the native-endpoint rule: the
 visible `PA_RETURN` of `SEQ_US` is 1.30% from 2 January, while the numerator of `SHARPE_RF0` is
@@ -644,7 +658,8 @@ z_skew, z_kurt = stats.skewtest(log_m).statistic, stats.kurtosistest(log_m).stat
 np.testing.assert_allclose(k_squared, z_skew ** 2 + z_kurt ** 2, rtol=1e-12)
 np.testing.assert_allclose(p_value, np.exp(-k_squared / 2.0), rtol=1e-12)
 np.testing.assert_allclose(k_squared, [2.52, 2.17], atol=5e-3)
-assert list(moments[Stat.NORMTEST.to_str()]) == ['0.28', '0.34']
+assert list(moments[Stat.NORMTEST.to_str()]) == [f'{p:.4f}' for p in p_value]
+assert list(moments[Stat.NORMTEST.to_str()]) == ['0.2843', '0.3387']
 ```
 
 Neither asset rejects normality, as it should not: the paths are Gaussian by construction. The
@@ -652,7 +667,9 @@ third block reproduces the three pitfalls of the methodology section. Without `p
 business-day index is inferred as `B` and `VOL` becomes 16.56% and 5.97%, daily volatilities
 annualised with $\sqrt{252}$, instead of 17.10% and 5.59%; dropping the single row of 4 July 2014
 makes the index irregular and restores the monthly numbers. The `freq` shortcut leaves skewness on
-months. And `MAX_DD_VOL` divides the daily drawdown by the monthly volatility.
+months, and `PerfParams.copy` keeps it. `MAX_DD_VOL` divides the daily drawdown by the monthly
+volatility. Finally, a month-end NAV that never falls and has no losing month has no drawdown
+and no downside volatility, so `CALMAR_RATIO`, `DOWNSIDE_VOL` and `SORTINO_RATIO` are missing.
 
 ```python
 inferred = qis.compute_ra_perf_table(prices=prices)  # perf_params=None: freq is inferred as 'B'
@@ -676,6 +693,16 @@ assert (max_dd_monthly >= max_dd_daily).all()
 np.testing.assert_allclose(column(Stat.MAX_DD_VOL), max_dd_daily / vol, rtol=1e-12)
 np.testing.assert_allclose(max_dd_daily / vol, [-2.71, -1.96], atol=5e-3)
 np.testing.assert_allclose(max_dd_monthly / vol, [-2.64, -1.70], atol=5e-3)
+assert qis.PerfParams(freq_skewness='QE').copy().freq_skewness == 'QE'
+
+# undefined ratios are missing, not infinite: every month gains between 0.8% and 1.2%
+growth = 1.01 + 0.002 * np.sin(np.arange(24))
+rising = pd.Series(100.0 * np.concatenate(([1.0], np.cumprod(growth))),
+                   index=month_end.index[:25], name='rising')
+rising_row = qis.compute_ra_perf_table(prices=rising, perf_params=params).loc['rising']
+assert rising_row[Stat.MAX_DD.to_str()] == 0.0 and rising_row[Stat.PA_EXCESS_RETURN.to_str()] > 0
+assert np.isnan(rising_row[[Stat.CALMAR_RATIO.to_str(), Stat.DOWNSIDE_VOL.to_str(),
+                            Stat.SORTINO_RATIO.to_str()]].astype(float)).all()
 ```
 
 ## Implementation in qis
@@ -711,7 +738,7 @@ and [regime_classifier.py](https://github.com/ArturSepp/QuantInvestStrats/blob/m
 
 | `DescTableType` | Columns added or removed |
 |---|---|
-| `NONE` | Not implemented; raises `TypeError` |
+| `NONE` | Removes every column: the ticker index only; the plotting functions draw no table |
 | `SHORT` (default) | No further columns |
 | `AVG_WITH_POSITIVE_PROB` | Removes `Avg` and `Std`; adds `Positive` |
 | `WITH_POSITIVE_PROB` | Adds `Positive` |
@@ -770,8 +797,10 @@ assert list(formatted.columns) == [stat.to_str() for stat in custom]
 
 Two naming details matter when code selects columns. `PerfStat.X.to_str()` returns the display
 label, and so does `PerfStat.X.name`, because the `ColVar` field `name` shadows the enumeration's
-member name; use `PerfStat.X._name_` or `PerfStat['VOL']` for the member name. `ALPHA` and
-`ALPHA_AN` share the wrapped label `Alpha`, so a wrapped header containing both is ambiguous.
+member name; the shadowing is kept because qis reads its labels that way, so use
+`PerfStat.X._name_` or `PerfStat['VOL']` for the member name. The wrapped labels
+(`to_str(short_n=True)`) are unique: `ALPHA` is `Alpha` and `ALPHA_AN` is `An` over `Alpha`, where
+both were `Alpha` before, and a wide table containing the two could not tell them apart.
 
 ## Interpretation and limitations
 
@@ -780,8 +809,8 @@ member name; use `PerfStat.X._name_` or `PerfStat['VOL']` for the member name. `
 - The default table mixes grids. `MAX_DD`, `CURRENT_DD`, `WORST` and `BEST` are daily, `VOL`,
   the Sharpe family and the Sortino ratio monthly, and `MAX_DD_VOL` divides one by the other. The
   regression grid is quarterly under `PerfParams()` and monthly under `PerfParams(freq='ME')`.
-- `freq_excess_return` is stored, printed and copied but not read by any calculation, and
-  `PerfParams.copy` does not carry `freq_skewness`, which returns to `'ME'` in the copy.
+- `freq_excess_return` is stored, printed and copied but not read by any calculation. It is kept
+  so that existing code constructing `PerfParams` with it keeps working.
 - For a sampled history of one year or less the ratio numerators are total, not annualised,
   returns, while `VOL` is annualised; the resulting Sharpe and Sortino ratios are not comparable
   with those of longer histories.
@@ -789,9 +818,13 @@ member name; use `PerfStat.X._name_` or `PerfStat['VOL']` for the member name. `
   implementation a rate series that starts on the first price date leaves the first native
   excess return missing, and the native excess per-annum return then compounds from the second
   observation while still dividing by the full $Y$.
-- Degenerate inputs give values that are undefined rather than extreme: an infinite Sortino
-  ratio, a minus-infinite Calmar ratio, a zero `MAX_DD_VOL` for zero volatility, and missing
-  moments for fewer than three or four observations.
+- Degenerate inputs give missing values, not zeros or infinities: `DOWNSIDE_VOL` and
+  `SORTINO_RATIO` with fewer than two losing periods, `CALMAR_RATIO` without a drawdown,
+  `MAX_DD_VOL` with a missing or zero volatility, and the moments with fewer than three or four
+  observations. Filter or fill them explicitly before ranking assets on these columns.
+- On a coarse drawdown grid such as `freq_drawdown='ME'`, `MAX_DD` and `CURRENT_DD` include the
+  final observation of a history that ends mid-month, but troughs inside earlier months are
+  still invisible.
 - Skewness, kurtosis and the normality test assume independent observations. Under serial
   correlation, as in smoothed private-asset returns, they are less precise than their nominal
   standard errors suggest; see [Serial dependence and autocorrelation](serial_dependence.md).

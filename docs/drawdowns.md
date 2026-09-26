@@ -47,7 +47,7 @@ the same total return but a different maximum drawdown.
 | Convention | This article |
 |---|---|
 | Return basis | Levels, not returns: price, total-return index or NAV; $D_t$ is a relative (compounded) drawdown; the Calmar numerator is the p.a. compound excess return |
-| Sampling grid | Native index for `compute_rolling_drawdowns` and `compute_max_current_drawdown`; calendar days `D`, forward-filled, for the episode table, time under water and `PerfParams.freq_drawdown` |
+| Sampling grid | Native index for `compute_rolling_drawdowns` and `compute_max_current_drawdown`; calendar days `D`, forward-filled, for the episode table, time under water and `PerfParams.freq_drawdown`; the table's `freq_drawdown` grid ends at each asset's final observation |
 | Annualisation | None for drawdowns and durations; the Calmar numerator uses 365.25-day years; `MAX_DD_VOL` divides by a volatility annualised with $\sqrt{\mathrm{AN}}$ on `freq_vol` |
 | Mean adjustment | None: drawdowns are path functionals, and `compute_avg_max_dd` averages the path over time without demeaning |
 | Timing | $D_t$ uses levels up to and including $t$ (point in time); maxima, episode ends and recovery flags are full-sample and known only ex post |
@@ -196,8 +196,10 @@ shrink on a coarser grid. Only the depth of the maximum drawdown is ordered. The
 ordering between grids that are not nested, such as Friday closes and month-end closes. The
 number of episodes and their durations are not monotone: a coarse grid can miss a brief new
 high and merge two episodes, or register a recovery to its own lower peak and split one. The
-current drawdown is ordered only when both grids end on the same date; qis month-end sampling
-drops a trailing incomplete month, so the coarse current drawdown can refer to an earlier date.
+current drawdown is ordered only when both grids end on the same date. The performance table
+ensures that they do: its `freq_drawdown` grid is the complete boundaries followed by each
+asset's final observation when that falls inside an incomplete period, so `CURRENT_DD` on
+month-ends is the drawdown at the last observation, measured from the highest month-end level.
 
 ### Drawdown episodes
 
@@ -329,14 +331,17 @@ a noisier estimate. qis has no trailing-window Calmar function; the worked examp
 Young's version from a month-end slice.
 
 The numerator is taken from the native-endpoint return table, whereas the Sharpe and Sortino
-numerators use the `freq_vol` boundaries of their risk denominators. A path that is never under
-water has $\mathrm{MDD}=0$, for which the column is undefined; the implementation then returns
-negative infinity for a positive return.
+numerators use the `freq_vol` boundaries of their volatility denominators. Both choices pair a
+numerator with the sample of its own denominator: $\mathrm{MDD}$ on the `freq_drawdown` grid runs
+to the asset's final observation, as the native return does. A path that is never under water
+has $\mathrm{MDD}=0$, for which the ratio is undefined, and the column is then missing. Earlier
+versions returned negative infinity for a positive return.
 
 #### Maximum drawdown over volatility
 
 **Definition (as implemented).** `MAX_DD_VOL` $=\mathrm{MDD}/\sigma_v$ when $\sigma_v>0$, and
-0 otherwise (including a missing volatility). By default the two terms live on different grids:
+missing otherwise: a single sampled return leaves $\sigma_v$ missing, and a constant sampled
+price makes it zero. By default the two terms live on different grids:
 $\mathrm{MDD}$ on calendar days (`freq_drawdown='D'`) and $\sigma_v$ on month-end log returns
 (`freq_vol='ME'`, `return_type=ReturnTypes.LOG`). With `perf_params=None`,
 `compute_ra_perf_table` infers `freq` from the index, so for daily input $\sigma_v$ is a daily-grid
@@ -472,7 +477,8 @@ on 7 January, the recovery day, no plateau) and $7=6+1$ for the unrecovered one 
 on 16 January and a one-day plateau). The path summary gives a time-average drawdown of
 $-1.03/12\approx-8.58\%$, a 10% quantile of −19.8%, a maximum of −25% and a last value of −15%.
 The history is shorter than a year, so the Calmar numerator is the 2% total return and
-$\mathrm{CR}=0.02/0.25=0.08$.
+$\mathrm{CR}=0.02/0.25=0.08$. Twelve closes that each rise by between 0.8% and 1.2% are never
+under water: $\mathrm{MDD}=0$ and the Calmar ratio is missing.
 
 ```python
 import numpy as np
@@ -530,6 +536,13 @@ row = qis.compute_ra_perf_table(prices=price, perf_params=qis.PerfParams(freq='B
 np.testing.assert_allclose(row[qis.PerfStat.MAX_DD.to_str()], -0.25, atol=1e-12)
 np.testing.assert_allclose(row[qis.PerfStat.CURRENT_DD.to_str()], -0.15, atol=1e-12)
 np.testing.assert_allclose(row[qis.PerfStat.CALMAR_RATIO.to_str()], 0.02 / 0.25, atol=1e-12)
+# never under water: the Calmar ratio is undefined and reported as missing
+rising = pd.Series(100.0 * np.cumprod(1.01 + 0.002 * np.sin(np.arange(12))), index=dates,
+                   name='rising')
+rising_row = qis.compute_ra_perf_table(prices=rising,
+                                       perf_params=qis.PerfParams(freq='B')).loc['rising']
+assert rising_row[qis.PerfStat.MAX_DD.to_str()] == 0.0
+assert np.isnan(rising_row[qis.PerfStat.CALMAR_RATIO.to_str()])
 
 # path dependence: the same four returns in two orders
 up_down = pd.Series(100.0 * np.cumprod([1.0, 1.1, 0.9, 1.1, 0.9]), index=dates[:5])
@@ -548,6 +561,13 @@ and −45.18% on month-end closes; the Treasury sleeve `SBD_TSY` has −10.95% a
 p.a. returns of 1.30% and 4.00%, the full-history Calmar ratios are 0.028 and 0.365. Over the
 last 36 month-ends, Young's convention gives −0.39 and 0.36: the equity sleeve lost 16.9% a year
 over that window, which the full-history ratio does not show.
+
+Cut the history at Monday 15 December 2025 and the month-end grid still ends on that date,
+because the table appends each asset's final observation to the complete month-ends. `CURRENT_DD`
+is then −45.40% and −1.98%, against −44.89% and −0.54% at the last complete month-end,
+30 November; for `SEQ_US` the fall in early December also deepens the month-end-grid `MAX_DD`
+from −45.18% to −45.40%. Earlier versions of qis dropped the incomplete month and reported the
+November values.
 
 ```python
 from qis.datasets import generate_synthetic_universe
@@ -589,6 +609,22 @@ young_max_dd = (window / window.cummax() - 1.0).min()
 young_calmar = -young_return / young_max_dd
 np.testing.assert_allclose(young_return, [-0.1688, 0.0197], atol=5e-5)
 np.testing.assert_allclose(young_calmar, [-0.3934, 0.3620], atol=5e-5)
+
+# a history ending mid-month: the month-end grid keeps the final observation
+partial = prices.loc[:'2025-12-15']
+partial_table = qis.compute_ra_perf_table(prices=partial,
+                                          perf_params=qis.PerfParams(freq_drawdown='ME'))
+grid = partial.resample('ME').last()  # the December row holds the 15 December level
+grid_dd = grid / grid.cummax() - 1.0
+np.testing.assert_allclose(partial_table[CURRENT_DD], grid_dd.iloc[-1], atol=1e-12)
+np.testing.assert_allclose(partial_table[MAX_DD], grid_dd.min(), atol=1e-12)
+np.testing.assert_allclose(partial_table[CURRENT_DD], [-0.4540, -0.0198], atol=5e-5)
+np.testing.assert_allclose(partial_table.loc['SEQ_US', MAX_DD], -0.4540, atol=5e-5)
+complete = grid.iloc[:-1]  # month-ends up to 30 November only
+np.testing.assert_allclose((complete / complete.cummax() - 1.0).iloc[-1], [-0.4489, -0.0054],
+                           atol=5e-5)
+np.testing.assert_allclose((complete / complete.cummax() - 1.0).min()['SEQ_US'], -0.4518,
+                           atol=5e-5)
 ```
 
 ### Monte Carlo check of the Brownian benchmark
@@ -643,8 +679,8 @@ assert np.all(weekly_max_dd <= log_max_dd + 1e-15)
 | Path summary | mean, quantile, extreme, last | `qis.compute_avg_max_dd(ds, is_max=True, q=0.1)` |
 | Table maximum drawdown | $\mathrm{MDD}$ on `freq_drawdown` | `PerfStat.MAX_DD` in `qis.compute_ra_perf_table` |
 | Table current drawdown | $D_T$ on `freq_drawdown` | `PerfStat.CURRENT_DD` |
-| Drawdown over volatility | $\mathrm{MDD}/\sigma_v$, or 0 | `PerfStat.MAX_DD_VOL` |
-| Calmar ratio | $-R^{\mathrm{ex}}_{\mathrm{pa}}/\mathrm{MDD}$ | `PerfStat.CALMAR_RATIO` |
+| Drawdown over volatility | $\mathrm{MDD}/\sigma_v$, missing unless $\sigma_v>0$ | `PerfStat.MAX_DD_VOL` |
+| Calmar ratio | $-R^{\mathrm{ex}}_{\mathrm{pa}}/\mathrm{MDD}$, missing if $\mathrm{MDD}=0$ | `PerfStat.CALMAR_RATIO` |
 | Drawdown grid | calendar days by default | `qis.PerfParams(freq_drawdown='D')` |
 | Drawdown panel | $D_t$ on the native grid | `qis.plot_rolling_drawdowns(prices, dd_legend_type=DdLegendType.DETAILED)` |
 | Time-under-water panel | $\mathrm{TUW}_t$ on `'D'` | `qis.plot_rolling_time_under_water(prices, dd_legend_type=DdLegendType.SIMPLE)` |
@@ -672,16 +708,21 @@ Contract details:
   column, for a DataFrame. The maximum ignores missing values; the current drawdown is the last
   row after the forward fill, so a column that stopped early reports its last observed drawdown.
 - In `compute_ra_perf_table`, `MAX_DD` and `CURRENT_DD` come from `compute_max_current_drawdown`
-  on levels sampled at `freq_drawdown` and cut at each asset's last observation. Passing
-  `PerfParams(freq=...)` does not change `freq_drawdown`, whose own default `'D'` takes
-  precedence.
+  on levels sampled at `freq_drawdown`, per asset, up to and including each asset's last
+  observation: when that falls inside an incomplete period it is appended to the sampled
+  boundaries. Passing `PerfParams(freq=...)` does not change `freq_drawdown`, whose own default
+  `'D'` takes precedence unless `freq_drawdown=None` is passed.
 - `compute_rolling_drawdown_time_under_water` returns both series on the rebased `'D'` or `'B'`
   grid, which has more rows than a business-day input.
 - `plot_rolling_drawdowns` and `plot_prices_with_dd` draw $D_t$ on the grid of the supplied
   levels, not on `freq_drawdown`; their legends use `compute_avg_max_dd(is_max=False)`.
-  `plot_rolling_time_under_water` counts calendar days. `plot_top_drawdowns_paths` takes its
-  episodes from `compute_drawdowns_stats_table` on calendar days and plots each episode as
-  $P_t/P_{t^{\mathrm{start}}}-1$ against the number of `freq` observations since its start.
+  `plot_rolling_time_under_water` counts calendar days. `plot_top_drawdowns_paths` rebases the
+  levels to its `freq` (calendar days by default), takes its episodes from
+  `compute_drawdowns_stats_table` on the same grid, and plots each episode as
+  $P_t/P_{t^{\mathrm{start}}}-1$ against the number of grid observations since its start; the
+  axis reads "Days in drawdown" on `'D'` and "Observations in drawdown" otherwise. With
+  `highlight_ongoing=True` it draws the unrecovered episode (`is_recovered=False`) solid; earlier
+  versions compared episode ends with the penultimate date and so missed it.
 - There is no trailing-window maximum drawdown or Calmar function; slice the levels and call
   `compute_max_current_drawdown`, as in the Young calculation above.
 
@@ -696,7 +737,8 @@ Contract details:
 - State the grid with every drawdown number. The table default (`'D'`) equals the native
   business-day value; month-end or quarter-end sampling reports shallower drawdowns, and the
   underlying continuous-time path is deeper still. With `freq_drawdown='ME'`, a fall inside the
-  current incomplete month is invisible to both `MAX_DD` and `CURRENT_DD`.
+  current incomplete month enters `MAX_DD` and `CURRENT_DD` through the final observation, but a
+  trough inside an earlier month is invisible.
 - Maximum drawdown is a single extreme of one path. Its expectation grows with volatility and
   with the horizon, so compare it only across histories of equal length, or against the Brownian
   benchmark $\sqrt{\pi/2}\,\sigma\sqrt{\tau}$ for the same $\sigma$ and $\tau$.

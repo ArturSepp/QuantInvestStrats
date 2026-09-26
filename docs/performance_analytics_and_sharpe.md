@@ -419,8 +419,11 @@ $e^{\sum_g z_g}-1\neq\sum_g(e^{z_g}-1)$. The `PA` branch forms
 $\exp(\mathrm{AN}\,p_g\bar r_g)-1$ from mean simple returns, allocates the gap between their
 sum and the visible `PA_RETURN` across regimes in proportion to $p_g$, and divides by `VOL`.
 Its bars therefore add up to `PA_RETURN` divided by `VOL`, which differs from `SHARPE_RF0` when
-the native endpoints are off the `freq_vol` grid. Classifier grids, partial periods and the
-patch are treated in [regime-conditional performance](regime_conditional_performance.md).
+the native endpoints are off the `freq_vol` grid. All three branches decompose total-return
+Sharpe ratios: `PerfParams.rates_data` enters the table's excess columns but not the regime
+contributions, and the regime column labels, such as `Bear-Sharpe`, do not name the convention.
+Classifier grids, partial periods and the patch are treated in
+[regime-conditional performance](regime_conditional_performance.md).
 
 ### Sampling uncertainty
 
@@ -562,8 +565,9 @@ A practical rule: report `SHARPE_RF0` or `SHARPE_EXCESS` and say so; use `SHARPE
 `SharpeConvention.ARITHMETIC` or `SharpeConvention.LOG` for regime attribution.
 
 > **Pitfall.** The column labelled `Sharpe (rf=0)` is the compound p.a. convention; the label does
-> not say so. Comparing it with an arithmetic Sharpe ratio from another system shows a gap of
-> about half the volatility that is convention, not performance.
+> not say so, and it is kept because code selects the column by it. Comparing it with an
+> arithmetic Sharpe ratio from another system shows a gap of about half the volatility that is
+> convention, not performance.
 
 ### Rolling statistics and drawdowns
 
