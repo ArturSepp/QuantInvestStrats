@@ -85,13 +85,24 @@ def test_pnl_risk_attribution_handles_all_zero_instrument_without_warning(
     with warnings.catch_warnings():
         warnings.simplefilter('error', RuntimeWarning)
         actual = portfolio_data.get_instruments_pnl_risk_attribution()
+        standalone = portfolio_data.get_instruments_pnl_risk_attribution(is_standalone=True)
 
+    # The default is now the ex-post Euler share Cov(x_i, x_p) / Var(x_p). An instrument whose
+    # P&L is identically zero has zero covariance with the portfolio P&L, so its share is 0.0,
+    # no longer the NaN of the former standalone shares, which dropped zero-P&L days.
     expected = pd.Series(
-        [np.nan, 1.0 / 3.0, 2.0 / 3.0],
+        [0.0, 1.0 / 3.0, 2.0 / 3.0],
         index=pnl.columns,
         name=portfolio_data.nav.name,
     )
     pd.testing.assert_series_equal(actual, expected)
+    # the former standalone shares keep their contract under is_standalone=True
+    expected_standalone = pd.Series(
+        [np.nan, 1.0 / 3.0, 2.0 / 3.0],
+        index=pnl.columns,
+        name=portfolio_data.nav.name,
+    )
+    pd.testing.assert_series_equal(standalone, expected_standalone)
 
 
 def test_brinson_keeps_canonical_alignment_with_display_names() -> None:

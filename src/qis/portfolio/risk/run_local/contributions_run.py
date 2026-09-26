@@ -134,9 +134,10 @@ def run_local(local: Locals) -> None:
         portfolio_weights, benchmark_weights, asset_betas, factor_covar, idiosyncratic_var
     )
 
-    # Calculate risk contributions
+    # Euler contributions to tracking error: marginal_risk is the gradient of active variance,
+    # m = 2 S d, so sum_i d_i m_i = 2 TE^2 and d_i m_i / (2 TE) sums to TE
     weight_diff = portfolio_weights - benchmark_weights
-    risk_contributions = marginal_risk * weight_diff
+    risk_contributions = marginal_risk * weight_diff / (2.0 * total_active_risk)
 
     # Create results DataFrame
     results_df = pd.DataFrame({
@@ -145,7 +146,7 @@ def run_local(local: Locals) -> None:
         'Marginal_Risk_Systematic': systematic_marginal,
         'Marginal_Risk_Idiosyncratic': idiosyncratic_marginal,
         'Risk_Contribution': risk_contributions,
-        'Risk_Contribution_pct': risk_contributions / total_active_risk_sq * 100
+        'Risk_Contribution_pct': risk_contributions / total_active_risk * 100
     }, index=asset_names)
 
     print("Marginal Active Risk Analysis:")
@@ -156,9 +157,10 @@ def run_local(local: Locals) -> None:
     total_risk_contrib = np.sum(risk_contributions)
     print("Verification:")
     print(f"Sum of Risk Contributions: {total_risk_contrib:.8f}")
-    print(f"Total Active Risk Squared: {total_active_risk_sq:.8f}")
-    print(f"Difference: {abs(total_risk_contrib - total_active_risk_sq):.2e}")
-    print(f"Risk contributions sum correctly: {np.isclose(total_risk_contrib, total_active_risk_sq)}\n")
+    print(f"Total Active Risk (TE): {total_active_risk:.8f}")
+    print(f"Difference: {abs(total_risk_contrib - total_active_risk):.2e}")
+    print(f"Risk contributions sum correctly: {np.isclose(total_risk_contrib, total_active_risk)}")
+    print(f"Sum of percentage contributions: {results_df['Risk_Contribution_pct'].sum():.2f}%\n")
 
     # Risk/Return Analysis
     print("=== Risk-Adjusted Analysis ===")
@@ -187,15 +189,17 @@ def run_local(local: Locals) -> None:
     # Factor contribution analysis
     print("=== Factor Risk Contribution Analysis ===")
 
-    # Calculate each factor's contribution to active risk
+    # Each factor's contribution to active risk by the same degree-two Euler identity:
+    # e_k (2 S_x e)_k / (2 TE) sums to the systematic variance divided by TE
     factor_marginal_risks = 2 * factor_covar @ active_exposures
-    factor_risk_contributions = factor_marginal_risks * active_exposures
+    factor_risk_contributions = (factor_marginal_risks * active_exposures
+                                 / (2.0 * total_active_risk))
 
     factor_analysis_df = pd.DataFrame({
         'Active_Exposure': active_exposures,
         'Marginal_Risk': factor_marginal_risks,
         'Risk_Contribution': factor_risk_contributions,
-        'Risk_Contribution_pct': factor_risk_contributions / total_active_risk_sq * 100
+        'Risk_Contribution_pct': factor_risk_contributions / total_active_risk * 100
     }, index=factor_names)
 
     print("Factor-Level Risk Analysis:")
@@ -227,7 +231,7 @@ def run_local(local: Locals) -> None:
     print(f"• Total tracking error: {annual_tracking_error:.2f}% annually")
     print(f"• Largest risk contributor: {asset_names[np.argmax(np.abs(risk_contributions))]}")
     print(f"• Highest marginal risk: {asset_names[np.argmax(marginal_risk)]}")
-    print(f"• Risk decomposition verified: {np.isclose(total_risk_contrib, total_active_risk_sq)}")
+    print(f"• Risk decomposition verified: {np.isclose(total_risk_contrib, total_active_risk)}")
 
 if __name__ == "__main__":
     run_local(local=Locals.MARGINAL_ACTIVE_RISK)

@@ -87,9 +87,9 @@ def reduce_attribution_to_tails(data: pd.Series,
     keep the extremes of an attribution and fold the middle into a reported total.
 
     Sorted descending and cut from both ends when the values carry both signs - a P&L
-    attribution, where the losers matter as much as the winners - and from the top only when they
-    do not, which is every share-of-total metric: a risk attribution, costs and turnover are
-    non-negative by construction and have no bottom tail to show.
+    attribution, where the losers matter as much as the winners, or a risk attribution with
+    hedges, whose Euler shares are negative - and from the top only when they do not, as for
+    costs and turnover, which are non-negative by construction and have no bottom tail to show.
 
     The folded value is returned rather than plotted. A single bar carrying sixty instruments
     dominates the axis and flattens the ones the panel exists to show, so the caller states it in
@@ -125,6 +125,15 @@ def reduce_attribution_to_tails(data: pd.Series,
 class AttributionMetric(str, Enum):
     """
     input for computation of get_performance_attribution_data()
+
+    Attributes:
+        PNL: total return contribution of each instrument, summing to the portfolio performance
+        PNL_RISK: ex-post Euler share of each instrument in the variance of the portfolio P&L,
+            Cov(x_i, x_p) / Var(x_p); the shares sum to 100% and a hedge has a negative share
+        INST_PNL: NAV path compounded from each instrument's P&L contribution
+        COSTS: total trading costs by instrument
+        TURNOVER: annualised mean turnover by instrument
+        VOL_ADJUSTED_TURNOVER: annualised mean turnover of volatility-normalised weights
     """
     PNL = 'P&L Attribution, sum=portfolio performance'
     PNL_RISK = 'P&L Risk Attribution, sum=100%'
@@ -717,12 +726,26 @@ class PortfolioData:
     def compute_portfolio_benchmark_betas(self,
                                           benchmark_prices: pd.DataFrame,
                                           time_period: TimePeriod = None,
-                                          freq_beta: str = None,
-                                          factor_beta_span: int = 65  # quarter
+                                          freq_beta: str = 'B',
+                                          factor_beta_span: int = 63  # quarter of 252 days
                                           ) -> pd.DataFrame:
-        """
-        compute benchmark betas of instruments
-        portfolio_beta_i = sum(instrument_beta_i*exposure)
+        """Holdings-based EWM betas of the portfolio to each benchmark.
+
+        The portfolio beta to benchmark q is sum_i w_{i,t} beta_{i,q,t}, with instrument betas
+        estimated by EWM regression of ``freq_beta`` log returns. The defaults are those of
+        ``compute_portfolio_benchmark_attribution``, so the betas shown are the betas the
+        attribution applies; the defaults were ``freq_beta=None`` (the price index's own grid)
+        and ``factor_beta_span=65`` before they were aligned.
+
+        Args:
+            benchmark_prices: Benchmark prices, one column per benchmark.
+            time_period: Optional period applied to the output after estimation.
+            freq_beta: Return frequency of the beta regressions (default 'B').
+            factor_beta_span: EWM span of the beta regressions in ``freq_beta`` periods
+                (default 63, a quarter of business days).
+
+        Returns:
+            Portfolio beta per benchmark and date.
         """
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
@@ -739,12 +762,29 @@ class PortfolioData:
                                                 benchmark_prices: pd.DataFrame,
                                                 time_period: TimePeriod = None,
                                                 freq_beta: str = 'B',
-                                                factor_beta_span: int = 63,  # quarter
+                                                factor_beta_span: int = 63,  # quarter of 252 days
                                                 residual_name: str = 'Alpha'
                                                 ) -> pd.DataFrame:
-        """
-        attribution = portfolio_return_{t} - benchmark_return_{t}*bet_{t-1}
-        returns are compounded
+        """Per-period split of the portfolio return into benchmark contributions and a residual.
+
+        On the grid of the betas, benchmark q contributes beta_{q,t-1} x_{q,t}, with x_{q,t} the
+        simple benchmark return and beta the holdings-based beta of
+        ``compute_portfolio_benchmark_betas`` at the previous date; the residual column is the
+        simple NAV return minus the sum of the contributions. The returns are per-period simple
+        returns and nothing is compounded: the columns add up to the NAV return of each period,
+        and their cumulative sums (as the factsheets plot) add up to the sum of NAV returns, not
+        to the compounded return.
+
+        Args:
+            benchmark_prices: Benchmark prices, one column per benchmark.
+            time_period: Optional period applied to the output after estimation.
+            freq_beta: Return frequency of the beta regressions (default 'B').
+            factor_beta_span: EWM span of the beta regressions in ``freq_beta`` periods
+                (default 63, a quarter of business days).
+            residual_name: Name of the residual column.
+
+        Returns:
+            Contribution of each benchmark and the residual per period.
         """
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
@@ -792,18 +832,53 @@ class PortfolioData:
         return perf
 
     def get_instruments_pnl_risk_attribution(self,
-                                             time_period: TimePeriod = None
+                                             time_period: TimePeriod = None,
+                                             is_standalone: bool = False
                                              ) -> pd.Series:
-        pnl = self.get_instruments_pnl(time_period=time_period)
-        # portfolio_pnl = pnl.sum(axis=1)
+        """Shares of the realised P&L risk by instrument, summing to one.
 
-        pnl_values = pnl.replace({0.0: np.nan}).to_numpy()
-        # np.nanstd warns on an all-NaN instrument; NaN is the intended risk for that column.
-        pnl_risk = np.array([np.nan if np.isnan(values).all() else np.nanstd(values)
-                             for values in pnl_values.T])
-        # portfolio_pnl_risk = np.nanstd(portfolio_pnl.replace({0.0: np.nan}), axis=0)
-        # pnl_risk_ratio = pnl_risk / portfolio_pnl_risk
-        pnl_risk_ratio = pnl_risk / np.nansum(pnl_risk)
+        By default the shares are the ex-post Euler contributions to the variance of the
+        portfolio P&L. With x_{i,t} the arithmetic P&L contribution of instrument i
+        (``get_instruments_pnl``, gross of costs, missing values counted as zero) and
+        x_{p,t} = sum_i x_{i,t}, instrument i has the share Cov(x_i, x_p) / Var(x_p), the slope of
+        its P&L on the portfolio P&L. The shares sum to one because the sample covariance is
+        bilinear; multiplied by the standard deviation of x_p they are contributions that add up
+        to the portfolio P&L volatility. A hedge that lowered the realised volatility has a
+        negative share.
+
+        Args:
+            time_period: Optional period over which the P&L is taken.
+            is_standalone: Return standalone volatility shares instead, the former output: the
+                standard deviation of each instrument's P&L (``ddof=0``, over its dates with
+                non-zero P&L) divided by the sum of these. They are non-negative, ignore
+                correlation and do not decompose the portfolio risk.
+
+        Returns:
+            Share per instrument, renamed with ``tickers_to_names_map``. NaN when the portfolio
+            P&L has no variance, or, for standalone shares, for an instrument with no non-zero
+            P&L.
+        """
+        pnl = self.get_instruments_pnl(time_period=time_period)
+
+        if is_standalone:
+            pnl_values = pnl.replace({0.0: np.nan}).to_numpy()
+            # np.nanstd warns on an all-NaN instrument; NaN is the intended risk for that column.
+            pnl_risk = np.array([np.nan if np.isnan(values).all() else np.nanstd(values)
+                                 for values in pnl_values.T])
+            pnl_risk_ratio = pnl_risk / np.nansum(pnl_risk)
+        else:
+            pnl_values = pnl.to_numpy(dtype=float)
+            pnl_values = np.where(np.isfinite(pnl_values), pnl_values, 0.0)
+            portfolio_ss = 0.0
+            if pnl_values.shape[0] > 1:
+                portfolio_pnl = pnl_values.sum(axis=1)
+                portfolio_deviation = portfolio_pnl - portfolio_pnl.mean()
+                portfolio_ss = float(portfolio_deviation @ portfolio_deviation)
+            if portfolio_ss > 0.0:
+                instrument_deviation = pnl_values - pnl_values.mean(axis=0)
+                pnl_risk_ratio = (instrument_deviation.T @ portfolio_deviation) / portfolio_ss
+            else:  # no portfolio risk to attribute
+                pnl_risk_ratio = np.full(pnl_values.shape[1], np.nan)
 
         data = pd.Series(pnl_risk_ratio, index=pnl.columns, name=self.nav.name)
         if self.tickers_to_names_map is not None:
@@ -1003,8 +1078,23 @@ class PortfolioData:
                               freq: str = 'W-WED',
                               span: int = 13  # 3m span of weekly returns
                               ) -> pd.DataFrame:
-        """
-        compute_portfolio_vol using 1) instrument weights and covar matrix 2) realised returns vol
+        """Annualised EWM portfolio volatility, from holdings and from realised NAV returns.
+
+        Both columns use simple returns on the ``freq`` grid. ``instrument weighted vol`` is
+        ``compute_portfolio_vol`` of the instrument returns with the realised weights
+        forward-filled to the grid and lagged one period: the point-in-time EWM covariance
+        contracted with the weights held over each period. ``strategy returns vol`` is the EWM
+        volatility of the simple NAV return, the realised counterpart. They differ by weight
+        drift and rebalancing inside the grid periods, by costs and fees, and because the first
+        applies the latest weights to the whole covariance history.
+
+        Args:
+            time_period: Optional period applied to the output after estimation.
+            freq: Return grid (default 'W-WED').
+            span: EWM span in ``freq`` periods (default 13).
+
+        Returns:
+            DataFrame with the columns ``instrument weighted vol`` and ``strategy returns vol``.
         """
         returns_f = self.get_instruments_periodic_returns(freq=freq)
         weights = self.weights.reindex(index=returns_f.index, method='ffill')
@@ -1012,7 +1102,9 @@ class PortfolioData:
                                               weights=weights,
                                               span=span,
                                               annualize=True)
-        strategy_vol = compute_ewm_vol(data=qis.to_returns(self.get_portfolio_nav(freq=freq), is_log_returns=True),
+        # simple NAV returns: the same basis as the simple instrument returns above
+        strategy_vol = compute_ewm_vol(data=qis.to_returns(self.get_portfolio_nav(freq=freq),
+                                                           is_log_returns=False),
                                        span=span,
                                        annualize=True)
         df = pd.concat([portfolio_vol.rename('instrument weighted vol'),
@@ -1085,8 +1177,23 @@ class PortfolioData:
                                                        covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
                                                        freq: Optional[str] = None
                                                        ) -> pd.Series:
-        """
-        compute portfolio ex-anti portfolio vol using covar_dict
+        """Ex-ante portfolio volatility sqrt(w' Σ w) implied by dated covariance matrices.
+
+        With ``freq=None`` the volatility is evaluated on each covariance date with the input
+        weights (the realised weights when the input was not a DataFrame) selected as of that
+        date: the latest weights dated at or before it, zero before the first weight date, as
+        in ``RiskModel``. With ``freq`` set, it is evaluated on each date of the realised weights
+        resampled to ``freq``, with the latest covariance at or before that date.
+
+        Args:
+            covar_dict: Covariance matrix per date; ``self.covar_dict`` when None.
+            freq: Optional grid of the realised weights; None evaluates on the covariance dates.
+
+        Returns:
+            Portfolio volatility per date, in the units of the square root of the covariance.
+
+        Raises:
+            ValueError: If no covariance is supplied or stored.
         """
         if covar_dict is None:
             if self.covar_dict is None:
@@ -1097,8 +1204,9 @@ class PortfolioData:
         strategy_weights = self.get_weights(freq=freq, is_input_weights=is_input_weights)
         covar_index = list(covar_dict.keys())
         portfolio_vol = {}
-        if freq is None:  # align with covar
-            strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
+        if freq is None:  # weights as of each covariance date
+            strategy_weights = strategy_weights.sort_index().reindex(
+                index=covar_index, method='ffill').fillna(0.0)
             for date, pd_covar in covar_dict.items():
                 # align with covar matrix
                 w = strategy_weights.loc[date].reindex(index=pd_covar.columns).fillna(0.0)
@@ -1121,8 +1229,29 @@ class PortfolioData:
                                                     normalise: bool = False,
                                                     time_period: TimePeriod = None
                                                     ) -> pd.DataFrame:
-        """
-        compute risk contributions using covar_dict
+        """Euler risk contributions w_i (Σ w)_i / sqrt(w' Σ w) implied by dated covariances.
+
+        With ``freq=None`` the contributions are evaluated on each covariance date with the
+        input weights (the realised weights when the input was not a DataFrame) selected as of
+        that date: the latest weights dated at or before it, zero before the first weight date,
+        as in ``RiskModel``. With ``freq`` set, they are evaluated on each date of the realised
+        weights resampled to ``freq`` after the first covariance date, with the latest
+        covariance at or before that date.
+
+        Args:
+            covar_dict: Covariance matrix per date; ``self.covar_dict`` when None.
+            group_data: Optional group of each instrument; contributions are summed by group.
+            group_order: Order of the groups.
+            freq: Optional grid of the realised weights; None evaluates on the covariance dates.
+            normalise: Rescale each row to sum to one (percentage contributions).
+            time_period: Optional period applied to the weights before the alignment.
+
+        Returns:
+            Contributions per date and instrument or group, in volatility units, or shares when
+            ``normalise`` is True.
+
+        Raises:
+            ValueError: If no covariance is supplied or stored.
         """
         if covar_dict is None:
             if self.covar_dict is None:
@@ -1133,8 +1262,9 @@ class PortfolioData:
         strategy_weights = self.get_weights(freq=freq, is_input_weights=is_input_weights, time_period=time_period)
         covar_index = list(covar_dict.keys())
         strategy_rc = {}
-        if freq is None:  # align with covar dates
-            strategy_weights = strategy_weights.reindex(index=covar_index).ffill().fillna(0.0)
+        if freq is None:  # weights as of each covariance date
+            strategy_weights = strategy_weights.sort_index().reindex(
+                index=covar_index, method='ffill').fillna(0.0)
             for date, pd_covar in covar_dict.items():
                 strategy_rc[date] = compute_portfolio_risk_contributions(w=strategy_weights.loc[date], covar=pd_covar)
         else:
@@ -1319,6 +1449,8 @@ class PortfolioData:
                                     benchmark_price.reindex(index=prices.index, method='ffill')],
                                    axis=1, sort=True)
             prices = prices.loc[:, ~prices.columns.duplicated(keep='first')]
+            if perf_params is None:  # the default the benchmark table itself would apply
+                perf_params = PerfParams(freq=pd.infer_freq(prices.index))
             title = title or f"RA performance table {for_title} for {perf_params.freq_vol}-freq returns with beta to {benchmark}:" \
                              f" {qis.get_time_period(prices).to_str()}"
             ppt.plot_ra_perf_table_benchmark(prices=prices,
