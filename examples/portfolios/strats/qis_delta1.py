@@ -6,6 +6,10 @@ signal and returns weights, navs and the signal. Weights are applied lagged one 
 ``*_range`` variants sweep one span each - ``vol_spans``, and ``tf_spans`` with ``vol_span`` held
 fixed - and prepend the underlying prices to the navs frame unless ``add_asset`` is off. Neither
 returns a portfolio object, so a report over them goes through ``qis.backtest_model_portfolio``.
+
+``vol_target`` is annual. ``vol_af`` converts it to the per-period target of daily data and
+defaults to 252, qis's business-day annualisation factor (``qis.get_annualization_factor('B')``),
+so a 15% target yields 15% realised volatility as qis reports it.
 """
 
 # packages
@@ -23,10 +27,24 @@ def simulate_vol_target_strats(prices: Union[pd.DataFrame, pd.Series],
                                vol_span: int = 21,
                                vol_target: float = 0.15,
                                constant_trade_level: bool = False,
-                               vol_af: float = 260
+                               vol_af: float = 252
                                ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    simulate weights and returns on vol target
+    simulate weights and returns on vol target.
+
+    The weight is ``vol_target / (sqrt(vol_af) * sigma_t)`` with ``sigma_t`` the per-period EWM
+    volatility of log returns, applied to simple returns one period later: the same as
+    ``qis.compute_ra_returns`` with the per-period target ``vol_target / sqrt(vol_af)``.
+
+    Args:
+        prices: asset prices
+        vol_span: EWM span of the volatility
+        vol_target: annual volatility target
+        constant_trade_level: passed to ``returns_to_nav``
+        vol_af: periods per year of the price grid; 252 for business days, as in qis
+
+    Returns:
+        the pair ``(nav_weights, vt_navs)`` of unlagged target weights and strategy navs
     """
     log_returns = ret.to_returns(prices=prices, is_log_returns=True)
     returns = ret.to_returns(prices=prices, is_log_returns=False)
@@ -46,7 +64,7 @@ def simulate_vol_target_strats_range(prices: Union[pd.DataFrame, pd.Series],
                                      vol_spans: List[int] = (21, 31),
                                      vol_target: float = 0.15,
                                      constant_trade_level: bool = False,
-                                     vol_af: float = 260,
+                                     vol_af: float = 252,
                                      add_asset: bool = True
                                      ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     vt_nav_weights, vt_navs = [], []
@@ -73,7 +91,7 @@ def simulate_trend_strats(prices: Union[pd.DataFrame, pd.Series],
                           tf_span: int = 63,
                           vol_target: float = 0.15,
                           constant_trade_level: bool = False,
-                          vol_af: float = 260
+                          vol_af: float = 252
                           ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     simulate weights and returns on tf strats
@@ -101,7 +119,7 @@ def simulate_trend_strats_range(prices: Union[pd.DataFrame, pd.Series],
                                 tf_spans: List[int] = (21, 63),
                                 vol_target: float = 0.15,
                                 constant_trade_level: bool = False,
-                                vol_af: float = 260,
+                                vol_af: float = 252,
                                 add_asset: bool = True
                                 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     tf_nav_weights, tf_navs, signals = [], [], []
