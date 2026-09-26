@@ -275,7 +275,11 @@ with the other. This is current local risk, not a distribution of a nonlinear
 contract's complete tail payoff.
 
 `KinkPolicy.LEFT`, `RIGHT` and `MIDPOINT` specify a common one-sided **quote**
-derivative across all vanilla legs of a holding:
+derivative across all vanilla legs of a holding. The policy applies only when the quote
+at which the derivative is taken equals a leg's strike exactly (floating-point equality,
+no tolerance); a quote any distance from the strike uses the ordinary slope, one or zero
+for a call. Current risk takes the derivative at the baseline quote; scenario-local bands
+take it at each scenario quote.
 
 - Continuing accumulator proxy: Q calls minus LQ puts; favorable boundary uses RIGHT.
 - Continuing decumulator proxy: Q puts minus LQ calls; favorable boundary uses LEFT.
@@ -432,11 +436,15 @@ these decompositions do not bound losses across option strikes or discontinuous 
 
 ## Report subjects and audit exports
 
-Nine core pages cover requested scenarios, conditional scenarios, worst historical
-months, current exposures/risk, holding factor contributors, sensitivity curves,
-response loadings/R-squared, fitted cluster dendrograms and correlation/methodology.
-The layout preserves the original stress-report titles and explanatory notes;
-`model_name="MATF"` gives the MATF titles without a private model dependency.
+Twelve analysis pages cover requested scenarios (page 1), conditional scenarios (2),
+worst historical months (3), current exposures/risk (4), holding factor contributors (5),
+sensitivity curves (6), fitted cluster dendrograms (7), cluster contributions (8),
+response loadings/R-squared (9), correlation and scenario construction (10) and the
+conditional-shock tables at 10% and one-sigma anchors (11 and 12). An optional parser
+appendix is page 13, and a final page gives the notation and a guide to the analysis:
+thirteen pages without the appendix, fourteen with it. The layout preserves the
+original stress-report titles and explanatory notes; `model_name="MATF"` gives the MATF
+titles without a private model dependency.
 
 Page four contains an annualised factor-model risk table and **family Euler
 volatility contributions**. Each family sums its signed constituent contributions;
@@ -453,8 +461,11 @@ variance divided by total model volatility; adding the residual term gives total
 model volatility. All holding terms for a factor sum to its factor term, while the
 displayed subsets need not add to the full totals.
 
-Page six calls QIS scatter plots and `qis.utils.regression.fit_ols` for through-zero
-quadratic fits for every portfolio, including derivatives. Fits pass through
+Page six draws up to six grids, in two rows of three panels: the caller's
+`selected_grids`, or else the ranked factors and families of page five that have a grid,
+or else the first six custom grids. It calls QIS scatter plots and
+`qis.utils.regression.fit_ols` for through-zero quadratic fits for every portfolio,
+including derivatives. Fits pass through
 zero and use decimal grid returns. The legend displays the equation and uncentered
 R-squared: `1 - sum((actual - fitted)^2) / sum(actual^2)`. A zero curve has undefined
 R-squared; a grid without enough independent regressors has no fitted line. These
@@ -470,19 +481,32 @@ constant-variance regression errors on a deterministic grid; they measure polyno
 approximation, not portfolio risk. A forced zero intercept has zero standard error;
 no error degrees of freedom means no interval.
 Credit grids retain the caller's total-family split.
-Page seven includes signed beta colours, fitted R-squared, annual systematic and
+
+Page eight groups holdings by the caller's fitted cluster memberships. Its stress heatmap
+shows cluster P&L divided by the denominator for the first 12 scenarios of the
+conditional-comparison batch, `valuations["conditional"]`, the batch of page two. The
+contributor column names, for each displayed row, the three holdings with the largest
+absolute P&L in that row's worst scenario of the same batch. The worst scenario is chosen
+over all scenarios of the batch, so it can lie beyond the 12 displayed columns; it is
+named beside the row, the Portfolio row uses its own worst scenario, and a blank rank
+means fewer than three holdings. Without a conditional batch
+(`include_conditional_comparison=False`) neither the heatmap nor the contributor column is
+drawn.
+
+Page nine includes signed beta colours, fitted R-squared, annual systematic and
 residual volatility, Rest of assets, and Portfolio rows. Rest uses full-denominator
 weights, not a renormalised sleeve. Portfolio R-squared is an absolute-response-
 exposure-weighted average of available fitted R-squared, not a portfolio regression.
 
-The parser can add a tenth page with `StressReportConfig(appendix_table=...,
-appendix_title=..., appendix_subtitle=..., appendix_notes=(...))`. QIS displays the
+The parser can add page 13, before the final guide, with
+`StressReportConfig(appendix_table=..., appendix_title=..., appendix_subtitle=...,
+appendix_notes=(...))`. QIS displays the
 supplied preformatted DataFrame and footnotes; it invents no source-quality,
 collateral or coverage rules. The table supports up to 24 rows and ten data columns.
 Use `None` to omit the page. The complete source audit can remain a separate export.
 
 All table exports retain every scenario, holding and grid. PDF limits are 12
-scenario rows, ten contributors, six factor panels, four grid panels and 20 unit
+scenario rows, ten contributors, six factor panels, six grid panels and 20 unit
 response rows plus aggregate rows. All fitted factors appear in model order.
 Missing R-squared and fitted trees are labelled unavailable. The caller supplies
 names, diagnostics and original topology; the renderer never estimates them.

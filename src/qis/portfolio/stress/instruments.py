@@ -39,6 +39,12 @@ class ResponseBasis(Enum):
 class KinkPolicy(Enum):
     """One-sided quote derivative used consistently across a holding's legs.
 
+    The policy binds only when the quote at which the derivative is taken equals a leg's strike
+    exactly, by floating-point equality with no tolerance. A quote any distance from the strike,
+    however small, uses the ordinary slope: one for a call above its strike and zero below, and
+    the call slope minus one for a put. Current risk takes the derivative at the baseline quote;
+    scenario-local bands take it at each scenario quote.
+
     Attributes:
         LEFT: Derivative approached from lower quotes.
         RIGHT: Derivative approached from higher quotes.
@@ -138,8 +144,13 @@ class InstrumentLeg:
     def get_quote_delta(self, spot0: float, kink_policy: KinkPolicy) -> float:
         """Return current local derivative with respect to the actual quote.
 
+        For an option the call slope is one above the strike and zero below; the put slope is
+        the call slope minus one. ``kink_policy`` sets the call slope only when ``spot0 ==
+        strike`` exactly, with no tolerance.
+
         Args:
-            spot0: Baseline quote.
+            spot0: Quote at which the derivative is taken: the baseline quote for current risk,
+                or a scenario quote for scenario-local bands.
             kink_policy: Common one-sided derivative policy for this holding.
 
         Returns:

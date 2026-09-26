@@ -326,8 +326,11 @@ $(S-K)^{+}-(K-S)^{+}=S-K$, whose slope is one on both sides. For a continuing ac
 $Q$ calls minus $LQ$ puts at one strike, the left and right slopes are $LQ$ and $Q$; `RIGHT`
 reports the favourable above-strike rate. For a decumulator proxy, $Q$ puts minus $LQ$ calls,
 the slopes are $-Q$ (left) and $-LQ$ (right), and `LEFT` reports the favourable side. The policy
-binds only when a quote equals a strike exactly, which is common for remaining-quantity proxies
-struck at the current fixing and for trades struck at spot.
+binds only when the quote at which the derivative is taken equals a strike exactly, by
+floating-point equality with no tolerance: a quote any distance from the strike, however small,
+takes the ordinary call slope, one above the strike and zero below. Current risk takes the
+derivative at the baseline quote and scenario-local bands at each scenario quote, so the policy
+matters for remaining-quantity proxies struck at the current fixing and for trades struck at spot.
 
 #### Exposures and model variance
 
@@ -916,13 +919,16 @@ prefixes such as ME-1 and QE-1. Its top heatmap shows P&L of the first twelve sc
 conditional-comparison batch by cluster, divided by $V$; the bottom left shows cluster factor
 exposures $\sum_{h}E_{hf}/V$; the bottom right stacks systematic and residual Euler contributions
 to model volatility, which reconcile to $\sigma$. Each table appends an additive portfolio row.
-The display keeps at most eight groups, reserving explicit unassigned and multi-cluster buckets
-and combining the smallest regular clusters as Other clusters, ordered by gross mark. A
-contributor panel names, for each displayed row, the three holdings with the largest absolute
-P&L in that row's worst conditional-comparison scenario. The factor-risk bars show the five largest
-absolute atomic factor Euler terms with fixed colours; their annotations are subtotals over those
-five factors only. `StressReportConfig.cluster_labels` maps cadence-prefixed IDs to descriptive
-labels, which `qis.plot_clusters` also accepts. qis never estimates a tree or a label.
+The display keeps at most eight groups, reserving explicit unassigned and multi-cluster buckets and
+combining the smallest regular clusters as Other clusters, ordered by gross mark. A contributor
+panel names, for each displayed row, the three holdings with the largest absolute P&L in that row's
+worst conditional-comparison scenario. That scenario is chosen over all scenarios of the batch, so
+it can lie beyond the twelve displayed columns; it is named beside the row, the portfolio row uses
+its own worst scenario, and a blank rank means fewer than three holdings. The factor-risk bars show
+the five largest absolute atomic factor Euler terms with fixed colours; their annotations are
+subtotals over those five factors only. `StressReportConfig.cluster_labels` maps cadence-prefixed
+IDs to descriptive labels, which `qis.plot_clusters` also accepts. qis never estimates a tree or a
+label.
 
 Display names should be unique aliases of at most 20 characters, supplied as
 `PortfolioHolding.metadata["short_name"]` and `StressReportConfig.response_diagnostics["name"]`;
@@ -931,12 +937,13 @@ full names and IDs remain in the exports.
 ### Exports and audit
 
 Every table is exported to CSV and, with `write_workbook=True`, to a formatted workbook with a
-linked contents sheet. `manifest.json` records conventions, the table mapping, display limits and
-SHA-256 hashes of every artefact; an existing output directory is rejected. The numerical tables
+linked contents sheet. `manifest.json` records conventions, the table mapping, the PDF display
+limits (12 scenario rows, ten contributors, six factor panels, six grid panels and 20 response rows)
+and SHA-256 hashes of every artefact; an existing output directory is rejected. The numerical tables
 retain every scenario, holding and grid point without PDF rounding, including the four
-`Conditional factor shocks` tables, `Positions and payoff audit` (marks, intrinsic baselines,
-basis offsets, coverage and boundary policy) and `Vanilla leg terms`. Additional plain
-DataFrames can be attached to a copied `report_diagnostics` mapping with `dataclasses.replace`.
+`Conditional factor shocks` tables, `Positions and payoff audit` (marks, intrinsic baselines, basis
+offsets, coverage and boundary policy) and `Vanilla leg terms`. Additional plain DataFrames can be
+attached to a copied `report_diagnostics` mapping with `dataclasses.replace`.
 
 ### Verification
 

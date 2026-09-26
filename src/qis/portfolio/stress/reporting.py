@@ -489,7 +489,8 @@ def generate_portfolio_stress_report(
             "response_rows": 20,
             "response_factor_columns": len(result.factor_loadings.columns),
             "factor_panels": 6,
-            "grid_panels": 4,
+            # the sensitivity page lays out two rows of three panels, one per selected grid
+            "grid_panels": 6,
         },
         "hashes": {
             str(path.relative_to(output_dir)): hashlib.sha256(path.read_bytes()).hexdigest()

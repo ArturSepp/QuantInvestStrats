@@ -736,7 +736,13 @@ def _clusters_page(result, config):
 
 
 def _cluster_contribution_page(result, config):
-    """Compare cluster stress, exposures and signed Euler risk on aligned QIS panels."""
+    """Compare cluster stress, exposures and signed Euler risk on aligned QIS panels.
+
+    The stress heatmap shows the first 12 scenarios of the conditional-comparison batch,
+    ``result.valuations["conditional"]``. The contributor column names, for each displayed row,
+    the three holdings with the largest absolute P&L in that row's worst scenario of the same
+    batch, chosen over all of its scenarios, so it can lie beyond the 12 displayed columns.
+    """
     clusters = compute_cluster_contributions(result, config.cluster_memberships)
     summary = display_cluster_table(clusters.summary, clusters)
     scope = ("Modelled subtotal" if result.metadata.get("scope") == "modelled subtotal"
@@ -858,9 +864,9 @@ def _cluster_contribution_page(result, config):
     notes = [
         "Stress (first 12 requested correlated scenarios): exact holding P&L summed by cluster / "
         "full notional. Contributors rank the three largest absolute holding P&Ls in that "
-        f"row's worst correlated scenario and show signed % of {denominator_label}. The scenario "
-        "is named beside the row; Portfolio uses its own worst scenario. Blank ranks mean fewer "
-        "than three holdings. Methodology: appendix, page 11.",
+        f"row's worst correlated scenario and show signed % of {denominator_label}. That scenario, "
+        "named beside the row, can lie beyond the first 12; Portfolio uses its own worst. Blank "
+        "ranks mean fewer than three holdings. Methodology: appendix, page 11.",
         "Exposures: sum current holding response dollar sensitivities times factor betas / "
         "notional. Factor risk bars: portfolio's five largest absolute atomic-factor Euler "
         "contributions, using the same factors and colours for every cluster. Labels show their "
