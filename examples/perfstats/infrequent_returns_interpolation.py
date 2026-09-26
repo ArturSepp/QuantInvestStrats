@@ -52,7 +52,7 @@ def run_local(local: Locals):
     infrequent_returns = qis.to_returns(prices[asset], is_log_returns=is_log_returns, freq='QE')
     pivot_returns = qis.to_returns(prices[pivot], is_log_returns=is_log_returns, freq='ME')
     i_backfill = qis.interpolate_infrequent_returns(infrequent_returns=infrequent_returns.dropna(), pivot_returns=pivot_returns,
-                                                    is_to_log_returns=False)
+                                                    is_to_log_returns=is_log_returns)
 
     known_returns = qis.to_returns(prices[asset], is_log_returns=is_log_returns, freq='ME')
     returns = pd.concat([pivot_returns, known_returns.rename(f"{asset} actual"), i_backfill.rename(f"{asset} interpolated")], axis=1).dropna()

@@ -34,10 +34,10 @@
       "paper_phrase": null
     },
     "backtester_physical_lines": {
-      "value": 427,
+      "value": 441,
       "how": "physical lines of src/qis/portfolio/backtester.py",
       "live": true,
-      "paper_phrase": "backtester is 427 lines"
+      "paper_phrase": "backtester is 441 lines"
     },
     "capability_groups": {
       "value": 14,
