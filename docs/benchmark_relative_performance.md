@@ -284,7 +284,9 @@ shrinks $s_\varepsilon$.
 
 The benchmark is regressed on itself: $\hat\alpha=0$ up to rounding, $\hat\beta=1$, $R^2=1$, and
 the residuals vanish, so the $t$-statistic is undefined. qis sets the benchmark's
-`ALPHA_PVALUE` to 1.0; with `drop_benchmark=True` the row is removed instead.
+`ALPHA_PVALUE` to 1.0, unless the self-regression is itself undefined (a benchmark whose returns
+do not vary), when the whole row is missing; with `drop_benchmark=True` the row is removed
+instead.
 
 Other degenerate cases:
 

@@ -482,6 +482,14 @@ Each entry below states the size of its effect and, where possible, how to resto
 - Record `"grid_panels": 6` in the stress report manifest's display limits; the sensitivity page
   draws up to six grid panels and `StressReportConfig.selected_grids` accepts six, but the
   manifest said four.
+- Leave the benchmark row's `ALPHA_PVALUE` in `compute_ra_perf_table_with_benchmark` missing
+  when the benchmark's regression on itself is undefined (returns that do not vary), instead of
+  reporting a p-value of 1.0 next to a missing alpha, beta and R2.
+- Raise the minimum observation count that `min_obs_for_ar_unsmoothing` reports for the
+  unconstrained AR unsmoother to `max(q, w + 1) + w + 2` for a given warm-up `w`, and to
+  `max(23, q + 2)` for `warmup_period=None`. A lag that has not been observed now has a missing
+  beta, where the tensor returned the raw cross moment, so the first complete coefficient vector
+  appears later; the old floors let `InsufficientData.RAISE` accept frames that produce no output.
 
 ### Changed
 

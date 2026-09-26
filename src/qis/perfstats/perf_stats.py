@@ -770,7 +770,10 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
 
     if drop_benchmark:
         ra_perf_table = ra_perf_table.drop([benchmark], axis=0)
-    else:  # set p-value of benchmark alpha to 1.0 (regression of benchmark on itself)
+    elif np.isfinite(betas.get(benchmark, np.nan)):
+        # the benchmark regressed on itself has alpha 0 and an undefined t-statistic: report a
+        # p-value of 1.0, unless the self-regression is itself undefined (a constant benchmark),
+        # when the row stays NaN like its alpha, beta and R2
         ra_perf_table.loc[benchmark, PerfStat.ALPHA_PVALUE.to_str()] = 1.0
     return ra_perf_table
 
