@@ -287,9 +287,12 @@ those branch labels did not identify published stress-framework distributions.
   arbitrary cadence counts are supported without importing any consumer package.
 - Add the offline examples/plots/cluster_dendrograms.py workflow.
 
-## [Unreleased]
+## [5.24.0] and [5.25.0] - not published separately
 
-**Seeded `BootstrapType.IID` results produced by earlier qis versions may not reproduce exactly.**
+These two versions were recorded together and never published to PyPI on their own; their changes
+first reached users in 5.30.0. Items that name a version were introduced in it.
+
+**Seeded `BootstrapType.IID` results produced by qis 5.23.0 and earlier may not reproduce exactly.**
 Every draw now samples its terminal row instead of leaving it mapped to source row zero. When
 `(index_length - 1)` is divisible by `num_data_index`, completing that row consumes another random
 batch and also shifts later sample columns.
@@ -1355,9 +1358,11 @@ generator are unchanged.
 **`compute_ar_residuals` and `bootstrap_ar_process` change their results on data with gaps, and
 raise where they previously returned a number.** Any AR bootstrap run on a series with a missing
 observation moves in this release, and a panel with a row incomplete across columns now raises
-instead of returning NaN. On gap-free data nothing moves: the AR(1) is still ordinary least
-squares on the lag pairs, agreeing with the previous `statsmodels AutoReg` fit to 6.7e-16 across
-persistences from -0.6 to 0.95 and lengths 60 to 2000.
+instead of returning NaN. On gap-free data the fitted AR(1) does not move: it is still ordinary
+least squares on the lag pairs, agreeing with the previous `statsmodels AutoReg` fit to 6.7e-16
+across persistences from -0.6 to 0.95 and lengths 60 to 2000. Seeded bootstrap paths do move on
+gap-free data too, because the residual indices are now drawn over the n-1 residual rows instead
+of the n data rows.
 
 **5.2.0 is yanked and this release replaces it.** It was published from an uncommitted working
 tree, so no commit set that version and the release could not be reproduced from source. It also
