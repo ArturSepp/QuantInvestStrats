@@ -215,9 +215,9 @@ def test_compute_excess_returns_uses_pre_sample_rate_after_lag() -> None:
 
     With one-day intervals, annual rates of 73.0% and 109.5% produce funding
     costs of 0.002 and 0.003. Subtracting those independently calculated costs
-    from 10% returns gives 0.098 and 0.097. The earlier 36.5% observation makes
-    the initial zero-duration boundary finite; removing it must restore the
-    intentional initial NaN because no lagged rate is then observable.
+    from 10% returns gives 0.098 and 0.097. The first return date closes no period and
+    accrues no cash, so removing the earlier 36.5% observation leaves every value
+    unchanged: the rate quoted on the first return date funds the first period.
     """
     return_dates = pd.date_range('2024-01-01', periods=3, freq='D')
     returns = pd.Series([0.0, 0.1, 0.1], index=return_dates, name='asset')
@@ -231,8 +231,7 @@ def test_compute_excess_returns_uses_pre_sample_rate_after_lag() -> None:
 
     pd.testing.assert_series_equal(actual, expected, check_exact=False, rtol=0.0, atol=1e-15)
     without_prior_rate = ret.compute_excess_returns(returns=returns, rates_data=rates.iloc[1:])
-    assert pd.isna(without_prior_rate.iloc[0])
-    pd.testing.assert_series_equal(without_prior_rate.iloc[1:], expected.iloc[1:],
+    pd.testing.assert_series_equal(without_prior_rate, expected,
                                    check_exact=False, rtol=0.0, atol=1e-15)
     pd.testing.assert_series_equal(returns, returns_before)
     pd.testing.assert_series_equal(rates, rates_before)

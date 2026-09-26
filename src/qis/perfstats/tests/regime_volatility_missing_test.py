@@ -223,8 +223,8 @@ def _expected_mixed_vols() -> pd.DataFrame:
     healthy_returns[0] = np.nan
     expected_healthy: list[float] = []
     for start, end in _MIXED_VOL_WINDOWS:
-        # Included start dates make adjacent monthly windows share the prior month-end return.
-        in_window = (_MIXED_DATES >= start) & (_MIXED_DATES <= end)
+        # Windows are right-closed: a month-end return belongs to the month it ends only.
+        in_window = (_MIXED_DATES > start) & (_MIXED_DATES <= end)
         window_values = healthy_returns[in_window]
         expected_healthy.append(_annualized_sample_std(window_values[np.isfinite(window_values)]))
     late_start_returns = np.full(len(_MIXED_DATES), np.nan, dtype=float)
@@ -232,7 +232,7 @@ def _expected_mixed_vols() -> pd.DataFrame:
     late_start_returns[_MIXED_DATES.get_loc("2022-01-31")] = 0.01
     expected_late_start: list[float] = []
     for start, end in _MIXED_VOL_WINDOWS:
-        in_window = (_MIXED_DATES >= start) & (_MIXED_DATES <= end)
+        in_window = (_MIXED_DATES > start) & (_MIXED_DATES <= end)
         window_values = late_start_returns[in_window]
         finite_values = window_values[np.isfinite(window_values)]
         # Select from observed returns so ragged-window padding cannot change the reference.
@@ -323,7 +323,7 @@ def test_compute_sampled_vols_preserves_mixed_window_states(
 
     Healthy expected values use the independent sample-variance formula above. The all-missing
     column remains missing in every month; the one-return January window uses annualized RMS. The
-    overlapping February window includes that boundary return, while the sufficiently observed
+    right-closed February window excludes that boundary return, while the sufficiently observed
     all-zero March control equals zero.
 
     Args:
