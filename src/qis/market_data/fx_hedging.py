@@ -202,7 +202,9 @@ def compute_fx_vol_beta(asset_price_local_ccy: pd.Series,
 
     Returns:
         Tuple ``(fx_vol, fx_beta)`` of Series at ``freq``: annualised FX volatility
-        and the EWMA beta of the local return on the FX return.
+        and the EWMA beta of the local return on the FX return. Both are point in time: the
+        beta's FX variance is seeded with the first squared FX return (up to qis 5.30.3 with
+        the full-sample mean square) and its cross moment with zero.
     """
     local_return, fx_return = compute_local_and_fx_return(
         asset_price_local_ccy=asset_price_local_ccy,
@@ -214,7 +216,8 @@ def compute_fx_vol_beta(asset_price_local_ccy: pd.Series,
                                        y_data=local_return.to_frame(),
                                        span=span,
                                        cross_xy_type=qis.CrossXyType.BETA,
-                                       mean_adj_type=qis.MeanAdjType.EWMA)
+                                       mean_adj_type=qis.MeanAdjType.EWMA,
+                                       var_init_type=qis.InitType.X0)
     fx_vol = qis.compute_ewm_vol(data=fx_return.to_frame(), span=span,
                                  mean_adj_type=qis.MeanAdjType.EWMA,
                                  init_value=0.08 ** 2 * 1.0 / 12.0,

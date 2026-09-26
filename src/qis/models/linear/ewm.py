@@ -1453,8 +1453,9 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
                          cross_xy_type: CrossXyType = CrossXyType.COVAR,
                          mean_adj_type: MeanAdjType = MeanAdjType.NONE,
                          init_type: InitType = InitType.ZERO,
-                         var_init_type: InitType = InitType.MEAN,  # to avoid overflows
-                         nan_backfill: NanBackfill = NanBackfill.FFILL
+                         var_init_type: InitType = InitType.X0,
+                         nan_backfill: NanBackfill = NanBackfill.FFILL,
+                         warmup_period: Optional[int] = None
                          ) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """
     EWM cross moment, beta or correlation of y on x, pair by pair.
@@ -1482,10 +1483,17 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
         mean_adj_type: mean removed from x and y first, each on its own index
         init_type: seed of ``M^{xy}`` (and of an EWMA mean adjustment, with ``VAR`` read as
             ``MEAN`` there). ``ZERO`` by default
-        var_init_type: seed of ``M^{xx}`` and ``M^{yy}``. The default ``MEAN`` is the
-            full-sample mean square, a look-ahead that damps the ratios in the first
-            ``1.5 N`` rows; ``X0`` or ``ZERO`` is point in time
+        var_init_type: seed of ``M^{xx}`` and ``M^{yy}``. The default ``X0`` is each column's
+            first finite square, point in time; with the zero-seeded cross moment the first
+            beta is ``(1-λ) y_1 / x_1``, shrunk towards zero while ``M^{xy}`` warms up.
+            ``ZERO`` gives the raw ratio ``y_1 / x_1`` on the first row. ``MEAN``, the default
+            up to qis 5.30.3, is the full-sample mean square: a look-ahead that damps the ratios
+            in the first ``1.5 N`` rows
         nan_backfill: missing-observation policy of every recursion
+        warmup_period: if given, an output is NaN until its pair has more than
+            ``warmup_period`` joint finite observations, counted from the pair's own first one,
+            so a late-starting column is masked for the same number of observations. ``None``
+            masks nothing
 
     Returns:
         the EWM cross statistic, in the container described above
@@ -1578,6 +1586,10 @@ def compute_ewm_cross_xy(x_data: Union[pd.DataFrame, pd.Series, np.ndarray],
         )
     else:
         raise TypeError(f"unknown cross_xy_type = {cross_xy_type}")
+
+    if warmup_period is not None:
+        num_obs = np.cumsum(np.isfinite(x) & np.isfinite(y), axis=0)
+        cross_xy = np.where(num_obs > int(warmup_period), cross_xy, np.nan)
 
     if isinstance(wrap, pd.Series):
         cross_xy = pd.Series(data=cross_xy, index=wrap.index, name=wrap.name)

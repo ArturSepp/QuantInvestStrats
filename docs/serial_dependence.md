@@ -480,10 +480,10 @@ where $\mathbb{E}^{\lambda}_t$ is the EWM recursion started at the first row whe
 finite (zero-based row $2h-1$ for the numerator). When $h=1$ the decay is 0.2 and returns are
 not summed. All three moments are seeded at zero, so every estimate is point in time. In qis
 5.30.3 and earlier the two second moments were seeded at their full-sample means, the
-`InitType.MEAN` default of `qis.compute_ewm_cross_xy`, and frequencies whose factor is a float,
-such as `'ME'` and `'YE'`, failed because $h$ reached pandas `rolling` and `shift` as a float;
-`var_init_type=qis.InitType.MEAN` still selects the look-ahead seed. `mean_adj_type` defaults to
-`MeanAdjType.NONE`, so moments are about zero. `is_ra_returns=True` first divides returns by an
+`InitType.MEAN` default that `qis.compute_ewm_cross_xy` then had, and frequencies whose factor is
+a float, such as `'ME'` and `'YE'`, failed because $h$ reached pandas `rolling` and `shift` as a
+float; `var_init_type=qis.InitType.MEAN` still selects the look-ahead seed. `mean_adj_type` defaults
+to `MeanAdjType.NONE`, so moments are about zero. `is_ra_returns=True` first divides returns by an
 EWM volatility ($\lambda=0.94$) lagged one row, which is point in time, and
 `estimates_smoothing_lambda` smooths the output with a further EWM.
 

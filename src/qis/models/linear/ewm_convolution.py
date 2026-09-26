@@ -144,8 +144,7 @@ def ewm_xy_convolution(returns: pd.DataFrame,
     else:
         raise ValueError(f"{convolution_type} is not implemented")
 
-    # compute ewm cross; the second moments get a point-in-time seed by default, rather than the
-    # full-sample mean that compute_ewm_cross_xy uses unless told otherwise
+    # compute ewm cross; the second moments are seeded with var_init_type, ZERO by default
     corr = ewm.compute_ewm_cross_xy(x_data=x_data,
                                     y_data=y_data,
                                     ewm_lambda=ewm_lambda,

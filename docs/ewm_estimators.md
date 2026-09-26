@@ -60,7 +60,7 @@ The chapter answers five questions.
 | Sampling grid | The rows of the input. The decay applies per row, so a span counts observations, not calendar time |
 | Annualisation | Off by default. With `annualize=True` variances are multiplied by $\mathrm{AN}$ inferred from the index, so volatilities scale by $\sqrt{\mathrm{AN}}$; a bare ndarray uses 1 with a warning |
 | Mean adjustment | `MeanAdjType.NONE` by default: second moments about zero. `EWMA` and `EXPANDING` are point in time; `INSAMPLE` is full sample |
-| Timing | An estimate dated $t$ uses rows up to and including $t$ and applies from $t+1$. The seeds `InitType.MEAN` and `InitType.VAR` use the full sample, and `compute_ewm_cross_xy` seeds its denominators with `MEAN` by default |
+| Timing | An estimate dated $t$ uses rows up to and including $t$ and applies from $t+1$. The seeds `InitType.MEAN` and `InitType.VAR` use the full sample; no default uses them |
 | Output units | Per period in the units of the input: $x$ for a mean or volatility, $x^2$ for a variance; betas and correlations are dimensionless |
 | qis default | `compute_ewm(ewm_lambda=0.94, init_type=InitType.X0, nan_backfill=NanBackfill.FFILL)`; `compute_ewm_vol` adds `mean_adj_type=MeanAdjType.NONE, annualize=False`; the covariance functions default to `nan_backfill=NanBackfill.DEFLATED_FFILL` |
 
@@ -223,10 +223,11 @@ By the unrolled recursion the seed keeps weight $\lambda^{t-t_0+1}$ at row $t$. 
 after $\ln 20/(-\ln\lambda)\approx 1.5N$ rows: 54 rows at $N=36$, 389 at $N=260$. Until then a
 full-sample seed leaks later information into early estimates.
 
-One default seeds with the full sample: `compute_ewm_cross_xy(var_init_type=InitType.MEAN)`
-seeds the denominators $M^{xx}$ and $M^{yy}$ of `CrossXyType.BETA` and `CrossXyType.CORR` with
-full-sample second moments. `ewm_xy_convolution` does not inherit it: it passes
-`var_init_type=InitType.ZERO`, and `var_init_type=InitType.MEAN` restores the former seed.
+No default seeds with the full sample. Up to qis 5.30.3 `compute_ewm_cross_xy` seeded the
+denominators $M^{xx}$ and $M^{yy}$ of `CrossXyType.BETA` and `CrossXyType.CORR` with full-sample
+second moments (`var_init_type=InitType.MEAN`); it now seeds them with each column's first square
+(`InitType.X0`), and `var_init_type=InitType.MEAN` restores the former seed. `ewm_xy_convolution`
+passes `var_init_type=InitType.ZERO`.
 
 The other entry points of the chapter are point in time by default: `compute_ewm`,
 `compute_ewm_vol`, `compute_ewm_newey_west_vol`, `compute_rolling_mean_adj`,
@@ -450,8 +451,13 @@ M^{yy}_t=\lambda M^{yy}_{t-1}+(1-\lambda)\tilde y_t^2 .
 $$
 
 $M^{xy}$ is seeded by `init_type` (default `ZERO`, so the first product enters with weight
-$1-\lambda$) and $M^{xx}$, $M^{yy}$ by `var_init_type` (default `MEAN`, the full-sample second
-moments, a look-ahead that damps the ratios over the first $1.5N$ rows).
+$1-\lambda$) and $M^{xx}$, $M^{yy}$ by `var_init_type` (default `X0`, the first squares). The
+first beta is therefore $(1-\lambda)\,y_1/x_1$, shrunk towards zero while $M^{xy}$ warms up;
+`var_init_type=InitType.ZERO` gives the raw ratio $y_1/x_1$ instead, which is unstable over the
+first rows. `warmup_period` $=k$ masks an output until its pair has $k+1$ joint observations,
+counted from the pair's own first one. Up to qis 5.30.3 the default `MEAN` seeded the
+denominators with full-sample second moments, a look-ahead that damped the ratios over the first
+$1.5N$ rows.
 
 | `CrossXyType` | Output | Notes |
 |---|---|---|
@@ -507,8 +513,8 @@ $R_t=\sum_{j=0}^{h-1}r_{t-j}$. `ConvolutionType.AUTO_CORR` correlates $R_{t-h}$ 
 `SIGNAL_CORR` and `SIGNAL_BETA` correlate or regress $R_t$ on the signal (its last value or its
 $h$-row mean) shifted by $h$ rows. The call is `compute_ewm_cross_xy` with the zero seed of the
 cross moment and `var_init_type=InitType.ZERO` for the denominators, so every estimate is point
-in time; before this release the denominators carried the full-sample `MEAN` seed of
-`compute_ewm_cross_xy`. Overlapping $h$-row sums make consecutive
+in time; before this release the denominators carried the full-sample `MEAN` seed that was then
+the default of `compute_ewm_cross_xy`. Overlapping $h$-row sums make consecutive
 products strongly dependent; see [serial dependence](serial_dependence.md) and
 [signal diagnostics](signal_diagnostics.md).
 
@@ -933,12 +939,12 @@ assert z.max() <= np.sqrt((span + 1) / 2) and np.isclose(z.max(), 4.22, atol=5e-
 
 The sixth block checks the betas and cross moments. `compute_one_factor_ewm_betas` equals a
 zero-seeded loop and masks the first 21 rows. `compute_ewm_cross_xy` with `BETA` seeds its
-denominator with the full-sample second moment of the factor, which is visible in the value at
-row 1; a Series factor, two Series and one-dimensional arrays give the same path, and so does the
-same data in units ten thousand times smaller. The uncentred EWM correlation of the two series at
-the last date is −0.091; with EWMA mean adjustment it is −0.050.
-`compute_ewm_beta_alpha_forecast` starts at $y_0/x_0$ and predicts $y_t$ with the beta and alpha
-of $t-1$.
+denominator with the first squared factor return, which is visible in the value at row 1, and
+`warmup_period=21` masks the same rows as `compute_one_factor_ewm_betas`; a Series factor, two
+Series and one-dimensional arrays give the same path, and so does the same data in units ten
+thousand times smaller. The uncentred EWM correlation of the two series at the last date is −0.091;
+with EWMA mean adjustment it is −0.050. `compute_ewm_beta_alpha_forecast` starts at $y_0/x_0$ and
+predicts $y_t$ with the beta and alpha of $t-1$.
 
 ```python
 bench, asset = returns['SEQ_US'], returns[['SBD_TSY']]
@@ -956,9 +962,13 @@ x_frame, y_frame = returns[['SEQ_US']], returns[['SBD_TSY']]
 beta_xy = qis.compute_ewm_cross_xy(x_frame, y_frame, span=span,
                                    cross_xy_type=qis.CrossXyType.BETA)
 (x0, y0), (x1, y1) = r[0], r[1]
-m_xx = lam * (lam * np.mean(r[:, 0] ** 2) + (1 - lam) * x0 ** 2) + (1 - lam) * x1 ** 2
+m_xx = lam * x0 ** 2 + (1 - lam) * x1 ** 2  # the X0 seed x0^2 is also the row-0 state
 m_xy = lam * (1 - lam) * x0 * y0 + (1 - lam) * x1 * y1
 assert np.isclose(beta_xy.iloc[1, 0], m_xy / m_xx)
+masked = qis.compute_ewm_cross_xy(x_frame, y_frame, span=span,
+                                  cross_xy_type=qis.CrossXyType.BETA, warmup_period=21)
+assert masked.iloc[:21].isna().all().all()
+pd.testing.assert_frame_equal(masked.iloc[21:], beta_xy.iloc[21:])
 for x_in, y_in in [(bench, y_frame), (bench, asset['SBD_TSY']), (r[:, 0], r[:, 1]),
                    (x_frame / 1e4, y_frame / 1e4)]:
     other = qis.compute_ewm_cross_xy(x_in, y_in, span=span, cross_xy_type=qis.CrossXyType.BETA)
@@ -1154,7 +1164,7 @@ Contracts worth knowing at the call site:
 ## Interpretation and limitations
 
 - **Point in time or not.** The recursion itself is point in time, and so is every default
-  seed except the `MEAN` seed of the denominators of `compute_ewm_cross_xy`. Look-ahead enters
+  seed. Look-ahead enters
   only through `InitType.MEAN` and `InitType.VAR`, `MeanAdjType.INSAMPLE`, the clip quantile of
   the score, and the full-sample cuts of the outlier functions. The seed's weight decays as
   $\lambda^{t-t_0+1}$, so a full-sample seed matters for about $1.5N$ rows; the mean adjustment

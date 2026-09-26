@@ -167,9 +167,11 @@ All three ratios are clipped to `min_max_hedge`, $[0,1]$ by default.
 
 The inputs are point-in-time EWMA estimates on the `freq` grid. `compute_fx_vol_beta`
 estimates $\beta$ with `qis.compute_ewm_cross_xy` and the annualised $\sigma_{FX}$ with
-`qis.compute_ewm_vol`, both with EWMA mean adjustment and span 36 by default. The variance
-recursion is seeded with $0.08^2/12$, the monthly variance of an 8% annual volatility, on every
-grid. The carry $c$ is the
+`qis.compute_ewm_vol`, both with EWMA mean adjustment and span 36 by default. The volatility's
+variance recursion is seeded with $0.08^2/12$, the monthly variance of an 8% annual volatility,
+on every grid. The beta's cross moment starts at zero and its FX variance at the first squared FX
+return; up to qis 5.30.3 that variance was seeded with its full-sample mean square, so the early
+betas used later FX returns. The carry $c$ is the
 short-forward cost $f/(1+f)$ divided by the period length $\Delta=1/\mathrm{AN}$. The default
 $\lambda=4/3$ is a modelling choice, not an estimate.
 
