@@ -11,7 +11,7 @@
     "seaborn": "0.13.2",
     "statsmodels": "0.15.0"
   },
-  "generated_at_utc": "2026-09-26T03:10:33.714060+00:00",
+  "generated_at_utc": "2026-09-26T03:18:29.763718+00:00",
   "manifest": {
     "assets": [
       {
@@ -896,7 +896,7 @@
       "docs/images/strategy.png",
       "docs/images/strategy_vs_benchmark.png"
     ],
-    "published_at_utc": "2026-09-26T03:11:49.897673+00:00"
+    "published_at_utc": "2026-09-26T03:19:23.190825+00:00"
   },
   "python": "3.11.15",
   "qis_import_path": "/home/user/QuantInvestStrats/src/qis/__init__.py",
@@ -1224,8 +1224,8 @@
       "src/qis/portfolio/reports/strategy_signal_factsheet.py": "1b95ab1102c3e78835edc7bf148f7296c1931225e6ee6784c07f6b6b4e083696",
       "src/qis/portfolio/reports/tests/strategy_factsheet_test.py": "e3ab4bea24a62732d7ca88134bfafc971d45d1e9d6fa0c0b8afaef907d54c3de",
       "src/qis/portfolio/risk/__init__.py": "f56f240b9bb707911af20db18472683168016d0639a4fbb52f36bce04a2c5416",
-      "src/qis/portfolio/risk/contributions.py": "64ed8ed3d148615e0c5cdca4bd6d21d436697e877dd376c58b991850933e3bf2",
-      "src/qis/portfolio/risk/ewm_covar_risk.py": "1fa56bf9151f6aa6a2caa66c01076923899aa5350a9930f10c520f7ea520b163",
+      "src/qis/portfolio/risk/contributions.py": "e4c47b50f74a645f2ef1938117fa3a316858edef1cb72b7095199502150b21d0",
+      "src/qis/portfolio/risk/ewm_covar_risk.py": "53a50e805740398e1da34c5e5ceaa9c2efd5fe7679ade6b0ae242e2928be4f7c",
       "src/qis/portfolio/risk/ewm_factor_model.py": "df83e735e9402e9aef1407afd96fea09f0308dbce2008e6b6a8e09b0d2d46f9c",
       "src/qis/portfolio/risk/ex_post_tracking_error.py": "a20ea8c150dafd00a8bc9617e2f3d4daf011c277cf0617e49365506c0570dc36",
       "src/qis/portfolio/risk/factor_groups.py": "f40be23fcf491359aefdd1720cc77672ebd0213126bcb4d97dc4bcc16f6121c5",
@@ -1386,7 +1386,7 @@
       "uv.lock": "597d7494a9b3ec0444de85793770c5950415072c27897c4f8cb801c73476da2e"
     },
     "identity": "Effective source content, including dirty export files",
-    "sha256": "71f2170abc5a2848b8d069ad9191bba5f71792271d5c6db08cd518028cd85b01"
+    "sha256": "0eb416f1b4faab72c16ee4018ea43fdc728f6a31bcdcbf0ddf8f1364f8cfffff"
   },
   "status": "complete",
   "version_note": "dependencies.qis is installed distribution metadata; qis_source_version and the content fingerprint identify the imported source export"
