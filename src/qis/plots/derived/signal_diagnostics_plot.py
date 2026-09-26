@@ -388,7 +388,9 @@ def plot_signal_diagnostics(
         result: Output of ``estimate_signal_diagnostics``.
         figsize: Figure dimensions.
         group_colors: Optional group → hex palette.
-        title: Figure-level title; auto-generated when None.
+        title: Figure-level title; auto-generated when None, naming the
+            pooled regression with or without intercept as recorded in
+            ``result.fit_intercept``.
         num_buckets: Number of quantile buckets for row 0. Default 10.
         min_obs_per_asset: Per-asset β minimum-obs threshold for row 1.
 
@@ -446,8 +448,14 @@ def plot_signal_diagnostics(
         if result.start_date is not None and result.end_date is not None:
             date_part = (f"  ({result.start_date.strftime('%b-%Y')} → "
                          f"{result.end_date.strftime('%b-%Y')})")
-        title = (r"Cross-sectional signal predictive regression  $\tilde y_{i,t,t+h} = "
-                 r"\beta \cdot z_{i,t-1} + \varepsilon$  (no intercept)" + date_part)
+        # name the regression that was fitted: the pooled β in the row-0 titles comes from it
+        if getattr(result, 'fit_intercept', False):
+            model = (r"$\tilde y_{i,t,t+h} = \alpha + \beta \cdot z_{i,t-1} + \varepsilon$"
+                     r"  (with intercept)")
+        else:
+            model = (r"$\tilde y_{i,t,t+h} = \beta \cdot z_{i,t-1} + \varepsilon$"
+                     r"  (no intercept)")
+        title = "Cross-sectional signal predictive regression  " + model + date_part
 
     fig.tight_layout()
     fig.subplots_adjust(top=0.90)

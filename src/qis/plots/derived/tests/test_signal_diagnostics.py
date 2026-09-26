@@ -251,12 +251,14 @@ class TestEdgeCases:
 
     def test_drops_assets_not_covered_by_signal(self):
         """Partial signal coverage projects the returns dict to the
-        intersection — no error, smaller pooled sample."""
+        intersection — no error, a warning naming the dropped asset, and a
+        smaller pooled sample."""
         ard, sig, _ = _make_synthetic_returns_dict()
         dropped_col = sig.columns[0]
         partial_sig = sig.drop(columns=[dropped_col])
-        result = estimate_signal_diagnostics(asset_returns_dict=ard,
-                                             signal=partial_sig, horizons=[1])
+        with pytest.warns(UserWarning, match=dropped_col):
+            result = estimate_signal_diagnostics(asset_returns_dict=ard,
+                                                 signal=partial_sig, horizons=[1])
         # The dropped asset should not appear in any pair frame
         pairs = result.pairs['1']
         assert dropped_col not in set(pairs['asset'].unique())
