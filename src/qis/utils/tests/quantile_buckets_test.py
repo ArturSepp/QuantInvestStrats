@@ -117,6 +117,29 @@ def test_categorical_output_keeps_the_index_and_every_category():
         classify_quantile_buckets(x, 3, labels=['a', 'b'])
 
 
+def test_an_order_statistic_at_a_whole_number_position_is_the_edge():
+    """At a whole-number position the order statistic is the edge and falls in the lower bucket.
+
+    Tertiles of 34 observations put the edges at positions 11 and 22 exactly; pandas 2 reaches the
+    same quantiles through np.percentile at 100 p and lands one ulp off. With p = 0.57 of 101
+    observations the float position is 56.99999999999999, which the rule snaps to 57.
+    """
+    x = np.random.default_rng(1).standard_normal(34)
+    s = np.sort(x)
+    assert compute_quantile_edges(x, 3).tolist() == [s[11], s[22]]
+    codes = compute_bucket_codes(x, 3)
+    assert codes[x == s[11]].item() == 0 and codes[x == s[22]].item() == 1
+    assert np.bincount(codes).tolist() == [12, 11, 11]
+    y = np.random.default_rng(2).standard_normal(101)
+    t = np.sort(y)
+    assert compute_quantile_edges(y, [0.0, 0.57, 1.0]).tolist() == [t[57]]
+    assert compute_bucket_codes(y, [0.0, 0.57, 1.0])[y == t[57]].item() == 0
+
+
+@pytest.mark.skipif(
+    int(pd.__version__.split('.')[0]) < 3,
+    reason='pandas 2 computes the qcut edges with np.percentile at 100 p, which can leave an edge '
+           'one ulp off the order statistic at a whole-number position')
 @pytest.mark.parametrize('kind', ['continuous', 'bootstrap', 'exact_positions', 'gaps'])
 def test_codes_equal_pd_qcut(kind):
     """Within the rules the classification is pd.qcut's, for explicit and integer partitions."""

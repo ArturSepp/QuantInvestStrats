@@ -25,8 +25,12 @@ when it is Bear in every other. The rule, case by case:
   else ``EmptyQuantileBucketError`` reports how many are occupied; callers that draw rather than
   estimate may waive the check.
 
-Within these rules the classification equals ``pd.qcut`` on the same data, which the tests of this
-module check on continuous, tied and gappy samples. ``BenchmarkReturnsPositiveNegativeRegime`` is a
+Within these rules the classification equals ``pd.qcut`` of pandas 3 on the same data, which the
+tests of this module check on continuous, tied and gappy samples. pandas 2 computes the ``qcut``
+edges with ``np.percentile`` at ``100 p``, which can leave an edge one ulp off the order statistic
+at a whole-number position (tertiles, deciles and seven buckets, not the one-sigma, 10/90 or 5/95
+cuts, quartiles or quintiles); there ``pd.qcut`` puts that observation in the upper bucket and this
+rule in the lower. ``BenchmarkReturnsPositiveNegativeRegime`` is a
 sign rule rather than a quantile partition and keeps its own definition: a zero return is Positive.
 """
 # packages

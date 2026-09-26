@@ -39,7 +39,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   it), buckets closed on the right with open outer ends, a value on an edge in the lower bucket,
   NaN and infinite values unclassified, and an `EmptyQuantileBucketError` reporting the occupied
   count when an estimated partition leaves a bucket empty. Within these rules it equals
-  `pd.qcut`.
+  `pd.qcut` of pandas 3. pandas 2 computes the `qcut` edges with `np.percentile` at `100 p`,
+  which can leave an edge one ulp off the order statistic at a whole-number position; there
+  `pd.qcut` puts that observation in the upper bucket and this rule in the lower.
 
 ### Changed
 
@@ -48,8 +50,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `BenchmarkVolsQuantilesRegime`, the open-ended default of `x_bins_cut` and with it
   `add_classification` and `add_quantile_classification` (scatter, boxplot and regime-class-table
   hue buckets), the bucket reduction of the signal-diagnostics plot, and `qis.regimes`. The
-  regime classifiers and the Sharpe decomposition are unchanged: they already used `pd.qcut`.
-  The other paths change only on ties and degenerate samples:
+  regime classifiers and the Sharpe decomposition are unchanged under pandas 3: they already used
+  `pd.qcut`. Under pandas 2 they also keep every label for the one-sigma, 10/90 and 5/95 cuts,
+  quartiles and quintiles; for tertiles, deciles and seven buckets an observation exactly at a
+  whole-number position of an edge moves to the lower bucket. The other paths change only on
+  ties and degenerate samples:
   - the volatility regimes and the quantile hue buckets put a value equal to an edge in the lower
     bucket, as the return regimes do; they computed the probabilities as `(1 / k) * i`, which can
     fall a hair short of `i / k`, and could put it in the upper bucket. On the synthetic panel no
