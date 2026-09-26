@@ -93,8 +93,8 @@ from qis.portfolio.reports.strategy_signal_factsheet import (generate_weight_cha
                                                              generate_current_signal_report,
                                                              generate_strategy_signal_factsheet_by_instrument)
 
-from qis.portfolio.reports.overlays_smart_diversification import (SmartDiversificationReport,
-                                                                  create_overlay_portfolio_curve)
+from qis.portfolio.smart_diversification import (SmartDiversificationReport,
+                                                 create_overlay_portfolio_curve)
 
 
 # disable requirements for pybloqs

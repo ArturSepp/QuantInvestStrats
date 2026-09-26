@@ -7,13 +7,15 @@ on those labels. The regime is a property of the *benchmark*, so all assets in a
 partition and their conditional statistics are comparable.
 
 ``BenchmarkReturnsQuantilesRegime`` is the default and the one the factsheets use. Bucketing is
-``pd.qcut`` on benchmark returns at q = [0.0, 0.16, 0.84, 1.0] - the one-sigma cut, since
+``qis.utils.quantile_buckets``, the one quantile rule of qis (right-closed buckets, a tie falling
+in the lower one, the ``pd.qcut`` convention), on benchmark returns at q = [0.0, 0.16, 0.84, 1.0]
+- the one-sigma cut, since
 P(Z < -1) = 15.87% rounds to 16% and the central mass is 68% against the normal's 68.27% -
 giving Bear / Normal / Bull. That default is shared with ``compute_regime_sharpe_decomposition``
 so the two agree. ``BenchmarkReturnsPositiveNegativeRegime`` splits on sign;
-``BenchmarkVolsQuantilesRegime`` buckets on realised volatility instead of return. Quantile
-edges must be unique: a constant or back-padded zero-return block raises here rather than
-surfacing as a bare pandas "Bin edges must be unique".
+``BenchmarkVolsQuantilesRegime`` buckets on realised volatility instead of return, with the same
+rule. Every band must hold data: a constant or back-padded zero-return block raises here with the
+occupied band count rather than surfacing as a bare exception.
 
 ``RegimeData`` selects which statistic the table reports - average, p.a., or Sharpe. Only the
 average is a within-regime statistic; the p.a. and Sharpe panels are frequency-weighted
@@ -52,6 +54,8 @@ import qis.perfstats.perf_stats as pt
 import qis.perfstats.returns as ret
 from qis.perfstats.config import ReturnTypes, RegimeData, PerfParams, PerfStat, SharpeConvention
 from qis.utils.annualisation import get_annualization_factor
+from qis.utils.quantile_buckets import (EmptyQuantileBucketError, classify_quantile_buckets,
+                                        compute_bucket_codes)
 
 # ============================================================================
 # Core computation functions
@@ -521,28 +525,24 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
 
         x = sampled_returns_with_regime_id[benchmark]
 
-        # Guard against a degenerate regime benchmark: pd.qcut requires strictly
-        # increasing bin edges, but a constant / zero-return block (e.g. an overlay
-        # nav with longer history than the principal, back-padded over the union
-        # index) collapses interior quantiles onto the same value and raises a bare
-        # "Bin edges must be unique". The condition below mirrors qcut exactly
-        # (unique edges <= number of labels), so it fires iff qcut would have failed
-        # and never on healthy data. Surface the cause instead of the pandas trace.
+        # A constant or zero-return block (e.g. an overlay nav with longer history than the
+        # principal, back-padded over the union index) collapses interior quantiles onto one
+        # value and leaves bands empty; surface the cause instead of a bare exception.
         labels = self.get_regime_ids()
-        x_valid = x.dropna().to_numpy(dtype=float)
-        probs = (np.linspace(0.0, 1.0, int(self.q) + 1) if np.isscalar(self.q)
-                 else np.asarray(self.q, dtype=float))
-        edges = np.nanquantile(x_valid, probs) if x_valid.size > 0 else np.array([])
-        if np.unique(edges).size <= len(labels):
+        quant0, num_occupied, edges = None, 0, []
+        if np.isfinite(x.to_numpy(dtype=float, na_value=np.nan)).any():
+            try:
+                quant0 = classify_quantile_buckets(x=x, q=self.q, labels=labels)
+            except EmptyQuantileBucketError as error:
+                num_occupied, edges = error.num_occupied, error.edges
+        if quant0 is None:
             raise ValueError(
                 f"Regime benchmark '{x.name}' is degenerate for q={self.q}: only "
-                f"{max(np.unique(edges).size - 1, 0)} of {len(labels)} quantile bands "
-                f"are non-empty (edges={np.unique(edges).tolist()}).\n"
+                f"{num_occupied} of {len(labels)} quantile bands "
+                f"are non-empty (edges={edges}).\n"
                 f"This usually means a constant or zero-return block from misaligned "
                 f"navs — clip the inputs to their common live window before classifying."
             )
-
-        quant0 = pd.qcut(x=x, q=self.q, labels=labels)
         sampled_returns_with_regime_id[self.REGIME_COLUMN] = quant0
 
         return sampled_returns_with_regime_id
@@ -768,7 +768,7 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             ValueError: If ``q`` is not a positive integer.
         """
         super().__init__()
-        # One positive integer must control both qcut allocation and published regime metadata.
+        # One positive integer must control both the bucket allocation and the regime metadata.
         if isinstance(q, (bool, np.bool_)) or not isinstance(q, Integral) or q <= 0:
             raise ValueError(f"q must be a positive integer, got {q!r}")
         self.freq = freq
@@ -818,25 +818,15 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             )
         if self.q > 0 and not valid_vols.empty:
             # Require every requested band to contain data before publishing its ID and color.
-            quantile_classification, quantile_edges = cast(
-                Tuple[pd.Categorical, np.ndarray],
-                pd.qcut(
-                    x=valid_vols.to_numpy(dtype=float),
-                    q=self.q,
-                    duplicates='drop',
-                    retbins=True,
-                ),
-            )
-            occupied_codes = quantile_classification.codes[quantile_classification.codes >= 0]
-            num_nonempty_bands = int(np.unique(occupied_codes).size)
-            if num_nonempty_bands < self.q:
-                unique_edges = np.unique(np.asarray(quantile_edges, dtype=float)).tolist()
+            try:
+                compute_bucket_codes(x=valid_vols.to_numpy(dtype=float), q=self.q)
+            except EmptyQuantileBucketError as error:
                 raise ValueError(
                     f"Volatility regime benchmark '{benchmark}' is degenerate for q={self.q}: "
-                    f"only {num_nonempty_bands} of {self.q} quantile bands are non-empty "
-                    f"(edges={unique_edges}).\n"
+                    f"only {error.num_occupied} of {self.q} quantile bands are non-empty "
+                    f"(edges={error.edges}).\n"
                     f"Use fewer buckets or a longer or more variable benchmark history."
-                )
+                ) from error
 
         hue_name = f"{benchmark} vol"
         classificator, labels = dfc.add_quantile_classification(
@@ -1011,8 +1001,8 @@ def compute_regime_sharpe_decomposition(returns: Union[pd.Series, pd.DataFrame],
     returns rather than prices: no resampling, no annualization inference (af is explicit),
     and any index type is accepted (the index is never touched, so RangeIndex works)
 
-    classification uses pd.qcut on the benchmark returns with the same labels as the
-    regime classifier, so on an aligned panel without missing values the output equals the
+    classification uses qis.utils.quantile_buckets on the benchmark returns with the same labels
+    as the regime classifier, so on an aligned panel without missing values the output equals the
     table branch to machine precision. All moments are computed per asset over the rows
     where both the asset and the benchmark are observed, which makes the decomposition
     exactly additive per asset for any missing-value pattern:
@@ -1049,7 +1039,7 @@ def compute_regime_sharpe_decomposition(returns: Union[pd.Series, pd.DataFrame],
         regime_ids = ['Bear', 'Normal', 'Bull'] if n_buckets == 3 else [f"Q{n + 1}" for n in range(n_buckets)]
     if len(regime_ids) != n_buckets:
         raise ValueError(f"regime_ids must have {n_buckets} labels, got {regime_ids!r}")
-    regime_id = pd.qcut(x=benchmark_valid, q=q, labels=regime_ids)
+    regime_id = classify_quantile_buckets(x=benchmark_valid, q=q, labels=regime_ids)
 
     if sharpe_convention == SharpeConvention.LOG:
         returns_df = np.log1p(returns_df)
