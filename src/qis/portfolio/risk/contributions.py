@@ -156,7 +156,7 @@ def compute_benchmark_portfolio_risk_contributions(w_portfolio: Union[np.ndarray
         w_portfolio: Portfolio weights as array or Series.
         w_benchmark: Benchmark weights as array or Series.
         covar: Covariance matrix as array or DataFrame.
-        is_independent_risk: If True, return the standalone active risks |d_i| σ_i with
+        is_independent_risk: If True, return the standalone active risks ``abs(d_i) * σ_i`` with
             σ_i = sqrt(Σ_ii) instead. They ignore correlation and are not additive: their sum
             is the undiversified (perfectly correlated) figure and bounds TE from above.
 
