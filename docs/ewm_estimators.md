@@ -86,7 +86,7 @@ The chapter answers five questions.
 | $\kappa$, $F_t$ | Normaliser and output of the two-span filter | Dimensionless |
 | $X_t$ | Cumulative sum $\sum_{j=0}^{t}x_j$, with $X_{-1}=0$ | Log price relative when $x$ are log returns |
 | $q$, $c_{k,t}$ | Newey–West lag count (`num_lags`); EWM lag-$k$ cross moment | Rows; units of $x^2$ |
-| $K(k)$, $y_s$ | Bartlett kernel $\max(0,1-\lvert k\rvert/(q+1))$; EWM-weighted observation | Dimensionless; units of $x$ |
+| $K(k)$, $g_s$ | Bartlett kernel $\max(0,1-\lvert k\rvert/(q+1))$; EWM-weighted observation | Dimensionless; units of $x$ |
 | $\eta$ | Normalising constant of `compute_ewm_std1_norm` | Dimensionless |
 | $c$ | Volatility floor of the EWM score; a score threshold in the outlier filters | Units of $x$; dimensionless |
 | $z_t$ | EWM score | Dimensionless |
@@ -639,11 +639,11 @@ use of the same kernel is in [regression and HAC inference](regression_and_hac.m
 
 **Proposition (non-negativity).** For a seed $v_{-1}\ge 0$, $v^{\mathrm{NW}}_t\ge 0$ at every row.
 
-**Proof.** Put $y_s=\sqrt{(1-\lambda)\lambda^{t-s}}\,\tilde x_s$ for $t_0\le s\le t$ and $y_s=0$
+**Proof.** Put $g_s=\sqrt{(1-\lambda)\lambda^{t-s}}\,\tilde x_s$ for $t_0\le s\le t$ and $g_s=0$
 otherwise. With the geometric-mean weights,
-$v^{\mathrm{NW}}_t=\lambda^{t-t_0+1}v_{-1}+\sum_{s,s'}y_sy_{s'}K(s-s')$. The number of integers
+$v^{\mathrm{NW}}_t=\lambda^{t-t_0+1}v_{-1}+\sum_{s,s'}g_sg_{s'}K(s-s')$. The number of integers
 $j$ with both $j-s$ and $j-s'$ in $\{0,\dots,q\}$ is $(q+1)K(s-s')$, so
-$\sum_{s,s'}y_sy_{s'}K(s-s')=(q+1)^{-1}\sum_j\big(\sum_{i=0}^{q}y_{j-i}\big)^2\ge 0$. $\square$
+$\sum_{s,s'}g_sg_{s'}K(s-s')=(q+1)^{-1}\sum_j\big(\sum_{i=0}^{q}g_{j-i}\big)^2\ge 0$. $\square$
 
 The same argument covers the missing-data policies, each of which is the quadratic form of a
 modified sequence: `FFILL` holds the estimate at a gap and pairs each observation with the
