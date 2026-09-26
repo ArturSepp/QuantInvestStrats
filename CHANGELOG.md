@@ -86,6 +86,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   supplied classifier, a monthly one for example, was silently ignored. The default is unchanged:
   quarterly regimes at the 16%/84% quantiles. The unused module-level `regime_classifier` of the
   old module is removed.
+- Make `adjust_returns_with_factor_lag(warmup_period=None)` disable both the public and delegated
+  beta-tensor warmup masks instead of silently retaining the tensor's 20-period default. The first
+  identified rolling beta and its next-period correction are now available without an extra
+  warmup; integer warmups are unchanged.
 - Make `df_resample_at_int_index` apply a numpy aggregation such as `np.nansum` itself on every
   pandas version. pandas 2 swapped the bare callable for the groupby's own sum, which adds in
   another order, and emitted a FutureWarning that failed four tests on Python 3.10. Under pandas 3
