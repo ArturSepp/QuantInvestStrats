@@ -28,7 +28,8 @@ The chapter follows one pipeline, from returns to weights:
 2. **Target.** Scale by a volatility target to obtain a position and its returns. Evidence on
    whether this improves performance is mixed and asset-class dependent.
 3. **Aggregate.** Sum risk-adjusted returns over rolling windows or calendar periods, scaled by
-   the square root of the horizon.
+   the square root of the number of terms so that the sums keep unit variance, and pair them with
+   the signal known before each window.
 4. **Filter.** Smooth risk-adjusted returns with EWM filters normalised to unit variance, the
    building block of time-series momentum.
 5. **Map.** Turn a signal into a bounded weight through a CDF-shaped map.
@@ -67,8 +68,8 @@ observation.
 | $\mu_x$ | Mean of $x_t$: the per-period Sharpe ratio when $\sigma_{\mathrm{tgt}}=1$ | Risk units |
 | $\theta$, $W$ | `vol_floor_quantile`, `vol_floor_quantile_roll_period` | Probability; rows |
 | $h$ | Summation horizon of the rolling functions (their `span`) | Rows |
-| $J$, $n_J$ | A calendar period of `freq` and its number of observations | |
-| $\mathrm{AN}_f$ | Annualisation factor of `freq` | `qis.get_annualization_factor(freq)` |
+| $J$, $n_J$ | A calendar period of `freq` and its number of finite risk-adjusted returns | |
+| $\mathrm{AN}_f$ | Annualisation factor of `freq`, periods of `freq` per year | `qis.get_annualization_factor(freq)` |
 | $X^{(h)}_t$, $X^{f}_{J}$ | Normalised rolling and calendar sums of $x_t$ | Risk units |
 | $R^{(h)}_t$, $\hat\sigma^{(h)}_t$, $\lambda_h$ | Rolling $h$-row return sum, its EWM volatility and decay | Per $h$ rows; $\lambda_h=1-2/(h+1)$ |
 | $\lambda_m$, $N_m$, $m_t$ | Decay, span and state of the momentum EWM | `momentum_span`; $m=0$ before the first finite $x_t$ |
@@ -282,11 +283,12 @@ computes $x_t$ (its `span` is the volatility span) and, for `freq` other than `'
 it within each calendar period $J$ of `freq`:
 
 $$
-X^{f}_{J}=\frac{1}{\sqrt{\mathrm{AN}_f}}\sum_{t\in J}x_t .
+X^{f}_{J}=\frac{1}{\sqrt{n_J}}\sum_{t\in J}x_t ,
 $$
 
-The factor is applied with the default `is_norm=True`. For `'B'` and `'D'` it returns $x_t$
-unchanged.
+where $n_J$ counts the finite $x_t$ in $J$. The factor is applied with the default
+`is_norm=True`; a period without observations is missing. With `is_norm=False` the plain sums are
+returned, zero for an empty period. For `'B'` and `'D'` it returns $x_t$ unchanged.
 
 **Definition (sum, then normalise).** `qis.compute_rolling_ra_returns` with $h>1$ sums the returns
 first, $R^{(h)}_t=\sum_{j=0}^{h-1}r_{t-j}$, estimates the EWM volatility $\hat\sigma^{(h)}_t$ of the
@@ -302,12 +304,13 @@ not $h$ rows, and the first finite sum starts the variance from a zero state.
 
 **Proposition (square root of the horizon).** If $x_{t-h+1},\ldots,x_t$ are uncorrelated with
 unit variance, then $\operatorname{Var}\big(\sum_{j=0}^{h-1}x_{t-j}\big)=h$, so $X^{(h)}_t$ has unit
-variance. For overlapping windows,
-$\operatorname{Corr}\big(X^{(h)}_t,X^{(h)}_{t+j}\big)=(h-j)/h$ for $0\le j<h$.
+variance, and likewise $X^{f}_{J}$ for every calendar period, whatever its length $n_J$. For
+overlapping windows, $\operatorname{Corr}\big(X^{(h)}_t,X^{(h)}_{t+j}\big)=(h-j)/h$ for
+$0\le j<h$, while calendar periods do not overlap.
 
-**Proof.** The variance of a sum is the sum of all covariances; only the $h$ unit variances
-survive. Two windows $j$ rows apart share $h-j$ terms, so their covariance is $(h-j)/h$ after
-normalisation by $\sqrt{h}\sqrt{h}$. $\square$
+**Proof.** The variance of a sum is the sum of all covariances; only the $h$ (or $n_J$) unit
+variances survive. Two windows $j$ rows apart share $h-j$ terms, so their covariance is $(h-j)/h$
+after normalisation by $\sqrt{h}\sqrt{h}$. $\square$
 
 The first proposition of this chapter supplies the premise: correctly scaled risk-adjusted
 returns are serially uncorrelated with unit variance. The second statement is why overlapping
@@ -315,12 +318,13 @@ sums need autocorrelation-robust inference; see
 [Serial dependence and autocorrelation](serial_dependence.md) and
 [Regression and HAC inference](regression_and_hac.md).
 
-> **Pitfall.** `compute_sum_freq_ra_returns` divides by $\sqrt{\mathrm{AN}_f}$, the number of
-> periods of `freq` *per year*, not by $\sqrt{n_J}$, the number of observations *per period*. For
-> unit-variance daily terms,
-> $\operatorname{Var}(X^{f}_{J})=n_J/\mathrm{AN}_f\approx 252/\mathrm{AN}_f^2$, a standard deviation
-> of about 0.31 weekly, 1.32 monthly and 3.97 quarterly. For unit variance, call it with
-> `is_norm=False` and divide by the square root of the per-period observation count.
+Up to qis 5.30.3, `compute_sum_freq_ra_returns` divided by $\sqrt{\mathrm{AN}_f}$, the number of
+periods of `freq` per year, instead of $\sqrt{n_J}$, the number of observations per period. For
+unit-variance daily terms that gave
+$\operatorname{Var}(X^{f}_{J})=n_J/\mathrm{AN}_f\approx252/\mathrm{AN}_f^2$, a standard deviation
+of about 0.31 weekly, 1.32 monthly and 3.97 quarterly, and the same scale entered
+`get_paired_rareturns_signals`. Dividing by $\sqrt{n_J}$ also normalises partial periods at the
+sample edges exactly.
 
 The word `span` also changes meaning: it is the volatility span in `compute_ra_returns` and
 `compute_sum_freq_ra_returns`, but the summation horizon $h$ in
@@ -422,8 +426,9 @@ $\big((N_L+1)/2-(N_S+1)/2\big)/Q$. $\square$
 > is why momentum signals flip sign often and why the map from signal to weight matters.
 
 `compute_ewm_long_short_filtered_ra_returns` lags only the volatility normaliser through
-`weight_lag`; it does not shift its output. The two-leg output at $t$ uses $x$ through $t-1$, and
-the single-leg output uses $x_t$; either is applied over $(t,t+1]$.
+`weight_lag`; it does not shift its output, and its docstring says so. The two-leg output at $t$
+uses $x$ through $t-1$, and the single-leg output uses $x_t$. Both are signals dated $t$, formed
+from returns known at $t$, and are applied over $(t,t+1]$.
 
 ### Signal-to-weight maps
 
@@ -440,8 +445,9 @@ $$
 
 Both are odd about $y_0$, bounded in $(-1,1)$ and linear near the centre, with slopes
 $\sqrt{2/\pi}/b\approx0.80/b$ and $1/b$. The Laplace map approaches its bound exponentially; the
-normal map approaches it faster, like a Gaussian tail. They ignore `tail_level`, the slopes and
-the tail decays.
+normal map approaches it faster, like a Gaussian tail. They read only `loc` and `scale`: setting
+`tail_level`, a slope or a tail decay away from its default emits a `UserWarning` and has no
+effect.
 
 **Definition (`ExpCDF`).** With tail level $q$, anchor levels $p_{+}$ for $y\ge y_0$ and $p_{-}$
 for $y<y_0$, the code sets $\omega_{\pm}=1.5625\,b/\ln\big(q/(q-p_{\pm})\big)$ and returns
@@ -463,14 +469,15 @@ $e^{-(y-y_0)^2/\omega_{\pm}}=\big((q-p_{\pm})/q\big)^{(y-y_0)^2/(1.5625\,b)}$; a
 $\lvert y-y_0\rvert=1.25\sqrt{b}$ the exponent is 1 and $g=\pm p_{\pm}$. As $y\to\pm\infty$ the
 power vanishes. $\square$
 
-The constant $1.5625=1.25^2$ is not documented in the source; its only effect is to place the
-anchor at $1.25\sqrt{b}$. Despite their names, `slope_right` and `slope_left` are not derivatives:
-they are the weights reached at the anchor. The map is quadratic near the centre,
+The constant $1.5625=1.25^2$ places the anchor at $1.25\sqrt{b}$; the docstrings of the function
+and of `SignalMapType` state it. Despite their names, `slope_right` and `slope_left` are not
+derivatives: they are the weights reached at the anchor. The map is quadratic near the centre,
 $g\approx q\ln\big(q/(q-p)\big)v^2$, so it has zero slope at $y_0$ and damps small signals, unlike
-the normal and Laplace maps. `scale` enters under a square root, so it acts as a variance.
+the normal and Laplace maps; despite its name it is not the distribution function of an
+exponential law. `scale` enters under a square root, so it acts as a variance.
 
-**Definition (`ExpCDF` tail treatment).** If both `tail_decay_right` $d_{+}$ and `tail_decay_left`
-$d_{-}$ are given, the weight is multiplied by
+**Definition (`ExpCDF` tail treatment).** Each side is faded when its own decay is given. With
+`tail_decay_right` $d_{+}$ and `tail_decay_left` $d_{-}$, the weight is multiplied by
 
 $$
 \begin{aligned}
@@ -479,9 +486,10 @@ $$
 \end{aligned}
 $$
 
-and by 1 in between. Beyond the threshold the weight decays to zero: extreme signals are faded.
-The tail level $q$ plays two roles here, the weight cap and the signal threshold, so the two
-are not independent. If only one decay is given, the tail treatment is skipped without warning.
+and by 1 in between and on a side without a decay. Beyond the threshold the weight decays to
+zero: extreme signals are faded. The tail level $q$ plays two roles here, the weight cap and the
+signal threshold, so the two are not independent. Up to qis 5.30.3 a single decay was ignored
+without warning; it now fades its own tail.
 
 ### Returns transforms and paired samples
 
@@ -491,22 +499,27 @@ are not independent. If only one decay is given, the tail treatment is skipped w
   and `weight_shift=1`: the sum-then-normalise transform with $h=31$ by default and the
   log-to-simple map on.
 - `EWMA_RETURNS_MOMENTUM` calls `compute_ewm_ra_returns_momentum` with `momentum_span`,
-  `vol_span` and `weight_shift=1`, whose defaults here are 31 and 33. These differ from the
-  defaults of the underlying function, 63 and 31.
+  `vol_span` and `weight_shift=1`, whose defaults here are 31 and 33. These differ on purpose
+  from the defaults of the underlying function, 63 and 31: an EWM of span 31 has the mean age
+  $(31-1)/2=15$ rows of the 31-row window of `ROLLING_RA_RETURNS`, so the two transforms have
+  comparable horizons, and span 33 gives the decay $1-2/34=0.941$, the RiskMetrics 0.94.
 
 Any other value raises `TypeError`.
 
-`qis.get_paired_rareturns_signals` aligns risk-adjusted returns with a signal for predictive
-diagnostics. With `is_nonoverlapping=True` it pairs $X^{f}_{J}$ from `compute_sum_freq_ra_returns`
-(with the normalisation of the pitfall above, and the log-to-simple map on by default) with the
-last signal value of the previous period, `signal.resample(freq).last().shift(1)`. With
-`is_nonoverlapping=False` it pairs $X^{(h)}_t$ with `signal.shift(1)`, the signal at $t-1$.
-`is_mean_adjust_returns=True` subtracts an expanding mean, which is point in time.
+`qis.get_paired_rareturns_signals` aligns risk-adjusted returns with the signal known before
+each return window, for predictive diagnostics. With `is_nonoverlapping=True` it pairs
+$X^{f}_{J}$ from `compute_sum_freq_ra_returns` (unit-variance sums, with the log-to-simple map on
+by default) with the last signal value of the previous period,
+`signal.resample(freq).last().shift(1)`; the default `freq='BQE'` is the business quarter-end.
+With `is_nonoverlapping=False` the window of $X^{(h)}_t$ covers $(t-h,t]$ and is paired with
+`signal.shift(h)`, the signal at $t-h$. `is_mean_adjust_returns=True` subtracts an expanding
+mean, which is point in time. Consecutive overlapping pairs share $h-1$ returns, so their
+inference needs an autocorrelation-robust standard error.
 
-> **Pitfall.** In the overlapping mode the window of $X^{(h)}_t$ covers $(t-h,t]$, so a signal
-> dated $t-1$ has already seen $h-1$ of its $h$ returns. A momentum signal paired this way
-> "predicts" returns it contains. For a forward-looking pair, lag the signal by $h$ rows. The
-> non-overlapping mode is correctly aligned.
+Up to qis 5.30.3 the overlapping mode paired $X^{(h)}_t$ with the signal at $t-1$, which had
+already seen $h-1$ of the $h$ returns it was said to predict; the default `freq='BQ'` and the
+`expanding(axis=0)` call of the mean adjustment also failed under pandas 3. The worked example
+measures the look-ahead.
 
 Diagnostics for such pairs, including the information coefficient, are the subject of
 [Signal diagnostics](signal_diagnostics.md).
@@ -521,7 +534,10 @@ volatility path is 1%, 5%, 5%, 5% and $\sqrt{0.0013}\approx3.61\%$. Dividing eac
 previous volatility gives 7, −1, 1 and −0.2 risk units. The first value, 7, is the one-observation
 seed at work. With a per-period target of 2% the weights are 2 and then 0.4. Without the lag the
 normalised returns are 1, 1.4, −1, 1 and −0.28, all within the look-ahead bound $\sqrt{2}$. The
-normalised two-row sums of 7, −1, 1 and −0.2 are $6/\sqrt{2}$, 0 and $0.8/\sqrt{2}$.
+normalised two-row sums of 7, −1, 1 and −0.2 are $6/\sqrt{2}$, 0 and $0.8/\sqrt{2}$. The five days
+form one calendar week, whose four risk-adjusted returns sum to 6.8; divided by $\sqrt{4}$, the
+normalised weekly sum is 3.4. In the overlapping mode of `get_paired_rareturns_signals` the
+two-row sum ending on a date is paired with the signal of two rows earlier.
 
 ```python
 import numpy as np
@@ -558,6 +574,17 @@ assert np.abs(ra_lookahead).max() <= np.sqrt(2.0)
 summed = qis.compute_sum_rolling_ra_returns(returns=returns, span=2, ewm_lambda=0.5,
                                             is_log_returns_to_arithmetic=False)
 np.testing.assert_allclose(summed.iloc[2:], np.array([6.0, 0.0, 0.8]) / np.sqrt(2.0), atol=1e-12)
+
+# calendar sums divide by the root of the number of terms in the period: one week, four terms
+weekly = qis.compute_sum_freq_ra_returns(returns=returns, freq='W-FRI', span=3,
+                                         is_log_returns_to_arithmetic=False)
+assert len(weekly) == 1
+np.testing.assert_allclose(weekly.iloc[0], (7.0 - 1.0 + 1.0 - 0.2) / np.sqrt(4.0), atol=1e-12)
+
+# overlapping pairs: the window (t-2, t] meets the signal dated t-2
+_, paired_signal = qis.get_paired_rareturns_signals(returns=returns, signal=returns, span=2,
+                                                    is_nonoverlapping=False)
+pd.testing.assert_series_equal(paired_signal, returns.shift(2))
 ```
 
 ### Volatility targeting on the frozen synthetic universe
@@ -702,7 +729,8 @@ The maps are checked against their closed forms: the normal map against the erro
 Laplace map against $1-e^{-\lvert \eta\rvert}$, and `ExpCDF` against its anchor, where a signal of
 $1.25\sqrt{b}$ returns the anchor level. With the default $q=1$, $p_{\pm}=0.5$ and $b=4$, a signal
 of 2.5 maps to 0.5 and a signal of 5 to $1-0.5^4=0.9375$. With both tail decays set to 1, a signal
-of 3 is faded from 0.98 to 0.13.
+of 3 is faded from 0.98 to 0.13. With the right decay alone, 3 is faded the same way and −3 keeps
+its weight of −0.98. Passing `tail_level` to the normal map warns and changes nothing.
 
 ```python
 from math import erf
@@ -727,6 +755,53 @@ faded = qis.map_signal_to_weight(signals, signal_map_type=qis.SignalMapType.ExpC
 plain = qis.map_signal_to_weight(signals, signal_map_type=qis.SignalMapType.ExpCDF)
 np.testing.assert_allclose(faded['s'].iloc[5], plain['s'].iloc[5] * np.exp(-2.0), atol=1e-12)
 np.testing.assert_allclose([plain['s'].iloc[5], faded['s'].iloc[5]], [0.98, 0.13], atol=0.005)
+
+# each side is faded by its own decay: the right decay alone leaves the left tail untouched
+right_only = qis.map_signal_to_weight(signals, signal_map_type=qis.SignalMapType.ExpCDF,
+                                      tail_decay_right=1.0)
+np.testing.assert_allclose(right_only['s'].iloc[[0, 5]], [plain['s'].iloc[0], faded['s'].iloc[5]],
+                           atol=1e-12)
+np.testing.assert_allclose(right_only['s'].iloc[0], -0.98, atol=0.005)
+
+# the normal and Laplace maps read only loc and scale, and say so
+import warnings
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter('always')
+    capped = qis.map_signal_to_weight(signals, signal_map_type=qis.SignalMapType.NormalCDF,
+                                      scale=2.0, tail_level=2.0)
+assert any('tail_level' in str(w.message) for w in caught)
+pd.testing.assert_frame_equal(capped, normal)
+```
+
+### Paired samples without look-ahead
+
+A 63-day EWM momentum signal of the ten clean synthetic instruments is paired with their
+normalised 63-day sums of risk-adjusted returns, keeping every 63rd row so that the pairs do not
+overlap. The instruments have no momentum by construction. Paired forward, as
+`get_paired_rareturns_signals` now does, the 400 pairs have a correlation of −0.07, within 1.4
+standard errors of zero. Paired with the signal of the previous day, as up to qis 5.30.3, the
+correlation is 0.88: the signal has already seen 62 of the 63 returns it is said to predict.
+
+```python
+h = 63
+momentum = qis.compute_ewm_ra_returns_momentum(panel, momentum_span=h)
+window_sums, forward_signal = qis.get_paired_rareturns_signals(
+    returns=panel, signal=momentum, span=h, is_nonoverlapping=False)
+pd.testing.assert_frame_equal(forward_signal, momentum.shift(h))
+sampled = window_sums.index[h::h]  # every h-th row: non-overlapping windows
+
+
+def pooled_corr(signal_frame: pd.DataFrame) -> tuple:
+    pairs = pd.concat([window_sums.loc[sampled].stack(), signal_frame.loc[sampled].stack()],
+                      axis=1).dropna()
+    return len(pairs), float(np.corrcoef(pairs.iloc[:, 0], pairs.iloc[:, 1])[0, 1])
+
+
+n_pairs, forward_corr = pooled_corr(forward_signal)
+_, previous_day_corr = pooled_corr(momentum.shift(1))  # the pairing up to qis 5.30.3
+assert n_pairs == 400
+np.testing.assert_allclose([forward_corr, previous_day_corr], [-0.07, 0.88], atol=0.005)
+assert abs(forward_corr) * np.sqrt(n_pairs) < 1.4
 ```
 
 ## Implementation in qis
@@ -738,17 +813,17 @@ np.testing.assert_allclose([plain['s'].iloc[5], faded['s'].iloc[5]], [0.98, 0.13
 | Volatility floor | $\hat\sigma_t\ge$ rolling $\theta$-quantile | `vol_floor_quantile=None`, `vol_floor_quantile_roll_period=1300` |
 | Volatility-targeting weight | $w^{*}_t=\sigma_{\mathrm{tgt}}/\hat\sigma_t$ | `vol_target / ewm_vol` from `compute_ra_returns`; executed by `qis.backtest_model_portfolio` |
 | Normalise-then-sum, rolling | $X^{(h)}_t$ | `qis.compute_sum_rolling_ra_returns(returns, span=1, ewm_lambda=0.94, is_norm=True, is_log_returns_to_arithmetic=True)` |
-| Normalise-then-sum, calendar | $X^{f}_{J}$, divided by $\sqrt{\mathrm{AN}_f}$ | `qis.compute_sum_freq_ra_returns(returns, freq='B', span=None, ewm_lambda=0.94, is_norm=True, is_log_returns_to_arithmetic=True)` |
+| Normalise-then-sum, calendar | $X^{f}_{J}$, divided by $\sqrt{n_J}$ | `qis.compute_sum_freq_ra_returns(returns, freq='B', span=None, ewm_lambda=0.94, is_norm=True, is_log_returns_to_arithmetic=True)` |
 | Sum-then-normalise | $(e^{R^{(h)}_t}-1)/\hat\sigma^{(h)}_{t-1}$ | `qis.compute_rolling_ra_returns(returns, span=1, ewm_lambda_eod=0.94, is_log_returns_to_arithmetic=True)` |
 | EWM momentum | $M_t=\sqrt{N_m}\,m_t$ | `qis.compute_ewm_ra_returns_momentum(returns, momentum_span=63, vol_span=31, weight_shift=1)` |
 | Long–short kernel | $F_t$ on an array | `qis.compute_ewm_long_short(a, init_value, long_span=63, short_span=5)` |
 | Long–short filter | $F_t$ with validation and warm-up | `qis.compute_ewm_long_short_filter(data, long_span=63, short_span=5, warmup_period=21)` |
 | Filtered risk-adjusted returns | $F_t$ applied to $x_t$ | `qis.compute_ewm_long_short_filtered_ra_returns(returns, vol_span=31, long_span=63, short_span=5, warmup_period=21, weight_lag=1)` |
-| Signal maps | $g_{\mathrm{N}}$, $g_{\mathrm{L}}$, $g_{\mathrm{E}}$ | `qis.map_signal_to_weight(signals, signal_map_type=SignalMapType.NormalCDF, loc=0.0, scale=1.0, tail_level=1.0, slope_right=0.5, slope_left=0.5)` |
+| Signal maps | $g_{\mathrm{N}}$, $g_{\mathrm{L}}$, $g_{\mathrm{E}}$; tail fading per side | `qis.map_signal_to_weight(signals, signal_map_type=SignalMapType.NormalCDF, loc=0.0, scale=1.0, tail_level=1.0, slope_right=0.5, slope_left=0.5, tail_decay_right=None, tail_decay_left=None)` |
 | Map choice | `NormalCDF`, `LaplaceCDF`, `ExpCDF` | `qis.SignalMapType` |
 | Returns transform | dispatch | `qis.compute_returns_transform(returns, returns_transform=ReturnsTransform.ROLLING_RA_RETURNS, momentum_span=31, vol_span=33, rolling_ra_returns_span=31)` |
 | Transform choice | `ROLLING_RA_RETURNS`, `EWMA_RETURNS_MOMENTUM` | `qis.ReturnsTransform` |
-| Returns paired with signals | $X^{f}_{J}$ or $X^{(h)}_t$ against a lagged signal | `qis.get_paired_rareturns_signals(returns, signal, freq='BQ', span=63, is_nonoverlapping=True, ra_returns_ewm_vol_lambda=0.94, is_mean_adjust_returns=False)` |
+| Returns paired with signals | $X^{f}_{J}$ with the previous period's last signal, or $X^{(h)}_t$ with the signal at $t-h$ | `qis.get_paired_rareturns_signals(returns, signal, freq='BQE', span=63, is_nonoverlapping=True, ra_returns_ewm_vol_lambda=0.94, is_mean_adjust_returns=False)` |
 
 The functions live in
 [ra_returns.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/models/linear/ra_returns.py)
@@ -760,8 +835,9 @@ and {doc}`map_signal_to_weight <api/generated/qis.map_signal_to_weight>`.
 
 Contract details:
 
-- `compute_ra_returns` never annualises. Both branches of its `vol_target` test set
-  `annualize=False`, so `vol_target=0.15` on daily returns targets 15% *per day*.
+- `compute_ra_returns` never annualises: it calls `compute_ewm_vol` with `annualize=False`, so
+  `vol_target=0.15` on daily returns targets 15% *per day*. Its docstring and the module docstring
+  state the per-period target.
 - `vol_target=None` is a unit target, not "no scaling": the output is in risk units.
 - The returned `weights` are already lagged by `weight_lag`; the target weight to execute at $t$ is
   `vol_target / ewm_vol`. Passing the lagged weights to a backtester that lags again delays the
@@ -783,8 +859,10 @@ sweeps volatility-targeting and trend strategies over spans through helpers in
 Its volatility-target strategy divides an annualised EWM volatility of log returns into the
 annual target and applies the result to simple returns with a one-row lag. This reproduces
 `compute_ra_returns` on log returns with `span=vol_span`, `is_log_returns_to_arithmetic=True` and
-a per-period target equal to the annual target over $\sqrt{260}$: the example annualises with
-`vol_af=260`, whereas qis annualises business-day statistics with 252. Its trend strategy
+a per-period target equal to the annual target over $\sqrt{252}$: the helpers' `vol_af` defaults
+to 252, the business-day factor with which qis reports volatility. Up to qis 5.30.3 they used
+260, which left positions $\sqrt{252/260}\approx0.98$ of the size needed for the target, so a
+15% target delivered about 14.8%. Its trend strategy
 multiplies a unit-variance EWM signal of risk-adjusted returns by the inverse volatility and the
 per-period target, the continuous analogue of the volatility-scaled sign of Moskowitz, Ooi and
 Pedersen (2012).
@@ -806,14 +884,12 @@ functions of this chapter.
   turnover.
 - **Warm-up.** Without `warmup_period`, the first span of output rests on a seed of one squared
   return and is unreliable.
-- **Calendar sums are not unit-variance.** See the pitfall on `compute_sum_freq_ra_returns`; the
-  same scale enters `get_paired_rareturns_signals` in its non-overlapping mode. Correlations are
-  unaffected by a constant scale; regression slopes are not.
-- **Overlap.** Rolling sums are autocorrelated by construction, and the overlapping mode of
-  `get_paired_rareturns_signals` pairs a signal with returns it has already seen.
-- **pandas 3.** Under pandas 3, the default `freq='BQ'` of `get_paired_rareturns_signals` raises
-  `ValueError` (pass `'BQE'` or `'QE'`), and `is_mean_adjust_returns=True` raises `TypeError`
-  because `expanding` no longer accepts `axis`.
+- **Unit-variance sums need uncorrelated terms.** Rolling and calendar sums are divided by the
+  root of their number of terms; serial correlation or a drift in $x_t$ moves their variance away
+  from one.
+- **Overlap.** Rolling sums are autocorrelated by construction: the overlapping pairs of
+  `get_paired_rareturns_signals` are forward looking but share $h-1$ returns with their
+  neighbours, so use every $h$-th pair or an autocorrelation-robust standard error.
 - **Volatility floor on a Series.** `vol_floor_quantile` works on a DataFrame; on a pandas Series
   the floor is broadcast to a square array and `compute_ra_returns` raises `ValueError`. Pass a
   one-column DataFrame.
