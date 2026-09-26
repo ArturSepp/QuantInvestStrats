@@ -722,8 +722,13 @@ def set_rebalancing_timeindex_on_given_timeindex(given_index: pd.DatetimeIndex,
     indicators_off_grid = all_dates_indicators.iloc[np.isin(all_dates_indicators.index, indicators_on_grid.index) == False]
     next_dates_off_grid = pd.Series(given_index, index=given_index).reindex(index=indicators_off_grid.index, method='bfill')
     indicators_off_grid = pd.Series(data=True, index=next_dates_off_grid.to_numpy())
-    if not indicators_off_grid.empty:
-        indicators_on_grid = pd.concat([indicators_on_grid, indicators_off_grid], axis=0).sort_index()
+    # only the index is used below; an empty part is left out of the concat, whose dtype
+    # treatment of empty entries pandas deprecates
+    parts = [part for part in (indicators_on_grid, indicators_off_grid) if not part.empty]
+    if len(parts) == 2:
+        indicators_on_grid = pd.concat(parts, axis=0).sort_index()
+    elif len(parts) == 1:
+        indicators_on_grid = parts[0].sort_index()
     else:
         indicators_on_grid = indicators_on_grid.sort_index()
     indicators_full = pd.Series(data=np.where(np.isin(given_index, indicators_on_grid.index), True, False), index=given_index)
