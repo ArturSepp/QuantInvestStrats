@@ -349,8 +349,8 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
                                             ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Computes the undiversified portfolio VaR: the sum of standalone instrument VaRs.
 
-    Instrument i contributes ``VAR99 * abs(w_{i,t}) * σ_{i,t}``, where σ²_{i,t} is the diagonal of the
-    same zero-seeded EWM covariance Σ_t that ``compute_portfolio_correlated_var_by_groups``
+    Instrument i contributes ``VAR99 * abs(w_{i,t}) * σ_{i,t}``, where σ²_{i,t} is the diagonal
+    of the same zero-seeded EWM covariance Σ_t that ``compute_portfolio_correlated_var_by_groups``
     uses, with the same weights of date t. Adding standalone VaRs assumes that every pair of
     positions is perfectly aligned (correlation times the sign of the weight product equal to
     one), not that assets are independent: the result is the undiversified upper bound, and on
