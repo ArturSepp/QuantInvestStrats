@@ -822,6 +822,10 @@ Each entry below states the size of its effect and, where possible, how to resto
 
 ### Fixed
 
+- Preserve separate strategy and benchmark weight and return columns in
+  `compute_brinson_attribution_table` when their display names match, instead of silently dropping
+  one role during summary construction.
+
 - Keep `adjust_returns_with_factor_lag` point-in-time by seeding EWMA means from the first
   observation and leaving warm-up coefficients unavailable, so later observations cannot revise
   earlier corrected returns or diagnostics.
