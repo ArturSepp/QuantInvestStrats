@@ -36,7 +36,7 @@ drift, implementation lags, unavailable assets, and costs visible.
 | Sampling grid | The native price index |
 | Annualisation | Annual funding, fee and carry rates accrue ACT/365 over elapsed days |
 | Mean adjustment | Not applicable |
-| Timing | A dated target executes at the first price at or after its date, plus `weight_implementation_lag` observations; units are held over $(t,t+1]$ |
+| Timing | A dated target executes at the first price at or after its date, plus `weight_implementation_lag` observations; units are held over $(t,t+1]$; cash held over $(t-1,t]$ earns the funding rate known at $t-1$ |
 | Output units | NAV and costs in currency; weights as fractions of NAV |
 | qis default | `rebalancing_freq='QE'`, no lag, no costs, `initial_nav=100` |
 
@@ -61,8 +61,14 @@ delayed signal schedule: use dated targets when timing matters.
 
 `funding_rate`, `management_fee`, and `instruments_carry` are annualised decimal inputs converted
 to the price grid. Dated funding and carry inputs are ordered chronologically before alignment.
-The residual cash balance earns the funding rate, which defaults to zero. Returns arise from
-simple holding-period P&L; do not substitute asset log returns into the cash accounting.
+The residual cash balance earns the funding rate, which defaults to zero. Cash held over
+$(t-1,t]$ earns the rate known at the previous price date, the latest quote on or before it,
+accrued ACT/365 over the calendar days of the period: the convention of
+`qis.compute_excess_returns`, so a cash-only portfolio earns exactly the cash return that the
+excess-return helpers subtract. Quote the funding rate from the first price date on; a period
+without a known rate leaves the NAV missing from that date, with a warning. Carry uses the latest
+quote on or before the price date. Returns arise from simple holding-period P&L; do not
+substitute asset log returns into the cash accounting.
 
 Cost inputs may be a scalar, ticker-indexed Series, or date-by-ticker DataFrame. A dated cost
 panel is forward-filled and read on the trade date, with zero cost before its first dated value.

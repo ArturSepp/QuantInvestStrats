@@ -40,7 +40,7 @@ argument `annualize_less_1y`; the two refer to the same concept.
 | Sampling grid | Any regular pandas frequency; examples use month-ends (`ME`) |
 | Annualisation | $\mathrm{AN}$ periods per year from `qis.get_annualization_factor` |
 | Mean adjustment | Sample moments are demeaned, with `ddof=1`, unless a chapter states otherwise |
-| Timing | A return at $t$ covers $(t-1,t]$; a decision at $t$ applies over $(t,t+1]$ |
+| Timing | A return at $t$ covers $(t-1,t]$; a decision at $t$ applies over $(t,t+1]$; cash accrued over $(t-1,t]$ uses the rate known at $t-1$ |
 | Output units | Decimal fractions: `0.10` means 10% |
 | qis default | `qis.to_returns` returns simple returns and forward-fills missing prices |
 
@@ -215,15 +215,20 @@ r^{f}_t=y_{t-1}\,\frac{d_t-d_{t-1}}{365},
 \tilde r_t=r_t-r^{f}_t,
 $$
 
-where $d_t$ is the calendar date of observation $t$. The rate is the quote known at the start of
-the period, one observation earlier, and accrues on an ACT/365 day count. Per-annum returns use
-365.25-day years; the two day counts are separate conventions.
+where $d_t$ is the calendar date of observation $t$ and $y_{t-1}$ is the latest quote dated on or
+before $d_{t-1}$: the rate known at the start of the period on the return grid, whatever the
+calendar of the rate series. With daily quotes and monthly returns, each month accrues the quote
+of the previous month-end. The first return date closes no period and accrues nothing. The rate
+accrues on an ACT/365 day count; per-annum returns use 365.25-day years, and the two day counts are
+separate conventions. The cash leg of a qis backtest accrues the same $r^{f}_t$ on its cash
+balance.
 
 ### Timing and information
 
 A quantity dated $t$ may use observations up to and including $t$. A portfolio decision dated
-$t$ earns the return over $(t,t+1]$. Estimators used inside a backtest must be point in time:
-an exponentially weighted mean or an expanding mean qualifies; a full-sample mean does not.
+$t$ earns the return over $(t,t+1]$, and a cash rate fixed at $t-1$ accrues over $(t-1,t]$.
+Estimators used inside a backtest must be point in time: an exponentially weighted mean or an
+expanding mean qualifies; a full-sample mean does not.
 
 > **Pitfall.** `qis.MeanAdjType.INSAMPLE` subtracts the full-sample mean. It is correct for a
 > descriptive exhibit and wrong inside a backtest, where it leaks later observations into
@@ -283,8 +288,8 @@ np.testing.assert_allclose(excess.iloc[1:], [0.01 - 0.0365 * 29 / 365,
                                              0.02 - 0.0365 * 31 / 365], atol=1e-15)
 ```
 
-The last check shows the one-observation lag: the March excess return uses the February
-rate of 3.65%, not the 7.3% quoted at the end of March.
+The last check shows the lag of one return period: the March excess return uses the rate of
+3.65% known at the end of February, not the 7.3% quoted at the end of March.
 
 ## Implementation in qis
 

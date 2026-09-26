@@ -57,9 +57,9 @@ questions:
 | Sampling grid | The input index, or the `freq` grid when given: prices are sampled at `freq` boundaries before differencing |
 | Annualisation | Per-annum returns use $Y$ = days/365.25; cash and fees accrue ACT/365; leverage financing uses the annual rate divided by $\mathrm{AN}$; `compute_sampled_vols` scales by $\sqrt{\mathrm{AN}}$ |
 | Mean adjustment | None in return, NAV, fee and leverage transforms; `estimate_vol` removes the sample mean at 20 or more observations and none below 20 |
-| Timing | A return dated $t$ covers $(t-1,t]$; `compute_excess_returns` lags the rate by one rate observation; the backtester and leverage helpers use the latest quote at or before $t$; `to_portfolio_returns` lags weights by one row |
+| Timing | A return dated $t$ covers $(t-1,t]$; cash accrued over it, in the excess helpers and in the backtest cash leg alike, uses the rate known on the return date $t-1$; the leverage helpers and backtest carry use the latest quote at or before $t$; `to_portfolio_returns` lags weights by one row; interpolated returns up to a report date use data up to that date |
 | Output units | Decimal returns; NAVs start at 1 unless `init_value` or `terminal_value` rescales them |
-| qis default | `to_returns(is_log_returns=False, return_type=ReturnTypes.RELATIVE, freq=None, ffill_nans=True, drop_first=False, is_first_zero=False)`, `returns_to_nav(init_period=0)`, fees `man_fee=0.01, perf_fee=0.2, perf_fee_frequency='YE'` |
+| qis default | `to_returns(is_log_returns=False, return_type=ReturnTypes.RELATIVE, freq=None, ffill_nans=True, drop_first=False, is_first_zero=False)`, `returns_to_nav(init_period=0)`, fees `man_fee=0.01, perf_fee=0.2, perf_fee_frequency='YE'`, `interpolate_infrequent_returns(span=12, is_to_log_returns=False, vol_adjustment=1.0)` |
 
 | Symbol or input | Meaning | Units and convention |
 |---|---|---|
@@ -67,7 +67,7 @@ questions:
 | $\delta_t=(d_t-d_{t-1})/365$ | ACT/365 accrual fraction between consecutive return dates | Years; $\delta=0$ on the first return date |
 | $S_t$ | Signed level (a rate or spread) for the difference and level modes | Units of the input |
 | $y_{(q)}$, $d^{y}_{q}$ | The $q$-th quote of an annual rate series and its date | Decimal annual rate |
-| $q_t$ | Position of the latest rate quote dated on or before $d_t$ | Integer; $q_t-1$ is the preceding quote |
+| $q_t$ | Position of the latest rate quote dated on or before $d_t$ | Integer; the period ending $t$ uses quote $q_{t-1}$ |
 | $V_t$ | NAV rebuilt from returns | Starts at 1 unless rescaled |
 | $t'$ | Running date index inside a product or sum | Same grid as $t$ |
 | $\omega$ | Return scale of `prices_to_scaled_nav` | Default 0.5 |
@@ -83,10 +83,12 @@ questions:
 | $c_t$ | Financing cost per return period | $y_{(q_t)}/\mathrm{AN}$ |
 | $r^{A}_t$, $r^{V}_t$ | Unlevered asset return and levered vehicle return | Simple |
 | $\hat\sigma$ | Output of `estimate_vol` | Per period, not annualised |
-| $r^{\mathrm{rep}}_b$, $X_b$, $d_{(b)}$ | Reported infrequent return $b=0,\ldots,K$, its cumulative sum and its date | Decimal; summed, not compounded |
-| $r^{\mathrm{piv}}_t$, $z_t$ | Pivot return and its standardised value | Frequent grid |
-| $\theta$, $M_t$, $\sigma^{\mathrm{br}}_t$ | Bridge time, bridge mean and bridge standard deviation | $\theta$ in units of $\eta$ calendar days |
-| $\eta$, $\kappa$ | The `annualization_factor` and `vol_adjustment` arguments of `interpolate_infrequent_returns` | Defaults 260 and 1.15 |
+| $\ell^{\mathrm{rep}}_b$, $d_{(b)}$ | Reported log return $b=0,\ldots,K$ and its report date | $\log(1+r)$ of a reported simple return |
+| $m_b$ | Number of pivot dates in the report interval ending at report $b$ | Count |
+| $r^{\mathrm{piv}}_j$, $e_j$ | Pivot return on pivot date $j$ and its normalised innovation | $\sum_j e_j=0$ and $\sum_j e_j^2=m_b-1$ in each interval |
+| $\hat v_b$ | EWM variance of the reported returns per pivot period | Squared log return per pivot period |
+| $\hat\ell_j$ | Interpolated log return on pivot date $j$ | Decimal |
+| $\kappa$ | The `vol_adjustment` argument of `interpolate_infrequent_returns` | Default 1 |
 | $n$, $\gamma$ | Number of component NAVs and their common growth factor | Count; dimensionless |
 
 Inputs are pandas objects with a `DatetimeIndex`; columns are assets or strategies. Prices and
@@ -134,16 +136,19 @@ sampled and again after. With `ffill_nans=False` the gap stays missing and remov
 bounds.
 
 > **Pitfall.** When the inferred frequency of the input index already equals `freq`, for example
-> month-end prices passed with `freq='ME'`, `prices_at_freq` returns the input unchanged and no
-> forward fill is applied, whatever `ffill_nans` says. A missing month-end price then removes two
-> monthly returns, where `freq=None` would have filled it. Pass `freq=None` for data already on
-> the target grid when the fill is intended.
+> month-end prices passed with `freq='ME'`, `prices_at_freq` returns the input unchanged, missing
+> values included, whatever `ffill_nans` says. This is deliberate and documented: on its own grid
+> a missing value is a missing observation, and filling it would manufacture a zero return. A
+> missing month-end price then removes the two monthly returns it bounds, where `freq=None` fills
+> it. Pass `freq=None` for data already on the target grid when the fill is intended.
 
 **First observation.** `drop_first=True` removes the first row. `is_first_zero=True` sets to zero
 the missing return immediately before each column's first observed return, so that a NAV rebuilt
 from the result starts on the first price date. If both are set, `is_first_zero` wins and nothing
-is dropped. `to_returns` accepts and ignores unknown keyword arguments, so a misspelt keyword such
-as `is_log_return=True` silently returns simple returns.
+is dropped. `to_returns` accepts unknown keyword arguments, so that callers forwarding a shared
+keyword dictionary do not fail, but does not use them: each one raises a `UserWarning` that names
+it and the closest documented argument. A misspelt `is_log_return=True` therefore returns simple
+returns with a warning that `is_log_returns` was probably meant.
 
 ### From returns back to levels
 
@@ -234,8 +239,11 @@ unit holding with realised weights $w_{i,t-1}$; with target weights the same for
 portfolio rebalanced to target every period.
 
 `qis.portfolio_returns_to_nav(returns)` expects per-asset return contributions. It sums each row
-with the same zero rule but, unlike `to_portfolio_returns`, a fully missing row counts as zero.
-It compounds the sums with `init_period=1`, so the first row's contribution is discarded.
+with the same rules as `to_portfolio_returns`, so a fully missing row has a missing aggregate
+return, and compounds the sums. With the default `init_period=1` the first row's aggregate is set
+to zero whether or not it is observed: the NAV is one on the first date and that row's
+contribution is discarded. The NAV is carried flat through a fully missing row inside the history
+and ends at the last row with an observed contribution.
 
 ### Cash and excess returns
 
@@ -247,19 +255,26 @@ $y_{(1)},y_{(2)},\ldots$ dated $d^{y}_1<d^{y}_2<\cdots$, and let $q_t$ be the po
 quote dated on or before $d_t$. `qis.compute_excess_returns(returns, rates_data)` computes
 
 $$
-r^f_t=y_{(q_t-1)}\,\delta_t,
+r^f_t=y_{(q_{t-1})}\,\delta_t,
 \qquad
 \tilde r_t=r_t-r^f_t .
 $$
 
-The lag is one observation **of the rate series on its own calendar**, applied before the rate is
-aligned to the return dates. When the rate lives on the return grid, $y_{(q_t-1)}$ is the rate
-dated $t-1$, as chapter 1 states. With daily quotes and monthly returns it is the quote just
-before the latest one in the month, typically the penultimate business day, not the quote at the
-start of the month. The
-accrual $\delta_t$ counts calendar days between consecutive return dates, so the first return date
-accrues nothing. A return dated before the second quote has a missing excess return. A rate series
-with a single quote is not lagged at all.
+The rate of the period $(t-1,t]$ is the one known on the return date $t-1$: the rate series is
+first aligned to the return grid by the latest quote on or before each date, and then lagged by
+one period **of the return grid**, whatever its own calendar. When the rate lives on the return
+grid, $y_{(q_{t-1})}$ is the rate dated $t-1$, as chapter 1 states; with daily quotes and monthly
+returns each month is charged the quote of the previous month-end. The accrual $\delta_t$ counts
+calendar days between consecutive return dates, so the first return date accrues exactly nothing,
+whatever the rate. A period that starts before the first quote has a missing excess return.
+
+**Proposition (a rate series that starts on the first return date is enough).** If the rate
+series has a quote dated $d_0$, the first return date, then every $r^f_t$ is defined, and it is
+unchanged by any extension of the series to dates before $d_0$.
+
+**Proof.** For $t\ge1$, $d_{t-1}\ge d_0$, so the latest quote on or before $d_{t-1}$ exists and is
+dated in $[d_0,d_{t-1}]$; quotes dated before $d_0$ are never the latest. For $t=0$,
+$\delta_0=0$ and $r^f_0=0$. $\square$
 
 The excess helpers differ in what they return; all use this lag and day count.
 
@@ -267,9 +282,18 @@ The excess helpers differ in what they return; all use this lag and day count.
 |---|---|
 | `qis.compute_excess_returns(returns, rates_data)` | $\tilde r_t$ on the return index |
 | `qis.compute_excess_return_navs(prices, rates_data, first_date=None)` | $\prod_{t'\le t}(1+\tilde r_{t'})$ from 1, from the simple returns of `prices` with a zero first return |
-| `qis.compute_pa_excess_compounded_returns(returns, rates_data, first_date=None, annualize_less_1y=False)` | $R_{\mathrm{pa}}$ of that excess NAV, with $Y$ = days/365.25 |
-| `qis.get_excess_returns_nav(prices, funding_rate, freq='B')` | The excess NAV on the `freq` grid, with the first observed excess return set to zero and the path rescaled so that its last level equals the last price; the first date is missing |
+| `qis.compute_pa_excess_compounded_returns(returns, rates_data, first_date=None, annualize_less_1y=False)` | $R_{\mathrm{pa}}$ of that excess NAV, compounded from the date that opens the first period with a known excess return and with $Y$ = days/365.25 counted from the same date; each DataFrame column on its own window |
+| `qis.get_excess_returns_nav(prices, funding_rate, freq='B')` | The excess NAV on the `freq` grid, one on the first date so that the first period's excess return is compounded, then rescaled so that its last level equals the last price |
 | `qis.compute_returns_dict(prices, perf_params)` | `'P.a. excess return'` from `compute_pa_excess_compounded_returns` when `perf_params.rates_data` is set, else the per-annum return; `'An. log return ex'` is its log |
+
+**Rates that start late.** When the first quote is dated after the first return date, the periods
+before it have no excess return. `compute_pa_excess_compounded_returns`, and through it the
+`'P.a. excess return'` of `compute_returns_dict` and of the performance tables, then compounds
+from the date that opens the first period with a known rate and divides by the years elapsed from
+that date, with a warning. It counts the missing periods neither as flat nor in $Y$, so the
+compounding window and $Y$ always agree. `compute_excess_return_navs` carries its NAV flat over
+those periods. A rate series quoted from the first price date on, as the proposition shows, avoids
+the shorter window entirely.
 
 **Proposition (compounded excess versus ratio of NAVs).** Let $B_T=\prod_{t\le T}(1+r^f_t)$ be the
 cash NAV. For each period,
@@ -379,7 +403,9 @@ Hence $0\le\mathrm{GAV}_t\le G_t$ and the induction continues. $\square$
 The model has one investor, no subscriptions or redemptions, no equalisation or series
 accounting, and no hurdle rate. `qis.compute_net_navs_ex_perf_man_fees(navs, ...)` forward-fills
 the gross NAVs, takes simple returns, applies the recursion column by column, and rebuilds a net
-NAV that starts at 1.
+NAV. Each column runs its own fee account from its first observed NAV: the net NAV is missing
+before that date and one on it, and the column's result equals that of the column passed alone on
+its observed range.
 
 ![Gross NAV of synthetic US equity rising from 100 to 227 over 21 years, and the dashed net NAV after a 2% management fee and a 20% performance fee ending at 131](images/handbook_fee_navs.png)
 
@@ -470,34 +496,38 @@ attenuates it, while smoothing the regressor can inflate it; see
 
 ### Day-count and timing conventions
 
-Three day counts coexist, and rates are aligned with or without a one-observation lag. The table
-records what each helper does, as verified against the code. $C_{t-1}$ is the backtest cash
-balance and $V_{t-1}$ its NAV.
+Three day counts coexist, and rates are aligned either as known at the start of the period or as
+the latest quote at its end. The table records what each helper does, as verified against the
+code. $C_{t-1}$ is the backtest cash balance and $V_{t-1}$ its NAV.
 
 | Helper | Year basis | Rate applied to the period ending $t$ | Accrual |
 |---|---|---|---|
 | `qis.compute_num_years`, `qis.compute_pa_return`, `qis.compute_returns_dict`, per-annum step of `qis.compute_pa_excess_compounded_returns` | 365.25-day years | None | $Y$ = days/365.25 |
 | `qis.adjust_component_navs_to_portfolio` | 365.25-day years | None | Exponent days/365.25 |
-| `qis.compute_excess_returns`, and through it `qis.compute_excess_return_navs`, `qis.compute_pa_excess_compounded_returns`, `qis.compute_returns_dict` | ACT/365 | $y_{(q_t-1)}$: one rate observation lag | $y_{(q_t-1)}\delta_t$ |
-| `qis.get_excess_returns_nav` | ACT/365 on the `freq` grid | $y_{(q_t-1)}$: one rate observation lag | $y_{(q_t-1)}\delta_t$ |
-| `qis.backtest_model_portfolio`, `funding_rate` | ACT/365 | $y_{(q_t)}$: latest quote, no lag | $C_{t-1}\,y_{(q_t)}\delta_t$ on cash |
+| `qis.compute_excess_returns`, and through it `qis.compute_excess_return_navs`, `qis.compute_pa_excess_compounded_returns`, `qis.compute_returns_dict` | ACT/365 | $y_{(q_{t-1})}$: known at $t-1$ on the return grid | $y_{(q_{t-1})}\delta_t$ |
+| `qis.get_excess_returns_nav` | ACT/365 on the `freq` grid | $y_{(q_{t-1})}$: known at $t-1$ on the `freq` grid | $y_{(q_{t-1})}\delta_t$ |
+| `qis.backtest_model_portfolio`, `funding_rate` | ACT/365 | $y_{(q_{t-1})}$: known at $t-1$ on the price grid | $C_{t-1}\,y_{(q_{t-1})}\delta_t$ on cash |
 | `qis.backtest_model_portfolio`, `management_fee` | ACT/365 | Constant | $f_{\mathrm{man}}\delta_t V_{t-1}$ deducted from cash |
 | `qis.backtest_model_portfolio`, `instruments_carry` | ACT/365 | Latest quote, no lag | Carry rate times $\delta_t$ on current notional |
 | `qis.compute_net_return_ex_perf_man_fees`, `qis.compute_net_navs_ex_perf_man_fees` | ACT/365 | Constant | $f_{\mathrm{man}}\delta_t$ subtracted from $r_t$ |
 | `qis.lever_returns`, `qis.delever_returns` | Periods per year | $y_{(q_t)}$: latest quote, no lag | $y_{(q_t)}/\mathrm{AN}$, independent of period length |
 | `qis.compute_sampled_vols` | $\sqrt{\mathrm{AN}}$ inferred from the return index | None | None |
-| `qis.interpolate_infrequent_returns` | Time unit of $\eta$ calendar days | None | None |
+| `qis.interpolate_infrequent_returns` | Pivot periods; `annualization_factor` sets no time scale | None | None |
 
-The ACT/365 helpers all go through the internal `qis.utils.df_ops.multiply_df_by_dt`, which shifts
-the rate series by `lag` observations on its own index, aligns it to the target dates by the latest
-value on or before each date, and multiplies by calendar days over 365, with zero on the first
-target date. The backtester calls it with `lag=0` and the excess helpers with `lag=1`.
+The ACT/365 helpers all go through the internal `qis.utils.df_ops.multiply_df_by_dt`, which aligns
+the rate series to the target dates by the latest quote on or before each date, shifts the aligned
+series by `lag` observations of the target grid, and multiplies by calendar days over 365, with
+exactly zero on the first target date. The excess helpers and the backtest funding call it with
+`lag=1`, and the backtest carry with `lag=0`.
 
-A consequence is that the cash leg of a backtest and the cash subtracted by the excess helpers are
-not the same number when the rate moves: the backtester credits the period ending $t$ with the
-quote at $t$, while `compute_excess_returns` charges the quote one observation earlier. On the
-[chapter 1 example](notation_and_conventions.md#worked-example), a cash-only backtest earns
-$7.3\%\times31/365$ in March and the excess helper subtracts $3.65\%\times31/365$.
+The cash leg of a backtest and the cash subtracted by the excess helpers are therefore the same
+number: on the [chapter 1 example](notation_and_conventions.md#worked-example), a cash-only
+backtest earns $3.65\%\times31/365$ in March, which is what `compute_excess_returns` subtracts.
+A cash balance held over $(t-1,t]$ earns the rate fixed when the period starts; the quote dated
+$t$, 7.3% in that example, is not yet known then. A funding series that starts after the first
+price date leaves the backtest NAV missing from the first period without a known rate, with a
+warning. The leverage helpers, which charge a per-period cost with no day count, keep the latest
+quote at or before $t$.
 
 ### Short-sample volatility
 
@@ -528,83 +558,100 @@ $\sum_t(x_t-\bar x)^2=(T-1)s(x)^2$. $\square$
 `qis.compute_sampled_vols(prices, freq_vol='ME', freq_return=None)` forms returns on the
 `freq_return` grid (the input grid when `None`), splits them into windows ending at each `freq_vol`
 boundary, applies `estimate_vol` to each window and multiplies by $\sqrt{\mathrm{AN}}$, with
-$\mathrm{AN}$ inferred from the return index. Each window runs from the previous boundary to the
-current one with both ends included, so an observation dated exactly on a boundary belongs to two
-adjacent windows. Daily business-day returns in monthly windows give 20 to 24 observations and the
-demeaned branch, but on an exchange calendar a month with a holiday and a weekend boundary can
-have 19 and switch to the root mean square. Weekly returns in quarterly windows and monthly returns
-in annual windows always fall below 20. The estimator therefore depends on the pair of grids and
-on the holiday calendar, not only on the data.
+$\mathrm{AN}$ inferred from the return index. Each window is right-closed: it runs from just after
+the previous boundary to the current one, so a return dated exactly on a boundary closes the
+window that ends there and is counted once. Business-day returns in monthly windows give 20 to 23
+observations and the demeaned branch, but on an exchange calendar a month with a holiday can have
+19 and switch to the root mean square. Weekly returns in quarterly windows and monthly returns in
+annual windows always fall below 20. The estimator therefore depends on the pair of grids and on
+the holiday calendar, not only on the data.
 
 ### Interpolating infrequent returns
 
 `qis.interpolate_infrequent_returns(infrequent_returns, pivot_returns, span=12,
-annualization_factor=260, is_to_log_returns=False, vol_adjustment=1.15)` places an infrequently
+annualization_factor=260, is_to_log_returns=False, vol_adjustment=1.0)` places an infrequently
 reported return series, such as quarterly private-asset returns, on the grid of a frequent pivot
-series. A DataFrame is handled column by column after dropping each column's missing values; a
-Series must have none.
+series, and returns it on the pivot index. A DataFrame is handled column by column after dropping
+each column's missing values; a Series must have none.
 
-**Definition (method as implemented).** Let $r^{\mathrm{rep}}_0,\ldots,r^{\mathrm{rep}}_K$ be the
-reported returns at dates $d_{(0)}<\cdots<d_{(K)}$, replaced by $\log(1+r^{\mathrm{rep}}_b)$ when
-`is_to_log_returns=True`, and let $X_b=\sum_{b'\le b}r^{\mathrm{rep}}_{b'}$. Time is
-$\theta=(d-d_{(0)})/\eta$ with $d-d_{(0)}$ in calendar days, and $\theta_b$ is the time of report
-$b$. The method has three steps.
-
-1. Standardise the pivot. With $\hat\mu^{\mathrm{ewm}}_t$ the EWM mean (`qis.compute_ewm`) and
-   $\hat\sigma^{\mathrm{ewm}}_t$ the EWM root mean square (`qis.compute_ewm_vol` with its default
-   `MeanAdjType.NONE`) of $r^{\mathrm{piv}}$, both with span $N$ = `span` and both including
-   $t$, set
-   $\tilde z_t=(r^{\mathrm{piv}}_t-\hat\mu^{\mathrm{ewm}}_t)/\hat\sigma^{\mathrm{ewm}}_t$, keep
-   $t\ge d_{(0)}$, and rescale $\tilde z$ to zero full-sample mean and unit full-sample standard
-   deviation (`ddof=0`) to obtain $z_t$.
-2. Between reports, $\theta_b\le\theta\le\theta_{b+1}$, form the bridge mean $M_t$ and standard
-   deviation $\sigma^{\mathrm{br}}_t$ displayed below, where $\sigma_R$ is the full-sample `ddof=0`
-   standard deviation of the reported returns, logged in log mode. After the last report,
-   $M_t=X_K$.
-3. Set the level $\hat X_t=M_t+\kappa\,\sigma^{\mathrm{br}}_t\,z_t$ and return
-   $\hat r_t=\hat X_t-\hat X_{t-1}$, converted with `expm1` in log mode, on the union of the pivot
-   dates from $d_{(0)}$ onward and the report dates. The first row is missing.
+**Definition (method as implemented).** Let $\ell^{\mathrm{rep}}_0,\ldots,\ell^{\mathrm{rep}}_K$ be
+the reported log returns at report dates $d_{(0)}<\cdots<d_{(K)}$: the reported returns themselves
+when `is_to_log_returns=True`, and $\log(1+r)$ of the reported simple returns otherwise. Each report
+is placed on the last pivot date on or before its report date, and report 0 only sets the starting
+level. The interval ending at report $b$ holds the $m_b$ pivot dates after the previous report's
+pivot date, up to and including its own. On those dates
 
 $$
-M_t=\frac{(\theta_{b+1}-\theta)X_b+(\theta-\theta_b)X_{b+1}}{\theta_{b+1}-\theta_b},
+\hat\ell_j=\frac{\ell^{\mathrm{rep}}_b}{m_b}+\kappa\,\sqrt{\hat v_b}\,e_j,
 \qquad
-\sigma^{\mathrm{br}}_t=\sigma_R\sqrt{\frac{(\theta_{b+1}-\theta)(\theta-\theta_b)}{\theta_{b+1}-\theta_b}} .
+\hat v_b=\lambda\,\hat v_{b-1}+(1-\lambda)\,\frac{(\ell^{\mathrm{rep}}_b)^2}{m_b},
 $$
 
-**Identity (reported values are matched).** If $d_{(0)}$ is a pivot date and no reported return is
-exactly zero, then for every $b$ the interpolated returns dated in $(d_{(b)},d_{(b+1)}]$ sum to
-$r^{\mathrm{rep}}_{b+1}$ (to its log in log mode).
+with $\hat v_1=(\ell^{\mathrm{rep}}_1)^2/m_1$ and $\lambda=1-2/(N+1)$, where $N$ = `span` counts
+reports. The innovations $e_j$ are the pivot returns $r^{\mathrm{piv}}_j$ of the interval, demeaned
+and scaled so that $\sum_j e_j=0$ and $\sum_j e_j^2=m_b-1$; a missing pivot return has $e_j=0$. The
+output is $\hat\ell_j$ in log mode and $\exp(\hat\ell_j)-1$ in the default simple mode. Pivot dates
+up to the first placed report and after the last one are missing. A report interval that holds no
+pivot date, as with weekly reports on a monthly pivot, is merged with the next one.
 
-**Proof.** At a report date $\sigma^{\mathrm{br}}_t=0$ and $M_t=X_b$, so $\hat X_t=X_b$; the
-increments telescope to $X_{b+1}-X_b=r^{\mathrm{rep}}_{b+1}$. $\square$
+This is a discretised Brownian bridge on the log NAV. Conditional on its two endpoints, a Brownian
+motion sampled at $m$ equal steps has increments equal to the average increment plus demeaned
+independent Gaussian increments, whose sum of squares has expectation $m-1$ times the step
+variance. The method keeps that structure, fixes the sum of squares at its expectation, and takes
+the shape of the deviations from the pivot, so that the interpolated series moves with a real
+market.
 
-In the default simple-return mode the interpolated returns **sum**, not compound, to the reported
-return; use `is_to_log_returns=True` when the compounded quarterly return must be reproduced. If
-$d_{(0)}$ is not a pivot date, for example a quarter-end on a Sunday, the level there is missing and
-the first interval loses its first increment. A reported return of exactly zero makes
-$X_b=X_{b+1}$, which the code reads as the end of the data: the bridge mean over that interval is
-held at its value on the preceding grid date, and the two intervals around that report match their
-reported returns only approximately.
+**Identity (reported returns are matched).** Over every report interval,
+$\sum_j\hat\ell_j=\ell^{\mathrm{rep}}_b$. In the simple mode the interpolated simple returns
+therefore compound exactly to the reported simple return, and in the log mode they sum to it.
 
-The implementation has three limitations, which matter for its intended use in risk models:
+**Proof.** $\sum_j e_j=0$, so $\sum_j\hat\ell_j=m_b\,\ell^{\mathrm{rep}}_b/m_b$. In the simple mode
+$\prod_j\big(1+(e^{\hat\ell_j}-1)\big)=e^{\ell^{\mathrm{rep}}_b}=1+r^{\mathrm{rep}}_b$. $\square$
 
-- **$\eta$ acts as calendar days per time unit, not as periods per year.** The code converts
-  $\eta$ to seconds as $\eta$ days, while the docstring calls it the periods per year of the
-  pivot. Passing 12 for a monthly pivot makes the time unit 12 days and multiplies every
-  $\sigma^{\mathrm{br}}_t$ by $\sqrt{260/12}\approx4.7$ relative to the default. Because $\sigma_R$
-  is a per-report-period deviation while $\theta$ is in $\eta$-day units, $\sigma^{\mathrm{br}}_t$
-  equals the Brownian-bridge standard deviation times $\sqrt{\Delta}$, where $\Delta$ is the report
-  interval in $\eta$-day units: for quarterly reports and $\eta=260$, $\sqrt{91/260}\approx0.59$.
-- **The deviations are not a Brownian path.** $z_t$ is a standardised pivot *return*, used directly
-  as the level deviation at $t$. Successive levels therefore receive independent draws rather than
-  the increments of one bridge path, and the interpolated returns are differences of independent
-  deviations: over-dispersed and negatively autocorrelated, with lag-one autocorrelation near
-  $-0.5$. The worked example quantifies both effects.
-- **Full-sample inputs.** $\sigma_R$ and the standardisation of $z_t$ use the whole sample, so the
-  interpolated history is not point in time.
+**Proposition (sum of squares).** Over the interval ending at report $b$,
+
+$$
+\sum_j\hat\ell_j^2=\frac{(\ell^{\mathrm{rep}}_b)^2}{m_b}+\kappa^2\,\hat v_b\,(m_b-1).
+$$
+
+With `span=1` and $\kappa=1$ the right-hand side is $(\ell^{\mathrm{rep}}_b)^2$: the realised
+quadratic variation of the interpolated path over each interval equals the squared reported
+return, the square-root-of-time rule on the pivot clock.
+
+**Proof.** Expand the square. The cross term is
+$2\kappa\sqrt{\hat v_b}\,(\ell^{\mathrm{rep}}_b/m_b)\sum_je_j=0$ and $\sum_je_j^2=m_b-1$. With
+$N=1$, $\lambda=0$ and $\hat v_b=(\ell^{\mathrm{rep}}_b)^2/m_b$. $\square$
+
+**Proposition (second moments under a Brownian motion).** Let the log NAV be a Brownian motion
+whose increment over one pivot period has mean $\mu$ and variance $v$, and let $\hat v_b=v$ and
+$\kappa=1$. Then over each interval the interpolated log returns have the expected sum of squares
+$m_b(v+\mu^2)$ and the average expected cross-product over distinct pairs $\mu^2$ of the true
+increments: no added variance and, on average, no serial correlation.
+
+**Proof.** $\ell^{\mathrm{rep}}_b$ has mean $m_b\mu$ and variance $m_bv$, so
+$\mathbb{E}\big[(\ell^{\mathrm{rep}}_b)^2\big]=m_bv+m_b^2\mu^2$, and the previous proposition gives
+$\mathbb{E}\big[\sum_j\hat\ell_j^2\big]=v+m_b\mu^2+v(m_b-1)$. For distinct pairs,
+$\sum_{i\ne j}e_ie_j=\big(\sum_je_j\big)^2-\sum_je_j^2=-(m_b-1)$ and $\sum_{i\ne j}(e_i+e_j)=0$, so
+the average of $\hat\ell_i\hat\ell_j$ over the $m_b(m_b-1)$ ordered pairs is
+$(\ell^{\mathrm{rep}}_b)^2/m_b^2-v/m_b$, whose expectation is $\mu^2$. $\square$
+
+The interval ending at report $b$ uses the pivot returns inside it and the reports up to and
+including $b$ only, so the interpolated history up to $d_{(b)}$ does not change when later data
+arrive: it is point in time as of each report date, though not before it, since the reported
+return is known only at the end of its interval. Both the bridge variance and the reported-return
+variance are measured per pivot period, so `annualization_factor` sets no time scale and the path
+is the same for every value of it; the bridge volatility per year is
+$\kappa\sqrt{\mathrm{AN}\,\hat v_b}$ with $\mathrm{AN}$ = `annualization_factor`.
+
+qis 5.30.3 and earlier used the standardised pivot return as a level deviation around
+a linear path, with full-sample moments, a scale read in units of `annualization_factor` calendar
+days, and `vol_adjustment=1.15`. Those interpolated returns summed rather than compounded in the
+default mode and were over-dispersed, with a lag-one autocorrelation near $-0.5$; the current
+method does not reproduce them.
 
 Reported returns of appraisal-based vehicles are themselves smoothed
-(Getmansky, Lo and Makarov, 2004); interpolation does not remove that smoothing.
+(Getmansky, Lo and Makarov, 2004); interpolation does not remove that smoothing. A `vol_adjustment`
+above one adds variance to the bridge but not the serial dependence that smoothing removed.
 
 ### Additive component NAVs and spliced histories
 
@@ -689,7 +736,9 @@ Net returns are 18.4%, $-12.0\%$ and 25.13%. No fee is charged in 2023 on the re
 over 36 monthly gross returns, reproduces qis exactly. On that path the gross NAV ends the three years at 95.62, 109.36 and
 117.63, the net NAV at 93.72, 104.06 and 108.60, and the mark rises from 100 to 104.06 and then
 108.60. In 7 of the 36 months the net return exceeds the gross return, which is the accrual
-release of the insight above.
+release of the insight above. A second fund with the same gross path from its twelfth month-end
+on runs its own fee account from its first NAV: in a two-column frame its net NAV is missing
+before that date, one on it, and equal to the net NAV computed on its own range.
 
 ```python
 dates = pd.to_datetime(['2020-12-31', '2021-12-31', '2022-12-31', '2023-12-31'])
@@ -735,13 +784,27 @@ np.testing.assert_allclose(loop_nav[[12, 24, 36]], [93.72, 104.06, 108.60], atol
 np.testing.assert_allclose(np.unique(loop_hwm.round(2)), [100.0, 104.06, 108.60])
 assert np.all(np.diff(loop_hwm) >= 0.0) and np.all(loop_nav <= gross_nav + 1e-9)
 assert int((qis_net > monthly_gross).sum()) == 7
+
+funds = pd.DataFrame({'early': gross_nav, 'late': np.r_[np.full(12, np.nan), gross_nav[12:]]},
+                     index=month_ends)
+fund_nets = qis.compute_net_navs_ex_perf_man_fees(navs=funds, man_fee=0.02, perf_fee=0.20)
+late_alone = qis.compute_net_navs_ex_perf_man_fees(navs=funds['late'].dropna(), man_fee=0.02,
+                                                   perf_fee=0.20)
+np.testing.assert_allclose(fund_nets['early'].to_numpy(), loop_nav / 100.0, rtol=1e-12)
+assert fund_nets['late'].iloc[:12].isna().all() and fund_nets['late'].iloc[12] == 1.0
+np.testing.assert_allclose(fund_nets['late'].iloc[12:].to_numpy(), late_alone.to_numpy(),
+                           rtol=1e-14)
 ```
 
 The excess example uses two years of 10% returns and a flat 4% cash rate on an annual grid.
 Compounding the difference gives $1.06^2=1.1236$, while the ratio of the asset NAV to the cash NAV
 is $1.21/1.0816=1.1187$. The per-period gap is $0.04\times0.06/1.04=0.231\%$, as the proposition
 states, and the terminal gap is 0.489%. The per-annum excess return reported by qis is the
-compounded one, 6.00% over $730/365.25$ years.
+compounded one, 6.00% over $730/365.25$ years. The rate series starts on the first price date,
+which by the proposition is enough: `compute_returns_dict`, the path of the performance tables,
+reports the same 6.00%, and an earlier start of the rate series changes nothing. A cash-only
+backtest on the three-date cash series of chapter 1 earns in March the 3.65% quoted at the end of
+February, exactly the cash return that `compute_excess_returns` subtracts.
 
 ```python
 dates = pd.to_datetime(['2020-12-31', '2021-12-31', '2022-12-31'])
@@ -757,6 +820,21 @@ assert abs((excess_nav.iloc[-1] - ratio_nav.iloc[-1]) - 0.004887) < 1e-6
 pa_excess = qis.compute_pa_excess_compounded_returns(returns=returns, rates_data=rates)
 assert abs(pa_excess - (1.1236 ** (365.25 / 730.0) - 1.0)) < 1e-12
 assert abs(pa_excess - 0.06) < 1e-4
+
+label = qis.PerfStat.PA_EXCESS_RETURN.to_str()
+for cash in (rates, pd.Series(0.04, index=pd.date_range('2019-12-31', periods=4, freq='YE'))):
+    summary = qis.compute_returns_dict(prices=qis.returns_to_nav(returns),
+                                       perf_params=qis.PerfParams(rates_data=cash))
+    assert abs(summary[label] - pa_excess) < 1e-14
+
+chapter1_cash = pd.Series([0.0365, 0.0365, 0.073], index=pd.to_datetime(
+    ['2024-01-31', '2024-02-29', '2024-03-31']))
+cash_only = qis.backtest_model_portfolio(
+    prices=pd.DataFrame({'asset': 100.0}, index=chapter1_cash.index), weights={'asset': 0.0},
+    funding_rate=chapter1_cash, is_rebalanced_at_first_date=True).get_portfolio_nav()
+subtracted = -qis.compute_excess_returns(returns=0.0 * chapter1_cash, rates_data=chapter1_cash)
+np.testing.assert_allclose(cash_only.pct_change().iloc[1:], subtracted.iloc[1:], atol=1e-15)
+assert abs(cash_only.iloc[-1] / cash_only.iloc[-2] - 1.0 - 0.0365 * 31 / 365) < 1e-15
 ```
 
 The leverage example checks the identity by hand, the round trip, and the implied-leverage
@@ -803,11 +881,14 @@ np.testing.assert_allclose(qis.estimate_vol(draws) ** 2,
 ```
 
 The interpolation example places 20 quarterly returns, reported on the last business day of each
-quarter, on a business-day pivot of five years. The interpolated returns sum exactly to each
-reported return, while compounding them misses by up to 0.82%. Their annualised daily volatility is
-22.2%, about 3.1 times the 7.2% implied by the quarterly returns, and their lag-one
-autocorrelation is $-0.47$. Replacing $\eta=260$ by $\eta=65$ doubles every deviation from the
-linear bridge mean, as the time-unit reading predicts.
+quarter, on a business-day pivot of five years. The interpolated simple returns compound exactly
+to each reported return, while summing them misses by up to 0.32%. Truncating both inputs at the
+tenth report leaves the history up to it unchanged, and `annualization_factor=12` gives the same
+path as the default 260. With `span=1` the sum of squared daily log returns equals that of the 19
+quarterly log returns, 0.0398, so both give a root mean square of 8.99% a year on the pivot clock.
+At the default span of 12 reports the daily log returns have a volatility of 11.6% a year: the EWM
+variance is seeded with the first quarter, 8.3%, the second largest of the sample. Their lag-one
+autocorrelation is 0.03.
 
 ```python
 rng = np.random.default_rng(20260725)
@@ -818,30 +899,32 @@ quarter_ends = pd.date_range('2019-03-29', '2023-12-29', freq='BQE')
 reported = pd.Series(0.02 + 0.04 * rng.standard_normal(len(quarter_ends)), index=quarter_ends,
                      name='fund')
 daily = qis.interpolate_infrequent_returns(infrequent_returns=reported, pivot_returns=pivot)
-summed = daily.fillna(0.0).cumsum().reindex(quarter_ends).diff().iloc[1:]
-np.testing.assert_allclose(summed, reported.iloc[1:], atol=1e-12)
+assert daily.index.equals(business_days)
 compounded = (1.0 + daily.fillna(0.0)).cumprod().reindex(quarter_ends).pct_change().iloc[1:]
-assert abs(np.max(np.abs(compounded - reported.iloc[1:])) - 0.0082) < 5e-5
+np.testing.assert_allclose(compounded, reported.iloc[1:], atol=1e-14)
+summed = daily.fillna(0.0).cumsum().reindex(quarter_ends).diff().iloc[1:]
+assert abs(np.max(np.abs(summed - reported.iloc[1:])) - 0.0032) < 5e-5
 
-daily_vol = daily.dropna().std() * np.sqrt(252)
-quarterly_vol = reported.std() * 2.0
-assert abs(daily_vol - 0.222) < 5e-4 and abs(quarterly_vol - 0.072) < 5e-4
-assert abs(daily.dropna().autocorr(1) + 0.47) < 5e-3
+cutoff = quarter_ends[9]
+early = qis.interpolate_infrequent_returns(infrequent_returns=reported.loc[:cutoff],
+                                           pivot_returns=pivot.loc[:cutoff])
+pd.testing.assert_series_equal(daily.loc[:cutoff], early, rtol=0.0, atol=0.0)
+monthly_factor = qis.interpolate_infrequent_returns(infrequent_returns=reported,
+                                                    pivot_returns=pivot, annualization_factor=12)
+pd.testing.assert_series_equal(daily, monthly_factor, rtol=0.0, atol=0.0)
 
-seconds = (daily.index - quarter_ends[0]).total_seconds().to_numpy()
-report_seconds = (quarter_ends - quarter_ends[0]).total_seconds().to_numpy()
-bridge_mean = np.interp(seconds, report_seconds, reported.cumsum().to_numpy())
+log_reported = np.log1p(reported.iloc[1:])
+exact = np.log1p(qis.interpolate_infrequent_returns(infrequent_returns=reported,
+                                                    pivot_returns=pivot, span=1).dropna())
+np.testing.assert_allclose((exact ** 2).sum(), (log_reported ** 2).sum(), rtol=1e-12)
+assert abs((log_reported ** 2).sum() - 0.0398) < 5e-5
+assert abs(np.sqrt(252.0 * np.mean(exact ** 2)) - 0.0899) < 5e-5
 
-
-def deviation(eta):
-    path = qis.interpolate_infrequent_returns(infrequent_returns=reported, pivot_returns=pivot,
-                                              annualization_factor=eta)
-    return path.fillna(0.0).cumsum().to_numpy() + reported.iloc[0] - bridge_mean
-
-
-base, short_unit = deviation(260.0), deviation(65.0)
-inside = np.abs(base) > 1e-10
-np.testing.assert_allclose(short_unit[inside] / base[inside], 2.0, rtol=1e-8)
+log_daily = np.log1p(daily.dropna())
+assert abs(log_daily.std() * np.sqrt(252.0) - 0.116) < 5e-4
+assert abs(log_reported.iloc[0] - 0.083) < 5e-4
+assert sorted(np.abs(log_reported))[-2] == abs(log_reported.iloc[0])
+assert abs(daily.dropna().autocorr(1) - 0.03) < 5e-3
 ```
 
 ## Implementation in qis
@@ -856,22 +939,22 @@ np.testing.assert_allclose(short_unit[inside] / base[inside], 2.0, rtol=1e-8)
 | Scaled NAV | $\prod(1+\omega\,r)$ | `qis.prices_to_scaled_nav(prices, scale=0.5)` |
 | Long-short NAV | $\prod(1+r^{\mathrm{long}}-r^{\mathrm{short}})$ | `qis.long_short_to_relative_nav(long_price, short_price)` |
 | Portfolio return | $\sum_{i\in O_t}w_{i,t-1}r_{i,t}$, no renormalisation | `qis.to_portfolio_returns(weights, returns)` |
-| Portfolio NAV from contributions | $\prod(1+\sum_i\text{contribution}_{i,t})$, first row zero | `qis.portfolio_returns_to_nav(returns, init_period=1)` |
+| Portfolio NAV from contributions | $\prod(1+\sum_i\text{contribution}_{i,t})$, first row zero, fully missing rows missing | `qis.portfolio_returns_to_nav(returns, init_period=1)` |
 | Total return, years, per-annum return | $\mathrm{TR}$, $Y$ = days/365.25, $R_{\mathrm{pa}}$ | `qis.compute_total_return`, `qis.to_total_returns`, `qis.compute_num_years`, `qis.compute_pa_return` |
 | Return summary | Total, per-annum, per-annum excess and log versions | `qis.compute_returns_dict(prices, perf_params)` |
-| Excess return | $r_t-y_{(q_t-1)}\delta_t$ | `qis.compute_excess_returns(returns, rates_data)` |
+| Excess return | $r_t-y_{(q_{t-1})}\delta_t$ | `qis.compute_excess_returns(returns, rates_data)` |
 | Excess NAV | $\prod(1+\tilde r)$ | `qis.compute_excess_return_navs`, `qis.get_excess_returns_nav` |
-| Per-annum excess return | $R_{\mathrm{pa}}$ of $\prod(1+\tilde r)$ | `qis.compute_pa_excess_compounded_returns` |
+| Per-annum excess return | $R_{\mathrm{pa}}$ of $\prod(1+\tilde r)$ over the window with known cash | `qis.compute_pa_excess_compounded_returns` |
 | Net-of-fee returns and NAV | The fee recursion | `qis.compute_net_return_ex_perf_man_fees`, `qis.compute_net_navs_ex_perf_man_fees` |
 | Lever, de-lever | $(1+L)r^A-Lc$ and its inverse, $c=y/\mathrm{AN}$ | `qis.lever_returns`, `qis.delever_returns` |
 | Implied leverage | $\hat\beta-1$, at least 10 joint observations | `qis.implied_leverage(levered_returns, unlevered_returns)` |
 | Short-sample volatility | $s(x)$ at $T\ge20$, root mean square below | `qis.estimate_vol(sampled_returns)` |
-| Sampled volatility | `estimate_vol` per window times $\sqrt{\mathrm{AN}}$ | `qis.compute_sampled_vols(prices, freq_vol='ME', freq_return=None)` |
-| Interpolated returns | $M_t+\kappa\,\sigma^{\mathrm{br}}_t z_t$, differenced | `qis.interpolate_infrequent_returns` |
+| Sampled volatility | `estimate_vol` per right-closed window times $\sqrt{\mathrm{AN}}$ | `qis.compute_sampled_vols(prices, freq_vol='ME', freq_return=None)` |
+| Interpolated returns | $\hat\ell_j=\ell^{\mathrm{rep}}_b/m_b+\kappa\sqrt{\hat v_b}\,e_j$ | `qis.interpolate_infrequent_returns(span=12, is_to_log_returns=False, vol_adjustment=1.0)` |
 | Additive component NAVs | $V_{c,t}\gamma^{Y_t}$ | `qis.adjust_component_navs_to_portfolio`, `qis.portfolio_navs_to_additive` |
 | Spliced history | Older returns before the newer start | `qis.bfill_timeseries(df_newer, df_older, freq='B', is_prices=False)` |
-| Rate accrual | Lag, as-of alignment, days/365 | internal `qis.utils.df_ops.multiply_df_by_dt(df, dates, lag)` |
-| Backtest funding and fees | ACT/365, no lag | `qis.backtest_model_portfolio(funding_rate, management_fee)` |
+| Rate accrual | As-of alignment, lag on the target grid, days/365, zero on the first date | internal `qis.utils.df_ops.multiply_df_by_dt(df, dates, lag)` |
+| Backtest funding and fees | ACT/365; funding at the rate known at $t-1$ | `qis.backtest_model_portfolio(funding_rate, management_fee)` |
 
 The return, NAV, excess, fee and leverage helpers are in
 [returns.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/returns.py);
@@ -885,29 +968,29 @@ and the backtest cash recursion is in
 ## Interpretation and limitations
 
 - A return is defined only with its grid. `to_returns(freq=...)` samples levels at calendar
-  boundaries; partial first and last periods are dropped by default, and a same-frequency input is
-  not forward-filled.
+  boundaries; partial first and last periods are dropped by default, and input already on the
+  `freq` grid keeps its missing values by design.
 - `returns_to_nav` with the default `init_period=0` compounds a first observed return into the
   first level. Start return series with a missing or zero row, or pass `first_date`, when the first
   NAV must be one.
 - `to_portfolio_returns` treats a missing asset return as a zero return on an unchanged weight. It
   never renormalises, and it needs weights on the return index.
 - The excess helpers compound $r-r^f$; the ratio of NAVs is a different, equally valid quantity.
-  The cash leg of `backtest_model_portfolio` uses the rate without a lag, and the excess helpers
-  lag it by one rate observation, not by one return period.
+  Cash over $(t-1,t]$ accrues the rate known at $t-1$ on the return grid, in the excess helpers and
+  the backtest cash leg alike. A rate series quoted from the first price date on covers every
+  period; a later start shortens the window of the per-annum excess return, with a warning.
 - The fee model covers one investor from inception with annual, or other calendar, crystallisation.
-  It has no flows, equalisation, hurdle or series accounting. `compute_net_navs_ex_perf_man_fees`
-  expects every column to be observed from the first row: a column that starts later produces a
-  missing path, so call it on each column's own observed range.
-- Leverage assumes constant debt to equity and one financing rate, applied without a day count.
-  `implied_leverage` identifies $L$ only when financing is constant and the vehicles differ by
-  leverage alone.
+  It has no flows, equalisation, hurdle or series accounting. A column that starts later runs its
+  own account from its first NAV.
+- Leverage assumes constant debt to equity and one financing rate, applied without a day count and
+  at the latest quote at or before the return date. `implied_leverage` identifies $L$ only when
+  financing is constant and the vehicles differ by leverage alone.
 - `estimate_vol` switches estimator at 20 observations, and `compute_sampled_vols` inherits the
   switch through the pair of grids.
-- `interpolate_infrequent_returns` matches reported returns in sum, not in compounding, by default.
-  Its daily increments are over-dispersed and negatively autocorrelated, its `annualization_factor`
-  acts as a number of calendar days, and it uses full-sample moments. Aggregate its output to the
-  reporting frequency before estimating volatilities, and do not report it as performance.
+- `interpolate_infrequent_returns` reproduces every reported return exactly and is point in time
+  as of each report date, but the path between reports is a model: its variance comes from an EWM
+  of the reported returns and its timing from the pivot. Use it in risk models, aggregate it to
+  the reporting frequency before comparing volatilities, and do not report it as performance.
 
 ## See also
 

@@ -118,6 +118,8 @@ and the [frequency convention](frequency_convention_note.md).
 ### Missing-value policies are method-specific
 
 `qis.to_returns` forward-fills by default; use `ffill_nans=False` when gaps must remain missing.
+Input already on the requested `freq` grid, such as month-end NAVs passed with `freq='ME'`, keeps
+its gaps whatever `ffill_nans` says: on its own grid a missing value is a missing report.
 Specify `is_log_returns` explicitly. Filling should stop at the economically justified boundary,
 especially after a terminal event.
 
