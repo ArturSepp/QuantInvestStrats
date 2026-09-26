@@ -5,6 +5,26 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Move the smart-diversification report from `qis/portfolio/reports/overlays_smart_diversification.py`
+  to the new subpackage `qis.portfolio.smart_diversification`: `SmartDiversificationReport` in
+  `report.py`, `create_overlay_portfolio_curve` in `overlay_curve.py`, and the development runner in
+  its `run_local/`. `qis.SmartDiversificationReport` and `qis.create_overlay_portfolio_curve` are
+  unchanged, and the old module path remains valid as a re-export of the same objects. Computed
+  values are unchanged: on the synthetic panel every curve, mix and point is bit-identical to
+  5.31.0.
+
+### Fixed
+
+- Make `SmartDiversificationReport` keep a `regime_classifier` passed by the caller.
+  `__post_init__` replaced it unconditionally with `BenchmarkReturnsQuantilesRegime()`, so a
+  supplied classifier, a monthly one for example, was silently ignored. The default is unchanged:
+  quarterly regimes at the 16%/84% quantiles. The unused module-level `regime_classifier` of the
+  old module is removed.
+
 ## [5.31.0] - 2026-09-26
 
 **This release changes computed values.** It fixes the defects found while the analytics
