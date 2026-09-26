@@ -38,7 +38,7 @@ import datetime as dt
 import re
 import pandas as pd
 import numpy as np
-from typing import List, Union, Tuple, Optional, NamedTuple, Dict, cast
+from typing import List, Union, Tuple, Optional, NamedTuple, Dict, Literal, cast
 from enum import Enum
 
 from qis.utils.struct_ops import separate_number_from_string
@@ -871,14 +871,31 @@ def split_df_by_freq(df: pd.DataFrame,
                      freq: str = 'ME',
                      overlap_frequency: str = None,
                      include_start_date: bool = True,
-                     include_end_date: bool = True
+                     include_end_date: bool = True,
+                     inclusive: Literal['both', 'right'] = 'both'
                      ) -> Dict[pd.Timestamp, pd.DataFrame]:
+    """Split a time series into windows ending on the boundaries of a lower frequency.
+
+    Args:
+        df: Data on a chronological ``DatetimeIndex``
+        freq: Frequency of the window end dates, which key the result
+        overlap_frequency: None for consecutive windows, or an overlapping look-back such as
+            ``'YE'``, passed to ``generate_sample_dates``
+        include_start_date: Use the first date of ``df`` as the first window boundary
+        include_end_date: Use the last date of ``df`` as the last window boundary
+        inclusive: ``'both'`` keeps observations dated on either boundary, ``[start, end]``,
+            which suits levels: a window of prices needs the price that opens it. ``'right'``
+            keeps ``(start, end]``, which suits returns: a return dated on a boundary closes
+            the window ending there and is not counted again in the next one
+
+    Returns:
+        Dictionary of windows keyed by their end date
+
+    Raises:
+        ValueError: If ``inclusive`` is neither ``'both'`` nor ``'right'``.
     """
-    take pandas data sampled at some freq and split into lower freq
-    one caveat: the correct date of he split must be last day of sample_dates
-    for consistency wih different calenders
-    get sample start end dates as data
-    """
+    if inclusive not in ('both', 'right'):
+        raise ValueError(f"inclusive must be 'both' or 'right', got {inclusive!r}")
     time_period = TimePeriod(start=df.index[0], end=df.index[-1])
     sample_dates = generate_sample_dates(time_period=time_period,
                                          freq=freq,
@@ -887,7 +904,10 @@ def split_df_by_freq(df: pd.DataFrame,
                                          include_end_date=include_end_date)
     df_split = {}
     for start, end in zip(sample_dates['start'], sample_dates['end']):
-        df_split[end] = df[start:end]
+        window = df[start:end]
+        if inclusive == 'right':
+            window = window.loc[window.index > start]
+        df_split[end] = window
     return df_split
 
 

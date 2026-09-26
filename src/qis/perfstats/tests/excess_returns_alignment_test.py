@@ -78,10 +78,12 @@ def _assert_array_close(actual: object, expected: NDArray[np.float64]) -> None:
 def test_compute_excess_returns_aligns_late_rates_without_lookahead() -> None:
     """Align a late funding history and charge only previously observable rates.
 
-    The annual rate is first observed on January 2. With the documented one-observation lag,
-    neither January 1 nor January 2 has an available funding cost. From January 3 onward, the
-    36.5% annual rate costs exactly 0.1% for each one-day interval. The final return date extends
-    past the rate history and therefore uses the last previously observed rate.
+    The annual rate is first observed on January 2. The period ending January 2 started on
+    January 1, when no rate was known, so it has no funding cost and a missing excess return.
+    January 1 is the first return date and closes no period: it accrues no cash, so its excess
+    return is the return itself. From January 3 onward, the 36.5% annual rate costs exactly 0.1%
+    for each one-day interval. The final return date extends past the rate history and therefore
+    uses the last previously observed rate.
     """
     returns = pd.DataFrame(
         {
@@ -97,10 +99,12 @@ def test_compute_excess_returns_aligns_late_rates_without_lookahead() -> None:
     )
     original_returns = returns.copy(deep=True)
     original_rates = rates.copy(deep=True)
+    # The first row was missing before the first-period fix: a zero-length accrual was
+    # multiplied by an unknown lagged rate. It now accrues exactly zero cash.
     expected = pd.DataFrame(
         {
-            'Asset B': [np.nan, np.nan, -0.031, 0.039, 0.049],
-            'Asset A': [np.nan, np.nan, 0.009, -0.021, 0.029],
+            'Asset B': [0.01, np.nan, -0.031, 0.039, 0.049],
+            'Asset A': [0.02, np.nan, 0.009, -0.021, 0.029],
         },
         index=_DATES,
     )

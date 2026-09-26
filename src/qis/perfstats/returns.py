@@ -25,18 +25,21 @@ inferred in ``qis/utils/annualisation.py`` rather than assumed here.
 
 Main entry points: ``to_returns``, ``returns_to_nav``, ``compute_total_return``,
 ``compute_pa_return``, ``compute_sampled_vols``, and ``compute_excess_returns``, which subtracts
-an annualised ``rates_data`` series lagged one period, so the funding cost charged at t is the
-rate observable at t-1. Leverage and fee arithmetic - ``lever_returns``, ``delever_returns``,
+the cash accrued at an annualised ``rates_data`` series: the period (t-1, t] is charged the rate
+known at the return date t-1, one period of the return grid whatever the calendar of the rate
+series, times ACT/365 days, and the first return date accrues nothing. The backtester's cash leg
+uses the same convention. Leverage and fee arithmetic - ``lever_returns``, ``delever_returns``,
 ``compute_net_navs_ex_perf_man_fees`` - is here because it is a return transform; ratio
 statistics such as Sharpe are assembled in ``qis/perfstats/perf_stats.py``.
 """
 # packages
+import difflib
 import warnings
 from math import isfinite
 from numbers import Integral, Real
 import numpy as np
 import pandas as pd
-from typing import Union, Dict, Optional, cast
+from typing import Union, Dict, Optional, Tuple, cast
 
 # qis
 import qis.utils.dates as da
@@ -105,6 +108,25 @@ def compute_num_years(prices: Union[pd.DataFrame, pd.Series],
     return compute_num_days(prices=prices) / days_per_year
 
 
+def _warn_unused_keywords(function_name: str,
+                          keywords: Dict[str, object],
+                          known: Tuple[str, ...]
+                          ) -> None:
+    """Warn that keyword arguments were passed to a function that ignores them.
+
+    Args:
+        function_name: Name of the public function reported in the message
+        keywords: The unused keyword arguments
+        known: The function's documented argument names, used to suggest a correction
+    """
+    descriptions = []
+    for name in keywords:
+        close = difflib.get_close_matches(name, known, n=1)
+        descriptions.append(f"'{name}' (did you mean '{close[0]}'?)" if close else f"'{name}'")
+    warnings.warn(f"{function_name}() ignores the unknown keyword argument(s) "
+                  f"{', '.join(descriptions)}", UserWarning, stacklevel=3)
+
+
 def to_returns(prices: Union[pd.Series, pd.DataFrame],
                is_log_returns: bool = False,
                return_type: ReturnTypes = ReturnTypes.RELATIVE,
@@ -126,10 +148,15 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
         freq: Resampling frequency (e.g., 'D', 'W', 'M')
         include_start_date: Include period start date when resampling
         include_end_date: Include period end date when resampling
-        ffill_nans: Forward-fill NaN prices before computing returns
+        ffill_nans: Forward-fill NaN prices before computing returns. With ``freq`` set, the
+            fill applies when prices are resampled onto the ``freq`` grid; input whose inferred
+            frequency already equals ``freq`` is returned by ``prices_at_freq`` with its missing
+            values kept, so a missing observation there leaves both adjacent returns missing
         drop_first: Drop first return observation
         is_first_zero: Set first non-NaN return to zero
-        **kwargs: Additional arguments
+        **kwargs: Accepted so that callers forwarding a shared keyword dictionary do not fail.
+            They are not used, and any keyword passed here raises a ``UserWarning`` that names
+            it, with the closest documented argument when there is one
 
     Returns:
         Return time series matching the input's pandas shape and labels. LOG and RELATIVE are
@@ -137,6 +164,14 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
         signed endpoints are finite; LEVEL and LEVEL0 are missing unless their returned level is
         finite. Nullable floating inputs retain a nullable output dtype
     """
+    if kwargs:
+        # An ignored keyword would otherwise go unnoticed: is_log_return=True returns simple
+        # returns. Warn rather than raise so pass-through callers keep working.
+        _warn_unused_keywords(function_name='to_returns', keywords=kwargs,
+                              known=('prices', 'is_log_returns', 'return_type', 'freq',
+                                     'include_start_date', 'include_end_date', 'ffill_nans',
+                                     'drop_first', 'is_first_zero'))
+
     # Resample prices to specified frequency
     prices = prices_at_freq(prices=prices, freq=freq,
                             include_start_date=include_start_date,
@@ -470,21 +505,24 @@ def compute_excess_return_navs(prices: Union[pd.Series, pd.DataFrame],
 def compute_excess_returns(returns: Union[pd.Series, pd.DataFrame],
                            rates_data: pd.Series
                            ) -> Union[pd.Series, pd.DataFrame]:
-    """Subtract risk-free rate from returns.
+    """Subtract the cash return accrued over each return period.
+
+    The cash return of the period ``(t-1, t]`` is the annual rate known at the return date
+    ``t-1``, the latest ``rates_data`` quote dated on or before it, times the ACT/365 fraction
+    ``(d_t - d_{t-1}) / 365``. The lag is one period of the return grid whatever the calendar of
+    the rate series, and the first return date accrues no cash.
 
     Args:
-        returns: Return time series
-        rates_data: Risk-free rate time series (annualized)
+        returns: Simple return time series on a ``DatetimeIndex``
+        rates_data: Annual cash rate on its own calendar, in decimals
 
     Returns:
-        Excess return time series (returns minus risk-free rate)
+        Excess returns on the return index. A period that starts before the first rate quote
+        has a missing excess return
     """
-    # Use lag=1 on the rate series: funding cost at time t reflects the
-    # rate that was set at t-1 (the rate the manager could observe and
-    # plan around). Previously this used lag=None (contemporaneous rate),
-    # which introduces a small look-ahead bias relative to
-    # get_excess_returns_nav() that uses lag=1. The two functions now
-    # agree on convention.
+    # The rate applying over (t-1, t] is the one known at t-1 on the return grid; the
+    # contemporaneous quote at t would be a look-ahead. The backtester's cash leg uses the
+    # same convention through the same helper.
     rates_dt = dfo.multiply_df_by_dt(df=rates_data, dates=returns.index, lag=1)
     returns0 = returns.copy()
     if isinstance(returns, pd.Series):
@@ -502,19 +540,67 @@ def compute_pa_excess_compounded_returns(returns: Union[pd.Series, pd.DataFrame]
                                          ) -> Union[np.ndarray, float]:
     """Compute annualized excess returns with geometric compounding.
 
+    The excess NAV starts at one on the last date before the first period with a known excess
+    return, normally the first return date, and the per-annum return divides by the years
+    elapsed from that same date. When ``rates_data`` starts after the first return date, the
+    periods before its first quote have no excess return; they are excluded from both the
+    compounding and the elapsed years, with a warning, rather than counted as flat.
+
     Args:
-        returns: Return time series
+        returns: Simple return time series; each column is treated on its own history
         rates_data: Risk-free rate time series (annualized)
-        first_date: Start date for NAV calculation
+        first_date: Inclusive date through which observed excess returns are set to zero
         annualize_less_1y: Annualize periods <1 year
 
     Returns:
-        Array of annualized excess returns for DataFrame input, float for Series input
+        Array of annualized excess returns for DataFrame input, float for Series input. A
+        column without any known excess return after its first date is missing
     """
     excess_returns = compute_excess_returns(returns=returns, rates_data=rates_data)
-    prices = returns_to_nav(returns=excess_returns, first_date=first_date)
-    compounded_return_pa = compute_pa_return(prices=prices, annualize_less_1y=annualize_less_1y)
-    return compounded_return_pa
+    if isinstance(excess_returns, pd.Series):
+        return _compute_pa_excess_from_known_rates(excess_returns=excess_returns,
+                                                   returns=returns,
+                                                   first_date=first_date,
+                                                   annualize_less_1y=annualize_less_1y)
+    return np.array([_compute_pa_excess_from_known_rates(excess_returns=excess_returns[column],
+                                                         returns=returns[column],
+                                                         first_date=first_date,
+                                                         annualize_less_1y=annualize_less_1y)
+                     for column in excess_returns.columns], dtype=float)
+
+
+def _compute_pa_excess_from_known_rates(excess_returns: pd.Series,
+                                        returns: pd.Series,
+                                        first_date: Optional[pd.Timestamp],
+                                        annualize_less_1y: bool
+                                        ) -> float:
+    """Per-annum excess return of one column over the window with known excess returns.
+
+    Args:
+        excess_returns: Excess returns of one column
+        returns: The simple returns they were formed from, on the same index
+        first_date: Inclusive date through which observed excess returns are set to zero
+        annualize_less_1y: Annualize periods <1 year
+
+    Returns:
+        The per-annum excess return, or NaN when no excess return is known after the first row
+    """
+    # The NAV is anchored on the date that opens the first period with a known excess return,
+    # so the compounding and the elapsed years cover the same window.
+    is_known = excess_returns.notna().to_numpy()
+    known_after_first = np.flatnonzero(is_known[1:])
+    if known_after_first.size == 0:
+        return np.nan
+    anchor = int(known_after_first[0])
+    if anchor > 0 and bool(returns.iloc[1:anchor + 1].notna().any()):
+        warnings.warn(f"rates_data has no quote known at the start of the return periods before "
+                      f"{excess_returns.index[anchor + 1]}: the per-annum excess return of "
+                      f"{excess_returns.name} is computed from {excess_returns.index[anchor]}",
+                      UserWarning, stacklevel=3)
+    window_returns = excess_returns.iloc[anchor:].copy()
+    window_returns.iloc[0] = 0.0
+    prices = returns_to_nav(returns=window_returns, first_date=first_date)
+    return compute_pa_return(prices=prices, annualize_less_1y=annualize_less_1y)
 
 
 def estimate_vol(sampled_returns: Union[pd.DataFrame, pd.Series, np.ndarray]
@@ -592,6 +678,10 @@ def compute_sampled_vols(prices: Union[pd.DataFrame, pd.Series],
                          ) -> Union[pd.DataFrame, pd.Series]:
     """Compute annualized realized volatility from sampled returns.
 
+    Returns on the ``freq_return`` grid are split into windows ``(start, end]`` between
+    consecutive ``freq_vol`` boundaries, so each return is counted in exactly one window, and
+    ``estimate_vol`` is applied to each window.
+
     Args:
         prices: Price time series
         freq_vol: Frequency for volatility estimation window (e.g., 'ME' for monthly)
@@ -607,12 +697,14 @@ def compute_sampled_vols(prices: Union[pd.DataFrame, pd.Series],
     sampled_returns = to_returns(prices=prices, freq=freq_return,
                                  include_start_date=include_start_date, include_end_date=include_end_date)
 
-    # Split returns by volatility estimation window
+    # Split returns by volatility estimation window. Windows are right-closed: a return dated
+    # on a boundary closes the window ending there and is not counted again in the next one.
     sampled_returns_at_vol_freq = da.split_df_by_freq(df=sampled_returns,
                                                       freq=freq_vol,
                                                       overlap_frequency=None,
                                                       include_start_date=include_start_date,
-                                                      include_end_date=include_end_date)
+                                                      include_end_date=include_end_date,
+                                                      inclusive='right')
 
     # Compute volatility for each window
     vol_samples = {}
@@ -657,25 +749,29 @@ def adjust_component_navs_to_portfolio(portfolio_nav: pd.Series,
 
     Used for portfolio NAV decomposition: when a portfolio's total return is
     expressed as a sum of additive components (carry types, fundamental return
-    sources, gross vs net vs costs, etc.), the corresponding component NAVs
-    don't *automatically* sum back to the portfolio NAV — geometric compounding
-    introduces a small residual gap from the linear additivity of period
-    returns. This function rescales each component NAV by a common
-    time-weighted factor that closes the gap, so the visualised stacked NAVs
-    add up to the portfolio total.
+    sources, gross vs net vs costs, etc.), the per-annum returns of the
+    corresponding component NAVs don't *automatically* sum to the portfolio's
+    — geometric compounding introduces a residual gap from the linear
+    additivity of period returns. This function rescales each component NAV
+    by a common time-weighted factor that closes the gap in per-annum returns.
 
     Formula::
 
         c_m(t) = ((portfolio_pa / n + 1) / (mean(component_pa) + 1)) ** t
 
-    where ``n`` is the number of components and ``t`` is years-from-start.
-    For truly additive components, ``mean(component_pa) ≈ portfolio_pa / n``
-    and ``c_m`` is close to 1 — only a small adjustment is applied.
+    where ``n`` is the number of components and ``t`` is years-from-start
+    (days / 365.25). For truly additive components,
+    ``mean(component_pa) ≈ portfolio_pa / n`` and ``c_m`` is close to 1 —
+    only a small adjustment is applied.
 
     Each component is rescaled by the same ``c_m(t)``, preserving the
-    *relative* contributions of components to the portfolio while making
-    them sum to the portfolio NAV exactly at the terminal point. Intended
-    use is display / stacked-area charting, not formal attribution.
+    *relative* contributions of components. When the history spans more than
+    one year and every component is observed on the portfolio's first and
+    last dates, the rescaled components' per-annum returns sum exactly to the
+    portfolio's per-annum return. The rescaled NAVs themselves do not sum to
+    the portfolio NAV at any date, including the terminal one: each starts
+    near one, so n components sum to about n. Intended use is display /
+    stacked-area charting of per-annum contributions, not formal attribution.
 
     Args:
         portfolio_nav: Portfolio NAV time series.
@@ -797,34 +893,46 @@ def compute_net_navs_ex_perf_man_fees(navs: Union[pd.Series, pd.DataFrame],
                                       ) -> Union[pd.Series, pd.DataFrame]:
     """Compute net NAVs after management and performance fees.
 
+    Each column runs its own fee account from its first observed NAV: the gross asset value,
+    the high-water mark and the fee accruals start there, and the crystallisation calendar
+    covers that column's own history.
+
     Args:
-        navs: Gross NAV time series. Fillable missing values are forward-filled before returns
+        navs: Gross NAV time series on a ``DatetimeIndex``, interpreted chronologically.
+            Missing values after a column's first observation are forward-filled before returns
             are calculated, preserving the historical flat-return treatment of price gaps.
         man_fee: Annual management fee
         perf_fee: Performance fee rate on profits above HWM
         perf_fee_frequency: Performance fee crystallization frequency
 
     Returns:
-        Net NAV time series after fees
+        Net NAV time series after fees, equal to one on each column's first observed date and
+        missing before it
     """
-    # State the historical pandas default explicitly so dependency versions cannot choose the
-    # missing-price return policy.
-    gross_returns = navs.ffill().pct_change(fill_method=None)
-    net_returns = []
+    def _net_returns(gross_navs: pd.Series) -> pd.Series:
+        """Net returns of one column over its observed range, on the full index."""
+        first_date = gross_navs.first_valid_index()
+        if first_date is None:
+            return pd.Series(np.nan, index=gross_navs.index, name=gross_navs.name)
+        # Missing gross returns before the first NAV would otherwise enter the fee recursion
+        # and make the whole path missing. State the historical pandas default explicitly so
+        # dependency versions cannot choose the missing-price return policy.
+        gross_returns = gross_navs.loc[first_date:].ffill().pct_change(fill_method=None)
+        net = compute_net_return_ex_perf_man_fees(gross_return=gross_returns,
+                                                  man_fee=man_fee,
+                                                  perf_fee=perf_fee,
+                                                  perf_fee_frequency=perf_fee_frequency)
+        return net.reindex(gross_navs.index)
+
+    if not navs.index.is_monotonic_increasing:
+        navs = navs.sort_index()
     if isinstance(navs, pd.Series):
-        net_returns = compute_net_return_ex_perf_man_fees(gross_return=gross_returns,
-                                         man_fee=man_fee,
-                                         perf_fee=perf_fee,
-                                         perf_fee_frequency=perf_fee_frequency)
+        net_returns = _net_returns(navs)
     else:
-        for column in gross_returns.columns:
-            net = compute_net_return_ex_perf_man_fees(gross_return=gross_returns[column],
-                                     man_fee=man_fee,
-                                     perf_fee=perf_fee,
-                                     perf_fee_frequency=perf_fee_frequency)
-            net_returns.append(net)
-        net_returns = pd.concat(net_returns, axis=1, sort=True)
-    net_nav = returns_to_nav(returns=net_returns)
+        net_returns = pd.concat([_net_returns(navs[column]) for column in navs.columns],
+                                axis=1, sort=True)
+    # Each column's first net return is already zero: no further initialisation.
+    net_nav = returns_to_nav(returns=net_returns, init_period=None)
     return net_nav
 
 
@@ -937,8 +1045,12 @@ def prices_at_freq(prices: Union[pd.Series, pd.DataFrame],
         freq: Target frequency (e.g., 'D', 'W', 'M')
         include_start_date: Include period start in resampling
         include_end_date: Include period end in resampling
-        ffill_nans: Forward-fill NaN values
-        fill_na_method: Method for filling NaN ('ffill', 'bfill', None)
+        ffill_nans: Forward-fill NaN values. With ``freq`` set, the fill is applied on the source
+            grid and at the boundaries when prices are resampled. Input whose inferred frequency
+            already equals ``freq`` is returned unchanged, missing values included: on its own
+            grid a missing value is a missing observation, and filling it would manufacture a
+            zero return. Pass ``freq=None`` to fill such input
+        fill_na_method: Method for filling NaN ('ffill', 'bfill', None) when ``freq`` is None
 
     Returns:
         Resampled price time series
@@ -1083,19 +1195,35 @@ def portfolio_returns_to_nav(returns: pd.DataFrame,
 
     NaN handling: uses ``nansum`` across columns — a NaN contribution
     on a given date is treated as 0 PnL, equivalent to "this asset held
-    its notional but earned 0% that period". See ``to_portfolio_returns``
-    docstring for the full discussion.
+    its notional but earned 0% that period". A date on which every
+    contribution is NaN has a NaN portfolio return, exactly as in
+    ``to_portfolio_returns``: the NAV is carried flat through such a date
+    inside the history and, as ``returns_to_nav`` does for any trailing
+    missing returns, ends at the last date with an observed contribution.
+    See ``to_portfolio_returns`` docstring for the full discussion.
 
     Args:
-        returns: Return DataFrame with assets as columns
-        init_period: Set first non-NaN return to zero
+        returns: Per-asset return contributions, with assets as columns
+        init_period: 1 sets the first row's aggregate return to zero, observed or not, so the
+            NAV equals one on the first date and that row's contribution is discarded; 0 sets
+            the missing row before the first observed aggregate return to zero; None leaves
+            the aggregate unchanged
         init_value: Initial NAV value
         freq: Resampling frequency
 
     Returns:
         Aggregate portfolio NAV series
     """
-    agg_pnl = pd.Series(np.nansum(returns.to_numpy(), axis=1), index=returns.index)
+    contributions = returns.to_numpy()
+    is_all_nan = np.all(np.isnan(contributions), axis=1)
+    agg_pnl = pd.Series(np.where(is_all_nan, np.nan, np.nansum(contributions, axis=1)),
+                        index=returns.index)
+    if init_period == 1:
+        # Anchor on the first row itself: with a missing first row, zeroing the first observed
+        # aggregate instead would discard a real period's return.
+        if len(agg_pnl.index) > 0:
+            agg_pnl.iloc[0] = 0.0
+        init_period = None
     nav = returns_to_nav(returns=agg_pnl, init_period=init_period, init_value=init_value, freq=freq)
     return nav
 
@@ -1172,20 +1300,25 @@ def get_excess_returns_nav(prices: Union[pd.DataFrame, pd.Series],
                            ) -> Union[pd.DataFrame, pd.Series]:
     """Compute excess return NAV after funding costs.
 
+    The funding cost of the period ``(t-1, t]`` on the ``freq`` grid is the annual rate known
+    at ``t-1`` times the ACT/365 fraction of the period, as in ``compute_excess_returns``. The
+    NAV is one on each column's first price date, so the first period's excess return is
+    compounded, and the path is then rescaled so that its last level equals the last price.
+
     Args:
         prices: Price time series
         funding_rate: Funding rate time series (annualized)
         freq: Return calculation frequency
 
     Returns:
-        Excess return NAV scaled to match terminal price
+        Excess return NAV on the ``freq`` grid, scaled to match the terminal price
     """
     if not isinstance(funding_rate, pd.Series):
         raise ValueError(f"funding_rate must be series")
 
     nav_returns = to_returns(prices=prices, freq=freq)
 
-    # Convert annualized funding rate to period rate
+    # Convert annualized funding rate to period rate, lagged one period of the return grid
     funding_rate_dt = dfo.multiply_df_by_dt(df=funding_rate, dates=nav_returns.index, lag=1)
 
     # Subtract funding costs from returns
@@ -1197,11 +1330,13 @@ def get_excess_returns_nav(prices: Union[pd.DataFrame, pd.Series],
         data = nav_returns.to_numpy()-funding_rate_dt.to_numpy()
         excess_returns = pd.Series(data, index=nav_returns.index, name=nav_returns.name)
 
-    # Scale to match terminal price
+    # Scale to match terminal price. The first return row is missing (no prior price), so
+    # init_period=0 anchors the NAV there and keeps the first period's excess return; zeroing
+    # the first observed return instead would discard it.
     terminal_value = dfo.get_last_nonnan_values(prices)
     excess_nav = returns_to_nav(returns=excess_returns,
-                                    terminal_value=terminal_value,
-                                    init_period=1)
+                                terminal_value=terminal_value,
+                                init_period=0)
     return excess_nav
 
 

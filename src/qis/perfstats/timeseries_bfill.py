@@ -1,9 +1,9 @@
 """
 splicing time series together: a Brownian-bridge interpolation and two backfill joins.
 
-``interpolate_infrequent_returns`` fills the gaps of an infrequently reported series onto the
-grid of a frequent pivot series, drawing increments from a Brownian bridge whose innovations
-come from the pivot path, so the result hits every reported value exactly while carrying the
+``interpolate_infrequent_returns`` places an infrequently reported series on the grid of a
+frequent pivot series with a Brownian bridge on log levels whose innovations come from the pivot
+path, so the result reproduces every reported return exactly, point in time, while carrying the
 timing of a real market. The interpolated path is a plausible history, not the true one.
 
 ``bfill_timeseries`` extends a newer panel backwards with an older one column by column. Output
@@ -21,7 +21,6 @@ import qis.utils.df_ops as dfo
 import qis.utils.df_freq as dfr
 import qis.utils.np_ops as npo
 import qis.perfstats.returns as ret
-import qis.models.linear.ewm as ewm
 from qis.utils.df_ops import df_ffill_negatives
 
 
@@ -30,33 +29,59 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
                                    span: int = 12,
                                    annualization_factor: float = 260,
                                    is_to_log_returns: bool = False,
-                                   vol_adjustment: float = 1.15  # adjust vol of the bridge
+                                   vol_adjustment: float = 1.0
                                    ) -> Union[pd.Series, pd.DataFrame]:
     """
     backfill an infrequently reported series onto a frequent grid with a Brownian bridge.
 
     A quarterly private-market series cannot be risk-analysed against daily public markets, and
-    forward-filling it makes it look riskless between reports. This interpolates instead: the
-    increments between two reported values are drawn from a Brownian bridge whose innovations come
-    from the path of ``pivot_returns``, so the interpolated series carries the timing of a real
-    market rather than a smooth line, while still hitting each reported value exactly.
+    forward-filling it makes it look riskless between reports. This interpolates instead: between
+    two reports the log NAV follows a Brownian bridge pinned to both reported values, and the
+    bridge increments take their timing from ``pivot_returns``, so the interpolated series moves
+    with a real market rather than along a smooth line.
 
-    The interpolated path is a plausible history, not the true one. Statistics computed on it
-    inherit the bridge's assumptions, so it belongs in a risk model and not in a performance report.
+    Report ``b`` is placed on the last pivot date on or before its report date. Over the ``n``
+    pivot dates of a report interval, with reported log return ``l``, the interpolated log
+    returns are ``x_j = l / n + vol_adjustment * sqrt(v) * e_j``. Here ``e_j`` are the pivot
+    returns of the interval, demeaned and scaled so that ``sum(e_j**2) = n - 1``, the expected
+    sum of squares of the demeaned increments of a unit Brownian motion, and ``v`` is the
+    per-pivot-period variance of the reported returns: an EWM, with span ``span`` reports, of
+    ``l**2 / n`` over the intervals up to and including the current one. Because ``e`` sums to
+    zero, the interval's log returns sum exactly to ``l``. Their sum of squares is
+    ``l**2 / n + vol_adjustment**2 * v * (n - 1)``, so with ``vol_adjustment=1`` the increments
+    carry, per pivot period, the variance of the reported returns under the square-root-of-time
+    rule, and under a Brownian motion observed at the report dates they are, on average,
+    serially uncorrelated.
+
+    The interval ending at a report uses only the pivot returns inside it and the reports up to
+    and including it, so the interpolated history up to a report date does not change when later
+    data arrive. It is a plausible history, not the true one, and inherits the bridge's
+    assumptions: it belongs in a risk model and not in a performance report.
 
     Args:
-        infrequent_returns: the reported series, with gaps between reports. A DataFrame is handled
-            column by column
-        pivot_returns: a frequent series whose path supplies the innovations; the grid it is
-            observed on is the grid the result is returned on
-        span: EWM span used to estimate the volatility of the infrequent series
-        annualization_factor: periods per year of ``pivot_returns``
-        is_to_log_returns: treat the inputs as log returns
-        vol_adjustment: multiplier on the bridge volatility. Above one compensates for the bridge
-            understating the volatility of the unobserved path
+        infrequent_returns: the reported returns, one per report date, in the convention set by
+            ``is_to_log_returns``. A Series must not contain missing values; a DataFrame is
+            handled column by column after dropping each column's missing values
+        pivot_returns: a frequent series whose path supplies the timing of the increments; the
+            result is returned on its index. Missing pivot returns contribute no deviation
+        span: EWM span, in reports, of the per-pivot-period variance of the reported returns
+        annualization_factor: periods per year of ``pivot_returns``. Both the bridge variance and
+            the reported-return variance are measured on the pivot clock, so the interpolated
+            path does not depend on this value; the bridge volatility per year is
+            ``vol_adjustment * sqrt(annualization_factor * v)``
+        is_to_log_returns: False (default) for simple returns, which are converted with
+            ``log1p`` for the bridge and returned as simple returns that compound exactly to each
+            reported return; True for log returns, returned as log returns that sum exactly to
+            each reported return
+        vol_adjustment: multiplier on the bridge volatility. The default 1 keeps the variance of
+            the reported returns; a value above one adds variance, for example to offset the
+            smoothing of appraisal-based reports
 
     Returns:
-        the interpolated returns on the index of ``pivot_returns``, in the shape of the input
+        the interpolated returns on the index of ``pivot_returns``, in the shape of the input.
+        Dates up to the first placed report and after the last one are missing. A report
+        interval that contains no pivot date is merged with the next one, whose increments then
+        reproduce the two reports together
 
     Raises:
         TypeError: If a nonempty input does not use a ``DatetimeIndex``.
@@ -85,47 +110,69 @@ def interpolate_infrequent_returns(infrequent_returns: Union[pd.Series, pd.DataF
     if np.any(np.isnan(infrequent_returns)):
         raise ValueError(f"infrequent_returns contains nans")
 
-    # transform to cumulative
-    if is_to_log_returns:
-        infrequent_returns = np.log(1.0+infrequent_returns)
-    infrequent_cumulative = infrequent_returns.cumsum()
+    if not pivot_returns.index.is_monotonic_increasing:
+        pivot_returns = pivot_returns.sort_index()
+    if not infrequent_returns.index.is_monotonic_increasing:
+        infrequent_returns = infrequent_returns.sort_index()
 
-    # starting time
-    date0 = infrequent_returns.index[0]
-    # pivot brownian starting from date0
-    pivot_brownian = (pivot_returns - ewm.compute_ewm(data=pivot_returns, span=span)) / ewm.compute_ewm_vol(data=pivot_returns, span=span)
-    pivot_brownian = pivot_brownian.loc[date0:, ]
-    pivot_brownian = (pivot_brownian - np.nanmean(pivot_brownian)) / np.nanstd(pivot_brownian)  # path to (0, 1) brownian
+    # The bridge runs on log levels, so compounding in the simple-return mode is exact.
+    reported = infrequent_returns.to_numpy(dtype=float)
+    log_reported = reported if is_to_log_returns else np.log1p(reported)
+    log_levels = np.cumsum(log_reported)
 
-    # add running times
-    seconds_per_year = annualization_factor * 24 * 60 * 60  # days, hours, minute, seconds
-    t = pd.Series((infrequent_returns.index - date0).total_seconds() / seconds_per_year, index=infrequent_returns.index)
-    t1 = t.shift(-1)
-    dt = t1 - t
+    # Place each report on the last pivot date on or before it. A report before the first pivot
+    # date only sets the starting level; later reports sharing a pivot date with an earlier one
+    # are merged into the next interval, so no return lands on a date before it occurred.
+    positions = pivot_returns.index.searchsorted(infrequent_returns.index, side='right') - 1
+    anchor_positions: List[int] = []
+    anchor_levels: List[float] = []
+    for position, level in zip(positions, log_levels):
+        if position < 0:
+            if len(anchor_positions) > 0:
+                anchor_positions[-1], anchor_levels[-1] = -1, level
+            else:
+                anchor_positions.append(-1)
+                anchor_levels.append(level)
+        elif len(anchor_positions) == 0 or position > anchor_positions[-1]:
+            anchor_positions.append(int(position))
+            anchor_levels.append(level)
 
-    # the index of df = index of pivot_brownian
-    df = pd.concat([pivot_brownian,
-                    infrequent_cumulative.rename('x_i'), infrequent_cumulative.shift(-1).rename('x_i+1'),
-                    t.rename('t_i'), t1.rename('t_i+1'), dt.rename('dt_i')], axis=1, sort=True)
-    df['t'] = (df.index - date0).total_seconds() / seconds_per_year
-    df = df.ffill()  # ffill data to cover nans for infrequent series
+    pivot_values = pivot_returns.to_numpy(dtype=float)
+    increments = np.full(len(pivot_values), np.nan)
+    ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    per_period_variance = np.nan
+    for start, end, level_start, level_end in zip(anchor_positions[:-1], anchor_positions[1:],
+                                                  anchor_levels[:-1], anchor_levels[1:]):
+        num_periods = end - start
+        interval_return = level_end - level_start
+        # Point-in-time EWM of the per-period variance implied by the reported returns.
+        variance = interval_return ** 2 / num_periods
+        if np.isnan(per_period_variance):
+            per_period_variance = variance
+        else:
+            per_period_variance = ewm_lambda * per_period_variance + (1.0 - ewm_lambda) * variance
 
-    # compute bridge mean and stdev
-    bridge_mean = ((df['t_i+1']-df['t']) * df['x_i'] + (df['t']-df['t_i']) * df['x_i+1'] ) / df['dt_i']
-    # extrapolate last values when df['x_i'] = df['x_i+1']
-    bridge_mean = bridge_mean.where(np.equal(df['x_i'], df['x_i+1']) == False, other=np.nan)
-    bridge_mean[infrequent_cumulative.index[-1]] = infrequent_cumulative.iloc[-1]  # enter last observed value
-    bridge_mean = bridge_mean.ffill()  # extrapolate last value
+        # Demeaned pivot returns scaled to the expected sum of squares of a unit Brownian
+        # bridge's increments; they sum to zero, so the reported return is matched exactly.
+        interval_pivot = pivot_values[start + 1:end + 1]
+        is_observed = np.isfinite(interval_pivot)
+        deviations = np.zeros(num_periods)
+        if np.any(is_observed):
+            deviations[is_observed] = (interval_pivot[is_observed]
+                                       - np.mean(interval_pivot[is_observed]))
+        sum_squares = float(np.sum(np.square(deviations)))
+        if num_periods > 1 and sum_squares > 0.0:
+            innovations = deviations * np.sqrt((num_periods - 1) / sum_squares)
+        else:
+            innovations = np.zeros(num_periods)
 
-    bridge_stdev = np.nanstd(infrequent_returns)*np.sqrt(((df['t_i+1']-df['t'])*(df['t']-df['t_i'])) / df['dt_i'])
-    # simulate backfill
-    infrequent_cumulative_backfill = bridge_mean + vol_adjustment*bridge_stdev * df[pivot_brownian.name]
-    # compute returns
-    infrequent_return_backfill = infrequent_cumulative_backfill.diff(1)
-    if is_to_log_returns:
-        infrequent_return_backfill = np.expm1(infrequent_return_backfill)
+        increments[start + 1:end + 1] = (interval_return / num_periods
+                                         + vol_adjustment * np.sqrt(per_period_variance)
+                                         * innovations)
 
-    return infrequent_return_backfill
+    if not is_to_log_returns:
+        increments = np.expm1(increments)
+    return pd.Series(increments, index=pivot_returns.index, name=infrequent_returns.name)
 
 
 def _add_price_return_anchors(price_returns: pd.DataFrame,

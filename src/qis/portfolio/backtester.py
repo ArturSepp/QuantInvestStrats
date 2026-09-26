@@ -23,7 +23,9 @@ per-instrument cost constant in time, or a (t, n) DataFrame of dates x tickers, 
 onto the price dates so a schedule stated on era boundaries applies from each boundary onward.
 Dates before the first schedule row are costless. A date-indexed Series is rejected as
 ambiguous. ``funding_rate`` accrues on the cash balance, ``management_fee`` on nav and
-``instruments_carry`` per instrument, all annualised and converted to the price grid.
+``instruments_carry`` per instrument, all annualised and converted to the price grid. Cash held
+over (t-1, t] earns the funding rate known at the previous price date t-1, the convention of
+``qis.compute_excess_returns``; carry uses the latest quote on or before t.
 
 ``weight_implementation_lag`` is a non-negative integer selecting the entry price for the units and
 nothing else: the weight observed at t is traded at the price ``weight_implementation_lag``
@@ -94,7 +96,10 @@ def backtest_model_portfolio(prices: pd.DataFrame,
             passed to :func:`generate_rebalancing_indicators`
         initial_nav: starting nav
         funding_rate: annualised rate applied to positive and negative cash balances. Dated rows
-            are ordered chronologically on a local copy before alignment to ``prices``
+            are ordered chronologically on a local copy before alignment to ``prices``. The cash
+            balance held over (t-1, t] earns the latest quote on or before the price date t-1
+            times the ACT/365 fraction of the period, as ``qis.compute_excess_returns`` charges;
+            a period with no quote known at its start leaves the nav missing, with a warning
         management_fee: annualised fee accrued on nav
         instruments_carry: per-instrument carry, expressed on nav. Dated rows are ordered
             chronologically on a local copy before alignment to ``prices``
@@ -242,9 +247,18 @@ def backtest_model_portfolio(prices: pd.DataFrame,
 
     # Sort dated funding and carry before multiply_df_by_dt forward-fills them onto the price grid.
     if funding_rate is not None:
+        # Cash held over (t-1, t] earns the rate known at t-1 on the price grid, the convention
+        # of compute_excess_returns; the quote dated t is not yet known when the period starts.
         funding_rate_dt = multiply_df_by_dt(
-            df=funding_rate.sort_index(kind="stable"), dates=prices.index, lag=0
+            df=funding_rate.sort_index(kind="stable"), dates=prices.index, lag=1
         )
+        is_unfunded_period = funding_rate_dt.iloc[1:].isna()
+        if np.any(is_unfunded_period):
+            first_unfunded = funding_rate_dt.index[1:][is_unfunded_period.to_numpy()][0]
+            warnings.warn(f"funding_rate has no quote known at the start of the period ending "
+                          f"{first_unfunded:%d%b%Y}: the cash accrual and the nav are missing "
+                          f"from that date. Supply funding quotes from the first price date",
+                          UserWarning, stacklevel=2)
     else:
         funding_rate_dt = pd.Series(0.0, index=prices.index)
 

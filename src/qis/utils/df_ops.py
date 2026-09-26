@@ -10,7 +10,9 @@ observation are dropped rather than returned as nan.
 ``align_df1_to_df2`` and ``align_dfs_dict_with_df`` are the alignment entry points.
 ``multiply_df_by_dt`` converts an annualised rate into a per-period accrual by multiplying by the
 actual calendar days between index dates over ``annualization_factor`` (365 by default), with the
-first date carrying dt = 0, and ``lag`` shifting the rate before the reindex.
+first date carrying an accrual of exactly zero. The rate is aligned to the target dates as of each
+date first and lagged by ``lag`` target-grid observations second, so ``lag=1`` charges the period
+(t-1, t] with the rate known at t-1 whatever the calendar of the rate series.
 
 Numpy work without an index is ``np_ops.py``; aggregation across columns is ``df_agg.py``.
 """
@@ -257,35 +259,62 @@ def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
                       is_actual_calendar_dt: bool = True,
                       annualization_factor: float = 365.0
                       ) -> Union[pd.DataFrame, pd.Series]:
-    """
-    to compute rate adjustment with data - rate:
-    get data at dates index and adjust by dt if needed
-    adjust data by time spread:
-    data = dt*data
+    """Convert annualised rates into per-period accruals on a target date grid.
+
+    The rate series is first aligned to the target grid as of each date, taking the latest
+    quote dated on or before it, and only then lagged by ``lag`` observations of the target
+    grid. With ``lag=1`` the accrual of the period ``(t-1, t]`` therefore uses the rate known at
+    the grid date ``t-1``, whatever the calendar of the rate series: daily quotes on a month-end
+    grid give each month the quote of the previous month-end, and a series with a single quote
+    is lagged like any other.
+
+    Args:
+        df: Annualised rates on their own ``DatetimeIndex``, which need not match ``dates``
+            and is interpreted chronologically. The caller's object is not modified
+        dates: Target grid. None uses the index of ``df``
+        lag: Number of target-grid observations by which the aligned rate is delayed. None or
+            0 uses the quote dated on or before each target date itself
+        is_actual_calendar_dt: If True, the accrual fraction is the number of calendar days
+            since the previous target date over ``annualization_factor``, and the first target
+            date accrues exactly zero because no time has elapsed, even when no rate is known
+            there. If False, every date accrues ``1 / annualization_factor``
+        annualization_factor: Days per year of the accrual day count (365 for ACT/365), or
+            periods per year when ``is_actual_calendar_dt`` is False
+
+    Returns:
+        Per-period accruals on the target grid. A target date whose lagged rate is not yet
+        known, because the rate series starts later, is missing, except on the first date
+
+    Raises:
+        TypeError: If ``df`` does not use a ``DatetimeIndex``.
     """
     if not isinstance(df.index, pd.DatetimeIndex):
         raise TypeError(f"data index must be DateTimeIndex: {df.index}")
 
-    if lag is not None:
-        if len(df.index) > lag:
-            df = df.shift(lag)
+    # As-of alignment runs in date order and must not reorder or relabel the caller's object.
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
+    if dates is None:
+        dates = df.index
+    elif isinstance(dates, pd.DatetimeIndex) and df.index.tz is not None:
+        df = df.set_axis(df.index.tz_convert(dates.tz), axis=0)
 
-    if dates is not None:
-        # align tz
-        if isinstance(dates, pd.DatetimeIndex) and df.index.tz is not None:
-            df.index = df.index.tz_convert(dates.tz)
-        df = df.reindex(index=dates, method='ffill')
+    # Align on the target grid first and lag second, so the lag counts target periods.
+    df = df.reindex(index=dates, method='ffill')
+    if lag is not None and lag != 0:
+        df = df.shift(lag)
 
-    # apply dt multiplication
-    if len(df.index) > 1:
-        if is_actual_calendar_dt:
-            delta = np.append(0.0, (df.index[1:] - df.index[:-1]).days / annualization_factor)
-        else:
-            delta = 1.0 / annualization_factor
+    if is_actual_calendar_dt:
+        # The first date closes no period: its accrual is zero even if its rate is unknown.
+        delta = np.append(0.0, (dates[1:] - dates[:-1]).days / annualization_factor)
         df = df.multiply(delta, axis=0)
+        if len(dates) > 0:
+            if isinstance(df, pd.DataFrame):
+                df.iloc[0, :] = 0.0
+            else:
+                df.iloc[0] = 0.0
     else:
-        warnings.warn(f"in adjust_data_with_dt: lengh of data index is one - cannot adjust by dt")
-        return df
+        df = df.multiply(1.0 / annualization_factor)
 
     return df
 

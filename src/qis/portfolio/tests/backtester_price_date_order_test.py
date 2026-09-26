@@ -190,10 +190,13 @@ def test_backtest_model_portfolio_aligns_permuted_dated_companions() -> None:
         rebalancing_costs=permuted_costs,
     )
 
-    # Opening costs leave 49.5 cash. Each later cash balance earns its dated funding rate,
-    # then receives carry on the unchanged 50 notional before it is added back to that notional.
+    # Opening costs leave 49.5 cash. Each later cash balance earns the funding rate dated at the
+    # start of its one-day period (0%, 36.5%, 73%), then receives carry on the unchanged 50
+    # notional before it is added back to that notional. The values changed when funding moved
+    # from the quote dated at the end of the period (lag 0, a look-ahead) to the quote known at
+    # its start: 99.5 + 0.05, then 49.55 * 1.001 + 0.1, then 49.69955 * 1.002 + 0.15 on cash.
     expected_nav = pd.Series(
-        [99.5, 99.5995, 99.798699, 100.098095097],
+        [99.5, 99.55, 99.69955, 99.9489491],
         index=DATES,
         name="Portfolio",
     )

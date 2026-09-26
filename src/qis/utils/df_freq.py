@@ -3,7 +3,9 @@ resampling a panel onto another frequency or onto another series' index, with th
 convention made explicit. ``df_asfreq`` samples the last observation at or before each scheduled
 date, while ``df_resample_at_freq`` and ``df_resample_at_other_index`` aggregate within the period
 by ``agg_func`` and, under ``include_end_date``, carry a final partial period through
-``agg_remained_data_on_right`` rather than discarding it.
+``agg_remained_data_on_right`` rather than discarding it. ``df_resample_at_int_index`` groups rows
+into blocks of a fixed count, counted back from the last row, and drops an incomplete first block
+when it aggregates, since a partial sum is not an observation of the block aggregate.
 
 A panel is a mapping from date to value, so the row order it arrives in carries no information:
 ``df_asfreq`` sorts an index that is not chronological rather than resampling along it.
@@ -81,7 +83,9 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
         method: fill method passed to pd.DataFrame.reindex()
         fill_na_method: Fill applied before and after reindexing when the input frequency differs
             from ``freq``. This lets an exact-boundary missing value use the latest earlier value.
-            Already-periodic input is returned without changing its missing-value mask.
+            Already-periodic input is returned without changing its missing-value mask: on its
+            own grid a missing value is a missing observation, and ``qis.to_returns`` and
+            ``qis.prices_at_freq`` inherit this rule.
         inclusive: reserved, currently unused
         include_start_date: If True, include ``df``'s first observation date.
         include_end_date: If True, include ``df``'s last observation date, representing a terminal
@@ -261,18 +265,39 @@ def df_resample_at_freq(df: Union[pd.DataFrame, pd.Series],
 
 def df_resample_at_int_index(df: pd.DataFrame,
                              func: Optional[Callable] = np.nansum,
-                             sample_size: int = 5
+                             sample_size: int = 5,
+                             drop_incomplete_first: Optional[bool] = None
                              ) -> pd.DataFrame:
-    """
-    Resample dataframe at evenly spaced discrete index with intervals of sample_size.
+    """Resample a panel into consecutive blocks of ``sample_size`` rows.
 
-    The grouping is reversed so the last group always has a full cycle.
-    func is the accumulating function; None takes the last row per group.
+    Blocks are counted back from the last row, so the last block is always complete and the
+    first holds the remaining ``T mod sample_size`` rows when ``T`` is not a multiple of
+    ``sample_size``.
+
+    Args:
+        df: Panel in chronological row order
+        func: Aggregation applied to each block, such as ``np.nansum`` for returns; None takes
+            the last row of each block, which samples levels on the block grid
+        sample_size: Positive number of rows per block
+        drop_incomplete_first: Whether to drop an incomplete first block. None drops it when
+            ``func`` aggregates, because an aggregate of fewer rows, such as a partial sum of
+            returns, is not an observation of the ``sample_size``-row aggregate, and keeps it
+            when ``func`` is None, because its last row is a level on the block grid
+
+    Returns:
+        One row per block, labelled with the last timestamp of the block
+
+    Raises:
+        ValueError: If ``sample_size`` is not a positive integer.
     """
     if not isinstance(sample_size, int) or sample_size <= 0:
         raise ValueError(f"sample_size must be a positive integer, got {sample_size}")
     if sample_size == 1:
         return df
+    if drop_incomplete_first is None:
+        drop_incomplete_first = func is not None
+    if drop_incomplete_first:
+        df = df.iloc[len(df.index) % sample_size:]
 
     original_index = df.index
     df = df.reset_index(drop=True)
