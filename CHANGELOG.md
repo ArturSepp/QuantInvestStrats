@@ -12,14 +12,17 @@ handbook was written. Most fixes remove crashes, silent zeros or infinities, or 
 but several change numbers that earlier versions reported:
 
 - Excess returns no longer drop their first period, and every period accrues cash at the rate
-  known at its start on the return grid, in `compute_ra_perf_table` and in the backtester's
-  funding leg.
+  known at its start on the return grid, in `compute_ra_perf_table`, in the backtester's
+  funding leg and in the financing leg of `lever_returns` and `delever_returns`.
 - EWM estimators are point in time by default: `EwmLinearModel.fit`,
-  `compute_ewm_beta_alpha_forecast`, `compute_portfolio_vol`, `ewm_xy_convolution` and the EWM
-  autocorrelation estimators no longer seed with full-sample statistics, and every EWM uses the
-  first observation of each column. Early values move; late values barely do.
+  `compute_ewm_beta_alpha_forecast`, `compute_portfolio_vol`, `ewm_xy_convolution`,
+  `compute_ewm_cross_xy` (and with it `compute_fx_vol_beta`) and the EWM autocorrelation
+  estimators no longer seed with full-sample statistics, and every EWM uses the first
+  observation of each column. Early values move; late values barely do.
 - `estimate_rolling_ewma_covar(demean=True)` no longer understates variances by about 6% at span
-  52, and EWM covariance tensors default to a positive-semidefinite gap policy.
+  52, gives NaN rather than zero before an asset's first return, and EWM covariance tensors
+  default to a positive-semidefinite gap policy. The qis risk functions ignore such an asset when
+  it is not held.
 - Tracking-error contributions sum to the tracking error, the factsheet's P&L risk attribution
   shows Euler shares, and the risk-table drawdowns on a coarse grid include the last observation.
 - Signal diagnostics pair signals with future returns only, use the library's annualisation
@@ -115,6 +118,16 @@ Each entry below states the size of its effect and, where possible, how to resto
   subtract. A 50/30 portfolio with 20% cash over 2014 to 2025 on a realistic rate path ends at a
   NAV of 142.878 instead of 142.884. A funding series with no quote known at the start of a
   period now warns that the NAV is missing from that date.
+- **Behaviour change.** Charge the financing leg of `lever_returns` and `delever_returns` at the
+  rate known at the start of each period. A time-varying `financing_rate` was forward-filled to
+  each return date without a lag, so the period (t-1, t] paid the quote dated t, a one-period
+  look-ahead that disagreed with `compute_excess_returns` and the backtester. The rate is now
+  aligned to the return grid as of each date and lagged by one return date; the first date takes
+  the latest quote strictly before it and is missing when there is none. A scalar rate is
+  unchanged. Levering monthly `SEQ_US` returns of the synthetic universe once (`leverage=1`) over
+  2014 to 2025 with a Fed-funds-like path (0.1%, hikes to 5.3% in 2022 and 2023, cuts from
+  September 2024) ends at a NAV of 0.8593 instead of 0.8566; the largest monthly difference is
+  2.6bp. To reproduce the old numbers, date each quote one period earlier.
 - Lag a rate series with a single quote in the internal `multiply_df_by_dt`; the lag was skipped
   when the series had no more observations than the lag.
 - Make `compute_pa_excess_compounded_returns` compound and annualise over the same window when
@@ -336,6 +349,25 @@ Each entry below states the size of its effect and, where possible, how to resto
   `2 lambda^2 / (1 + lambda)` to reproduce earlier numbers. Ex-ante volatility, tracking error and
   absolute risk contributions built on these matrices rise by 2.9%; percentage contributions do
   not move.
+- **Behaviour change.** Make `estimate_rolling_ewma_covar` report NaN before an asset's first
+  return in both estimators, and seed its demeaning mean at zero. The default path returned a
+  zero row and column before inception, which read as a riskless asset, while the vol-normalised
+  path (`is_apply_vol_normalised_returns=True`) returned NaN also on the first return date,
+  because the mean seeded at the first return made the first residual exactly zero. The mean now
+  starts from zero, so an asset's first residual is its first return: on the covariance chapter's
+  example the volatilities after 12 weekly returns move from 9.3%, 3.4% and 4.7% to 9.5%, 3.4%
+  and 4.6%, and at the last date by less than 0.01%. On the synthetic universe with quirks,
+  `SEQ_EM` (first price 2 April 2010) had zero variance on 21 of 84 quarterly matrices of the
+  default path and now has NaN there; after inception both paths are finite and PSD. Consumers
+  that need zeros can call `fillna(0.0)` on each matrix.
+- **Behaviour change.** Default `compute_ewm_cross_xy(var_init_type=InitType.X0)` instead of
+  `InitType.MEAN`. The full-sample mean square seeded the denominators of `BETA` and `CORR`, so
+  the ratios over the first `1.5 N` rows depended on later data. `compute_fx_vol_beta`, which
+  feeds `compute_fx_optimal_hedge` and the FX hedging report, now passes `X0` explicitly: on a
+  synthetic `SEQ_EU` against an 8%-volatility EUR/USD, monthly from 2010 with span 36, its beta
+  moves by up to 0.067 in the first 54 months, by up to 0.029 afterwards and by 1e-5 at the end
+  of 2025. Pass `var_init_type=InitType.MEAN` to `compute_ewm_cross_xy` to restore the old
+  values; `ewm_xy_convolution` is unaffected, as it passes `ZERO`.
 - **Behaviour change.** Make `estimate_rolling_ewma_covar` apply the end of `time_period`; only its
   start was applied, so matrices after the end were returned. A `time_period` with a missing
   start or end no longer raises.
@@ -493,6 +525,21 @@ Each entry below states the size of its effect and, where possible, how to resto
 
 ### Changed
 
+- Add the optional `warmup_period` to `estimate_rolling_ewma_covar`: an asset's row and column
+  stay NaN for its first `warmup_period` returns, counted from its own first return, so a late
+  starter enters with the same history as the others. The default `None` masks only the dates
+  before the first return.
+- Add the optional `warmup_period` to `compute_ewm_cross_xy`: an output stays NaN until its pair
+  has more than `warmup_period` joint observations, counted from the pair's own first one. The
+  default `None` masks nothing.
+- Make the covariance consumers ignore an asset whose variance is NaN when it has zero weight:
+  `compute_portfolio_risk_contributions`, `compute_portfolio_risk_contribution_ratios`,
+  `compute_benchmark_portfolio_risk_contributions`, `PortfolioData`'s ex-ante volatility, and
+  `RiskModel`'s tracking error, marginal contributions and benchmark betas. Their results equal
+  those of the available block; a nonzero weight on such an asset gives NaN, and its own
+  benchmark-beta loading is NaN. `RiskModel` accepts non-finite entries in the rows and columns
+  of assets with a non-finite variance and checks symmetry and PSD on the other assets; any other
+  non-finite entry is still rejected.
 - Label the rolling Sharpe statistic `RollingPerfStat.SHARPE` as "Sharpe ratio" in plot titles
   and legends; it previously read "Sharp ratio".
 - Format the normality-test p-value of `compute_desc_table` with the four decimals of
