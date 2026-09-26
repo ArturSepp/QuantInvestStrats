@@ -66,10 +66,10 @@ requires positive NAVs and converts them on `freq`; a Series of per-asset freque
 monthly and quarterly sleeves to use different grids. EWMA `span` counts observations on that
 grid and is not a fixed-length window.
 
-Annual financing quotes supplied as a Series are aligned from observations at or before each
-return date, with **no additional one-period shift** in `delever_returns`. The caller must supply
-the quote applicable to that period; a quote first known at its end is not automatically an
-opening financing rate. Missing leading quotes remain unavailable. The helper divides by $\mathrm{AN}$,
+Annual financing quotes supplied as a Series are point in time in `delever_returns`: the period
+ending on a return date is charged the latest quote dated on or before the previous return date,
+so a quote first known at a period's end finances the next period, and the first return date takes
+the latest quote dated before it. Missing leading quotes remain unavailable. The helper divides by $\mathrm{AN}$,
 rather than applying an elapsed-day accrual.
 
 ## Methodology

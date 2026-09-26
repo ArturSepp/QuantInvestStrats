@@ -30,6 +30,9 @@ from qis.perfstats.returns import delever_returns, lever_returns
 # =============================================================================
 
 _DATES = pd.date_range("2024-01-31", periods=4, freq="ME")
+# Funding quotes are dated one month-end before the period they finance: under the
+# point-in-time convention a period is charged the rate known at its start.
+_QUOTE_DATES = pd.date_range("2023-12-31", periods=4, freq="ME")
 
 _LEVERAGE = 1.0
 _PERIODS_PER_YEAR = 12
@@ -155,7 +158,7 @@ def _financing_with_explicit_missing(nullable: bool) -> pd.Series:
         values = pd.array((0.12, pd.NA, -0.12), dtype=pd.Float64Dtype())
     else:
         values = np.asarray((0.12, np.nan, -0.12), dtype=float)
-    return pd.Series(values, index=_DATES[[0, 1, 3]], name="Annual funding")
+    return pd.Series(values, index=_QUOTE_DATES[[0, 1, 3]], name="Annual funding")
 
 
 def _returns_with_available_funding_only() -> pd.DataFrame:
@@ -549,7 +552,7 @@ def test_leverage_transforms_align_compatible_timezone_aware_financing(
     aware_returns_index = _DATES.tz_localize("UTC")
     returns.index = aware_returns_index
     expected.index = aware_returns_index
-    funding_index = aware_returns_index[[0, 2]].tz_convert(funding_timezone)
+    funding_index = _QUOTE_DATES.tz_localize("UTC")[[0, 2]].tz_convert(funding_timezone)
     funding = pd.Series((0.12, 0.24), index=funding_index, name="Annual funding")
     original_returns = returns.copy()
     original_funding = funding.copy()

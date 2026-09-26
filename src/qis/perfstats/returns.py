@@ -28,8 +28,10 @@ Main entry points: ``to_returns``, ``returns_to_nav``, ``compute_total_return``,
 the cash accrued at an annualised ``rates_data`` series: the period (t-1, t] is charged the rate
 known at the return date t-1, one period of the return grid whatever the calendar of the rate
 series, times ACT/365 days, and the first return date accrues nothing. The backtester's cash leg
-uses the same convention. Leverage and fee arithmetic - ``lever_returns``, ``delever_returns``,
-``compute_net_navs_ex_perf_man_fees`` - is here because it is a return transform; ratio
+uses the same convention, and so do the financing Series of ``lever_returns`` and
+``delever_returns``, which charge the rate known at t-1 per period without a day count. Leverage and
+fee arithmetic - ``lever_returns``, ``delever_returns``, ``compute_net_navs_ex_perf_man_fees`` -
+is here because it is a return transform; ratio
 statistics such as Sharpe are assembled in ``qis/perfstats/perf_stats.py``.
 """
 # packages
@@ -1384,6 +1386,13 @@ def _get_periodic_financing_rate(financing_rate: Union[float, pd.Series],
                                  ) -> Union[float, pd.Series]:
     """Convert annual financing to a chronologically aligned periodic rate.
 
+    A Series is point in time: the period ``(t-1, t]`` is charged the rate known at the previous
+    return date ``t-1``, the latest quote dated on or before it, as in ``compute_excess_returns``.
+    Return dates are taken in chronological order of their unique values. The first return date
+    has no previous return date, so it takes the latest quote dated strictly before it and is
+    missing when there is none. A quote dated on a return date therefore applies from the next
+    period on.
+
     Args:
         financing_rate: Constant annual rate or a date-indexed Series of annual rates.
         returns_index: Return dates to which a financing Series is aligned.
@@ -1432,7 +1441,14 @@ def _get_periodic_financing_rate(financing_rate: Union[float, pd.Series],
         financing_rate = financing_rate.sort_index()
         if financing_index.tz is not None:
             financing_rate = financing_rate.tz_convert(returns_index.tz)
-        return financing_rate.reindex(returns_index, method='ffill') / periods_per_year
+        # the rate of the period (t-1, t] is the one known at the previous return date: align as
+        # of each unique return date in chronological order, then lag one return date
+        return_dates = pd.DatetimeIndex(returns_index.unique()).sort_values()
+        known_at_start = financing_rate.reindex(return_dates, method='ffill').shift(1)
+        if len(return_dates) > 0:
+            earlier_quotes = financing_rate.loc[financing_rate.index < return_dates[0]]
+            known_at_start.iloc[0] = earlier_quotes.iloc[-1] if len(earlier_quotes) > 0 else np.nan
+        return known_at_start.reindex(returns_index) / periods_per_year
 
     # Reject invalid constants before they can silently produce non-finite returns.
     if (isinstance(financing_rate, (bool, np.bool_))
@@ -1473,8 +1489,10 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
             finite and real; ordinary or nullable missing values remain unavailable. For nonzero
             leverage, both date axes must be ``DatetimeIndex`` objects without ``NaT`` and must
             both be timezone-naive or timezone-aware. Different aware zones align by absolute
-            instant. Series observations are sorted chronologically, aligned to return dates, and
-            forward-filled from prior observations only; duplicate funding dates are invalid.
+            instant. Series observations are sorted chronologically; the period (t-1, t] is
+            charged the rate known at the previous return date t-1, the latest quote dated on or
+            before it, and the first return date the latest quote dated strictly before it
+            (missing when there is none). Duplicate funding dates are invalid.
             Default 0.0 ignores financing — only correct if the portfolio earns the financing
             rate on its borrowed capital, which is rarely the case.
         periods_per_year: Strictly positive integer annualisation factor used to convert the
@@ -1550,9 +1568,10 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
             Series values must be finite and real; ordinary or nullable missing values remain
             unavailable. For nonzero leverage, both date axes must be ``DatetimeIndex`` objects
             without ``NaT`` and must both be timezone-naive or timezone-aware. Different aware
-            zones align by absolute instant. Series observations are sorted chronologically,
-            aligned to return dates, and forward-filled from prior observations only; duplicate
-            funding dates are invalid.
+            zones align by absolute instant. Series observations are sorted chronologically; the
+            period (t-1, t] is charged the rate known at the previous return date t-1, the latest
+            quote dated on or before it, and the first return date the latest quote dated strictly
+            before it (missing when there is none). Duplicate funding dates are invalid.
         periods_per_year: Strictly positive integer annualisation factor. If None, inferred from
             the index.
 

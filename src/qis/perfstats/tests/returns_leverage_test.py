@@ -24,6 +24,9 @@ from qis.perfstats.returns import delever_returns, lever_returns
 # =============================================================================
 
 _DATES = pd.date_range("2024-01-31", periods=4, freq="ME")
+# Funding quotes are dated one month-end before the period they finance: under the
+# point-in-time convention a period is charged the rate known at its start.
+_QUOTE_DATES = pd.date_range("2023-12-31", periods=4, freq="ME")
 _TOLERANCE = 1.0e-12
 
 
@@ -42,7 +45,7 @@ def _funding_series() -> pd.Series:
     """Return annual funding observations that forward-fill to 1%, 1%, 2%, 2%."""
     return pd.Series(
         [0.12, 0.24],
-        index=pd.DatetimeIndex([_DATES[0], _DATES[2]]),
+        index=pd.DatetimeIndex([_QUOTE_DATES[0], _QUOTE_DATES[2]]),
         name="Annual funding",
     )
 
@@ -159,7 +162,7 @@ def test_leverage_transforms_are_exact_identity_at_zero_leverage() -> None:
     returns = _returns_frame()
     funding = pd.Series(
         [0.12, 0.24],
-        index=pd.DatetimeIndex([_DATES[1], _DATES[3]]),
+        index=pd.DatetimeIndex([_QUOTE_DATES[1], _QUOTE_DATES[3]]),
         name="Annual funding",
     )
 
@@ -210,7 +213,7 @@ def test_lever_returns_does_not_backfill_leading_unavailable_funding() -> None:
     returns = _returns_frame()["Asset A"]
     funding = pd.Series(
         [0.12, 0.24],
-        index=pd.DatetimeIndex([_DATES[1], _DATES[3]]),
+        index=pd.DatetimeIndex([_QUOTE_DATES[1], _QUOTE_DATES[3]]),
         name="Annual funding",
     )
     expected = pd.Series(
@@ -239,7 +242,7 @@ def test_delever_returns_does_not_backfill_leading_unavailable_funding() -> None
     )
     funding = pd.Series(
         [0.12, 0.24],
-        index=pd.DatetimeIndex([_DATES[1], _DATES[3]]),
+        index=pd.DatetimeIndex([_QUOTE_DATES[1], _QUOTE_DATES[3]]),
         name="Annual funding",
     )
     expected = pd.Series(
@@ -266,7 +269,7 @@ def test_delever_returns_does_not_backfill_leading_unavailable_funding() -> None
 def test_scalar_and_constant_series_funding_produce_the_same_values() -> None:
     """Keep scalar financing behavior while adding date-aligned Series support."""
     returns = _returns_frame()
-    constant_funding = pd.Series(0.12, index=_DATES, name="Annual funding")
+    constant_funding = pd.Series(0.12, index=_QUOTE_DATES, name="Annual funding")
     expected_levered = pd.DataFrame(
         {
             "Asset A": [0.03, -0.03, 0.05, -0.01],

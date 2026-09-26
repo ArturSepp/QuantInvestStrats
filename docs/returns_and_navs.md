@@ -37,7 +37,8 @@ questions:
 4. **How are fees charged?** A management fee accrues ACT/365 on gross asset value; a performance
    fee accrues on gains above a high-water mark and crystallises at calendar period ends.
 5. **How are leverage and financing applied?** Through a constant debt-to-equity ratio, with the
-   annual financing rate divided by the number of periods per year and no lag.
+   annual financing rate known at the start of each period divided by the number of periods per
+   year.
 
 | Task | qis entry point | Section |
 |---|---|---|
@@ -57,7 +58,7 @@ questions:
 | Sampling grid | The input index, or the `freq` grid when given: prices are sampled at `freq` boundaries before differencing |
 | Annualisation | Per-annum returns use $Y$ = days/365.25; cash and fees accrue ACT/365; leverage financing uses the annual rate divided by $\mathrm{AN}$; `compute_sampled_vols` scales by $\sqrt{\mathrm{AN}}$ |
 | Mean adjustment | None in return, NAV, fee and leverage transforms; `estimate_vol` removes the sample mean at 20 or more observations and none below 20 |
-| Timing | A return dated $t$ covers $(t-1,t]$; cash accrued over it, in the excess helpers and in the backtest cash leg alike, uses the rate known on the return date $t-1$; the leverage helpers and backtest carry use the latest quote at or before $t$; `to_portfolio_returns` lags weights by one row; interpolated returns up to a report date use data up to that date |
+| Timing | A return dated $t$ covers $(t-1,t]$; cash accrued over it, in the excess helpers and in the backtest cash leg alike, uses the rate known on the return date $t-1$, as does leverage financing; backtest carry uses the latest quote at or before $t$; `to_portfolio_returns` lags weights by one row; interpolated returns up to a report date use data up to that date |
 | Output units | Decimal returns; NAVs start at 1 unless `init_value` or `terminal_value` rescales them |
 | qis default | `to_returns(is_log_returns=False, return_type=ReturnTypes.RELATIVE, freq=None, ffill_nans=True, drop_first=False, is_first_zero=False)`, `returns_to_nav(init_period=0)`, fees `man_fee=0.01, perf_fee=0.2, perf_fee_frequency='YE'`, `interpolate_infrequent_returns(span=12, is_to_log_returns=False, vol_adjustment=1.0)` |
 
@@ -80,7 +81,7 @@ questions:
 | $f_{\mathrm{man}}$, $f_{\mathrm{perf}}$ | Annual management fee and performance-fee rate | Decimals, e.g. 0.02 and 0.20 |
 | $\chi_t$ | Crystallisation indicator | 1 on a crystallisation date, else 0 |
 | $L$, $E$ | Debt divided by equity; equity | Nonnegative; $L=0.5$ is 1.5x assets/equity |
-| $c_t$ | Financing cost per return period | $y_{(q_t)}/\mathrm{AN}$ |
+| $c_t$ | Financing cost per return period | $y_{(q_{t-1})}/\mathrm{AN}$ |
 | $r^{A}_t$, $r^{V}_t$ | Unlevered asset return and levered vehicle return | Simple |
 | $\hat\sigma$ | Output of `estimate_vol` | Per period, not annualised |
 | $\ell^{\mathrm{rep}}_b$, $d_{(b)}$ | Reported log return $b=0,\ldots,K$ and its report date | $\log(1+r)$ of a reported simple return |
@@ -438,12 +439,15 @@ discusses when the inverse is economically meaningful. Both use simple returns. 
 is
 
 $$
-c_t=\frac{y_{(q_t)}}{\mathrm{AN}},
+c_t=\frac{y_{(q_{t-1})}}{\mathrm{AN}},
 $$
 
-with **no lag**: a Series of annual rates is sorted and aligned to the return dates by the latest
-quote dated on or before each date, including a quote dated on the return date itself. Returns
-dated before the first quote are missing. A scalar `financing_rate` is constant. $\mathrm{AN}$ is
+the rate known at the start of the period: a Series of annual rates is sorted, and the period
+ending on return date $t$ is charged the latest quote dated on or before the previous return date
+$t-1$. A quote dated on a return date applies from the next period. The first return date takes
+the latest quote dated strictly before it, and is missing when there is none; so is every return
+whose period starts before the first quote. Up to qis 5.30.3 the quote dated on the return date
+itself was used. A scalar `financing_rate` is constant. $\mathrm{AN}$ is
 `periods_per_year`, or, when it is `None`, the factor inferred from the return index and rounded to
 an integer; an irregular index falls back to 252 with a warning. There is no day count: every
 period costs $y/\mathrm{AN}$ whatever its length. `leverage=0` returns a copy of the input, even
@@ -510,7 +514,7 @@ code. $C_{t-1}$ is the backtest cash balance and $V_{t-1}$ its NAV.
 | `qis.backtest_model_portfolio`, `management_fee` | ACT/365 | Constant | $f_{\mathrm{man}}\delta_t V_{t-1}$ deducted from cash |
 | `qis.backtest_model_portfolio`, `instruments_carry` | ACT/365 | Latest quote, no lag | Carry rate times $\delta_t$ on current notional |
 | `qis.compute_net_return_ex_perf_man_fees`, `qis.compute_net_navs_ex_perf_man_fees` | ACT/365 | Constant | $f_{\mathrm{man}}\delta_t$ subtracted from $r_t$ |
-| `qis.lever_returns`, `qis.delever_returns` | Periods per year | $y_{(q_t)}$: latest quote, no lag | $y_{(q_t)}/\mathrm{AN}$, independent of period length |
+| `qis.lever_returns`, `qis.delever_returns` | Periods per year | $y_{(q_{t-1})}$: known at $t-1$ on the return grid | $y_{(q_{t-1})}/\mathrm{AN}$, independent of period length |
 | `qis.compute_sampled_vols` | $\sqrt{\mathrm{AN}}$ inferred from the return index | None | None |
 | `qis.interpolate_infrequent_returns` | Pivot periods; `annualization_factor` sets no time scale | None | None |
 
@@ -526,8 +530,8 @@ backtest earns $3.65\%\times31/365$ in March, which is what `compute_excess_retu
 A cash balance held over $(t-1,t]$ earns the rate fixed when the period starts; the quote dated
 $t$, 7.3% in that example, is not yet known then. A funding series that starts after the first
 price date leaves the backtest NAV missing from the first period without a known rate, with a
-warning. The leverage helpers, which charge a per-period cost with no day count, keep the latest
-quote at or before $t$.
+warning. The leverage helpers also charge the rate known at $t-1$, but as a per-period cost with
+no day count. Backtest carry is the one rate that still uses the latest quote at or before $t$.
 
 ### Short-sample volatility
 
@@ -840,7 +844,8 @@ assert abs(cash_only.iloc[-1] / cash_only.iloc[-2] - 1.0 - 0.0365 * 31 / 365) < 
 The leverage example checks the identity by hand, the round trip, and the implied-leverage
 proposition. An asset return of 2% with $L=0.5$ and 4.8% financing, 0.4% a month, gives a vehicle
 return of $1.5\times2\%-0.5\times0.4\%=2.8\%$. Over the 36 monthly returns above, financed at 1% in
-2021 and 5% afterwards, the round trip recovers the asset returns to $10^{-15}$. With constant
+2021 and 5% afterwards, each month's rate quoted at the previous month-end so that it is known when
+the month starts, the round trip recovers the asset returns to $10^{-15}$. With constant
 financing the implied leverage is exactly 0.5; with the time-varying rate it is 0.4946, which the
 covariance identity reproduces; with nine observations it is missing.
 
@@ -850,10 +855,12 @@ vehicle = qis.lever_returns(returns=one, leverage=0.5, financing_rate=0.048, per
 assert abs(vehicle.iloc[0] - 0.028) < 1e-15
 
 asset = monthly_gross.iloc[1:].rename('asset')
-financing = pd.Series(np.where(asset.index.year == 2021, 0.01, 0.05), index=asset.index)
+# each month's rate is quoted at the previous month-end: the rate known when the month starts
+financing = pd.Series(np.where(asset.index.year == 2021, 0.01, 0.05),
+                      index=asset.index - pd.offsets.MonthEnd(1))
 levered = qis.lever_returns(returns=asset, leverage=0.5, financing_rate=financing,
                             periods_per_year=12)
-np.testing.assert_allclose(levered, 1.5 * asset - 0.5 * financing / 12.0, atol=1e-15)
+np.testing.assert_allclose(levered, 1.5 * asset - 0.5 * financing.to_numpy() / 12.0, atol=1e-15)
 round_trip = qis.delever_returns(returns=levered, leverage=0.5, financing_rate=financing,
                                  periods_per_year=12)
 np.testing.assert_allclose(round_trip, asset, atol=1e-15)
@@ -983,7 +990,7 @@ and the backtest cash recursion is in
   It has no flows, equalisation, hurdle or series accounting. A column that starts later runs its
   own account from its first NAV.
 - Leverage assumes constant debt to equity and one financing rate, applied without a day count and
-  at the latest quote at or before the return date. `implied_leverage` identifies $L$ only when
+  at the rate known at the start of each period. `implied_leverage` identifies $L$ only when
   financing is constant and the vehicles differ by leverage alone.
 - `estimate_vol` switches estimator at 20 observations, and `compute_sampled_vols` inherits the
   switch through the pair of grids.

@@ -28,6 +28,9 @@ from qis.perfstats.returns import delever_returns, lever_returns
 # =============================================================================
 
 _DATES = pd.date_range("2024-01-31", periods=4, freq="ME")
+# Funding quotes are dated one month-end before the period they finance: under the
+# point-in-time convention a period is charged the rate known at its start.
+_QUOTE_DATES = pd.date_range("2023-12-31", periods=4, freq="ME")
 
 _ANNUAL_FUNDING_LOW = 0.12
 _ANNUAL_FUNDING_HIGH = 0.24
@@ -114,7 +117,7 @@ def _funding_series(order: str) -> pd.Series:
     else:
         raise ValueError(f"unsupported funding fixture order: {order}")
 
-    return pd.Series(values, index=_DATES[list(positions)], name="Annual funding")
+    return pd.Series(values, index=_QUOTE_DATES[list(positions)], name="Annual funding")
 
 
 def _transform_case(transform_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -214,7 +217,7 @@ def test_lever_and_delever_returns_preserve_nullable_mixed_panel_round_trip() ->
     expected_levered = _expected_levered_returns().astype(nullable_dtype)
     funding = pd.Series(
         pd.array((_ANNUAL_FUNDING_HIGH, _ANNUAL_FUNDING_LOW), dtype=nullable_dtype),
-        index=_DATES[[2, 0]],
+        index=_QUOTE_DATES[[2, 0]],
         name="Annual funding",
     )
     original_returns = returns.copy()
@@ -257,7 +260,7 @@ def test_lever_and_delever_returns_keep_leading_funding_unavailable(
     expected.iloc[0, :] = np.nan
     funding = pd.Series(
         (_ANNUAL_FUNDING_LOW, _ANNUAL_FUNDING_HIGH),
-        index=_DATES[[1, 2]],
+        index=_QUOTE_DATES[[1, 2]],
         name="Annual funding",
     )
     original_returns = returns.copy()
@@ -355,7 +358,7 @@ def test_lever_and_delever_returns_reject_duplicate_funding_dates(
     frame, _ = _transform_case(transform_name)
     funding = pd.Series(
         (_ANNUAL_FUNDING_LOW, 0.18, _ANNUAL_FUNDING_HIGH),
-        index=pd.DatetimeIndex((_DATES[0], _DATES[0], _DATES[2])),
+        index=pd.DatetimeIndex((_QUOTE_DATES[0], _QUOTE_DATES[0], _QUOTE_DATES[2])),
         name="Annual funding",
     )
     original_funding = funding.copy()
@@ -383,7 +386,7 @@ def test_lever_and_delever_returns_keep_zero_identity_with_duplicate_funding(
     frame, _ = _transform_case(transform_name)
     funding = pd.Series(
         (_ANNUAL_FUNDING_LOW, _ANNUAL_FUNDING_HIGH),
-        index=pd.DatetimeIndex((_DATES[0], _DATES[0])),
+        index=pd.DatetimeIndex((_QUOTE_DATES[0], _QUOTE_DATES[0])),
         name="Annual funding",
     )
     original_funding = funding.copy()
