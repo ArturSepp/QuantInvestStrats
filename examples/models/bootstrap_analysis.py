@@ -3,8 +3,9 @@ Block bootstrap of price paths and AR(1) residual diagnostics.
 
 Demonstrates ``qis.bootstrap_price_data`` and
 ``qis.estimate_acf_from_paths``: bootstraps a single price series
-into N synthetic paths, then plots the path fan, return distributions,
-and per-path autocorrelation diagnostics.
+into N synthetic paths, then plots the path fan, EWMA volatilities
+and per-path partial autocorrelations of returns and squared returns
+(``estimate_acf_from_paths(..., is_pacf=True)``).
 """
 # packages
 import numpy as np
@@ -47,7 +48,8 @@ def plot_bootstrap_paths(prices: pd.Series,
     kwargs = dict(x_date_freq='YE', legend_loc=None)
     with sns.axes_style("darkgrid"):
         fig, axs = plt.subplots(2, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title='Log-performance and drawdowns of realized (red) and bootstrapped paths (grey)')
+        qis.set_suptitle(fig, title='Log-performance and drawdowns of realized (red) '
+                                    'and bootstrapped paths (grey)')
         figs.append(fig)
         qis.plot_prices_with_dd(prices=prices1,
                                 is_log=True,
@@ -63,7 +65,8 @@ def plot_bootstrap_paths(prices: pd.Series,
                                     annualization_factor=252)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title=f"EWMA-{span} span volatility of realized (red) and bootstrapped paths (gray)")
+        qis.set_suptitle(fig, title=f"EWMA-{span} span volatility of realized (red) "
+                                    f"and bootstrapped paths (gray)")
         figs.append(fig)
         qis.plot_time_series(df=ewma_vols,
                              colors=colors1,
@@ -74,7 +77,8 @@ def plot_bootstrap_paths(prices: pd.Series,
     acfs, m_acf, std_acf = qis.estimate_acf_from_paths(log_returns, is_pacf=True, nlags=nlags)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title=f"Auto-correlation of returns of realized (red) and bootstrapped paths (grey)")
+        qis.set_suptitle(fig, title="Partial auto-correlation of returns of realized (red) "
+                                    "and bootstrapped paths (grey)")
         figs.append(fig)
         qis.plot_line(df=acfs,
                       colors=colors1,
@@ -84,7 +88,8 @@ def plot_bootstrap_paths(prices: pd.Series,
     acfs, m_acf, std_acf = qis.estimate_acf_from_paths(log_returns2, is_pacf=True, nlags=nlags)
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title=f"Auto-correlation of squared returns of realized (red) and bootstrapped paths (grey)")
+        qis.set_suptitle(fig, title="Partial auto-correlation of squared returns of realized (red) "
+                                    "and bootstrapped paths (grey)")
         figs.append(fig)
         qis.plot_line(df=acfs,
                       colors=colors1,
@@ -94,7 +99,9 @@ def plot_bootstrap_paths(prices: pd.Series,
 
     with sns.axes_style("darkgrid"):
         fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-        qis.set_suptitle(fig, title=f"Realized auto-correlation of squared returns (red) and Boxplot of auto-correlation of bootstrapped paths (grey)")
+        qis.set_suptitle(fig, title="Realized partial auto-correlation of squared returns (red) "
+                                    "and Boxplot of partial auto-correlation of bootstrapped "
+                                    "paths (grey)")
         figs.append(fig)
         qis.df_boxplot_by_index(df=acfs.drop(prices.name, axis=1),
                                 legend_loc=None,
@@ -121,7 +128,7 @@ def plot_autocorr_in_block_size(prices: pd.Series,
                                 nlags: int = 20,
                                 ) -> List[plt.Figure]:
     """
-    use different block_size to check for autocorrelation
+    use different block_size to check the partial autocorrelation of squared returns
     """
     figs = []
     for idx, block_size in enumerate(block_sizes):
@@ -141,8 +148,10 @@ def plot_autocorr_in_block_size(prices: pd.Series,
 
         with sns.axes_style("darkgrid"):
             fig, ax = plt.subplots(1, 1, figsize=(14, 10))
-            qis.set_suptitle(fig, title=f"Realized auto-correlation of squared returns (red) and Boxplot of "
-                                        f"auto-correlation of bootstrapped paths (grey) for block_size={block_size:0.0f}")
+            qis.set_suptitle(fig, title=f"Realized partial auto-correlation of squared returns "
+                                        f"(red) and Boxplot of partial auto-correlation of "
+                                        f"bootstrapped paths (grey) for "
+                                        f"block_size={block_size:0.0f}")
             figs.append(fig)
             qis.df_boxplot_by_index(df=acfs.drop(prices.name, axis=1),
                                     legend_loc=None,
@@ -152,7 +161,8 @@ def plot_autocorr_in_block_size(prices: pd.Series,
                                     showmedians=True,
                                     ax=ax)
             # add reasized labels
-            add_scatter_points(label_x_y=[(lag, v) for lag, v in acfs[prices.name].to_dict().items()],
+            add_scatter_points(label_x_y=[(lag, v)
+                                          for lag, v in acfs[prices.name].to_dict().items()],
                                    color='red',
                                    ax=ax)
             set_legend(ax=ax,
@@ -178,7 +188,8 @@ def run_local(local: Locals):
     LOCAL_PATH = "C://Users//artur//OneDrive//analytics//outputs//"
 
     # download spy prices
-    prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename('Realised')
+    prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True,
+                         auto_adjust=True)['Close'].rename('Realised')
 
     if local == Locals.PLOT_bootstrapPED_PRICES:
         # use small number of num_samples for illustration

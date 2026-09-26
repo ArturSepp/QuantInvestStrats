@@ -65,7 +65,7 @@ computed on the draws are the caller's.
 | Mean adjustment | None: rows are drawn as observed and never recentred; AR(1) residuals have zero sample mean by construction |
 | Timing | Full sample, not point in time: any draw may use any row of the input; each resampled row keeps its own contemporaneous cross-section |
 | Output units | Units of the input; indices are zero-based integers; price paths are levels starting at an anchor price |
-| qis default | `generate_bootstrapped_indices`: `BootstrapType.IID`, `num_samples=10`, `index_length=1000`, `block_size=30`, `min_block_size=1`, `seed=1`; the `bootstrap_*` functions: `BootstrapType.STATIONARY`, `BootstrapOutput.DF_TO_LIST_ARRAYS`, `bootstrap_price_data` with `block_size=20`, `init_to_end=True` |
+| qis default | `generate_bootstrapped_indices`: `BootstrapType.IID`, `num_samples=10`, `index_length=1000`, `block_size=30`, `min_block_size=1`, `seed=1`; the `bootstrap_*` functions: `BootstrapType.STATIONARY`, `BootstrapOutput.DF_TO_LIST_ARRAYS`, `bootstrap_price_data` with `block_size=20`, `init_to_end=True`; `bootstrap_ar_process` with `is_positive=True` |
 
 | Symbol or input | Meaning | Units and convention |
 |---|---|---|
@@ -88,16 +88,17 @@ computed on the draws are the caller's.
 | $\gamma_k$, $\hat\gamma_k$, $\hat\gamma^{c}_k$ | Autocovariance at lag $k$; its sample and circular sample versions | Divisor $n$, demeaned |
 | $\sigma^2_{\mathrm{LR}}$ | Long-run variance $\sum_k\gamma_k$ | Squared units of the input |
 | $b^{\mathrm{opt}}$, $G$, $D$ | Politis–White block length and its constants | Rows; constants defined where used |
-| $P_{\mathrm{a}}$, $P^*_t$ | Anchor price; resampled price path | Price units |
+| $P_{\mathrm{a}}$, $P^*_t$ | Anchor price; resampled price path, $P^*_1=P_{\mathrm{a}}$ | Price units |
 | $r^*_t$, $\ell^*_t$ | Resampled simple and log return | Decimal |
 | $y_t$, $\bar y$ | Series modelled as an AR(1); mean of all its observations | Units of the input |
 | $\bar y^{(1)}$, $\bar y^{(0)}$, $\mu^*$ | Means of $y_t$ and $y_{t-1}$ over $\mathcal{T}$; fixed point of the fitted recursion | Units of the input |
 | $\alpha$, $\beta$, $\hat\varepsilon_t$ | AR(1) intercept, slope and residual | Hats denote estimates |
+| $\underline{y}_i$ | Positivity floor of column $i$: 25% quantile of its observed values | Units of the input; defined only for a column whose observed values are all positive |
 | $\mathcal{T}$ | Dates with a complete lag pair in every column | Set of positions |
 | $C_h$, $f_h$ | Case study: draw count and relative draw frequency of source row $h$ | Count; 1 means uniform |
 | $\delta$, $\mathrm{AN}$ | Case study: resampled minus source mean; linear annualisation factor | Decimal per period; 260 |
 | Index seed, return seed | Case study: seed of the index sampler; NumPy seed of the source series | 7 and 3 |
-| $q$, $d$, $Z$, $e_t$, $y_{(1)}$, $A$, $B$ | Local dummies: product index; summation index; a non-negative integer variable; expected AR(1) path; smallest cross-sectional value; two panels | Defined where used |
+| $q$, $d$, $Z$, $e_t$, $A$, $B$ | Local dummies: product index; summation index; a non-negative integer variable; expected AR(1) path; two panels | Defined where used |
 
 The block schemes are justified for strictly stationary, weakly dependent series whose
 dependence decays within a few block lengths
@@ -374,9 +375,16 @@ $$
 or $P^*_t=P_{\mathrm{a}}\exp\big(\sum_{q=2}^{t}\ell^*_q\big)$ with log returns. The anchor
 $P_{\mathrm{a}}$ is each column's last positive finite price when `init_to_end=True`, the
 default, so paths continue from the current level; with `init_to_end=False` it is the physical
-first row, so paths are alternative histories from the first date. Each path is scaled so that
-its first level equals the anchor, so the first drawn return has no effect: a path of $K$ levels
-carries $K-1$ resampled returns.
+first row, so paths are alternative histories from the first date.
+
+**Definition (anchor row).** The first level of every path is the anchor itself. The return
+drawn at position 1 is not used, so a path of $K$ levels carries the $K-1$ returns drawn at
+positions $2,\ldots,K$; request `index_length=K+1` for $K$ resampled returns after the anchor.
+The convention keeps the anchor in the output, which is what a fan of paths continuing from the
+last price needs. Discarding one drawn position costs nothing in distribution: every position has
+the uniform marginal of the proposition above, and under `IID`, or `STATIONARY` with
+$L_{\min}=1$, positions $2,\ldots,K$ have the joint law of a fresh path of $K-1$ positions,
+because those index processes are stationary.
 
 **Identity (expected log growth).** For every scheme, whether simple or log returns are
 resampled, $\mathbb{E}^*\big[\log(P^*_K/P_{\mathrm{a}})\big]=(K-1)\,\bar\ell$, where $\bar\ell$ is
@@ -425,13 +433,24 @@ $$
 
 where $\bar y^{(1)}$ and $\bar y^{(0)}$ are the means of $y_t$ and $y_{t-1}$ over $\mathcal{T}$.
 This is ordinary least squares of $y_t$ on $y_{t-1}$, the conditional maximum-likelihood
-estimate of a Gaussian AR(1). When the sample variance of $y_{t-1}$ is within the default
-absolute tolerance of `numpy.isclose` of zero, that is at most $10^{-8}$, the column is treated
-as constant: $\hat\beta=0$ and $\hat\alpha=\bar y^{(1)}$. The residuals, one row per element of
+estimate of a Gaussian AR(1). When the lagged values $y_{t-1}$, $t\in\mathcal{T}$, have a range
+of at most $10^{-12}$ times their largest absolute value, the column is treated as constant:
+$\hat\beta=0$ and $\hat\alpha=\bar y^{(1)}$. The residuals, one row per element of
 $\mathcal{T}$, have zero sample mean. A pair that straddles a gap is dropped rather than joined
 across it; the [gap example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/models/ar_bootstrap_gaps.py)
 measures what joining would cost, since an AR(1) sampled at spacing $k$ has persistence
 $\beta^k$.
+
+**Identity (units).** For a constant $c\ne0$, fitting $c\,y_t$ gives the slope $\hat\beta$, the
+intercept $c\,\hat\alpha$ and the residuals $c\,\hat\varepsilon_t$.
+
+**Proof.** The sample covariance and variance both scale by $c^2$, so their ratio is unchanged,
+and the means scale by $c$. The constant test compares a range with a largest absolute value,
+which both scale by $\lvert c\rvert$, so the same columns are treated as constant. $\square$
+
+Earlier versions used an absolute tolerance of $10^{-8}$ on the variance, which set
+$\hat\beta=0$ for any series with a standard deviation below about $10^{-4}$, such as a yield in
+decimals divided by a thousand; the worked example measures the difference.
 
 **Definition (resampled recursion).** Indices are drawn over the $\lvert\mathcal{T}\rvert$
 residual rows, not over the data rows. Each path starts from the column means of all observed
@@ -445,18 +464,29 @@ $$
 where $\hat\varepsilon_{J_t}$ is a whole residual row, so contemporaneous innovations across
 columns stay paired. The start value is not part of the output.
 
-After every step a positivity clamp is applied, and `qis.bootstrap_ar_process` exposes no
-argument to turn it off: each component with $y^*_{t,i}\le0$ is replaced by the 25% quantile,
-with linear interpolation, of that step's values across columns, computed before replacement;
-the clamped value feeds the next step. Two consequences follow from this exact rule. For a single
-series the quantile of one value is the value itself, so the clamp does nothing and paths can go
-negative; this is always the case for `SERIES_TO_DF` output. For a panel the replacement can
-itself be non-positive: with four columns it is $y_{(1)}+0.75\,(y_{(2)}-y_{(1)})$ for the two
-lowest values $y_{(1)}\le y_{(2)}$, which is negative when $y_{(1)}$ is negative enough. The clamp
-therefore guarantees positivity in neither case, and for a panel it couples otherwise separate
-columns.
+**Definition (positivity floor).** With `is_positive=True`, the default, a column $i$ whose
+observed values are all strictly positive is constrained, with floor $\underline{y}_i$, the 25%
+quantile, with linear interpolation, of those values. After every step a value $y^*_{t,i}\le0$ of
+a constrained column is replaced by $\underline{y}_i$, and the replaced value feeds the next step.
+A column with a zero or negative observation is not constrained, because positivity is not a
+property of its data; `is_positive=False` constrains no column.
 
-**Proposition (mean path).** While the clamp is inactive and $\hat\beta\ne1$,
+**Proposition (positivity).** Every path value of a constrained column is strictly positive, and
+the path of column $i$ does not depend on the other columns' floors or levels.
+
+**Proof.** $\underline{y}_i$ is a quantile of positive numbers, so it is positive, and each output
+value is either a positive recursion value or $\underline{y}_i$. The recursion of column $i$
+uses only $\hat\alpha_i$, $\hat\beta_i$, its own residual column and $\underline{y}_i$; the other
+columns enter only through the shared row index $J_t$. $\square$
+
+The floor is a reset, not a reflection: a path that would cross zero restarts at the lower
+quartile of the data, which raises the mean path. In earlier versions the replacement was the
+25% quantile of that step's values across columns. For a single series that is the value itself, so
+the clamp did nothing; for a panel it coupled independent columns, could itself be negative, and
+rewrote the negative values of mean-zero columns.
+
+**Proposition (mean path).** While the floor is inactive, which is always the case for an
+unconstrained column, and $\hat\beta\ne1$,
 
 $$
 \mathbb{E}^*[y^*_t]=\mu^*+\hat\beta^{\,t}\,(\bar y-\mu^*),
@@ -477,11 +507,14 @@ alternative histories around the mean, not forecasts from the current level.
 
 > **Pitfall.** `qis.bootstrap_price_fundamental_data` draws one index array over the $n-1$ return
 > rows of the first price panel and applies it to every price panel and every fundamental
-> panel, so a return and an AR innovation dated at the same step move together. The prices
-> continue from their last level (`init_to_end=True`), whereas the fundamentals start from their
-> full-sample mean, and `is_price_weighted_fundamentals=True` multiplies the two element by
-> element. A fundamental panel with gaps has fewer residual rows than return rows, and the
-> shared draw then typically raises `ValueError`.
+> panel, so a return and an AR innovation drawn at the same position move together. The two
+> kinds of path start differently and are offset by one step. A price path starts at its anchor,
+> the last price by default (`init_to_end` is forwarded), and its level at position $t$ has applied
+> the returns drawn at positions $2,\ldots,t$. A fundamental path starts from its full-sample mean,
+> which is not part of the output, and its value at position $t$ has applied the innovations drawn
+> at positions $1,\ldots,t$. `is_price_weighted_fundamentals=True` multiplies the two element by
+> element, position by position. A fundamental panel with gaps has fewer residual rows than
+> return rows, and the shared draw then typically raises `ValueError`.
 
 ### Choosing the block length
 
@@ -569,7 +602,7 @@ a compounded annual return, CAGR, Sharpe ratio or probability of profit.
 
 ## Worked example
 
-The blocks below run offline, in page order. The first three check the propositions against
+The blocks below run offline, in page order. The first four check the propositions against
 direct numpy calculations; the case study reproduces the measurement behind the 5.1.0 change.
 
 ### Floored block lengths
@@ -677,8 +710,9 @@ panel, to two column subsets and to the prices. Every resampled row equals a sou
 subsets reassemble into the full resample, and the pooled covariance of all resampled rows
 equals the source covariance weighted by the draw counts. The correlation between `SEQ_US` and
 `SEQ_EU` is 0.800 in the source and 0.800 pooled over the resampled rows; drawing the two columns
-with independent index arrays gives 0.002. Each price path equals the last month-end price
-compounded with the resampled returns from the second row on.
+with independent index arrays gives 0.002. Each price path starts at the last month-end price
+and compounds the resampled returns from the second row on, and one Series resampled with the
+same 300-column index array returns 300 paths although `num_samples` defaults to 10.
 
 ```python
 import pandas as pd
@@ -729,6 +763,69 @@ for m, path in enumerate(price_paths):
     growth = np.cumprod(1.0 + source[indices[1:, m]], axis=0)
     np.testing.assert_allclose(path, levels[-1] * np.vstack([np.ones((1, 3)), growth]),
                                rtol=1e-12)
+
+# one Series as a DataFrame of paths: the supplied indices, not num_samples=10, set the count
+series_paths = qis.bootstrap_price_data(prices=prices['SEQ_US'],
+                                        bootstrap_output=qis.BootstrapOutput.SERIES_TO_DF,
+                                        bootstrapped_indices=indices)
+assert series_paths.shape == (n, paths)
+np.testing.assert_allclose(series_paths.to_numpy(),
+                           np.column_stack([path[:, 0] for path in price_paths]), rtol=1e-12)
+```
+
+### AR(1) paths: positivity and units
+
+A persistent positive series close to zero, like a dividend yield, shows the positivity floor.
+The fixture has 400 monthly observations around 2% with persistence 0.98; every observation is
+positive, the smallest 0.197%. The fitted slope is 0.979, equal to ordinary least squares on the
+lag pairs. Over 200 `STATIONARY` paths of 1,500 steps with $b=20$, 1.085% of the unconstrained
+values (`is_positive=False`) are at or below zero. With the default floor none are: the floor is
+the lower quartile of the data, 1.077%, 0.106% of the values sit on it, and the average level
+rises from 1.643% to 1.698%. A numpy recursion from the fitted coefficients reproduces the first
+floored path. A thousandth of the series has a standard deviation of $7\times10^{-6}$ and the same
+fitted slope; the former absolute variance test set it to zero.
+
+```python
+n, level, persistence, noise = 400, 0.02, 0.98, 0.0015
+rng = np.random.default_rng(5)
+values = np.full(n, level)
+for t in range(1, n):
+    values[t] = level + persistence * (values[t - 1] - level) + rng.normal(0.0, noise)
+yields = pd.Series(values, index=pd.date_range('1990-01-31', periods=n, freq='ME'), name='yield')
+
+residuals, intercept, beta = qis.compute_ar_residuals(yields)
+target, regressor = values[1:], values[:-1]
+np.testing.assert_allclose(
+    beta[0], np.cov(target, regressor, ddof=1)[0, 1] / np.var(regressor, ddof=1), rtol=1e-12)
+
+indices = qis.generate_bootstrapped_indices(
+    num_data_index=len(residuals), bootstrap_type=qis.BootstrapType.STATIONARY,
+    num_samples=200, index_length=1500, block_size=20, seed=5)
+free = np.stack(list(qis.bootstrap_ar_process(yields, bootstrapped_indices=indices,
+                                              is_positive=False)))
+floored = np.stack(list(qis.bootstrap_ar_process(yields, bootstrapped_indices=indices)))
+quartile = np.quantile(values, 0.25)
+
+# the first floored path, rerun in numpy: start at the mean, reset to the quartile at or below 0
+level_path, y = np.zeros(1500), values.mean()
+for t in range(1500):
+    y = intercept[0] + beta[0] * y + residuals[indices[t, 0], 0]
+    y = quartile if y <= 0.0 else y
+    level_path[t] = y
+np.testing.assert_allclose(floored[0, :, 0], level_path, rtol=1e-12)
+
+# units: a thousandth of the series has the same slope
+_, _, beta_small = qis.compute_ar_residuals(yields / 1000.0)
+np.testing.assert_allclose(beta_small, beta, rtol=1e-12)
+
+at_floor = np.isclose(floored, quartile, rtol=0.0, atol=1e-15).mean()
+print(values.min(), beta[0], (free <= 0.0).mean(), quartile, at_floor, free.mean(), floored.mean())
+assert values.min() > 0.0 and abs(values.min() - 0.00197) < 0.000005
+assert abs(beta[0] - 0.979) < 0.0005
+assert abs((free <= 0.0).mean() - 0.01085) < 0.000005 and (floored > 0.0).all()
+assert abs(quartile - 0.01077) < 0.000005 and abs(at_floor - 0.00106) < 0.000005
+assert abs(free.mean() - 0.01643) < 0.000005 and abs(floored.mean() - 0.01698) < 0.000005
+assert abs((yields / 1000.0).std() - 7e-6) < 1e-7
 ```
 
 ### Case study: what an unstated convention costs
@@ -812,9 +909,9 @@ for label, indices in [('truncating', legacy), ('circular', circular)]:
 | Paired draws | one $J$ shared by several panels | `bootstrapped_indices=` |
 | Price path | $P^*_t=P_{\mathrm{a}}\prod_{q=2}^{t}(1+r^*_q)$ | `qis.bootstrap_price_data` (`is_log_returns`, `init_to_end`) |
 | AR(1) fit | $\hat\alpha$, $\hat\beta$, $\hat\varepsilon_t$ on $\mathcal{T}$ | `qis.compute_ar_residuals`, returning `(residuals, intercept, beta)` |
-| AR(1) paths | $y^*_t=\hat\alpha+\hat\beta y^*_{t-1}+\hat\varepsilon_{J_t}$, then the clamp | `qis.bootstrap_ar_process` |
-| Prices with fundamentals | one $J$ over the $n-1$ return rows | `qis.bootstrap_price_fundamental_data` |
-| Path diagnostics | per-path partial or ordinary autocorrelations | `qis.estimate_acf_from_paths` (`is_pacf=True` by default) |
+| AR(1) paths | $y^*_t=\hat\alpha+\hat\beta y^*_{t-1}+\hat\varepsilon_{J_t}$, then the floor $\underline{y}_i$ | `qis.bootstrap_ar_process` (`is_positive`) |
+| Prices with fundamentals | one $J$ over the $n-1$ return rows | `qis.bootstrap_price_fundamental_data` (`init_to_end`, `is_positive`, `is_price_weighted_fundamentals`) |
+| Path diagnostics | per-path partial or ordinary autocorrelations | `qis.estimate_acf_from_paths`, with `is_pacf` passed explicitly |
 
 The module is [bootstrap_numba.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/models/bootstrap/bootstrap_numba.py);
 the index kernels and the AR recursion are compiled with numba.
@@ -823,18 +920,20 @@ the index kernels and the AR recursion are compiled with numba.
 
 - `qis.generate_bootstrapped_indices` returns an `int64` array of shape
   `(index_length, num_samples)`; it raises `ValueError` for an unknown `bootstrap_type`.
-- `qis.bootstrap_data` with `DF_TO_LIST_ARRAYS` returns a numba typed list of `num_samples`
-  arrays, each of shape `(index_length, number of columns)`, and needs a DataFrame: a Series
-  fails in numba typing, so pass `series.to_frame()`. With `SERIES_TO_DF` it needs a Series,
-  raises `ValueError` for a DataFrame, and returns columns `path_1`, `path_2`, … on a
-  `RangeIndex`. No output carries dates; attach an index when needed.
-- `qis.bootstrap_price_data` accepts a Series in both modes. In `SERIES_TO_DF` mode the anchor
-  is repeated `num_samples` times, so supplied `bootstrapped_indices` must have exactly
-  `num_samples` columns.
-- `qis.bootstrap_ar_process` draws over the residual rows. Supplied indices that reach past
-  them raise `ValueError`, because the compiled kernel does not check bounds.
+- `qis.bootstrap_data` with `DF_TO_LIST_ARRAYS` returns a numba typed list of arrays, each of
+  shape `(index_length, number of columns)`; a Series is resampled as one column. With
+  `SERIES_TO_DF` it needs a Series, raises `ValueError` for a DataFrame, and returns columns
+  `path_1`, `path_2`, … on a `RangeIndex`. No output carries dates; attach an index when needed.
+- Supplied `bootstrapped_indices` set the number of paths, whatever `num_samples` says, and every
+  entry must lie in $\{0,\ldots,n-1\}$ for the $n$ rows the function draws from; otherwise the
+  function raises `ValueError`, because the compiled kernels do not check bounds.
+- `qis.bootstrap_price_data` accepts a Series in both modes and draws over the return rows, one
+  fewer than the price rows. Its first output row is the anchor.
+- `qis.bootstrap_ar_process` draws over the residual rows, which gaps can shorten below $n-1$,
+  and applies the positivity floor unless `is_positive=False`.
 - `qis.bootstrap_price_fundamental_data` asserts that every fundamental panel has the index, and
-  for DataFrames the columns, of the first price panel.
+  for DataFrames the columns, of the first price panel, and forwards `init_to_end` to the price
+  paths and `is_positive` to the fundamental paths.
 
 ### Seeds and random streams
 
@@ -884,8 +983,11 @@ A seed alone does not promise identical output across software versions. The
 several changes that move seeded resamples: `STATIONARY` blocks wrap from qis 5.1.0, which also
 added `FIXED_BLOCK` and `min_block_size` with a default that keeps the earlier behaviour; from
 5.2.1 AR(1) indices are drawn over the residual rows and lag pairs that straddle a gap are
-dropped; and a later fix fills the terminal row of every `IID` path, so seeded `IID` results of
-earlier versions may not reproduce either.
+dropped; a later fix fills the terminal row of every `IID` path, so seeded `IID` results of
+earlier versions may not reproduce either; and a still later fix makes the AR(1) positivity
+floor per column and the constant-series test relative to scale, which moves seeded AR paths of
+positive columns that reach zero, of panels whose columns were coupled by the old clamp, and of
+series with a standard deviation below about $10^{-4}$.
 
 For an unchanged publication, preserve the original code, environment and inputs. For a
 recomputation using current qis, report it as a new computation and identify the changed
@@ -914,8 +1016,10 @@ import location. Generation timestamps and fixed sample dates are separate field
   resample only the rows available at each decision date.
 - Missing values are resampled as they are. `compute_ar_residuals` needs complete rows, and
   `bootstrap_price_data` treats a drawn missing return as no growth.
-- The AR(1) positivity clamp is inactive for a single series and does not guarantee positivity
-  for a panel; check the sign of resampled levels where it matters.
+- The AR(1) positivity floor keeps positive columns positive by resetting a path that would
+  cross zero to the column's lower quartile. That reset is a modelling choice, not a property of
+  the fitted AR(1): it raises the mean path, and a series that can be negative is never floored.
+  Report `is_positive` with the result.
 
 ### What follows for the package
 

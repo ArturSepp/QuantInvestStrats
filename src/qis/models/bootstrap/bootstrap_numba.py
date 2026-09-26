@@ -18,8 +18,10 @@ the sample is cut short, the realised block length is no longer geometric there,
 observations can only ever appear in short blocks. STATIONARY gained the wrap in 5.1.0, so any
 result resampled under an earlier version does not reproduce.
 
-Draws are reproducible through ``seed``, which sets both the numpy and the numba random state -
-setting ``np.random.seed`` alone does not reach the ``@njit`` kernels.
+Draws are reproducible through ``seed``, which seeds numba's own generator inside the ``@njit``
+kernels. numba keeps that state separate from numpy's global generator: calling
+``np.random.seed`` does not change the draws, and a draw neither reads nor changes numpy's
+global state.
 
 Entry points: ``generate_bootstrapped_indices`` for indices, ``bootstrap_data`` for a series or
 panel, ``bootstrap_price_data`` which resamples returns and recompounds them into prices rather
@@ -41,6 +43,10 @@ import qis.utils.np_ops as npo
 import qis.perfstats.returns as ret
 
 FloatArray = np.ndarray[tuple[int, ...], np.dtype[np.float64]]
+
+# a lagged series whose range is at most this fraction of its largest magnitude is constant:
+# about 4500 ulps, far above rounding noise and far below any economically meaningful variation
+_CONSTANT_RELATIVE_RANGE = 1e-12
 
 
 class BootstrapType(Enum):
@@ -78,7 +84,7 @@ class BootstrapOutput(Enum):
 @njit
 def set_seed(value):
     """
-    set seed for numba space
+    seed numba's generator; called from Python it does not seed numpy's global generator.
     """
     np.random.seed(value)
 
@@ -205,11 +211,24 @@ def get_bootstrap_ar_data_list(residuals: np.ndarray,
                                beta: np.ndarray,
                                data0: np.ndarray,
                                bootstrapped_indices: np.ndarray,
-                               is_positive: bool = True
+                               positive_floor: np.ndarray
                                ) -> List:
     """
-    map indices to ar data
+    map indices to AR(1) paths, applying the per-column positivity floor after every step.
+
+    Args:
+        residuals: residual rows, one column per series
+        intercept: fitted intercept per series
+        beta: fitted slope per series
+        data0: start value per series; it is not part of the output
+        bootstrapped_indices: residual rows to draw, shape ``(index_length, num_samples)``
+        positive_floor: one entry per series. NaN leaves the series unconstrained; a positive
+            value replaces any non-positive step of that series before it feeds the next step
+
+    Returns:
+        numba list of ``num_samples`` arrays of shape ``(index_length, number of series)``
     """
+    constrained = ~np.isnan(positive_floor)
     bootstrap_sample = List()
     for index in np.transpose(bootstrapped_indices):
         bootstrapped_resids = residuals[index, :]
@@ -217,12 +236,38 @@ def get_bootstrap_ar_data_list(residuals: np.ndarray,
         y0 = data0*np.ones_like(beta)  # nb important for numba so it can map beta*y0
         for idx, resid in enumerate(bootstrapped_resids):
             y0 = intercept + beta*y0 + resid
-            if is_positive:
-                y0 = np.where(np.greater(y0, 0.0), y0, np.nanquantile(y0, 0.25))
+            # each column is floored with its own value, so columns stay independent
+            y0 = np.where(constrained & np.less_equal(y0, 0.0), positive_floor, y0)
             bootstrapped_data[idx] = y0
 
         bootstrap_sample.append(bootstrapped_data)
     return bootstrap_sample
+
+
+def _get_positive_floor(data: Union[pd.Series, pd.DataFrame], is_positive: bool) -> np.ndarray:
+    """Return the per-column positivity floor used by the AR(1) path recursion.
+
+    A column is constrained only when all its observed values are strictly positive; its floor
+    is then the 25% quantile, with linear interpolation, of those values, which is positive.
+    Positivity is not a property of a column with a zero or negative observation, so such a
+    column is left unconstrained.
+
+    Args:
+        data: observations, one column per series
+        is_positive: False leaves every column unconstrained
+
+    Returns:
+        one float per column: the floor, or NaN for an unconstrained column
+    """
+    values = (data.to_frame() if isinstance(data, pd.Series) else data).to_numpy(dtype=float)
+    floors = np.full(values.shape[1], np.nan)
+    if not is_positive:
+        return floors
+    for idx in range(values.shape[1]):
+        observed = values[np.isfinite(values[:, idx]), idx]
+        if observed.size > 0 and np.all(observed > 0.0):
+            floors[idx] = float(np.quantile(observed, 0.25))
+    return floors
 
 
 def compute_ar_residuals(data: Union[pd.Series, pd.DataFrame]
@@ -236,7 +281,10 @@ def compute_ar_residuals(data: Union[pd.Series, pd.DataFrame]
     ``bootstrap_ar_process`` resamples rows jointly to preserve the cross-section.
 
     The coefficient is the conditional maximum likelihood estimate, which for an AR(1) is
-    ordinary least squares of the series on its own lag.
+    ordinary least squares of the series on its own lag. A column whose lagged values have a
+    range of at most 1e-12 times their largest absolute value is treated as constant, with
+    slope zero and the mean of the target as intercept. The test is relative, so the slope does
+    not depend on the units of the series.
 
     Args:
         data: observations, one column per series
@@ -271,13 +319,15 @@ def compute_ar_residuals(data: Union[pd.Series, pd.DataFrame]
     residuals = np.zeros((num_pairs, num_columns))
     for idx in range(num_columns):
         target, regressor = y[:, idx], y_1[:, idx]
-        variance = float(np.var(regressor, ddof=1))
-        if np.isclose(variance, 0.0):
+        # constant relative to its own scale: an absolute tolerance on the variance would treat
+        # every series with a standard deviation below about 1e-4 as constant
+        if np.ptp(regressor) <= _CONSTANT_RELATIVE_RANGE * np.max(np.abs(regressor)):
             # a constant series has no autoregression to estimate: zero beta and a mean
             # intercept reproduce it exactly
             beta[idx] = 0.0
             intercept[idx] = float(np.mean(target))
         else:
+            variance = float(np.var(regressor, ddof=1))
             beta[idx] = float(np.cov(target, regressor, ddof=1)[0, 1] / variance)
             intercept[idx] = float(np.mean(target) - beta[idx] * np.mean(regressor))
         residuals[:, idx] = target - (intercept[idx] + beta[idx] * regressor)
@@ -363,7 +413,8 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
     ``bootstrapped_indices`` for each panel.
 
     Args:
-        data: observations to resample, rows are dates
+        data: observations to resample, rows are dates. A Series is resampled as a one-column
+            panel under DF_TO_LIST_ARRAYS
         bootstrap_type: resampling scheme; see :class:`BootstrapType`
         bootstrap_output: shape of the result; see :class:`BootstrapOutput`
         num_samples: number of independent draws
@@ -371,11 +422,19 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
         block_size: mean block length for STATIONARY, exact length for FIXED_BLOCK
         min_block_size: floor on the drawn block length under STATIONARY
         seed: seed for the numba random state
-        bootstrapped_indices: precomputed indices. Given, every sampling argument above is ignored
-            and this is the array used, which is how paired resampling is done
+        bootstrapped_indices: precomputed indices of shape ``(index_length, number of draws)``.
+            Given, every sampling argument above is ignored, including ``num_samples``: the
+            number of draws is the number of columns of this array. This is how paired
+            resampling is done
 
     Returns:
-        a DataFrame of draws for SERIES_TO_DF, or a list of arrays for DF_TO_LIST_ARRAYS
+        a DataFrame of draws for SERIES_TO_DF, with columns ``path_1``, ``path_2``, ... on a
+        RangeIndex, or a numba list of arrays of shape ``(index_length, number of columns)`` for
+        DF_TO_LIST_ARRAYS
+
+    Raises:
+        ValueError: if supplied ``bootstrapped_indices`` fall outside ``[0, len(data.index))``,
+            or if SERIES_TO_DF is requested for a DataFrame
     """
     if bootstrapped_indices is None:
         bootstrapped_indices = generate_bootstrapped_indices(num_data_index=len(data.index),
@@ -385,16 +444,27 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
                                                              block_size=block_size,
                                                              min_block_size=min_block_size,
                                                              seed=seed)
+    else:
+        # the kernel is @njit with bounds checking off: an index outside the data would read
+        # adjacent memory and return it as an observation instead of raising
+        bootstrapped_indices = np.asarray(bootstrapped_indices)
+        smallest, largest = int(np.min(bootstrapped_indices)), int(np.max(bootstrapped_indices))
+        if smallest < 0 or largest >= len(data.index):
+            raise ValueError(f"bootstrapped_indices span [{smallest}, {largest}] but data has "
+                             f"{len(data.index)} rows")
 
     if bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
-        bootstrap_sample = get_bootstrap_data_list(data_np=data.to_numpy(),
+        # the kernel indexes rows of a two-dimensional array, so a Series becomes one column
+        data_np = data.to_frame().to_numpy() if isinstance(data, pd.Series) else data.to_numpy()
+        bootstrap_sample = get_bootstrap_data_list(data_np=data_np,
                                                    bootstrapped_indices=bootstrapped_indices)
 
     elif bootstrap_output == BootstrapOutput.SERIES_TO_DF:
         if not isinstance(data, pd.Series):
-            raise ValueError(f"data must be series")
+            raise ValueError("data must be series")
 
-        bootstrap_sample = get_bootstrap_data_list(data_np=npo.np_array_to_matrix(a=data.to_numpy(), ncols=1),
+        data_np = npo.np_array_to_matrix(a=data.to_numpy(), ncols=1)
+        bootstrap_sample = get_bootstrap_data_list(data_np=data_np,
                                                    bootstrapped_indices=bootstrapped_indices)
         data = []
         for idx, sample in enumerate(bootstrap_sample):
@@ -402,7 +472,7 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
         bootstrap_sample = pd.concat(data, axis=1, sort=False)
 
     else:
-        raise ValueError(f"not implemented")
+        raise ValueError("not implemented")
 
     return bootstrap_sample
 
@@ -415,10 +485,54 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
                          block_size: int = 30,
                          min_block_size: int = 1,
                          seed: int = 1,
-                         bootstrapped_indices: np.ndarray = None
+                         bootstrapped_indices: np.ndarray = None,
+                         is_positive: bool = True
                          ) -> Union[List, pd.DataFrame]:
+    """
+    resample the residuals of a fitted AR(1) per column and rerun the recursion.
 
+    For persistent level series, such as valuation ratios, resampling observations would break
+    the persistence; resampling innovations keeps it. Each column is fitted with
+    :func:`compute_ar_residuals` on complete lag pairs, indices are drawn over the residual
+    rows, and every path starts from the column means of all observed data, ``y0 = nanmean``,
+    and runs ``y_t = intercept + beta * y_{t-1} + residual_{J_t}``, a whole residual row per
+    step so contemporaneous innovations stay paired. The start value is not part of the output,
+    so row ``t`` of a path has applied the innovations drawn at index rows ``0..t``. The paths
+    are alternative histories around the fitted mean, not forecasts from the last observation.
+
+    Positivity rule: with ``is_positive=True`` a column is constrained when all its observed
+    values are strictly positive. After every step a non-positive value of such a column is
+    replaced by the 25% quantile, with linear interpolation, of that column's observed values
+    (a positive number), and the replaced value feeds the next step. Each column uses its own
+    floor, so columns stay independent. A column with a zero or negative observation is never
+    constrained, since positivity is not a property of its data.
+
+    Args:
+        data: observations, one column per series; rows must be complete across columns
+        bootstrap_type: resampling scheme; see :class:`BootstrapType`
+        bootstrap_output: shape of the result; see :class:`BootstrapOutput`. SERIES_TO_DF needs
+            a Series
+        num_samples: number of independent draws
+        index_length: length of each path
+        block_size: mean block length for STATIONARY, exact length for FIXED_BLOCK
+        min_block_size: floor on the drawn block length under STATIONARY
+        seed: seed for the numba random state
+        bootstrapped_indices: precomputed indices over the residual rows, which override the
+            sampling arguments
+        is_positive: apply the positivity rule above; False leaves every column unconstrained
+
+    Returns:
+        a DataFrame of paths for SERIES_TO_DF, with columns ``path_1``, ``path_2``, ... on a
+        RangeIndex, or a numba list of arrays of shape ``(index_length, number of columns)`` for
+        DF_TO_LIST_ARRAYS
+
+    Raises:
+        ValueError: if the AR(1) is not identified (see :func:`compute_ar_residuals`), if
+            supplied ``bootstrapped_indices`` fall outside the residual rows, or if SERIES_TO_DF
+            is requested for a DataFrame
+    """
     residuals, intercept, beta = compute_ar_residuals(data=data)
+    positive_floor = _get_positive_floor(data=data, is_positive=is_positive)
     if bootstrapped_indices is None:
         # an AR(1) on n observations has n-1 residuals, and the consumer is @njit with bounds
         # checking off, so drawing over len(data.index) reads one row past the end
@@ -433,10 +547,11 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
         # supplied indices were drawn over some other array. get_bootstrap_ar_data_list is
         # njit with bounds checking off, so an index past the end reads adjacent memory
         # and returns a plausible number instead of raising
+        smallest = int(np.min(bootstrapped_indices))
         largest = int(np.max(bootstrapped_indices))
-        if largest >= len(residuals):
-            raise ValueError(f"bootstrapped_indices reach {largest} but residuals has "
-                             f"{len(residuals)} rows: draw them over the residual rows, "
+        if smallest < 0 or largest >= len(residuals):
+            raise ValueError(f"bootstrapped_indices span [{smallest}, {largest}] but residuals "
+                             f"has {len(residuals)} rows: draw them over the residual rows, "
                              f"which gaps in the data can shorten below len(data.index)-1")
 
     if bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
@@ -444,17 +559,19 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
                                                       intercept=intercept,
                                                       beta=beta,
                                                       data0=np.nanmean(data, axis=0),
-                                                      bootstrapped_indices=bootstrapped_indices)
+                                                      bootstrapped_indices=bootstrapped_indices,
+                                                      positive_floor=positive_floor)
 
     elif bootstrap_output == BootstrapOutput.SERIES_TO_DF:
         if not isinstance(data, pd.Series):
-            raise ValueError(f"data must be series")
+            raise ValueError("data must be series")
 
         bootstrap_sample = get_bootstrap_ar_data_list(residuals=residuals,
                                                       intercept=intercept,
                                                       beta=beta,
                                                       data0=np.array(np.nanmean(data)),
-                                                      bootstrapped_indices=bootstrapped_indices)
+                                                      bootstrapped_indices=bootstrapped_indices,
+                                                      positive_floor=positive_floor)
 
         data = []
         for idx, sample in enumerate(bootstrap_sample):
@@ -462,7 +579,7 @@ def bootstrap_ar_process(data: Union[pd.Series, pd.DataFrame],
         bootstrap_sample = pd.concat(data, axis=1, sort=False)
 
     else:
-        raise ValueError(f"not implemented")
+        raise ValueError("not implemented")
 
     return bootstrap_sample
 
@@ -518,18 +635,25 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
     jump at the joins. Returns are resampled and then compounded back into a path, so each draw is a
     continuous price series with the return distribution of the original.
 
+    Anchor convention: row 0 of every path is the anchor price itself, and row ``k`` compounds
+    the anchor with the returns drawn at index rows ``1..k``. The return drawn at index row 0 is
+    not used, so a path of ``index_length`` levels carries ``index_length - 1`` resampled
+    returns. Pass ``index_length=K + 1`` for ``K`` resampled returns after the anchor.
+
     Args:
         prices: Price levels. A Series represents one asset; a DataFrame has one column per asset.
         bootstrap_type: resampling scheme; see :class:`BootstrapType`
         bootstrap_output: Shape of the result; see :class:`BootstrapOutput`. Series input supports
             either output mode; ``DF_TO_LIST_ARRAYS`` returns one-column arrays for that case.
         num_samples: number of independent draws
-        index_length: length of each draw
+        index_length: length of each draw, anchor row included
         block_size: mean block length for STATIONARY, exact length for FIXED_BLOCK. 1 is IID
         min_block_size: floor on the drawn block length under STATIONARY
         is_log_returns: resample log returns rather than arithmetic ones
         seed: seed for the numba random state
-        bootstrapped_indices: precomputed indices, which override the sampling arguments
+        bootstrapped_indices: precomputed indices over the ``len(prices.index) - 1`` return rows,
+            which override the sampling arguments; the number of paths is then the number of
+            columns of this array, whatever ``num_samples`` says
         init_to_end: Start each path from its input series' last positive finite price, so ragged
             columns continue from their own terminal observation. False starts every path from the
             physical first row, so the draws are alternative histories
@@ -572,14 +696,16 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
     elif bootstrap_output == BootstrapOutput.SERIES_TO_DF:
         assert isinstance(prices, pd.Series)
         price_anchor = _get_price_anchor(prices=prices, init_to_end=init_to_end)
-        init_value = np.repeat(price_anchor, num_samples)
+        # one anchor per drawn path: supplied indices set the path count, not num_samples
+        init_value = np.repeat(price_anchor, bootstrap_returns.shape[1])
 
         if is_log_returns:
-            bootstrap_sample = ret.log_returns_to_nav(log_returns=bootstrap_returns, init_value=init_value)
+            bootstrap_sample = ret.log_returns_to_nav(log_returns=bootstrap_returns,
+                                                      init_value=init_value)
         else:
             bootstrap_sample = ret.returns_to_nav(returns=bootstrap_returns, init_value=init_value)
     else:
-        raise ValueError(f"not implemented")
+        raise ValueError("not implemented")
 
     return bootstrap_sample
 
@@ -587,18 +713,61 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
 def bootstrap_price_fundamental_data(price_datas: Dict[str, Union[pd.Series, pd.DataFrame]],
                                      fundamental_datas: Dict[str, Union[pd.Series, pd.DataFrame]],
                                      bootstrap_type: BootstrapType = BootstrapType.STATIONARY,
-                                     bootstrap_output: BootstrapOutput = BootstrapOutput.DF_TO_LIST_ARRAYS,
+                                     bootstrap_output: BootstrapOutput = (
+                                         BootstrapOutput.DF_TO_LIST_ARRAYS),
                                      num_samples: int = 10,
                                      index_length: int = 1000,
                                      block_size: int = 30,
                                      min_block_size: int = 1,
                                      is_log_returns: bool = False,
                                      seed: int = 1,
-                                     is_price_weighted_fundamentals: bool = False  # multiply by price_datas[0] price bootstrap
-                                     ) -> Tuple[Dict[str, Union[pd.DataFrame, List]], Dict[str, Union[pd.DataFrame, List]]]:
-
+                                     is_price_weighted_fundamentals: bool = False,
+                                     init_to_end: bool = True,
+                                     is_positive: bool = True
+                                     ) -> Tuple[Dict[str, Union[pd.DataFrame, List]],
+                                                Dict[str, Union[pd.DataFrame, List]]]:
     """
-    price data in the first element must  be aligned with all fundamentals
+    resample price panels and AR(1) fundamentals jointly with one shared index array.
+
+    One index array is drawn over the ``len(prices.index) - 1`` return rows of the first price
+    panel and passed to :func:`bootstrap_price_data` for every price panel and to
+    :func:`bootstrap_ar_process` for every fundamental panel, so the return and the AR
+    innovation drawn at the same index row move together.
+
+    The two kinds of path start differently and are offset by one step. A price path starts at
+    its anchor (the last positive price with ``init_to_end=True``, the first row otherwise):
+    row 0 is the anchor and row ``t`` has applied the returns drawn at index rows ``1..t``. A
+    fundamental path starts from the full-sample mean of its data, which is not part of the
+    output: row ``t`` has applied the innovations drawn at index rows ``0..t``. With
+    ``is_price_weighted_fundamentals=True`` each fundamental path is multiplied element by
+    element by the matching path of the first price panel, row by row and column by column.
+
+    Args:
+        price_datas: price panels keyed by name; the first one sets the index array and must be
+            aligned with every fundamental panel. Every panel must have as many rows as the first
+        fundamental_datas: fundamental panels keyed by name, with the index, and for DataFrames
+            the columns, of the first price panel
+        bootstrap_type: resampling scheme; see :class:`BootstrapType`
+        bootstrap_output: shape of the results; see :class:`BootstrapOutput`
+        num_samples: number of independent draws
+        index_length: length of each path
+        block_size: mean block length for STATIONARY, exact length for FIXED_BLOCK
+        min_block_size: floor on the drawn block length under STATIONARY
+        is_log_returns: resample log returns rather than arithmetic ones
+        seed: seed for the numba random state
+        is_price_weighted_fundamentals: multiply each fundamental path by the matching path of
+            the first price panel
+        init_to_end: anchor of the price paths, forwarded to :func:`bootstrap_price_data`
+        is_positive: positivity rule of the fundamental paths, forwarded to
+            :func:`bootstrap_ar_process`
+
+    Returns:
+        Tuple of (price paths, fundamental paths), each a dict keyed like its input
+
+    Raises:
+        ValueError: if a fundamental panel and the first price panel are of different types, if
+            a price panel has fewer rows than the first, or if gaps leave a fundamental panel
+            fewer residual rows than the shared index array reaches
     """
     prices = price_datas[list(price_datas.keys())[0]]
     for key, fundamental_data in fundamental_datas.items():
@@ -608,7 +777,7 @@ def bootstrap_price_fundamental_data(price_datas: Dict[str, Union[pd.Series, pd.
         elif isinstance(prices, pd.Series) and isinstance(fundamental_data, pd.Series):
             pass
         else:
-            raise ValueError(f" data types not aligned")
+            raise ValueError(" data types not aligned")
 
     # very important to reduce lenth for returns and ar-1 bootstrap
     bootstrapped_indices = generate_bootstrapped_indices(num_data_index=len(prices.index)-1,
@@ -629,7 +798,8 @@ def bootstrap_price_fundamental_data(price_datas: Dict[str, Union[pd.Series, pd.
                                                      block_size=block_size,
                                                      is_log_returns=is_log_returns,
                                                      seed=seed,
-                                                     bootstrapped_indices=bootstrapped_indices)
+                                                     bootstrapped_indices=bootstrapped_indices,
+                                                     init_to_end=init_to_end)
 
     bootstrap_fundamentals = {}
     for key, fundamental_data in fundamental_datas.items():
@@ -640,12 +810,18 @@ def bootstrap_price_fundamental_data(price_datas: Dict[str, Union[pd.Series, pd.
                                             index_length=index_length,
                                             block_size=block_size,
                                             seed=seed,
-                                            bootstrapped_indices=bootstrapped_indices)
+                                            bootstrapped_indices=bootstrapped_indices,
+                                            is_positive=is_positive)
 
         if is_price_weighted_fundamentals:
             prices = bootstrap_prices[list(bootstrap_prices.keys())[0]]
-            for idx, (price, fund) in enumerate(zip(prices, fundamentals)):
-                fundamentals[idx] = price*fund
+            if isinstance(fundamentals, pd.DataFrame):
+                # both are path_1..path_M on the same RangeIndex; iterating a DataFrame would
+                # yield column labels, not paths
+                fundamentals = fundamentals * prices.to_numpy()
+            else:
+                for idx, (price, fund) in enumerate(zip(prices, fundamentals)):
+                    fundamentals[idx] = price*fund
 
         bootstrap_fundamentals[key] = fundamentals
 

@@ -57,7 +57,7 @@ def generate_ar1(theta: float,
 def estimate_by_collapsing_gaps(series: pd.Series) -> float:
     """fit the AR(1) after dropping the missing observations.
 
-    This is the rule qis used before 5.1.1 and it is the subject of the example, not a
+    This is the rule qis used before 5.2.1 and it is the subject of the example, not a
     defect in the code below. Written with numpy rather than a library call so that the
     only difference from the qis path is the treatment of the gap.
     """
