@@ -33,8 +33,8 @@ Three questions separate the estimators, and the qis functions answer them diffe
 | Estimator | qis entry point | Mean removed | PSD | Point in time |
 |---|---|---|---|---|
 | Common-sample covariance or correlation | `compute_masked_covar_corr` on a panel without NaN | Sample mean | Yes | No: full sample |
-| Pairwise-complete covariance or correlation | `compute_masked_covar_corr` on a panel with NaN | Own-series mean (covariance), overlap mean (correlation) | Not guaranteed | No: full sample |
-| EWM covariance on rebalancing dates | `estimate_rolling_ewma_covar` | EWM mean, including the current return | Yes | Yes |
+| Pairwise-complete covariance or correlation | `compute_masked_covar_corr` on a panel with NaN | Overlap means of each pair | Not guaranteed | No: full sample |
+| EWM covariance on rebalancing dates | `estimate_rolling_ewma_covar` | Previous date's EWM mean, with an $N/(N+1)$ rescaling | Yes | Yes |
 | Uncentred EWM correlation paths | `compute_ewm_corr_df`, `compute_ewm_corr_single`, `compute_data_pca_r2` | None | Yes, on gap-free input | Yes |
 
 The spectral layer works on any symmetric matrix: `apply_pca` and `compute_pca_r2` for eigenvalues
@@ -48,7 +48,7 @@ portfolios, and `matrix_regularization` for eigenvalue clipping.
 | Return basis | Caller's returns for `compute_masked_covar_corr` and the EWM correlation functions; `estimate_rolling_ewma_covar` forms log returns from prices |
 | Sampling grid | Native rows of the input; `estimate_rolling_ewma_covar` samples prices at `returns_freq` and reports on `rebalancing_freq` dates |
 | Annualisation | Per period unless stated: a covariance annualises by $\mathrm{AN}$, a volatility by $\sqrt{\mathrm{AN}}$, a correlation not at all; `estimate_rolling_ewma_covar` multiplies by $\mathrm{AN}$ inferred from its return grid |
-| Mean adjustment | Sample mean with `ddof=1` (common sample); own-series mean (pairwise covariance); overlap means (pairwise correlation); EWM mean including the current return (`estimate_rolling_ewma_covar`); none (EWM correlations) |
+| Mean adjustment | Sample mean with `ddof=1` (common sample); overlap means of each pair (pairwise covariance and correlation); EWM mean of the previous date, rescaled by $N/(N+1)$ (`estimate_rolling_ewma_covar`); none (EWM correlations) |
 | Timing | Full-sample and pairwise matrices use the whole sample and are descriptive; an EWM matrix dated $t$ uses returns up to and including $t$ and serves a decision at $t$ applied over $(t,t+1]$ |
 | Output units | Covariance in squared return units per period, or per year after $\mathrm{AN}$; correlations and variance shares dimensionless; eigen-portfolios scaled to unit variance in the units of $\Sigma$ |
 | qis default | `estimate_rolling_ewma_covar(returns_freq='W-WED', rebalancing_freq='QE', span=52, demean=True, apply_an_factor=True)`; `compute_ewm_corr_df(ewm_lambda=0.94)`; `matrix_regularization(cut=1e-5)` |
@@ -66,7 +66,8 @@ portfolios, and `matrix_regularization` for eigenvalue clipping.
 | $\eta$ | Variance tolerance of the normalisation kernel | $100$ times machine epsilon times the largest finite $\lvert\Sigma_{kl}\rvert$ |
 | $O_i$, $O_{ij}$, $n_{ij}$ | Dates on which asset $i$ is observed; overlap $O_i\cap O_j$; its size | Pairwise estimators |
 | $\bar x^{(ij)}_i$ | Mean of asset $i$ over the overlap $O_{ij}$ | Per period |
-| $m_t$, $e_t$ | EWM mean and EWM-demeaned return $x_t-m_t$ | Per period |
+| $m_t$, $e_t$ | EWM mean through $t$; one-step forecast error $x_t-m_{t-1}$ | Per period |
+| $c_N$ | Rescaling of the demeaned EWM covariance, $(1+\lambda)/2=N/(N+1)$ | Dimensionless; one with `demean=False` |
 | $S_t$ | Uncentred EWM second-moment matrix | Squared return units per period |
 | $K$ | Number of returns since the zero seed | Warm-up count |
 | $\mathcal{T}_{\mathrm{reb}}$ | Rebalancing dates on the return grid | Dates |
@@ -142,20 +143,19 @@ pairwise correlation of `compute_masked_covar_corr` does not.
 
 A ragged panel has no common sample. `compute_masked_covar_corr` uses `np.cov` or `np.corrcoef`
 when the panel has no NaN, and otherwise estimates each entry from the dates on which both series
-are observed. The covariance and correlation paths then use different means.
+are observed, about the means of that overlap.
 
 **Definition (implemented pairwise estimators).** With $O_{ij}=O_i\cap O_j$ and
-$n_{ij}=\lvert O_{ij}\rvert$, the covariance path (`is_covar=True`, NumPy masked covariance)
-centres each series on its own full-history mean,
+$n_{ij}=\lvert O_{ij}\rvert$, the covariance path (`is_covar=True`) is
 
 $$
-\hat\Sigma^{\mathrm{mask}}_{ij}=\frac{1}{n_{ij}-d}\sum_{t\in O_{ij}}(x_{i,t}-\bar x_i)(x_{j,t}-\bar x_j),
-\qquad
-\bar x_i=\frac{1}{\lvert O_i\rvert}\sum_{t\in O_i}x_{i,t},
+\hat\Sigma^{\mathrm{pair}}_{ij}=\frac{1}{n_{ij}-d}\sum_{t\in O_{ij}}(x_{i,t}-\bar x^{(ij)}_i)(x_{j,t}-\bar x^{(ij)}_j),
 $$
 
-while the correlation path (`is_covar=False`, pandas pairwise-complete Pearson) computes every
-moment on the overlap:
+which equals pandas `DataFrame.cov` for $d=1$; a pair with $n_{ij}\le d$, in particular one with
+no common date, is missing. Its diagonal $O_{ii}=O_i$ is the variance of each series over all its
+observations. The correlation path (`is_covar=False`, pandas pairwise-complete Pearson) also
+takes its variances on the overlap:
 
 $$
 \hat\rho^{\mathrm{pair}}_{ij}=
@@ -163,13 +163,15 @@ $$
 {\Big(\sum_{t\in O_{ij}}(x_{i,t}-\bar x^{(ij)}_i)^2\sum_{t\in O_{ij}}(x_{j,t}-\bar x^{(ij)}_j)^2\Big)^{1/2}} .
 $$
 
-By Cauchy–Schwarz on the overlap, $\lvert\hat\rho^{\mathrm{pair}}_{ij}\rvert\le1$. The masked
+By Cauchy–Schwarz on the overlap, $\lvert\hat\rho^{\mathrm{pair}}_{ij}\rvert\le1$. The pairwise
 covariance has no such bound once it is normalised by variances from longer histories, which is
-why the correlation path does not normalise it.
+why the correlation path does not normalise the covariance matrix.
 
-**Identity (own-mean versus overlap-mean covariance).** Let $\hat\Sigma^{\mathrm{pair}}_{ij}$ be
-the covariance of the overlap sample about its own means, with the same $d$ (pandas
-`DataFrame.cov` uses $d=1$). Then
+**Identity (own-mean versus overlap-mean covariance).** In qis 5.30.3 and earlier the covariance
+path was the NumPy masked covariance, which centres each series on its own full-history mean
+$\bar x_i$ over $O_i$:
+$\hat\Sigma^{\mathrm{mask}}_{ij}=\frac{1}{n_{ij}-d}\sum_{t\in O_{ij}}(x_{i,t}-\bar x_i)(x_{j,t}-\bar x_j)$.
+With the same $d$,
 
 $$
 \hat\Sigma^{\mathrm{mask}}_{ij}-\hat\Sigma^{\mathrm{pair}}_{ij}
@@ -182,9 +184,12 @@ Multiply and sum over $O_{ij}$: the two cross terms vanish because deviations fr
 mean sum to zero over the overlap, leaving the overlap sum of products plus $n_{ij}$ times the
 product of the mean differences. Divide by $n_{ij}-d$. $\square$
 
-The two conventions agree whenever one series of the pair has no observation outside the overlap.
+The two conventions agree whenever one series of the pair has no observation outside the overlap,
+and on return panels the gap is usually small, being a product of two mean differences that are
+small relative to return volatility. The former path also dropped the mask of its result, so a
+pair with no common date had covariance zero instead of a missing value.
 
-**Proposition (pairwise matrices need not be PSD).** Neither $\hat\Sigma^{\mathrm{mask}}$ nor
+**Proposition (pairwise matrices need not be PSD).** Neither $\hat\Sigma^{\mathrm{pair}}$ nor
 $\hat\rho^{\mathrm{pair}}$ is guaranteed PSD. Take three series observed in pairs on three
 disjoint blocks of three dates: $A=B=(1,2,3)$ on the first block, $B=C=(1,2,3)$ on the second,
 and $A=(1,2,3)$, $C=(3,2,1)$ on the third. Then
@@ -196,11 +201,11 @@ $w^{\top}\hat\rho^{\mathrm{pair}}w=-3$. The eigenvalues are $2$, $2$ and $-1$.
 correlation is $\pm1$. Then
 $w^{\top}\hat\rho w=\sum_iw_i^2+2\sum_{i<j}w_iw_j\hat\rho_{ij}=3+2(-1-1-1)=-3<0$, and a negative
 quadratic form rules out PSD. Every series has mean 2 over its own six observations and over each
-overlap, so $\hat\Sigma^{\mathrm{mask}}$ has variances $0.8$ and covariances $\pm1$, and the same
+overlap, so $\hat\Sigma^{\mathrm{pair}}$ has variances $0.8$ and covariances $\pm1$, and the same
 $w$ gives $2.4-6=-3.6$. $\square$
 
 The PSD proof above needs one Gram matrix of one sample; a pairwise matrix assembles entries from
-different samples. The masked covariance in the counterexample even implies a correlation of
+different samples. The pairwise covariance in the counterexample even implies a correlation of
 $1/0.8=1.25$.
 
 > **Pitfall.** A pairwise-complete matrix can assign negative variance to a portfolio. A
@@ -219,14 +224,18 @@ this section states how the function uses them.
    forward-filled) and converted to log returns $\ell_{i,t}$, so $x_t$ is the vector of weekly log
    returns by default. Forward filling turns a gap inside a history into a zero return; a missing
    return appears only before an asset's first price.
-2. **Demeaning.** With `demean=True`, $e_t=x_t-m_t$ with $m_t=\lambda m_{t-1}+(1-\lambda)x_t$,
-   $\lambda=1-2/(N+1)$ and $N$ = `span` in units of `returns_freq`. The mean is seeded with the
-   first row of returns, so the first residual is zero; an asset whose returns start later is
-   seeded at zero. With `demean=False`, $e_t=x_t$: the second moment about zero.
+2. **Demeaning.** With `demean=True`, the residual is the one-step forecast error
+   $e_t=x_t-m_{t-1}$ against the EWM mean of the previous date,
+   $m_t=\lambda m_{t-1}+(1-\lambda)x_t$, with $\lambda=1-2/(N+1)$ and $N$ = `span` in units of
+   `returns_freq`. The mean is seeded with the first row of returns, so the first residual is
+   zero; for an asset whose returns start later the previous mean is zero, so its first residual
+   is its first return. With `demean=False`, $e_t=x_t$: the second moment about zero.
 3. **Recursion.** Starting from $\hat\Sigma_0=0$,
 
    $$
-   \hat\Sigma_t=\lambda\hat\Sigma_{t-1}+(1-\lambda)\,e_te_t^{\top},
+   \hat\Sigma_t=\lambda\hat\Sigma_{t-1}+(1-\lambda)\,c_N\,e_te_t^{\top},
+   \qquad
+   c_N=\frac{1+\lambda}{2}=\frac{N}{N+1}\ \text{if demeaned},\quad c_N=1\ \text{otherwise},
    $$
 
    with `NanBackfill.ZERO_FILL`: an entry whose update is not finite, because either asset is
@@ -234,46 +243,58 @@ this section states how the function uses them.
 4. **Sampling and annualisation.** The function returns a dictionary from each date in
    $\mathcal{T}_{\mathrm{reb}}$ to $\mathrm{AN}\,\hat\Sigma_t$. A rebalancing date is the first
    return date on or after each scheduled `rebalancing_freq` date
-   (`qis.generate_rebalancing_indicators`). $\mathrm{AN}$ comes from
+   (`qis.generate_rebalancing_indicators`); a `time_period` keeps the dates within its start and
+   end, while the recursion still runs from the first price. $\mathrm{AN}$ comes from
    `qis.infer_annualisation_factor_from_df` on the return grid, 52 for `W-WED`; an irregular grid
    falls back to 252 with a warning. `apply_an_factor=False` returns per-period matrices.
 
 The option `is_apply_vol_normalised_returns=True` rebuilds the matrix as
 $\operatorname{diag}(\tilde\sigma_t)\,\tilde\rho_t\operatorname{diag}(\tilde\sigma_t)$, where
-$\tilde\sigma_t$ is the EWM volatility of $e_t$ and $\tilde\rho_t$ the EWM correlation of
-$e_{i,t}/\tilde\sigma_{i,t}$. That volatility recursion is seeded with the full-sample mean of
-$e_t^2$, a look-ahead that decays like $\lambda^t$.
+$\tilde\sigma_t$ is the EWM volatility of $\sqrt{c_N}\,e_t$ and $\tilde\rho_t$ the EWM correlation
+of $e_{i,t}/\tilde\sigma_{i,t}$. That volatility recursion is seeded with the full-sample mean of
+its squared input, a look-ahead that decays like $\lambda^t$.
 
 **Identity (the EWM mean includes the current return).**
-$e_t=x_t-m_t=\lambda\,(x_t-m_{t-1})$.
+$x_t-m_t=\lambda\,(x_t-m_{t-1})$.
 
 **Proof.** Substitute $m_t=\lambda m_{t-1}+(1-\lambda)x_t$ into $x_t-m_t$. $\square$
 
-The demeaning is therefore point in time: $e_t$ uses only returns dated at or before $t$. It also
-shrinks every residual by $\lambda$.
+The implementation forms $e_t$ from `qis.compute_ewm` through this identity, as
+$(x_t-m_t)/\lambda$. The demeaning is point in time: $e_t$ uses only returns dated at or before
+$t$.
 
-**Proposition (steady-state scale of the demeaned estimator).** If the $x_t$ are independent and
-identically distributed with mean $\mu$ and covariance $\Sigma$, then once the seeds are forgotten
+**Proposition (the demeaned estimator is unbiased for iid returns).** If the $x_t$ are
+independent and identically distributed with mean $\mu$ and covariance $\Sigma$, then once the
+seeds are forgotten
 
 $$
-\mathbb{E}\big[\hat\Sigma_t\big]=\frac{2\lambda^2}{1+\lambda}\,\Sigma=\frac{(N-1)^2}{N(N+1)}\,\Sigma .
+\mathbb{E}\big[e_te_t^{\top}\big]=\frac{2}{1+\lambda}\,\Sigma=\frac{N+1}{N}\,\Sigma,
+\qquad
+\mathbb{E}\big[\hat\Sigma_t\big]=\Sigma .
 $$
 
 **Proof.** $m_{t-1}=(1-\lambda)\sum_{k\ge0}\lambda^kx_{t-1-k}$ is independent of $x_t$, with mean
 $\mu$ and covariance $\frac{(1-\lambda)^2}{1-\lambda^2}\Sigma=\frac{1-\lambda}{1+\lambda}\Sigma$.
-Hence $x_t-m_{t-1}$ has mean zero and covariance $\frac{2}{1+\lambda}\Sigma$, and by the identity
-$\mathbb{E}[e_te_t^{\top}]=\frac{2\lambda^2}{1+\lambda}\Sigma$. The EWM weights sum to one in the
-steady state, and $\lambda=(N-1)/(N+1)$ gives the second form. $\square$
+Hence $e_t=x_t-m_{t-1}$ has mean zero and covariance
+$\Sigma+\frac{1-\lambda}{1+\lambda}\Sigma=\frac{2}{1+\lambda}\Sigma$, and $\lambda=(N-1)/(N+1)$
+gives the second form. The EWM weights sum to one in the steady state, so
+$\mathbb{E}[\hat\Sigma_t]=c_N\,\frac{2}{1+\lambda}\Sigma=\Sigma$. $\square$
 
-For $N=52$ the factor is $0.944$: variances are 5.6% low and volatilities 2.9% low.
+The term $\Sigma/N$ is the sampling variance of the EWM mean, which the forecast error carries on
+top of the return's own variance; $c_N$ removes it. In qis 5.30.3 and earlier the residual was
+$x_t-m_t$ without rescaling. By the identity its expected outer product is
+$\frac{2\lambda^2}{1+\lambda}\Sigma$, which is $0.944\,\Sigma$ at $N=52$: variances were 5.6% and
+volatilities 2.9% low. The current output is the former one multiplied by
+$(1+\lambda)/(2\lambda^2)=1.0596$ at $N=52$; correlations are unchanged.
 
-> **Insight.** Removing an EWM mean costs more than it saves at typical spans. Without demeaning
-> the bias is $\mu\mu^{\top}$, which for weekly returns of an asset with 8% drift and 17%
-> volatility is $\mu^2/\sigma^2\approx0.4\%$ of the variance, against the $-5.6\%$ above. The
-> demeaning factor is common to all entries, so it cancels in correlations.
+> **Insight.** Demeaning matters little at weekly frequency. Without it the bias is
+> $\mu\mu^{\top}$, which for weekly returns of an asset with 8% drift and 17% volatility is
+> $\mu^2/\sigma^2\approx0.4\%$ of the variance; with it, the forecast-error form and $c_N$ remove
+> the bias for iid returns. The factor $c_N$ is common to all entries, so by the scale invariance
+> above it cancels in correlations.
 
-**Identity (zero-seed warm-up).** If $\mathbb{E}[e_te_t^{\top}]=S$ for all $t$, then after $K$
-returns $\mathbb{E}[\hat\Sigma]=(1-\lambda^{K})\,S$.
+**Identity (zero-seed warm-up).** If $\mathbb{E}[c_Ne_te_t^{\top}]=S$ for all $t$, then after
+$K$ returns $\mathbb{E}[\hat\Sigma]=(1-\lambda^{K})\,S$.
 
 **Proof.** The weights on the $K$ outer products are $(1-\lambda)\lambda^{k}$, $k=0,\ldots,K-1$,
 and sum to $1-\lambda^{K}$; the zero seed contributes nothing. $\square$
@@ -295,10 +316,10 @@ The default policy of the lower-level kernel `compute_ewm_covar_tensor` is `NanB
 which holds the entries of a missing asset while the others update. Like the pairwise estimator,
 it mixes entries of different ages and can lose PSD; it is safe only on gap-free input.
 
-> **Pitfall.** `estimate_rolling_ewma_covar` returns a matrix for every rebalancing date from the
-> first one, and the recursion starts from zero. With the default span of 52 weeks the warm-up
-> factor $1-\lambda^{K}$ is 0.37 after one quarter and 0.86 after one year. Pass a `time_period`
-> that starts at least two spans after the first price (factor 0.98).
+> **Pitfall.** Without a `time_period`, `estimate_rolling_ewma_covar` returns a matrix for every
+> rebalancing date from the first one, and the recursion starts from zero. With the default span
+> of 52 weeks the warm-up factor $1-\lambda^{K}$ is 0.37 after one quarter and 0.86 after one
+> year. Pass a `time_period` that starts at least two spans after the first price (factor 0.98).
 
 ### Uncentred EWM correlations
 
@@ -312,8 +333,10 @@ S_t=\lambda S_{t-1}+(1-\lambda)\,x_tx_t^{\top},
 $$
 
 The decay is `ewm_lambda=0.94` unless `span` is given. The result is one column per pair, named
-`"<column i> - <column j>"`: `CorrMatrixOutput.FULL` returns all pairs with $j<i$, and `TOP_ROW`
-the pairs of the first column with every later one. With the zero seed, the first date has
+`"<column i> - <column j>"`: `CorrMatrixOutput.FULL` returns all pairs with $j<i$, ordered by $i$
+and then $j$, and `TOP_ROW` the pairs of the first column with every later one, named
+`"<column 0> - <column j>"`. `SUB_TOP` returns the same pairs as `FULL`: it skips the first row,
+which has no pair below the diagonal. With the zero seed, the first date has
 $\rho^{\mathrm{u}}_{ij}=\operatorname{sign}(x_{i,1}x_{j,1})=\pm1$, so the path needs a warm-up
 before it means anything. `compute_ewm_corr_single` is the two-column case: it converts `span`
 to $\lambda$ and returns the one series.
@@ -376,10 +399,13 @@ it point in time as the effective number of independent assets; see
 
 `apply_pca` calls `np.linalg.eigh`, which reads only the lower triangle, and reverses its
 ascending output. Its default sign convention, `is_max_sign_positive=True`, flips each eigenvector
-so that its largest-magnitude loading is positive; this matches the docstring. The sign of an
-eigenvector is arbitrary, and the convention pins it only while the largest loading keeps its
-identity: a near tie between two loadings can still flip the sign between refits, and an
-eigenvector inside a repeated eigenvalue is not unique at all.
+so that its largest-magnitude loading is positive. The alternative `eigen_signs` gives one sign
+per eigenvector and flips eigenvector $v_j$ whenever its first loading, that of asset 0, has the
+opposite sign. Both flip whole columns, so the output remains an eigen-decomposition. The sign of
+an eigenvector is arbitrary, and neither convention can pin it under every perturbation: the
+default holds only while the largest loading keeps its identity, so a near tie in magnitude
+between two loadings of opposite sign can still flip the sign between refits, and an eigenvector
+inside a repeated eigenvalue is not unique at all.
 
 `compute_data_pca_r2` applies `compute_pca_r2` through time to the uncentred EWM correlation
 tensor (`is_corr=True`) or second-moment tensor (`is_corr=False`) with decay `ewm_lambda`, zero
@@ -540,7 +566,8 @@ assert corr_cash['Cash'].isna().all() and corr_cash.loc['Cash'].isna().all()
 The correlation eigenvalues are 1.5128, 1.1711 and 0.3161. They sum to the trace, 3, and multiply
 to the determinant $1+2(0.5)(-0.2)(0.3)-0.25-0.04-0.09=0.56$. The explained-variance shares are
 50.4%, 39.0% and 10.5%, and the participation ratio is 2.394. Each eigenvector's largest loading
-is positive. The first component of the covariance matrix explains 82.1%.
+is positive. With `eigen_signs=(1, -1, 1)` the first loadings take those signs and the columns
+remain eigenvectors. The first component of the covariance matrix explains 82.1%.
 
 ```python
 nu, vecs = qis.apply_pca(cmatrix=corr.to_numpy())
@@ -549,6 +576,11 @@ assert abs(nu.sum() - 3.0) < 1e-12 and abs(np.prod(nu) - 0.56) < 1e-12
 np.testing.assert_allclose(nu, [1.5128, 1.1711, 0.3161], atol=5e-5)
 np.testing.assert_allclose(rho @ vecs, vecs * nu, atol=1e-12)
 assert all(v[np.argmax(np.abs(v))] > 0.0 for v in vecs.T)
+signs = np.array([1.0, -1.0, 1.0])
+_, signed = qis.apply_pca(cmatrix=corr.to_numpy(), eigen_signs=signs)
+np.testing.assert_array_equal(np.sign(signed[0]), signs)
+np.testing.assert_allclose(rho @ signed, signed * nu, atol=1e-12)
+np.testing.assert_allclose(np.abs(signed), np.abs(vecs), atol=1e-12)
 
 shares = qis.compute_pca_r2(cmatrix=corr.to_numpy())
 np.testing.assert_allclose(shares, nu / nu.sum(), atol=1e-15)
@@ -576,11 +608,13 @@ np.testing.assert_allclose(weights[0], [2.644, 6.003, 2.899], atol=5e-4)
 The pairwise counterexample reproduces the proposition: the correlation equals pandas' pairwise
 result and has eigenvalues $-1$, 2 and 2, and $w=(1,-1,1)$ has variance $-3$. A two-series panel
 shows the mean convention. $X=(0,2,4,6,\cdot)$ and $Y=(\cdot,1,3,2,4)$ overlap on three dates with
-overlap means 4 and 2 and own means 3 and 2.5. The masked covariance is
-$[(-1)(-1.5)+(1)(0.5)+(3)(-0.5)]/2=0.25$, pandas' overlap covariance is 1, and the identity
-bridges them: $1+\tfrac32(4-3)(2-2.5)=0.25$. The pairwise correlation is 0.5. Clipping the
-negative eigenvalue adds $v_3v_3^{\top}$ with $v_3=(1,-1,1)/\sqrt3$, which lifts the diagonal to
-$4/3$; renormalising gives correlations $\pm0.5$ and eigenvalues 0, 1.5 and 1.5.
+overlap means 4 and 2 and own means 3 and 2.5. The pairwise covariance is
+$[(-2)(-1)+(0)(1)+(2)(0)]/2=1$, equal to pandas'. The former own-mean convention gives
+$[(-1)(-1.5)+(1)(0.5)+(3)(-0.5)]/2=0.25$, and the identity bridges them:
+$1+\tfrac32(4-3)(2-2.5)=0.25$. The pairwise correlation is 0.5, and a pair without a common date
+is missing in both outputs. Clipping the negative eigenvalue adds $v_3v_3^{\top}$ with
+$v_3=(1,-1,1)/\sqrt3$, which lifts the diagonal to $4/3$; renormalising gives correlations
+$\pm0.5$ and eigenvalues 0, 1.5 and 1.5.
 
 ```python
 nan = np.nan
@@ -603,10 +637,17 @@ assert abs(qis.covar_to_corr(cov_pw).loc['A', 'B'] - 1.25) < 1e-12
 pair = pd.DataFrame({'X': [0, 2, 4, 6, nan], 'Y': [nan, 1, 3, 2, 4]}, dtype=float)
 cov_xy = qis.compute_masked_covar_corr(data=pair)
 np.testing.assert_allclose(np.diag(cov_xy), [20 / 3, 5 / 3], atol=1e-12)
-assert abs(cov_xy.loc['X', 'Y'] - 0.25) < 1e-12
-assert abs(pair.cov().loc['X', 'Y'] - 1.0) < 1e-12
-assert abs(pair.cov().loc['X', 'Y'] + 3 / 2 * (4 - 3) * (2 - 2.5) - cov_xy.loc['X', 'Y']) < 1e-12
+overlap = pair.dropna().to_numpy()
+by_hand = np.sum((overlap[:, 0] - 4.0) * (overlap[:, 1] - 2.0)) / 2
+assert abs(cov_xy.loc['X', 'Y'] - 1.0) < 1e-12 and abs(by_hand - 1.0) < 1e-12
+assert abs(pair.cov().loc['X', 'Y'] - cov_xy.loc['X', 'Y']) < 1e-12
+own_mean = np.sum((overlap[:, 0] - 3.0) * (overlap[:, 1] - 2.5)) / 2  # the former convention
+assert abs(own_mean - 0.25) < 1e-12
+assert abs(cov_xy.loc['X', 'Y'] + 3 / 2 * (4 - 3) * (2 - 2.5) - own_mean) < 1e-12
 assert abs(qis.compute_masked_covar_corr(data=pair, is_covar=False).loc['X', 'Y'] - 0.5) < 1e-12
+disjoint = pd.DataFrame({'X': [0, 2, 4, nan, nan], 'Y': [nan, nan, nan, 1, 3]}, dtype=float)
+assert np.isnan(qis.compute_masked_covar_corr(data=disjoint).loc['X', 'Y'])
+assert np.isnan(qis.compute_masked_covar_corr(data=disjoint, is_covar=False).loc['X', 'Y'])
 
 clipped = qis.matrix_regularization(covar=corr_pw.to_numpy())
 np.testing.assert_allclose(clipped, np.array([[4, 2, -2], [2, 4, 2], [-2, 2, 4]]) / 3,
@@ -618,9 +659,9 @@ np.testing.assert_allclose(np.linalg.eigvalsh(repaired), [0.0, 1.5, 1.5], atol=1
 ```
 
 The synthetic panel starts with three instruments whose design volatilities are 17%, 6% and 15%.
-The EWM mean of `qis.compute_ewm` equals the direct recursion, and the demeaned residual is
-exactly $\lambda$ times the deviation from the previous mean, with $\lambda=51/53$ for a span of
-52 weeks. The weekly grid gives $\mathrm{AN}=52$.
+The EWM mean of `qis.compute_ewm` equals the direct recursion, and $x_t-m_t$ is exactly
+$\lambda$ times the forecast error $x_t-m_{t-1}$, with $\lambda=51/53$ for a span of 52 weeks.
+The weekly grid gives $\mathrm{AN}=52$.
 
 ```python
 from qis.datasets import generate_synthetic_prices
@@ -642,9 +683,11 @@ assert qis.infer_annualisation_factor_from_df(returns) == 52.0
 
 `estimate_rolling_ewma_covar` returns 23 matrices, from 2015-04-01 to 2020-09-30: each is dated on
 the first Wednesday on or after a quarter end, such as 2016-01-06 for the 2015 year end. Each
-equals 52 times the direct recursion at its date. On 2020-09-30 the annualised volatilities are
-17.6%, 5.5% and 13.7%. On 2015-04-01, after only 12 returns, they are 9.0%, 3.3% and 4.5%: the
-warm-up factor $1-\lambda^{12}=0.37$ at work.
+equals 52 times the direct recursion on the forecast errors, scaled by $c_N=52/53$, at its date.
+On 2020-09-30 the annualised volatilities are 18.1%, 5.7% and 14.1%, which is $\sqrt{1.0596}$
+times the 17.6%, 5.5% and 13.7% of the former residual $x_t-m_t$. On 2015-04-01, after only 12
+returns, they are 9.3%, 3.4% and 4.7%: the warm-up factor $1-\lambda^{12}=0.37$ at work. A
+`time_period` from 2017 to 2018 keeps the eight quarterly dates inside it.
 
 ```python
 covars = qis.estimate_rolling_ewma_covar(prices=prices, returns_freq='W-WED',
@@ -653,18 +696,35 @@ dates = list(covars)
 assert len(dates) == 23
 assert [d.strftime('%Y-%m-%d') for d in dates[:4]] == ['2015-04-01', '2015-07-01',
                                                         '2015-09-30', '2016-01-06']
+c_n = (1.0 + lam) / 2.0
+assert abs(c_n - 52 / 53) < 1e-15
+errors = x - np.vstack([x[:1], m[:-1]])  # x_t - m_{t-1}, zero on the seed row
 state = np.zeros((3, 3))
-path = []
-for e_t in x - m:
-    state = lam * state + (1.0 - lam) * np.outer(e_t, e_t)
+path, former_path = [], []
+former = np.zeros((3, 3))
+for e_t, residual in zip(errors, x - m):
+    state = lam * state + (1.0 - lam) * c_n * np.outer(e_t, e_t)
+    former = lam * former + (1.0 - lam) * np.outer(residual, residual)
     path.append(state)
+    former_path.append(former)
 for date in (dates[0], dates[-1]):
     np.testing.assert_allclose(covars[date].to_numpy(),
                                52.0 * path[returns.index.get_loc(date)], rtol=1e-12)
-np.testing.assert_allclose(np.sqrt(np.diag(covars[dates[-1]])), [0.176, 0.055, 0.137], atol=5e-4)
+last = returns.index.get_loc(dates[-1])
+np.testing.assert_allclose(path[last] / former_path[last], (1 + lam) / (2 * lam ** 2), rtol=1e-12)
+assert abs((1 + lam) / (2 * lam ** 2) - 1.0596) < 5e-5
+np.testing.assert_allclose(np.sqrt(np.diag(covars[dates[-1]])), [0.181, 0.057, 0.141], atol=5e-4)
+np.testing.assert_allclose(np.sqrt(52.0 * np.diag(former_path[last])), [0.176, 0.055, 0.137],
+                           atol=5e-4)
 assert returns.index.get_loc(dates[0]) == 11
 assert abs(1.0 - lam ** 12 - 0.37) < 1e-3
-np.testing.assert_allclose(np.sqrt(np.diag(covars[dates[0]])), [0.090, 0.033, 0.045], atol=5e-4)
+np.testing.assert_allclose(np.sqrt(np.diag(covars[dates[0]])), [0.093, 0.034, 0.047], atol=5e-4)
+
+window = qis.estimate_rolling_ewma_covar(prices=prices, span=span,
+                                         time_period=qis.TimePeriod('2017-01-01', '2018-12-31'))
+assert list(window) == [d for d in dates if pd.Timestamp('2017-01-01') <= d
+                        <= pd.Timestamp('2018-12-31')]
+assert len(window) == 8
 ```
 
 The uncentred EWM correlation of `compute_ewm_corr_df` equals the direct recursion on raw returns:
@@ -732,14 +792,14 @@ assert abs(residual_share - 0.573) < 5e-4 and np.sum(nu_all > scaled_edges[1]) =
 | Quantity | Formula | qis entry point |
 |---|---|---|
 | Correlation from covariance | $\Delta^{-1}\Sigma\Delta^{-1}$ with the normalisation kernel | `qis.covar_to_corr(covar)` |
-| Common-sample or pairwise covariance | $\hat\Sigma$, or $\hat\Sigma^{\mathrm{mask}}$ with NaN | `qis.compute_masked_covar_corr(data, is_covar=True, bias=False)` |
+| Common-sample or pairwise covariance | $\hat\Sigma$, or $\hat\Sigma^{\mathrm{pair}}$ with NaN | `qis.compute_masked_covar_corr(data, is_covar=True, bias=False)` |
 | Common-sample or pairwise correlation | $\rho$, or $\hat\rho^{\mathrm{pair}}$ with NaN | `qis.compute_masked_covar_corr(data, is_covar=False)` |
 | Pearson correlation of matching columns | Centred, full sample | `qis.compute_path_corr(a1, a2)` |
-| Rolling EWM covariance | $\mathrm{AN}\,\hat\Sigma_t$ on $\mathcal{T}_{\mathrm{reb}}$ | `qis.estimate_rolling_ewma_covar(prices, time_period, returns_freq, rebalancing_freq, span, is_apply_vol_normalised_returns, demean, apply_an_factor)` |
+| Rolling EWM covariance | $\mathrm{AN}\,\hat\Sigma_t$ on $\mathcal{T}_{\mathrm{reb}}$, forecast errors $e_t$ scaled by $c_N$ | `qis.estimate_rolling_ewma_covar(prices, time_period, returns_freq, rebalancing_freq, span, is_apply_vol_normalised_returns, demean, apply_an_factor)` |
 | Uncentred EWM correlation paths | $\rho^{\mathrm{u}}_{ij,t}$ per pair | `qis.compute_ewm_corr_df(df, corr_matrix_output, span, ewm_lambda, init_value, init_type)`, `qis.CorrMatrixOutput` |
 | One uncentred EWM correlation path | $\rho^{\mathrm{u}}_{21,t}$ | `qis.compute_ewm_corr_single(returns, ewm_lambda, span, time_period)` |
 | Uncentred cosine similarity to a pivot | $\operatorname{cs}_k$ | `qis.corr_to_pivot_row(pivot, data, is_normalized=True, vol_scalers=None)` |
-| Eigenvalues and eigenvectors | $\nu_j$, $v_j$, descending, largest loading positive | `qis.apply_pca(cmatrix, is_max_sign_positive=True)` |
+| Eigenvalues and eigenvectors | $\nu_j$, $v_j$, descending, largest loading positive or first loading signed by `eigen_signs` | `qis.apply_pca(cmatrix, is_max_sign_positive=True, eigen_signs=None)` |
 | Explained-variance shares | $\pi_j$ or $\sum_{k\le j}\pi_k$ | `qis.compute_pca_r2(cmatrix, is_cumulative=False)` |
 | Shares through time | $\pi_j$ of $\rho^{\mathrm{u}}_t$ on `freq` dates | `qis.compute_data_pca_r2(data, freq='ME', time_period=None, ewm_lambda=0.94, is_corr=True)` |
 | Eigen-portfolios | $w^{(j)}=\Delta^{-1}v_j/\sqrt{\nu_j}$, one per row | `qis.compute_eigen_portfolio_weights(covar)` |
@@ -760,16 +820,15 @@ and `covar_to_corr` with the internal normalisation kernel `_covar_to_corr_array
 
 Contract details that the formulas do not show:
 
-- `compute_masked_covar_corr` returns the input's container. On a panel with NaN, a pair with no
-  common date gets covariance 0, because the masked-array mask is dropped, but correlation NaN.
-  `bias` affects only the covariance.
-- `estimate_rolling_ewma_covar` labels each matrix with `prices.columns`. Only the start of
-  `time_period` is applied: matrices are returned for every rebalancing date on or after it,
-  including dates after its end.
-- `CorrMatrixOutput.SUB_TOP` currently returns the same pairs as `FULL`.
-- The `eigen_signs` argument of `apply_pca` is documented as one sign per eigenvector, but the
-  implementation compares and flips rows of the eigenvector matrix, which are asset coordinates,
-  and so breaks the eigenvector property whenever it flips. Use the default convention.
+- `compute_masked_covar_corr` returns the input's container. On a panel with NaN, a pair with too
+  few common dates (none, or one with the default `bias=False`) is missing in both the covariance
+  and the correlation. `bias` affects only the covariance, where it divides by $n_{ij}$.
+- `estimate_rolling_ewma_covar` labels each matrix with `prices.columns`. Both ends of
+  `time_period` are applied to the rebalancing dates; a missing bound is not applied.
+- `CorrMatrixOutput.SUB_TOP` returns the same pairs as `FULL`; it is kept for compatibility, and
+  `compute_ewm_corr_single` uses it.
+- `apply_pca(eigen_signs=...)` expects one sign per eigenvector and raises `ValueError` for a
+  vector of another length; a zero first loading or a zero sign leaves that eigenvector as it is.
 - `plot_corr_matrix_from_covar` shows $\sqrt{\Sigma_{ii}}$ in the units of its input; pass an
   annualised covariance to display annual volatilities.
 
@@ -787,11 +846,12 @@ API reference:
 
 - Full-sample and pairwise matrices use every date of the sample. They describe a history and
   must not feed a backtest; the EWM estimators are the point-in-time path.
-- A pairwise-complete matrix is not guaranteed PSD, and its covariance and correlation outputs
-  are mutually inconsistent on ragged data. Check the spectrum before optimising.
-- The EWM covariance starts from zero and, when demeaned, is scaled by
-  $2\lambda^2/(1+\lambda)$. Both factors cancel in correlations of assets with a common start; a
-  late starter's correlations are biased towards zero until $\lambda^{K}$ is small.
+- A pairwise-complete matrix is not guaranteed PSD. On ragged data its correlation output is not
+  the normalised covariance output, because the covariance diagonal uses each series' full
+  history and the correlation uses overlap variances. Check the spectrum before optimising.
+- The EWM covariance starts from zero, and when demeaned it is rescaled by $c_N$ to be unbiased
+  for iid returns. Both factors cancel in correlations of assets with a common start; a late
+  starter's correlations are biased towards zero until $\lambda^{K}$ is small.
 - On return panels with gaps, `compute_ewm_corr_df` and `compute_data_pca_r2` hold stale entries
   under the default forward fill and can produce correlations outside $[-1,1]$. Fill or align the
   panel first; `qis.to_returns` forward-fills prices by default.

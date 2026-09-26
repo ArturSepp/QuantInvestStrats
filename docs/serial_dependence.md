@@ -52,7 +52,7 @@ total exposure, which is also the beta a long-horizon investor experiences.
 | Sampling grid | The input's own index: a lag $k$ counts rows, not calendar time. Block sums use `span` rows; `ewm_xy_convolution` uses $h=\mathrm{AN}$ of `freq` rows |
 | Annualisation | None: autocorrelations and betas are dimensionless. $\mathrm{AN}$ enters only through the variance-ratio scaling of $\sqrt{\mathrm{AN}}\,s(x)$ |
 | Mean adjustment | Standard ACF: full-sample mean. Lagged Pearson: each overlapping segment's own mean. EWM: an EWM mean or none, per function. Dimson: OLS intercept |
-| Timing | Full-sample estimators are descriptive. EWM estimates at $t$ use rows up to $t$, except full-sample variance seeds, which look ahead |
+| Timing | Full-sample estimators are descriptive. EWM estimates at $t$ use rows up to $t$: their states are seeded at zero by default, and a full-sample seed that looks ahead is available only on request |
 | Output units | Correlations in $[-1,1]$; EWM ratios can leave that range; betas in asset return per unit of market return; t-statistics |
 | qis default | `compute_autocorr_df(num_lags=20)`; `estimate_acf_from_path(nlags=10)`; `compute_ewm_vector_autocorr_df(span=30, lag=1)`; `estimate_dimson_beta(num_lags=3, min_obs=36)` |
 
@@ -82,6 +82,7 @@ total exposure, which is also the beta a long-horizon investor experiences.
 | $L$, $\beta_k$, $\beta_{\mathrm{D}}$ | Number of market lags; slope on $m_{t-k}$; Dimson beta $\sum_{k=0}^{L}\beta_k$ | `num_lags`; dimensionless |
 | $\hat b$, $X$ | OLS coefficient vector $(\hat\alpha,\hat\beta_0,\dots,\hat\beta_L)^{\top}$ and design matrix $[1,m_t,\dots,m_{t-L}]$ | Rows are joint observations |
 | $\beta_{\mathrm{lag}}$, $t_{\mathrm{lag}}$ | Sum of the lagged slopes and its classical t-statistic | Columns `sum_lag_beta`, `t_sum_lag` |
+| $\mathrm{se}_{\mathrm{D}}$, $t_{\mathrm{D}}$ | Classical standard error and t-statistic of $\beta_{\mathrm{D}}$ | Columns `se_beta_dimson`, `t_beta_dimson` |
 | $c_k$, $a$, $e_t$ | True exposure to $m_{t-k}$, intercept and noise of a data-generating model | Dimensionless; return units |
 | $\beta(h)$ | Beta of $h$-period aggregate returns | Dimensionless |
 | $\iota_{\mathrm{lag}}$, $\iota_{\mathrm{D}}$ | Selectors of the lagged slopes, $(0,0,1,\dots,1)^{\top}$, and of all slopes, $(0,1,\dots,1)^{\top}$ | Length $L+2$ |
@@ -135,8 +136,9 @@ $$
 \qquad \hat\rho^{\mathrm{P}}_0=1 .
 $$
 
-This is `np.corrcoef(x[k:], x[:-k])` inside `qis.compute_path_lagged_corr`. Lag 0 is set to one
-without computation.
+This is `np.corrcoef(x[k:], x[:-k])` inside `qis.compute_path_lagged_corr`. For an
+autocorrelation lag 0 is one by definition; applied to two different arrays, the same kernel
+returns their contemporaneous correlation at lag 0.
 
 **Identity (Pearson versus standard ACF).** Let $\check x_t=x_t-\bar x$,
 $Q=\sum_{t=1}^{T}\check x_t^2$, $d^{\pm}_k=\bar x^{\pm}_k-\bar x$, and let $Q^{+}_k$ and $Q^{-}_k$ be the
@@ -372,9 +374,10 @@ contract details:
 - With `is_returns=True` a block value is the sum of the block with NaNs counted as zero;
   with `is_returns=False` it is the last value of the block, for levels.
 - The lag-one correlation is the lagged Pearson estimator. The `demean=True` step subtracts the
-  full-sample block mean first, which cannot change a Pearson correlation. `span` is the block
-  length in rows, not an EWM span, and `ewma_smoothin_span` other than `None` raises
-  `NotImplementedError`.
+  full-sample block mean first, which cannot change a Pearson correlation; the argument is kept
+  for compatibility. `span` is the block length in rows, not an EWM span. The reserved argument
+  `ewma_smoothin_span` has no implementation: any value other than `None` raises
+  `NotImplementedError` naming it.
 
 ### EWM autocorrelation through time
 
@@ -389,12 +392,16 @@ $$
 \end{aligned}
 $$
 
-and reports zero for $t<k$. The cross moment is seeded at zero. The second moment is seeded
-at the full-sample variance of the column (`np.nanvar`, with `ddof=0`), which is a
-look-ahead: the first estimates depend on later data, with a weight that decays like
-$\lambda^{t-k+1}$. `qis.compute_ewm_vector_autocorr` is the kernel and does not demean;
+and reports a missing value for $t<k$, and wherever $\hat\gamma^{\lambda}_{0,t}$ is not positive.
+Both moments are seeded at zero, so the estimate is point in time. The zero seeds give numerator
+and denominator the same warm-up factor $1-\lambda^{t-k+1}$, which cancels in the ratio: from its
+first date $\tilde\rho_{k,t}$ is the ratio of the normalised EWM averages over the rows seen so
+far. `qis.compute_ewm_vector_autocorr` is the kernel and does not demean;
 `is_normalize=False` returns $\hat\gamma^{\lambda}_{k,t}$ instead of the ratio, and a non-finite
-update is handled by `nan_backfill` (by default both states carry forward).
+update is handled by `nan_backfill` (by default both states carry forward). In qis 5.30.3 and
+earlier the second moment was seeded at the full-sample variance of the column (`np.nanvar`,
+with `ddof=0`), a look-ahead whose weight decays like $\lambda^{t-k+1}$ and which pulled the
+early estimates towards zero; `var_init_type=qis.InitType.VAR` still selects it.
 `qis.compute_ewm_vector_autocorr_df(data, span=N)` first sets $z_t=x_t-\bar x^{\lambda}_t$, where
 $\bar x^{\lambda}_t$ is `qis.compute_ewm` with the same span, seeded at the first observation and
 including $x_t$; that mean is point in time.
@@ -432,7 +439,7 @@ $$
 with both states seeded at zero, or both at `covar0` in the kernel
 `qis.compute_ewm_matrix_autocorr`. Element $(i,j)$ of $\Psi_t$ is the EWM co-movement of past
 $z_i$ with current $z_j$, divided by the EWM contemporaneous co-movement of $z_i$ and $z_j$. On
-the diagonal it is the vector estimator of each column, with a zero seed.
+the diagonal it is the vector estimator of each column. Both outputs are missing for $t<k$.
 
 Off the diagonal, $\Psi_t[i,j]$ is **not a correlation**. Its denominator is a covariance, which
 can be close to zero or change sign, so the ratio is unbounded: for two unrelated assets it is
@@ -442,8 +449,8 @@ contemporaneous co-movement. The output aggregates $\Psi_t$ to two numbers per d
 - `aggregation_type='mean'`: the diagonal mean
   $\bar\psi^{\mathrm{diag}}_t=n^{-1}\sum_i\Psi_t[i,i]$ and the off-diagonal mean
   $\bar\psi^{\mathrm{off}}_t=\big(n(n-1)\big)^{-1}\sum_{i\ne j}\Psi_t[i,j]$. NaN entries are
-  counted as zero in the sums, which still divide by the full counts, and $n=1$ fails with a
-  division by zero.
+  counted as zero in the sums, which still divide by the full counts. With $n=1$ there is no
+  off-diagonal entry and $\bar\psi^{\mathrm{off}}_t$ is missing.
 - `aggregation_type='median'`: the median of the diagonal, and the median of the **whole**
   matrix, diagonal included, as the second number.
 
@@ -455,7 +462,8 @@ prefix of the sample reproduces the prefix of the full run. `MeanAdjType.INSAMPL
 
 **Definition (EWM horizon autocorrelation).** `qis.ewm_xy_convolution` with
 `convolution_type=qis.ConvolutionType.AUTO_CORR` sets $h=\mathrm{AN}$ of `freq` from
-`qis.get_annualization_factor` and treats it as a number of rows, with the input assumed daily.
+`qis.get_annualization_factor` and treats it as a whole number of rows, with the input assumed
+daily; a frequency whose factor is not a whole number, such as `'3QE'`, is rejected.
 With the rolling sum $S^{(h)}_t$ of the last $h$ rows, it reports the EWM correlation of each
 $h$-row sum with the preceding, non-overlapping one,
 
@@ -469,10 +477,13 @@ $$
 
 where $\mathbb{E}^{\lambda}_t$ is the EWM recursion started at the first row where its input is
 finite (zero-based row $2h-1$ for the numerator). When $h=1$ the decay is 0.2 and returns are
-not summed. The numerator is seeded at zero, and the two second moments at their full-sample
-means (`InitType.MEAN` inside `qis.compute_ewm_cross_xy`), which is a look-ahead. `mean_adj_type`
-defaults to `MeanAdjType.NONE`, so moments are about zero. `is_ra_returns=True` first divides
-returns by an EWM volatility ($\lambda=0.94$) lagged one row, which is point in time, and
+not summed. All three moments are seeded at zero, so every estimate is point in time. In qis
+5.30.3 and earlier the two second moments were seeded at their full-sample means, the
+`InitType.MEAN` default of `qis.compute_ewm_cross_xy`, and frequencies whose factor is a float,
+such as `'ME'` and `'YE'`, failed because $h$ reached pandas `rolling` and `shift` as a float;
+`var_init_type=qis.InitType.MEAN` still selects the look-ahead seed. `mean_adj_type` defaults to
+`MeanAdjType.NONE`, so moments are about zero. `is_ra_returns=True` first divides returns by an
+EWM volatility ($\lambda=0.94$) lagged one row, which is point in time, and
 `estimates_smoothing_lambda` smooths the output with a further EWM.
 
 This is a genuine correlation, bounded by one, and an EWM estimate of $\rho^{(h)}_1$. Its span
@@ -506,19 +517,27 @@ $$
 \widehat{\operatorname{Cov}}(\hat b)=\hat\sigma_\varepsilon^2\,(X^{\top}X)^{-1},
 \qquad
 \hat\sigma_\varepsilon^2=\frac{\sum_t\hat\varepsilon_t^2}{T-L-2},
-\qquad
+$$
+
+and the two reported tests are
+
+$$
 t_{\mathrm{lag}}=\frac{\beta_{\mathrm{lag}}}
 {\sqrt{\iota_{\mathrm{lag}}^{\top}\widehat{\operatorname{Cov}}(\hat b)\,\iota_{\mathrm{lag}}}},
+\qquad
+t_{\mathrm{D}}=\frac{\beta_{\mathrm{D}}}{\mathrm{se}_{\mathrm{D}}},
+\qquad
+\mathrm{se}_{\mathrm{D}}=\sqrt{\iota_{\mathrm{D}}^{\top}\widehat{\operatorname{Cov}}(\hat b)\,\iota_{\mathrm{D}}},
 $$
 
 where $T$ is the number of joint observations (`n_obs`). The statistic $t_{\mathrm{lag}}$ tests
-whether the lagged loadings sum to zero, which is the staleness hypothesis. The standard errors
-are homoskedastic and not HAC. `qis.estimate_dimson_beta` returns one row per
-asset with `beta_0` ($\hat\beta_0$), `beta_dimson`, `smoothing_ratio`
-($\beta_{\mathrm{D}}/\hat\beta_0$, NaN when $\lvert\hat\beta_0\rvert\le10^{-8}$), `t_beta_0`,
-`sum_lag_beta`, `t_sum_lag`, `ar1` (the lag-one Pearson autocorrelation of $r_t$ on the
-regression sample), the centred `r2` and `n_obs`. No standard error of $\beta_{\mathrm{D}}$ itself
-is reported; the same quadratic form with $\iota_{\mathrm{D}}=(0,1,\dots,1)^{\top}$ gives it.
+whether the lagged loadings sum to zero, which is the staleness hypothesis; $\mathrm{se}_{\mathrm{D}}$
+gives a confidence interval for the total exposure. The standard errors are homoskedastic and not
+HAC. `qis.estimate_dimson_beta` returns one row per asset with `beta_0` ($\hat\beta_0$),
+`beta_dimson`, `smoothing_ratio` ($\beta_{\mathrm{D}}/\hat\beta_0$, NaN when
+$\lvert\hat\beta_0\rvert\le10^{-8}$), `t_beta_0`, `sum_lag_beta`, `t_sum_lag`, `ar1` (the lag-one
+Pearson autocorrelation of $r_t$ on the regression sample), the centred `r2`, `n_obs`, and, after
+these, `se_beta_dimson` and `t_beta_dimson`, which were added after qis 5.30.3.
 
 **Proposition (lag regression recovers the total exposure).** Let
 $r_t=a+\sum_{k\ge0}c_k\,m_{t-k}+e_t$ with $\sum_k\lvert c_k\rvert<\infty$, $m_t$ iid with variance
@@ -576,8 +595,10 @@ slopes 0.4, 0 and 0, and a smoothing ratio of $1/0.6=1.667$, on $T=237$ joint ob
 regression on $m_t$ alone gives 0.5997, not exactly 0.6: in a finite sample the omitted
 $m_{t-1}$ is not exactly orthogonal to $m_t$. The lag-one autocorrelation of the stale series is
 0.490, against the population value $0.6\cdot0.4/(0.6^2+0.4^2)=0.462$. With zero residuals the
-t-statistics are meaningless, so the block then adds noise and checks `t_sum_lag` (8.69) against
-the classical formula computed directly with numpy.
+t-statistics are meaningless, so the block then adds noise and checks `t_sum_lag` (8.69) and the
+standard error of the Dimson beta, 0.053 around $\beta_{\mathrm{D}}=0.989$ ($t_{\mathrm{D}}=18.8$),
+against the classical formulas computed directly with numpy. Without lags the Dimson beta is the
+contemporaneous one, so `t_beta_dimson` equals `t_beta_0`.
 
 ```python
 import numpy as np
@@ -604,6 +625,9 @@ joint = pd.concat([stale, market], axis=1).dropna().to_numpy()
 slope = np.cov(joint[:, 0], joint[:, 1])[0, 1] / np.var(joint[:, 1], ddof=1)
 np.testing.assert_allclose(only_contemporaneous['beta_0'], slope, atol=1e-12)
 assert abs(slope - 0.5997) < 5e-5
+assert only_contemporaneous['sum_lag_beta'] == 0.0 and np.isnan(only_contemporaneous['t_sum_lag'])
+np.testing.assert_allclose(only_contemporaneous['t_beta_dimson'],
+                           only_contemporaneous['t_beta_0'], rtol=1e-12)
 assert abs(row['ar1'] - 0.490) < 5e-4 and abs(row['ar1'] - 0.24 / 0.52) < 0.05
 
 # With noise, t_sum_lag is the classical (non-HAC) t-statistic of the summed lagged slopes.
@@ -621,6 +645,12 @@ t_lag = selector @ coef / np.sqrt(selector @ cov @ selector)
 np.testing.assert_allclose(fit.loc['noisy', 't_sum_lag'], t_lag, rtol=1e-10)
 np.testing.assert_allclose(fit.loc['noisy', 'beta_dimson'], coef[1:].sum(), rtol=1e-10)
 assert abs(t_lag - 8.69) < 0.01
+iota_d = np.array([0.0, 1.0, 1.0, 1.0, 1.0])
+se_d = np.sqrt(iota_d @ cov @ iota_d)
+np.testing.assert_allclose(fit.loc['noisy', 'se_beta_dimson'], se_d, rtol=1e-10)
+np.testing.assert_allclose(fit.loc['noisy', 't_beta_dimson'], coef[1:].sum() / se_d, rtol=1e-10)
+assert abs(se_d - 0.053) < 5e-4 and abs(coef[1:].sum() - 0.989) < 5e-4
+assert abs(coef[1:].sum() / se_d - 18.8) < 0.05
 ```
 
 The second block simulates an AR(1) with $\phi=0.5$ for $T=2000$ observations after a burn-in of
@@ -708,11 +738,15 @@ theory = variance_ratio(phi, 2 * h) / variance_ratio(phi, h) - 1
 assert abs(block['ar1'] - 0.039) < 5e-4 and abs(theory - 0.077) < 5e-4
 ```
 
-The last block runs the EWM vector estimator with span $N=60$, checks it against the recursion
-written out in numpy, including the full-sample variance seed, and exhibits that seed's
-look-ahead. The same estimator run on the first 250 rows alone differs by up to 0.008 over those
-rows, and by $4.5\times10^{-6}$ at the 250th, as the seed's weight decays. After row 500 the path
-averages 0.520 with a standard deviation of 0.097 over time, the same order as $1/\sqrt{N}=0.13$.
+The last block runs the EWM vector estimator with span $N=60$ and checks it against the recursion
+written out in numpy with zero seeds; the first row has no lagged pair and is missing. The
+estimator is point in time: run on the first 250 rows alone it reproduces those rows exactly.
+The full-sample variance seed of qis 5.30.3 and earlier, still available as
+`var_init_type=qis.InitType.VAR`, is not: its prefix run differs by up to 0.008, and by
+$4.5\times10^{-6}$ at the 250th row, as the seed's weight decays. That seed also pulls the first
+estimates towards zero, 0.009, 0.013 and 0.028 at rows 2 to 4 against 0.37, 0.45 and 0.40 with
+the zero seed. After row 500 the two agree, and the path averages 0.520 with a standard deviation
+of 0.097 over time, the same order as $1/\sqrt{N}=0.13$.
 
 ```python
 span = 60
@@ -720,17 +754,26 @@ lam = 1.0 - 2.0 / (span + 1.0)
 ewm_path = qis.compute_ewm_vector_autocorr_df(ar1, span=span)
 
 z = x - qis.compute_ewm(x, span=span)  # point-in-time EWM mean, first-observation seed
-cross, second = 0.0, np.var(z)  # zero seed and full-sample variance seed
-by_hand = np.zeros(T)
+cross, second = 0.0, 0.0  # zero seeds for both moments
+by_hand = np.full(T, np.nan)
 for t in range(1, T):
     cross = (1 - lam) * z[t - 1] * z[t] + lam * cross
     second = (1 - lam) * z[t] ** 2 + lam * second
     by_hand[t] = cross / second
 np.testing.assert_allclose(ewm_path.to_numpy(), by_hand, atol=1e-12)
+assert np.isnan(ewm_path.iloc[0])
 
 prefix = qis.compute_ewm_vector_autocorr_df(ar1.iloc[:250], span=span)
-gap = (prefix - ewm_path.iloc[:250]).abs()
+assert (prefix - ewm_path.iloc[:250]).abs().max() < 1e-12  # point in time
+
+former = qis.compute_ewm_vector_autocorr_df(ar1, span=span, var_init_type=qis.InitType.VAR)
+former_prefix = qis.compute_ewm_vector_autocorr_df(ar1.iloc[:250], span=span,
+                                                   var_init_type=qis.InitType.VAR)
+gap = (former_prefix - former.iloc[:250]).abs()
 assert 0.005 < gap.max() < 0.01 and gap.iloc[-1] < 1e-5  # look-ahead that decays
+np.testing.assert_allclose(former.iloc[2:5], [0.009, 0.013, 0.028], atol=5e-4)
+np.testing.assert_allclose(ewm_path.iloc[2:5], [0.37, 0.45, 0.40], atol=5e-3)
+assert (former.iloc[500:] - ewm_path.iloc[500:]).abs().max() < 1e-6
 assert abs(ewm_path.iloc[500:].mean() - 0.520) < 5e-4
 assert abs(ewm_path.iloc[500:].std() - 0.097) < 5e-4
 ```
@@ -741,16 +784,16 @@ assert abs(ewm_path.iloc[500:].std() - 0.097) < 5e-4
 |---|---|---|
 | Standard ACF and PACF, one series | $\hat\rho^{\mathrm{acf}}_k$, $k=1,\dots,K$; Yule–Walker PACF | `qis.estimate_acf_from_path(path, nlags=10)` returns `(acf, pacf)` indexed by lag |
 | The same across columns | Per column, plus the cross-column mean and standard deviation | `qis.estimate_acf_from_paths(paths, nlags=10, is_pacf=True)` returns the PACF by default |
-| Lagged Pearson correlation of two arrays | $\hat\rho^{\mathrm{P}}_k$ of `a1` against lagged `a2`, lags $0,\dots,K-1$ | `qis.compute_path_lagged_corr(a1, a2, num_lags=20)` |
-| The same at chosen lags | $\hat\rho^{\mathrm{P}}_k$ for $k$ in `lags` (each $\ge1$) | `qis.compute_path_lagged_corr_given_lags(a1, a2, lags=(1, 5, 10))` |
+| Lagged Pearson correlation of two arrays | $\hat\rho^{\mathrm{P}}_k$ of `a1` against lagged `a2`, lags $0,\dots,K-1$; lag 0 is the contemporaneous correlation | `qis.compute_path_lagged_corr(a1, a2, num_lags=20)` |
+| The same at chosen lags | $\hat\rho^{\mathrm{P}}_k$ for $k$ in `lags` (each $\ge0$) | `qis.compute_path_lagged_corr_given_lags(a1, a2, lags=(1, 5, 10))` |
 | Lagged Pearson autocorrelation, arrays | $\hat\rho^{\mathrm{P}}_k$ per column; shape $K\times n$, or length $K$ for 1-D input | `qis.compute_path_autocorr(a, num_lags=20)` |
 | The same at chosen lags | $\hat\rho^{\mathrm{P}}_k$ per column; shape $n\times$ `len(lags)`, transposed relative to the row above | `qis.compute_path_autocorr_given_lags(a, lags=(1, 5, 10))` |
 | Lagged Pearson autocorrelation, pandas | $\hat\rho^{\mathrm{P}}_k$ indexed by lag $0,\dots,K-1$ | `qis.compute_autocorr_df(df, num_lags=20)` |
 | Block autocorrelation | $\hat\rho^{(h)}_1$ of end-aligned $h$-row block sums | `qis.compute_autocorrelation_at_int_periods(data, span=30)` |
-| EWM autocorrelation, vector | $\tilde\rho_{k,t}=\hat\gamma^{\lambda}_{k,t}/\hat\gamma^{\lambda}_{0,t}$ | `qis.compute_ewm_vector_autocorr(a, ewm_lambda=0.94, lag=1)`, `qis.compute_ewm_vector_autocorr_df(data, span=30)` |
+| EWM autocorrelation, vector | $\tilde\rho_{k,t}=\hat\gamma^{\lambda}_{k,t}/\hat\gamma^{\lambda}_{0,t}$, zero seeds | `qis.compute_ewm_vector_autocorr(a, ewm_lambda=0.94, lag=1, var_init_type=qis.InitType.ZERO)`, `qis.compute_ewm_vector_autocorr_df(data, span=30)` |
 | EWM lagged cross moments, matrix | $\bar\psi^{\mathrm{diag}}_t$, $\bar\psi^{\mathrm{off}}_t$ from $\Psi_t$ | `qis.compute_ewm_matrix_autocorr(a, ewm_lambda=0.94)` returns a tuple; `qis.compute_ewm_matrix_autocorr_df(data)` |
-| EWM horizon autocorrelation | $\hat\rho^{(h)}_{1,t}$ with $h=\mathrm{AN}$ of `freq` | `qis.ewm_xy_convolution(returns, freq, convolution_type=qis.ConvolutionType.AUTO_CORR)` |
-| Dimson beta | $\hat\beta_0$, $\beta_{\mathrm{D}}$, $\beta_{\mathrm{D}}/\hat\beta_0$, classical t-statistics | `qis.estimate_dimson_beta(asset_returns, market_returns, num_lags=3, min_obs=36)` |
+| EWM horizon autocorrelation | $\hat\rho^{(h)}_{1,t}$ with $h=\mathrm{AN}$ of `freq`, zero seeds | `qis.ewm_xy_convolution(returns, freq, convolution_type=qis.ConvolutionType.AUTO_CORR, var_init_type=qis.InitType.ZERO)` |
+| Dimson beta | $\hat\beta_0$, $\beta_{\mathrm{D}}$, $\beta_{\mathrm{D}}/\hat\beta_0$, $\mathrm{se}_{\mathrm{D}}$, classical t-statistics | `qis.estimate_dimson_beta(asset_returns, market_returns, num_lags=3, min_obs=36)` |
 
 The estimators live in
 [auto_corr.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/models/linear/auto_corr.py),
@@ -772,27 +815,30 @@ Contract details not visible in the formulas:
 - `estimate_acf_from_path` and `estimate_acf_from_paths` drop NaNs and return NaN unless more
   than $2K$ finite observations remain. `estimate_acf_from_paths` returns a table indexed
   $0,\dots,K$, including lag 0, with the mean and the population standard deviation (`ddof=0`)
-  across columns; the second Series is named `str`.
+  across columns, named `mean` and `std`. Its default `is_pacf=True` returns partial
+  autocorrelations; pass `is_pacf=False` for the ACF.
 - `compute_path_lagged_corr` with `a1` $\ne$ `a2` is a lead–lag correlation: entry $k$ is
-  $\operatorname{Corr}(a_{1,t},a_{2,t-k})$. Entry 0 is still set to one, not to the
-  contemporaneous correlation. The `*_given_lags` variants reject lag 0.
+  $\operatorname{Corr}(a_{1,t},a_{2,t-k})$, and entry 0 the contemporaneous correlation. The
+  autocorrelation kernels keep lag 0 at one, and the `*_given_lags` variants accept lag 0.
 - The `compute_path_*` kernels are numba-compiled; the first call in a session compiles them.
   `compute_autocorr_df` accepts an `axis` argument for compatibility and ignores it.
-- `compute_ewm_vector_autocorr` and `compute_ewm_matrix_autocorr` report zero, not NaN, for the
-  first `lag` rows.
+- `compute_ewm_vector_autocorr` and `compute_ewm_matrix_autocorr` report NaN for the first `lag`
+  rows; the vector version also where the second moment is zero, and the matrix version for the
+  off-diagonal mean of a single column.
 - `estimate_dimson_beta` builds its lags with `market_returns.shift(k)` on the market's own
   index before aligning, so the market must be on the asset's grid. An asset with fewer than
   `max(min_obs, num_lags + 3)` joint observations gets a NaN row with its `n_obs`. With
-  `num_lags=0`, `sum_lag_beta` is zero and `t_sum_lag` is NaN.
+  `num_lags=0` there is no lagged slope: `sum_lag_beta` is zero, `t_sum_lag` is NaN, and
+  `beta_dimson` and `t_beta_dimson` equal `beta_0` and `t_beta_0`.
 
 ## Interpretation and limitations
 
 - **Full sample versus point in time.** `estimate_acf_from_path`, the `compute_path_*` kernels,
   `compute_autocorrelation_at_int_periods` and `estimate_dimson_beta` are full-sample,
-  descriptive statistics. Of the EWM estimators, only the matrix version with the default
-  demeaning is point in time. The vector version and `ewm_xy_convolution` seed their second
-  moments with full-sample values; the effect decays like $\lambda^t$ but is real in the first
-  few spans.
+  descriptive statistics. The EWM estimators are point in time with their defaults, which seed
+  every state at zero. `MeanAdjType.INSAMPLE`, `var_init_type=qis.InitType.VAR` in the vector
+  version and `var_init_type=qis.InitType.MEAN` in `ewm_xy_convolution` reintroduce full-sample
+  information; the effect decays like $\lambda^t$ but is real in the first few spans.
 - **Significance.** Judge a sample autocorrelation against $1/\sqrt{T}$ at best, and against a
   wider heteroskedasticity-consistent band for daily returns. With 60 monthly returns, a lag-one
   autocorrelation of 0.2 is not distinguishable from zero.
@@ -807,10 +853,9 @@ Contract details not visible in the formulas:
   contemporaneous covariance can dominate it; the median aggregation is more robust but mixes
   in the diagonal.
 - **Horizon convolution.** In `ewm_xy_convolution` the horizon, lag and EWM span are all the one
-  number $h=\mathrm{AN}$ of `freq`, counted in rows of an input assumed daily. The current
-  implementation passes that number to pandas `rolling` and `shift`, which require an integer;
-  `freq='B'` ($h=252$) runs, while frequencies whose factor is returned as a float, such as
-  `'ME'`, raise.
+  number $h=\mathrm{AN}$ of `freq`, counted in rows of an input assumed daily: `freq='ME'` means
+  12 rows, not one month, whatever the grid of the input. A frequency whose factor is not a whole
+  number of rows is rejected rather than rounded.
 - **Dimson truncation.** The default $L=3$ recovers a finite lag structure exactly but truncates
   an AR-type smoothing filter, so $\beta_{\mathrm{D}}$ still understates the total exposure of a
   heavily smoothed series. Its t-statistics are classical, not HAC.
