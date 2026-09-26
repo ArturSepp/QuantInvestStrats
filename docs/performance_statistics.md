@@ -56,7 +56,7 @@ regime columns in [Regime-conditional performance](regime_conditional_performanc
 | Sampling grid | Native observations for visible return columns; `freq_vol` for volatility, the Sharpe and Sortino numerators and the arithmetic family; `freq_drawdown`, followed by each asset's final observation, for drawdowns, `WORST` and `BEST`; `freq_skewness` for moments; `freq_reg` for regressions |
 | Annualisation | $\mathrm{AN}$ inferred from the sampled `freq_vol` index: $\sqrt{\mathrm{AN}}$ for volatilities, $\mathrm{AN}$ for arithmetic means; 365.25-day years for per-annum returns; moments, drawdowns and extreme returns are not annualised |
 | Mean adjustment | `VOL`: sample mean removed, `ddof=1`; `DOWNSIDE_VOL`: mean of the negative returns removed, `ddof=1`; table moments: bias-corrected $G_1$, $G_2$; descriptive-table and rolling moments: uncorrected $g_1$, $g_2$ |
-| Timing | Full-sample and descriptive: every column uses the whole history, so none is point in time; the cash rate is lagged one observation of the rate series |
+| Timing | Full-sample and descriptive: every column uses the whole history, so none is point in time; cash accrued over $(t-1,t]$ uses the rate known at $t-1$ on the return grid |
 | Output units | Decimal fractions for returns, volatilities and drawdowns; dimensionless ratios, moments and p-values; dates, prices, counts and years where labelled |
 | qis default | `PerfParams()`: `freq_vol='ME'`, `freq_skewness='ME'`, `freq_drawdown='D'`, `freq_reg='QE'`, `freq_excess_return='ME'`, `return_type=ReturnTypes.LOG`, `sharpe_convention=SharpeConvention.PA`, `rates_data=None`; `compute_ra_perf_table(prices, perf_params=None)` infers `freq` from the index instead |
 
@@ -264,10 +264,10 @@ R_{\mathrm{pa}}=
 $$
 
 With a cash series, the per-period cash return is $r^{f}_t=y_{t-1}\,(d_t-d_{t-1})/365$. Here
-$y_{t-1}$ is the `rates_data` quote one observation *of the rate series* before the last quote on
-or before $d_t$. When the rate series is on the return grid this is the rate at the start of the
-period; a daily rate series applied to month-end returns uses the quote of the business day
-before the month-end for the whole month. The excess
+$y_{t-1}$ is the latest `rates_data` quote dated on or before $d_{t-1}$, whatever the calendar of
+the rate series: the rate known at the start of the period. A daily rate series applied to
+month-end returns charges each month the previous month-end quote, and the first return date
+accrues nothing. The excess
 per-annum return compounds $\tilde r_t=r_t-r^{f}_t$ and applies the same rule:
 $\tilde R_{\mathrm{pa}}=\big(\prod_t(1+\tilde r_t)\big)^{1/Y}-1$ for $Y>1$. Without a cash series
 every excess column equals its zero-rate counterpart. The log columns are
@@ -814,10 +814,9 @@ both were `Alpha` before, and a wide table containing the two could not tell the
 - For a sampled history of one year or less the ratio numerators are total, not annualised,
   returns, while `VOL` is annualised; the resulting Sharpe and Sortino ratios are not comparable
   with those of longer histories.
-- Supply `rates_data` starting at least one observation before the first price. In the current
-  implementation a rate series that starts on the first price date leaves the first native
-  excess return missing, and the native excess per-annum return then compounds from the second
-  observation while still dividing by the full $Y$.
+- A rate series quoted from the first price date covers every period, and an earlier start
+  changes nothing. If it starts later, the per-annum excess columns compound and annualise from
+  the first period with a known rate, and qis warns.
 - Degenerate inputs give missing values, not zeros or infinities: `DOWNSIDE_VOL` and
   `SORTINO_RATIO` with fewer than two losing periods, `CALMAR_RATIO` without a drawdown,
   `MAX_DD_VOL` with a missing or zero volatility, and the moments with fewer than three or four

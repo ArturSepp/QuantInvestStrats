@@ -57,7 +57,7 @@ the whole-sample estimators and links to that chapter for the rest.
 | Convention | This article |
 |---|---|
 | Return basis | Table regression: simple returns (`is_log_returns=False`), in excess of cash on both sides when `PerfParams.rates_data` is set. EWMA betas: log returns. Attribution: simple returns |
-| Sampling grid | `PerfParams.freq_reg`, default `QE`; with `perf_params=None` the grid is inferred from the price index. EWMA betas and attribution: `freq_beta`, default the input grid |
+| Sampling grid | `PerfParams.freq_reg`, default `QE`; with `perf_params=None` the grid is inferred from the price index. EWMA betas and attribution: `freq_beta`, default the input grid for the `qis.*` functions and `'B'` for the `PortfolioData` methods |
 | Annualisation | `ALPHA_AN` is $\mathrm{AN}\,\hat\alpha$ with $\mathrm{AN}$ of `freq_reg`; TE is $\sqrt{\mathrm{AN}}\,s(x)$ and IR is $\sqrt{\mathrm{AN}}\,\bar x/s(x)$ with $\mathrm{AN}$ inferred from the return index; beta and $R^2$ are not annualised |
 | Mean adjustment | OLS with an intercept and a centred $R^2$; TE demeaned with `ddof=1`; EWMA betas demeaned by an EWMA mean (`MeanAdjType.EWMA`) |
 | Timing | Table statistics and TE/IR are full-sample and descriptive. Attribution applies the beta known at $t-1$ to the return over $(t-1,t]$ |
@@ -123,7 +123,7 @@ paying for benchmark exposure.
    observation;
 2. simple returns, or log returns when `is_log_returns=True`;
 3. excess returns when `PerfParams.rates_data` is set, with the same cash return
-   $r^{f}_t$ (the rate one observation earlier, accrued ACT/365, as in
+   $r^{f}_t$ (the rate known at the start of the period on the return grid, accrued ACT/365, as in
    [Notation and conventions](notation_and_conventions.md)) subtracted from both sides;
 4. OLS with an intercept on the rows where both the column and the benchmark are finite.
 
@@ -708,13 +708,13 @@ Defaults verified with `inspect.signature`:
 | `qis.PerfParams` | `freq=None`, `freq_vol='ME'`, `freq_reg='QE'`, `rates_data=None`; passing `freq` sets `freq_reg` too |
 | `qis.compute_portfolio_ewm_benchmark_betas` | `freq_beta=None`, `factor_beta_span=63`, `mean_adj_type=MeanAdjType.EWMA` |
 | `qis.compute_portfolio_benchmark_ewm_beta_alpha_attribution` | `freq_beta=None`, `factor_beta_span=63`, `residual_name='Alpha'` |
-| `PortfolioData.compute_portfolio_benchmark_betas` | `freq_beta=None`, `factor_beta_span=65` |
+| `PortfolioData.compute_portfolio_benchmark_betas` | `freq_beta='B'`, `factor_beta_span=63` |
 | `PortfolioData.compute_portfolio_benchmark_attribution` | `freq_beta='B'`, `factor_beta_span=63` |
 | `qis.compute_ewm_beta_alpha_forecast` | `span=None`, `ewm_lambda=0.94`, `mean_adj_type=MeanAdjType.NONE`, `init_type=InitType.MEAN`, `beta_init_value=None`, `annualize=False` |
 
-With their defaults, the two `PortfolioData` methods estimate betas with different spans and
-grids. Pass `freq_beta` and `factor_beta_span` explicitly when a beta chart and an attribution
-chart must describe the same betas, as the strategy factsheet does.
+Both `PortfolioData` methods default to business-day betas with span 63, so a beta chart and an
+attribution chart drawn with their defaults describe the same betas. The strategy factsheet
+passes both arguments explicitly from its reporting preset.
 
 Sources:
 [perf_stats.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/perf_stats.py),
@@ -742,9 +742,9 @@ Sources:
   [Serial dependence and autocorrelation](serial_dependence.md).
 - **Rows use different samples.** Each asset is regressed over its joint history with the
   benchmark, so alphas of assets with different inception dates are not directly comparable.
-- **Two columns, one header.** `PerfStat.ALPHA` and `PerfStat.ALPHA_AN` share the short label
-  `Alpha`, which wide rendered tables use as the column header. `LN_BENCHMARK_TABLE_COLUMNS`
-  selects the per-period `ALPHA`; `BENCHMARK_TABLE_COLUMNS` selects `ALPHA_AN`.
+- **Per-period and annualised alpha.** Wide rendered tables head `PerfStat.ALPHA` with `Alpha`
+  and `PerfStat.ALPHA_AN` with `An Alpha`. `LN_BENCHMARK_TABLE_COLUMNS` selects the per-period
+  `ALPHA`; `BENCHMARK_TABLE_COLUMNS` selects `ALPHA_AN`.
 - **Cumulated attribution is a sum.** Factsheets plot the cumulative sum of $A_{q,t}$ and
   $\eta_t$. The sum is additive across components but is not the compounded return.
 - **Missing is not zero.** Portfolio betas and attribution rows are missing during the warm-up and

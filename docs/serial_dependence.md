@@ -369,8 +369,9 @@ blocks are available, so the band widens to $\pm1.96\sqrt{h/T}$, or $\pm0.18$ fo
 contract details:
 
 - Blocks are formed by the internal helper `qis.utils.df_freq.df_resample_at_int_index`, which
-  counts back from the last row, so the last block is complete and the first holds the
-  remaining $T \bmod h$ rows. That short first block is included.
+  counts back from the last row, so the last block is complete. An incomplete first block of
+  $T \bmod h$ rows is dropped when blocks are summed; pass `drop_incomplete_first=False` to the
+  helper to keep it.
 - With `is_returns=True` a block value is the sum of the block with NaNs counted as zero;
   with `is_returns=False` it is the last value of the block, for levels.
 - The lag-one correlation is the lagged Pearson estimator. The `demean=True` step subtracts the
@@ -721,7 +722,7 @@ assert abs(q_ar1 - 818.6) < 0.1 and abs(q_iid - 6.2) < 0.1
 The fourth block forms 200 non-overlapping ten-row block sums of the same path. The qis value
 0.039 equals the numpy lag-one correlation of the block sums; the AR(1) population value
 $\mathrm{VR}(20)/\mathrm{VR}(10)-1$ is 0.077, well inside the $\pm1.96/\sqrt{200}=\pm0.139$ band.
-Because $T$ is a multiple of $h$ here, there is no short first block.
+Because $T$ is a multiple of $h$ here, no incomplete first block is dropped.
 
 ```python
 h = 10

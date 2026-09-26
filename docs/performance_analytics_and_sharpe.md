@@ -61,7 +61,7 @@ conventions are defined in [notation and conventions](notation_and_conventions.m
 | Sampling grid | `PerfParams.freq_vol` (default `ME`) for every table Sharpe column, on each asset's complete boundaries; the regime classifier's grid (default `QE`); `roll_freq` for rolling ratios; the caller's grid for EWM ratios and the information ratio |
 | Annualisation | $\sqrt{\mathrm{AN}}$ of the sampled grid for volatilities and arithmetic ratios; compound numerators use $Y$ years of 365.25 days; $\mathrm{AN}$ is inferred from the sampled index |
 | Mean adjustment | Standard deviations are demeaned, `ddof=1`; numerators are raw means or compound returns; the EWM ratio with `norm_type=1` uses a second moment about zero |
-| Timing | Table and regime ratios are full-sample and descriptive; rolling and EWM ratios at $t$ use data up to $t$; the cash rate is lagged one observation of the rate series |
+| Timing | Table and regime ratios are full-sample and descriptive; rolling and EWM ratios at $t$ use data up to $t$; cash accrued over $(t-1,t]$ uses the rate known at $t-1$ on the return grid |
 | Output units | Dimensionless annualised ratios; the EWM ratio with `norm_type=0` is an annualised return; standard errors are in Sharpe-ratio units |
 | qis default | `compute_ra_perf_table(prices, perf_params=None)` builds `PerfParams(freq=pd.infer_freq(prices.index))`; `PerfParams()` has `freq_vol='ME'`, `return_type=ReturnTypes.LOG`, `sharpe_convention=SharpeConvention.PA`, `rates_data=None` |
 
@@ -298,17 +298,15 @@ r^{f}_t=y_{(t)}\,\frac{d_t-d_{t-1}}{365},
 \tilde r_t=r_t-r^{f}_t .
 $$
 
-`qis.compute_excess_returns` shifts the rate series by one of its own observations and then
-forward-fills it onto the return dates, so $y_{(t)}$ is the quote preceding the last quote on
-or before $d_t$. When the rates share the return grid this is the start-of-period quote
-$y_{t-1}$; with daily rates and monthly returns it is the second-to-last daily quote of the
-period, not the quote at its start. The first row of a return series accrues nothing, so the
-table passes returns that begin with the starting price boundary and every realised return
-accrues cash. The ACT/365 accrual is separate from the 365.25-day years used to annualise
-compound returns. Supply a cash series that starts before the first price: if its first quote
-falls on or after the first price boundary, the lag leaves that row without a rate, and the
-compounded excess return starts one period late while $Y$ still counts the full history; qis
-issues only a missing-price warning.
+`qis.compute_excess_returns` aligns the rate series to the return dates as of each date and then
+lags it one return period, so $y_{t-1}$ is the latest quote dated on or before $d_{t-1}$: the rate
+known at the start of the period, whatever the calendar of the rate series. With daily rates and
+monthly returns each month is charged the previous month-end quote. The first return date
+accrues nothing, so the table passes returns that begin with the starting price boundary and
+every realised return accrues cash. The ACT/365 accrual is separate from the 365.25-day years
+used to annualise compound returns. A cash series quoted from the first price date covers every
+period. If it starts later, the excess columns compound and annualise from the first period with
+a known rate, and qis warns.
 
 The excess columns then use
 
@@ -623,7 +621,8 @@ assert isclose(arithmetic_sharpe, 16.0 / 7.0, abs_tol=1e-12)
 
 The frozen synthetic universe (seed 20260725, reporting quirks disabled) starts on
 2 January 2014 and ends on 31 December 2025. Take its gold series, `SCM_GLD`, with a constant 2%
-cash rate quoted from December 2013, so that the lagged rate exists for the first return. On the
+cash rate quoted from December 2013; a series starting on the first price date gives the same
+numbers. On the
 month-end grid there are $T=143$ returns over $Y=11.915$ years between 31 January 2014 and
 31 December 2025, and $T/(\mathrm{AN}\,Y)=1.0001$.
 

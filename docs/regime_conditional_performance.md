@@ -141,7 +141,8 @@ unclassified.
 
 **Definition (volatility regimes).** `qis.BenchmarkVolsQuantilesRegime(q=4)` computes, for each
 regime period, the realised volatility of the benchmark's native-frequency returns within the
-period, annualised with the native grid's factor, and splits these volatilities into `q`
+period (after the previous regime date, up to and including its own, so a boundary return is
+counted once), annualised with the native grid's factor, and splits these volatilities into `q`
 equal-count buckets at full-sample quantiles. The labels carry the thresholds, for example
 `'SPY vol<12%'`, so they are known only after classification. The volatility is measured over
 the same period whose returns are conditioned on, and the thresholds use the full sample.

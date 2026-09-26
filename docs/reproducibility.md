@@ -983,8 +983,8 @@ A seed alone does not promise identical output across software versions. The
 several changes that move seeded resamples: `STATIONARY` blocks wrap from qis 5.1.0, which also
 added `FIXED_BLOCK` and `min_block_size` with a default that keeps the earlier behaviour; from
 5.2.1 AR(1) indices are drawn over the residual rows and lag pairs that straddle a gap are
-dropped; a later fix fills the terminal row of every `IID` path, so seeded `IID` results of
-earlier versions may not reproduce either; and a still later fix makes the AR(1) positivity
+dropped; 5.30.0 fills the terminal row of every `IID` path, so seeded `IID` results of
+5.23.0 and earlier may not reproduce either; and a still later fix makes the AR(1) positivity
 floor per column and the constant-series test relative to scale, which moves seeded AR paths of
 positive columns that reach zero, of panels whose columns were coupled by the old clamp, and of
 series with a standard deviation below about $10^{-4}$.

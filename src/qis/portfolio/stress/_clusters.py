@@ -122,7 +122,11 @@ def display_cluster_table(frame, contributions):
 
 
 def cluster_top_contributors(result, contributions, displayed=False):
-    """Rank three absolute holding P&Ls in each cluster's worst conditional scenario."""
+    """Rank three absolute holding P&Ls in each cluster's worst conditional scenario.
+
+    The worst scenario is chosen over the whole conditional-comparison batch, not only the
+    scenarios displayed on the cluster page, so it can lie beyond the displayed columns.
+    """
     fields = ["holding_id", "name", "pnl", "nav_contribution"]
     columns = ["scenario", *fields, *[f"{field}_{rank}"
                for rank in (2, 3) for field in fields]]
