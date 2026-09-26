@@ -90,7 +90,10 @@ Contributions are defined for $\sigma_p>0$; a non-positive quadratic form, which
 is not positive semi-definite can produce, returns zeros. Dated covariance matrices for these
 functions and for `RiskModel` are usually produced by `qis.estimate_rolling_ewma_covar`, which
 returns one annualised matrix per rebalancing date; its estimator is the subject of the
-[covariance chapter](covariance_correlation_pca.md).
+[covariance chapter](covariance_correlation_pca.md). Before an asset's first return that
+estimator leaves its row and column NaN. The contribution functions treat an asset with a NaN
+variance as unavailable: at zero weight it is ignored and receives a zero contribution, and when
+held all contributions are NaN, because the portfolio's risk is unknown.
 
 ## Methodology
 

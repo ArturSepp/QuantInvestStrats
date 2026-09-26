@@ -66,7 +66,10 @@ from qis.models.linear.ewm import compute_ewm_vol
 import qis.portfolio.risk.ewm_factor_model as ef
 from qis.portfolio.signal_data import StrategySignalData
 from qis.portfolio.risk.ewm_covar_risk import compute_portfolio_vol
-from qis.portfolio.risk.contributions import compute_portfolio_risk_contributions
+from qis.portfolio.risk.contributions import (
+    compute_portfolio_risk_contributions,
+    fill_unavailable_unheld,
+)
 from qis.utils.annualisation import infer_annualisation_factor_from_df
 from qis.utils.df_str import date_to_str
 from qis.perfstats.turnover import (
@@ -1190,7 +1193,9 @@ class PortfolioData:
             freq: Optional grid of the realised weights; None evaluates on the covariance dates.
 
         Returns:
-            Portfolio volatility per date, in the units of the square root of the covariance.
+            Portfolio volatility per date, in the units of the square root of the covariance. An
+            asset without a covariance on a date (a NaN row and column) is ignored when its
+            weight is zero; when it is held, the volatility on that date is NaN.
 
         Raises:
             ValueError: If no covariance is supplied or stored.
@@ -1210,6 +1215,7 @@ class PortfolioData:
             for date, pd_covar in covar_dict.items():
                 # align with covar matrix
                 w = strategy_weights.loc[date].reindex(index=pd_covar.columns).fillna(0.0)
+                pd_covar = fill_unavailable_unheld(pd_covar, w)
                 portfolio_vol[date] = np.sqrt(w.T @ pd_covar @ w)
         else:
             for date, weights in strategy_weights.to_dict(orient='index').items():
@@ -1217,6 +1223,7 @@ class PortfolioData:
                 if last_covar_update_date is not None:
                     pd_covar = covar_dict[last_covar_update_date]
                     w = pd.Series(weights).reindex(index=pd_covar.columns).fillna(0.0)
+                    pd_covar = fill_unavailable_unheld(pd_covar, w)
                     portfolio_vol[date] = np.sqrt(w.T @ pd_covar @ w)
         portfolio_vol = pd.Series(portfolio_vol, name=self.ticker)
         return portfolio_vol

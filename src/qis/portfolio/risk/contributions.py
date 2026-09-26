@@ -20,6 +20,42 @@ import pandas as pd
 from typing import Union, Tuple
 
 
+def fill_unavailable_unheld(covar: Union[np.ndarray, pd.DataFrame],
+                            *weights: Union[np.ndarray, pd.Series]
+                            ) -> Union[np.ndarray, pd.DataFrame]:
+    """Zero the covariance of assets that have no covariance and no weight.
+
+    An asset whose variance is missing, for example before its first return in
+    ``qis.estimate_rolling_ewma_covar``, has a NaN row and column. With a zero weight in every
+    vector it contributes nothing to a quadratic or bilinear form of those vectors, so its NaNs are
+    replaced by zeros; with a nonzero weight they are kept, and the form is NaN because that
+    asset's risk is unknown.
+
+    Args:
+        covar: Covariance matrix as array or DataFrame.
+        *weights: Weight vectors aligned to the rows of ``covar``.
+
+    Returns:
+        ``covar`` itself when every variance is finite, otherwise a copy of the same type with
+        the unavailable, unheld rows and columns set to zero.
+    """
+    values = covar.to_numpy(dtype=float) if isinstance(covar, pd.DataFrame) else np.asarray(
+        covar, dtype=float)
+    unavailable = ~np.isfinite(np.diag(values))
+    if not unavailable.any():
+        return covar
+    held = np.zeros(values.shape[0], dtype=bool)
+    for weight in weights:
+        held |= np.nan_to_num(np.asarray(weight, dtype=float), nan=0.0) != 0.0
+    fill = unavailable & ~held
+    values = values.copy()
+    values[fill, :] = 0.0
+    values[:, fill] = 0.0
+    if isinstance(covar, pd.DataFrame):
+        return pd.DataFrame(values, index=covar.index, columns=covar.columns)
+    return values
+
+
 def compute_portfolio_risk_contributions(w: Union[np.ndarray, pd.Series],
                                          covar: Union[np.ndarray, pd.DataFrame]
                                          ) -> Union[np.ndarray, pd.Series]:
@@ -31,7 +67,9 @@ def compute_portfolio_risk_contributions(w: Union[np.ndarray, pd.Series],
 
     Returns:
         Risk contributions for each asset. A non-positive-variance portfolio
-        has no risk to attribute and returns zeros.
+        has no risk to attribute and returns zeros. An asset without a covariance (a NaN row
+        and column) is ignored when its weight is zero; when it is held the contributions are
+        NaN.
 
     Raises:
         ValueError: If input types are not compatible.
@@ -43,6 +81,7 @@ def compute_portfolio_risk_contributions(w: Union[np.ndarray, pd.Series],
         assert covar.shape[0] == covar.shape[1] == w.shape[0]
     else:
         raise ValueError(f"unnsuported types {type(w)} and {type(covar)}")
+    covar = fill_unavailable_unheld(covar, w)
     portfolio_var = float(w.T @ covar @ w)
     if portfolio_var <= 0.0:
         if isinstance(w, pd.Series):
@@ -85,6 +124,7 @@ def compute_portfolio_risk_contribution_ratios(
     else:
         raise ValueError(f"unsupported types {type(weights)} and {type(covar)}")
 
+    covar = fill_unavailable_unheld(covar, aligned_w)
     portfolio_var = float(aligned_w.T @ covar @ aligned_w)
     if portfolio_var <= 0.0:
         if isinstance(aligned_w, pd.Series):
@@ -166,7 +206,9 @@ def compute_benchmark_portfolio_risk_contributions(w_portfolio: Union[np.ndarray
         as zero weight, labels outside the covariance are dropped), array weights are taken
         in covariance order, and the result is a Series in covariance order. With array
         inputs the result is an array. A zero tracking error returns zeros, the convention of
-        ``RiskModel``.
+        ``RiskModel``. An asset without a covariance (a NaN row and column) is ignored when
+        its active weight is zero; otherwise the tracking error is unknown and the
+        contributions are NaN.
 
     Raises:
         ValueError: If input types are not compatible.
@@ -191,6 +233,7 @@ def compute_benchmark_portfolio_risk_contributions(w_portfolio: Union[np.ndarray
         raise ValueError(f"unsupported types {type(w_portfolio)}, {type(w_benchmark)} "
                          f"and {type(covar)}")
     active_weights = w_portfolio - w_benchmark
+    covar = fill_unavailable_unheld(covar, active_weights)
     if is_independent_risk:
         rc = np.abs(active_weights) * np.sqrt(np.diag(covar))
     else:

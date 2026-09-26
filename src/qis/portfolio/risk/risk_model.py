@@ -28,6 +28,7 @@ from typing import Dict, Optional, Union
 import numpy as np
 import pandas as pd
 
+from qis.portfolio.risk.contributions import fill_unavailable_unheld
 from qis.portfolio.risk.factor_groups import FactorGroupSpec
 
 
@@ -58,6 +59,11 @@ class RiskModel:
     ``LinearModel.get_loadings_at_date`` returns factors by assets; transpose
     such a snapshot before passing it here.
 
+    An asset whose variance is NaN on a date, for example before its first return in
+    ``qis.estimate_rolling_ewma_covar``, is unavailable on that date: its row and column may be
+    NaN. Results that do not weight it ignore it; results that weight it are NaN, and its own
+    benchmark-beta loading is NaN.
+
     Attributes:
         covar: Covariance matrices by date, with matching asset index and columns.
         factor_loadings: Optional asset-by-factor loading matrices by date.
@@ -67,10 +73,10 @@ class RiskModel:
         factor_groups: Optional provider-neutral family membership and bump weights.
 
     Raises:
-        ValueError: If the covariance or factor data are incomplete, non-finite,
-            misaligned, non-unique, non-square, non-symmetric, not positive
-            semi-definite, or have negative residual variances, each beyond a
-            rounding tolerance (``COVAR_PSD_TOL`` relative to the matrix scale).
+        ValueError: If the covariance or factor data are incomplete, non-finite (outside the
+            rows and columns of unavailable assets), misaligned, non-unique, non-square,
+            non-symmetric, not positive semi-definite, or have negative residual variances,
+            each beyond a rounding tolerance (``COVAR_PSD_TOL`` relative to the matrix scale).
     """
 
     covar: Dict[pd.Timestamp, pd.DataFrame]
@@ -105,7 +111,8 @@ class RiskModel:
             raise ValueError("residual_vars is required when factor_covar is supplied")
 
         for date, covar in self.covar.items():
-            self._validate_square_matrix(covar, field_name='covar', date=date)
+            self._validate_square_matrix(covar, field_name='covar', date=date,
+                                         allow_unavailable=True)
 
         if self.factor_loadings is not None:
             self._validate_factor_loadings()
@@ -180,8 +187,14 @@ class RiskModel:
     def _validate_square_matrix(matrix: pd.DataFrame,
                                 field_name: str,
                                 date: pd.Timestamp,
+                                allow_unavailable: bool = False,
                                 ) -> None:
-        """Validate a labelled covariance matrix."""
+        """Validate a labelled covariance matrix.
+
+        With ``allow_unavailable``, an asset with a non-finite variance is unavailable and its
+        row and column are not checked; the other entries must be finite, symmetric and
+        positive semi-definite.
+        """
         if not isinstance(matrix, pd.DataFrame):
             raise ValueError(f"{field_name}[{date}] must be a pd.DataFrame, got "
                              f"{type(matrix).__name__}")
@@ -198,6 +211,9 @@ class RiskModel:
             values = matrix.to_numpy(dtype=float)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{field_name}[{date}] must contain numeric values") from exc
+        if allow_unavailable:
+            available = np.isfinite(np.diag(values))
+            values = values[np.ix_(available, available)]
         if not np.isfinite(values).all():
             raise ValueError(f"{field_name}[{date}] contains non-finite values")
         if not np.allclose(values, values.T, rtol=0.0, atol=COVAR_SYMMETRY_TOL):
@@ -432,6 +448,7 @@ class RiskModel:
                                 covar: pd.DataFrame,
                                 ) -> float:
         """Compute the square root of the active-weight covariance quadratic form."""
+        covar = fill_unavailable_unheld(covar, active_weights)
         variance = float(active_weights @ covar @ active_weights)
         return float(np.sqrt(variance))
 
@@ -726,6 +743,7 @@ class RiskModel:
             date=date,
             role='portfolio_weights',
             strict=strict)
+        covar = fill_unavailable_unheld(covar, benchmark, portfolio)
         benchmark_variance = float(benchmark @ covar @ benchmark)
         self._validate_benchmark_variance(benchmark_variance)
         return float(portfolio @ covar @ benchmark) / benchmark_variance
@@ -771,9 +789,9 @@ class RiskModel:
         results = {}
         invalid_dates = []
         for date in self.dates:
-            covar = self._covar_at_date(date)
             benchmark = benchmark_history.loc[date]
             portfolio = portfolio_history.loc[date]
+            covar = fill_unavailable_unheld(self._covar_at_date(date), benchmark, portfolio)
             benchmark_variance = float(benchmark @ covar @ benchmark)
             if benchmark_variance <= 0.0:
                 results[date] = np.nan
@@ -813,7 +831,8 @@ class RiskModel:
             strict: If True, reject material weights outside the covariance universe.
 
         Returns:
-            Benchmark-beta loading Series indexed by covariance asset.
+            Benchmark-beta loading Series indexed by covariance asset. An unavailable asset
+            (NaN variance) has a NaN loading.
 
         Raises:
             KeyError: If ``date`` is not an exact covariance-grid date.
@@ -829,9 +848,11 @@ class RiskModel:
             outside_universe_remedy=(
                 "estimate the covariance on the joint universe of assets and "
                 "benchmark constituents upstream"))
+        unavailable = ~np.isfinite(np.diag(covar.to_numpy(dtype=float)))
+        covar = fill_unavailable_unheld(covar, benchmark)
         benchmark_variance = float(benchmark @ covar @ benchmark)
         self._validate_benchmark_variance(benchmark_variance)
-        return (covar @ benchmark) / benchmark_variance
+        return ((covar @ benchmark) / benchmark_variance).mask(unavailable)
 
     def compute_tre_decomposition_at_date(self,
                                           benchmark_weights: pd.Series,
@@ -982,6 +1003,7 @@ class RiskModel:
             role='portfolio_weights',
             strict=strict)
         active_weights = portfolio - benchmark
+        covar = fill_unavailable_unheld(covar, active_weights)
         tracking_error = self._compute_tracking_error(
             active_weights=active_weights, covar=covar)
         if tracking_error == 0.0:

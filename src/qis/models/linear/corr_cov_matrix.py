@@ -36,7 +36,8 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
                                 span: int = 52,
                                 is_apply_vol_normalised_returns: bool = False,
                                 demean: bool = True,
-                                apply_an_factor: bool = True
+                                apply_an_factor: bool = True,
+                                warmup_period: Optional[int] = None
                                 ) -> Dict[pd.Timestamp, pd.DataFrame]:
     """
     EWM covariance matrix sampled on a rebalancing schedule, ready for a rolling backtest.
@@ -48,10 +49,15 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
     turnover.
 
     The recursion starts from a zero matrix, so the first matrices are scaled down by the
-    warm-up factor ``1 - lambda^K`` after ``K`` returns; pass a ``time_period`` that starts a
-    few spans after the first price when the early dates matter. Missing returns reset the
-    affected entries to zero (``NanBackfill.ZERO_FILL``), which keeps every matrix positive
-    semi-definite.
+    warm-up factor ``1 - lambda^K`` after ``K`` returns; pass ``warmup_period`` to mask each
+    asset until it has enough returns, or a ``time_period`` that starts a few spans after the
+    first price. An asset's row and column are NaN until its first return, in both estimators.
+    On that date the direct recursion gives ``(1 - lambda) x x'`` (times ``(1 + lambda) / 2``
+    when demeaned); the vol-normalised estimator rebuilds the covariance from EWM volatilities
+    seeded with the first squared residual, so its first variances carry no ``1 - lambda``
+    warm-up factor. Missing returns after an asset's first return
+    reset the affected entries to zero (``NanBackfill.ZERO_FILL``), which keeps every matrix
+    positive semi-definite.
 
     Args:
         prices: price levels, one column per asset. NaN is tolerated
@@ -65,10 +71,13 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
             rebuild the covariance from it, which stops a single volatile asset dominating
         demean: remove the EWM mean before estimating. The residual is the one-step forecast
             error ``x_t - m_{t-1}`` against the EWM mean of the previous date, so it is point in
-            time, and the matrix is multiplied by ``N / (N + 1) = (1 + lambda) / 2``, which makes
-            it unbiased for iid returns once the seed is forgotten. False takes the second moment
-            about zero
+            time; the mean starts from zero, so the first residual of an asset is its first
+            return. The matrix is multiplied by ``(1 + lambda) / 2``, which makes it unbiased for
+            iid returns once the seed is forgotten. False takes the second moment about zero
         apply_an_factor: annualise, so the matrix is in annual units
+        warmup_period: None masks an asset only before its first return. An integer ``k``
+            also masks it for its first ``k`` returns, counted from its own first return, so
+            its row and column are NaN until it has ``k + 1`` returns
 
     Returns:
         rebalancing date to the covariance matrix estimated at that date, indexed and labelled by
@@ -78,11 +87,14 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
     returns_np = returns.to_numpy()
     if demean:
         # the EWM mean m_t includes x_t, so x_t - m_t = lambda (x_t - m_{t-1}): dividing by lambda
-        # gives the one-step forecast error against the prior mean m_{t-1} (zero on the seed row).
+        # gives the one-step forecast error against the prior mean m_{t-1}. The mean is seeded at
+        # zero, so an asset's first residual is its first return rather than exactly zero, which
+        # would give a zero first volatility and a NaN in the vol-normalised estimator.
         # Its steady-state covariance for iid returns is 2 / (1 + lambda) Sigma, so the residual is
         # scaled by sqrt((1 + lambda) / 2) to make the covariance unbiased.
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
-        prior_mean_residual = (returns_np - ewm.compute_ewm(returns_np, span=span)) / ewm_lambda
+        prior_mean = ewm.compute_ewm(returns_np, span=span, init_type=ewm.InitType.ZERO)
+        prior_mean_residual = (returns_np - prior_mean) / ewm_lambda
         x = np.sqrt(0.5 * (1.0 + ewm_lambda)) * prior_mean_residual
     else:
         x = returns_np
@@ -91,6 +103,13 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
         covar_tensor_txy, _, _ = ewm.compute_ewm_covar_tensor_vol_norm_returns(a=x, span=span, nan_backfill=ewm.NanBackfill.ZERO_FILL)
     else:
         covar_tensor_txy = ewm.compute_ewm_covar_tensor(a=x, span=span, nan_backfill=ewm.NanBackfill.ZERO_FILL)
+
+    # an asset without data, or still in its warm-up, has no covariance: NaN in its row and
+    # column rather than the zero that the reset recursion carries, which reads as no risk
+    num_returns = np.cumsum(np.isfinite(returns_np), axis=0)
+    is_available = num_returns > (0 if warmup_period is None else int(warmup_period))
+    pair_available = is_available[:, :, None] & is_available[:, None, :]
+    covar_tensor_txy = np.where(pair_available, covar_tensor_txy, np.nan)
 
     # create rebalancing schedule
     rebalancing_schedule = da.generate_rebalancing_indicators(df=returns, freq=rebalancing_freq)

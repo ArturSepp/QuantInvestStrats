@@ -78,6 +78,10 @@ $$
 `RiskModel` applies no annualisation. An annualised covariance produces annualised tracking
 error; a monthly covariance produces monthly tracking error. The canonical estimator
 `estimate_rolling_ewma_covar(..., apply_an_factor=True)` supplies annualised covariance.
+Its matrices are NaN in the row and column of an asset before that asset's first return.
+`RiskModel` accepts such rows and treats the asset as unavailable on that date: when its active
+weight is zero it is ignored, when it is nonzero the tracking error is NaN, and its own
+benchmark-beta loading is NaN. Any other non-finite entry is rejected.
 
 Covariance labels define the asset universe. Missing in-universe weights become zero.
 Material weights outside that universe are rejected in strict mode. Methods accepting dated

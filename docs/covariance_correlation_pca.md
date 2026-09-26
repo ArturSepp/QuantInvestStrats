@@ -227,9 +227,10 @@ this section states how the function uses them.
 2. **Demeaning.** With `demean=True`, the residual is the one-step forecast error
    $e_t=x_t-m_{t-1}$ against the EWM mean of the previous date,
    $m_t=\lambda m_{t-1}+(1-\lambda)x_t$, with $\lambda=1-2/(N+1)$ and $N$ = `span` in units of
-   `returns_freq`. The mean is seeded with each asset's first return (`InitType.X0`), so every
-   asset's first residual is zero, whether its returns start on the first row or later. With
-   `demean=False`, $e_t=x_t$: the second moment about zero.
+   `returns_freq`. The mean starts from zero (`InitType.ZERO`): before an asset's first return
+   nothing is known about its mean, so its first residual is its first return, whether its
+   returns start on the first row or later. With `demean=False`, $e_t=x_t$: the second moment
+   about zero.
 3. **Recursion.** Starting from $\hat\Sigma_0=0$,
 
    $$
@@ -240,7 +241,11 @@ this section states how the function uses them.
 
    with `NanBackfill.ZERO_FILL`: an entry whose update is not finite, because either asset is
    missing at $t$, is reset to zero.
-4. **Sampling and annualisation.** The function returns a dictionary from each date in
+4. **Availability.** An asset has no estimate before its first return, so its row and column are
+   NaN on those dates, and not zero. With `warmup_period` $=k$ they stay NaN for its first $k$
+   returns as well, counted from its own first return, so an asset enters with at least $k+1$
+   returns. The default `None` masks only the dates before the first return.
+5. **Sampling and annualisation.** The function returns a dictionary from each date in
    $\mathcal{T}_{\mathrm{reb}}$ to $\mathrm{AN}\,\hat\Sigma_t$. A rebalancing date is the first
    return date on or after each scheduled `rebalancing_freq` date
    (`qis.generate_rebalancing_indicators`); a `time_period` keeps the dates within its start and
@@ -252,10 +257,21 @@ The option `is_apply_vol_normalised_returns=True` rebuilds the matrix as
 $\operatorname{diag}(\tilde\sigma_t)\,\tilde\rho_t\operatorname{diag}(\tilde\sigma_t)$, where
 $\tilde\sigma_t$ is the EWM volatility of $\sqrt{c_N}\,e_t$ and $\tilde\rho_t$ the EWM correlation
 of $e_{i,t}/\tilde\sigma_{i,t}$. That volatility recursion is seeded, point in time, with each
-asset's first squared input (`InitType.X0`). Under `demean=True` that input is the zero first
-residual, so $\tilde\sigma$ starts at zero and the entries of an asset are missing on its first
-return date. Until the handbook follow-up the seed was the full-sample mean of the squared input,
-a look-ahead.
+asset's first squared input (`InitType.X0`), so an asset's first variance is $c_N e_{i,1}^2$,
+without the factor $1-\lambda$ of the direct recursion. Both estimators give NaN before an
+asset's first return and a finite, PSD matrix from it onwards; `warmup_period` masks both
+alike. Until the handbook follow-up the volatility seed was the full-sample mean of the squared
+input, a look-ahead. In qis 5.31.0 before this follow-up the demeaning mean was seeded with the
+first return, so the first residual was zero, and the vol-normalised entries of an asset were NaN
+on its first return date while the direct ones were zero before it.
+
+**Unavailable assets in risk calculations.** A NaN row makes $w^{\top}\hat\Sigma w$ NaN even
+at $w_i=0$, because $0\cdot\mathrm{NaN}$ is NaN. The risk functions of qis
+(`compute_portfolio_risk_contributions`, `compute_benchmark_portfolio_risk_contributions`,
+`RiskModel` and the ex-ante volatility of `PortfolioData`) therefore treat an asset whose
+variance is NaN as unavailable: with zero weight in every vector of the calculation it is
+ignored, and the result equals that of the available block; with a nonzero weight its risk is
+unknown and the result is NaN. Its own benchmark-beta loading is NaN.
 
 **Identity (the EWM mean includes the current return).**
 $x_t-m_t=\lambda\,(x_t-m_{t-1})$.
@@ -328,7 +344,9 @@ input.
 > **Pitfall.** Without a `time_period`, `estimate_rolling_ewma_covar` returns a matrix for every
 > rebalancing date from the first one, and the recursion starts from zero. With the default span
 > of 52 weeks the warm-up factor $1-\lambda^{K}$ is 0.37 after one quarter and 0.86 after one
-> year. Pass a `time_period` that starts at least two spans after the first price (factor 0.98).
+> year. Pass a `time_period` that starts at least two spans after the first price (factor 0.98),
+> or `warmup_period=2 * span`, which applies the same rule to each asset from its own first
+> return and so also covers late starters.
 
 ### Uncentred EWM correlations
 
@@ -693,10 +711,13 @@ assert qis.infer_annualisation_factor_from_df(returns) == 52.0
 `estimate_rolling_ewma_covar` returns 23 matrices, from 2015-04-01 to 2020-09-30: each is dated on
 the first Wednesday on or after a quarter end, such as 2016-01-06 for the 2015 year end. Each
 equals 52 times the direct recursion on the forecast errors, scaled by $c_N=52/53$, at its date.
-On 2020-09-30 the annualised volatilities are 18.1%, 5.7% and 14.1%, which is $\sqrt{1.0596}$
-times the 17.6%, 5.5% and 13.7% of the former residual $x_t-m_t$. On 2015-04-01, after only 12
-returns, they are 9.3%, 3.4% and 4.7%: the warm-up factor $1-\lambda^{12}=0.37$ at work. A
-`time_period` from 2017 to 2018 keeps the eight quarterly dates inside it.
+The mean starts from zero, so the first forecast error is the first return. On 2020-09-30 the
+annualised volatilities are 18.1%, 5.7% and 14.1%, which is $\sqrt{1.0596}$ times the 17.6%,
+5.5% and 13.7% of the former residual $x_t-m_t$ with the mean seeded at the first return: by then
+both means have forgotten their seeds, and the variances differ by the factor $1.0596$ to five
+digits. On 2015-04-01, after only 12 returns, the volatilities are 9.5%, 3.4% and 4.6%: the
+warm-up factor $1-\lambda^{12}=0.37$ at work. A `time_period` from 2017 to 2018 keeps the eight
+quarterly dates inside it.
 
 ```python
 covars = qis.estimate_rolling_ewma_covar(prices=prices, returns_freq='W-WED',
@@ -707,7 +728,10 @@ assert [d.strftime('%Y-%m-%d') for d in dates[:4]] == ['2015-04-01', '2015-07-01
                                                         '2015-09-30', '2016-01-06']
 c_n = (1.0 + lam) / 2.0
 assert abs(c_n - 52 / 53) < 1e-15
-errors = x - np.vstack([x[:1], m[:-1]])  # x_t - m_{t-1}, zero on the seed row
+prior_mean = np.zeros_like(x)  # m_{t-1}, zero before the first return
+for t in range(1, len(x)):
+    prior_mean[t] = lam * prior_mean[t - 1] + (1.0 - lam) * x[t - 1]
+errors = x - prior_mean
 state = np.zeros((3, 3))
 path, former_path = [], []
 former = np.zeros((3, 3))
@@ -720,20 +744,52 @@ for date in (dates[0], dates[-1]):
     np.testing.assert_allclose(covars[date].to_numpy(),
                                52.0 * path[returns.index.get_loc(date)], rtol=1e-12)
 last = returns.index.get_loc(dates[-1])
-np.testing.assert_allclose(path[last] / former_path[last], (1 + lam) / (2 * lam ** 2), rtol=1e-12)
+np.testing.assert_allclose(np.diag(path[last]) / np.diag(former_path[last]),
+                           (1 + lam) / (2 * lam ** 2), rtol=1e-5)
 assert abs((1 + lam) / (2 * lam ** 2) - 1.0596) < 5e-5
 np.testing.assert_allclose(np.sqrt(np.diag(covars[dates[-1]])), [0.181, 0.057, 0.141], atol=5e-4)
 np.testing.assert_allclose(np.sqrt(52.0 * np.diag(former_path[last])), [0.176, 0.055, 0.137],
                            atol=5e-4)
 assert returns.index.get_loc(dates[0]) == 11
 assert abs(1.0 - lam ** 12 - 0.37) < 1e-3
-np.testing.assert_allclose(np.sqrt(np.diag(covars[dates[0]])), [0.093, 0.034, 0.047], atol=5e-4)
+np.testing.assert_allclose(np.sqrt(np.diag(covars[dates[0]])), [0.095, 0.034, 0.046], atol=5e-4)
 
 window = qis.estimate_rolling_ewma_covar(prices=prices, span=span,
                                          time_period=qis.TimePeriod('2017-01-01', '2018-12-31'))
 assert list(window) == [d for d in dates if pd.Timestamp('2017-01-01') <= d
                         <= pd.Timestamp('2018-12-31')]
 assert len(window) == 8
+```
+
+A late starter shows the availability rule. With the gold prices removed up to mid-2016, its first
+weekly return is dated 2016-07-13, and its row and column are NaN on the six rebalancing dates
+before it while the other two assets are estimated as before. With `warmup_period=26` gold enters
+on 2017-04-05, the first rebalancing date after its 27th return, and the equity and Treasury
+entries are NaN on the first two dates. A portfolio without gold has the risk contributions of
+the available block; one that holds gold before its inception has none.
+
+```python
+late = prices.copy()
+late.loc[:'2016-06-30', 'SCM_GLD'] = np.nan
+late_covars = qis.estimate_rolling_ewma_covar(prices=late, span=span)
+gold_missing = [d for d, c in late_covars.items() if c['SCM_GLD'].isna().all()]
+assert gold_missing == dates[:6] and dates[6] == pd.Timestamp('2016-10-05')
+for d in dates:
+    block = late_covars[d].loc[['SEQ_US', 'SBD_TSY'], ['SEQ_US', 'SBD_TSY']]
+    np.testing.assert_allclose(block, covars[d].loc[block.index, block.columns], rtol=1e-12)
+masked = qis.estimate_rolling_ewma_covar(prices=late, span=span, warmup_period=26)
+assert min(d for d, c in masked.items() if np.isfinite(c.loc['SCM_GLD', 'SCM_GLD'])) \
+    == pd.Timestamp('2017-04-05')
+assert [d for d, c in masked.items() if np.isnan(c.loc['SEQ_US', 'SEQ_US'])] == dates[:2]
+
+d = dates[3]
+unheld = pd.Series([0.6, 0.4, 0.0], index=late.columns)
+rc = qis.compute_portfolio_risk_contributions(w=unheld, covar=late_covars[d])
+rc_block = qis.compute_portfolio_risk_contributions(w=unheld.iloc[:2], covar=covars[d].iloc[:2, :2])
+np.testing.assert_allclose(rc.iloc[:2], rc_block, rtol=1e-12)
+assert rc['SCM_GLD'] == 0.0
+held = pd.Series([0.5, 0.3, 0.2], index=late.columns)
+assert qis.compute_portfolio_risk_contributions(w=held, covar=late_covars[d]).isna().all()
 ```
 
 The uncentred EWM correlation of `compute_ewm_corr_df` equals the direct recursion on raw returns:
@@ -804,7 +860,7 @@ assert abs(residual_share - 0.573) < 5e-4 and np.sum(nu_all > scaled_edges[1]) =
 | Common-sample or pairwise covariance | $\hat\Sigma$, or $\hat\Sigma^{\mathrm{pair}}$ with NaN | `qis.compute_masked_covar_corr(data, is_covar=True, bias=False)` |
 | Common-sample or pairwise correlation | $\rho$, or $\hat\rho^{\mathrm{pair}}$ with NaN | `qis.compute_masked_covar_corr(data, is_covar=False)` |
 | Pearson correlation of matching columns | Centred, full sample | `qis.compute_path_corr(a1, a2)` |
-| Rolling EWM covariance | $\mathrm{AN}\,\hat\Sigma_t$ on $\mathcal{T}_{\mathrm{reb}}$, forecast errors $e_t$ scaled by $c_N$ | `qis.estimate_rolling_ewma_covar(prices, time_period, returns_freq, rebalancing_freq, span, is_apply_vol_normalised_returns, demean, apply_an_factor)` |
+| Rolling EWM covariance | $\mathrm{AN}\,\hat\Sigma_t$ on $\mathcal{T}_{\mathrm{reb}}$, forecast errors $e_t$ scaled by $c_N$; NaN before each asset's first return | `qis.estimate_rolling_ewma_covar(prices, time_period, returns_freq, rebalancing_freq, span, is_apply_vol_normalised_returns, demean, apply_an_factor, warmup_period)` |
 | Uncentred EWM correlation paths | $\rho^{\mathrm{u}}_{ij,t}$ per pair | `qis.compute_ewm_corr_df(df, corr_matrix_output, span, ewm_lambda, init_value, init_type)`, `qis.CorrMatrixOutput` |
 | One uncentred EWM correlation path | $\rho^{\mathrm{u}}_{21,t}$ | `qis.compute_ewm_corr_single(returns, ewm_lambda, span, time_period)` |
 | Uncentred cosine similarity to a pivot | $\operatorname{cs}_k$ | `qis.corr_to_pivot_row(pivot, data, is_normalized=True, vol_scalers=None)` |
@@ -860,7 +916,10 @@ API reference:
   history and the correlation uses overlap variances. Check the spectrum before optimising.
 - The EWM covariance starts from zero, and when demeaned it is rescaled by $c_N$ to be unbiased
   for iid returns. Both factors cancel in correlations of assets with a common start; a late
-  starter's correlations are biased towards zero until $\lambda^{K}$ is small.
+  starter's correlations are biased towards zero until $\lambda^{K}$ is small. Before an asset's
+  first return, and for `warmup_period` returns after it, its row and column are NaN; the qis
+  risk functions ignore it at zero weight and return NaN when it is held, but a consumer outside
+  qis must handle the NaN itself.
 - On return panels with gaps, `compute_ewm_corr_df` and `compute_data_pca_r2` treat a missing
   return as a zero return, which keeps every matrix PSD but pulls the correlations of an asset
   with gaps towards zero, and those of a delisted asset decay to zero. Under `NanBackfill.FFILL`,

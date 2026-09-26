@@ -29,11 +29,14 @@ def test_demeaned_matrix_is_scaled_prior_mean_recursion() -> None:
                                          apply_an_factor=False)
     returns = np.diff(np.log(prices.to_numpy()), axis=0)
     lam = 1.0 - 2.0 / (span + 1.0)
-    prior_mean = returns[0].copy()
+    # the mean starts from a zero prior, so the first residual is the first return itself; with
+    # the former seed at the first return it was exactly zero, which gave the vol-normalised
+    # estimator a zero first volatility and a NaN matrix
+    prior_mean = np.zeros(2)
     state = np.zeros((2, 2))
     path = []
     for x_t in returns:
-        e_t = x_t - prior_mean  # zero on the first row, where the mean is seeded
+        e_t = x_t - prior_mean
         state = lam * state + (1.0 - lam) * np.outer(e_t, e_t)
         path.append(0.5 * (1.0 + lam) * state)
         prior_mean = lam * prior_mean + (1.0 - lam) * x_t
