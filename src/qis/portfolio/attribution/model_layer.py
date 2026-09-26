@@ -11,7 +11,7 @@ For each observed or derived layer L, the module estimates the descriptive full-
 ``r_L[t] = alpha_L + beta_L * r_B[t] + epsilon_L[t]``, where B is the supplied benchmark. The point
 estimates are OLS. Alpha inference uses a Bartlett-kernel HAC covariance with ``hac_lags`` Bartlett
 lags (default three), the statsmodels small-sample correction, a normal reference distribution and
-a two-sided 95% interval.
+a two-sided interval at ``confidence_level`` (default 0.95).
 Alpha and its confidence bounds are annualised linearly by the factor implied by ``freq``; beta,
 R² and the periodic HAC standard error are not annualised. The generic regression and HAC
 calculation lives in ``qis.utils.regression``; this module only assigns ``PerfStat`` labels.
@@ -94,14 +94,17 @@ class ModelLayerEwmaAlphaAttribution:
     Attributes:
         periodic_returns: Common-sample model-layer log returns.
         estimated_betas: EWMA betas after observing each return, preserving leading NaNs.
-        applied_betas: Betas available before each return, using the prior when unavailable.
+        applied_betas: Betas available before each return: the estimate ``beta_lag`` periods
+            earlier, or ``beta_init_value`` while that estimate is missing.
         component_returns: Exact realised systematic and alpha return components.
         cumulative_alpha: Cumulative realised log-return alpha components from inception.
         expanding_annualised_alpha: Annualised expanding means of realised alpha components.
         freq: Return frequency used by the estimator.
         beta_span: EWMA beta span in return periods.
         beta_lag: Number of periods between beta estimation and application.
-        beta_init_value: Point-in-time beta prior used before an estimate is available.
+        beta_init_value: One-observation beta prior. It fills the applied betas before the
+            first lagged estimate and enters the EWMA moments as a pseudo-observation, so every
+            later estimate retains it with EWMA weight.
         mean_adj_type: Point-in-time mean adjustment used in beta estimation.
         nav_start_date: Actual common NAV baseline, before the first realised return.
 
@@ -214,7 +217,7 @@ class ModelLayerCumulativeAlphaAttribution:
         freq: Return frequency inherited from the underlying attribution.
         beta_span: EWMA beta span in return periods.
         beta_lag: Number of periods between beta estimation and application.
-        beta_init_value: Point-in-time beta prior used by the underlying estimator.
+        beta_init_value: One-observation beta prior of the underlying estimator.
         mean_adj_type: Point-in-time mean adjustment used by the underlying estimator.
     """
 
@@ -531,7 +534,9 @@ def compute_model_layer_ewma_regression_attribution(
 
     This endpoint estimator assigns geometrically decaying weights to the common log-return
     sample, with decay ``1 - 2 / (span + 1)`` and latest weight one. Risk-layer, signal-layer,
-    integration and full-model returns are fitted jointly to the benchmark, where integration is
+    integration and full-model returns, and the net full-model return when
+    ``full_model_net_nav`` is supplied, are fitted jointly to the benchmark in one EWMA-WLS
+    system with a joint HAC covariance, where integration is
     first constructed exactly as full minus risk minus signal. Including that constructed response
     directly is algebraically equivalent to a coefficient contrast while avoiding cancellation in
     its weighted-score HAC covariance. This is a descriptive current estimate; use
@@ -1025,11 +1030,17 @@ def compute_model_layer_ewma_alpha_attribution(
     """Estimate model-layer alpha using point-in-time, lagged EWMA betas.
 
     QIS estimates each layer beta after observing return ``t`` and applies it only from
-    ``t + beta_lag`` onward. An explicit beta prior is applied until a lagged finite estimate is
-    available. With the default EWMA mean adjustment and ``InitType.X0``, the first centered
-    observation is zero, so the first estimated beta remains NaN for audit while applied betas
-    remain finite. Alpha is the realised step-ahead beta-adjusted log return; the EWMA alpha
-    forecast returned by the lower-level estimator is deliberately not used.
+    ``t + beta_lag`` onward. ``beta_init_value`` is a one-observation prior, not only a
+    placeholder: ``compute_ewm_beta_alpha_forecast`` replaces the first informative observation
+    of each layer (the first jointly finite pair with a non-zero centred benchmark return ``x``)
+    by the pseudo-observation ``(x, beta_init_value * x)``. The first finite estimate therefore
+    equals the prior, and every later estimate keeps the pseudo-observation in both EWMA moments,
+    discounted by ``lambda^k`` after ``k`` further periods like any other observation. The
+    applied betas also use the prior while no lagged estimate exists. With the default EWMA mean
+    adjustment and ``InitType.X0``, the first centred observation is zero, so the first estimated
+    beta remains NaN for audit while applied betas remain finite. Alpha is the realised
+    step-ahead beta-adjusted log return; the EWMA alpha forecast returned by the lower-level
+    estimator is deliberately not used.
 
     Args:
         benchmark_nav: Benchmark NAV or price index.
@@ -1039,7 +1050,9 @@ def compute_model_layer_ewma_alpha_attribution(
         freq: Return frequency. Defaults to month-end.
         beta_span: EWMA beta span in return periods. Defaults to 36.
         beta_lag: Periods between beta estimation and application. Defaults to one.
-        beta_init_value: Finite beta prior used before an estimate is available. Defaults to one.
+        beta_init_value: Finite one-observation beta prior, used as the applied beta before
+            the first lagged estimate and retained in later estimates with EWMA weight.
+            Defaults to one.
         mean_adj_type: Point-in-time beta mean adjustment. Defaults to EWMA. ``INSAMPLE`` is
             rejected because it is forward-looking.
         full_model_net_nav: Optional same-weights NAV after trading costs. Adds exact log-return
@@ -1162,7 +1175,8 @@ def compute_model_layer_cumulative_alpha_after_warmup(
         base_date: Date on which cumulative alpha is rebased to zero.
         warmup_periods: Minimum estimator observations through ``base_date``. Defaults to 12.
             Zero allows an exact reporting base, including the validated initial NAV date.
-            The existing beta prior applies until a lagged estimate is available.
+            The applied beta is the prior until a lagged estimate is available; the prior also
+            remains in later estimates with EWMA weight.
 
     Returns:
         Post-warm-up alpha returns and their unannualised cumulative sums.

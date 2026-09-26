@@ -33,6 +33,10 @@ from qis.portfolio.risk.factor_groups import FactorGroupSpec
 
 WEIGHT_TOL: float = 1e-10
 COVAR_SYMMETRY_TOL: float = 1e-12
+# Relative tolerance for positive semi-definiteness and non-negative residual variances: the
+# smallest eigenvalue (or residual variance) may be negative by at most this fraction of the
+# largest diagonal element (or residual variance), with a floor of one on the scale.
+COVAR_PSD_TOL: float = 1e-10
 UNASSIGNED_GROUP: str = 'Unassigned'
 
 
@@ -48,16 +52,25 @@ class RiskModel:
     exposures and systematic/residual decompositions; it never replaces or
     rebuilds the supplied covariance.
 
+    Orientation: ``factor_loadings[date]`` is assets by factors (``B``, rows
+    the covariance assets), so exposures are ``B' w``. ``LinearModel`` and
+    ``EwmLinearModel`` store loadings per factor as dates-by-assets frames and
+    ``LinearModel.get_loadings_at_date`` returns factors by assets; transpose
+    such a snapshot before passing it here.
+
     Attributes:
         covar: Covariance matrices by date, with matching asset index and columns.
         factor_loadings: Optional asset-by-factor loading matrices by date.
-        factor_covar: Optional factor covariance matrices by date.
-        residual_vars: Optional asset residual variances by date.
+        factor_covar: Optional factor-by-factor covariance matrices by date.
+        residual_vars: Optional asset residual variances (not volatilities) by date, one
+            Series indexed by asset per date.
         factor_groups: Optional provider-neutral family membership and bump weights.
 
     Raises:
         ValueError: If the covariance or factor data are incomplete, non-finite,
-            misaligned, non-unique, non-square, or non-symmetric.
+            misaligned, non-unique, non-square, non-symmetric, not positive
+            semi-definite, or have negative residual variances, each beyond a
+            rounding tolerance (``COVAR_PSD_TOL`` relative to the matrix scale).
     """
 
     covar: Dict[pd.Timestamp, pd.DataFrame]
@@ -191,6 +204,17 @@ class RiskModel:
             max_asymmetry = float(np.max(np.abs(values - values.T)))
             raise ValueError(f"{field_name}[{date}] is not symmetric within "
                              f"{COVAR_SYMMETRY_TOL}; max asymmetry={max_asymmetry}")
+        if values.size > 0:
+            # A Cholesky factor of the matrix shifted by the tolerance exists exactly when its
+            # smallest eigenvalue is above minus the tolerance; it is cheaper than eigvalsh.
+            symmetric = 0.5 * (values + values.T)
+            tolerance = COVAR_PSD_TOL * max(1.0, float(np.max(np.abs(np.diag(symmetric)))))
+            try:
+                np.linalg.cholesky(symmetric + tolerance * np.eye(symmetric.shape[0]))
+            except np.linalg.LinAlgError:
+                min_eigenvalue = float(np.linalg.eigvalsh(symmetric).min())
+                raise ValueError(f"{field_name}[{date}] is not positive semi-definite; smallest "
+                                 f"eigenvalue={min_eigenvalue} is below -{tolerance}") from None
 
     def _validate_factor_loadings(self) -> None:
         """Validate the loadings date grid, asset universe, and finite values."""
@@ -254,6 +278,11 @@ class RiskModel:
                 raise ValueError(f"residual_vars[{date}] must contain numeric values") from exc
             if not np.isfinite(values).all():
                 raise ValueError(f"residual_vars[{date}] contains non-finite values")
+            tolerance = COVAR_PSD_TOL * max(1.0, float(np.max(np.abs(values), initial=0.0)))
+            if (values < -tolerance).any():
+                negative = residual_vars.loc[values < -tolerance].to_dict()
+                raise ValueError(f"residual_vars[{date}] has negative variances {negative} "
+                                 f"below -{tolerance}")
             self.residual_vars[date] = residual_vars.reindex(index=covar_assets)
 
     def _validate_date_grid(self, data: Dict[pd.Timestamp, object], field_name: str) -> None:

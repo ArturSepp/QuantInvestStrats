@@ -4,7 +4,8 @@ statsmodels OLS wrappers: fit, extract alpha and beta, and render the fitted equ
 ``fit_multivariate_ols`` regresses a Series on the columns of a frame and returns, in that order,
 the prediction, the parameters and a formatted label of the fitted equation; ``fit_ols`` is the
 array form. ``estimate_ols_alpha_beta`` reduces a fit to alpha, beta, R² and the conventional alpha
-p-value, returning zeros with a warning rather than raising when the fit fails.
+p-value, returning NaN with a warning rather than raising when the fit fails or the regressor does
+not vary.
 ``estimate_ols_alpha_beta_hac`` returns the same point estimates together with a Bartlett-kernel
 HAC standard error, p-value and confidence interval for alpha. ``estimate_hac_mean`` is the
 constant-only case: a sample mean with the same Bartlett HAC inference and the one-parameter
@@ -12,8 +13,8 @@ small-sample correction, for a return series that has no regressor.
 ``estimate_ewma_alpha_beta_hac`` fits several dependent series on one common regressor using
 exponentially weighted least squares and returns their joint Bartlett-HAC covariance.
 ``reg_model_params_to_str`` formats the fitted equation for a chart legend, and annualises the
-intercept as expm1(a α) when
-``alpha_an_factor`` is passed. ``newey_west_lag_rule`` supplies the opt-in Newey-West rule of thumb
+intercept linearly as AN α, the convention of ``PerfStat.ALPHA_AN``, when ``alpha_an_factor`` is
+passed. ``newey_west_lag_rule`` supplies the opt-in Newey-West rule of thumb
 for callers that do not want to select a fixed Bartlett lag count.
 
 Every fit runs through ``filter_x_y`` first: rows where any of x or y is non-finite are dropped,
@@ -146,8 +147,9 @@ def fit_multivariate_ols(x: pd.DataFrame,
         alpha_format: format for the intercept in the returned label
 
     Returns:
-        the fitted parameters indexed by regressor name, the prediction indexed by the retained
-        dates, and a formatted label of the fitted equation for a chart legend
+        A tuple ``(prediction, params, reg_label)``: the prediction indexed by the retained
+        dates, the fitted parameters indexed by regressor name (``'intercept'`` first when
+        ``fit_intercept``), and a formatted label of the fitted equation for a chart legend.
     """
 
     x_, y_, cond = filter_x_y(x=x.to_numpy(), y=y.to_numpy())
@@ -607,18 +609,23 @@ def estimate_ols_alpha_beta(
     """Estimate scalar OLS statistics from numeric NumPy or pandas inputs.
 
     Real-valued numeric pandas containers are normalized before fitting so ordinary and nullable
-    storage use the same statsmodels design. Nonnumeric or otherwise invalid inputs retain the
-    established warning and four-zero fallback.
+    storage use the same statsmodels design. Undefined statistics are NaN, never zero: a zero
+    alpha p-value would read as a highly significant alpha.
 
     Args:
         x: One explanatory variable in an array, Series, or one-column DataFrame.
         y: Dependent observations in an array or Series.
-        order: Polynomial degree passed to the OLS design builder.
+        order: Polynomial degree passed to the OLS design builder; ``beta`` is the coefficient
+            on the linear term.
         fit_intercept: Whether to include and report an intercept.
 
     Returns:
-        Alpha, beta, R-squared, and the conventional alpha p-value. Without an intercept, alpha
-        and its p-value are zero. A failed fit warns and returns four zeros.
+        Alpha, beta, R-squared, and the conventional alpha p-value, all per period of the input
+        returns. Without an intercept, alpha is zero by construction and its p-value is NaN,
+        because no intercept was tested. A fit that fails (for example nonnumeric or misaligned
+        inputs) or is not identified (a regressor that does not vary on the retained rows, such
+        as a constant benchmark return or a single observation) warns and returns four NaN
+        values.
     """
     try:
         reg_model = fit_ols(
@@ -627,26 +634,35 @@ def estimate_ols_alpha_beta(
             order=order,
             fit_intercept=fit_intercept,
         )
-    except Exception:
-        warnings.warn(f"problem with x={x}, y={y}")
-        return 0.0, 0.0, 0.0, 0.0
+        params = np.asarray(reg_model.params, dtype=float).ravel()
+        pvalues = np.asarray(reg_model.pvalues, dtype=float).ravel()
+        r2 = float(reg_model.rsquared)
+        design_rank = int(reg_model.model.rank)
+    except Exception as exception:
+        warnings.warn(f"problem with x={x}, y={y}: {type(exception).__name__}: {exception}; "
+                      f"returning NaN alpha, beta, R-squared and p-value")
+        return np.nan, np.nan, np.nan, np.nan
+    # statsmodels' add_constant skips the intercept when x is itself a non-zero constant, and a
+    # zero regressor gives a rank-deficient design solved by a minimum-norm pseudo-inverse with a
+    # zero slope. Neither identifies alpha and beta, so report them as undefined.
+    if order < 1:
+        warnings.warn(f"OLS beta is not identified for order={order}: the design has no "
+                      f"regressor; returning NaN")
+        return np.nan, np.nan, np.nan, np.nan
+    n_expected_params = order + 1 if fit_intercept else order
+    if params.shape[0] != n_expected_params or design_rank < n_expected_params:
+        warnings.warn(f"OLS alpha and beta are not identified: the design has rank "
+                      f"{design_rank} for {n_expected_params} parameters on "
+                      f"{int(reg_model.nobs)} retained observations; returning NaN")
+        return np.nan, np.nan, np.nan, np.nan
     if fit_intercept:
-        if isinstance(reg_model.params, pd.Series):
-            alpha = reg_model.params.iloc[0]
-            beta = reg_model.params.iloc[1]
-            alpha_pvalue = reg_model.pvalues.iloc[0]
-        else:
-            alpha = reg_model.params[0]
-            beta = reg_model.params[1]
-            alpha_pvalue = reg_model.pvalues[0]
+        alpha = params[0]
+        beta = params[1]
+        alpha_pvalue = pvalues[0]
     else:
         alpha = 0.0
-        alpha_pvalue = 0.0
-        if isinstance(reg_model.params, pd.Series):
-            beta = reg_model.params.iloc[0]
-        else:
-            beta = reg_model.params[0]
-    r2 = reg_model.rsquared
+        alpha_pvalue = np.nan
+        beta = params[0]
     return alpha, beta, r2, alpha_pvalue
 
 
@@ -684,6 +700,33 @@ def reg_model_params_to_str(reg_model: RegModel,
                             alpha_an_factor: float = None,
                             **kwargs
                             ) -> str:
+    """Format a fitted polynomial regression as a chart-legend label.
+
+    The label reads ``y=<b1>X<alpha>, R²=<r2>`` for ``order=1`` and adds the higher powers first
+    for ``order`` 2 and 3. Coefficients are printed as estimated, per period of the returns that
+    were regressed.
+
+    Args:
+        reg_model: Fitted statsmodels OLS result whose design came from ``get_ols_x`` with the
+            same ``order`` and ``fit_intercept``.
+        order: Polynomial degree of the design: 1, 2 or 3.
+        r2_only: Print only the R² of the fit.
+        beta_format: Format string for the slope coefficients.
+        alpha_format: Format string for the per-period intercept when ``alpha_an_factor`` is
+            None. The default ``'{0:+0.2f}'`` prints a monthly intercept of 0.013 as ``+0.01``;
+            pass ``'{0:+0.2%}'`` to show it as a percentage, or ``alpha_an_factor``.
+        fit_intercept: Whether the design has an intercept; without one no alpha is printed.
+        alpha_an_factor: Annualisation factor AN (12 for monthly returns). When given, the
+            intercept is printed as the linear ``AN * alpha`` in ``'{:+0.0%}'`` format, the same
+            convention as ``PerfStat.ALPHA_AN`` in the performance tables.
+        **kwargs: Ignored; lets plotting wrappers forward their keyword arguments.
+
+    Returns:
+        The legend label.
+
+    Raises:
+        TypeError: If ``order`` is not 1, 2 or 3.
+    """
     try:
         r2 = f", R\N{SUPERSCRIPT TWO}={reg_model.rsquared:.0%}"
     except (AttributeError, ValueError):
@@ -694,8 +737,8 @@ def reg_model_params_to_str(reg_model: RegModel,
     else:
         if fit_intercept:
             if alpha_an_factor is not None:
-                # alpha = '{:+0.0%}'.format(alpha_an_factor*reg_model.params[0])
-                alpha = '{:+0.0%}'.format(np.expm1(alpha_an_factor * reg_model.params[0]))
+                # linear annualisation, consistent with PerfStat.ALPHA_AN in the tables
+                alpha = '{:+0.0%}'.format(alpha_an_factor * reg_model.params[0])
             else:
                 alpha = alpha_format.format(reg_model.params[0])
             idx1 = 1

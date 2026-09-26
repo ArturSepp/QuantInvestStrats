@@ -95,7 +95,11 @@ def test_estimate_ols_alpha_beta_filters_paired_nullable_missing_rows() -> None:
 
 
 def test_estimate_ols_alpha_beta_preserves_no_intercept_semantics() -> None:
-    """Keep the established zero-alpha convention when the intercept is disabled."""
+    """Keep the zero-alpha convention when the intercept is disabled.
+
+    The alpha p-value was 0.0 until the handbook follow-up; no intercept is tested without an
+    intercept, so it is now NaN (a zero p-value reads as a highly significant alpha).
+    """
     x = pd.Series([1.0, 2.0, 3.0, 4.0], dtype=pd.Float64Dtype(), name="x")
     y = pd.Series([2.0, 4.0, 6.0, 8.0], dtype=pd.Float64Dtype(), name="y")
 
@@ -103,11 +107,11 @@ def test_estimate_ols_alpha_beta_preserves_no_intercept_semantics() -> None:
         warnings.simplefilter("error")
         actual = estimate_ols_alpha_beta(x=x, y=y, fit_intercept=False)
 
-    np.testing.assert_allclose(actual, [0.0, 2.0, 1.0, 0.0], rtol=0.0, atol=1.0e-12)
+    np.testing.assert_allclose(actual, [0.0, 2.0, 1.0, np.nan], rtol=0.0, atol=1.0e-12)
 
 
 def test_estimate_ols_alpha_beta_keeps_nonnumeric_fallback() -> None:
-    """Do not turn the numeric-storage normalization into string coercion."""
+    """Do not turn the numeric-storage normalization into string coercion; warn and return NaN."""
     x = pd.Series(["0", "1", "2", "3"], name="x")
     y = pd.Series([1.0, 3.0, 5.0, 7.0], name="y")
     x_before = x.copy(deep=True)
@@ -116,7 +120,8 @@ def test_estimate_ols_alpha_beta_keeps_nonnumeric_fallback() -> None:
     with pytest.warns(UserWarning, match="problem with x="):
         actual = estimate_ols_alpha_beta(x=x, y=y)
 
-    assert actual == (0.0, 0.0, 0.0, 0.0)
+    # The fallback was four zeros until the handbook follow-up; undefined statistics are NaN.
+    assert np.isnan(actual).all()
     pd.testing.assert_series_equal(x, x_before)
     pd.testing.assert_series_equal(y, y_before)
 
@@ -135,7 +140,8 @@ def test_estimate_ols_alpha_beta_rejects_misaligned_pandas_indexes() -> None:
     with pytest.warns(UserWarning, match="problem with x="):
         actual = estimate_ols_alpha_beta(x=x, y=y)
 
-    assert actual == (0.0, 0.0, 0.0, 0.0)
+    # The fallback was four zeros until the handbook follow-up; undefined statistics are NaN.
+    assert np.isnan(actual).all()
 
 
 def test_estimate_ols_alpha_beta_hac_is_invariant_to_nullable_storage() -> None:
