@@ -3,9 +3,11 @@ drawdown panels: the running loss from the prior peak, and how long it lasted.
 
 ``plot_rolling_drawdowns`` draws p_t / max_{s<=t} p_s - 1 through time, a series that is
 non-positive and whose axis is therefore capped at zero by default.
-``plot_rolling_time_under_water`` draws the consecutive periods spent below the prior peak on
-the same grid, and ``plot_top_drawdowns_paths`` overlays the deepest episodes re-indexed to days
-since their own peak, so episodes of different dates are compared on one horizontal axis.
+``plot_rolling_time_under_water`` draws the consecutive calendar days spent below the prior peak,
+on levels rebased to calendar days, and ``plot_top_drawdowns_paths`` overlays the deepest
+episodes re-indexed to grid steps since their own start (calendar days on its default 'D'
+grid), so episodes of different dates are compared on one horizontal axis; with
+``highlight_ongoing`` the episode still under water at the last date is drawn solid.
 
 ``DdLegendType`` selects what the legend reports - nothing, the extreme and the last value, or
 the mean and the 10% quantile as well - all from ``compute_avg_max_dd``. The drawdown series
@@ -124,10 +126,31 @@ def plot_top_drawdowns_paths(price: pd.Series,
                              ax: plt.Subplot = None,
                              **kwargs
                              ) -> plt.Figure:
+    """
+    overlay the deepest drawdown episodes, each re-indexed to the number of grid steps since its
+    start.
 
+    The episodes come from ``compute_drawdowns_stats_table`` on the same ``freq`` grid as the
+    plotted paths. Each path is price / peak - 1 from the episode's start to its end, plotted
+    against the number of ``freq`` observations since the start: calendar days on the default
+    'D' grid, native observations with ``freq=None``. The legend's ``days_dd`` is the episode
+    table's duration: calendar days for any non-None ``freq``, observations for None.
+
+    Args:
+        price: level series of one asset
+        freq: grid to rebase the levels to before finding episodes; None keeps the native grid
+        max_num: number of deepest episodes to draw
+        date_format: format of the start and end dates in the legend
+        highlight_ongoing: draw the episode that is still under water at the last date
+            (``is_recovered=False``) solid black and the others dotted
+
+    Returns:
+        the figure
+    """
     if freq is not None:
         price = price.asfreq(freq, method='ffill')  # it will have nans
-    df = pt.compute_drawdowns_stats_table(price=price, max_num=max_num)
+    # the episode table uses the plotted grid, so its dates and durations match the paths
+    df = pt.compute_drawdowns_stats_table(price=price, max_num=max_num, freq=freq)
     price_slices = {}
     points = {}
     for start, trough, end, max_dd, peak, days_dd in zip(df['start'], df['trough'], df['end'], df['max_dd'], df['peak'],
@@ -141,9 +164,10 @@ def plot_top_drawdowns_paths(price: pd.Series,
     colors, linestyles = put.get_n_colors(n=n), None
     if highlight_ongoing:
         linestyles = ['dotted'] * n
-        last_time = price.index[-2]  # shouldbe one tick back
-        for idx, end in enumerate(df['end']):
-            if end == last_time:
+        # an episode is ongoing when it has not recovered by the last observation; its end is
+        # then the final grid date
+        for idx, is_recovered in enumerate(df['is_recovered']):
+            if not is_recovered:
                 dd_slice = price_slices.columns[idx]
                 name = f"{dd_slice}-ongoing"
                 colors[idx] = 'black'
@@ -151,6 +175,7 @@ def plot_top_drawdowns_paths(price: pd.Series,
                 price_slices = price_slices.rename({dd_slice: name}, axis=1)
                 break
 
+    xlabel = 'Days in drawdown' if freq == 'D' else 'Observations in drawdown'
     fig = pts.plot_time_series(df=price_slices,
                                var_format=var_format,
                                legend_loc=legend_loc,
@@ -158,7 +183,7 @@ def plot_top_drawdowns_paths(price: pd.Series,
                                legend_stats=pts.LegendStats.NONE,
                                x_limits=x_limits,
                                y_limits=y_limits,
-                               xlabel='Days in drawdown',
+                               xlabel=xlabel,
                                ylabel='% performance from the last peak',
                                title=title,
                                colors=colors,

@@ -80,7 +80,8 @@ _EXPECTED_VALUES: dict[str, tuple[str, ...]] = {
     "Positive": ("100.0%", "0.0%", "0.0%", "100.0%", "50.0%"),
     "Skew": ("nan", "nan", "nan", "nan", "0.0"),
     "Kurt": ("nan", "nan", "nan", "nan", "-1.2"),
-    "P-val": ("nan", "nan", "nan", "nan", "0.08"),
+    # P-val now uses PerfStat.NORMTEST's FLOAT4 format ('{:.4f}') instead of '{:.2f}'.
+    "P-val": ("nan", "nan", "nan", "nan", "0.0849"),
     "Last": ("2.00", "0.00", "-3.00", "4.00", "11.50"),
     "Rank": ("52%", "52%", "52%", "52%", "100%"),
     "Min": ("2.00", "0.00", "-3.00", "4.00", "-11.50"),

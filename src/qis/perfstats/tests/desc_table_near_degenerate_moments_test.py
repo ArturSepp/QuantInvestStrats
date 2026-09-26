@@ -121,8 +121,9 @@ _EXPECTED_MOMENTS = pd.DataFrame(
     index=pd.Index(_ASSETS),
 )
 
+# P-val now uses PerfStat.NORMTEST's FLOAT4 format ('{:.4f}') instead of '{:.2f}'.
 _EXPECTED_NORMALITY = pd.Series(
-    ("0.00", "0.00", "0.00", "0.07", "0.00", "nan", "0.08", "nan"),
+    ("0.0000", "0.0000", "0.0000", "0.0711", "0.0000", "nan", "0.0849", "nan"),
     index=pd.Index(_ASSETS),
     name="P-val",
 )

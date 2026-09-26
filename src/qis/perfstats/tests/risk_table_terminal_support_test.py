@@ -126,10 +126,12 @@ def _expected_risk_statistics(
 
     annualized_vol = float(np.sqrt(_ANNUALIZATION_FACTOR) * np.std(risk_returns, ddof=1))
     negative_returns = risk_returns[np.less(risk_returns, 0.0)]
+    # fewer than two negative returns leave the downside volatility undefined (missing, no longer
+    # 0.0 since the W1a fixes); the fixtures here have many negative months either way
     downside_vol = (
         float(np.sqrt(_ANNUALIZATION_FACTOR) * np.std(negative_returns, ddof=1))
         if len(negative_returns) > 1
-        else 0.0
+        else np.nan
     )
     sampled_index = pd.DatetimeIndex(sampled_prices.index)
     sampled_nanoseconds = cast(
@@ -334,6 +336,14 @@ def test_compute_ra_perf_table_stops_distinct_risk_frequencies_at_terminal_suppo
         _sample_observed_period_ends(_series(prices, "Terminated"), frequency="QE"),
         ReturnTypes.LOG,
     )
+    # The drawdown grid keeps the asset's final observation (2022-11-30) after its last quarter
+    # end, so the trailing incomplete quarter enters MAX_DD, CURRENT_DD, WORST and BEST. For this
+    # rising path the extra point leaves all four unchanged; the expectation states the contract.
+    terminated = _series(prices, "Terminated").dropna()
+    drawdown_path = pd.concat(
+        [_sample_observed_period_ends(terminated, frequency="QE"), terminated.iloc[-1:]]
+    )
+    drawdown_expected = _expected_risk_statistics(drawdown_path, ReturnTypes.LOG)
 
     with pytest.warns(UserWarning, match="is all nans"):
         table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
@@ -344,17 +354,17 @@ def test_compute_ra_perf_table_stops_distinct_risk_frequencies_at_terminal_suppo
         rtol=0.0,
         atol=_TOLERANCE,
     )
-    for perf_stat in (
-        PerfStat.MAX_DD,
-        PerfStat.CURRENT_DD,
-        PerfStat.WORST,
-        PerfStat.BEST,
-        PerfStat.SKEWNESS,
-        PerfStat.KURTOSIS,
-    ):
+    for perf_stat in (PerfStat.SKEWNESS, PerfStat.KURTOSIS):
         np.testing.assert_allclose(
             _stat(table, "Terminated", perf_stat),
             quarterly_expected[perf_stat],
+            rtol=0.0,
+            atol=_TOLERANCE,
+        )
+    for perf_stat in (PerfStat.MAX_DD, PerfStat.CURRENT_DD, PerfStat.WORST, PerfStat.BEST):
+        np.testing.assert_allclose(
+            _stat(table, "Terminated", perf_stat),
+            drawdown_expected[perf_stat],
             rtol=0.0,
             atol=_TOLERANCE,
         )

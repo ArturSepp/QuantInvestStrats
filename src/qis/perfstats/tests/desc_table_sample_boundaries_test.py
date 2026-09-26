@@ -78,7 +78,8 @@ _EXPECTED_VALUES: dict[str, tuple[str, ...]] = {
     "Positive": ("100.0%", "50.0%", "57.1%", "50.0%", "52.6%", "50.0%", "nan%"),
     "Skew": ("nan", "0.0", "0.0", "0.0", "0.0", "0.0", "nan"),
     "Kurt": ("nan", "-2.0", "-1.2", "-1.4", "-1.2", "-1.3", "nan"),
-    "P-val": ("nan", "nan", "nan", "nan", "nan", "0.08", "nan"),
+    # P-val now uses PerfStat.NORMTEST's FLOAT4 format ('{:.4f}') instead of '{:.2f}'.
+    "P-val": ("nan", "nan", "nan", "nan", "nan", "0.0802", "nan"),
     "Last": ("1.00", "2.00", "4.00", "5.00", "10.00", "11.00", "nan"),
     "Rank": ("100%", "100%", "100%", "100%", "100%", "100%", "nan%"),
     "Min": ("1.00", "0.00", "-2.00", "-3.00", "-8.00", "-9.00", "nan"),
@@ -248,7 +249,7 @@ def test_compute_desc_table_applies_each_statistic_minimum_independently(
 
     The mixed panel checks all relevant physical-column states in one call. In particular, a
     one-point column retains its mean and score even though sample volatility and moments are
-    undefined; normality remains missing through nineteen points and becomes ``0.08`` at twenty.
+    undefined; normality remains missing through nineteen points and becomes ``0.0802`` at twenty.
 
     Args:
         desc_table_type: Implemented reporting mode under test.

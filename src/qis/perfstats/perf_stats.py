@@ -18,12 +18,14 @@ so the choice is made by picking a column rather than by a flag: ``SHARPE_RF0`` 
 return, ``SHARPE_EXCESS`` over p.a. excess return, ``SHARPE_LOG_AN`` and ``SHARPE_LOG_EXCESS``
 on annualised log returns, with those ratio-only numerators sampled on the same complete
 ``freq_vol`` boundaries as risk and bounded by each asset's final sampled observation. Visible
-return columns retain native observed endpoints. The arithmetic pair is computed by
-``compute_sharpe_arithmetic``,
+return columns retain native observed endpoints. The arithmetic pair ``SHARPE_ARITH`` and
+``SHARPE_ARITH_EXCESS``,
 
-    SR = sqrt(af) E[r] / sqrt(Var[r])
+    SR = sqrt(AN) E[r] / sqrt(Var[r])
 
-computed inside ``compute_risk_table`` so numerator and denominator share one return series.
+on simple returns, is computed inline in ``compute_risk_table`` so numerator and denominator
+share one return series. ``compute_sharpe_arithmetic`` is a standalone helper with the same
+formula for callers holding returns; the table does not call it.
 Every excess variant uses ``PerfParams.rates_data``; without it each equals its zero-rate column.
 ``PerfParams.sharpe_convention`` labels which object a *regime* Sharpe reports and is read in
 ``qis/perfstats/regime_classifier.py``, not here. Summary in ``qis/docs/sharpe_conventions.md``;
@@ -37,7 +39,7 @@ statistics belong in ``qis/perfstats/regime_classifier.py``.
 import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis, skew
-from typing import Callable, Union, Tuple, Optional, Literal, cast
+from typing import Callable, List, Union, Tuple, Optional, Literal, cast
 
 # qis
 import qis.utils.regression as ols
@@ -160,21 +162,22 @@ BENCHMARK_TABLE_COLUMNS2 = (PerfStat.TOTAL_RETURN,
 def _safe_downside_vol(returns_array: np.ndarray, vol_dt: float) -> float:
     """Compute annualised downside volatility with safe handling of empty/sparse arrays.
 
-    The standard downside vol is the annualised stdev of strictly negative returns.
-    When there are 0 or 1 negative observations, np.std with ddof=1 produces a
-    RuntimeWarning and NaN. This helper returns 0.0 in those degenerate cases.
+    The downside vol here is the annualised sample standard deviation (``ddof=1``) of the
+    strictly negative returns about their own mean. With 0 or 1 negative observations it is
+    undefined; np.std would warn and return NaN, so this helper returns NaN without the warning.
 
     Args:
         returns_array: 1-D array of returns (any sign).
         vol_dt: Square-root annualisation factor (e.g. sqrt(252) for daily).
 
     Returns:
-        Annualised downside volatility, or 0.0 if fewer than 2 negative observations.
+        Annualised downside volatility, or NaN if fewer than 2 negative observations.
     """
     neg_returns = returns_array[returns_array < 0.0]
     if len(neg_returns) < 2:
-        # ddof=1 with N<2 is undefined; downside vol is meaningless
-        return 0.0
+        # ddof=1 with N<2 is undefined: report a missing value, not a zero that would make the
+        # Sortino ratio infinite
+        return np.nan
     return vol_dt * float(np.std(neg_returns, ddof=1))
 
 
@@ -206,6 +209,51 @@ def _prices_at_freq_with_terminal_support(prices: pd.DataFrame,
             terminal_date = observed_prices.index.max()
             sampled_prices.iloc[sampled_prices.index > terminal_date, position] = np.nan
     return sampled_prices
+
+
+def _drawdown_paths_with_terminal_observation(prices: pd.DataFrame,
+                                              sampled_prices: pd.DataFrame
+                                              ) -> List[pd.Series]:
+    """Per-asset drawdown paths on the sampled grid, ending at each asset's final observation.
+
+    Calendar sampling keeps complete boundaries only, so on a coarse drawdown grid the trailing
+    incomplete period would be dropped and a fall inside it would be invisible to the maximum and
+    current drawdowns. Each asset's own final observed level is appended when it falls after its
+    last sampled boundary. Assets are handled separately, so one asset's final date never adds a
+    point to another asset's path.
+
+    Args:
+        prices: Unsampled price panel.
+        sampled_prices: The same panel sampled on the drawdown grid by
+            ``_prices_at_freq_with_terminal_support``, in the same column order.
+
+    Returns:
+        One float Series per column, in column order: the sampled levels from the first to the
+        last valid one, with any interior missing values kept, followed by the final observed
+        level when it lies between boundaries. A column without observations gives an empty
+        Series.
+    """
+    paths = []
+    for position in range(prices.shape[1]):
+        sampled = sampled_prices.iloc[:, position]
+        # trim leading and trailing gaps only: an interior gap stays missing, so no return spans
+        # it, as on the panel grid
+        valid_positions = np.flatnonzero(sampled.notna().to_numpy(dtype=bool))
+        if valid_positions.size == 0:
+            sampled = sampled.iloc[0:0]
+        else:
+            sampled = sampled.iloc[valid_positions[0]:valid_positions[-1] + 1]
+        path = pd.Series(sampled.to_numpy(dtype=float, na_value=np.nan), index=sampled.index,
+                         dtype=float)
+        observed = prices.iloc[:, position].dropna().sort_index()
+        if not observed.empty:
+            terminal_date = observed.index[-1]
+            if path.empty or terminal_date > path.index[-1]:
+                terminal_level = float(observed.to_numpy(dtype=float, na_value=np.nan)[-1])
+                terminal = pd.Series([terminal_level], index=[terminal_date], dtype=float)
+                path = terminal if path.empty else pd.concat([path, terminal])
+        paths.append(path)
+    return paths
 
 
 def resolve_benchmark_source(prices: pd.DataFrame,
@@ -292,22 +340,26 @@ def compute_performance_table(prices: Union[pd.DataFrame, pd.Series],
     with different inception dates.
 
     Args:
-        prices: DataFrame of asset price levels (dates × assets).
-        perf_params: Performance parameter object specifying frequencies and conventions.
+        prices: DataFrame of asset price levels (dates × assets). A Series is treated as one
+            column named after it.
+        perf_params: Performance parameter object specifying frequencies and conventions. None
+            uses ``PerfParams()``, without inferring a frequency.
 
     Returns:
         DataFrame indexed by asset with columns from the returns dict.
 
     Raises:
-        TypeError: If ``prices`` is not a DataFrame.
+        TypeError: If ``prices`` is neither a DataFrame nor a Series.
 
     Note:
         ``compute_ra_perf_table`` calls this once on the native history for its visible return
         columns and once on ``freq_vol`` boundaries for ratio-only numerators. This duplication
         keeps both public contracts explicit and could be cached for unusually large panels.
     """
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame()
     if not isinstance(prices, pd.DataFrame):
-        raise TypeError(f"must be pd.Dataframe")
+        raise TypeError(f"prices must be pd.DataFrame or pd.Series, not {type(prices)}")
 
     if perf_params is None:
         perf_params = PerfParams()
@@ -334,13 +386,21 @@ def compute_risk_table(prices: pd.DataFrame,
     """Compute risk metrics (vol, drawdown, skew/kurtosis) per asset using vectorised ops.
 
     Resamples prices at the configured frequencies for vol, drawdown and skewness, then
-    computes all risk metrics column-wise on the full DataFrame rather than per-asset.
-    Interior gaps retain the established fill policy, while every reduction stops at the
-    corresponding asset's final sampled observed price.
+    computes the return-based risk metrics column-wise on the full DataFrame and the drawdown
+    metrics per asset. Interior gaps retain the established fill policy, while every reduction
+    stops at the corresponding asset's final observed price.
+
+    Grids: ``VOL``, ``DOWNSIDE_VOL``, ``NUM_OBS`` and the arithmetic family use complete
+    ``freq_vol`` boundaries; ``SKEWNESS`` and ``KURTOSIS`` use ``freq_skewness``; ``MAX_DD``,
+    ``CURRENT_DD``, ``WORST`` and ``BEST`` use ``freq_drawdown`` (calendar days by default)
+    followed by each asset's final observation when that falls between boundaries, so on a
+    coarse grid a trailing incomplete period is included and ``CURRENT_DD`` is the drawdown at
+    the last observation.
 
     Args:
         prices: DataFrame of asset price levels (dates × assets).
-        perf_params: Performance parameter object. If None, a default PerfParams() is used.
+        perf_params: Performance parameter object. If None, a default PerfParams() is used,
+            without inferring a frequency.
 
     Returns:
         DataFrame indexed by asset with risk metric columns including:
@@ -348,6 +408,8 @@ def compute_risk_table(prices: pd.DataFrame,
         AVG_ARITH_EXCESS_RETURN, AN_ARITH_EXCESS_RETURN, SHARPE_ARITH,
         SHARPE_ARITH_EXCESS, START_DATE, END_DATE, NUM_OBS,
         MAX_DD, CURRENT_DD, MAX_DD_VOL, WORST, BEST, SKEWNESS, KURTOSIS.
+        Undefined values are missing rather than zero: ``DOWNSIDE_VOL`` with fewer than two
+        negative returns, and ``MAX_DD_VOL`` when ``VOL`` is missing or zero.
 
     Raises:
         TypeError: If ``prices`` is not a DataFrame.
@@ -396,8 +458,10 @@ def compute_risk_table(prices: pd.DataFrame,
                                   return_type=perf_params.return_type,
                                   ffill_nans=False,
                                   drop_first=True)
-    # Preserve missing price gaps rather than letting pandas choose an implicit fill policy.
-    pct_returns_dd = dd_sampled_prices.pct_change(fill_method=None)
+    # Drawdown paths are per asset: the sampled boundaries plus the asset's own final
+    # observation, so a trailing incomplete period on a coarse grid is not dropped.
+    dd_paths = _drawdown_paths_with_terminal_observation(prices=prices,
+                                                         sampled_prices=dd_sampled_prices)
 
     # ── Bulk vectorised metrics across all assets ──
     # std uses ddof=1 to match the original per-asset numpy call.
@@ -405,10 +469,12 @@ def compute_risk_table(prices: pd.DataFrame,
     avg_log_return = returns_vol.mean()  # nanmean equivalent for pandas
 
     # ── Arithmetic Sharpe family ──
-    # SR_arith = sqrt(a) * mean(r_m) / std(r_m) on simple returns at freq_vol
+    # SR_arith = sqrt(AN) * mean(r_m) / std(r_m) on simple returns at freq_vol
     # (Sharpe 1994 plug-in estimator). Numerator and denominator are paired on the
     # same simple-return series and do not reuse the table vol, which follows
-    # perf_params.return_type (LOG by default); the std(r) vs std(l) wedge is third-order.
+    # perf_params.return_type (LOG by default). The std(r) vs std(l) gap is first order in
+    # the periodic volatility relative to the vol itself, s(l)/s(r) ~ 1 - skew*s(r)/2 - mean(r)
+    # (0.993 for monthly gold in the Sharpe chapter), so the two vols are not interchangeable.
     # Note SR_arith is an estimate at the sampling frequency freq_vol.
     if perf_params.return_type == ReturnTypes.RELATIVE:
         returns_arith = returns_vol
@@ -436,8 +502,28 @@ def compute_risk_table(prices: pd.DataFrame,
     else:  # rf = 0: excess objects collapse to plain, mirroring the pa excess convention
         avg_arith_excess_return = avg_arith_return
         sharpe_arith_excess = sharpe_arith
-    worst_series = pct_returns_dd.min()
-    best_series = pct_returns_dd.max()
+
+    # max / current drawdown and extreme returns on each asset's drawdown path
+    max_dd_values, current_dd_values, worst_values, best_values = [], [], [], []
+    for path in dd_paths:
+        if path.empty:
+            max_dd_values.append(np.nan)
+            current_dd_values.append(np.nan)
+            worst_values.append(np.nan)
+            best_values.append(np.nan)
+            continue
+        path_max_dd, path_current_dd = compute_max_current_drawdown(prices=path)
+        # Preserve missing price gaps rather than letting pandas choose an implicit fill policy.
+        path_returns = path.pct_change(fill_method=None).iloc[1:]
+        max_dd_values.append(path_max_dd)
+        current_dd_values.append(path_current_dd)
+        worst_values.append(path_returns.min() if not path_returns.empty else np.nan)
+        best_values.append(path_returns.max() if not path_returns.empty else np.nan)
+    # Wrap in Series for O(1) by-name lookup in the asset loop below.
+    max_dds = pd.Series(max_dd_values, index=prices.columns, dtype=float)
+    current_dds = pd.Series(current_dd_values, index=prices.columns, dtype=float)
+    worst_series = pd.Series(worst_values, index=prices.columns, dtype=float)
+    best_series = pd.Series(best_values, index=prices.columns, dtype=float)
 
     # skew/kurtosis via scipy on dropna'd numpy arrays per column (scipy's pandas
     # methods don't expose bias=False consistently across versions).
@@ -448,16 +534,10 @@ def compute_risk_table(prices: pd.DataFrame,
         lambda s: kurtosis(s.dropna().to_numpy(), bias=False) if s.dropna().size > 3 else np.nan
     )
 
-    # downside vol — guarded against empty negative-return arrays
+    # downside vol — missing with fewer than two negative returns
     downside_vol_series = returns_vol.apply(
         lambda s: _safe_downside_vol(s.dropna().to_numpy(), vol_dt)
     )
-
-    # max / current drawdown using the dedicated helper (operates on full DataFrame)
-    max_dds_arr, current_dds_arr = compute_max_current_drawdown(prices=dd_sampled_prices)
-    # Wrap in Series for O(1) by-name lookup in the asset loop below.
-    max_dds = pd.Series(max_dds_arr, index=dd_sampled_prices.columns)
-    current_dds = pd.Series(current_dds_arr, index=dd_sampled_prices.columns)
 
     # ── Assemble per-asset rows ──
     # Per-asset metadata (start/end dates, obs count) still needs the dropna trick.
@@ -484,7 +564,8 @@ def compute_risk_table(prices: pd.DataFrame,
                 PerfStat.NUM_OBS.to_str(): n_obs,
                 PerfStat.MAX_DD.to_str(): max_dd_val,
                 PerfStat.CURRENT_DD.to_str(): float(current_dds[asset]),
-                PerfStat.MAX_DD_VOL.to_str(): max_dd_val / vol if vol > 0.0 else 0.0,
+                # undefined, not zero, when the volatility is missing (one return) or zero
+                PerfStat.MAX_DD_VOL.to_str(): max_dd_val / vol if vol > 0.0 else np.nan,
                 PerfStat.WORST.to_str(): float(worst_series[asset]),
                 PerfStat.BEST.to_str(): float(best_series[asset]),
                 PerfStat.SKEWNESS.to_str(): float(skew_series[asset]) if pd.notna(skew_series[asset]) else np.nan,
@@ -520,7 +601,13 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
 
     Args:
         prices: DataFrame or Series of asset price levels.
-        perf_params: Performance parameter object. If None, frequency is inferred.
+        perf_params: Performance parameter object. If None, the frequency is inferred from the
+            index: ``PerfParams(freq=pd.infer_freq(prices.index))``. A regular business-day
+            index then gives ``freq_vol``, ``freq_reg`` and ``freq_excess_return`` of 'B'
+            (volatility annualised with 252), while ``freq_drawdown`` stays 'D' and
+            ``freq_skewness`` 'ME'; an irregular index, for which ``pd.infer_freq`` returns
+            None, gives the ``PerfParams()`` defaults. Pass an explicit ``PerfParams`` for
+            reproducible grids.
 
     Returns:
         DataFrame indexed by asset with all performance and risk columns merged.
@@ -528,7 +615,12 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
         from the performance table. Visible return columns retain each asset's native observed
         endpoints. The p.a., log, excess, and Sortino ratio numerators instead use complete
         ``freq_vol`` boundaries within each asset's observed support, so they describe the same
-        sample as their risk denominators without extending terminated histories.
+        sample as their volatility denominators without extending terminated histories. The
+        Calmar numerator is the native-endpoint ``PA_EXCESS_RETURN``, because its denominator
+        ``MAX_DD`` is measured on ``freq_drawdown`` up to each asset's final observation.
+        Undefined ratios are missing rather than infinite: ``SORTINO_RATIO`` with fewer than
+        two negative ``freq_vol`` returns and ``CALMAR_RATIO`` for a history that is never
+        under water.
     """
     if perf_params is None:
         perf_params = PerfParams(freq=pd.infer_freq(prices.index))
@@ -568,12 +660,21 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
     # compute_risk_table where numerator and denominator share the simple-return series
 
     if PerfStat.DOWNSIDE_VOL.to_str() in risk_table.columns:
+        # undefined (missing), not infinite, when the downside vol is missing or zero
+        downside_vol = risk_table[PerfStat.DOWNSIDE_VOL.to_str()]
         perf_table[PerfStat.SORTINO_RATIO.to_str()] = (
             ratio_perf_table[PerfStat.PA_EXCESS_RETURN.to_str()]
-            / risk_table[PerfStat.DOWNSIDE_VOL.to_str()]
+            / downside_vol.where(downside_vol > 0.0)
         )
     if PerfStat.MAX_DD.to_str() in risk_table.columns:
-        perf_table[PerfStat.CALMAR_RATIO.to_str()] = -1.0*perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / risk_table[PerfStat.MAX_DD.to_str()]
+        # Calmar = excess p.a. return / |MAX_DD|. The numerator is the native-endpoint
+        # PA_EXCESS_RETURN because its denominator, MAX_DD on freq_drawdown, covers each asset's
+        # history up to its final observation rather than the complete freq_vol boundaries.
+        # A history that is never under water has MAX_DD = 0 and an undefined (missing) ratio.
+        max_dd = risk_table[PerfStat.MAX_DD.to_str()]
+        perf_table[PerfStat.CALMAR_RATIO.to_str()] = (
+            perf_table[PerfStat.PA_EXCESS_RETURN.to_str()] / -max_dd.where(max_dd < 0.0)
+        )
 
     # ── Merge perf and risk tables, dropping duplicates ──
     # Both tables produce START_DATE / END_DATE; we keep the perf_table version
@@ -605,7 +706,11 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
         benchmark_price: Stand-alone benchmark price Series. Optional if ``benchmark``
             is in ``prices``. Its name must be a non-empty string when ``benchmark`` is omitted.
             See ``resolve_benchmark_source`` for the three-way branching.
-        perf_params: Performance parameter object. If None, frequency is inferred.
+        perf_params: Performance parameter object. If None, it is
+            ``PerfParams(freq=pd.infer_freq(prices.index))``, which sets ``freq_reg`` as well as
+            ``freq_vol`` to the inferred index frequency: a regular business-day index regresses
+            daily returns (``freq_reg='B'``), not the quarterly ``PerfParams()`` default
+            ``freq_reg='QE'``; an irregular index falls back to the defaults.
         is_log_returns: If True, compute log returns instead of arithmetic returns
             for the regression.
         drop_benchmark: If True, exclude the benchmark row from the output table.
@@ -751,8 +856,11 @@ def compute_rolling_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Ser
                                               ) -> Tuple[Union[pd.DataFrame, pd.Series], Union[pd.DataFrame, pd.Series]]:
     """Compute joint drawdown and time-under-water series.
 
-    Time under water counts consecutive periods spent below the prior peak,
-    resetting to zero each time a new high is established.
+    The levels are first rebased to ``sampling_freq`` with forward filling. Time under water
+    then counts the consecutive grid points, up to and including each date, at which the level
+    is below its running peak, resetting to zero at every new high. On 'D' it is the number of
+    calendar days since the last day at the running peak: a Friday peak followed by a Monday
+    fall counts from Sunday, the last forward-filled day at the peak.
 
     Args:
         prices: Price level Series or DataFrame.
@@ -761,7 +869,10 @@ def compute_rolling_drawdown_time_under_water(prices: Union[pd.DataFrame, pd.Ser
             wall-clock recovery time.
 
     Returns:
-        Tuple of (drawdown, time_under_water), both matching the input shape.
+        Tuple of (drawdown, time_under_water) of the input type (Series or DataFrame) and
+        columns, both on the rebased ``sampling_freq`` grid, not the input index: a
+        business-day input returns more rows on 'D'. Leading missing levels count as zero time
+        under water.
 
     Raises:
         ValueError: If ``prices`` is neither Series nor DataFrame.
@@ -821,15 +932,19 @@ def compute_avg_max_dd(ds: pd.Series,
     """Compute summary statistics of a drawdown (or run-up) series.
 
     Args:
-        ds: Drawdown or running-extreme Series.
-        is_max: If True, consider only positive values (run-ups); if False, only
-            negative values (drawdowns).
+        ds: Drawdown, time-under-water or run-up Series.
+        is_max: If True, keep only the non-negative values (``>= 0``: time under water or
+            run-ups); if False, only the non-positive values (``<= 0``: drawdowns). Zeros are
+            kept in both cases, and missing values are ignored. The default True suits time
+            under water; applied to a drawdown series it keeps only the zeros at the peaks and
+            returns ``(0, 0, 0, last)``, so pass ``is_max=False`` for drawdowns.
         q: Quantile for the tail statistic (default 0.1 = 10th/90th percentile).
 
     Returns:
-        Tuple of (avg, quantile, extreme, last). For ``is_max=True`` quantile is the
-        upper (1-q) quantile and extreme is the max; for ``is_max=False`` quantile
-        is the lower q quantile and extreme is the min.
+        Tuple of (avg, quantile, extreme, last) over the kept values, except ``last``, which is
+        the final value of ``ds`` unfiltered. For ``is_max=True`` quantile is the upper (1-q)
+        quantile and extreme is the max; for ``is_max=False`` quantile is the lower q quantile
+        and extreme is the min. Quantiles use NumPy's linear interpolation.
     """
     if is_max:
         nan_data = np.where(ds.to_numpy() >= 0, ds.to_numpy(), np.nan)
@@ -855,17 +970,28 @@ def compute_drawdowns_stats_table(price: pd.Series,
                                   ) -> pd.DataFrame:
     """Compute a sorted table of drawdown episodes and their statistics.
 
-    Each episode starts when its running peak level was first reached immediately before
-    prices fall and ends at either the observation that recovers that peak or the final
-    underwater observation. Episodes are sorted by maximum drawdown depth, then by start
-    date to resolve equal depths.
+    The series is first rebased to ``freq`` with forward filling (kept on its own grid for
+    ``freq=None``). An episode is a maximal run of consecutive grid points below the running
+    peak. Its ``start`` is the *first* grid point of the plateau at the peak level immediately
+    before the fall, that is the date the peak was first reached, not the last date at the
+    peak. Its ``trough`` is the earliest deepest point of the run, and its ``end`` is the first
+    point back at or above the peak, or the final grid point for an episode still under water
+    (``is_recovered=False``, and its durations are right-censored lower bounds). Episodes are
+    sorted by maximum drawdown depth, then by start date to resolve equal depths.
+
+    Durations are measured from ``start``, so on the calendar-day grid a Friday peak followed
+    by a Monday fall starts on Friday, while ``compute_rolling_drawdown_time_under_water``
+    counts time under water from Sunday, the last forward-filled day at the peak; ``days_dd``
+    exceeds the time under water by that plateau and, for a recovered episode, by the recovery
+    day.
 
     Args:
         price: Price level Series.
         max_num: Maximum number of drawdown episodes to return (worst N).
-        freq: Frequency to rebase to before block detection. Default 'D' (calendar
-            days) gives durations in wall-clock days. Pass None to count durations on
-            the original observation grid.
+        freq: Frequency to rebase to before block detection. Any non-None frequency gives
+            durations in calendar days between grid dates (``freq='B'`` also gives calendar
+            days); the default 'D' makes them wall-clock days on a daily grid. Pass None to
+            count durations in observations of the original grid.
 
     Returns:
         DataFrame sorted by max_dd ascending, with columns:
@@ -934,9 +1060,19 @@ def compute_sharpe_arithmetic(returns: Union[pd.Series, pd.DataFrame],
                               ddof: int = 1
                               ) -> Union[float, pd.Series]:
     """
-    canonical arithmetic Sharpe ratio, SR = sqrt(af) * E[r] / sqrt(Var[r]) on periodic
-    simple excess returns (Sharpe 1994 plug-in estimator, docs/performance_analytics_and_sharpe.md)
-    af defaults to the annualization factor inferred from the return index
+    canonical arithmetic Sharpe ratio, SR = sqrt(af) * E[r] / sqrt(Var[r]), of the returns given.
+
+    The Sharpe (1994) plug-in estimator (docs/performance_analytics_and_sharpe.md). Pass simple
+    excess returns for an excess Sharpe ratio; no cash is deducted here. The risk table computes
+    ``SHARPE_ARITH`` with the same formula inline and does not call this helper.
+
+    Args:
+        returns: periodic returns, one column per asset
+        af: annualisation factor; None infers it from the return index
+        ddof: delta degrees of freedom of the standard deviation
+
+    Returns:
+        the annualised ratio, a float for a Series and a Series for a DataFrame
     """
     if not isinstance(returns, (pd.Series, pd.DataFrame)):
         raise ValueError(f"returns must be pd.Series or pd.DataFrame, got {type(returns)!r}")

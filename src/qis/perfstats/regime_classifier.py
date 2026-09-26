@@ -15,15 +15,20 @@ so the two agree. ``BenchmarkReturnsPositiveNegativeRegime`` splits on sign;
 edges must be unique: a constant or back-padded zero-return block raises here rather than
 surfacing as a bare pandas "Bin edges must be unique".
 
-``RegimeData`` selects which statistic the table reports - average, p.a., or Sharpe. The Sharpe
-branch is the one that needs care, and ``PerfParams.sharpe_convention`` selects it:
+``RegimeData`` selects which statistic the table reports - average, p.a., or Sharpe. Only the
+average is a within-regime statistic; the p.a. and Sharpe panels are frequency-weighted
+contributions that add up across regimes. The Sharpe branch is the one that needs care, and
+``PerfParams.sharpe_convention`` selects it:
 
-    sr_s = sqrt(af) p_s m_s / std,   sum over regimes s of sr_s = the full-sample Sharpe
+    sr_s = sqrt(af) p_s m_s / std,   sum over regimes s of sr_s = sqrt(af) mean / std
 
-is exactly additive under ARITHMETIC and LOG. PA does not decompose additively without a
-c-adjustment, which the table path applies and ``compute_regime_sharpe_decomposition`` refuses -
-that function is the returns-level counterpart for callers holding periodic returns rather than
-prices, with ``af`` explicit and no resampling.
+where the right-hand side is the Sharpe ratio of the convention (simple returns for ARITHMETIC,
+log returns for LOG) computed on the classifier's regime grid, not any Sharpe column of the
+performance table, which is sampled on ``freq_vol``. PA does not decompose additively without a
+c-adjustment, which the table path applies (its bars add up to ``PA_RETURN / VOL``) and
+``compute_regime_sharpe_decomposition`` refuses - that function is the returns-level counterpart
+for callers holding periodic returns rather than prices, with ``af`` explicit and no resampling.
+No branch deducts cash.
 
 Main entry points: the three classifiers, ``compute_regimes_pa_perf_table`` on each,
 ``compute_bnb_regimes_pa_perf_table`` for the benchmark case in one call, and
@@ -90,11 +95,14 @@ def compute_regime_avg(sampled_returns_with_regime_id: pd.DataFrame,
     Args:
         sampled_returns_with_regime_id: DataFrame with returns and regime classification
         freq: Sampling frequency for annualization
-        is_report_pa_returns: If True, report as per annum returns
+        is_report_pa_returns: If True, report the compounded contribution
+            exp(AN * p_s * m_s) - 1; if False, the linear contribution AN * p_s * m_s
         regime_ids: Optional ordered list of regime IDs
+        **kwargs: ignored
 
     Returns:
-        Tuple of (regime means, regime PA contributions, regime frequencies)
+        Tuple of (regime means, regime PA contributions, regime frequencies). An empty regime
+        has a missing mean and a missing contribution.
     """
     regime_means, norm_q = compute_mean_freq_regimes(
         sampled_returns_with_regime_id=sampled_returns_with_regime_id
@@ -129,8 +137,17 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
         drop_benchmark: bool = False,
         additive_pa_returns_to_pa_total: bool = True,
         regime_ids: List[str] = None,
+        sampled_return_type: ReturnTypes = ReturnTypes.RELATIVE,
         **kwargs) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
     """Compute comprehensive regime-conditional performance table.
+
+    The p.a. and Sharpe panels are regime *contributions*: they add up across regimes to a
+    full-sample total. Under ``SharpeConvention.PA`` (the default) the Sharpe contributions are
+    the patched p.a. contributions over the table's ``VOL`` and add up to ``PA_RETURN / VOL``,
+    with ``PA_RETURN`` on each asset's native endpoints; this equals ``SHARPE_RF0`` only when
+    those endpoints lie on the ``freq_vol`` grid. Under ARITHMETIC and LOG they are
+    sqrt(AN) * p_s * m_s / std on the sampled simple or log returns and add up exactly to the
+    Sharpe ratio of that convention on the regime grid. No cash is deducted.
 
     Args:
         sampled_returns_with_regime_id: Returns with regime classification
@@ -139,14 +156,21 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
         perf_params: Performance calculation parameters
         freq: Sampling frequency
         is_use_benchmark_means: Replace the benchmark's ordered P.a. regime values with its
-            conditional periodic means
+            conditional periodic means, for display only; its regime Sharpe values are still
+            computed from the per-annum contributions
         is_add_ra_perf_table: Include risk-adjusted performance table
         drop_benchmark: Exclude benchmark from final table
         additive_pa_returns_to_pa_total: Adjust regime PA to sum to total
         regime_ids: Ordered list of regime IDs
+        sampled_return_type: Return basis of ``sampled_returns_with_regime_id``, the
+            classifier's ``return_type``. With ``ReturnTypes.LOG`` the returns are already log
+            returns: the LOG convention uses them as they are and the ARITHMETIC convention
+            converts them to simple returns. Other types are treated as simple returns
+        **kwargs: Passed to ``compute_regime_avg`` (``is_report_pa_returns``)
 
     Returns:
-        Tuple of (performance table, regime data dictionary)
+        Tuple of (performance table, regime data dictionary). An empty regime has missing
+        contributions in every panel.
     """
     regime_avg, regime_pa, norm_q = compute_regime_avg(
         sampled_returns_with_regime_id=sampled_returns_with_regime_id,
@@ -185,7 +209,11 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
         regime_pa_diff = weighted_diff.multiply(norm_q, axis=1)
         regime_pa1 = regime_pa[regime_pa_columns].add(regime_pa_diff.to_numpy(), axis=0)
     else:
-        regime_pa1 = regime_pa
+        regime_pa1 = regime_pa.copy()
+
+    # The PA regime Sharpe uses the per-annum contributions, before the optional display
+    # substitution of the benchmark's periodic means below.
+    regime_pa_for_sharpe = regime_pa1.copy()
 
     if is_use_benchmark_means and benchmark is not None:
         # Average and P.a. columns share regime order but not display labels. Use one .loc
@@ -203,26 +231,25 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
         # numerator and denominator are paired on the identical periodic return series.
         af_mult = get_annualization_factor(freq=freq)
         sampled_returns = sampled_returns_with_regime_id.drop(columns=[RegimeClassifier.REGIME_COLUMN])
+        # convert the classifier's returns to the basis of the convention exactly once
+        is_log_input = sampled_return_type == ReturnTypes.LOG
         if sharpe_convention == SharpeConvention.LOG:
-            # log-space decomposition (Sepp 2020): sr_s = sqrt(af) * p_s * mean(log(1+r) | s) / std(log(1+r)),
-            # exactly additive to the log Sharpe, l = log(1+r) computed from the sampled simple returns
-            log_returns_with_id = sampled_returns_with_regime_id.copy()
-            log_returns_with_id[sampled_returns.columns] = np.log1p(sampled_returns)
-            conditional_means, _ = compute_mean_freq_regimes(sampled_returns_with_regime_id=log_returns_with_id)
-            conditional_means = conditional_means.T[given_columns]
-            an_vol = np.sqrt(af_mult) * np.log1p(sampled_returns).std(ddof=1)
+            convention_returns = sampled_returns if is_log_input else np.log1p(sampled_returns)
         else:
-            # arithmetic decomposition: sr_s = sqrt(af) * p_s * m_s / std(r), exactly additive
-            conditional_means = regime_avg.copy()
-            conditional_means.columns = given_columns
-            an_vol = np.sqrt(af_mult) * sampled_returns.std(ddof=1)
+            convention_returns = np.expm1(sampled_returns) if is_log_input else sampled_returns
+        convention_returns_with_id = sampled_returns_with_regime_id.copy()
+        convention_returns_with_id[sampled_returns.columns] = convention_returns
+        conditional_means, _ = compute_mean_freq_regimes(
+            sampled_returns_with_regime_id=convention_returns_with_id)
+        conditional_means = conditional_means.T[given_columns]
+        an_vol = np.sqrt(af_mult) * convention_returns.std(ddof=1)
         # linear annualized regime contributions af * p_s * m_s from the conditional means
         regime_contrib = conditional_means.multiply(af_mult * norm_q[given_columns].to_numpy(), axis=1)
         regime_sharpe = regime_contrib.divide(an_vol, axis=0)
         regime_sharpe.columns = [f"{x}{RegimeData.REGIME_SHARPE.value}" for x in given_columns]
-    else:  # SharpeConvention.PA, the default: unchanged
+    else:  # SharpeConvention.PA, the default: patched p.a. contributions over the table VOL
         vols_for_sharpe_pa = ra_perf_table[PerfStat.VOL.to_str()]
-        regime_sharpe = regime_pa1.divide(vols_for_sharpe_pa, axis=0)[regime_pa_columns]
+        regime_sharpe = regime_pa_for_sharpe.divide(vols_for_sharpe_pa, axis=0)[regime_pa_columns]
         regime_sharpe.columns = [f"{x}{RegimeData.REGIME_SHARPE.value}" for x in given_columns]
 
     # Combine into performance table
@@ -330,11 +357,13 @@ class RegimeClassifier(ABC):
             perf_params: Performance parameters; perf_params.sharpe_convention selects the
                 regime-Sharpe convention (PA default, ARITHMETIC/LOG exactly additive)
             is_use_benchmark_means: Replace the benchmark's ordered P.a. regime values with its
-                conditional periodic means
+                conditional periodic means, for display only
             is_add_ra_perf_table: Include risk-adjusted performance
             drop_benchmark: Exclude benchmark from results
             additive_pa_returns_to_pa_total: Adjust regime PA to sum to total
             regime_ids: Ordered list of regime IDs
+            **kwargs: Passed on to ``compute_regimes_pa_perf_table_from_sampled_returns`` and
+                from there to ``compute_regime_avg``, for example ``is_report_pa_returns``
 
         Returns:
             Tuple of (performance table, regime data dictionary)
@@ -347,6 +376,10 @@ class RegimeClassifier(ABC):
         if regime_ids is None:
             regime_ids = self.get_regime_ids()
 
+        # The classifier's own return basis tells the Sharpe branch whether the sampled returns
+        # are already log returns.
+        sampled_return_type = getattr(self, 'return_type', ReturnTypes.RELATIVE)
+
         cond_perf_table, regime_datas = compute_regimes_pa_perf_table_from_sampled_returns(
             sampled_returns_with_regime_id=sampled_returns_with_regime_id,
             prices=prices,
@@ -356,7 +389,10 @@ class RegimeClassifier(ABC):
             is_use_benchmark_means=is_use_benchmark_means,
             is_add_ra_perf_table=is_add_ra_perf_table,
             drop_benchmark=drop_benchmark,
-            regime_ids=regime_ids
+            additive_pa_returns_to_pa_total=additive_pa_returns_to_pa_total,
+            regime_ids=regime_ids,
+            sampled_return_type=sampled_return_type,
+            **kwargs
         )
 
         return cond_perf_table, regime_datas
@@ -516,6 +552,7 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
                                       benchmark: str,
                                       perf_params: PerfParams,
                                       drop_benchmark: bool = False,
+                                      additive_pa_returns_to_pa_total: bool = True,
                                       **kwargs) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
         """Compute regime performance attribution table.
 
@@ -525,6 +562,11 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
             perf_params: Performance parameters; perf_params.sharpe_convention selects the
                 regime-Sharpe convention (PA default, ARITHMETIC/LOG exactly additive)
             drop_benchmark: Exclude benchmark from results
+            additive_pa_returns_to_pa_total: Shift the per-annum regime contributions in
+                proportion to regime frequency so they add up to the table's ``PA_RETURN``;
+                False reports the unpatched exp(AN * p_s * m_s) - 1
+            **kwargs: Accepted for call compatibility (plotting functions pass their own
+                options through) and ignored
 
         Returns:
             Tuple of (performance table, regime data dictionary)
@@ -545,7 +587,8 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
             is_report_pa_returns=True,
             is_use_benchmark_means=False,
             regime_ids=self.get_regime_ids(),
-            drop_benchmark=drop_benchmark
+            drop_benchmark=drop_benchmark,
+            additive_pa_returns_to_pa_total=additive_pa_returns_to_pa_total
         )
 
 
@@ -660,6 +703,7 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
                                       benchmark: str,
                                       perf_params: PerfParams,
                                       drop_benchmark: bool = False,
+                                      additive_pa_returns_to_pa_total: bool = True,
                                       **kwargs) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
         """Compute regime performance attribution table.
 
@@ -669,6 +713,11 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
             perf_params: Performance parameters; perf_params.sharpe_convention selects the
                 regime-Sharpe convention (PA default, ARITHMETIC/LOG exactly additive)
             drop_benchmark: Exclude benchmark from results
+            additive_pa_returns_to_pa_total: Shift the per-annum regime contributions in
+                proportion to regime frequency so they add up to the table's ``PA_RETURN``;
+                False reports the unpatched exp(AN * p_s * m_s) - 1
+            **kwargs: Accepted for call compatibility (plotting functions pass their own
+                options through) and ignored
 
         Returns:
             Tuple of (performance table, regime data dictionary)
@@ -689,7 +738,8 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
             is_report_pa_returns=True,
             is_use_benchmark_means=False,
             regime_ids=self.get_regime_ids(),
-            drop_benchmark=drop_benchmark
+            drop_benchmark=drop_benchmark,
+            additive_pa_returns_to_pa_total=additive_pa_returns_to_pa_total
         )
 
 
@@ -827,6 +877,7 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
                                       benchmark: str,
                                       perf_params: PerfParams,
                                       drop_benchmark: bool = False,
+                                      additive_pa_returns_to_pa_total: bool = True,
                                       **kwargs) -> Tuple[pd.DataFrame, Dict[RegimeData, pd.DataFrame]]:
         """Compute regime performance attribution table.
 
@@ -835,6 +886,11 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             benchmark: Benchmark asset name
             perf_params: Performance parameters
             drop_benchmark: Exclude benchmark from results
+            additive_pa_returns_to_pa_total: Shift the per-annum regime contributions in
+                proportion to regime frequency so they add up to the table's ``PA_RETURN``;
+                False reports the unpatched exp(AN * p_s * m_s) - 1
+            **kwargs: Accepted for call compatibility (plotting functions pass their own
+                options through) and ignored
 
         Returns:
             Tuple of (performance table, regime data dictionary)
@@ -856,7 +912,8 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             is_report_pa_returns=True,
             is_use_benchmark_means=False,
             # Match the shared table contract while leaving component regime data intact.
-            drop_benchmark=drop_benchmark
+            drop_benchmark=drop_benchmark,
+            additive_pa_returns_to_pa_total=additive_pa_returns_to_pa_total
         )
 
     def get_regime_colors(self) -> List[Tuple[float, ...]]:
@@ -959,7 +1016,9 @@ def compute_regime_sharpe_decomposition(returns: Union[pd.Series, pd.DataFrame],
     table branch to machine precision. All moments are computed per asset over the rows
     where both the asset and the benchmark are observed, which makes the decomposition
     exactly additive per asset for any missing-value pattern:
-    sum_s sr_s = sqrt(af) * mean / std on that asset's sample
+    sum_s sr_s = sqrt(af) * mean / std on that asset's sample, where a regime without
+    observations for the asset reports a missing value, as in the table, and is skipped in
+    the sum (it contributes nothing to the mean)
 
     q defaults to the one-sigma boundaries np.array([0.0, 0.16, 0.84, 1.0])
     (P(Z < -1) = 15.87% rounds to 16%, central mass 68% against the normal's 68.27%),
@@ -1001,8 +1060,11 @@ def compute_regime_sharpe_decomposition(returns: Union[pd.Series, pd.DataFrame],
         regimes = regime_id.reindex(r.index)
         sigma = r.std(ddof=ddof)
         n = len(r)
+        # an empty regime has no conditional mean: report a missing value, as the table does
         row = {f"{regime}{RegimeData.REGIME_SHARPE.value}":
-               float(np.sqrt(af) * ((regimes == regime).sum() / n) * (r[regimes == regime].mean() if (regimes == regime).any() else 0.0) / sigma)
+               float(np.sqrt(af) * ((regimes == regime).sum() / n)
+                     * (r[regimes == regime].mean() if (regimes == regime).any() else np.nan)
+                     / sigma)
                for regime in regime_ids}
         if is_add_total:
             row[f"Total{RegimeData.REGIME_SHARPE.value}"] = float(np.sqrt(af) * r.mean() / sigma)

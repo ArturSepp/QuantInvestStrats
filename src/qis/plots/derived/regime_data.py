@@ -34,7 +34,7 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                      drop_benchmark: bool = False,
                      x_rotation: int = 90,
                      add_bar_values: bool = True,
-                     title: Optional[str] = 'Conditional Excess Sharpe ratio',
+                     title: Optional[str] = 'Conditional Sharpe ratio',
                      var_format: str = '{:.1f}',
                      bbox_to_anchor: Optional[Tuple[float, float]] = (1.0, 0.95),
                      fontsize: int = 10,
@@ -48,17 +48,29 @@ def plot_regime_data(regime_classifier: RegimeClassifier,
                      ) -> plt.Figure:
     """plot regime-conditional data of the classifier as stacked bars with regime colors.
 
-    for regime_data_to_plot=RegimeData.REGIME_SHARPE the values follow
-    perf_params.sharpe_convention (see qis/docs/sharpe_conventions.md):
-    PA (default) divides the additivity-patched compound per-annum regime returns
-    by the annualized vol. ARITHMETIC computes sr_s = sqrt(af) * p_s * m_s / std(r)
-    on the sampled simple returns, so the regime bars sum to the total arithmetic
-    Sharpe ratio exactly; LOG is the analog on log(1+r). The additive conventions
-    are the natural choice for regime attribution.
+    for regime_data_to_plot=RegimeData.REGIME_SHARPE the values are regime contributions that
+    follow perf_params.sharpe_convention (see qis/docs/sharpe_conventions.md):
+    PA (default) divides the additivity-patched compound per-annum regime contributions
+    by the annualized vol ``VOL``, so the bars add up to ``PA_RETURN / VOL``, which equals
+    ``SHARPE_RF0`` only when the native endpoints lie on the ``freq_vol`` grid. ARITHMETIC
+    computes sr_s = sqrt(af) * p_s * m_s / std(r) on the sampled simple returns, so the
+    regime bars sum to the arithmetic Sharpe ratio on the regime grid exactly; LOG is the
+    analog on log(1+r). The additive conventions are the natural choice for regime
+    attribution. No convention deducts cash; state the convention in the title when it matters.
 
     Args:
+        regime_classifier: classifier whose ``compute_regimes_pa_perf_table`` receives
+            ``prices``, ``benchmark`` and ``perf_params`` from ``kwargs``
+        regime_data_to_plot: panel to draw: regime averages, p.a. contributions or Sharpe
+            contributions
+        drop_sharpe_from_labels: remove ' Sharpe' from the regime labels
         drop_benchmark: Exclude the benchmark from the rendered regime bars while leaving the
             classifier's component tables unchanged.
+        title: panel title; the default names a conditional Sharpe ratio, of total returns
+        is_add_totals: show each asset's row sum of the drawn panel, skipping missing regimes
+
+    Returns:
+        the figure
     """
     regimes_pa_perf_table, regime_datas = regime_classifier.compute_regimes_pa_perf_table(drop_benchmark=drop_benchmark,
                                                                                           **kwargs)

@@ -3,9 +3,10 @@ descriptive statistics per column of a panel, formatted for display.
 
 ``compute_desc_table`` transposes the panel - time by ticker in, ticker by statistic out - and
 ``DescTableType`` selects what is reported: mean and standard deviation first, though
-``AVG_WITH_POSITIVE_PROB`` and ``SKEW_KURTOSIS`` drop both again, then skewness, kurtosis, a
-normality p-value, quantiles, the median, the positive share, or the percentile rank of the last
-value. Values come back as formatted strings because the table renderer takes them directly.
+``AVG_WITH_POSITIVE_PROB`` and ``SKEW_KURTOSIS`` drop both again and ``NONE`` reports nothing,
+then skewness, kurtosis, a normality p-value, quantiles, the median, the positive share, or the
+percentile rank of the last value. Values come back as formatted strings because the table
+renderer takes them directly.
 
 ``annualize_vol`` scales the standard deviation by the square root of the factor inferred from
 the index via ``infer_annualisation_factor_from_df``, reporting ``STD_AN`` rather than ``STD``.
@@ -25,6 +26,22 @@ from qis.perfstats.config import PerfStat
 
 
 class DescTableType(Enum):
+    """
+    which statistics ``compute_desc_table`` reports after the mean and standard deviation.
+
+    Attributes:
+        NONE: no statistics; the plotting functions draw no table, and ``compute_desc_table``
+            returns a table indexed by ticker with no columns
+        SHORT: mean and standard deviation only
+        AVG_WITH_POSITIVE_PROB: the positive share instead of mean and standard deviation
+        WITH_POSITIVE_PROB: adds the positive share
+        WITH_KURTOSIS: adds skewness and excess kurtosis
+        WITH_NORMAL_PVAL: adds skewness, excess kurtosis and the normality-test p-value
+        WITH_SCORE: adds the last value and its percentile rank
+        EXTENSIVE: adds skewness, kurtosis, minimum, 16% quantile, median, 84% quantile, maximum
+        SKEW_KURTOSIS: skewness and kurtosis instead of mean and standard deviation
+        WITH_MEDIAN: adds the median, skewness and kurtosis
+    """
     NONE = 0
     SHORT = 1
     AVG_WITH_POSITIVE_PROB = 2
@@ -219,10 +236,13 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         df: returns panel, index is time and columns are tickers; a Series is treated as one
             column named after it; repeated DataFrame column labels are retained and calculated
             independently; observations may be finite or missing but not infinite
-        desc_table_type: which set of statistics to report; positive-probability modes use each
+        desc_table_type: which set of statistics to report; ``DescTableType.NONE`` returns the
+            ticker index with no columns; positive-probability modes use each
             column's non-missing observation count as the denominator; moment modes retain
             defined level statistics, report finite zero-spread moments as missing, and stabilize
-            varying finite samples through translation before standardized-moment calculations
+            varying finite samples through translation before standardized-moment calculations;
+            the normality p-value is formatted with ``PerfStat.NORMTEST``'s own four-decimal
+            format
         var_format: format applied to the statistics
         annualize_vol: report volatility per annum rather than per period; reduced modes omit
             the volatility column selected by this convention
@@ -286,7 +306,11 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
         descriptive_table[PerfStat.T_STAT.to_str()] = [norm_variable_display_type.format(x) for x in tstats]
 
     nan_policy = 'omit'  # skip nans
-    if desc_table_type == desc_table_type.SHORT:
+    if desc_table_type == DescTableType.NONE:
+        # no statistics requested: keep the ticker index, drop every statistic column
+        descriptive_table = descriptive_table.iloc[:, 0:0]
+
+    elif desc_table_type == desc_table_type.SHORT:
         pass
 
     elif desc_table_type == desc_table_type.AVG_WITH_POSITIVE_PROB:
@@ -314,8 +338,9 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             data_np,
             lambda values: normaltest(a=values, axis=0, nan_policy=nan_policy)[1],
             minimum_observations=20)
+        # format with the member's own ValueType (FLOAT4), so small p-values stay visible
         descriptive_table[PerfStat.NORMTEST.value.short_n] = [
-            '{:.2f}'.format(x) for x in ps]
+            PerfStat.NORMTEST.to_format().format(x) for x in ps]
 
     elif desc_table_type == desc_table_type.SKEW_KURTOSIS:
         # Remove setup columns and leave ineligible moments undefined in the reduced schema.

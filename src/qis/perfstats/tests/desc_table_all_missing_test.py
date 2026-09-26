@@ -88,7 +88,8 @@ _EXPECTED_COLUMNS: dict[DescTableType, tuple[tuple[str, str, str], ...]] = {
         ('Std', '6.37', 'nan'),
         ('Skew', '0.0', 'nan'),
         ('Kurt', '-1.3', 'nan'),
-        ('P-val', '0.08', 'nan'),
+        # P-val now uses PerfStat.NORMTEST's FLOAT4 format ('{:.4f}') instead of '{:.2f}'.
+        ('P-val', '0.0802', 'nan'),
     ),
     DescTableType.WITH_SCORE: (
         ('Avg', '0.00', 'nan'),

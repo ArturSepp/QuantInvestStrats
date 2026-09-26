@@ -10,8 +10,9 @@ the three Sharpe numerators a number reports, and ``ReturnTypes`` fixes log agai
 Frequencies are explicit, not inferred: the defaults are ``freq_vol='ME'``, ``freq_reg='QE'`` and
 ``freq_drawdown='D'``, the last daily so the peak-to-trough path is not smoothed onto the
 reporting grid. Passing ``freq`` sets ``freq_vol``, ``freq_reg`` and ``freq_excess_return`` only;
-``freq_drawdown`` keeps its own value unless that is unset, and ``freq_skewness`` is never touched.
-Column-preset tuples are what reporting selects from; the numbers themselves are ``perf_stats.py``.
+``freq_drawdown`` takes ``freq`` only when it is passed as None (its default 'D' is kept), and
+``freq_skewness`` is never touched. Column-preset tuples are what reporting selects from; the
+numbers themselves are ``perf_stats.py``.
 """
 from __future__ import annotations
 
@@ -59,13 +60,22 @@ class RegimeData(Enum):
     which statistic a regime-conditional table reports.
 
     Selects the panel produced by :func:`compute_regimes_pa_perf_table` and rendered by
-    :func:`plot_regime_data`.
+    :func:`plot_regime_data`. Only the average is a within-regime statistic; the p.a. and Sharpe
+    panels are frequency-weighted *contributions* of each regime to a full-sample total, so they
+    add up across regimes and are not the return or Sharpe ratio earned inside a regime.
 
     Attributes:
-        REGIME_AVG: average return within each regime, on the sampling frequency
-        REGIME_PA: return annualised within each regime
-        REGIME_SHARPE: Sharpe ratio within each regime; the convention is the one carried on
-            PerfParams, see ``qis/docs/sharpe_conventions.md``
+        REGIME_AVG: conditional mean periodic return within each regime, m_g, on the
+            classifier's grid and return basis
+        REGIME_PA: per-annum contribution of each regime, exp(AN * p_g * m_g) - 1 with p_g the
+            regime frequency, shifted by p_g times the residual so the regimes add up to the
+            table's ``PA_RETURN`` (native endpoints)
+        REGIME_SHARPE: Sharpe-ratio contribution of each regime in the convention carried on
+            ``PerfParams.sharpe_convention``: under ARITHMETIC and LOG, sqrt(AN) * p_g * m_g
+            over the full-sample standard deviation, adding up to the Sharpe ratio on the
+            regime grid; under PA, the REGIME_PA contribution over ``VOL``, adding up to
+            ``PA_RETURN / VOL``, which equals ``SHARPE_RF0`` only when the native endpoints lie
+            on the ``freq_vol`` grid. See ``qis/docs/sharpe_conventions.md``
     """
     REGIME_AVG = 'Average'
     REGIME_PA = 'P.a.'
@@ -84,11 +94,25 @@ class PerfStat(ColVar, Enum):
     percent, ratio, date or count. Formatting therefore travels with the statistic instead of
     being reapplied at each call site.
 
-    Members whose name ends in ``_RF0`` use a zero risk-free rate; the excess variants need
-    ``PerfParams.rates_data``. The Sharpe members are fixed columns, one family per convention:
-    ``SHARPE_RF0``/``SHARPE_EXCESS`` (p.a.), ``SHARPE_LOG_AN``/``SHARPE_LOG_EXCESS`` (log) and
-    ``SHARPE_ARITH``/``SHARPE_ARITH_EXCESS`` (arithmetic). ``PerfParams.sharpe_convention`` does
-    not change them; it selects the convention of the regime-conditional Sharpe ratios.
+    Members whose name ends in ``_RF0`` use a zero risk-free rate; the excess variants deduct
+    ``PerfParams.rates_data`` and, without it, equal their zero-rate counterparts. The Sharpe
+    members are fixed columns, one family per convention: ``SHARPE_RF0``/``SHARPE_EXCESS``
+    (compound p.a.), ``SHARPE_LOG_AN``/``SHARPE_LOG_EXCESS`` (log) and
+    ``SHARPE_ARITH``/``SHARPE_ARITH_EXCESS`` (arithmetic). The labels 'Sharpe (rf=0)' and
+    'Ex Sharpe' denote the compound p.a. convention; the labels are column names that downstream
+    code selects on, so the convention is stated here rather than added to them.
+    ``PerfParams.sharpe_convention`` does not change these columns; it selects the convention of
+    the regime-conditional Sharpe contributions (``BEAR_SHARPE`` and its analogues), whose labels
+    likewise do not carry it.
+
+    ``WORST`` and ``BEST`` are the extreme simple returns on the ``PerfParams.freq_drawdown`` grid
+    (daily by default), not on ``freq_vol``. ``SKEWNESS`` and ``KURTOSIS`` are sampled on
+    ``freq_skewness``.
+
+    A member's ``name`` attribute is the ``ColVar`` display label, not the enumeration name:
+    ``PerfStat.VOL.name == 'Vol'``. The ``ColVar`` field shadows ``Enum.name`` and is kept because
+    it is how the labels are read throughout qis; use ``PerfStat.VOL._name_`` or
+    ``PerfStat['VOL']`` for the member name.
     """
     START_DATE = ColVar(name='Start date', short_n='Start\ndate', value_type=ValueType.DATE)
     END_DATE = ColVar(name='End date', short_n='End\ndate', value_type=ValueType.DATE)
@@ -136,10 +160,11 @@ class PerfStat(ColVar, Enum):
     BEST = ColVar(name='Best', short_n='Best', value_type=ValueType.PERCT)
     POSITIVE = ColVar(name='Positive', short_n='Positive', value_type=ValueType.PERCT)
 
-    # regime conditional performances
-    BEAR_AVG = ColVar(name='Bear Avg', short_n='Bear\nAvg', value_type=ValueType.PERCT)
-    NORMAL_AVG = ColVar(name='Normal Avg', short_n='Normal\nAvg', value_type=ValueType.PERCT)
-    BULL_AVG = ColVar(name='Bull Avg', short_n='Bull\nAvg', value_type=ValueType.PERCT)
+    # regime conditional performances; labels match the columns of the regime table,
+    # f"{regime} {RegimeData.REGIME_AVG.value}" and so on
+    BEAR_AVG = ColVar(name='Bear Average', short_n='Bear\nAvg', value_type=ValueType.PERCT)
+    NORMAL_AVG = ColVar(name='Normal Average', short_n='Normal\nAvg', value_type=ValueType.PERCT)
+    BULL_AVG = ColVar(name='Bull Average', short_n='Bull\nAvg', value_type=ValueType.PERCT)
 
     BEAR_PA = ColVar(name='Bear P.a.', short_n='Bear\nP.a.', value_type=ValueType.PERCT)
     NORMAL_PA = ColVar(name='Normal P.a.', short_n='Normal\nP.a.', value_type=ValueType.PERCT)
@@ -164,7 +189,7 @@ class PerfStat(ColVar, Enum):
 
     # linear ml
     ALPHA = ColVar(name='Alpha', short_n='Alpha', value_type=ValueType.PERCT)
-    ALPHA_AN = ColVar(name='An Alpha', short_n='Alpha', value_type=ValueType.PERCT)
+    ALPHA_AN = ColVar(name='An Alpha', short_n='An\nAlpha', value_type=ValueType.PERCT)
     BETA = ColVar(name='Beta', short_n='Beta', value_type=ValueType.FLOAT2)
     R2 = ColVar(name='R2', short_n='R2', value_type=ValueType.PERCT0)
     ALPHA_PVALUE = ColVar(name='p-Alpha', short_n='p-Alpha', value_type=ValueType.FLOAT2)
@@ -236,13 +261,21 @@ class SharpeConvention(Enum):
     ratio should be quoted with its convention. Summary in ``qis/docs/sharpe_conventions.md``;
     derivations in the handbook chapter on Sharpe ratios.
 
+    The enum is read only by the regime-conditional Sharpe contributions, which are computed on
+    total returns: no cash is deducted in any of the three branches, whatever
+    ``PerfParams.rates_data`` holds. The table columns ``SHARPE_EXCESS``, ``SHARPE_LOG_EXCESS``
+    and ``SHARPE_ARITH_EXCESS`` are the excess-of-cash versions of the same conventions.
+
     Attributes:
-        PA: compound annual excess return over annualised volatility. The reporting default
-            and the BarclayHedge tradition; leaves every pre-5.0.2 output unchanged
-        ARITHMETIC: ``sqrt(af) * mean / std`` of periodic simple excess returns — the Sharpe
-            (1994) plug-in estimator and the convention of the Sharpe-inference literature.
-            The regime decomposition is exactly additive only in this convention
-        LOG: ``sqrt(af) * mean / std`` of periodic log excess returns
+        PA: compound annual return over annualised volatility. For the regime contributions,
+            the per-annum regime returns are patched to add up to the table's ``PA_RETURN``
+            and divided by ``VOL``. The reporting default and the BarclayHedge tradition;
+            leaves every pre-5.0.2 output unchanged
+        ARITHMETIC: ``sqrt(AN) * mean / std`` of periodic simple returns - the Sharpe (1994)
+            plug-in estimator and the convention of the Sharpe-inference literature. The regime
+            contributions add up exactly to it
+        LOG: ``sqrt(AN) * mean / std`` of periodic log returns; the regime contributions add up
+            exactly to it
     """
     PA = 1
     ARITHMETIC = 2
@@ -259,25 +292,34 @@ class PerfParams:
     frequencies are therefore explicit here rather than assumed, and each factsheet panel
     states the frequency it was computed at. See ``qis/docs/reporting_frequencies.md``.
 
-    Passing ``freq`` sets ``freq_vol``, ``freq_reg``, ``freq_excess_return`` and, where it is
-    not already set, ``freq_drawdown`` to the same value; the per-statistic fields are for the
-    cases where one statistic needs a different grid from the rest.
+    Passing ``freq`` sets ``freq_vol``, ``freq_reg`` and ``freq_excess_return`` to the same
+    value. It sets ``freq_drawdown`` only when that field is passed as None: the default
+    ``freq_drawdown='D'`` is kept, so ``PerfParams(freq='ME')`` still measures drawdowns on
+    calendar days. ``freq_skewness`` is never set by ``freq``. The per-statistic fields are for
+    the cases where one statistic needs a different grid from the rest.
 
     Attributes:
         freq: single frequency applied to the fields listed above; None keeps them independent
             and defaults ``freq`` itself to 'ME'
-        freq_vol: sampling for volatility, and therefore the Sharpe denominator
-        freq_skewness: sampling for skewness
-        freq_drawdown: sampling for drawdowns and time under water; 'D' keeps the peak-to-
-            trough path at native resolution rather than on the reporting grid
+        freq_vol: sampling for volatility, and therefore the Sharpe denominator; also the grid of
+            the ratio numerators and of ``NUM_OBS``
+        freq_skewness: sampling for skewness and kurtosis
+        freq_drawdown: sampling for drawdowns and for the ``WORST`` and ``BEST`` returns; 'D'
+            keeps the peak-to-trough path at native resolution rather than on the reporting
+            grid. A coarser grid keeps each asset's final observation, so ``CURRENT_DD`` is the
+            drawdown at the last observation
         freq_reg: sampling for linear and quadratic regressions against a benchmark
-        freq_excess_return: sampling for excess returns over ``rates_data``
+        freq_excess_return: stored, printed and copied for compatibility but not read by any
+            calculation; excess returns are formed on the grid of the statistic that uses them
         return_type: log or arithmetic returns for the volatility computation
-        sharpe_convention: which Sharpe object the numerator reports — compound p.a.,
-            arithmetic, or log. PA is the default and leaves every existing output unchanged.
-            See ``qis/docs/sharpe_conventions.md``
-        rates_data: risk-free rate series; required for the excess-return statistics and for
-            any Sharpe ratio that is not the rf=0 variant
+        sharpe_convention: which Sharpe object the regime-conditional Sharpe contributions
+            report — compound p.a., arithmetic, or log. PA is the default and leaves every
+            existing output unchanged; the table's Sharpe columns do not depend on it. See
+            ``qis/docs/sharpe_conventions.md``
+        rates_data: risk-free rate series deducted by the excess-return columns
+            (``PA_EXCESS_RETURN``, ``SHARPE_EXCESS``, ``SORTINO_RATIO``, ``CALMAR_RATIO`` and the
+            other excess members) and by benchmark regressions. Without it every excess column
+            equals its zero-rate counterpart; it is not an error to omit it
     """
     freq: str = None  # if pass this will be default for all
     freq_vol: str = 'ME'  # volatility of Sharpe
@@ -320,13 +362,38 @@ class PerfParams:
              return_type: ReturnTypes = None,
              rates_data: pd.Series = None,
              sharpe_convention: SharpeConvention = None,
+             freq_skewness: str = None,
              **kwargs
              ) -> PerfParams:
+        """
+        a copy with the given fields replaced and every other field kept.
+
+        ``freq`` is carried over as stored; it is not re-applied, so the copy keeps the per-
+        statistic frequencies of this object or the ones passed here.
+
+        Args:
+            freq_reg: replacement ``freq_reg``; None keeps the current value
+            freq_vol: replacement ``freq_vol``; None keeps the current value
+            freq_drawdown: replacement ``freq_drawdown``; None keeps the current value
+            freq_excess_return: replacement ``freq_excess_return``; None keeps the current value
+            return_type: replacement ``return_type``; None keeps the current value
+            rates_data: replacement ``rates_data``; None keeps the current series
+            sharpe_convention: replacement ``sharpe_convention``; None keeps the current value
+            freq_skewness: replacement ``freq_skewness``; None keeps the current value
+            **kwargs: ignored, for compatibility with callers passing report settings
+
+        Returns:
+            a new PerfParams
+        """
         this_copy = PerfParams(freq_reg=freq_reg or self.freq_reg,
                                freq_vol=freq_vol or self.freq_vol,
+                               freq_skewness=freq_skewness or self.freq_skewness,
                                freq_drawdown=freq_drawdown or self.freq_drawdown,
                                freq_excess_return=freq_excess_return or self.freq_excess_return,
                                return_type=return_type or self.return_type,
                                rates_data=rates_data if rates_data is not None else self.rates_data,
                                sharpe_convention=sharpe_convention or self.sharpe_convention)
+        # freq is a shortcut applied in __post_init__; passing it to the constructor would
+        # overwrite the per-statistic fields above, so restore the stored value afterwards
+        this_copy.freq = self.freq
         return this_copy

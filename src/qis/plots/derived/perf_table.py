@@ -83,14 +83,23 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
 
     Args:
         prices: price levels, one column per asset. A Series is promoted to a one-column frame
-        perf_params: annualisation, frequency and rate conventions. None uses the defaults
-        perf_columns: statistics to include, in column order
+        perf_params: annualisation, frequency and rate conventions. None is passed on to
+            :func:`compute_ra_perf_table`, which infers the frequency from the index,
+            ``PerfParams(freq=pd.infer_freq(prices.index))``; it is not ``PerfParams()``, so a
+            regular business-day index gives a daily volatility. Pass an explicit PerfParams
+            for reproducible grids
+        perf_columns: statistics to include, in column order. Only columns that
+            :func:`compute_ra_perf_table` produces are returned; the regression columns of the
+            ``BENCHMARK_*`` and ``LN_BENCHMARK_*`` presets and the regime Sharpe columns of
+            ``SD_PERF_COLUMNS`` are skipped without a warning. Use
+            :func:`plot_ra_perf_table_benchmark` or :func:`compute_bnb_regimes_pa_perf_table`
+            for those
         column_header: header of the leading column, which holds the asset names
         df_to_add: extra columns inserted before the statistics, for group labels or weights
         is_to_str: format the values as strings. False returns the numbers, for further computation
 
     Returns:
-        one row per asset, columns named by the display names of ``perf_columns``
+        one row per asset, columns named by the display names of the produced ``perf_columns``
     """
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()

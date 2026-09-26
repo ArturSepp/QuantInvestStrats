@@ -1,8 +1,9 @@
 """Regression coverage for benchmark means in regime performance tables.
 
 ``is_use_benchmark_means`` replaces the benchmark's per-annum regime values with its conditional
-periodic means. The average and per-annum tables use different display suffixes, so the values
-must follow the common explicit regime order rather than align on those display labels.
+periodic means, for display. The average and per-annum tables use different display suffixes, so
+the values must follow the common explicit regime order rather than align on those display
+labels. The regime Sharpe values are computed before the substitution.
 
 The deterministic quarterly panel reverses the natural regime order and retains an unobserved
 middle regime. Expected means and Sharpe values are calculated directly from literal returns.
@@ -76,8 +77,16 @@ def _expected_sharpe(convention: SharpeConvention) -> np.ndarray:
     up = _BENCHMARK_RETURNS[2:]
     down = _BENCHMARK_RETURNS[:2]
     if convention is SharpeConvention.PA:
+        # Expected value changed in the W1a fixes: the PA regime Sharpe divides the patched
+        # per-annum contributions by VOL, and the display substitution of the benchmark's
+        # periodic means (is_use_benchmark_means) no longer enters it. The previous expectation,
+        # periodic means over an annualised volatility, pinned that defect.
         annualized_vol = np.sqrt(4.0) * np.std(_BENCHMARK_RETURNS, ddof=1)
-        return np.array((np.mean(up) / annualized_vol, np.nan, np.mean(down) / annualized_vol))
+        years = 366.0 / 365.25  # native endpoints 2023-12-31 and 2024-12-31
+        pa_return = np.prod(1.0 + _BENCHMARK_RETURNS) ** (1.0 / years) - 1.0
+        compounded = np.expm1(4.0 * 0.5 * np.array((np.mean(up), np.mean(down))))
+        patched = compounded + 0.5 * (pa_return - compounded.sum())
+        return np.array((patched[0], np.nan, patched[1])) / annualized_vol
 
     values = (
         np.log1p(_BENCHMARK_RETURNS) if convention is SharpeConvention.LOG else _BENCHMARK_RETURNS
