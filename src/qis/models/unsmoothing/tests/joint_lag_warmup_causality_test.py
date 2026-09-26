@@ -152,8 +152,11 @@ def test_adjust_returns_with_joint_unsmoothing_ewma_mean_is_prefix_invariant() -
     _assert_prefix_equal(shorter=shorter, longer=longer)
     _, phi1, beta1 = longer
     first_joint = _first_joint_position(returns, factor, "complete")
-    assert phi1["complete"].first_valid_index() == returns.index[first_joint]
-    assert beta1["complete"].first_valid_index() == returns.index[first_joint]
+    # The X0 mean seed centres each regressor's first value to zero, so the first joint row adds
+    # nothing and the second a rank-one moment: the 2 x 2 system is singular on both rows, and
+    # the beta tensor reports NaN there rather than a fallback.
+    assert phi1["complete"].first_valid_index() == returns.index[first_joint + 2]
+    assert beta1["complete"].first_valid_index() == returns.index[first_joint + 2]
 
 
 def test_adjust_returns_with_joint_unsmoothing_mixed_panel_is_causal_without_warnings() -> None:

@@ -103,8 +103,9 @@ class ModelLayerEwmaAlphaAttribution:
         beta_span: EWMA beta span in return periods.
         beta_lag: Number of periods between beta estimation and application.
         beta_init_value: One-observation beta prior. It fills the applied betas before the
-            first lagged estimate and enters the EWMA moments as a pseudo-observation, so every
-            later estimate retains it with EWMA weight.
+            first lagged estimate and enters the EWMA moments as a pseudo-observation that is
+            their whole state on its date, so every later estimate retains it with weight
+            ``lambda^k``.
         mean_adj_type: Point-in-time mean adjustment used in beta estimation.
         nav_start_date: Actual common NAV baseline, before the first realised return.
 
@@ -1033,10 +1034,12 @@ def compute_model_layer_ewma_alpha_attribution(
     ``t + beta_lag`` onward. ``beta_init_value`` is a one-observation prior, not only a
     placeholder: ``compute_ewm_beta_alpha_forecast`` replaces the first informative observation
     of each layer (the first jointly finite pair with a non-zero centred benchmark return ``x``)
-    by the pseudo-observation ``(x, beta_init_value * x)``. The first finite estimate therefore
-    equals the prior, and every later estimate keeps the pseudo-observation in both EWMA moments,
-    discounted by ``lambda^k`` after ``k`` further periods like any other observation. The
-    applied betas also use the prior while no lagged estimate exists. With the default EWMA mean
+    by the pseudo-observation ``(x, beta_init_value * x)``, which also seeds both EWMA moments.
+    The first finite estimate therefore equals the prior, and every later estimate keeps the
+    pseudo-observation in both moments with weight ``lambda^k`` after ``k`` further periods. An
+    ordinary observation enters with weight ``1 - lambda``, so the prior weighs as much as
+    ``(beta_span + 1) / 2`` ordinary observations of its date, 18.5 at the default span of 36.
+    The applied betas also use the prior while no lagged estimate exists. With the default EWMA mean
     adjustment and ``InitType.X0``, the first centred observation is zero, so the first estimated
     beta remains NaN for audit while applied betas remain finite. Alpha is the realised
     step-ahead beta-adjusted log return; the EWMA alpha forecast returned by the lower-level
@@ -1051,7 +1054,8 @@ def compute_model_layer_ewma_alpha_attribution(
         beta_span: EWMA beta span in return periods. Defaults to 36.
         beta_lag: Periods between beta estimation and application. Defaults to one.
         beta_init_value: Finite one-observation beta prior, used as the applied beta before
-            the first lagged estimate and retained in later estimates with EWMA weight.
+            the first lagged estimate and retained in later estimates with weight ``lambda^k``
+            after ``k`` periods.
             Defaults to one.
         mean_adj_type: Point-in-time beta mean adjustment. Defaults to EWMA. ``INSAMPLE`` is
             rejected because it is forward-looking.

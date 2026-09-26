@@ -910,7 +910,8 @@ def test_ewma_sharpe_contributions_use_two_common_denominators_and_reconcile() -
     decay = 1.0 - 2.0 / (result.span + 1.0)
     manual_mean = np.zeros(values.shape[1])
     manual_variance = np.zeros(values.shape[1])
-    for row in values[1:]:
+    # the zero seeds are the state before the first return, which updates them like any other
+    for row in values:
         manual_mean = decay * manual_mean + (1.0 - decay) * row
         manual_variance = (
             decay * manual_variance

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from qis.models.linear.ewm import MeanAdjType
+from qis.models.linear.ewm import MeanAdjType, NanBackfill, compute_ewm_xy_beta_tensor
 from qis.models.unsmoothing.ar_lag import (
     InsufficientData,
     adjust_returns_with_ar,
@@ -121,16 +121,18 @@ def test_adjust_returns_with_ar_ewma_mean_is_prefix_invariant(
     ("ar_order", "warmup_period", "non_negative", "expected_floor"),
     [
         (1, 0, False, 3),
-        (2, 0, False, 3),
-        (3, 0, False, 4),
-        (5, 1, False, 6),
+        # A beta needs every lag observed: the tensor no longer reports the raw cross moment
+        # of a lag it has not seen, so these floors rose from q + 1 to q + w + 2.
+        (2, 0, False, 4),
+        (3, 0, False, 5),
+        (5, 1, False, 8),
         (1, 1, False, 5),
         (2, 1, False, 5),
         (1, 3, False, 9),
         (2, 3, False, 9),
         (1, None, False, 23),
         (2, None, False, 23),
-        (24, None, False, 25),
+        (12, 0, False, 14),
         (1, 0, True, 3),
         (2, 0, True, 4),
         (3, 1, True, 6),
@@ -170,6 +172,43 @@ def test_min_obs_for_ar_unsmoothing_matches_causal_availability(
 
     assert below_floor.dropna().shape[0] == 0
     assert at_floor.dropna().shape[0] == 1
+
+
+@pytest.mark.parametrize(
+    ("ar_order", "warmup_period", "expected_floor"),
+    [(24, None, 26), (24, 0, 26)],
+)
+def test_min_obs_for_ar_unsmoothing_is_a_lower_bound_for_long_lag_orders(
+    ar_order: int,
+    warmup_period: int | None,
+    expected_floor: int,
+) -> None:
+    """The floor counts rows to an exactly identified q x q system; it never overstates.
+
+    For a long lag order the exactly identified system can fail the scale-free singularity test
+    of ``compute_ewm_xy_beta_tensor``. On this sample the 24 x 24 system is singular on row 24,
+    so the first output needs one row more than the floor, and no shorter frame yields any.
+    """
+    assert min_obs_for_ar_unsmoothing(ar_order, warmup_period) == expected_floor
+    counts = {
+        num_rows: _adjust_with_diagnostics(
+            _seeded_ar_returns(num_periods=num_rows),
+            ar_order=ar_order,
+            mean_adj_type=MeanAdjType.NONE,
+            warmup_period=warmup_period,
+            apply_ewma_mean_smoother=False,
+        )[0].dropna().shape[0]
+        for num_rows in (expected_floor - 1, expected_floor, expected_floor + 1)
+    }
+    assert counts == {expected_floor - 1: 0, expected_floor: 0, expected_floor + 1: 1}
+
+    returns = _seeded_ar_returns(num_periods=expected_floor)["asset"]
+    lags = np.column_stack([returns.shift(lag + 1).to_numpy() for lag in range(ar_order)])
+    betas = compute_ewm_xy_beta_tensor(x=lags, y=returns.to_numpy(), span=20, warmup_period=-1,
+                                       nan_backfill=NanBackfill.FFILL)
+    assert bool(np.isnan(betas[:ar_order]).any(axis=(1, 2)).all())  # a lag is not yet observed
+    assert bool(np.isnan(betas[ar_order]).all())  # exactly identified, numerically singular
+    assert bool(np.isfinite(betas[ar_order + 1]).all())
 
 
 def test_non_negative_no_warmup_is_not_rejected_by_tensor_floor() -> None:

@@ -105,8 +105,12 @@ def simulate_trend_strats(prices: Union[pd.DataFrame, pd.Series],
     # vol target weights
     weights_100 = qu.to_finite_reciprocal(data=ewm_vol, fill_value=0.0, is_gt_zero=True)
     vt_return_100 = returns.multiply(weights_100.shift(1))
-    # signal is unit var
-    signals = ewm.compute_ewm(data=vt_return_100, span=tf_span, is_unit_vol_scaling=True)
+    # signal is unit var. The unit-variance scaling multiplies by about sqrt(tf_span), so the
+    # recursion starts from a zero state: an X0 seed would start the signal at that multiple of
+    # the first return. Here the first finite return is zero, the weight before the first
+    # volatility, but the zero seed keeps the start right for any input.
+    signals = ewm.compute_ewm(data=vt_return_100, span=tf_span, init_type=ewm.InitType.ZERO,
+                              is_unit_vol_scaling=True)
     # normalized to target vol
     weights = signals.multiply(weights_100).multiply(vol_target/np.sqrt(vol_af))
     vt_returns = returns.multiply(weights.shift(1))

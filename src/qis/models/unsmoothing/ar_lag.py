@@ -102,11 +102,19 @@ def min_obs_for_ar_unsmoothing(ar_order: int,
                                ) -> int:
     """Minimum number of ROWS in the returns frame for which AR(q) unsmoothing yields output.
 
-    The unconstrained rolling beta tensor masks its first ``warmup_period`` rows, and
-    ``set_nans_for_warmup_period`` then discards the first ``warmup_period`` finite betas.
-    The inversion consumes one further shift and cannot run before lag ``ar_order`` exists.
-    The non-negative estimator waits until all lag cross-products exist, so its floor differs
-    when the lag order exceeds the warmup.
+    Lag ``k`` is first observed on row ``k``, and a lag with no observation has no beta, so
+    both estimators produce their first beta vector on row ``max(q, m)``, where the q x q
+    system is exactly identified and ``m`` is the first row the estimator does not mask:
+    ``warmup_period + 1``, or ``TENSOR_DEFAULT_WARMUP + 1`` for the unconstrained tensor and 0
+    for the non-negative estimator when ``warmup_period`` is None. A given ``warmup_period``
+    then discards that many further finite betas (``set_nans_for_warmup_period``), and the
+    inversion applies a beta one row later.
+
+    The floor is a lower bound: no shorter frame yields output, whatever the data. It is
+    attained when the exactly identified system is numerically regular. For a long lag order
+    that system can fail the scale-free singularity test of ``compute_ewm_xy_beta_tensor``,
+    and the first output then comes one or more rows later; a column that stays all NaN is
+    handled by ``insufficient_data``.
 
     This is a bound on the row count, not on a column's finite observation count. A column
     with few finite returns inside a long frame can still receive betas because the tensor
@@ -127,15 +135,21 @@ def min_obs_for_ar_unsmoothing(ar_order: int,
     """
     if ar_order < 1:
         raise ValueError(f"ar_order must be >= 1, got {ar_order!r}")
+    # First beta on row max(q, m), w more discarded, applied one row later: a row count of
+    # max(q, m) + w + 2. Until the handbook follow-up the tensor returned the raw cross moment
+    # for a lag not yet observed, so the unconstrained floor was only q + 1; a beta now needs
+    # every lag, which the non-negative estimator already required. max(q, m) + w + 2 is not
+    # raised to cover a numerically singular exactly identified system: that is data dependent
+    # (on the seeded AR(1) test sample it costs one row from q = 15 on, and up to three rows at
+    # q = 24 on other samples), and a larger floor would make InsufficientData.RAISE reject
+    # frames that do yield output. The non-negative solve has no singularity test.
     if warmup_period is None:
         if non_negative:
             return ar_order + 2
-        return max(TENSOR_DEFAULT_WARMUP + WARMUP_NONE_MIN_OBS_OFFSET, ar_order + 1)
+        return max(TENSOR_DEFAULT_WARMUP + WARMUP_NONE_MIN_OBS_OFFSET, ar_order + 2)
     if warmup_period < 0:
         raise ValueError(f"warmup_period must be >= 0 or None, got {warmup_period!r}")
-    if non_negative:
-        return max(ar_order, warmup_period + 1) + warmup_period + 2
-    return max(2 * warmup_period + 3, ar_order + 1)
+    return max(ar_order, warmup_period + 1) + warmup_period + 2
 
 
 def _validate_ar_inputs(returns: pd.DataFrame,

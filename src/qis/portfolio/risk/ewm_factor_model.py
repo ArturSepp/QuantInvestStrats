@@ -69,8 +69,8 @@ class EwmLinearModel(LinearModel):
             init_type: Seed of the EWMA mean when ``mean_adj_type`` is ``EWMA``; no effect
                 otherwise. The default ``InitType.X0`` seeds with the first observation, which
                 is point in time. ``InitType.MEAN`` seeds with the full-sample mean, a
-                look-ahead whose weight in the mean at position t is lambda^t (about 0.26 at the
-                first reported beta for span 31); it was the default before this release.
+                look-ahead whose weight in the mean at position t is lambda^(t+1) (about 0.24 at
+                the first reported beta for span 31); it was the default before this release.
             warmup_period: Last position whose betas are left missing: positions 0 to
                 ``warmup_period``, that is ``warmup_period + 1`` rows (21 by default), are NaN.
 
