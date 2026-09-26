@@ -103,7 +103,10 @@ $$
 `compute_marginal_tre_at_date` returns these contributions in `mcte`. They include the
 active-weight multiplier; they are not merely the derivative of TE with respect to a weight.
 A negative contribution can represent a reduction in total active risk. At zero TE, qis defines
-all contributions as zero.
+all contributions as zero. For one covariance matrix outside a `RiskModel`,
+`compute_benchmark_portfolio_risk_contributions` returns the same contributions, with both weight
+vectors aligned to the covariance labels; see
+[Portfolio risk and Euler contributions](risk_contributions.md).
 
 Group rows aggregate asset contributions additively. If the returned table also contains
 `Total`, do not add that row to its constituent groups. Optional systematic and residual
@@ -177,6 +180,10 @@ contributions = risk.compute_marginal_tre_at_date(
 )
 assert isclose(ex_ante, sqrt(0.00046), abs_tol=1e-12)
 assert isclose(contributions['mcte'].sum(), ex_ante, abs_tol=1e-12)
+single_matrix = qis.compute_benchmark_portfolio_risk_contributions(
+    w_portfolio=portfolio_weights, w_benchmark=benchmark_weights, covar=covariance
+)
+assert isclose(single_matrix.sum(), ex_ante, abs_tol=1e-12)
 
 return_diffs = pd.DataFrame(
     {'Active return': [0.01, -0.01, 0.02, 0.00]},

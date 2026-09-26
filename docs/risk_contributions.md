@@ -33,11 +33,10 @@ effective number of risk contributors; neither result is repeated here.
 |---|---|---|
 | How much of portfolio volatility does each position carry? | `compute_portfolio_risk_contributions` | Euler contributions in volatility units, summing to $\sigma_p$ |
 | What share of the risk is that? | `compute_portfolio_risk_contribution_ratios`, `compute_group_portfolio_risk_contribution_ratios` | Signed shares summing to one |
-| How does each active position drive tracking error? | `RiskModel.compute_marginal_tre_at_date` | Euler contributions summing to $\mathrm{TE}$ |
-| What does the legacy active-risk function return? | `compute_benchmark_portfolio_risk_contributions` | Contributions scaled by benchmark volatility, not by $\mathrm{TE}$ |
-| How has portfolio volatility evolved? | `compute_portfolio_vol`, `PortfolioData.compute_portfolio_vol` | EWM volatility of the held weights |
-| What is the one-day 99% loss under normality? | `compute_portfolio_correlated_var_by_groups`, `compute_portfolio_independent_var_by_ac` | Diversified and undiversified VaR |
-| Which instruments drove realised P&L volatility? | `PortfolioData.get_instruments_pnl_risk_attribution` | Standalone volatility shares, not Euler contributions |
+| How does each active position drive tracking error? | `RiskModel.compute_marginal_tre_at_date`, `compute_benchmark_portfolio_risk_contributions` | Euler contributions summing to $\mathrm{TE}$ |
+| How has portfolio volatility evolved? | `compute_portfolio_vol`, `PortfolioData.compute_portfolio_vol` | Point-in-time EWM volatility of the held weights |
+| What is the one-day 99% loss under normality? | `compute_portfolio_correlated_var_by_groups`, `compute_portfolio_independent_var_by_ac` | Diversified and undiversified VaR from one covariance |
+| Which instruments drove realised P&L volatility? | `PortfolioData.get_instruments_pnl_risk_attribution` | Ex-post Euler shares of the P&L variance, summing to one |
 
 Three results carry the chapter: Euler's theorem makes contributions add up exactly; the
 contribution of a position equals its standalone risk times its correlation with the portfolio,
@@ -48,13 +47,13 @@ above, which is why an undiversified VaR is never below a correlated one for the
 
 | Convention | This article |
 |---|---|
-| Return basis | Static contributions take $\Sigma$ as supplied; the VaR functions use log returns; `compute_portfolio_vol` uses the caller's returns; P&L shares use simple returns |
+| Return basis | Static contributions take $\Sigma$ as supplied; the VaR functions use log returns; `compute_portfolio_vol` uses the caller's returns; `PortfolioData.compute_portfolio_vol` and the P&L shares use simple returns |
 | Sampling grid | The covariance's own grid; `freq='B'` for the VaR functions; `W-WED` for `PortfolioData.compute_portfolio_vol` |
-| Annualisation | None for contributions and VaR, which keep the units of $\Sigma$ or of one period; `annualize=True` multiplies the variance by $\mathrm{AN}$, so the volatility scales by $\sqrt{\mathrm{AN}}$ |
-| Mean adjustment | None by default: EWM second moments about zero (`MeanAdjType.NONE`); P&L risk shares subtract the sample mean with `ddof=0` |
-| Timing | Static weights and $\Sigma$ share one date; EWM volatility pairs $w_{t-1}$ with $\hat\Sigma_t$, which includes $r_t$, and seeds the recursion from the full sample |
+| Annualisation | None for contributions and VaR, which keep the units of $\Sigma$ or of one period; `annualize=True` multiplies the variance by $\mathrm{AN}$, so the volatility scales by $\sqrt{\mathrm{AN}}$; the VaR cap converts annual volatilities to one day with $\mathrm{AN}=252$ |
+| Mean adjustment | None by default: EWM second moments about zero (`MeanAdjType.NONE`); P&L risk shares are sample covariances about the sample means |
+| Timing | Static weights and $\Sigma$ share one date; EWM volatility pairs $w_{t-1}$ with $\hat\Sigma_t$, which includes $r_t$; the VaR functions pair $w_t$ with $\hat\Sigma_t$; every recursion starts from a zero matrix, so no estimate uses a later observation |
 | Output units | Contributions in the volatility units of $\Sigma$; ratios dimensionless and summing to one; VaR as a decimal fraction of NAV per period; VaR limits in basis points |
-| qis default | `compute_portfolio_vol(span=None, ewm_lambda=0.94, annualize=False)`; VaR functions `freq='B'`, `vol_span=33`; `limit_weights_to_max_var_limit(max_var_limit_bp=25.0, annualization_factor=260)` |
+| qis default | `compute_portfolio_vol(span=None, ewm_lambda=0.94, annualize=False, weight_lag=1)`; VaR functions `freq='B'`, `vol_span=33`; `limit_weights_to_max_var_limit(max_var_limit_bp=25.0, annualization_factor=252.0)` |
 
 | Symbol or input | Meaning | Units and convention |
 |---|---|---|
@@ -65,6 +64,7 @@ above, which is why an undiversified VaR is never below a correlated one for the
 | $\sigma_i$, $\sigma_p$, $\sigma_b$ | Asset, portfolio and benchmark volatility | $\sigma_i=\sqrt{\Sigma_{ii}}$, $\sigma_p=\sqrt{w^{\top}\Sigma w}$ |
 | $\mathrm{MRC}_i$ | Marginal risk contribution | Volatility per unit of weight |
 | $\mathrm{RC}_i$ | Euler risk contribution | Volatility units; sums to $\sigma_p$ |
+| $c_i$ | Euler contribution to tracking error | Volatility units; sums to $\mathrm{TE}$ |
 | $\kappa_i$ | Percentage contribution, $\mathrm{RC}_i/\sigma_p$ | Dimensionless; sums to one; may be negative or exceed one |
 | $\beta_{i,p}$, $\rho_{i,p}$ | Beta and correlation of asset $i$ with the portfolio | Dimensionless |
 | $g$, $\mathcal{A}_g$ | Group label; set of assets in group $g$ | A partition of the covariance universe |
@@ -73,7 +73,7 @@ above, which is why an undiversified VaR is never below a correlated one for the
 | $K$, $B$ | Number of factors; loading matrix | $K\times n$ in `contributions.py`, $n\times K$ in `RiskModel` |
 | $\Sigma_x$, $\Psi$ | Factor covariance; diagonal residual variance | Units of $\Sigma$ |
 | $e$, $m$ | Active factor exposures $Bd$; gradient of active variance | $K$-vector; $n$-vector |
-| $\hat\Sigma_t$, $\lambda_0$ | EWM covariance at $t$; decay of its seed | $\hat\Sigma_t$ includes $r_t r_t^{\top}$; $\lambda_0=0.94$ |
+| $\hat\Sigma_t$, $\hat\Sigma_0$ | EWM covariance at $t$; its seed before the first observation | $\hat\Sigma_t$ includes $r_t r_t^{\top}$; $\hat\Sigma_0=0$ unless `covar0` is passed |
 | $\delta$ | Tolerance on the weight of the seed | Dimensionless |
 | $z_{0.99}$ | One-sided 99% standard normal quantile | 2.3263 in qis (`VAR99`) |
 | $\mathrm{VaR}$, $L$ | Value at risk; portfolio loss $-r_p$ | Decimal fraction of NAV over one period |
@@ -243,34 +243,32 @@ portfolios belongs to the `optimalportfolios` package.
 ### Benchmark-relative contributions
 
 For active weights $d=w_p-w_b$ and $\mathrm{TE}=\sqrt{d^{\top}\Sigma d}$, Euler's theorem gives
-contributions $d_i(\Sigma d)_i/\mathrm{TE}$ that sum to $\mathrm{TE}$. The canonical implementation
-is `RiskModel.compute_marginal_tre_at_date`, column `mcte`, documented with its alignment policy,
+contributions
+
+$$
+c_i=\frac{d_i(\Sigma d)_i}{\mathrm{TE}},
+\qquad
+\sum_i c_i=\mathrm{TE},
+$$
+
+because $\mathrm{TE}$ is the portfolio volatility of the vector $d$. The dated implementation is
+`RiskModel.compute_marginal_tre_at_date`, column `mcte`, documented with its alignment policy,
 grouping and zero-TE convention in the [tracking-error chapter](tracking_error_and_risk.md).
+`compute_benchmark_portfolio_risk_contributions` returns the same $c_i$ for one covariance
+matrix: it aligns both weight vectors to the covariance labels (a missing label is a zero weight,
+a label outside the covariance is dropped), forms $d$ and applies
+`compute_portfolio_risk_contributions` to it. The result is in covariance order, a zero benchmark
+gives the Euler split of the portfolio itself, and a zero tracking error gives zeros, as in
+`RiskModel`. With `is_independent_risk=True` it returns the standalone active risks
+$\lvert d_i\rvert\sigma_i$ instead. Despite the argument name, these are not contributions under
+a diagonal covariance, which would be $d_i^2\sigma_i^2$ divided by the diagonal tracking error;
+their sum bounds $\mathrm{TE}$ from above by the undiversified-risk proposition below.
 
-`compute_benchmark_portfolio_risk_contributions` is a legacy function with a different
-denominator. With `is_independent_risk=False` it returns
-
-$$
-\mathrm{rc}^{\mathrm{legacy}}_i=\frac{d_i(\Sigma d)_i}{\sigma_b},
-\qquad
-\sigma_b=\sqrt{w_b^{\top}\Sigma w_b},
-\qquad
-\sum_i\mathrm{rc}^{\mathrm{legacy}}_i=\frac{\mathrm{TE}^2}{\sigma_b}
-=\mathrm{TE}\cdot\frac{\mathrm{TE}}{\sigma_b}.
-$$
-
-Each legacy contribution is the Euler TE contribution multiplied by $\mathrm{TE}/\sigma_b$, so the
-normalised shares agree with the Euler TE shares while the level does not. With a zero benchmark,
-$\sigma_b=0$ and the function returns infinite or undefined values. With
-`is_independent_risk=True` it returns the standalone active risks $\lvert d_i\rvert\sigma_i$.
-Despite the argument name, these are not contributions under a diagonal covariance, which would
-be $d_i^2\sigma_i^2$ divided by the diagonal tracking error; their sum bounds $\mathrm{TE}$ from
-above by the undiversified-risk proposition below.
-
-> **Pitfall.** When `w_portfolio`, `w_benchmark` and `covar` are all labelled, only `w_portfolio`
-> is reindexed to the covariance. A benchmark Series with a missing or an extra label raises
-> `ValueError: matrices are not aligned`, and a benchmark in a different order returns the
-> result in sorted label order. Reindex the benchmark yourself, or use `RiskModel`.
+Earlier qis versions divided $d_i(\Sigma d)_i$ by the benchmark volatility
+$\sigma_b=\sqrt{w_b^{\top}\Sigma w_b}$ instead of by $\mathrm{TE}$. Those figures had the same
+shares but summed to $\mathrm{TE}^2/\sigma_b$, were undefined for a zero benchmark, and aligned
+only the portfolio weights to the covariance. Multiplying the current output by
+$\mathrm{TE}/\sigma_b$ reproduces them.
 
 ### Factor-model decomposition of active risk
 
@@ -308,10 +306,12 @@ $B^{\top}\Sigma_x B+\Psi$.
 ### Time-varying portfolio volatility from EWM covariances
 
 `compute_portfolio_vol` runs the EWM covariance recursion on the rows $t=1,\ldots,T$ of the
-aligned return panel and contracts each matrix with the previous row's weights:
+aligned return panel and, by default, contracts each matrix with the previous row's weights:
 
 $$
 \hat\Sigma_t=(1-\lambda)\,r_t r_t^{\top}+\lambda\,\hat\Sigma_{t-1},
+\qquad
+\hat\Sigma_0=0,
 \qquad
 \hat\sigma^2_{p,t}=w_{t-1}^{\top}\,\hat\Sigma_t\,w_{t-1},
 $$
@@ -321,19 +321,19 @@ $\lambda=0.94$ is the RiskMetrics daily decay ([J.P. Morgan and Reuters, 1996](#
 `annualize=True` the variance is multiplied by $\mathrm{AN}$, inferred from the weights' index,
 and `is_return_vol=True` returns $\sqrt{\mathrm{AN}\,\hat\sigma^2_{p,t}}$. The weights applied
 over $(t-1,t]$ meet a covariance updated by the return $r_t$ they earn. The estimate is the EWM
-variance of the held portfolio as of $t$, not a forecast for $(t,t+1]$; that forecast would pair
-$w_t$ with $\hat\Sigma_t$. Missing returns and weights are set to zero before the recursion, so a
-gap decays the covariance rather than holding it. The optional `mean_adj_type` demeans the returns
-first: `MeanAdjType.EXPANDING` and `MeanAdjType.EWMA` are point in time, while
+variance of the held portfolio as of $t$, not a forecast for $(t,t+1]$; that forecast pairs
+$w_t$ with $\hat\Sigma_t$ and is what `weight_lag=0` returns. Missing returns and weights are set
+to zero before the recursion, so a gap decays the covariance rather than holding it; for that
+reason the `nan_backfill` argument has no effect. The optional `mean_adj_type` demeans the
+returns first: `MeanAdjType.EXPANDING` and `MeanAdjType.EWMA` are point in time, while
 `MeanAdjType.INSAMPLE` subtracts the full-sample mean and is forward-looking.
 
-**Implementation contract (seed).** The recursion does not start from zero. Its seed
-$\hat\Sigma_0$ is the *final* state of an EWM covariance run over the whole sample, and inside
-`compute_portfolio_vol` that seed always uses the default decay $\lambda_0=0.94$, whatever `span`
-or `ewm_lambda` is passed: the wrapper converts `span` into `ewm_lambda` before calling
-`compute_portfolio_var_np`, which passes only `span` to the seed. Called directly with `span`,
-`compute_portfolio_var_np` seeds at the span's decay. The `init_type` argument affects only the
-optional mean adjustment.
+**Implementation contract (seed).** The recursion starts from the zero matrix before the first
+row, so the estimate on a date uses the returns up to that date and nothing later. The requested
+decay, from `span` or `ewm_lambda`, applies to every step. `init_type` seeds only the running
+mean of the optional mean adjustment. `compute_portfolio_var_np`, the Numba kernel underneath,
+accepts an explicit seed `covar0`, for example a covariance estimated on a window that ends before
+the sample starts.
 
 **Proposition (weight of the seed).** Unrolling the recursion,
 
@@ -348,29 +348,46 @@ $t\ge\log\delta/\log\lambda$.
 **Proof.** Substitute the recursion into itself $t$ times; each substitution multiplies the
 remaining seed term by $\lambda$. $\square$
 
-For $N=33$, $\lambda=0.9412$ and the seed weight falls below 1% after 76 observations.
+**Identity (warm-up bias of the zero seed).** If the returns have zero mean and a constant
+covariance $\Sigma$, the zero-seeded estimate satisfies
 
-> **Pitfall.** The seed is a full-sample estimate, so the first few spans of
-> `compute_portfolio_vol` and of `compute_portfolio_correlated_var_by_groups` carry information
-> from the end of the sample. Discard at least $\log\delta/\log\lambda$ leading observations, for
-> example with the `time_period` argument of the VaR functions, before using the path in a
-> backtest.
+$$
+\mathbb{E}\big[\hat\Sigma_t\big]=\big(1-\lambda^{t}\big)\,\Sigma .
+$$
+
+**Proof.** Take expectations in the unrolled recursion with $\hat\Sigma_0=0$. Each term has
+$\mathbb{E}[r_{t-k}r_{t-k}^{\top}]=\Sigma$, and the weights sum to
+$(1-\lambda)\sum_{k=0}^{t-1}\lambda^{k}=1-\lambda^{t}$. $\square$
+
+For $N=33$, $\lambda=0.9412$ and the seed weight falls below 1% after 76 observations. On the
+second observation the zero-seeded volatility is on average $\sqrt{1-\lambda^{2}}\approx34\%$ of
+the stationary level.
+
+> **Pitfall.** A point-in-time recursion is biased low until the seed has decayed, so the first
+> spans of `compute_portfolio_vol` and of both VaR functions understate risk. Discard at least
+> $\log\delta/\log\lambda$ leading observations, for example with the `time_period` argument of
+> the VaR functions, or pass a pre-sample covariance as `covar0`. Do not seed with an estimate
+> from the same sample: its final state carries information from the end of the sample into
+> every early estimate. Earlier qis versions did exactly that, seeding with the full-sample final
+> state at the fixed decay 0.94.
 
 `PortfolioData.compute_portfolio_vol(time_period=None, freq='W-WED', span=13)` applies this to a
 backtest: simple instrument returns on the `freq` grid, realised weights forward-filled to the
-same dates, `annualize=True`, and beside it the EWM volatility of the portfolio's log NAV returns.
-The two columns, `instrument weighted vol` and `strategy returns vol`, differ by drift between
-grid dates, the return basis and the seed.
+same dates, `annualize=True`, and beside it the EWM volatility of the portfolio's simple NAV
+returns on the same grid. The two columns, `instrument weighted vol` and `strategy returns vol`,
+use one return basis and one warm-up; they differ by weight drift and rebalancing between grid
+dates, by costs and fees, and because the first applies the latest weights to the whole
+covariance memory while the second weights each past return by the weights then held.
 
 For dated covariance matrices estimated elsewhere, the `PortfolioData` methods
 `compute_ex_anti_portfolio_vol_implied_by_covar` and `compute_risk_contributions_implied_by_covar`
-evaluate $\sigma_p$ and $\mathrm{RC}_i$ on each covariance date. With `freq` set they use realised
-weights on that grid and the latest covariance at or before each date, which is point in time.
-With `freq=None` they take the input weights (the realised weights when the input was not a
-DataFrame), reindex them to the covariance dates by exact date and forward-fill across covariance
-dates only. A weight is used only if it is dated on a covariance date: weights dated before or
-between covariance dates are ignored, and covariance dates before the first exact match return
-zero risk. `normalise=True` rescales each row of contributions to sum to one.
+evaluate $\sigma_p$ and $\mathrm{RC}_i$ with point-in-time weights. With `freq=None` they evaluate
+each covariance date with the input weights (the realised weights when the input was not a
+DataFrame) as of that date: the latest weights dated at or before it, and zero before the first
+weight date, the policy of `RiskModel`. With `freq` set they evaluate each date of the realised
+weights on that grid with the latest covariance at or before it. `normalise=True` rescales each
+row of contributions to sum to one. Earlier qis versions matched `freq=None` weights to
+covariance dates by exact date only and reported zero risk wherever the two calendars differed.
 
 ### Parametric value at risk
 
@@ -389,22 +406,29 @@ quantile too small ([Jorion, 2006](#references)). Because $\mathrm{VaR}_{0.99}$ 
 multiple of $\sigma_p$, it inherits the Euler decomposition: $z_{0.99}\mathrm{RC}_i$ are component
 VaRs summing to the portfolio VaR, and $z_{0.99}\mathrm{MRC}_i$ is the marginal VaR.
 
-The two qis VaR functions compute log returns on `freq` (default `B`) and use EWM estimates of
-span `vol_span` (default 33), without annualisation:
+The two qis VaR functions compute log returns on `freq` (default `B`), run the zero-seeded EWM
+covariance recursion of span `vol_span` (default 33) on the dates shared by weights and returns,
+and apply no annualisation:
 
 $$
-\mathrm{VaR}^{\mathrm{corr}}_{g,t}=z_{0.99}\sqrt{w_{g,t-1}^{\top}\,\hat\Sigma_{g,t}\,w_{g,t-1}},
+\mathrm{VaR}^{\mathrm{corr}}_{g,t}=z_{0.99}\sqrt{w_{g,t}^{\top}\,\hat\Sigma_{g,t}\,w_{g,t}},
 \qquad
-\mathrm{VaR}^{\mathrm{ind}}_{i,t}=z_{0.99}\,\lvert w_{i,t}\rvert\,\hat\sigma_{i,t}.
+\mathrm{VaR}^{\mathrm{ind}}_{i,t}=z_{0.99}\,\lvert w_{i,t}\rvert\,\hat\sigma_{i,t},
+\qquad
+\hat\sigma_{i,t}^{2}=\big(\hat\Sigma_t\big)_{ii}.
 $$
 
-`compute_portfolio_correlated_var_by_groups` evaluates the first on each group's own weights and
-covariance, $w_g$ and $\hat\Sigma_g$, through `compute_portfolio_vol`, plus a `Total` column over
-all assets; without `group_data` it returns one column, `Total VAR`. Group figures are standalone
-and do not add to the total. `compute_portfolio_independent_var_by_ac` returns the instrument
-figures and their sums by group, with the total as the sum over all instruments. That sum assumes
-every pair of positions is perfectly aligned; it is the undiversified figure, not a figure for
-independent assets, which would be $z_{0.99}\sqrt{\sum_i w_i^2\hat\sigma_i^2}$.
+Both figures pair the weights of date $t$ with the covariance of the returns up to $t$, both
+known at $t$: they are the one-period VaR of the current positions. The undiversified figure uses
+the diagonal of the same $\hat\Sigma_t$ as the correlated one, not a separate volatility
+estimate. `compute_portfolio_correlated_var_by_groups` evaluates the first on each group's own
+weights and covariance, $w_g$ and $\hat\Sigma_g$, through `compute_portfolio_vol(weight_lag=0)`,
+plus a `Total` column over all assets; without `group_data` it returns one column, `Total VAR`.
+Group figures are standalone and do not add to the total. `compute_portfolio_independent_var_by_ac`
+returns the instrument figures and their sums by group, with the total as the sum over all
+instruments. That sum assumes every pair of positions is perfectly aligned; it is the
+undiversified figure, not a figure for independent assets, which would be
+$z_{0.99}\sqrt{\sum_i w_i^2\hat\sigma_i^2}$.
 
 **Proposition (undiversified bound and subadditivity).** For any weights and any valid covariance,
 
@@ -434,47 +458,35 @@ is the diversification ratio of
 [Choueifaty and Coignard (2008)](https://doi.org/10.3905/JPM.2008.35.1.40), written with absolute
 weights.
 
-> **Pitfall.** The proposition holds for one pair $(w,\hat\Sigma)$. The two qis functions do not
-> share one: the correlated figure lags the weights by one period and seeds its covariance from
-> the full sample, while the undiversified figure uses same-date weights and a point-in-time
-> `compute_ewm_vol` estimate (seeded from the first row, which is zero when the first return is
-> missing). During warm-up and on rebalancing dates the reported undiversified figure can
-> therefore fall below the correlated one.
+> **Insight.** The proposition holds for one pair $(w,\hat\Sigma)$, and the two qis functions share
+> that pair on every date, warm-up and rebalancing dates included: same weights, same returns,
+> same seed, same decay. The reported undiversified VaR is therefore never below the correlated
+> one, and their ratio is the diversification ratio on each date. Earlier qis versions lagged the
+> correlated figure's weights and seeded it from the full sample, so the order could invert.
 
-`limit_weights_to_max_var_limit(weights, vols, max_var_limit_bp=25.0, annualization_factor=260)`
-takes annualised volatilities $\sigma_i$, converts them to one day with $\sqrt{260}$, and caps
-each weight whose standalone one-day VaR exceeds the limit:
+`limit_weights_to_max_var_limit(weights, vols, max_var_limit_bp=25.0, annualization_factor=252.0)`
+takes volatilities $\sigma_i$ annualised with $\mathrm{AN}$, converts them to one period with
+$\sqrt{\mathrm{AN}}$, and caps each weight whose standalone one-period VaR exceeds the limit:
 
 $$
-\mathrm{VaR}^{\mathrm{bp}}_i=10^{4}\,z_{0.99}\,\lvert w_i\rvert\,\frac{\sigma_i}{\sqrt{260}},
+\mathrm{VaR}^{\mathrm{bp}}_i=10^{4}\,z_{0.99}\,\lvert w_i\rvert\,\frac{\sigma_i}{\sqrt{\mathrm{AN}}},
 \qquad
-w_i\leftarrow\operatorname{sign}(w_i)\,\frac{L_{\mathrm{bp}}\sqrt{260}}{10^{4}z_{0.99}\,\sigma_i}
+w_i\leftarrow\operatorname{sign}(w_i)\,\frac{L_{\mathrm{bp}}\sqrt{\mathrm{AN}}}{10^{4}z_{0.99}\,\sigma_i}
 \quad\text{if }\mathrm{VaR}^{\mathrm{bp}}_i>L_{\mathrm{bp}} .
 $$
 
-The cap is per instrument and ignores correlation. The default 260 follows the business-day
-window convention, while qis annualises business-day volatilities with $\mathrm{AN}=252$. With
-volatilities annualised on 252, the one-day VaR is understated by the factor
-$\sqrt{252/260}\approx0.985$, and a capped position carries a VaR about 1.6% above the limit.
+The cap is per instrument and ignores correlation. The default $\mathrm{AN}=252$ is the factor qis
+applies to business-day returns, so volatilities from `compute_ewm_vol(..., annualize=True)` on a
+`B` grid convert back to one day exactly. The former default of 260 understated the one-day VaR by
+the factor $\sqrt{252/260}\approx0.985$ and let a capped position run about 1.6% above the limit;
+pass `annualization_factor=260` to reproduce it.
 
 ### Realised P&L risk attribution
 
 A backtest records the arithmetic P&L contribution $x_{i,t}=w_{i,t-1}r_{i,t}$, with realised
 weights and simple returns, and $x_{p,t}=\sum_i x_{i,t}$ is the portfolio return when there are
-no costs or fees. `PortfolioData.get_instruments_pnl_risk_attribution` returns *standalone*
-volatility shares:
-
-$$
-\hat\sigma^{0}_i=\sqrt{\frac{1}{T_i}\sum_{t:\,x_{i,t}\ne0}\big(x_{i,t}-\bar x_i\big)^2},
-\qquad
-\text{share}_i=\frac{\hat\sigma^{0}_i}{\sum_j\hat\sigma^{0}_j},
-$$
-
-where the sum runs over the $T_i$ dates with a non-zero contribution and the standard deviation
-uses `ddof=0`. This is the `AttributionMetric.PNL_RISK` panel of the strategy factsheet. The
-shares are non-negative, ignore correlation and sum to one by normalisation. The standalone
-volatilities add up to more than the portfolio volatility whenever the instruments are imperfectly
-correlated, so no risk measure is being allocated.
+no costs or fees. The ex-post counterpart of the Euler decomposition replaces $\Sigma$ by the
+sample covariance of these P&L series.
 
 **Proposition (ex-post Euler decomposition).** With sample covariances,
 
@@ -489,8 +501,28 @@ $\sum_i\widehat{\operatorname{Cov}}(x_i,x_p)=\widehat{\operatorname{Cov}}(x_p,x_
 $\square$
 
 The ex-post Euler share of instrument $i$ is the regression slope of its P&L on the portfolio
-P&L. A hedge that lowered realised volatility has a negative Euler share and a positive standalone
-share.
+P&L. `PortfolioData.get_instruments_pnl_risk_attribution` returns these shares, computed on the
+gross P&L of `get_instruments_pnl` with missing values counted as zero, and they are the
+`AttributionMetric.PNL_RISK` panels of the strategy factsheet ('P&L Risk Attribution,
+sum=100%'). The divisor of the covariance cancels, so the shares do not depend on `ddof`;
+multiplied by $s(x_p)$ they are contributions to the realised P&L volatility. A hedge that lowered
+the realised volatility has a negative share, and the factsheet panel then shows both tails. A
+portfolio P&L without variance has no risk to attribute and returns NaN.
+
+With `is_standalone=True` the method returns the *standalone* volatility shares that earlier qis
+versions reported by default:
+
+$$
+\hat\sigma^{0}_i=\sqrt{\frac{1}{T_i}\sum_{t:\,x_{i,t}\ne0}\big(x_{i,t}-\bar x_i\big)^2},
+\qquad
+\text{share}_i=\frac{\hat\sigma^{0}_i}{\sum_j\hat\sigma^{0}_j},
+$$
+
+where the sum runs over the $T_i$ dates with a non-zero contribution and the standard deviation
+uses `ddof=0`. These shares are non-negative, ignore correlation and sum to one by normalisation
+only. The standalone volatilities add up to more than the portfolio volatility whenever the
+instruments are imperfectly correlated, so no risk measure is being allocated, and a hedge
+appears with a positive share.
 
 ## Worked example
 
@@ -512,8 +544,8 @@ marginal contribution of the hedge is $-0.0054/0.1041\approx-0.0519$: adding one
 of hedge lowers volatility by about 0.052 percentage points. The best hedge is
 $0.2+0.0054/0.0225=44\%$, where volatility falls to 9.77%. The standalone risks are 10%, 3% and
 3%, giving standalone shares of 62.5%, 18.75% and 18.75% and a diversification ratio of 1.537.
-On a one-day horizon ($\sqrt{260}$), the correlated 99% VaR is 1.50% of NAV against 2.31%
-undiversified; a 100 bp per-instrument VaR limit caps only the equity weight, at 34.66%.
+On a one-day horizon ($\sqrt{252}$), the correlated 99% VaR is 1.53% of NAV against 2.34%
+undiversified; a 100 bp per-instrument VaR limit caps only the equity weight, at 34.12%.
 
 ```python
 from math import isclose, sqrt
@@ -572,18 +604,19 @@ assert isclose(portfolio_vol(best.to_numpy()), sqrt(0.009544), abs_tol=1e-12)
 standalone = np.abs(w.to_numpy()) * vols
 np.testing.assert_allclose(standalone, [0.10, 0.03, 0.03], atol=1e-15)
 assert isclose(standalone.sum() / port_vol, 1.5368, abs_tol=5e-5)
-var_corr = 2.3263 * port_vol / sqrt(260)
-var_undiversified = 2.3263 * standalone.sum() / sqrt(260)
+an = qis.get_annualization_factor('B')  # 252 business days
+var_corr = 2.3263 * port_vol / sqrt(an)
+var_undiversified = 2.3263 * standalone.sum() / sqrt(an)
 risk_assets_vol = portfolio_vol(np.array([0.5, 0.3, 0.0]))  # sqrt(0.0139)
 assert isclose(risk_assets_vol, sqrt(0.0139), abs_tol=1e-15)
 assert port_vol <= risk_assets_vol + 0.03 <= standalone.sum()
-assert isclose(var_corr, 0.01502, abs_tol=5e-6)
-assert isclose(var_undiversified, 0.02308, abs_tol=5e-6)
+assert isclose(var_corr, 0.01526, abs_tol=5e-6)
+assert isclose(var_undiversified, 0.02345, abs_tol=5e-6)
 
 capped = qis.limit_weights_to_max_var_limit(weights=w.to_numpy(), vols=vols,
                                             max_var_limit_bp=100.0)
-np.testing.assert_allclose(capped, [100.0 * sqrt(260) / (23263.0 * 0.20), 0.3, 0.2], rtol=1e-12)
-assert isclose(capped[0], 0.34657, abs_tol=5e-6)
+np.testing.assert_allclose(capped, [100.0 * sqrt(252) / (23263.0 * 0.20), 0.3, 0.2], rtol=1e-12)
+assert isclose(capped[0], 0.34120, abs_tol=5e-6)
 ```
 
 ### Active and factor-model contributions
@@ -592,8 +625,10 @@ Take a benchmark of 60% equity and 40% credit, so the active weights are $(-0.1,
 By hand, $\Sigma d=(-0.0086,\ -0.0026,\ 0.0066)$, $d^{\top}\Sigma d=0.00244$ and
 $\mathrm{TE}\approx4.94\%$; the benchmark volatility is $\sqrt{0.0208}\approx14.42\%$. The Euler
 TE contributions are 1.74%, 0.53% and 2.67%: the hedge, which lowers total risk, is the largest
-source of active risk. The legacy function returns the same shares scaled to
-$\mathrm{TE}^2/\sigma_b\approx1.69\%$, and its standalone option returns 2%, 1% and 3%.
+source of active risk. `compute_benchmark_portfolio_risk_contributions` returns the same three
+numbers as `RiskModel`, also for a benchmark Series in another order or without its zero `Hedge`
+entry; the former benchmark-volatility scaling would have reported them summing to
+$\mathrm{TE}^2/\sigma_b\approx1.69\%$. Its standalone option returns 2%, 1% and 3%.
 
 For the factor version, two factors load on the assets with rows $(1,\ 0.4,\ -0.3)$ and
 $(0,\ 0.5,\ 1)$, factor variances 0.03 and 0.01 and residual variances 0.01, 0.004 and 0.0125.
@@ -615,13 +650,19 @@ mcte = qis.RiskModel(covar={date: covar}).compute_marginal_tre_at_date(
 np.testing.assert_allclose(mcte.to_numpy(), d.to_numpy() * sigma_d / te, atol=1e-15)
 assert isclose(mcte.sum(), te, abs_tol=1e-15) and mcte.idxmax() == 'Hedge'
 
-legacy = qis.compute_benchmark_portfolio_risk_contributions(
+np.testing.assert_allclose(mcte.to_numpy(), [0.017410, 0.005264, 0.026723], atol=5e-7)
+
+active = qis.compute_benchmark_portfolio_risk_contributions(
     w_portfolio=w, w_benchmark=w_b, covar=covar)
-np.testing.assert_allclose(legacy.to_numpy(), d.to_numpy() * sigma_d / bench_vol, atol=1e-15)
-assert isclose(legacy.sum(), te ** 2 / bench_vol, abs_tol=1e-15)
-assert isclose(legacy.sum(), 0.016918, abs_tol=5e-7)
-np.testing.assert_allclose((legacy / legacy.sum()).to_numpy(), (mcte / te).to_numpy(),
-                           atol=1e-12)
+np.testing.assert_allclose(active.to_numpy(), mcte.to_numpy(), atol=1e-15)
+assert isclose(active.sum(), te, abs_tol=1e-15)
+reordered = w_b[['Hedge', 'Credit', 'Equity']].drop('Hedge')  # zero weight left out
+aligned = qis.compute_benchmark_portfolio_risk_contributions(
+    w_portfolio=w, w_benchmark=reordered, covar=covar)
+assert aligned.index.tolist() == assets
+np.testing.assert_allclose(aligned.to_numpy(), active.to_numpy(), atol=1e-15)
+former_level = active * te / bench_vol  # the former benchmark-volatility scaling
+assert isclose(former_level.sum(), 0.016918, abs_tol=5e-7)
 standalone_active = qis.compute_benchmark_portfolio_risk_contributions(
     w_portfolio=w, w_benchmark=w_b, covar=covar, is_independent_risk=True)
 np.testing.assert_allclose(standalone_active.to_numpy(), [0.02, 0.01, 0.03], atol=1e-15)
@@ -672,9 +713,12 @@ The next two blocks use three instruments of the frozen synthetic universe, `SEQ
 and `SCM_GLD`, on business days from 2022-01-03 to 2024-12-31, with constant weights of 50%, 30%
 and 20% and a span of 33 days. The first estimate is zero because the lagged first weight is
 missing. On the second date, 2022-01-05, `compute_portfolio_vol` reports an annualised volatility
-of 8.21%; a point-in-time recursion started from zero gives 1.93%. The whole difference is the
-full-sample seed at decay 0.94. After 100 observations the two paths agree within 1%, and on
-2024-12-31 both give 8.49%.
+of 1.93%. The estimate rests on two squared returns, and the zero seed still carries the weight
+$\lambda^{2}=0.886$, so by the warm-up identity it is on average about a third of the stationary
+level. Seeding the recursion with the final state of a full-sample EWM covariance at decay 0.94,
+as earlier qis versions did, reports 8.21% on that date instead: a closer number obtained with
+returns up to 2024-12-31. After 100 observations the two paths agree within 0.11%, and on
+2024-12-31 both give 8.49%. Removing the later returns leaves every earlier estimate unchanged.
 
 ```python
 from qis.datasets import generate_synthetic_prices
@@ -702,30 +746,46 @@ def ewm_path(seed: np.ndarray, lam: float) -> list:
     return path
 
 
-full_sample_seed = ewm_path(np.zeros((3, 3)), 0.94)[-1]  # final state at the default decay
-seeded = np.array([x @ s @ x for x, s in zip(w_lag, ewm_path(full_sample_seed, decay))])
 point_in_time = np.array([x @ s @ x for x, s in zip(w_lag, ewm_path(np.zeros((3, 3)), decay))])
-np.testing.assert_allclose(port_var.to_numpy(), seeded, rtol=1e-12, atol=1e-18)
-
-ann_qis, ann_pit = np.sqrt(252.0 * port_var.to_numpy()), np.sqrt(252.0 * point_in_time)
+np.testing.assert_allclose(port_var.to_numpy(), point_in_time, rtol=1e-12, atol=1e-18)
+ann_pit = np.sqrt(252.0 * port_var.to_numpy())
 assert port_var.iloc[0] == 0.0 and port_var.index[1] == pd.Timestamp('2022-01-05')
-assert isclose(ann_qis[1], 0.0821, abs_tol=5e-5) and isclose(ann_pit[1], 0.0193, abs_tol=5e-5)
-assert np.max(np.abs(ann_qis[100:] / ann_pit[100:] - 1.0)) < 0.01
-assert isclose(ann_qis[-1], ann_pit[-1], rel_tol=1e-12)
-assert isclose(ann_qis[-1], 0.0849, abs_tol=5e-5)
+assert isclose(ann_pit[1], 0.0193, abs_tol=5e-5) and isclose(ann_pit[-1], 0.0849, abs_tol=5e-5)
+assert isclose(decay ** 2, 0.886, abs_tol=5e-4)
 assert np.log(0.01) / np.log(decay) < 76.0 < np.log(0.01) / np.log(decay) + 1.0
+
+# point in time: the estimates up to a date do not depend on later returns
+truncated = qis.compute_portfolio_vol(returns=returns.iloc[:60], weights=weights.iloc[:60],
+                                      span=span, is_return_vol=False)
+np.testing.assert_allclose(truncated.to_numpy(), port_var.iloc[:60].to_numpy(), rtol=1e-12,
+                           atol=0.0)
 annualised = qis.compute_portfolio_vol(returns=returns, weights=weights, span=span,
                                        annualize=True)
-assert isclose(annualised.iloc[-1], ann_qis[-1], rel_tol=1e-12)  # AN = 252 on a 'B' index
+assert isclose(annualised.iloc[-1], ann_pit[-1], rel_tol=1e-12)  # AN = 252 on a 'B' index
+```
+
+The Numba kernel `compute_portfolio_var_np` takes the seed as `covar0`. Passing the final state of
+the full-sample recursion reproduces the former look-ahead path.
+
+```python
+full_sample_seed = ewm_path(np.zeros((3, 3)), 0.94)[-1]
+seeded = np.array([x @ s @ x for x, s in zip(w_lag, ewm_path(full_sample_seed, decay))])
+np.testing.assert_allclose(
+    qis.compute_portfolio_var_np(returns=r, weights=w_lag, span=span, covar0=full_sample_seed),
+    seeded, rtol=1e-12, atol=1e-18)
+
+ann_seeded = np.sqrt(252.0 * seeded)
+assert isclose(ann_seeded[1], 0.0821, abs_tol=5e-5)
+assert np.max(np.abs(ann_seeded[100:] / ann_pit[100:] - 1.0)) < 0.0011
+assert isclose(ann_seeded[-1], ann_pit[-1], rel_tol=1e-12)
 ```
 
 ### Correlated and undiversified VaR through time
 
 On the same inputs, the one-day 99% VaR on 2024-12-31 is 1.244% of NAV correlated and 1.830%
-undiversified, a ratio of 1.471; both reproduce from one zero-seeded EWM covariance. From the
-101st observation on, the ratio stays between 1.30 and 2.15. On the seven business days from
-2022-01-05 to 2022-01-13 the reported undiversified figure is *below* the correlated one: the
-seed mismatch described above, not a failure of the proposition.
+undiversified, a ratio of 1.471; both reproduce from one zero-seeded EWM covariance and the
+weights of the same date. From the 101st observation on, the ratio stays between 1.30 and 2.15,
+and on every date, the warm-up included, the undiversified figure is at least the correlated one.
 
 ```python
 var_corr = qis.compute_portfolio_correlated_var_by_groups(
@@ -733,49 +793,50 @@ var_corr = qis.compute_portfolio_correlated_var_by_groups(
 instrument_var, var_undiversified = qis.compute_portfolio_independent_var_by_ac(
     prices=prices, weights=weights, vol_span=span)
 
-last_covar = ewm_path(np.zeros((3, 3)), decay)[-1]
-w_last = np.array([0.5, 0.3, 0.2])
-assert isclose(var_corr.iloc[-1], 2.3263 * sqrt(w_last @ last_covar @ w_last), rel_tol=1e-10)
-assert isclose(var_undiversified.iloc[-1],
-               2.3263 * float(np.abs(w_last) @ np.sqrt(np.diag(last_covar))), rel_tol=1e-10)
+covars = ewm_path(np.zeros((3, 3)), decay)
+w_now = weights.to_numpy()  # the weights of each date, not lagged
+expected_corr = [2.3263 * sqrt(x @ s @ x) for x, s in zip(w_now, covars)]
+expected_undiversified = [2.3263 * float(np.abs(x) @ np.sqrt(np.diag(s)))
+                          for x, s in zip(w_now, covars)]
+np.testing.assert_allclose(var_corr.to_numpy(), expected_corr, rtol=1e-10)
+np.testing.assert_allclose(var_undiversified.to_numpy(), expected_undiversified, rtol=1e-10)
 assert isclose(var_corr.iloc[-1], 0.01244, abs_tol=5e-6)
 assert isclose(var_undiversified.iloc[-1], 0.01830, abs_tol=5e-6)
 
 ratio = (var_undiversified / var_corr).iloc[100:]
 assert ratio.min() > 1.30 and ratio.max() < 2.15
-breaches = (var_undiversified - var_corr).loc[lambda x: x < 0.0]
-assert len(breaches) == 7
-assert breaches.index[0] == pd.Timestamp('2022-01-05')
-assert breaches.index[-1] == pd.Timestamp('2022-01-13')
+assert (var_undiversified - var_corr).min() >= -1e-15  # the bound holds on every date
 ```
 
 ### Standalone versus Euler shares of realised P&L
 
 A quarterly rebalanced backtest of the same weights, invested from the first date, has a daily
-P&L volatility of 0.557%. `get_instruments_pnl_risk_attribution` reports standalone shares of
-64.9%, 13.0% and 22.0%. The ex-post Euler shares, the slopes of each instrument's P&L on the
-portfolio P&L, are 90.5%, −1.9% and 11.3%: the Treasury sleeve hedged the equity risk in this
-sample, which the standalone view reports as 13% of the risk.
+P&L volatility of 0.557%. `get_instruments_pnl_risk_attribution` reports the ex-post Euler
+shares, the slopes of each instrument's P&L on the portfolio P&L: 90.5%, −1.9% and 11.3%. The
+Treasury sleeve hedged the equity risk in this sample. The standalone shares, still available
+with `is_standalone=True`, are 64.9%, 13.0% and 22.0% and report the hedge as 13% of the risk.
 
 ```python
 portfolio = qis.backtest_model_portfolio(
     prices=prices, weights={'SEQ_US': 0.5, 'SBD_TSY': 0.3, 'SCM_GLD': 0.2},
     rebalancing_freq='QE', is_rebalanced_at_first_date=True)
-standalone_shares = portfolio.get_instruments_pnl_risk_attribution()
+euler_shares = portfolio.get_instruments_pnl_risk_attribution()
 
 pnl = portfolio.get_instruments_pnl()
+total_pnl = pnl.sum(axis=1)
+nav_returns = portfolio.get_portfolio_nav().pct_change().iloc[1:]
+np.testing.assert_allclose(nav_returns.to_numpy(), total_pnl.iloc[1:].to_numpy(), atol=1e-14)
+slopes = pnl.apply(lambda x: np.cov(x, total_pnl)[0, 1]) / total_pnl.var()
+np.testing.assert_allclose(euler_shares.to_numpy(), slopes.to_numpy(), atol=1e-12)
+assert isclose(euler_shares.sum(), 1.0, abs_tol=1e-12)
+np.testing.assert_allclose(euler_shares.to_numpy(), [0.905, -0.019, 0.113], atol=5e-4)
+assert isclose(total_pnl.std(), 0.00557, abs_tol=5e-6)
+
+standalone_shares = portfolio.get_instruments_pnl_risk_attribution(is_standalone=True)
 nonzero_std = pnl.replace({0.0: np.nan}).std(ddof=0)
 np.testing.assert_allclose(standalone_shares.to_numpy(),
                            (nonzero_std / nonzero_std.sum()).to_numpy(), atol=1e-14)
 np.testing.assert_allclose(standalone_shares.to_numpy(), [0.649, 0.130, 0.220], atol=5e-4)
-
-total_pnl = pnl.sum(axis=1)
-nav_returns = portfolio.get_portfolio_nav().pct_change().iloc[1:]
-np.testing.assert_allclose(nav_returns.to_numpy(), total_pnl.iloc[1:].to_numpy(), atol=1e-14)
-euler_shares = pnl.apply(lambda x: np.cov(x, total_pnl)[0, 1]) / total_pnl.var()
-assert isclose(euler_shares.sum(), 1.0, abs_tol=1e-12)
-np.testing.assert_allclose(euler_shares.to_numpy(), [0.905, -0.019, 0.113], atol=5e-4)
-assert isclose(total_pnl.std(), 0.00557, abs_tol=5e-6)
 ```
 
 ## Implementation in qis
@@ -785,19 +846,20 @@ assert isclose(total_pnl.std(), 0.00557, abs_tol=5e-6)
 | Euler contribution | $w_i(\Sigma w)_i/\sigma_p$ | `qis.compute_portfolio_risk_contributions(w, covar)` |
 | Percentage contribution | $\kappa_i=\mathrm{RC}_i/\sigma_p$ | `qis.compute_portfolio_risk_contribution_ratios(weights, covar)` |
 | Group percentage contribution | $\sum_{i\in\mathcal{A}_g}\kappa_i$ | `qis.compute_group_portfolio_risk_contribution_ratios(weights, covar, groups)` |
-| Euler TE contribution | $d_i(\Sigma d)_i/\mathrm{TE}$ | `qis.RiskModel.compute_marginal_tre_at_date`, column `mcte` |
-| Legacy active contribution | $d_i(\Sigma d)_i/\sigma_b$, or $\lvert d_i\rvert\sigma_i$ | `qis.compute_benchmark_portfolio_risk_contributions(..., is_independent_risk=False)` |
+| Euler TE contribution, dated | $d_i(\Sigma d)_i/\mathrm{TE}$ | `qis.RiskModel.compute_marginal_tre_at_date`, column `mcte` |
+| Euler TE contribution, one matrix | $d_i(\Sigma d)_i/\mathrm{TE}$, or $\lvert d_i\rvert\sigma_i$ | `qis.compute_benchmark_portfolio_risk_contributions(..., is_independent_risk=False)` |
 | Factor active variance | $e^{\top}\Sigma_x e+d^{\top}\Psi d$ | internal `qis.portfolio.risk.contributions.calculate_active_risk_squared` |
 | Gradient of active variance | $2B^{\top}\Sigma_x e+2\Psi d$ | internal `qis.portfolio.risk.contributions.calculate_marginal_active_risk` |
-| EWM portfolio variance path | $w_t^{\top}\hat\Sigma_t w_t$ on the rows passed | `qis.compute_portfolio_var_np(returns, weights, span=None, ewm_lambda=0.94)` |
-| EWM portfolio volatility | $\sqrt{\mathrm{AN}\,w_{t-1}^{\top}\hat\Sigma_t w_{t-1}}$ | `qis.compute_portfolio_vol(..., annualize=True)` |
-| Correlated VaR by group | $z_{0.99}\sqrt{w_{g,t-1}^{\top}\hat\Sigma_{g,t}w_{g,t-1}}$ | `qis.compute_portfolio_correlated_var_by_groups` |
+| EWM portfolio variance path | $w_t^{\top}\hat\Sigma_t w_t$ on the rows passed, $\hat\Sigma_0$ from `covar0` or zero | `qis.compute_portfolio_var_np(returns, weights, span=None, ewm_lambda=0.94, covar0=None)` |
+| EWM portfolio volatility | $\sqrt{\mathrm{AN}\,w_{t-1}^{\top}\hat\Sigma_t w_{t-1}}$; $w_t$ with `weight_lag=0` | `qis.compute_portfolio_vol(..., annualize=True, weight_lag=1)` |
+| Correlated VaR by group | $z_{0.99}\sqrt{w_{g,t}^{\top}\hat\Sigma_{g,t}w_{g,t}}$ | `qis.compute_portfolio_correlated_var_by_groups` |
 | Undiversified VaR | $z_{0.99}\lvert w_{i,t}\rvert\hat\sigma_{i,t}$ and group sums | `qis.compute_portfolio_independent_var_by_ac` |
-| VaR weight cap | $\lvert w_i\rvert\le L_{\mathrm{bp}}\sqrt{260}/(10^{4}z_{0.99}\sigma_i)$ | `qis.limit_weights_to_max_var_limit` |
-| Backtest EWM volatility | as above, `W-WED`, span 13 | `PortfolioData.compute_portfolio_vol` |
+| VaR weight cap | $\lvert w_i\rvert\le L_{\mathrm{bp}}\sqrt{\mathrm{AN}}/(10^{4}z_{0.99}\sigma_i)$, $\mathrm{AN}=252$ | `qis.limit_weights_to_max_var_limit` |
+| Backtest EWM volatility | as above, simple returns, `W-WED`, span 13 | `PortfolioData.compute_portfolio_vol` |
 | Backtest VaR | the two VaR functions on realised weights | `PortfolioData.compute_portfolio_vars(is_correlated=True, freq='B', vol_span=33)` |
-| Covariance-implied risk | $\sigma_p$ and $\mathrm{RC}_i$ per covariance date | `PortfolioData.compute_ex_anti_portfolio_vol_implied_by_covar`, `PortfolioData.compute_risk_contributions_implied_by_covar` |
-| Standalone P&L risk share | $\hat\sigma^{0}_i/\sum_j\hat\sigma^{0}_j$ | `PortfolioData.get_instruments_pnl_risk_attribution`, `qis.AttributionMetric.PNL_RISK` |
+| Covariance-implied risk | $\sigma_p$ and $\mathrm{RC}_i$ with as-of weights | `PortfolioData.compute_ex_anti_portfolio_vol_implied_by_covar`, `PortfolioData.compute_risk_contributions_implied_by_covar` |
+| Ex-post Euler P&L risk share | $\widehat{\operatorname{Cov}}(x_i,x_p)/s(x_p)^2$ | `PortfolioData.get_instruments_pnl_risk_attribution`, `qis.AttributionMetric.PNL_RISK` |
+| Standalone P&L risk share | $\hat\sigma^{0}_i/\sum_j\hat\sigma^{0}_j$ | `PortfolioData.get_instruments_pnl_risk_attribution(is_standalone=True)` |
 
 Container contracts:
 
@@ -806,13 +868,17 @@ Container contracts:
   result has the container type of the weights. The group function requires a labelled `groups`
   Series covering every covariance asset, returns groups in first-seen order and names the result
   `risk_contribution`.
+- `compute_benchmark_portfolio_risk_contributions` accepts a DataFrame covariance with each weight
+  vector either a Series, aligned by label, or an array in covariance order, and returns a Series
+  in covariance order; with three arrays it returns an array.
 - `compute_portfolio_var_np` is Numba-compiled and applies no lag: pass weights already lagged.
   `compute_portfolio_vol` aligns weights and returns on their common dates and columns, lags the
-  weights by one row and fills missing values with zero before calling it.
+  weights by `weight_lag` rows and fills missing values with zero before calling it.
 - `compute_portfolio_correlated_var_by_groups` returns a DataFrame;
   `compute_portfolio_independent_var_by_ac` returns the instrument DataFrame and the aggregate,
-  which is a Series when `group_data` is `None`. Both apply `time_period` after estimation, so
-  the warm-up can lie before the window.
+  which is a Series when `group_data` is `None`. Both run the recursion on the dates common to
+  weights and returns and apply `time_period` after estimation, so the warm-up can lie before the
+  window.
 - `VAR99 = 2.3263` is a module constant of `qis.portfolio.risk.ewm_covar_risk`, not an export.
 
 Sources:
@@ -821,7 +887,11 @@ Sources:
 [risk_model.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/risk_model.py)
 and [portfolio_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/portfolio_data.py).
 The contribution tests are in
-[contributions_test.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/tests/contributions_test.py).
+[contributions_test.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/tests/contributions_test.py)
+and
+[benchmark_risk_contributions_te_test.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/tests/benchmark_risk_contributions_te_test.py);
+the point-in-time and VaR-consistency tests are in
+[ewm_covar_risk_point_in_time_test.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/tests/ewm_covar_risk_point_in_time_test.py).
 
 API reference:
 
@@ -844,21 +914,22 @@ API reference:
   that is neither its contribution nor its standalone risk.
 - Negative and above-100% shares are features, not errors. Absolute shares, as used by the
   breadth diagnostics, measure concentration and lose the hedge sign.
-- Use `RiskModel.compute_marginal_tre_at_date` for active risk. The legacy benchmark function
-  sums to $\mathrm{TE}^2/\sigma_b$, fails for a zero benchmark and aligns only the portfolio
-  weights.
-- The EWM volatility path is seeded from the full sample and pairs held weights with a covariance
-  that includes the period's return. Drop the warm-up before a backtest uses it, and treat the
-  series as a descriptive risk estimate, not a forecast.
+- `compute_benchmark_portfolio_risk_contributions` and `RiskModel.compute_marginal_tre_at_date`
+  return the same Euler TE contributions; `RiskModel` adds dated weights, strict universe checks,
+  grouping and the factor split.
+- The EWM volatility path is point in time but starts from a zero seed, so it is biased low during
+  the warm-up. Drop the first $\log\delta/\log\lambda$ observations or pass a pre-sample
+  `covar0`. With the default `weight_lag=1` it pairs held weights with a covariance that includes
+  the period's return, a descriptive estimate rather than a forecast.
 - Normal VaR assumes a zero mean and Gaussian losses over one period. It understates tail losses
   of fat-tailed or option-like positions, and its subadditivity is a property of the normal model.
-- The `independent` VaR is the undiversified, perfectly aligned bound. Correlated and
-  undiversified figures from the two functions use different weight timing and seeds; compare
-  them only after warm-up and away from rebalancing dates.
-- The factsheet's P&L risk attribution panel shows standalone volatility shares. They ignore
-  correlation, treat zero-P&L days as missing (which also drops genuine zero returns of stale
-  instruments) and use `ddof=0`. For an additive ex-post decomposition, use the covariance of
-  each instrument's P&L with the portfolio P&L.
+- The `independent` VaR is the undiversified, perfectly aligned bound. It shares weights and
+  covariance with the correlated VaR on every date, so the two figures can be compared on any
+  date and their ratio is the diversification ratio.
+- The factsheet's P&L risk attribution panel shows ex-post Euler shares of the portfolio P&L
+  variance: they add up to 100%, hedges are negative, and they describe the realised sample, not
+  the current portfolio. `is_standalone=True` gives the non-additive standalone view, which treats
+  zero-P&L days as missing and uses `ddof=0`.
 
 ## See also
 
