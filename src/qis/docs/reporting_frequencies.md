@@ -95,7 +95,8 @@ quantities are never conflated:
   (e.g. `(B-freq)`), because they are computed on the unresampled path. This is why the
   panel max-drawdown is frequency-invariant while the risk-table max-drawdown (computed on
   resampled returns) coarsens with the reporting frequency — both are correct, and the labels make
-  the distinction explicit.
+  the distinction explicit. The risk-table grid includes each asset's final observation, so a loss
+  in the current, unfinished period is counted; earlier intra-period troughs are not.
 - Rolling Sharpe / Vol, rolling beta, correlation and the return scatter all carry the reporting
   frequency and the window length actually used.
 

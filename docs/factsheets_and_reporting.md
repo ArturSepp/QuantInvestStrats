@@ -114,8 +114,9 @@ monthly bins. EWM spans are decay parameters; they are not fixed-length rolling 
 
 The [reporting-frequency convention](_included/reporting_frequencies.md) records every preset.
 Running drawdown and time-under-water panels use the native price path; risk-table drawdowns
-use the configured sampling grid. Intramonth losses can therefore appear in the native
-drawdown panel without appearing in month-end risk statistics. A reporting grid finer than
+use the configured sampling grid, extended by each asset's final observation so that a loss in
+the current, unfinished period is included. Earlier intramonth losses can still appear in the
+native drawdown panel without appearing in month-end risk statistics. A reporting grid finer than
 the inferred input frequency is rejected. This guard cannot detect information hidden by
 forward-filled monthly observations in a daily index.
 
