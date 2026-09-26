@@ -65,6 +65,8 @@ src/qis/
   plots/          visualisation layer (matplotlib/seaborn)
   portfolio/      portfolio objects, factsheets, multi-strategy reports
   models/         estimators and models
+  regimes/        regime-conditional nulls, premia, betas and mixture moments; imports utils,
+                  perfstats and models only, and is imported explicitly, not re-exported
   market_data/    data access helpers
   <component>/run_local/  source-adjacent development diagnostics named *_run.py
   examples/       runnable examples

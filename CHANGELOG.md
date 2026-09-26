@@ -7,6 +7,34 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Add the subpackage `qis.regimes`, regime-conditional analytics for any benchmark-return
+  partition of the regime classifiers, the one-sigma Bear, Normal and Bull cut by default:
+  - Gaussian and Student-t null loadings of the regime Sharpe contributions for any partition,
+    kappa, and the null contributions (`compute_regime_null_loadings`, `compute_regime_kappa`,
+    `calibrate_student_t_nu`, `compute_null_regime_contributions`);
+  - a per-asset table of the regime contributions, the null of the lowest bucket, the convexity
+    premium and the benchmark-adjusted premium (`compute_regime_premium_table`), with stationary
+    block-bootstrap intervals that reclassify the regimes in each resample
+    (`compute_regime_premium_bootstrap`);
+  - per-regime OLS betas with bootstrap standard errors (`compute_regime_betas`,
+    `compute_regime_betas_bootstrap`), regime-time EWMA means and betas
+    (`compute_regime_ewm_avg`, `compute_regime_ewm_betas`), the regime-mixture covariance and
+    Gaussian regime moments (`compute_regime_mixture_covar`, `compute_gaussian_regime_moments`);
+  - the closed forms of the portfolio aggregation identity and of a benchmark-overlay blend
+    (`compute_portfolio_bear_sharpe`, `compute_overlay_blend_frontier`), and
+    `create_sampled_returns_with_regime_id` for panels of periodic returns.
+
+  Import it as `qis.regimes`; its names are not re-exported from `qis`, so `qis.__all__` is
+  unchanged. It depends on `qis.utils`, `qis.perfstats` and `qis.models` only, which a test
+  enforces. Classification is the classifiers' `pd.qcut` rule throughout, including inside the
+  bootstraps, where resamples repeat observations and a return equal to an interior quantile
+  falls in the lower bucket.
+- Add `qis.plots.derived.regime_premium` with `plot_regime_sharpe_decomposition` and
+  `plot_regime_beta_profiles`, drawn from the `qis.regimes` tables. They are not re-exported
+  from `qis`.
+
 ### Changed
 
 - Move the smart-diversification report from `qis/portfolio/reports/overlays_smart_diversification.py`
