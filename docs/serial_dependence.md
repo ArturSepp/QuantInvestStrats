@@ -538,7 +538,7 @@ HAC. `qis.estimate_dimson_beta` returns one row per asset with `beta_0` ($\hat\b
 `beta_dimson`, `smoothing_ratio` ($\beta_{\mathrm{D}}/\hat\beta_0$, NaN when
 $\lvert\hat\beta_0\rvert\le10^{-8}$), `t_beta_0`, `sum_lag_beta`, `t_sum_lag`, `ar1` (the lag-one
 Pearson autocorrelation of $r_t$ on the regression sample), the centred `r2`, `n_obs`, and, after
-these, `se_beta_dimson` and `t_beta_dimson`, which were added after qis 5.30.3.
+these, `se_beta_dimson` and `t_beta_dimson`, which were added in qis 5.31.0.
 
 **Proposition (lag regression recovers the total exposure).** Let
 $r_t=a+\sum_{k\ge0}c_k\,m_{t-k}+e_t$ with $\sum_k\lvert c_k\rvert<\infty$, $m_t$ iid with variance

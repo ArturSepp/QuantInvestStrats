@@ -5,7 +5,27 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.31.0] - 2026-09-26
+
+**This release changes computed values.** It fixes the defects found while the analytics
+handbook was written. Most fixes remove crashes, silent zeros or infinities, or wrong docstrings,
+but several change numbers that earlier versions reported:
+
+- Excess returns no longer drop their first period, and every period accrues cash at the rate
+  known at its start on the return grid, in `compute_ra_perf_table` and in the backtester's
+  funding leg.
+- EWM estimators are point in time by default: `EwmLinearModel.fit`,
+  `compute_ewm_beta_alpha_forecast`, `compute_portfolio_vol`, `ewm_xy_convolution` and the EWM
+  autocorrelation estimators no longer seed with full-sample statistics, and every EWM uses the
+  first observation of each column. Early values move; late values barely do.
+- `estimate_rolling_ewma_covar(demean=True)` no longer understates variances by about 6% at span
+  52, and EWM covariance tensors default to a positive-semidefinite gap policy.
+- Tracking-error contributions sum to the tracking error, the factsheet's P&L risk attribution
+  shows Euler shares, and the risk-table drawdowns on a coarse grid include the last observation.
+- Signal diagnostics pair signals with future returns only, use the library's annualisation
+  factors and the right degrees of freedom.
+
+Each entry below states the size of its effect and, where possible, how to restore the old value.
 
 ### Fixed
 
@@ -19,11 +39,517 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   observation, as `compute_ewm_vol` does; it was seeded with the unsquared value. The lag terms now
   use an explicitly supplied `ewm_lambda` instead of the 0.94 default, and a Series input with
   lags no longer fails. With `num_lags=0` the estimator equals the EWM variance exactly.
+- Report `CALMAR_RATIO` as missing for a history that is never under water. `MAX_DD` is zero
+  there and the ratio was minus infinity for a positive return, the wrong sign as well as
+  undefined.
+- Report `DOWNSIDE_VOL` and `SORTINO_RATIO` as missing when fewer than two `freq_vol` returns
+  are negative. The downside volatility was 0.0 and the Sortino ratio plus or minus infinity.
+  A zero downside volatility (equal losses) also gives a missing Sortino ratio.
+- Report `MAX_DD_VOL` as missing when `VOL` is missing (a single sampled return) or zero; it was
+  0.0.
+- **Behaviour change.** Keep each asset's final observation on the `freq_drawdown` grid of
+  `compute_risk_table` and `compute_ra_perf_table`. On a coarse grid such as
+  `freq_drawdown='ME'` the trailing incomplete period was dropped, so a fall in the current month
+  was invisible and `CURRENT_DD` referred to the last month-end. On the frozen synthetic universe
+  ending 15 December 2025, month-end `CURRENT_DD` moves by up to 2.5 percentage points
+  (`SAL_HF` −22.0% to −19.6%); with the full universe cut at 15 December 2025, `SEQ_US`
+  `CURRENT_DD` is −45.40% instead of −44.89% and its `MAX_DD` deepens from −45.18% to −45.40%.
+  `WORST` and `BEST` include the partial-period return.
+  The default `freq_drawdown='D'` is unaffected; factsheets with monthly or quarterly presets,
+  which set `freq_drawdown` to the reporting grid, now show the current drawdown at the last
+  observation.
+- Make `RegimeClassifier.compute_regimes_pa_perf_table` forward `additive_pa_returns_to_pa_total`
+  and its other keywords (`is_report_pa_returns`) to
+  `compute_regimes_pa_perf_table_from_sampled_returns`; they were documented but ignored, so the
+  per-annum patch was always applied. The three classifiers' `compute_regimes_pa_perf_table`
+  gain the optional keyword `additive_pa_returns_to_pa_total=True` and pass it on.
+- Compute the `SharpeConvention.PA` regime Sharpe ratios before `is_use_benchmark_means=True`
+  replaces the benchmark's per-annum regime values by its periodic means for display. The
+  benchmark's regime Sharpe ratios were those periodic means divided by an annualised
+  volatility.
+- Stop the `SharpeConvention.LOG` regime branch from applying `log1p` to returns that a
+  `ReturnTypes.LOG` classifier already produced as log returns; the `ARITHMETIC` branch now
+  converts such returns to simple returns. `compute_regimes_pa_perf_table_from_sampled_returns`
+  gains the optional keyword `sampled_return_type=ReturnTypes.RELATIVE`, which the classifiers
+  set from their `return_type`. Classifiers with the default `ReturnTypes.RELATIVE` are
+  unchanged.
+- Report an empty regime as missing in `compute_regime_sharpe_decomposition`, as the regime
+  table does; it was 0.0. The total column is unchanged and the regime columns still add up to
+  it when missing values are skipped.
+- Label `PerfStat.BEAR_AVG`, `NORMAL_AVG` and `BULL_AVG` 'Bear Average', 'Normal Average' and
+  'Bull Average', the column names of the regime table. They were 'Bear Avg' and so on, and
+  `plot_ra_perf_scatter(x_var=PerfStat.BEAR_AVG)` raised `KeyError`.
+- Make `PerfParams.copy` keep `freq_skewness` and `freq`; both returned to 'ME' in the copy. The
+  method gains the optional keyword `freq_skewness`.
+- Accept a Series in `compute_performance_table`, as its signature states; it raised
+  `TypeError`.
+- Highlight the unrecovered episode in `plot_top_drawdowns_paths(highlight_ongoing=True)`. The
+  plot compared episode ends with the penultimate date, so the ongoing episode, which ends on the
+  last date, was never highlighted and an episode recovering on the penultimate date was.
+- Compute the episodes of `plot_top_drawdowns_paths` on the plotted `freq` grid; they were always
+  computed on calendar days. The x-axis reads 'Days in drawdown' on the default 'D' grid and
+  'Observations in drawdown' otherwise, and with `freq=None` the legend's `days_dd` now counts
+  observations, as the axis does.
+- **Behaviour change.** Compound the first return period into every per-annum excess return.
+  With `rates_data` starting on the first price date, the one-period lag left the first excess
+  return missing, so the excess NAV started one period late while the elapsed years still
+  covered the whole history. The first return date now accrues exactly zero cash (no time has
+  elapsed), so `PA_EXCESS_RETURN`, `AN_LOG_EXCESS_RETURN`, `SHARPE_EXCESS`, `SHARPE_LOG_EXCESS`,
+  `SORTINO_RATIO` and the Calmar numerator no longer depend on whether the rate series starts on
+  or before the first price date. On the frozen synthetic universe (2 January 2014 to
+  31 December 2025) with 2% cash from the first price date, `SEQ_US` `PA_EXCESS_RETURN` is
+  −0.704% instead of −0.651% and `SCM_GLD` 6.323% instead of 6.265%; with monthly 2% cash from
+  31 January 2014, `SCM_GLD` `SHARPE_EXCESS` is 0.3782 instead of 0.3925.
+- **Behaviour change.** Charge the cash return of the period (t-1, t] at the rate known on the
+  return date t-1 in `compute_excess_returns` and every helper built on it. The lag was one
+  observation of the rate series on its own calendar, so with daily rates and monthly returns
+  each month used the second-to-last daily quote of that month. The rate series is now aligned to
+  the return grid as of each date and then lagged by one period of that grid. With a realistic
+  time-varying daily cash path on the synthetic universe, monthly `SHARPE_EXCESS` of `SEQ_US`
+  moves from −0.0130 to −0.0114 and the annualised regression alpha of `SBD_TSY` from 2.246% to
+  2.274%.
+- **Behaviour change.** Accrue backtest cash at the funding rate known at the start of each
+  period. `backtest_model_portfolio` credited the cash held over (t-1, t] with the quote dated t,
+  a one-period look-ahead that also disagreed with `compute_excess_returns`; both now use the same
+  convention, and a cash-only portfolio earns exactly the cash return the excess helpers
+  subtract. A 50/30 portfolio with 20% cash over 2014 to 2025 on a realistic rate path ends at a
+  NAV of 142.878 instead of 142.884. A funding series with no quote known at the start of a
+  period now warns that the NAV is missing from that date.
+- Lag a rate series with a single quote in the internal `multiply_df_by_dt`; the lag was skipped
+  when the series had no more observations than the lag.
+- Make `compute_pa_excess_compounded_returns` compound and annualise over the same window when
+  `rates_data` starts after the first return date: the NAV starts at the date that opens the
+  first period with a known rate and the elapsed years count from that date, with a warning.
+  Missing periods were previously counted as flat but included in the years. DataFrame columns
+  are now each annualised over their own window.
+- **Behaviour change.** Count each return in one window of `compute_sampled_vols`. Windows
+  included both boundaries, so a return dated on a boundary entered two adjacent windows; they are
+  now right-closed. 102 of the 143 monthly volatilities of the synthetic `SEQ_US` change, by a
+  median of 2.1% and at most 17%. `BenchmarkVolsQuantilesRegime` inherits the change.
+  `split_df_by_freq` gains the optional keyword `inclusive='both'`; `'right'` gives the
+  right-closed windows.
+- Return a missing aggregate from `portfolio_returns_to_nav` on a date where every contribution is
+  missing, as `to_portfolio_returns` does, instead of a zero return. The NAV is still one on the
+  first date and flat through interior gaps, and now ends at the last date with an observed
+  contribution.
+- Warn when `to_returns` receives a keyword argument it does not use, naming the closest documented
+  argument. A misspelt `is_log_return=True` silently returned simple returns.
+- Run the fee account of each column of `compute_net_navs_ex_perf_man_fees` from its first
+  observed NAV. A column starting after the first row came back as 1.0 on the first row and
+  missing afterwards, because the missing gross returns entered the fee recursion.
+- Keep the first period's excess return in `get_excess_returns_nav`. It zeroed the first observed
+  return, which was the first real return, so the NAV was missing on the first date and omitted
+  the first period.
+- **Behaviour change.** Drop the incomplete first block of `T mod h` rows when
+  `df_resample_at_int_index` aggregates, as for the block sums of
+  `compute_autocorrelation_at_int_periods`; a partial sum was treated as a complete block. With
+  `func=None` the block's last level is still kept. The function gains the optional keyword
+  `drop_incomplete_first=None`. On the synthetic `SEQ_US` daily returns the 5-day block
+  autocorrelation moves from 0.0396 to 0.0373.
+- **Behaviour change.** Rebuild `interpolate_infrequent_returns` as a point-in-time Brownian
+  bridge on log NAVs. The interpolated returns are on the pivot index, compound exactly to each
+  reported return in the default simple mode and sum to it in log mode, use only data up to each
+  report date, and have, per pivot period, the variance of an EWM of the reported returns
+  (`span` reports). Previously the standardised pivot return was used as a level deviation with
+  full-sample moments: on 20 quarterly reports the daily increments had a volatility of 22.2%
+  against 7.2% implied by the reports and a lag-one autocorrelation of −0.47 (now 11.6% at the
+  default span, 9.0% at `span=1`, and 0.03); `annualization_factor` acted as calendar days (a
+  monthly pivot with 12 inflated the bridge 4.7 times; the path no longer depends on it); returns
+  summed rather than compounded; an exactly zero report or a first report date off the pivot grid
+  lost increments; and the output index was the union of pivot and report dates. The default
+  `vol_adjustment` is 1.0 instead of 1.15, which compensated for the old scaling; pass
+  `vol_adjustment=1.15` to add the same variance. `is_to_log_returns=True` now means that inputs
+  and outputs are log returns, as documented; the default mode takes and returns simple returns.
+- Make the internal `estimate_ols_alpha_beta` return NaN with a `UserWarning` when alpha and
+  beta are not identified. A constant non-zero regressor or a single observation made statsmodels
+  drop the intercept and the slope lookup raised `IndexError` outside the fallback, so
+  `qis.compute_ra_perf_table_with_benchmark` failed on a benchmark with constant returns; an
+  all-zero regressor reported a pseudo-inverse slope of zero.
+- Return NaN rather than zeros from `estimate_ols_alpha_beta` when the fit fails, and an alpha
+  p-value of NaN rather than 0.0 without an intercept: a zero p-value read as a highly
+  significant alpha. The alpha itself stays 0.0 without an intercept, as imposed by the model.
+- Make `LinearModel.get_model_residuals_corrs` return each asset's mean off-diagonal residual
+  correlation. It returned `(n - 1) / (2n)` times that mean, one third of it for three assets.
+- Align the two moments of `LinearModel.get_model_ewm_r2`: both are now geometrically weighted
+  sums over the same dates with the same weights. The residual moment used to start from zero
+  after the warm-up while the return moment had run since the first return, so the R² read
+  0.97 to 0.999 on the first dates after the warm-up instead of the single-observation ratio
+  (0.15, 0.00 and 0.79 in the factor-risk-model chapter example); last-date values move by less
+  than 0.002 there.
+- Select weights as of each loading date in `LinearModel.compute_agg_factor_exposures`, so a
+  weight row dated off the loading grid (a calendar month-end on a weekend, month-end weights
+  against weekly loadings) is no longer dropped. Exposures are NaN before the first weight row and
+  wherever a held asset has no loading, including the warm-up rows that showed zero; missing
+  loadings of assets with zero weight are ignored.
+- Report NaN in the `Total` column of `LinearModel.get_asset_factor_attribution` while a lagged
+  loading is missing; it summed the missing terms as zero.
+- Read residual variances as of each date in `LinearModel.compute_factor_risk_contribution`, as
+  weights and loadings already were; an off-grid date raised `KeyError`. A held asset without a
+  loading or residual variance now makes the date NaN instead of silently zeroing the whole factor
+  exposure, and undefined contribution ratios are NaN rather than 0.
+- Report the benchmark attribution of `compute_benchmarks_beta_attribution_from_prices` and
+  `compute_benchmarks_beta_attribution_from_returns` as NaN while a lagged beta is missing. The
+  residual `Alpha` used to absorb the whole portfolio return during the warm-up (21 periods by
+  default): in the synthetic gallery portfolio the cumulative monthly `Alpha` fell from 7.9% to
+  3.9% once those rows are excluded. The returns variant no longer overwrites its first row with
+  zeros; its total column still holds the portfolio return.
+- Keep a genuine zero portfolio beta in `compute_portfolio_ewm_benchmark_betas`; zeros were
+  replaced by the previous beta as if they were holidays, so a portfolio fully in cash kept its
+  last beta. With the as-of weights above no holiday filling is needed: on the monthly grid of the
+  gallery portfolio, 21 of 75 month-end betas were stale values from the previous month-end (up
+  to 0.10 off).
+- Stop `EwmLinearModel.fit` from overwriting `x` and `y` with the mean-adjusted panels; the
+  adjustment now serves the moments only, so `get_factor_alpha` and `get_model_ewm_r2` work on
+  the returns as supplied and the residual keeps the intercept.
+- Validate `RiskModel` inputs for positive semi-definiteness of `covar` and `factor_covar` and
+  for non-negative `residual_vars`, with a tolerance of 1e-10 relative to the largest diagonal
+  element (at least 1e-10). Such inputs were accepted and failed only later, in the stress
+  module.
+- **Behaviour change.** Seed the EWM covariance recursion of `compute_portfolio_var_np`, and so of
+  `compute_portfolio_vol`, the VaR functions and `PortfolioData.compute_portfolio_vol`, with a
+  zero matrix. It was seeded with the final state of an EWM covariance over the whole sample,
+  which put later observations into every early estimate, and inside `compute_portfolio_vol` that
+  seed always used decay 0.94 whatever `span` or `ewm_lambda` was requested. On three synthetic
+  instruments with span 33 the annualised volatility on the second date falls from 8.21% to 1.93%;
+  the two paths agree within 0.11% after 100 observations and are identical at the end of the
+  sample. A new optional `covar0` argument of `compute_portfolio_var_np` takes an explicit seed;
+  passing `compute_ewm_covar(a=returns, ewm_lambda=0.94)` reproduces the former path.
+- **Behaviour change.** Make `compute_portfolio_correlated_var_by_groups` pair the weights of
+  date t with the EWM covariance through t, and make `compute_portfolio_independent_var_by_ac` use
+  the diagonal of that same zero-seeded covariance. The correlated VaR previously lagged the
+  weights one period and used the full-sample seed, while the undiversified VaR used same-date
+  weights and a separate `compute_ewm_vol` estimate on the full return grid, so the undiversified
+  figure fell below the correlated one on warm-up days and after weight cuts (the first six to
+  eight dates of two synthetic examples). Both now run one recursion on the dates shared by
+  weights and returns, the correlated function's existing alignment, and the bound holds on every
+  date. On a quarterly rebalanced ten-asset synthetic
+  backtest the correlated VaR changes by a median 0.2% after warm-up, by more than 1% on 56 of
+  2,508 days (rebalancing and large-move days, at most 8.5%); the undiversified VaR is unchanged
+  on these inputs.
+- **Behaviour change.** Make `compute_benchmark_portfolio_risk_contributions` return Euler
+  contributions to tracking error, d_i (Σd)_i / TE, which sum to TE and equal `RiskModel`'s
+  `mcte`. It divided by the benchmark volatility, so its contributions summed to TE²/σ_b (1.69%
+  instead of 4.94% in the risk-contributions worked example), returned infinities for a zero
+  benchmark, and aligned only the portfolio weights to the covariance, so a benchmark Series with
+  a missing or extra label raised "matrices are not aligned" and a reordered one came back in
+  sorted order. Both weight vectors are now aligned by label and zero tracking error returns
+  zeros. Multiply the result by TE/σ_b to reproduce the former level.
+- **Behaviour change.** Make `PortfolioData.get_instruments_pnl_risk_attribution`, the
+  `AttributionMetric.PNL_RISK` panel of the strategy factsheet ("P&L Risk Attribution,
+  sum=100%"), return ex-post Euler shares Cov(x_i, x_p) / Var(x_p) of the portfolio P&L. It
+  returned standalone P&L volatility shares (`ddof=0`, zero-P&L days dropped) normalised to 100%,
+  which are not a decomposition of portfolio risk and show hedges as positive. In the
+  risk-contributions worked example the Treasury sleeve moves from 13.0% to −1.9%. The new
+  optional `is_standalone=True` returns the former shares.
+- Make `PortfolioData.compute_ex_anti_portfolio_vol_implied_by_covar` and
+  `compute_risk_contributions_implied_by_covar` with `freq=None` select the input weights as of
+  each covariance date, as `RiskModel` does. They matched weights to covariance dates by exact
+  date only and reported zero volatility and zero contributions wherever the two calendars
+  differed; this affects the ex-ante volatility panel of the strategy-vs-benchmark TRE factsheet.
+- Compute the `strategy returns vol` column of `PortfolioData.compute_portfolio_vol` from simple
+  NAV returns, the basis of the instrument-weighted column beside it; it used log returns. On a
+  ten-asset synthetic backtest the column moves by a median 0.03 and at most 0.18 volatility
+  points.
+- Make `PortfolioData.plot_ra_perf_table(benchmark_price=..., perf_params=None)` build the
+  default `PerfParams` the benchmark table itself uses instead of raising `AttributeError` on
+  `perf_params.freq_vol` when no title is passed.
+- Make the marginal-active-risk development runner (`contributions_run.py`) divide d_i m_i by
+  2 TE: the gradient of active variance sums to 2 TE² against the active weights, so its
+  verification printed False and its percentage contributions summed to 200%.
+- Make the EWM seed the state before a column's first finite observation, and let that
+  observation update it, whether the column starts on row 0 or later. `ewm_recursion` used to set
+  row 0 to the seed, so a finite first row never entered, while a column that started after
+  missing rows did enter. `InitType.X0` now seeds each column with its own first finite value,
+  so a late-starting column equals pandas `ewm(adjust=False)`; before, it was seeded with 0 and
+  started at `(1 - lambda) x`. With the leading missing row of `qis.to_returns`, the first
+  `compute_ewm_vol` variance is now `r_1^2` instead of `0.06 r_1^2` at `lambda = 0.94`, so the
+  first inverse-volatility weight of `compute_ra_returns` is no longer about 4.1 times too large.
+  A `ZERO` seed, an explicit `init_value`, `compute_ewm_sharpe` and
+  `compute_ewm_long_short_filter` now use the first row. The change decays as `lambda^t`, below 5%
+  after about 1.5 spans; on the synthetic daily panel at span 31 it vanishes (below 1e-12 of the
+  level) within about 300 rows of a column's start, and an `X0` column that starts on row 0 is
+  unchanged.
+- Make `NanBackfill` behave as documented. Before a column's first observation every policy now
+  returns NaN (`ZERO_FILL` and `NAN_FILL` returned 0 from row 1). `NAN_FILL` resets the state like
+  `ZERO_FILL` and reports NaN at the gaps in every function; it returned zeros outside the
+  covariance tensors, and inside them it reported every exactly-zero entry as missing, genuine
+  zero covariances included.
+- Seed `InitType.VAR` variance recursions with the variance of the observations: `compute_ewm_vol`
+  and `compute_ewm_newey_west_vol` used `Var(x^2)`, about 2e-8 instead of 9e-5 for 1% daily
+  returns. `compute_ewm` and `compute_rolling_mean_adj` now raise `ValueError` for `VAR`, which
+  seeded a mean with a variance, and an EWMA mean adjustment requested with `VAR` takes `MEAN`.
+- Make `compute_roll_mean` and `compute_rolling_mean_adj` with `MeanAdjType.INSAMPLE` use each
+  column's `nanmean` and return the input's container: one NaN made a column NaN, and pandas
+  input raised `ValueError`, which also broke `compute_ewm_cross_xy` and
+  `EwmLinearModel.fit(mean_adj_type=INSAMPLE)`.
+- Make the `compute_ewm_vol` volatility floor work for a Series and a one-dimensional ndarray: a
+  Series raised `ValueError` (also through `compute_ra_returns(series, vol_floor_quantile=...)`)
+  and a 1-d array returned a T x T array.
+- Make `compute_ewm_cross_xy` accept the documented Series x DataFrame, Series x Series and 1-d
+  ndarray inputs, which raised `TypeError`, a numba `TypingError` or `IndexError`; a DataFrame
+  factor with a Series asset now raises a clear `TypeError` instead of `AttributeError`.
+- Make `compute_ewm_covar` honour `is_corr` for a single cross-section.
+- Make `compute_ewm_covar_newey_west` pass `ewm_lambda` and `nan_backfill` to its lag terms; with
+  only `ewm_lambda` given they used 0.94.
+- Make `compute_ewm_long_short_filter` accept a one-dimensional ndarray (numba `TypingError`).
+- Make `compute_ewm_xy_beta_tensor` scale free and never report a cross moment as a beta. A factor
+  second moment below 1e-8 replaced the inverse of the whole factor matrix by the identity, so a
+  0.5bp-volatility factor got "betas" of 1e-9 instead of 2.0, and a singular matrix fell back to
+  univariate betas. A factor with no variance now gets NaN betas while the others come from the
+  reduced system, and a numerically singular (unit-diagonal eigenvalue ratio below 1e-12) system
+  gives NaN. `compute_ewm_cross_xy` and `compute_ewm_beta_alpha_forecast` now mask only
+  non-positive denominators instead of any below 1e-8.
+- Fix the `compute_one_factor_ewm_betas` index-mismatch message, which printed `{x.index}`.
+- Make `compute_ewm_newey_west_vol` non-negative by construction: the lag-k term now carries the
+  factor `lambda^(k/2)`, the geometric mean of the EWM weights of the two dates it pairs, which
+  makes the estimator a Bartlett quadratic form. The unweighted lags turned negative from row 531
+  on `x_t = (-1)^t 0.94^(t/2)` and qis returned a NaN volatility and a ratio of 1; the corrected
+  variance there is `0.94^t`. The lag terms now honour `nan_backfill` (they always held their state
+  from a zero seed), and the ratio is NaN, not 1, where the EWM variance is not positive.
+  `compute_ewm_covar_newey_west` uses the same factor. On monthly synthetic returns at span 36 the
+  Newey-West variance ratio at the last date moves from 1.22 to 1.21.
+- Make `compute_ewm_std1_norm` return unit standard deviation for IID input, as its name and
+  docstring state: with the default same-span EWMA demeaning it returned `1 / sqrt(1 + lambda)`,
+  0.71 at span 260; it now multiplies by `sqrt(1 + lambda)` and seeds its final EWM at zero instead
+  of at its first value, which gave a transient of up to `sqrt(N)`.
+- Make the `compute_ewm_covar_tensor_vol_norm_returns` volatility point in time: it was seeded
+  with the full-sample mean of `x^2`; it now takes each column's first squared return (`X0`).
+- Make `filter_outliers` silence invalid-value warnings locally; it called `np.seterr`, changing
+  numpy's error state for the whole process.
+- Make `ewm_insample_winsorising` use NaN-aware quantiles, so a column with a missing value is
+  winsorised; make `compute_ewm_score` floor each column's volatility at that column's own
+  `clip_quantile` quantile instead of one quantile pooled over all columns.
+- Fix the two-dimensional branch of `ewm_winsdor_markovian_score`, which updated the state only
+  at outliers; a missing observation now holds the state in both branches, as documented.
+- Make the soft presets of `OutlierPolicyTypes` cut the EWM score at 3.57, the score of a
+  10-standard-deviation move at `lambda = 0.94` (new helper `score_of_move`): the contemporaneous
+  score is bounded by `sqrt(lambda / (1 - lambda)) = 3.96`, so the previous cut at 10 could never
+  fire.
+- **Behaviour change.** Make `estimate_rolling_ewma_covar(demean=True)` unbiased for iid returns.
+  It centred each return on an EWM mean that already included it, so the residual was
+  `lambda (x_t - m_{t-1})` and the covariance was scaled by `2 lambda^2 / (1 + lambda)`: 0.944 at
+  the default span of 52, variances 5.6% and volatilities 2.9% low. The residual is now the
+  one-step forecast error `x_t - m_{t-1}`, still point in time, and the matrix is multiplied by
+  `N / (N + 1)`. Every entry of every matrix rises by the factor `(1 + lambda) / (2 lambda^2)`,
+  1.0596 at span 52 (on the synthetic universe the 2020-09-30 US equity volatility moves from
+  17.6% to 18.1%); correlations and `demean=False` output do not change. Multiply by
+  `2 lambda^2 / (1 + lambda)` to reproduce earlier numbers. Ex-ante volatility, tracking error and
+  absolute risk contributions built on these matrices rise by 2.9%; percentage contributions do
+  not move.
+- **Behaviour change.** Make `estimate_rolling_ewma_covar` apply the end of `time_period`; only its
+  start was applied, so matrices after the end were returned. A `time_period` with a missing
+  start or end no longer raises.
+- **Behaviour change.** Compute the covariance of `compute_masked_covar_corr` on a panel with NaN
+  pairwise-complete, as documented: each pair is centred on the means of its overlap, as pandas
+  `DataFrame.cov` does, instead of on each series' full-history mean, and a pair with no common
+  date is NaN instead of -0.0. On the two-series example of the covariance chapter the covariance
+  moves from 0.25 to 1.0; on daily returns of the ragged synthetic universe entries move by less
+  than 4e-5 in correlation units. `bias=True` divides the overlap sum by the overlap count.
+- Make `apply_pca(eigen_signs=...)` flip whole eigenvectors. It flipped rows of the eigenvector
+  matrix (asset coordinates), so the result was no longer an eigen-decomposition (residual 0.88
+  on a 3x3 correlation matrix). Eigenvector `j` is now flipped when its first loading has the
+  opposite sign to `eigen_signs[j]`, and a sign vector of the wrong length raises `ValueError`.
+- Make `ewm_xy_convolution` run for every frequency. The horizon from `get_annualization_factor`
+  is a float for `'ME'`, `'QE'`, `'W-WED'`, `'D'` and `'YE'`, and pandas `rolling` and `shift`
+  rejected it, so only `'B'` worked; it is now an integer number of rows, and a frequency whose
+  factor is not a whole number is rejected with `ValueError`.
+- **Behaviour change.** Seed the second moments of `ewm_xy_convolution` at zero, like its cross
+  moment. They were seeded with full-sample means, a look-ahead: a run on a prefix of the data did
+  not reproduce the prefix of the full run (gap 0.09 at `freq='ME'`). At `freq='ME'` on synthetic
+  daily returns the estimates move by up to 0.72 at the first date, 0.14 one horizon later and
+  under 0.002 after three. New optional keyword `var_init_type`; `InitType.MEAN` restores the former seed.
+- **Behaviour change.** Seed the second moment of `compute_ewm_vector_autocorr` and
+  `compute_ewm_vector_autocorr_df` at zero. It was seeded with the full-sample `np.nanvar`, a
+  look-ahead that also pulled the early estimates towards zero (0.009 to 0.028 at rows 2 to 4 of
+  an AR(1) with coefficient 0.5 at span 60, against 0.37 to 0.45 now); the difference falls to
+  0.03 after one span and 0.001 after three. The vector estimator now equals the diagonal of
+  `compute_ewm_matrix_autocorr`. New optional keyword `var_init_type`; `InitType.VAR` restores the
+  former seed.
+- Report NaN instead of zero for the first `lag` rows of `compute_ewm_vector_autocorr` and
+  `compute_ewm_matrix_autocorr`, and NaN instead of an infinite ratio where the vector
+  estimator's second moment is zero.
+- Return NaN for the off-diagonal mean of `compute_ewm_matrix_autocorr(aggregation_type='mean')`
+  with a single column; it raised `ZeroDivisionError`.
+- Make `compute_path_lagged_corr` return the contemporaneous correlation of `a1` and `a2` at lag
+  0; it returned 1.0 for any pair. The autocorrelation kernels keep lag 0 at one.
+- Accept lag 0 in `compute_path_lagged_corr_given_lags` and `compute_path_autocorr_given_lags`;
+  it raised `ValueError`.
+- Name the dispersion Series of `estimate_acf_from_paths` `'std'`; it was named `'str'`.
+- Make `compute_autocorrelation_at_int_periods` reject `ewma_smoothin_span` with a
+  `NotImplementedError` that names the argument; it raised a bare `NotImplementedError`.
+- Add the f-prefix to the `ValueError` message of `compute_ewm_corr_single`, which printed
+  `{returns.columns}` literally.
+- **Behaviour change.** Make `compute_sum_freq_ra_returns(is_norm=True)` divide each calendar
+  period's sum of risk-adjusted returns by the square root of the number of observations in that
+  period. It divided by the square root of `get_annualization_factor(freq)`, the number of periods
+  per year, so the "normalised" sums of unit-variance daily terms had standard deviations of about
+  0.31 weekly, 1.32 monthly and 3.97 quarterly instead of 1. A period without observations is now
+  missing rather than zero. The same scale enters the non-overlapping mode of
+  `get_paired_rareturns_signals`. The old numbers are the new ones times
+  `sqrt(n_J / get_annualization_factor(freq))`; `is_norm=False` still returns the plain sums.
+- **Behaviour change.** Make the overlapping mode of `get_paired_rareturns_signals`
+  (`is_nonoverlapping=False`) pair the rolling sum over rows (t - span, t] with the signal at
+  t - span (`signal.shift(span)`). It used the signal at t - 1, which had already seen span - 1 of
+  the returns it was said to predict: on the ten clean synthetic instruments a 63-day momentum
+  signal with no true predictive power showed a correlation of 0.88 with its 63-day forward sums;
+  paired forward it is -0.07. There is no switch back; shift the returned indicator by
+  `1 - span` rows to reproduce the old pairing.
+- Make `get_paired_rareturns_signals` run under pandas 3: the default `freq` is now `'BQE'`
+  (the business quarter-end alias valid in pandas 2.2 and 3; `'BQ'` raised `ValueError` under
+  pandas 3 and meant the same period), and `is_mean_adjust_returns=True` no longer passes the
+  removed `axis` argument to `expanding`, which raised `TypeError`.
+- **Behaviour change.** Make `map_signal_to_weight(signal_map_type=SignalMapType.ExpCDF)` fade a
+  tail when only its own decay is given; a single `tail_decay_right` or `tail_decay_left` was
+  silently ignored. Passing both is unchanged.
+- Make `map_signal_to_weight` warn (`UserWarning`) when `SignalMapType.NormalCDF` or `LaplaceCDF`
+  receives `tail_level`, a slope or a tail decay away from its default; those maps read only
+  `loc` and `scale` and ignored the arguments silently.
+- **Behaviour change.** Make string horizons of `estimate_signal_diagnostics` (e.g. `'YE'`)
+  compound each asset's native returns within the period and keep a period only when the asset's
+  frame covers it and the asset has a finite return at every row inside it, the rule of integer
+  horizons. The rebuilt NAV was forward-filled, which gave exact-zero returns for whole periods
+  before an asset's first return and after its last (delisting), entered partial periods at the
+  sample edges as full-period returns, and treated a missing return inside a period as zero; the
+  first complete period of the sample was always lost. For month-end assets `'YE'` now has the
+  same pair content as `h=12` on a January phase, ragged starts and ends included.
+- **Behaviour change.** Annualise `IC_IR_an` in `estimate_ic_ir` with qis's annualisation factor
+  of the IC grid, `get_annualization_factor` of the finest native key divided by the integer
+  horizon, or `get_annualization_factor(label)` for a string horizon. It used 365.25 over the
+  median calendar-day gap of the IC dates: 11.78 on month-ends instead of 12 (ratio x0.991),
+  11.98 for samples shorter than a year, and 365.25 on business days instead of 252, overstating
+  the business-day annualised ratio by 1.20. A user `periods_per_year` is now the factor of the
+  native (h = 1) grid and is divided by h for each integer horizon; it was applied unscaled to
+  every horizon.
+- **Behaviour change.** Charge one residual degree of freedom per regression date in the pooled
+  and per-group t-statistics of `estimate_signal_diagnostics`: the residual variance uses
+  `n - T - 1` (T dates) instead of `n - 1` without intercept and `n - 2` with it, because the
+  cross-sectional demeaning at each date is a date fixed effect that also absorbs the intercept.
+  Under the null the old t-statistic was overstated by about `sqrt(n_t / (n_t - 1))`, 1.12 at the
+  default minimum of 5 names and 1.03 at 20; on the handbook example (20 names, 60 months) the
+  pooled t-statistic moves from 2.89 to 2.81. `compute_per_asset_betas` keeps `n - 1`.
+- Align a returns frame whose dates fall inside the periods of its key but off the
+  `resample(key)` labels (business month-ends under `'ME'`) to those labels in
+  `estimate_signal_diagnostics`, pairing each return with the last signal value observed at or
+  before the return date that ends the previous native period. Such dates were dropped silently:
+  a five-year business-month-end panel of 8 names under `'ME'` gave 344 pairs instead of 480.
+  Pairs are dated at the labels. A frame with several dates in one period of its key (finer than
+  its key) now warns.
+- Emit the `UserWarning` that `estimate_signal_diagnostics` documented for an asset listed in
+  several frequency frames; the asset is assigned to the first frame and its other frames are now
+  ignored by string horizons too, which previously added a duplicate column.
+- Warn (`UserWarning`, naming the first five) when `estimate_signal_diagnostics` drops assets of
+  `asset_returns_dict` that have no signal column; they were dropped silently.
+- Make `compute_ic_timeseries` and `estimate_ic_ir` raise `ValueError` for an IC `method` other
+  than `'spearman'` or `'pearson'`; any other value, such as `'kendall'`, silently computed a
+  Pearson IC.
+- Name the fitted model in the default suptitle of `plot_signal_diagnostics`: it always said
+  "(no intercept)", also for a result fitted with `fit_intercept=True`.
+- **Behaviour change (example).** Default `vol_af` of the delta-one example helpers in
+  `examples/portfolios/strats/qis_delta1.py` (`simulate_vol_target_strats`,
+  `simulate_trend_strats` and their `_range` variants) to 252, qis's business-day factor. With
+  260 the positions were `sqrt(252/260) = 0.985` of the size needed, so a 15% target delivered
+  about 14.8% realised volatility as qis reports it. Pass `vol_af=260` for the old sizing.
+- **Behaviour change.** Make the positivity rule of `bootstrap_ar_process` per column. A
+  non-positive step was replaced by the 25% quantile of that step's values across columns: for a
+  single series that quantile is the value itself, so the clamp never bit (a positive
+  dividend-yield-like series left 1.1% of 1,500-step path values at or below zero), and for a
+  panel it coupled independent columns, could itself be negative and rewrote mean-zero columns
+  (in a four-column test their average path level was 0.007-0.009 instead of about 0.0007). A
+  column whose observed values
+  are all positive is now floored at its own lower quartile; other columns are never constrained.
+  Pass the new optional keyword `is_positive=False` to switch the rule off. Results for a single
+  series that never reaches zero, and for mean-zero series, do not move.
+- **Behaviour change.** Make the constant-series test of `compute_ar_residuals` relative to scale.
+  An absolute tolerance of 1e-8 on the variance set the AR(1) slope to zero for any series with a
+  standard deviation below about 1e-4 (a persistent series with variance 8.6e-9 returned 0
+  instead of 0.903); a column is now constant only when its lagged range is at most 1e-12 of its
+  largest absolute value, so the slope no longer depends on units.
+- Make `bootstrap_price_data` with `SERIES_TO_DF` output honour supplied `bootstrapped_indices`
+  whose column count differs from `num_samples`; it repeated the anchor `num_samples` times and
+  raised a broadcast `ValueError` (for example with 2 supplied paths and the default 10).
+- Make `bootstrap_data` resample a Series as one column under the default `DF_TO_LIST_ARRAYS`
+  output, as its docstring promised; it raised a numba `TypingError`.
+- Make `bootstrap_data`, and through it `bootstrap_price_data` and
+  `bootstrap_price_fundamental_data`, reject supplied `bootstrapped_indices` outside the data
+  rows with `ValueError`. The `@njit` kernel has no bounds checking and returned adjacent memory
+  as observations (for example 9.5e-322). `bootstrap_ar_process` now also rejects negative
+  indices.
+- Forward `init_to_end` from `bootstrap_price_fundamental_data` to its price paths through a new
+  optional keyword (default `True`, the previous behaviour), and `is_positive` to its fundamental
+  paths. With `SERIES_TO_DF` output and `is_price_weighted_fundamentals=True` the function
+  raised `TypeError`, because it zipped two DataFrames; it now multiplies the paths element by
+  element.
+- Record `"grid_panels": 6` in the stress report manifest's display limits; the sensitivity page
+  draws up to six grid panels and `StressReportConfig.selected_grids` accepts six, but the
+  manifest said four.
 
 ### Changed
 
 - Label the rolling Sharpe statistic `RollingPerfStat.SHARPE` as "Sharpe ratio" in plot titles
   and legends; it previously read "Sharp ratio".
+- Format the normality-test p-value of `compute_desc_table` with the four decimals of
+  `PerfStat.NORMTEST`'s `ValueType.FLOAT4` instead of two, so 0.004 no longer prints as 0.00.
+- Return a table indexed by ticker with no columns from
+  `compute_desc_table(desc_table_type=DescTableType.NONE)`; it raised `TypeError`.
+- Give `PerfStat.ALPHA_AN` the wrapped label 'An\nAlpha'. It shared 'Alpha' with
+  `PerfStat.ALPHA`, so a wide table containing both could not tell them apart.
+- Change the default title of `plot_regime_data` from 'Conditional Excess Sharpe ratio' to
+  'Conditional Sharpe ratio'; no regime convention deducts cash.
+- State in `to_returns` and `prices_at_freq` that input already on the `freq` grid keeps its
+  missing values whatever `ffill_nans` says, the documented `df_asfreq` convention for periodic
+  data; `freq=None` fills them.
+- BEHAVIOUR CHANGE: default `EwmLinearModel.fit(init_type=InitType.X0)` instead of
+  `InitType.MEAN`. With a mean adjustment (`MeanAdjType.EWMA`), the old default seeded the EWMA
+  mean with the full-sample mean, a look-ahead with weight lambda^21 = 0.26 at the first
+  reported beta for span 31. On synthetic monthly returns with span 36 the betas at the first
+  reported date move by up to 0.28, by up to 0.16 one span later and by less than 0.01 three spans
+  later; on weekly returns with span 31 by up to 0.04 at the first date. The default
+  `MeanAdjType.NONE` is unaffected. Pass `init_type=InitType.MEAN` to restore the old values.
+- BEHAVIOUR CHANGE: chart legends of `reg_model_params_to_str` with `alpha_an_factor` print the
+  linear annualised alpha `AN * alpha`, the convention of `PerfStat.ALPHA_AN`, instead of
+  `expm1(AN * alpha)`: a monthly alpha of 1.3% now prints `+16%` rather than `+17%`. No qis report
+  passes `alpha_an_factor`.
+- **Behaviour change.** Default `limit_weights_to_max_var_limit(annualization_factor=252.0)`,
+  the factor qis applies to business-day returns; it was 260, which understated the one-day VaR
+  by a factor sqrt(252/260) ≈ 0.985 for volatilities annualised with 252, so capped weights are
+  now 1.55% smaller. Pass `annualization_factor=260` for the former caps.
+- **Behaviour change.** Default `PortfolioData.compute_portfolio_benchmark_betas(freq_beta='B',
+  factor_beta_span=63)`, the defaults of `compute_portfolio_benchmark_attribution`, so the betas
+  a report shows are the betas its attribution applies. They were `None` and 65; on a ten-asset
+  synthetic backtest the betas move by at most 0.0025. The factsheets pass both arguments
+  explicitly and are unaffected.
+- Add the optional `weight_lag` argument to `compute_portfolio_vol` (default 1, the former
+  behaviour); the correlated VaR uses `weight_lag=0`.
+- BEHAVIOUR CHANGE: default `nan_backfill` of `compute_ewm_covar`, `compute_ewm_covar_tensor`,
+  `compute_ewm_covar_tensor_vol_norm_returns` and `compute_ewm_covar_newey_west` is now
+  `NanBackfill.DEFLATED_FFILL` (a missing return is a zero return), which keeps every matrix
+  positive semidefinite; `FFILL` gave eigenvalues down to -0.10 of the largest and correlations
+  of 1.29 on a panel with 20% asynchronous gaps. This is also the default path of
+  `compute_ewm_corr_df` and `compute_data_pca_r2`. Complete data are unaffected; on the synthetic
+  panel the holiday gaps of `SEQ_EU` move EWM correlations by at most 0.08, and the correlations
+  of a delisted asset now decay towards zero instead of staying frozen. Pass
+  `nan_backfill=NanBackfill.FFILL` for the old behaviour.
+- BEHAVIOUR CHANGE: `compute_ewm_beta_alpha_forecast` defaults to `init_type=InitType.X0`; the
+  `MEAN` default seeded every moment with full-sample means, so the first beta was the
+  full-sample slope through the origin and early betas changed when later data were added (by up
+  to 0.07 on 120 simulated months). Its prediction is now the one-step-ahead forecast `beta_{t-1} x_t + alpha_{t-1}`
+  (NaN on the first row) instead of the same-date fit; the beta, alpha, residual-variance and R^2
+  outputs keep their contemporaneous definitions. The beta and factor-variance recursions now
+  honour `nan_backfill`, and the factor-variance frame carries the asset column labels. All
+  internal callers already passed `InitType.X0` and use only the betas and alphas; pass
+  `init_type=InitType.MEAN` for the old seed.
+- Add the optional `warmup_period=20` keyword to `compute_one_factor_ewm_betas`.
+- Compile `ewm_recursion`, `compute_ewm_long_short` and the internal matrix-update and Newey-West
+  kernels with a numba on-disk cache (in-memory when no cache location is writable): the first
+  `compute_ewm_sharpe` call in a new process takes about 2 s instead of 9 s.
+- Report `se_beta_dimson` and `t_beta_dimson`, the classical standard error and t-statistic of
+  the Dimson beta, as two new trailing columns of `estimate_dimson_beta`. Existing columns keep
+  their names and order.
+- Add the field `fit_intercept` (default `False`) to `SignalDiagnosticsResult`, set by
+  `estimate_signal_diagnostics`.
+- Add the optional keyword `is_positive` to `bootstrap_ar_process` and the optional keywords
+  `init_to_end` and `is_positive` to `bootstrap_price_fundamental_data`. Defaults keep the
+  documented behaviour; see Fixed for the corrected positivity rule.
 
 ### Documentation
 
@@ -73,6 +599,163 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `fetch_default_report_kwargs`.
 - Correct the `PerfStat` module docstring: without `rates_data` the excess columns equal their
   zero-rate counterparts rather than being undefined.
+- State in the `RegimeData` docstring that the p.a. and Sharpe panels are frequency-weighted
+  regime contributions, not within-regime statistics, and that under `SharpeConvention.PA` the
+  bars add up to `PA_RETURN / VOL`, which equals `SHARPE_RF0` only when the native endpoints lie
+  on the `freq_vol` grid.
+- Correct the `SharpeConvention` docstring: the regime branches use total returns, not excess
+  returns, and PA patches to the table's `PA_RETURN`.
+- Correct the `PerfParams` docstring: `freq` sets `freq_drawdown` only when that is passed as
+  None, `freq_skewness` also governs kurtosis, `freq_drawdown` governs `WORST` and `BEST`,
+  `freq_excess_return` is not read by any calculation, and without `rates_data` the excess columns
+  equal the zero-rate columns.
+- Document in the `PerfStat` docstring that `SHARPE_RF0` is the compound p.a. convention, that the
+  `ColVar` field `name` shadows `Enum.name` (kept; use `_name_`), and the grids of `WORST`, `BEST`,
+  `SKEWNESS` and `KURTOSIS`.
+- Document the `perf_params=None` inference of `compute_ra_perf_table`,
+  `compute_ra_perf_table_with_benchmark` (which sets `freq_reg` to the index frequency, not 'QE')
+  and `get_ra_perf_columns`, and that `get_ra_perf_columns` skips preset columns the
+  risk-adjusted table does not produce.
+- Document the Calmar numerator: native-endpoint `PA_EXCESS_RETURN`, because `MAX_DD` runs to the
+  final observation on `freq_drawdown`.
+- Document precisely the episode-start convention of `compute_drawdowns_stats_table` (first day of
+  the peak plateau, calendar-day durations for any non-None `freq`), the rebased output grid of
+  `compute_rolling_drawdown_time_under_water`, and the `>= 0`/`<= 0` filter and `is_max=True`
+  default of `compute_avg_max_dd`.
+- Correct the `perf_stats` module docstring: the arithmetic Sharpe pair is computed inline in
+  `compute_risk_table`, not by `compute_sharpe_arithmetic`, and the gap between the log and
+  simple-return volatilities is first order in the periodic volatility, not third order.
+- Update the performance-statistic catalogue, drawdowns, regime-conditional performance and
+  Sharpe chapters and the packaged Sharpe note to the fixed behaviour, with worked-example checks
+  of the missing Calmar and Sortino ratios, the month-end drawdown grid of a history ending
+  mid-month, the forwarded regime patch switch and the regime-average labels.
+- Correct the `adjust_component_navs_to_portfolio` docstring: the rescaled components'
+  per-annum returns sum to the portfolio's; the rescaled NAVs do not sum to the portfolio NAV.
+- Rewrite the cash-timing passages of the returns, notation, and backtesting chapters for the
+  unified rate known at t-1, with a proposition that a rate series starting on the first return
+  date is enough, and new worked checks through `compute_returns_dict` and a cash-only backtest.
+- Rewrite the interpolation section of Returns, NAVs, excess returns, fees and leverage with the
+  new definition, the exactness identity, the sum-of-squares proposition and its Brownian-motion
+  consequence, and a new worked example; update the fee, portfolio-NAV, keyword and
+  sampled-volatility passages.
+- Correct the return order in the `fit_multivariate_ols` docstring: it returns the prediction,
+  the parameters and the label, in that order.
+- Document `reg_model_params_to_str` and the legend keywords `alpha_an_factor`, `alpha_format`,
+  `beta_format` and `r2_only` in the shared plotting-arguments note.
+- State the warm-up of `EwmLinearModel.fit` exactly: positions 0 to `warmup_period` are
+  missing, `warmup_period + 1` rows (21 by default).
+- State the loading orientation in every `LinearModel`, `EwmLinearModel` and `RiskModel`
+  docstring: `RiskModel` holds assets by factors, `LinearModel.loadings` one dates-by-assets frame
+  per factor, and `get_loadings_at_date` factors by assets. The orientations are kept to preserve
+  the public API.
+- Document that the benchmark attribution applies log-return EWM betas to simple returns, an
+  exact identity in simple returns for the supplied betas and a second-order approximation of a
+  simple-return beta.
+- Document the arguments of `LinearModel.get_factor_alpha` and the centring and lag of
+  `get_model_ewm_r2`.
+- Describe the model-layer `beta_init_value` accurately: it is a one-observation prior that
+  replaces the first informative observation and stays in every later EWMA estimate with weight
+  lambda^k, not only a placeholder until the first lagged estimate. State that the full-sample
+  interval level is `confidence_level` and that the EWMA-WLS endpoint fit includes the net
+  full-model return when a net NAV is supplied.
+- Update the regression and HAC, factor risk model and benchmark-relative performance chapters
+  to the fixed behaviour, with worked examples that assert it.
+- Correct the docstrings of `compute_portfolio_vol` (the `init_type` argument seeds only the
+  optional mean adjustment; `nan_backfill` has no effect because missing returns are set to zero
+  first), `compute_portfolio_independent_var_by_ac` (the sum of standalone VaRs is the
+  undiversified, perfectly aligned bound, not a VaR of independent assets), and the internal
+  `calculate_marginal_active_risk` (it returns the gradient of active variance, not marginal
+  active risk).
+- Correct the `PortfolioData.compute_portfolio_benchmark_attribution` docstring: the attribution
+  is per-period simple returns and nothing is compounded.
+- Rewrite the pitfalls of the Portfolio risk and Euler contributions chapter for the fixed
+  behaviour: the point-in-time EWM seed and its warm-up bias, one covariance and one weight
+  timing for both VaR figures, Euler TE contributions from the single-matrix function, as-of
+  covariance-implied risk, the 252-day VaR cap and ex-post Euler P&L risk shares. The tracking
+  error chapter now names the single-matrix TE decomposition.
+- Document `InitType`, `CrossXyType`, `ReplacementType` and `OutlierPolicyTypes` with
+  `Attributes:` sections, and add Google-style docstrings to `compute_ewm_sharpe`,
+  `compute_ewm_alpha_r2_given_prediction`, `compute_one_factor_ewm_betas`, `compute_ewm_score`,
+  `filter_outliers` and `ewm_insample_winsorising`. State that `MeanAdjType.INSAMPLE` is
+  forward-looking in `compute_roll_mean`, that norm 1 of `compute_ewm_sharpe` divides by a second
+  moment about zero, how the `beta_init_value` prior enters, and that the first output of
+  `compute_ewm_covar_tensor_vol_norm_returns` is always the covariance (`is_corr` switches the
+  second).
+- Rewrite the exponentially weighted estimators chapter for the fixed behaviour: the seed as the
+  state before the first observation, the four `NanBackfill` policies, point-in-time defaults,
+  the PSD-safe covariance default, scale-free betas, a proof that the EWM Newey-West variance is a
+  Bartlett quadratic form and so non-negative, and the variance `1/(1 + lambda)` of the demeaned
+  `compute_ewm_std1_norm` signal. The worked examples assert the new numbers.
+- Document the pair selection of `CorrMatrixOutput`: `FULL` returns pairs (i, j) with j < i, and
+  `SUB_TOP` returns the same pairs as `FULL` (kept for compatibility; `compute_ewm_corr_single`
+  uses it). The `compute_ewm_corr_df` docstring claimed j > i.
+- State in `estimate_acf_from_paths` that the default `is_pacf=True` returns partial
+  autocorrelations, that lag 0 is included and that the dispersion uses `ddof=0`; document that
+  `estimate_acf_from_path` drops NaNs, compressing gaps, and accepts an ndarray.
+- Document that `demean` has no effect in `compute_autocorrelation_at_int_periods` and that `span`
+  is a block length, not an EWM span.
+- Add docstrings to `compute_pca_r2` (whose annotation now says it returns one array),
+  `compute_data_pca_r2`, `matrix_regularization`, `compute_ewm_corr_df`, `compute_ewm_corr_single`,
+  the `compute_path_*` kernels and the EWM autocorrelation functions, and state in the `pca`
+  module that the default sign convention cannot prevent a flip under a near tie of the two
+  largest loadings.
+- Replace the stale module docstring of `dimson_beta.py` and document the `num_lags=0` case.
+- Correct `plot_corr_matrix_from_covar`, which named `covar_to_corr` as its conversion.
+- Update the covariance and serial-dependence chapters and their worked examples for the fixed
+  behaviour: the unbiased EWM covariance, overlap-mean pairwise covariance, both ends of
+  `time_period`, `eigen_signs`, point-in-time EWM autocorrelations, the horizon convolution at
+  every frequency, lag-0 cross-correlations and the Dimson standard error.
+- State in `compute_ra_returns` and the `ra_returns` module docstring that the volatility and
+  `vol_target` are per period of the return grid (an annual target enters as
+  `sigma_annual / sqrt(AN)`), add the missing Google-style docstring, and remove the redundant
+  branch that set `annualize=False` twice.
+- Correct the `compute_ewm_long_short_filtered_ra_returns` docstring: `weight_lag` lags the
+  volatility normaliser, not the filter output. The output is a signal dated at formation, from
+  returns through t (single leg) or t - 1 (two legs), applied over (t, t+1].
+- Document `map_signal_to_weight` and `SignalMapType` exactly: the constant 1.5625 = 1.25^2 puts
+  the `ExpCDF` anchor at 1.25 sqrt(scale), where the weight equals `slope_right` or `slope_left`
+  (weight levels, not derivatives); `scale` acts as a variance; `tail_level` is both the weight
+  cap and the fading threshold; `ExpCDF` is a Gaussian-shaped map with zero slope at the centre,
+  not the distribution function of an exponential law.
+- Explain in `compute_returns_transform` why its defaults `momentum_span=31` and `vol_span=33`
+  differ from those of `compute_ewm_ra_returns_momentum`: span 31 matches the mean age of the
+  31-row rolling transform and span 33 gives the RiskMetrics decay 0.94.
+- Correct the `fit_intercept` docstring of `estimate_signal_diagnostics`: demeaning the returns
+  does not make the intercept zero; it is `-beta * mean(z)`, zero only when the pooled signal
+  mean is zero. Document the `is_log_returns=True` default against the simple-return default of
+  `qis.to_returns`, the column order of `SignalDiagnosticsResult.pairs` (with `r`), and describe
+  `IC_IR` as the stability of the IC over time rather than "breadth-adjusted".
+- Update the handbook chapters Risk-adjusted returns and volatility targeting and Signal
+  diagnostics for the fixed behaviour: unit-variance calendar sums, forward pairing with a measured
+  look-ahead example, per-side tail fading, complete-period string horizons, `n - T - 1` degrees
+  of freedom with a new proposition that makes the pooled standard error unbiased under the null,
+  qis annualisation of the IC ratio, and the corrected worked-example numbers.
+- Correct the `qis.models.bootstrap` module docstring: `seed` seeds numba's generator only, and a
+  draw neither reads nor changes numpy's global random state.
+- State the anchor convention of `bootstrap_price_data`: row 0 of every path is the anchor and
+  the return drawn at index row 0 is not used, so a path of `index_length` levels carries
+  `index_length - 1` returns; pass `index_length=K + 1` for `K` returns after the anchor.
+- Add Google-style docstrings to `bootstrap_ar_process` and `bootstrap_price_fundamental_data`,
+  including the one-step offset between price and fundamental paths, the full-sample-mean start
+  of the fundamentals and the element-by-element price weighting.
+- Correct `examples/models/ar_bootstrap_gaps.py`: the gap rule changed in 5.2.1, not before
+  5.1.1. Title the `examples/models/bootstrap_analysis.py` plots as partial autocorrelations,
+  which is what `estimate_acf_from_paths(..., is_pacf=True)` computes.
+- Correct the stress report page counts in the packaged notes `qis/docs/portfolio_stress.md` and
+  `qis/docs/stress_testing.md`: twelve analysis pages, an optional parser appendix as page 13
+  and a final notation guide, not nine pages and a tenth appendix. The loadings page is page
+  nine, and the PDF shows up to six grid panels, not four.
+- Document the cluster page exactly: its heatmap shows the first 12 scenarios of the
+  conditional-comparison batch, and the contributor column names the three largest absolute
+  holding P&Ls in each row's worst scenario of that batch, chosen over all its scenarios, so it
+  can lie beyond the 12 displayed columns. The PDF footnote says so too.
+- Document that `KinkPolicy` binds only when the quote equals the strike exactly, with no
+  tolerance, in the `KinkPolicy` and `InstrumentLeg.get_quote_delta` docstrings, the packaged
+  note and the portfolio stress chapter.
+- Update Resampling and the bootstrap for the fixed behaviour: the per-column positivity floor
+  with a proposition and proof, the relative constant test with a units identity, the anchor-row
+  convention, the forwarded arguments and function contracts, and a new worked example that
+  checks the floor and the units invariance against a numpy recursion.
 
 ## [5.30.3] - 2026-09-22
 
