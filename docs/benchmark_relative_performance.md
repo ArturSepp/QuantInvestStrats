@@ -39,8 +39,8 @@ The chapter's main messages:
 1. The table's alpha and beta are a full-sample ordinary least squares (OLS) fit on the grid
    `PerfParams.freq_reg`, quarterly by default. They describe the sample; they are not point in
    time.
-2. `ALPHA_AN` annualises alpha linearly, $\mathrm{AN}\,\hat\alpha$. Scatter-plot legends can
-   show $e^{\mathrm{AN}\hat\alpha}-1$ instead. The two conventions differ at second order.
+2. `ALPHA_AN` annualises alpha linearly, $\mathrm{AN}\,\hat\alpha$, and scatter-plot legends use
+   the same convention. Compounding, $e^{\mathrm{AN}\hat\alpha}-1$, differs at second order.
 3. Alpha is estimated with a standard error of about the residual volatility divided by the
    square root of the sample length. When $R^2$ is low, alpha is as noisy as a mean return.
 4. Tracking error is the volatility of the return *difference*. It is not the difference of
@@ -183,13 +183,15 @@ $$
 with $\mathrm{AN}$ from `qis.get_annualization_factor(freq_reg)`. This is the arithmetic-mean
 convention: $\hat\alpha$ is a difference of means, and means annualise by $\mathrm{AN}$.
 
-Scatter-plot legends use another convention. `qis.plot_scatter` and `qis.plot_returns_scatter`
+Scatter-plot legends follow the same convention. `qis.plot_scatter` and `qis.plot_returns_scatter`
 format the fitted equation with the internal helper `qis.utils.regression.reg_model_params_to_str`.
 When the keyword `alpha_an_factor` is passed through their keyword arguments, the legend prints
-$e^{\mathrm{AN}\hat\alpha}-1$ as a whole percentage. Without it, the legend prints the
-per-period intercept as a two-decimal number, which rounds a typical monthly alpha to `+0.00`.
+$\mathrm{AN}\,\hat\alpha$ as a whole percentage, the table's figure. Without it, the legend prints
+the per-period intercept with `alpha_format`, by default a two-decimal number, which rounds a
+typical monthly alpha to `+0.00`; `alpha_format='{0:+0.2%}'` prints it as a percentage. Until the
+handbook follow-up the legend compounded, printing $e^{\mathrm{AN}\hat\alpha}-1$.
 
-**Proposition (gap between the conventions).** For $z=\mathrm{AN}\hat\alpha$,
+**Proposition (gap between linear and compounded annualisation).** For $z=\mathrm{AN}\hat\alpha$,
 
 $$
 e^{z}-1-z=\tfrac12 z^{2}e^{\xi}\quad\text{for some }\xi\text{ between }0\text{ and }z .
@@ -402,9 +404,14 @@ Both conditions are approximations. Weighted log returns are not the portfolio l
 [Notation and conventions](notation_and_conventions.md)), and after a rebalance the holdings-based
 beta moves at once while a beta estimated from the NAV would adjust over the EWMA memory.
 
-After aggregation, dates whose portfolio beta is exactly zero are set to missing and forward
-filled, to bridge holidays. A genuinely zero exposure, for example a portfolio fully in cash, is
-therefore reported with the previous beta. `PortfolioData.compute_portfolio_benchmark_betas`
+The weights entering the sum are those in force on each beta date, selected as of that date (the
+last weight row at or before it), so a calendar month-end that falls on a weekend uses the
+Friday weights. The portfolio beta is missing during the warm-up, before the first weight row,
+and wherever an instrument with a non-zero weight has no beta; a missing weight means the
+instrument is not held. A genuinely zero exposure, for example a portfolio fully in cash, is
+reported as zero. Until the handbook follow-up, weights were matched to beta dates exactly, zero
+betas were treated as holidays and replaced by the previous value, and the warm-up showed zero.
+`PortfolioData.compute_portfolio_benchmark_betas`
 passes `PortfolioData.get_weights()`, which by default samples weights weekly (`W-WED`) and
 forward-fills them onto the price grid.
 
@@ -464,15 +471,19 @@ full-sample regression with one constant beta has no term for it and cannot sepa
 alpha. The lagged attribution books it in the benchmark contributions $A_{q,t}$, not in
 $\eta_t$.
 
-While the lagged beta is still missing in the warm-up, $A_{q,t}$ is missing, the row sum skips it,
-and $\eta_t=r_{p,t}$: the whole return is reported as `Alpha`. Start cumulative attribution after
-the warm-up, for example with `time_period`, or drop those rows.
+While any lagged beta is still missing in the warm-up, $A_{q,t}$ and $\eta_t$ are both missing:
+the decomposition is undefined, and the residual does not absorb the return. A cumulative sum
+therefore starts at the first attributed period. Until the handbook follow-up the row sum
+skipped the missing contributions and reported the whole warm-up return as `Alpha`.
 
 `qis.compute_benchmarks_beta_attribution_from_prices` applies the definition to a NAV and
 benchmark prices reindexed with forward fill onto the beta dates.
 `qis.compute_benchmarks_beta_attribution_from_returns` applies it to returns: benchmark returns
-are reindexed onto the portfolio return dates without fill, the first row of the (optionally
-clipped) output is set to zero, and `total_name` adds the total return as a column.
+are reindexed onto the portfolio return dates without fill, and `total_name` adds the portfolio
+return as a column, which is filled in the warm-up as well. Both functions keep every row,
+including the first row after `time_period` clipping; the returns variant no longer overwrites
+its first row with zeros. The row dated $t$ attributes the return over $(t-1,t]$, so cumulate
+from the row after a base date to measure performance from that date.
 
 ## Worked example
 
@@ -532,7 +543,8 @@ $t$-statistic is about 1.28. Annualised, the residual volatility is 1.88% and th
 of `ALPHA_AN` is about $1.88\%/\sqrt{6}\approx0.77\%$. The same prices with the default
 `PerfParams()` regress 24 quarterly returns: $\hat\alpha\approx0.231\%$ per quarter, `ALPHA_AN`
 $\approx0.93\%$, $\hat\beta\approx0.784$ and p-value about 0.35. A legend with
-`alpha_an_factor=12` shows $e^{12\hat\alpha}-1\approx0.99\%$, printed as `+1%`.
+`alpha_an_factor=12` shows $12\hat\alpha\approx0.98\%$, printed as `+1%`; compounding would give
+$e^{12\hat\alpha}-1\approx0.99\%$.
 
 ```python
 # classical standard error of alpha and its residual-volatility approximation
@@ -556,7 +568,7 @@ assert np.isclose(q_row[ALPHA_AN], 4.0 * coef_q[0], rtol=1e-12)
 assert abs(q_row[ALPHA] - 0.00231) < 5e-6 and abs(q_row[ALPHA_AN] - 0.0093) < 5e-5
 assert abs(q_row[BETA] - 0.784) < 5e-4 and abs(q_row[P_ALPHA] - 0.35) < 0.01
 
-# legend convention against the linear table convention
+# compounded annualisation against the linear convention of tables and legends
 assert abs(np.expm1(12.0 * coef[0]) - 0.0099) < 5e-5
 assert abs(np.expm1(0.20) - 0.2214) < 5e-5 and abs(np.expm1(-0.20) + 0.1813) < 5e-5
 ```
@@ -597,8 +609,10 @@ Methodology section on log returns. The benchmark's beta to itself is 1, so the 
 times the portfolio sleeve's beta plus 0.4. The first beta is dated 2021-09-30, after the 21-row
 warm-up; the last is about 0.87, against $0.6\times0.805+0.4\approx0.88$ from the full-sample
 regression. The attribution uses the previous month's beta times the simple benchmark return and
-reconciles exactly to the fund return. During the warm-up, the 21 monthly returns are booked
-entirely as `Alpha`.
+reconciles exactly to the fund return in every attributed month. During the warm-up the first 22
+rows (the start date and 21 returns without a lagged beta) are missing in both columns rather
+than booked as `Alpha`. Moving the fund fully into cash for its last six months gives a beta of
+exactly zero on those dates.
 
 ```python
 weights = pd.DataFrame({'Portfolio': 0.6, 'Benchmark': 0.4}, index=dates)
@@ -642,12 +656,21 @@ assert np.nanmax(np.abs(beta_fund - beta_simple)) < 0.0025
 # attribution: beta at t-1 times the simple benchmark return over (t-1, t]
 np.testing.assert_allclose(attribution['Benchmark'].to_numpy(),
                            np.r_[np.nan, beta_fund[:-1] * r_b], rtol=1e-10, atol=1e-15)
-np.testing.assert_allclose(attribution.sum(axis=1).iloc[1:], fund_r, atol=1e-14)
 
-# warm-up: while the lagged beta is missing, the whole return is reported as Alpha
+# warm-up: while the lagged beta is missing, neither contribution nor residual is defined
 warm = attribution['Benchmark'].isna().to_numpy()[1:]
-assert warm.sum() == 21
-np.testing.assert_allclose(attribution['Alpha'].iloc[1:][warm], fund_r[warm], atol=1e-14)
+assert warm.sum() == 21 and attribution.iloc[:22].isna().all().all()
+np.testing.assert_allclose(attribution.sum(axis=1).iloc[1:][~warm], fund_r[~warm], atol=1e-14)
+
+# a fund fully in cash has beta zero, not the beta of its last invested month
+in_cash = weights.copy()
+in_cash.iloc[-6:] = 0.0
+betas_cash = qis.compute_portfolio_ewm_benchmark_betas(
+    instrument_prices=prices, weights=in_cash, benchmark_prices=prices[['Benchmark']],
+    factor_beta_span=span)
+assert (betas_cash['Benchmark'].iloc[-6:] == 0.0).all()
+np.testing.assert_allclose(betas_cash['Benchmark'].iloc[:-6], betas['Benchmark'].iloc[:-6],
+                           rtol=1e-12)
 
 # beta level and beta timing after the warm-up
 b_lag, r_bt, x_f = beta_fund[:-1][~warm], r_b[~warm], (fund_r - r_b)[~warm]
@@ -668,7 +691,7 @@ because the synthetic fund does not time its exposure.
 | Alpha, beta, $R^2$ | OLS of $r_p$ (or $\tilde r_p$) on $r_b$ (or $\tilde r_b$) on `freq_reg` | `qis.compute_ra_perf_table_with_benchmark` columns `PerfStat.ALPHA`, `PerfStat.BETA`, `PerfStat.R2`; internal `qis.utils.regression.estimate_ols_alpha_beta` |
 | Annualised alpha | $\mathrm{AN}\,\hat\alpha$ with $\mathrm{AN}$ of `freq_reg` | `PerfStat.ALPHA_AN` |
 | Alpha p-value | Student $t$, $T-2$ degrees of freedom, classical standard error; 1.0 for the benchmark row | `PerfStat.ALPHA_PVALUE` |
-| Legend alpha | $e^{\mathrm{AN}\hat\alpha}-1$ when `alpha_an_factor` is passed | `qis.plot_scatter`, `qis.plot_returns_scatter`; internal `qis.utils.regression.reg_model_params_to_str` |
+| Legend alpha | $\mathrm{AN}\,\hat\alpha$ when `alpha_an_factor` is passed, else the periodic $\hat\alpha$ | `qis.plot_scatter`, `qis.plot_returns_scatter`; internal `qis.utils.regression.reg_model_params_to_str` |
 | HAC alpha inference | Bartlett-kernel HAC standard error | internal `qis.utils.regression.estimate_ols_alpha_beta_hac`; `qis.estimate_ewma_alpha_beta_hac` |
 | Tracking error, information ratio | $\sqrt{\mathrm{AN}}\,s(x)$, $\sqrt{\mathrm{AN}}\,\bar x/s(x)$ | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
 | One-factor EWMA beta and alpha | $\mathrm{EWM}(r_br_i)/\mathrm{EWM}(r_b^2)$, $\mathrm{EWM}(r_i-\beta_ir_b)$ | `qis.compute_ewm_beta_alpha_forecast` |
@@ -724,8 +747,8 @@ Sources:
   selects the per-period `ALPHA`; `BENCHMARK_TABLE_COLUMNS` selects `ALPHA_AN`.
 - **Cumulated attribution is a sum.** Factsheets plot the cumulative sum of $A_{q,t}$ and
   $\eta_t$. The sum is additive across components but is not the compounded return.
-- **Zero beta is overwritten.** An exact zero portfolio beta is treated as a holiday and replaced
-  by the previous value.
+- **Missing is not zero.** Portfolio betas and attribution rows are missing during the warm-up and
+  wherever a held instrument has no beta; a zero portfolio beta is a genuine zero exposure.
 
 ## See also
 

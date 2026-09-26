@@ -54,7 +54,7 @@ only referenced here.
 | Mean adjustment | None by default: EWM moments about zero (regression through the origin) and an uncentred $R^2$ |
 | Timing | $\hat B_t$ uses data up to and including $t$; apply $\hat B_{t-1}$ to $f_t$; weights as of each covariance date |
 | Output units | Exposures in weight units; variances in covariance units; contributions in volatility units or shares |
-| qis default | `estimate_ewm_factor_model(freq='W-WED', span=26)`; `EwmLinearModel.fit(span=31, warmup_period=20)` |
+| qis default | `estimate_ewm_factor_model(freq='W-WED', span=26)`; `EwmLinearModel.fit(span=31, init_type=InitType.X0, warmup_period=20)` |
 
 Let $n$ be the number of assets and $K$ the number of factors.
 
@@ -84,10 +84,12 @@ Let $n$ be the number of assets and $K$ the number of factors.
 | $W$ | Warm-up | `warmup_period`, count of sampled periods |
 | $k$ | Loading lag in the diagnostics | $k\in\{0,1\}$ |
 | $\hat\varepsilon^{(k)}_{i,t}$ | Model residual with lag $k$ | The code's "factor alpha" |
-| $Q^{\varepsilon}_{i,t}$, $Q^{r}_{i,t}$ | EWM second moments of residual and of return | About zero |
+| $\mathcal{T}_{i,t}$, $n_{i,t}(m)$ | Dates up to $t$ with finite residual and return of asset $i$; number of those dates after $m$ | Common sample of the two sums in $R^2_{i,t}$ |
+| $Q^{\varepsilon}_{i,t}$, $Q^{r}_{i,t}$ | EWM-weighted sums of squared residual and squared return over $\mathcal{T}_{i,t}$ | About zero |
 | $R^2_{i,t}$ | EWM coefficient of determination | Dimensionless, clipped to $[0,1]$ |
-| $C$, $\bar\rho_i$, $a_i$ | Residual correlation matrix; mean off-diagonal correlation of asset $i$; implemented average | Dimensionless |
+| $C$, $\bar\rho_i$ | Residual correlation matrix; mean off-diagonal correlation of asset $i$ | Dimensionless |
 | $X_{q,t}$ | Aggregated factor exposure on a loading date | Weight units |
+| $w_{i,(t)}$ | Weight of asset $i$ in force at $t$: the last weight row dated at or before $t$ | A missing entry means not held |
 
 The model rests on three assumptions:
 
@@ -135,10 +137,11 @@ For 500 stocks and 10 factors that is 5,555 parameters instead of 125,250, and t
 $\Sigma$ is positive definite whenever $\Sigma_f$ is positive semi-definite and every $\psi_i>0$.
 The treatment follows Grinold and Kahn (2000), whose exposure matrix is our $B$.
 
-> **Pitfall.** qis uses two orientations for the same loadings. `RiskModel.factor_loadings[date]`
-> and the stress-testing `betas` are assets by factors ($B$). `LinearModel.get_loadings_at_date`
-> returns factors by assets ($B^{\top}$), and `EwmLinearModel.loadings` stores one dates-by-assets
-> frame per factor. Transpose before passing an estimated snapshot to `RiskModel`.
+> **Pitfall.** qis uses two orientations for the same loadings, by design, because changing either
+> would break the public API. `RiskModel.factor_loadings[date]` and the stress-testing `betas`
+> are assets by factors ($B$). `LinearModel.get_loadings_at_date` returns factors by assets
+> ($B^{\top}$), and `EwmLinearModel.loadings` stores one dates-by-assets frame per factor. Every
+> docstring states its orientation. Transpose before passing an estimated snapshot to `RiskModel`.
 
 ### Exposures and the systematic-residual variance split
 
@@ -342,10 +345,13 @@ are in [Exponentially weighted estimators](ewm_estimators.md). Three consequence
 `mean_adj_type` chooses the regression. `MeanAdjType.NONE`, the default, regresses through the
 origin on moments about zero. `MeanAdjType.EWMA` and `MeanAdjType.EXPANDING` first subtract a
 point-in-time mean from both panels, which turns the moments into covariances. `init_type` seeds
-that EWM mean and has no effect under `NONE`. Its default, `InitType.MEAN`, seeds with the
-full-sample mean and so leaks later data into early estimates with weight $\lambda^t$. For span 31
-this weight is still about 0.26 at the first reported loading ($\lambda^{21}$); pass
-`InitType.X0` for a point-in-time seed, as `compute_portfolio_ewm_benchmark_betas` does.
+that EWM mean and has no effect under `NONE`. Its default, `InitType.X0`, seeds with the first
+observation, so every loading dated $t$ uses returns up to $t$ only. The demeaned panels serve the
+moments only: the model's `x` and `y` keep the returns as supplied. `InitType.MEAN`, the default
+until the handbook follow-up and still available, seeds with the full-sample mean and so leaks
+later data into early estimates with weight $\lambda^t$, about 0.26 at the first reported loading
+for span 31 ($\lambda^{21}$). On monthly synthetic returns with span 36 the two seeds differed by
+up to 0.28 in beta at the first reported loading and by less than 0.01 three spans later.
 
 `estimate_ewm_factor_model(asset_prices, factor_prices, freq='W-WED', span=26,
 mean_adj_type=MeanAdjType.NONE)` is the price-level entry point. It forms log returns on the
@@ -368,7 +374,8 @@ $\hat B_t$ uses returns up to and including $t$. It therefore explains $r_t$ in 
 forecast only for returns after $t$. The implementation follows this rule by default:
 
 - `LinearModel.get_factor_alpha(lag=1)` applies $\hat B_{t-1}$ to $f_t$;
-  `get_asset_factor_attribution` always shifts the loadings by one period.
+  `get_asset_factor_attribution` always shifts the loadings by one period, and its `Total` is
+  missing on the dates where a lagged loading is missing.
 - `lag=0` applies $\hat B_t$ to $f_t$ and is an in-sample fit. `get_model_ewm_r2` defaults to it.
 - A `RiskModel` snapshot dated $t$ should hold $\hat B_t$, $\hat\Sigma_{f,t}$ and
   $\hat\psi_t$ estimated from data up to $t$, and describes risk over the following
@@ -398,49 +405,52 @@ smooths the result with `qis.compute_ewm`. The code calls this "factor alpha". I
 of a regression without an intercept, so it contains any intercept plus noise; it is not an
 intercept estimate.
 
-**Definition (EWM $R^2$).** `get_model_ewm_r2(span=52, lag=0)` returns
+**Definition (EWM $R^2$).** With $\mathcal{T}_{i,t}$ the dates up to $t$ on which both
+$\hat\varepsilon^{(k)}_{i}$ and $r_i$ are finite, and $n_{i,t}(m)$ the number of those dates after
+$m$, `get_model_ewm_r2(span=52, lag=0)` returns
 
 $$
 \begin{aligned}
-Q^{\varepsilon}_{i,t}&=\operatorname{EWM}_N\big[(\hat\varepsilon^{(k)}_i)^2\big]_t,
+Q^{\varepsilon}_{i,t}&=\sum_{m\in\mathcal{T}_{i,t}}\lambda^{n_{i,t}(m)}\big(\hat\varepsilon^{(k)}_{i,m}\big)^2,
 \qquad
-Q^{r}_{i,t}=\operatorname{EWM}_N\big[r_i^2\big]_t,\\
+Q^{r}_{i,t}=\sum_{m\in\mathcal{T}_{i,t}}\lambda^{n_{i,t}(m)}r_{i,m}^2,\\
 R^2_{i,t}&=\min\big\{1,\ \max\{0,\ 1-Q^{\varepsilon}_{i,t}/Q^{r}_{i,t}\}\big\},
 \end{aligned}
 $$
 
-with span $N=52$ and $k=0$ by default. It differs from a textbook $R^2$ in three ways. It is
-uncentred: the denominator is a second moment about zero, not a variance. At the default lag it is
-in sample. The two EWMs start differently: the residual EWM starts from zero at the first finite
-residual, after the warm-up, while the return EWM starts from $r_{i,0}^2$ at the first return.
-At lag 0 the numerator is therefore deflated by about the factor $1-\lambda^{t-W}$, so for
-roughly one span after the warm-up $R^2$ is biased towards one.
+with span $N=52$ and $k=0$ by default. The two sums run over the same dates with the same weights,
+so no seed and no normalisation enters the ratio: it is the uncentred $R^2$ of the lag-$k$ fit on
+the weighted window, and on the first date after the warm-up it is the single-observation ratio
+$1-(\hat\varepsilon^{(k)}_{i,m})^2/r_{i,m}^2$. It differs from a textbook $R^2$ in two deliberate
+ways. It is uncentred: the denominator is a second moment about zero, not a variance, matching the
+regression through the origin that `fit` runs by default. At the default lag it is in sample; pass
+`lag=1` for the point-in-time version. Until the handbook follow-up the residual moment started
+from zero after the warm-up while the return moment had run since the first return, which pushed
+$R^2$ towards one for roughly a span after the warm-up.
 
-**Identity (implemented average residual correlation).** `get_model_residuals_corrs(span=52)`
-returns the EWM correlation matrix $C$ of the lag-0 residuals at the last date only, from moments
-about zero with a zero seed, and the per-asset average
-$a_i=\tfrac12\cdot\tfrac1n\sum_j(C_{ij}-\delta_{ij})$. With the mean off-diagonal correlation
-$\bar\rho_i=\tfrac1{n-1}\sum_{j\ne i}C_{ij}$,
+**Definition (average residual correlation).** `get_model_residuals_corrs(span=52)` returns the
+EWM correlation matrix $C$ of the lag-0 residuals at the last date only, from moments about zero
+with a zero seed, and for each asset the mean off-diagonal correlation
 
 $$
-a_i=\frac{n-1}{2n}\,\bar\rho_i .
+\bar\rho_i=\frac{1}{n-1}\sum_{j\ne i}C_{ij},
 $$
 
-**Proof.** $C_{ii}=1$, so the diagonal terms of $C-I$ vanish and
-$\sum_j(C_{ij}-\delta_{ij})=(n-1)\bar\rho_i$. $\square$
-
-The returned average is therefore not the mean off-diagonal correlation: it is one third of it for
-three assets and tends to one half as $n$ grows. Rescale by $2n/(n-1)$ to recover $\bar\rho_i$.
-Material residual correlation means the diagonal $\Psi$ misses common risk.
+which is NaN for a single asset. Until the handbook follow-up the function returned
+$\tfrac{n-1}{2n}\bar\rho_i$ instead, one third of $\bar\rho_i$ for three assets. Material residual
+correlation means the diagonal $\Psi$ misses common risk.
 
 **Definition (aggregated exposures).** `compute_agg_factor_exposures(weights)` returns
-$X_{q,t}=\sum_i\hat B_{iq,t}w_{i,t}$ on the loading dates, with same-date loadings. Weights are
-reindexed onto the loading dates and forward-filled; weight rows dated off that grid are dropped,
-and missing loadings count as zero, so warm-up rows show zero exposure rather than NaN.
+$X_{q,t}=\sum_i\hat B_{iq,t}w_{i,(t)}$ on the loading dates, with same-date loadings and the
+weights in force at $t$, selected as of $t$; weight rows dated off the loading grid therefore
+count from their own date on. The sum runs over the assets with a non-zero weight. $X_{q,t}$ is
+missing before the first weight row and wherever a held asset has no loading, which includes the
+warm-up rows; a portfolio of zero weights has exposure zero. Until the handbook follow-up weights
+were matched to loading dates exactly and missing loadings counted as zero.
 
 **Definition (factor risk contribution shares).** For each date $t$ of `x_covars`,
-`compute_factor_risk_contribution(weights)` takes the last weights and loadings at or before
-$t$, the residual variances on exactly $t$, forms $x=\hat B_t^{\top}w$ and returns
+`compute_factor_risk_contribution(weights)` takes the last weights, loadings and residual
+variances at or before $t$, forms $x=\hat B_t^{\top}w$ over the held assets and returns
 
 $$
 \frac{x_q(\Sigma_fx)_q}{\sigma^2},
@@ -453,9 +463,12 @@ $$
 with $\sigma^2=\sigma_{\mathrm{sys}}^2+\sigma_{\mathrm{res}}^2$. The factor shares and the
 residual share sum to one; they equal $c_q/\sigma$ and $\sum_ic^{\varepsilon}_i/\sigma$ and form
 the second output, with the residual share in an `Idiosyncratic` column. The third expression is
-the third output. The first output divides the second by its row sum, which changes it only when
-a share is missing, and the fourth holds $\sigma_{\mathrm{sys}}^2$ and
-$\sigma_{\mathrm{res}}^2$. Missing exposures are set to zero.
+the third output. The first output divides the second by its row sum, which is one wherever the
+shares are defined, and the fourth holds $\sigma_{\mathrm{sys}}^2$ and $\sigma_{\mathrm{res}}^2$.
+A date is missing in every output when a held asset has no loading or residual variance; a factor
+of $\Sigma_f$ on which no asset loads has exposure zero. Until the handbook follow-up missing
+exposures were set to zero, residual variances were read on exactly $t$, and undefined ratios
+were reported as zero.
 
 ## Worked example
 
@@ -667,8 +680,8 @@ np.testing.assert_allclose(diagonal_last, m_fr / np.diag(m_ff)[:, None], atol=1e
 assert isclose(diagonal_last.loc['Rates', 'A1'], -0.731, abs_tol=5e-4)
 ```
 
-The residual-correlation diagnostic returns, for these three assets, one third of each asset's
-mean off-diagonal residual correlation. The check recomputes $C$ from the lag-0 residuals with
+The residual-correlation diagnostic returns each asset's mean correlation with the other two
+assets: about 0.13, 0.18 and $-0.02$. The check recomputes $C$ from the lag-0 residuals with
 span-52 weights.
 
 ```python
@@ -682,23 +695,45 @@ moments = (e_np[valid] * w52[:, None]).T @ e_np[valid]
 c = moments / np.sqrt(np.outer(np.diag(moments), np.diag(moments)))
 np.testing.assert_allclose(corr.to_numpy(), c, atol=1e-12)
 mean_off_diagonal = (c.sum(axis=1) - 1.0) / 2.0
-np.testing.assert_allclose(avg_corr.to_numpy(), mean_off_diagonal / 3.0, atol=1e-12)
+np.testing.assert_allclose(avg_corr.to_numpy(), mean_off_diagonal, atol=1e-12)
+np.testing.assert_allclose(avg_corr.to_numpy(), [0.126, 0.176, -0.024], atol=5e-4)
 ```
 
 The in-sample EWM $R^2$ at the last date is about 0.80, 0.73 and 0.72. It is reproduced below from
-its definition: a residual EWM that starts from zero after the warm-up, over a return EWM seeded
-with the first squared return. With `lag=1` the values fall to about 0.75, 0.66 and 0.63.
+its definition: two sums with the same span-52 weights over the dates with a finite residual.
+On the first date after the warm-up it is the single-week ratio, about 0.15, 0.00 (clipped) and
+0.79; the misaligned seeds used until the handbook follow-up reported 0.999, 0.997 and 0.970
+there. With `lag=1` the last-date values fall to about 0.75, 0.66 and 0.63.
 
 ```python
 r2 = joint.get_model_ewm_r2()  # span 52, lag 0: in sample
-numerator = (1.0 - lam52) * (w52[:, None] * e_np[valid] ** 2).sum(axis=0)
-denominator = (lam52 ** 155 * r_np[0] ** 2
-               + (1.0 - lam52) * (lam52 ** np.arange(154, -1, -1)[:, None]
-                                  * r_np[1:] ** 2).sum(axis=0))
+numerator = (w52[:, None] * e_np[valid] ** 2).sum(axis=0)
+denominator = (w52[:, None] * r_np[valid] ** 2).sum(axis=0)
 np.testing.assert_allclose(r2.iloc[-1].to_numpy(), 1.0 - numerator / denominator, atol=1e-12)
 np.testing.assert_allclose(r2.iloc[-1].to_numpy(), [0.80, 0.73, 0.72], atol=5e-3)
+first = np.flatnonzero(valid)[0]
+single_week = np.clip(1.0 - e_np[first] ** 2 / r_np[first] ** 2, 0.0, 1.0)
+np.testing.assert_allclose(r2.iloc[first].to_numpy(), single_week, atol=1e-12)
+np.testing.assert_allclose(single_week, [0.15, 0.00, 0.79], atol=5e-3)
 r2_lag1 = joint.get_model_ewm_r2(lag=1)
 np.testing.assert_allclose(r2_lag1.iloc[-1].to_numpy(), [0.75, 0.66, 0.63], atol=5e-3)
+```
+
+Finally, month-end weights meet the weekly loadings as of each week: a week that starts a new
+month uses the previous month-end's weights, and the warm-up weeks have no exposure.
+
+```python
+month_ends = pd.date_range('2022-01-31', periods=36, freq='ME')
+month_weights = pd.DataFrame(rng.dirichlet(np.ones(3), size=36), index=month_ends,
+                             columns=assets)
+agg = joint.compute_agg_factor_exposures(weights=month_weights)
+last_month_end = np.searchsorted(month_ends.to_numpy(), weeks.to_numpy(), side='right') - 1
+in_force = month_weights.to_numpy()[np.maximum(last_month_end, 0)]
+in_force[last_month_end < 0] = np.nan  # weeks before the first weight row
+for q in factors:
+    expected = (joint.loadings[q].to_numpy() * in_force).sum(axis=1)  # NaN if any term is NaN
+    np.testing.assert_allclose(agg[q].to_numpy(), expected, atol=1e-15)
+assert agg.iloc[:21].isna().all().all() and agg.iloc[21:].notna().all().all()
 ```
 
 These are fixed teaching inputs. The asserts compare qis with hand arithmetic, with the explicit
@@ -723,10 +758,10 @@ forecasting accuracy of any model.
 | Loadings from prices | weekly log returns, span 26 | `qis.estimate_ewm_factor_model` |
 | Loadings snapshot | $\hat B_t^{\top}$, factors by assets | `LinearModel.get_loadings_at_date` |
 | Model residual | $\hat\varepsilon^{(k)}_{i,t}$ | `LinearModel.get_factor_alpha(lag=1, span=None)` |
-| EWM $R^2$ | uncentred, lag 0 | `LinearModel.get_model_ewm_r2(span=52, lag=0)` |
-| Residual correlation | $C$ and $a_i=\tfrac{n-1}{2n}\bar\rho_i$ | `LinearModel.get_model_residuals_corrs(span=52)` |
-| Aggregated exposures | $X_{q,t}=\sum_i\hat B_{iq,t}w_{i,t}$ | `LinearModel.compute_agg_factor_exposures` |
-| Asset attribution | $\hat B_{iq,t-1}f_{q,t}$ and their total | `LinearModel.get_asset_factor_attribution` |
+| EWM $R^2$ | $1-Q^{\varepsilon}_{i,t}/Q^{r}_{i,t}$ on common dates, uncentred, lag 0 | `LinearModel.get_model_ewm_r2(span=52, lag=0)` |
+| Residual correlation | $C$ and $\bar\rho_i=\tfrac{1}{n-1}\sum_{j\ne i}C_{ij}$ | `LinearModel.get_model_residuals_corrs(span=52)` |
+| Aggregated exposures | $X_{q,t}=\sum_i\hat B_{iq,t}w_{i,(t)}$, weights as of $t$ | `LinearModel.compute_agg_factor_exposures` |
+| Asset attribution | $\hat B_{iq,t-1}f_{q,t}$ and their total, missing while a lagged loading is | `LinearModel.get_asset_factor_attribution` |
 | Portfolio benchmark betas | EWMA-demeaned betas aggregated by weights | `qis.compute_portfolio_ewm_benchmark_betas`, `qis.compute_portfolio_benchmark_ewm_beta_alpha_attribution` |
 | Factor price panel | validated factor prices | `qis.FactorsData(factors_prices, factors=None)` |
 
@@ -749,8 +784,12 @@ The EWM beta recursion is in
   DataFrame with index equal to columns and symmetric within $10^{-12}$. Loadings and residual
   variances must cover exactly the covariance assets and every optional field exactly the
   covariance dates. Loadings and residual variances are reordered to the covariance assets, and
-  the factor covariance to the loading columns. Positive semi-definiteness of either covariance
-  and non-negativity of residual variances are not checked.
+  the factor covariance to the loading columns. Both covariances must be positive
+  semi-definite and residual variances non-negative, each up to a rounding tolerance of
+  $10^{-10}$ times the largest diagonal element or variance (at least $10^{-10}$); the check
+  raises `ValueError` with the smallest eigenvalue or the offending variances and never alters
+  the inputs. These checks were added in the handbook follow-up; the stress module applied them
+  only at evaluation time before.
 - **Consistency.** `RiskModel` never builds $\Sigma$ from the factor block. Covariance-view
   methods use `covar`; decomposition methods use the factor block; they agree only when the caller
   supplies $\Sigma=B\Sigma_fB^{\top}+\Psi$, and qis does not reconcile them silently.
@@ -782,26 +821,29 @@ The EWM beta recursion is in
 
 - **The model is only as good as its diagonal.** Residual correlation that the factors miss, such
   as a sector the model has no factor for, is set to zero in $\Psi$ and understates the risk of
-  concentrated portfolios. Inspect `get_model_residuals_corrs`, remembering that its average is
-  scaled by $(n-1)/(2n)$.
+  concentrated portfolios. Inspect `get_model_residuals_corrs`, whose average is each asset's mean
+  off-diagonal residual correlation.
 - **Time-series loadings are statistical.** `EwmLinearModel` regresses on observed factor
   returns. Fundamental models, which take loadings as observed characteristics and estimate
   factor returns cross-sectionally, are not implemented in qis; `RiskModel` accepts their
   snapshots all the same.
 - **In-sample diagnostics flatter the model.** The default EWM $R^2$ uses lag 0 and is
-  uncentred, and it is biased towards one for roughly one span after the warm-up.
+  uncentred; use `lag=1` for the point-in-time fit. Its first values after the warm-up rest on a
+  few dates and are noisy.
 - **Estimation noise is not propagated.** Loadings, $\Sigma_f$ and $\Psi$ enter as known
   quantities. Contributions, betas and bands carry no parameter uncertainty, and a snapshot of
   noisy loadings reports noisy exposures with full confidence.
-- **Look-ahead enters through choices, not through `RiskModel`.** Full-sample mean seeds
-  (`InitType.MEAN` with a mean adjustment), lag-0 residuals and snapshots assembled with later
-  data all leak information that no validation step detects.
+- **Look-ahead enters through choices, not through `RiskModel`.** An explicit full-sample mean
+  seed (`init_type=InitType.MEAN` with a mean adjustment), lag-0 residuals and snapshots
+  assembled with later data all leak information that no validation step detects. The defaults
+  of `EwmLinearModel.fit` are point in time.
 
-> **Pitfall.** `compute_agg_factor_exposures` aligns weights to the loading dates by reindexing,
-> not as of. Month-end weights against weekly `W-WED` loadings survive only on month-ends that
-> fall on a Wednesday; the other rows are dropped, and every date before the first surviving row
-> shows zero exposure. Put the weights on the loading grid first, or use
-> `RiskModel.compute_exposures_history`, which selects weights as of each date.
+> **Pitfall.** Missing is not zero. Exposures, contribution shares and attribution totals of
+> `LinearModel` are missing while a held asset has no loading, including the warm-up, and a
+> weight row dated off the loading grid applies as of its own date, as in
+> `RiskModel.compute_exposures_history`. Until the handbook follow-up, weights were matched to the
+> loading dates exactly, so month-end weights against weekly `W-WED` loadings survived only on
+> Wednesdays, and missing loadings counted as zero exposure.
 
 > **Insight.** A factor model is a structured covariance estimator. With $K$ factors and diagonal
 > residuals it accepts some bias in exchange for far fewer parameters, which tends to make its

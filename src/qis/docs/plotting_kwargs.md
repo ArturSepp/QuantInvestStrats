@@ -74,6 +74,25 @@ be `None` to leave that end automatic. Use it to hold several panels on one scal
 
 `markersize: int` — marker size on scatter and line plots that draw points.
 
+## Regression legends
+
+Scatter plots that fit a regression line (`qis.plot_scatter`, `qis.plot_returns_scatter` and the
+factsheet panels built on them) label it with the fitted equation, for example
+`y=+0.90X+0.01, R²=81%`. Four keywords, passed through `**kwargs`, control that label:
+
+`alpha_an_factor: float = None` — the annualisation factor AN of the regressed returns (12 for
+monthly, 52 for weekly, 4 for quarterly). When given, the intercept is printed as the linear
+annualised alpha `AN * alpha` in `'{:+0.0%}'` format, the same convention as `PerfStat.ALPHA_AN`
+in the performance tables: a monthly alpha of 1.3% prints `+16%`. It is never compounded.
+
+`alpha_format: str = '{0:+0.2f}'` — the format of the per-period intercept when
+`alpha_an_factor` is `None`. The default prints a monthly alpha of 0.013 as `+0.01`, which hides
+most alphas; pass `'{0:+0.2%}'` to show `+1.30%`.
+
+`beta_format: str = '{0:+0.2f}'` — the format of the slope coefficients.
+
+`r2_only: bool = False` — print only the R² of the fit.
+
 ## `**kwargs`
 
 Most plot functions end in `**kwargs` and forward it to the helpers they call —

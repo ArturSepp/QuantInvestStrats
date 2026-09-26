@@ -55,11 +55,11 @@ Three results carry the chapter:
 |---|---|
 | Return basis | Any periodic return series supplied by the caller; qis callers pass log returns (model-layer attribution, `qis.estimate_ewm_factor_model`) or simple returns (`qis.compute_ra_perf_table_with_benchmark` by default) |
 | Sampling grid | Rows as supplied; the estimators have no calendar logic and do not sort rows. The examples use month-end (`ME`) log returns |
-| Annualisation | None inside the estimators. Tables annualise alpha linearly, $\mathrm{AN}\,\hat\alpha$; chart legends compound, $e^{\mathrm{AN}\hat\alpha}-1$, only when `alpha_an_factor` is passed |
+| Annualisation | None inside the estimators. Tables annualise alpha linearly, $\mathrm{AN}\,\hat\alpha$; chart legends do the same when `alpha_an_factor` is passed and otherwise print the periodic alpha |
 | Mean adjustment | OLS and WLS fit an intercept, which removes the sample (or weighted) means. EWM betas use moments about zero by default (`MeanAdjType.NONE`) |
 | Timing | OLS/HAC and EWMA-WLS are descriptive endpoint fits over every retained row. An EWM beta dated $t$ uses rows up to and including $t$; lag it one period before applying it |
 | Output units | Coefficients in the units of the inputs: $\hat\alpha$ per period, $\hat\beta$ dimensionless, $R^2$ a fraction, standard errors per period |
-| qis default | `qis.estimate_ewma_alpha_beta_hac(span=36.0, hac_lags=3, confidence_level=0.95)`; `EwmLinearModel.fit(span=31, is_x_correlated=True, mean_adj_type=MeanAdjType.NONE, init_type=InitType.MEAN, warmup_period=20)` |
+| qis default | `qis.estimate_ewma_alpha_beta_hac(span=36.0, hac_lags=3, confidence_level=0.95)`; `EwmLinearModel.fit(span=31, is_x_correlated=True, mean_adj_type=MeanAdjType.NONE, init_type=InitType.X0, warmup_period=20)` |
 
 | Symbol or input | Meaning | Units and convention |
 |---|---|---|
@@ -89,6 +89,7 @@ Three results carry the chapter:
 | $m^{y}_t$ | EWM mean $\mathcal{E}_t[y]$ seeded at $y_0$ | Point in time |
 | $\eta_t$ | First-stage residual $y_t-\hat\beta_tx_t$ of the one-factor EWM fit | Periodic return units |
 | $a_t$, $h$ | Linear-model alpha $y_t-\sum_fB_{f,t-h}x_{f,t}$; loading lag | $h=1$ point in time, $h=0$ in sample |
+| $\mathcal{T}_t$, $n_t(s)$ | Rows up to $t$ on which $a$ and $y$ are finite; number of those rows after row $s$ | Weight $\lambda^{n_t(s)}$ in the linear-model $R^2$ |
 | $\phi$ | AR(1) coefficient of the residuals in the examples | Dimensionless |
 
 The estimators assume that rows are consecutive observations in time order, that $X$ has full
@@ -171,17 +172,20 @@ alpha p-value) and behaves as follows.
 
 - Rows where $x$ or $y$ is not finite are dropped jointly before the fit.
 - `order` 2, 3 or 4 adds powers of $x$ as extra regressors; beta is then the linear coefficient.
-- `fit_intercept=False` fits through the origin, returns alpha 0.0 and alpha p-value 0.0, and the
-  uncentred $R^2$. The zero p-value is a placeholder, not a significance statement.
+- `fit_intercept=False` fits through the origin and returns alpha 0.0, which holds by
+  construction, the uncentred $R^2$, and an alpha p-value of NaN, because no intercept is tested.
 - When the fit raises inside the helper (non-numeric input, pandas indexes that differ, or no
-  finite row), it emits a `UserWarning` and returns `(0.0, 0.0, 0.0, 0.0)`: zeros, not NaN.
-- A constant regressor, including a single observation, raises `IndexError` instead.
-  statsmodels' `add_constant` does not add an intercept to a column that is already constant, the
-  fit has one coefficient, and the slope is read outside the protected block.
+  finite row), it emits a `UserWarning` and returns four NaN values.
+- When the design is not identified, it also warns and returns four NaN values. A regressor that
+  does not vary on the retained rows, including a single observation, is the case: statsmodels'
+  `add_constant` does not add an intercept to a non-zero constant column, and an all-zero
+  regressor leaves a rank-one design whose pseudo-inverse reports a slope of zero.
 - Two observations fit exactly: $R^2=1$ and the p-value is NaN.
 
 `qis.compute_ra_perf_table_with_benchmark` writes NaN itself when fewer than two joint rows exist,
-so the zero fallback reaches a table only through the other failure modes.
+and the helper's NaN covers every other undefined case, so a zero alpha in a table is an estimate,
+never a failed fit. Until the handbook follow-up the helper returned zeros, whose zero p-value
+reads as highly significant, and raised `IndexError` on a constant regressor.
 
 ### Linearity in the response
 
@@ -477,15 +481,18 @@ The implementation adds four rules.
   which corresponds to a span of about 32.
 
 `qis.EwmLinearModel.fit(span=31, ewm_lambda=0.94, is_x_correlated=True,
-mean_adj_type=MeanAdjType.NONE, init_type=InitType.MEAN, warmup_period=20)` requires identical
+mean_adj_type=MeanAdjType.NONE, init_type=InitType.X0, warmup_period=20)` requires identical
 factor and asset indexes and stores one $(T\times J)$ loadings frame per factor. With
-`mean_adj_type` other than `NONE` it first subtracts a mean from both panels and overwrites the
-model's `x` and `y` with the demeaned panels, so later calls to `get_factor_alpha` and
-`get_model_ewm_r2` see demeaned returns. `MeanAdjType.INSAMPLE` subtracts the full-sample mean,
-`EXPANDING` the expanding mean, and `EWMA` the running EWM mean $m_s$ at each row $s$, seeded by
-`init_type`. The `EWMA` result is point in time only with a point-in-time seed, and it is not a
-prefix regression with an intercept, because each row is centred on its own running mean. `qis.estimate_ewm_factor_model` fits the same model
-on `W-WED` log returns with span 26.
+`mean_adj_type` other than `NONE` it subtracts a mean from both panels before forming the moments;
+the model's `x` and `y` keep the returns as supplied, so `get_factor_alpha` and
+`get_model_ewm_r2` see the raw returns and the residual keeps the intercept.
+`MeanAdjType.INSAMPLE` subtracts the full-sample mean, `EXPANDING` the expanding mean, and `EWMA`
+the running EWM mean $m_s$ at each row $s$, seeded by `init_type`. The default seed
+`InitType.X0` is the first observation, so the `EWMA` result is point in time; it is not a prefix
+regression with an intercept, because each row is centred on its own running mean.
+`InitType.MEAN`, the default until the handbook follow-up, seeds with the full-sample mean and
+looks ahead. `qis.estimate_ewm_factor_model` fits the same model on `W-WED` log returns with
+span 26.
 
 #### One-factor alpha, prediction and $R^2$
 
@@ -562,21 +569,27 @@ where the loadings are forward-filled onto the factor index and shifted by `lag`
 is point in time; lag zero is in sample. There is no intercept: $a_t$ contains whatever mean of
 $y$ the factors do not explain. With `span`, the alpha is smoothed to $\mathcal{E}_t[a]$.
 
-`qis.LinearModel.get_model_ewm_r2(span=52, lag=0)` computes
+`qis.LinearModel.get_model_ewm_r2(span=52, lag=0)` computes, over the set $\mathcal{T}_t$ of
+rows up to $t$ on which both $a$ and $y$ are finite,
 
 $$
-R^2_t=\operatorname{clip}_{[0,1]}\Big(1-\frac{\mathcal{E}_t[a^2]}{\mathcal{E}_t[y^2]}\Big),
+R^2_t=\operatorname{clip}_{[0,1]}\Big(1-\frac{\sum_{s\in\mathcal{T}_t}\lambda^{n_t(s)}a_s^2}
+{\sum_{s\in\mathcal{T}_t}\lambda^{n_t(s)}y_s^2}\Big),
 $$
 
-an uncentred ratio (neither $a$ nor $y$ is demeaned) evaluated by default with lag-zero, in-sample
-loadings. After the warm-up the numerator starts from a zero seed while the denominator has run
-since the first row, so the first values after the warm-up are close to one by construction.
+where $n_t(s)$ counts the rows of $\mathcal{T}_t$ after $s$. Both sums use the same rows and the
+same weights, so no seed enters the ratio and the first value after the warm-up is the
+single-observation ratio $1-a^2/y^2$. The ratio is uncentred (neither $a$ nor $y$ is demeaned),
+matching the regression through the origin, and it is evaluated by default with lag-zero,
+in-sample loadings; `lag=1` gives the point-in-time ratio. Until the handbook follow-up the
+numerator started from a zero seed after the warm-up while the denominator had run since the
+first row, which pushed the first values after the warm-up towards one.
 
 > **Pitfall.** Three defaults leak or overstate. `InitType.MEAN`, the default seed of
-> `compute_ewm_beta_alpha_forecast` and of the demeaning step in `EwmLinearModel.fit`, uses
-> full-sample means. The prediction of `compute_ewm_beta_alpha_forecast` uses the same row it
-> predicts. `get_model_ewm_r2` defaults to in-sample loadings. For backtests, pass
-> `init_type=InitType.X0`, lag betas and alphas by one period, and use `lag=1`.
+> `compute_ewm_beta_alpha_forecast`, uses full-sample means. The prediction of
+> `compute_ewm_beta_alpha_forecast` uses the same row it predicts. `get_model_ewm_r2` defaults to
+> in-sample loadings. For backtests, pass `init_type=InitType.X0`, lag betas and alphas by one
+> period, and use `lag=1`. `EwmLinearModel.fit` seeds its demeaning with `InitType.X0` by default.
 
 > **Insight.** A point-in-time EWM beta is an endpoint EWMA-WLS slope without the intercept. The
 > last row of `compute_one_factor_ewm_betas` equals the slope of
@@ -585,21 +598,23 @@ since the first row, so the first values after the warm-up are close to one by c
 
 ### Alpha annualisation
 
-Alpha is estimated per period. qis annualises it in two ways, depending on the output.
+Alpha is estimated per period. Every qis output that annualises it does so linearly.
 
 | Output | Annualised alpha | Where it is used |
 |---|---|---|
 | `PerfStat.ALPHA_AN` (`An Alpha`) | $\mathrm{AN}\,\hat\alpha$, $\mathrm{AN}$ of `PerfParams.freq_reg` (default `QE`, 4) | `qis.compute_ra_perf_table_with_benchmark` |
 | Model-layer tables, bars and intervals | $\mathrm{AN}\,\hat\alpha$ and $\mathrm{AN}(\hat\alpha\pm z_{\gamma}\,\mathrm{se})$ | `qis.compute_model_layer_alpha_beta_attribution` and its EWMA variants |
-| Scatter-plot legends with `alpha_an_factor` | $e^{\mathrm{AN}\hat\alpha}-1$, formatted `'{:+0.0%}'` | internal `reg_model_params_to_str`, through `qis.plot_scatter` and `qis.plot_returns_scatter` keyword arguments |
-| Scatter-plot legends by default | raw $\hat\alpha$, formatted `'{0:+0.2f}'` | the same, and the label of `qis.fit_multivariate_ols` |
+| Scatter-plot legends with `alpha_an_factor` | $\mathrm{AN}\,\hat\alpha$, formatted `'{:+0.0%}'` | internal `reg_model_params_to_str`, through `qis.plot_scatter` and `qis.plot_returns_scatter` keyword arguments |
+| Scatter-plot legends by default | periodic $\hat\alpha$, formatted by `alpha_format`, default `'{0:+0.2f}'` | the same, and the label of `qis.fit_multivariate_ols` |
 
-The linear form keeps alphas additive, which the attribution identities need. The compound form is
-the annual growth of a constant periodic log alpha: exact when the regression is on log returns,
-an approximation on simple returns. Since $e^{a}-1\ge a$ with a gap of about $a^2/2$, the legend
-exceeds the table: a monthly alpha of 1.3% is 15.6% in a table and 16.9% (displayed `+17%`) in a
-legend. No qis report passes `alpha_an_factor`; by default a legend shows the periodic alpha to two
-decimals, so a monthly alpha of 0.013 reads `+0.01`.
+The linear form keeps alphas additive, which the attribution identities need. The compound form
+$e^{\mathrm{AN}\hat\alpha}-1$ is the annual growth of a constant periodic log alpha, exact on log
+returns and an approximation on simple returns, and it exceeds the linear form by about
+$(\mathrm{AN}\hat\alpha)^2/2$: a monthly alpha of 1.3% is 15.6% linearly and 16.9% compounded.
+Until the handbook follow-up, legends with `alpha_an_factor` printed the compounded figure
+(`+17%` against `+16%` in the table); they now print the table's figure. No qis report passes
+`alpha_an_factor`; by default a legend shows the periodic alpha to two decimals, so a monthly alpha
+of 0.013 reads `+0.01`. Pass `alpha_format='{0:+0.2%}'` to print it as `+1.30%`.
 
 ## Worked example
 
@@ -615,9 +630,12 @@ $10\times10^{-4}$, so $\hat\beta=0.9$ and $\hat\alpha=0.04-0.9\times0.03=0.013$.
 $-0.2\%$, $-0.1\%$, $1.0\%$, $-0.9\%$ and $0.2\%$, so $\mathrm{SSR}=1.9\times10^{-4}$,
 $\mathrm{SST}=10\times10^{-4}$ and $R^2=0.81$. With $\hat\sigma^2_{\varepsilon}=1.9\times10^{-4}/3$,
 $\mathrm{se}(\hat\alpha)=0.00835$ and the classical two-sided p-value on three degrees of freedom
-is 0.217. A second fund shows linearity, and the last lines compare the two alpha annualisations.
+is 0.217. A second fund shows linearity, the next lines check that a legend annualises alpha as
+the table does, and the last lines show that an unidentified fit returns NaN.
 
 ```python
+import warnings
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -658,14 +676,25 @@ np.testing.assert_allclose(params_diff, params - params_other, atol=1e-14)
 np.testing.assert_allclose((y - y_other) - pred_diff,
                            (y - prediction) - (y_other - pred_other), atol=1e-15)
 
-# annualisation: linear in tables, compounded in legends
+# annualisation: linear in tables and in legends; compounding would give 16.9%
 model = fit_ols(x=x['bench'], y=y)
-table_alpha, legend_alpha = 12 * model.params[0], np.expm1(12 * model.params[0])
-np.testing.assert_allclose([table_alpha, legend_alpha], [0.156, np.exp(0.156) - 1.0])
-assert round(legend_alpha, 3) == 0.169
+table_alpha, compounded_alpha = 12 * model.params[0], np.expm1(12 * model.params[0])
+np.testing.assert_allclose([table_alpha, compounded_alpha], [0.156, np.exp(0.156) - 1.0])
+assert round(compounded_alpha, 3) == 0.169
 assert reg_model_params_to_str(reg_model=model, order=1) == 'y=+0.90X+0.01, R²=81%'
 assert reg_model_params_to_str(reg_model=model, order=1,
-                               alpha_an_factor=12) == 'y=+0.90X+17%, R²=81%'
+                               alpha_an_factor=12) == 'y=+0.90X+16%, R²=81%'
+assert reg_model_params_to_str(reg_model=model, order=1,
+                               alpha_format='{0:+0.2%}') == 'y=+0.90X+1.30%, R²=81%'
+
+# undefined fits are NaN: a constant benchmark return identifies neither alpha nor beta
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter('always')
+    undefined = estimate_ols_alpha_beta(x=np.full(5, 0.01), y=y)
+assert np.isnan(undefined).all()
+assert any('not identified' in str(item.message) for item in caught)
+no_intercept = estimate_ols_alpha_beta(x=x['bench'], y=y, fit_intercept=False)
+assert no_intercept[0] == 0.0 and np.isnan(no_intercept[3])
 ```
 
 ### HAC standard errors with serially correlated residuals
@@ -883,10 +912,13 @@ np.testing.assert_allclose(beta_x0.iloc[0], y_a[0] / x_b[0], rtol=1e-12)
 
 ### EWM $R^2$ definitions
 
-The last block reproduces the two $R^2$ definitions with an independent loop that mirrors the qis
-recursion: the seed replaces the first row, and a series that starts missing starts from a zero
-seed at its first finite value. The in-sample, uncentred `get_model_ewm_r2` is 0.999 for `SEQ_EU`
-in November 2007, the first month after the warm-up, and 0.512 in December 2025. The centred
+The last block reproduces the two $R^2$ definitions independently. The uncentred
+`get_model_ewm_r2` is a ratio of two geometrically weighted sums over the same rows, computed here
+by direct summation. For the centred $R^2$, a loop mirrors the qis recursion: the seed replaces
+the first row, and a series that starts missing starts from a zero seed at its first finite
+value. The in-sample `get_model_ewm_r2` is 0.750 for `SEQ_EU` in November 2007, the first month
+after the warm-up, where it is the single-month ratio $1-a^2/y^2$, and 0.512 in December 2025.
+Before the handbook follow-up the misaligned seeds reported 0.999 in November 2007. The centred
 $R^2$ of the lag-one, point-in-time prediction from `compute_ewm_alpha_r2_given_prediction` is
 0.410 in December 2025. The two numbers answer different questions and are not comparable.
 
@@ -911,13 +943,19 @@ def first_row_seed(values):
     return np.where(np.isfinite(values[0]), values[0], 0.0)
 
 
-# uncentred, in-sample R2 of LinearModel
+# uncentred, in-sample R2 of LinearModel: weighted sums over the same rows
 r2_uncentred = full.get_model_ewm_r2(span=36)
 alpha_lag0, _ = full.get_factor_alpha(lag=0)
 a2, y2 = alpha_lag0.to_numpy() ** 2, y_a ** 2
-expected = np.clip(1 - ewm_path(a2, first_row_seed(a2), lam) / ewm_path(y2, y2[0], lam), 0, 1)
-np.testing.assert_allclose(r2_uncentred, expected, rtol=1e-9)
-assert round(r2_uncentred.loc['2007-11-30', 'SEQ_EU'], 3) == 0.999
+start = int(np.flatnonzero(np.isfinite(a2).all(axis=1))[0])
+expected = np.full(a2.shape, np.nan)
+for t in range(start, len(a2)):
+    w = lam ** np.arange(t - start, -1, -1)[:, None]
+    expected[t] = 1 - (w * a2[start:t + 1]).sum(axis=0) / (w * y2[start:t + 1]).sum(axis=0)
+np.testing.assert_allclose(r2_uncentred, np.clip(expected, 0, 1), rtol=1e-9)
+first_month = r2_uncentred.loc['2007-11-30', 'SEQ_EU']
+assert np.isclose(first_month, 1 - a2[start, 0] / y2[start, 0], rtol=1e-12)
+assert round(first_month, 3) == 0.750
 assert round(r2_uncentred['SEQ_EU'].iloc[-1], 3) == 0.512
 
 # centred R2 of a point-in-time prediction: lag-one loadings times the current factor return
@@ -944,14 +982,14 @@ assert round(r2_oos['SEQ_EU'].iloc[-1], 3) == 0.410
 | Mean with Bartlett HAC | $\hat\Sigma_{\theta}$ with $p=1$ | internal `qis.utils.regression.estimate_hac_mean(y, hac_lags=3, confidence_level=0.95)`, returns `HacMeanResult` |
 | Lag rule | $\lfloor 4(T/100)^{2/9}\rfloor$ | internal `qis.utils.regression.newey_west_lag_rule(nobs)` |
 | Geometric WLS with stacked HAC | $(X^{\top}\Omega X)^{-1}X^{\top}\Omega y$, $\hat\Sigma_{\Theta}$, $T_{\mathrm{eff}}$ | `qis.estimate_ewma_alpha_beta_hac(x, y, span=36.0, hac_lags=3, confidence_level=0.95)`, returns `qis.EwmaAlphaBetaHacResult` |
-| Legend annualisation | $e^{\mathrm{AN}\hat\alpha}-1$ | internal `qis.utils.regression.reg_model_params_to_str(..., alpha_an_factor=None)`, via `qis.plot_scatter` |
+| Legend annualisation | $\mathrm{AN}\,\hat\alpha$ | internal `qis.utils.regression.reg_model_params_to_str(..., alpha_an_factor=None)`, via `qis.plot_scatter` |
 | EWM loadings tensor | $B_t=M_t^{-1}C_t$ | `qis.compute_ewm_xy_beta_tensor(x, y, span=None, ewm_lambda=0.94, warmup_period=20, is_x_correlated=True)` |
 | One-factor EWM betas | $\mathcal{E}_t[xy]/\mathcal{E}_t[x^2]$, zero seeds | `qis.compute_one_factor_ewm_betas(x, y, span=None, ewm_lambda=0.94)` |
-| Linear model loadings | $B_t$ per factor | `qis.EwmLinearModel.fit(span=31, is_x_correlated=True, init_type=InitType.MEAN, warmup_period=20)`; `qis.estimate_ewm_factor_model` |
+| Linear model loadings | $B_t$ per factor | `qis.EwmLinearModel.fit(span=31, is_x_correlated=True, init_type=InitType.X0, warmup_period=20)`; `qis.estimate_ewm_factor_model` |
 | One-factor EWM alpha, prediction, $R^2$ | centred, seeds from `init_type` | `qis.compute_ewm_beta_alpha_forecast(..., init_type=InitType.MEAN)` |
 | EWM alpha and $R^2$ of a prediction | centred, X0 and zero seeds | `qis.compute_ewm_alpha_r2_given_prediction` |
 | Linear-model alpha | $y_t-\sum_fB_{f,t-h}x_{f,t}$ | `qis.LinearModel.get_factor_alpha(lag=1, span=None)` |
-| Linear-model $R^2$ | $1-\mathcal{E}_t[a^2]/\mathcal{E}_t[y^2]$, uncentred | `qis.LinearModel.get_model_ewm_r2(span=52, lag=0)` |
+| Linear-model $R^2$ | $1-\sum\lambda^{n_t(s)}a_s^2/\sum\lambda^{n_t(s)}y_s^2$ on common rows, uncentred | `qis.LinearModel.get_model_ewm_r2(span=52, lag=0)` |
 
 The OLS, HAC and EWMA-WLS code is in
 [regression.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/regression.py);
@@ -989,16 +1027,17 @@ API pages: {doc}`fit_multivariate_ols <api/generated/qis.fit_multivariate_ols>`,
   correction $T/(T-2)$ uses the raw row count, not $T_{\mathrm{eff}}$.
 - **Row order is the caller's responsibility.** `estimate_ewma_alpha_beta_hac` weights rows by
   position and does not sort them; an unsorted index silently reweights the sample.
-- **Failure modes differ by helper.** `estimate_ols_alpha_beta` returns zeros with a warning on
-  most failures and raises `IndexError` on a constant regressor; the HAC helpers raise
-  `ValueError`. A zero alpha in a table can therefore be a failed fit.
+- **Failure modes differ by helper.** `estimate_ols_alpha_beta` warns and returns NaN when a fit
+  fails or is not identified, so a table shows a missing value; the HAC helpers raise
+  `ValueError`.
 - **Units matter for EWM betas.** `compute_ewm_xy_beta_tensor` replaces the inverse by the
   identity when a factor's EWM second moment is at most $10^{-8}$, which returns a cross moment
   for very low-volatility factors; `compute_ewm_beta_alpha_forecast` returns NaN in the same
   regime. Scale such series before regressing.
-- **Uncentred and centred $R^2$ differ.** `get_model_ewm_r2` is uncentred, in sample by default
-  and biased towards one just after the warm-up; the $R^2$ of `compute_ewm_beta_alpha_forecast`
-  and `compute_ewm_alpha_r2_given_prediction` is centred. Do not rank models across the two.
+- **Uncentred and centred $R^2$ differ.** `get_model_ewm_r2` is uncentred and in sample by
+  default, and it is noisy for about one span after the warm-up, when few rows enter it; the $R^2$
+  of `compute_ewm_beta_alpha_forecast` and `compute_ewm_alpha_r2_given_prediction` is centred. Do
+  not rank models across the two.
 - **Linearity needs one sample.** Exact additive attribution of alphas requires the same rows and
   regressor values in every equation.
 
