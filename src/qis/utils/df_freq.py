@@ -308,7 +308,10 @@ def df_resample_at_int_index(df: pd.DataFrame,
     sampler = pd.Series(sampler.values[-1] - sampler.values[::-1], index=sampler.index)
 
     if func is not None:
-        df = df.groupby(sampler, sort=False).agg(func)
+        # a bare numpy callable such as np.nansum is swapped for the groupby's own sum on pandas 2,
+        # which adds in another order and warns; wrapping it applies func itself on every version
+        aggregation = func if isinstance(func, str) else (lambda block: func(block))
+        df = df.groupby(sampler, sort=False).agg(aggregation)
     else:
         df = df.groupby(sampler, sort=False).last()
 

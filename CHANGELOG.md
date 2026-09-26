@@ -84,6 +84,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   supplied classifier, a monthly one for example, was silently ignored. The default is unchanged:
   quarterly regimes at the 16%/84% quantiles. The unused module-level `regime_classifier` of the
   old module is removed.
+- Make `df_resample_at_int_index` apply a numpy aggregation such as `np.nansum` itself on every
+  pandas version. pandas 2 swapped the bare callable for the groupby's own sum, which adds in
+  another order, and emitted a FutureWarning that failed four tests on Python 3.10. Under pandas 3
+  the block sums and `compute_autocorrelation_at_int_periods` are unchanged; under pandas 2 they
+  move by at most 1e-16 and now equal the pandas 3 values bit for bit.
+- Make `generate_rebalancing_indicators` leave an empty part out of its concatenation when every
+  rebalancing date falls off the given index, which pandas 2.3 deprecates. The indicators are
+  unchanged.
 
 ## [5.31.0] - 2026-09-26
 
