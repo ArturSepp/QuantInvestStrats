@@ -47,3 +47,19 @@ def test_block_autocorrelation_uses_complete_blocks_only() -> None:
     complete = returns['a'].to_numpy()[3:].reshape(-1, 10).sum(axis=1)
     expected = np.corrcoef(complete[1:], complete[:-1])[0, 1]
     assert abs(float(actual.iloc[0]) - expected) < 1e-12
+
+
+def test_block_sums_are_np_nansum_of_each_block() -> None:
+    """Each block sum is np.nansum of its rows, bit for bit, on every pandas version."""
+    rng = np.random.default_rng(3)
+    df = pd.DataFrame(0.0004 + 0.01 * rng.standard_normal((2600, 4)),
+                      index=pd.bdate_range('2010-01-01', periods=2600), columns=list('abcd'))
+    df.iloc[rng.random(df.shape) < 0.05] = np.nan
+    df.iloc[:40, 2] = np.nan  # a late start leaves all-NaN blocks, whose sum is zero
+
+    sums = df_resample_at_int_index(df=df, func=np.nansum, sample_size=21)
+
+    rows = df.to_numpy()[len(df) % 21:].reshape(-1, 21, 4)
+    expected = np.array([[np.nansum(block[:, j]) for j in range(4)] for block in rows])
+    np.testing.assert_array_equal(sums.to_numpy(), expected)
+    assert (sums['c'].iloc[:1] == 0.0).all()
