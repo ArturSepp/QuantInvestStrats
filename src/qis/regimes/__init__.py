@@ -11,7 +11,6 @@ Imported explicitly, ``from qis.regimes import ...``; the names are not re-expor
 """
 from qis.regimes.partition import (
     ONE_SIGMA_QUANTILES,
-    classify_quantile_buckets,
     create_sampled_returns_with_regime_id,
     get_partition_quantiles,
     get_regime_ids,

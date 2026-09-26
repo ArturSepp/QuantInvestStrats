@@ -41,6 +41,7 @@ from qis.perfstats.signal_diagnostics import (
     estimate_signal_diagnostics,
 )
 from qis.plots.boxplot import df_boxplot_by_classification_var, plot_box
+from qis.utils.quantile_buckets import EmptyQuantileBucketError, compute_bucket_codes
 
 
 # ───────────────────────────────────────────────────────────────────────────────
@@ -183,19 +184,18 @@ def plot_signal_diagnostics_boxplot(
         ax.set_title(title, fontsize=11)
         return fig
 
-    # Adaptive bucket count — pd.qcut raises on duplicate bin edges,
-    # which happens routinely on signal panels with mass at zero
-    # (sparse alphas, ranked signals with ties). Reduce the requested
-    # bucket count until the empirical signal quantiles are unique.
-    # Lower bound of 3 buckets to keep the plot interpretable; below
-    # that we fall back to plain boxplot of returns (no signal buckets).
+    # Adaptive bucket count: signal panels with mass at zero (sparse alphas, ranked signals with
+    # ties) leave quantile buckets empty under the qis rule. Reduce the requested bucket count
+    # until every bucket holds an observation. Lower bound of 3 buckets to keep the plot
+    # interpretable; below that we fall back to plain boxplot of returns (no signal buckets).
     z_arr = pairs['z'].to_numpy(dtype=float)
     n_buckets_use = num_buckets
     while n_buckets_use >= 3:
-        edges = np.quantile(z_arr, np.linspace(0, 1, n_buckets_use + 1))
-        if len(np.unique(edges)) == len(edges):
+        try:
+            compute_bucket_codes(x=z_arr, q=n_buckets_use)
             break
-        n_buckets_use -= 1
+        except EmptyQuantileBucketError:
+            n_buckets_use -= 1
     if n_buckets_use < 3:
         # Fallback — too much mass on a single value to bucket usefully.
         # Show a single box of all returns; annotate the degeneracy.

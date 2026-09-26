@@ -25,7 +25,8 @@ from typing import Optional, Sequence, Union
 from qis.perfstats.perf_stats import compute_sharpe_arithmetic
 from qis.models.bootstrap.bootstrap_numba import BootstrapType, generate_bootstrapped_indices
 from qis.regimes.nulls import compute_regime_null_loadings
-from qis.regimes.partition import (REGIME_COLUMN, classify_quantile_buckets, get_ordered_regimes,
+from qis.utils.quantile_buckets import compute_bucket_codes
+from qis.regimes.partition import (REGIME_COLUMN, get_ordered_regimes,
                                    get_partition_quantiles, get_regime_ids,
                                    get_regime_probabilities)
 
@@ -106,7 +107,7 @@ def compute_regime_premium_bootstrap(returns: pd.DataFrame,
 
     Each asset is resampled jointly with the benchmark over their common periods with
     ``BootstrapType.STATIONARY`` (geometric blocks of mean ``block_size``, circular wrap), and
-    the regimes are reclassified inside every resample with the ``pd.qcut`` convention, so the
+    the regimes are reclassified inside every resample by ``qis.utils.quantile_buckets``, so the
     interval includes the sampling error of the regime cutoffs. Every asset uses the same
     ``seed``.
 
@@ -148,7 +149,8 @@ def compute_regime_premium_bootstrap(returns: pd.DataFrame,
         for b in range(n_boot):
             sample = joint[indices[:, b], :]
             r_a, r_b = sample[:, 0], sample[:, 1]
-            tail = classify_quantile_buckets(r_b, q=q) == 0
+            # the lowest bucket always holds the resample minimum, so no occupancy check
+            tail = compute_bucket_codes(x=r_b, q=q, is_require_occupied=False) == 0
             sigma = np.std(r_a, ddof=1)
             sr = np.sqrt(af) * np.mean(r_a) / sigma
             sr_tail = np.sqrt(af) * np.mean(tail) * np.mean(r_a[tail]) / sigma

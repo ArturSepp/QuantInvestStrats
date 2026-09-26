@@ -34,8 +34,35 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Add `qis.plots.derived.regime_premium` with `plot_regime_sharpe_decomposition` and
   `plot_regime_beta_profiles`, drawn from the `qis.regimes` tables. They are not re-exported
   from `qis`.
+- Add `qis.utils.quantile_buckets`, the one rule for classifying observations into quantile
+  buckets: linear-interpolation edges (a position within 1e-9 of a whole number is snapped to
+  it), buckets closed on the right with open outer ends, a value on an edge in the lower bucket,
+  NaN and infinite values unclassified, and an `EmptyQuantileBucketError` reporting the occupied
+  count when an estimated partition leaves a bucket empty. Within these rules it equals
+  `pd.qcut`.
 
 ### Changed
+
+- Route every quantile classification in qis through `qis.utils.quantile_buckets`:
+  `BenchmarkReturnsQuantilesRegime`, `compute_regime_sharpe_decomposition`,
+  `BenchmarkVolsQuantilesRegime`, the open-ended default of `x_bins_cut` and with it
+  `add_classification` and `add_quantile_classification` (scatter, boxplot and regime-class-table
+  hue buckets), the bucket reduction of the signal-diagnostics plot, and `qis.regimes`. The
+  regime classifiers and the Sharpe decomposition are unchanged: they already used `pd.qcut`.
+  The other paths change only on ties and degenerate samples:
+  - the volatility regimes and the quantile hue buckets put a value equal to an edge in the lower
+    bucket, as the return regimes do; they computed the probabilities as `(1 / k) * i`, which can
+    fall a hair short of `i / k`, and could put it in the upper bucket. On the synthetic panel no
+    label changes;
+  - `x_bins_cut` on its default path leaves an infinite value unclassified, where `pd.cut` put
+    `+inf` in the last bin;
+  - a degenerate benchmark is rejected when a band is empty, and the message counts occupied
+    bands: constant volatility reports 1 of `q` bands, all values sitting in the lowest, where it
+    reported 0. A benchmark whose lowest quantile edge equals its minimum is classified when every
+    band is occupied, where it was rejected;
+  - the signal-diagnostics boxplot lowers its bucket count until every bucket is occupied, where
+    it required unique edges.
+  `BenchmarkReturnsPositiveNegativeRegime` is a sign rule and keeps zero in Positive.
 
 - Move the smart-diversification report from `qis/portfolio/reports/overlays_smart_diversification.py`
   to the new subpackage `qis.portfolio.smart_diversification`: `SmartDiversificationReport` in

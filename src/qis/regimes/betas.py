@@ -9,7 +9,7 @@ spread is the non-linearity the regimes reveal.
 
 ``compute_regime_betas_bootstrap`` resamples whole rows of the panel with the stationary block
 bootstrap, keeping the cross-section, and reclassifies the regimes inside each resample with the
-``pd.qcut`` convention before re-estimating.
+rule of ``qis.utils.quantile_buckets`` before re-estimating.
 """
 # packages
 import numpy as np

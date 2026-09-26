@@ -8,7 +8,9 @@ require descriptive failure contracts instead of either a bare pandas exception 
 valid metadata containing unobserved regimes.
 
 Expected bucket counts follow directly from the deterministic monthly rank structures: constant
-prices form no quantile intervals, the tied fixture occupies three quartile bands, two monthly
+prices put every volatility in the lowest band, since all edges equal the one value and a value on
+an edge falls in the lower bucket (``qis.utils.quantile_buckets``), so one band is occupied; the
+tied fixture occupies three quartile bands, two monthly
 samples occupy two bands, and the healthy control has 36 strictly increasing volatility samples
 that divide into four groups of nine. No QIS classification helper constructs these references.
 """
@@ -237,7 +239,7 @@ def test_volatility_quantiles_preserve_valid_integer_bucket_counts(
 @pytest.mark.parametrize(
     ("prices_factory", "expected_nonempty_bands"),
     (
-        pytest.param(_constant_volatility_prices, 0, id="constant"),
+        pytest.param(_constant_volatility_prices, 1, id="constant"),
         pytest.param(_tied_volatility_prices, 3, id="tied"),
         pytest.param(_insufficient_volatility_prices, 2, id="insufficient"),
     ),

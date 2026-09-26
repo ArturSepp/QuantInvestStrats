@@ -10,7 +10,6 @@ from scipy import integrate
 from scipy.stats import norm
 
 from qis.regimes import (
-    classify_quantile_buckets,
     compute_gaussian_regime_moments,
     compute_regime_betas,
     compute_regime_betas_bootstrap,
@@ -33,14 +32,6 @@ def monthly():
               'C': -0.2 * b + 0.025 * rng.standard_normal(144)}
     index = pd.date_range('2012-01-31', periods=144, freq='ME')
     return pd.DataFrame({'BM': b, **assets}, index=index)
-
-
-def test_buckets_follow_qcut_on_tied_data():
-    """The numpy classifier puts a value equal to an interior quantile where pd.qcut does."""
-    x = np.array([1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 5.0, 5.0, 6.0, 7.0, 7.0])
-    q = [0.0, 0.25, 0.5, 0.75, 1.0]
-    expected = pd.qcut(x, q=q, labels=False)
-    np.testing.assert_array_equal(classify_quantile_buckets(x, q=q), expected)
 
 
 def test_regime_betas_equal_the_covariance_ratio_per_regime(monthly):

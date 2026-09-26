@@ -147,6 +147,10 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
   `src/qis/tests/test_core_api.py` enforces it, and also that a documented argument exists in the
   signature. Arguments shared across the `plot_*` functions are documented once in
   `src/qis/docs/plotting_kwargs.md`; a plot docstring covers only what is specific to it.
+- **Quantile buckets have one rule.** Every classification of observations into quantile buckets
+  (regimes, hue buckets, signal buckets, bootstrap reclassification) goes through
+  `qis.utils.quantile_buckets`; do not call `pd.qcut`, `pd.cut` or `np.quantile` for it directly.
+  The module docstring states the rule for ties, extremes, missing values and empty buckets.
 - Enums are used heavily (100+ modules) for options and switches; prefer an enum
   member over a string literal when one already exists.
 - Dataclasses are used for configuration and result containers.

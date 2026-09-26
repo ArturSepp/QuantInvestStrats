@@ -7,10 +7,10 @@ default is the one-sigma cut ``[0.0, 0.16, 0.84, 1.0]`` with the ids Bear, Norma
 default of ``BenchmarkReturnsQuantilesRegime`` and of ``compute_regime_sharpe_decomposition``.
 Other bucket counts use the ordered ids Q1 to Qn, again as the classifier does.
 
-Classification is ``pd.qcut``: buckets are closed on the right and the first includes the sample
-minimum, so a return equal to an interior quantile falls in the lower bucket. The numpy
-classifier used inside the bootstrap loops, ``classify_quantile_buckets``, follows the same rule,
-which matters there because a resample repeats observations and quantiles land on data points.
+Classification is ``qis.utils.quantile_buckets``, the one quantile rule of qis: buckets are closed
+on the right with open outer ends, so a return equal to an interior quantile falls in the lower
+bucket. The bootstrap loops use its numpy form, ``compute_bucket_codes``, where the rule matters
+most: a resample repeats observations and quantiles land on data points.
 
 ``create_sampled_returns_with_regime_id`` builds, from a panel of periodic returns, the frame a
 ``RegimeClassifier`` returns from prices, so that every analytic of ``qis.regimes`` takes one
@@ -22,6 +22,8 @@ import pandas as pd
 from typing import List, Optional, Sequence, Union
 # qis
 from qis.perfstats.regime_classifier import RegimeClassifier
+from qis.utils.quantile_buckets import (EmptyQuantileBucketError, classify_quantile_buckets,
+                                        get_quantile_probabilities)
 
 ONE_SIGMA_QUANTILES = (0.0, 0.16, 0.84, 1.0)
 REGIME_COLUMN = RegimeClassifier.REGIME_COLUMN
@@ -43,9 +45,7 @@ def get_partition_quantiles(q: Union[Sequence[float], np.ndarray, None] = None) 
     q = np.asarray(ONE_SIGMA_QUANTILES if q is None else q, dtype=float)
     if q.ndim != 1 or q.size < 3:
         raise ValueError(f"q needs at least two buckets, got {q!r}")
-    if q[0] != 0.0 or q[-1] != 1.0 or np.any(np.diff(q) <= 0.0):
-        raise ValueError(f"q must increase strictly from 0.0 to 1.0, got {q!r}")
-    return q
+    return get_quantile_probabilities(q)
 
 
 def get_regime_ids(q: Union[Sequence[float], np.ndarray, None] = None,
@@ -105,29 +105,6 @@ def get_regime_probabilities(q: Union[Sequence[float], np.ndarray, None] = None,
     return pd.Series(probs, index=get_regime_ids(q, regime_ids))
 
 
-def classify_quantile_buckets(x: np.ndarray,
-                              q: Union[Sequence[float], np.ndarray, None] = None
-                              ) -> np.ndarray:
-    """Bucket number of each observation, with the ``pd.qcut`` convention, for numpy loops.
-
-    Args:
-        x: one-dimensional observations without missing values
-        q: partition probabilities; None is the one-sigma cut
-
-    Returns:
-        integer bucket of each observation, 0 for the lowest
-
-    Raises:
-        ValueError: if the interior quantiles coincide, so that a bucket would be empty
-    """
-    q = get_partition_quantiles(q)
-    edges = np.quantile(np.asarray(x, dtype=float), q)
-    if np.any(np.diff(edges) <= 0.0):
-        raise ValueError(f"quantile edges are not unique for q={q.tolist()}: {edges.tolist()}")
-    # right-closed buckets: a value equal to an interior edge belongs to the lower bucket
-    return np.searchsorted(edges[1:-1], x, side='left')
-
-
 def create_sampled_returns_with_regime_id(returns: pd.DataFrame,
                                           benchmark: str,
                                           q: Union[Sequence[float], np.ndarray, None] = None,
@@ -137,8 +114,8 @@ def create_sampled_returns_with_regime_id(returns: pd.DataFrame,
 
     The counterpart of ``BenchmarkReturnsQuantilesRegime.compute_sampled_returns_with_regime_id``
     for a caller who holds periodic returns rather than prices: no resampling, and the same
-    ``pd.qcut`` classification of the benchmark column. Periods without a benchmark return get no
-    regime.
+    classification of the benchmark column by ``qis.utils.quantile_buckets``. Periods without a
+    benchmark return get no regime.
 
     Args:
         returns: periodic returns, one column per asset, including the benchmark
@@ -150,8 +127,8 @@ def create_sampled_returns_with_regime_id(returns: pd.DataFrame,
         a copy of ``returns`` with the categorical regime column ``RegimeClassifier.REGIME_COLUMN``
 
     Raises:
-        ValueError: if the benchmark is missing, has fewer than three returns, or is too
-            degenerate for unique quantile edges
+        ValueError: if the benchmark is missing, has fewer than three returns, or leaves a
+            regime without observations
     """
     if benchmark not in returns.columns:
         raise ValueError(f"benchmark {benchmark!r} is not a column of returns: "
@@ -162,11 +139,12 @@ def create_sampled_returns_with_regime_id(returns: pd.DataFrame,
     x_valid = x.dropna().to_numpy(dtype=float)
     if x_valid.size < 3:
         raise ValueError(f"need at least 3 benchmark returns to classify, got {x_valid.size}")
-    if np.unique(np.nanquantile(x_valid, q)).size <= len(labels):
-        raise ValueError(f"benchmark {benchmark!r} is degenerate for q={q.tolist()}: "
-                         f"the quantile edges are not unique")
     out = returns.copy()
-    out[REGIME_COLUMN] = pd.qcut(x=x, q=q, labels=labels)
+    try:
+        out[REGIME_COLUMN] = classify_quantile_buckets(x=x, q=q, labels=labels)
+    except EmptyQuantileBucketError as error:
+        raise ValueError(f"benchmark {benchmark!r} is degenerate for q={q.tolist()}: "
+                         f"{error}") from error
     return out
 
 
