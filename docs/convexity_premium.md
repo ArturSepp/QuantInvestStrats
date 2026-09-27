@@ -641,7 +641,8 @@ The fifth block runs the report. With the arithmetic convention its standalone p
 table's Bear contributions, and its funded Treasury curve matches the realised blends to within
 0.0004. Under the report's default per-annum convention the same principal has a Bear value of
 $-0.374$ rather than $-0.357$: a different statistic. Finally, mixes built from the full synthetic
-history, which starts on 3 January 2005, hold a flat NAV until the first quarter-end rebalance.
+history, which starts on 3 January 2005 between quarter-ends, are invested from that date: the
+zero-weight mix is the principal itself.
 
 ```python
 from qis.portfolio.smart_diversification import (SmartDiversificationReport,
@@ -665,10 +666,12 @@ default_points = SmartDiversificationReport(
     principal_nav=prices['SBM_6040'])
 np.testing.assert_allclose(default_points.loc['SBM_6040', bear_column], -0.3738, atol=5e-5)
 
-unaligned = create_overlay_portfolio_curve(principal_nav=universe.benchmark_prices['SBM_6040'],
+full_principal = universe.benchmark_prices['SBM_6040']
+unaligned = create_overlay_portfolio_curve(principal_nav=full_principal,
                                            overlay_nav=universe.prices['SBD_TSY'],
                                            is_principal_weight_fixed=False)
-assert (unaligned.loc[:'2005-03-30'] == 100.0).all().all()
+np.testing.assert_allclose(unaligned.iloc[:, 0] / unaligned.iloc[0, 0],
+                           full_principal / full_principal.iloc[0], rtol=1e-12)
 ```
 
 The sixth block estimates regime betas. Each equals the within-regime covariance ratio. The
@@ -781,13 +784,15 @@ Implementation contracts that affect the numbers:
   periods and needs at least five blocks of them; every asset uses the same `seed`. The beta
   bootstrap resamples whole rows of a panel without missing values. Both reclassify every
   resample with `compute_bucket_codes`, the array form of the quantile rule.
-- **Report mixes.** `create_overlay_portfolio_curve` backtests each mix from the first price
-  date, and the backtest holds no position until the first rebalancing date: a history that
-  starts between quarter-ends has a flat NAV, a zero return, in its first quarter in every mix,
-  which the principal's own series does not. `backtest_model_portfolio` rebalances on the first
-  business day on or after each calendar quarter-end, while the classifier samples the last
-  price on or before it; when a quarter ends on a weekend the two dates differ, and the curve
-  departs from the exact quarterly blends by up to 0.0004 in the worked example.
+- **Report mixes.** `create_overlay_portfolio_curve` invests each mix on the first price date
+  and rebalances it at `rebalancing_freq`, so the zero-weight mix is the principal portfolio and
+  a funded curve ends at the overlay's standalone point. Up to qis 5.31.0 the backtest held no
+  position until the first scheduled rebalancing date, and a history that started between
+  quarter-ends had a flat NAV, a zero return, in its first quarter in every mix.
+  `backtest_model_portfolio` rebalances on the first business day on or after each calendar
+  quarter-end, while the classifier samples the last price on or before it; when a quarter ends
+  on a weekend the two dates differ, and the curve departs from the exact quarterly blends by up
+  to 0.0004 in the worked example.
 - **Report defaults.** `regime_classifier=None` uses `BenchmarkReturnsQuantilesRegime()`,
   quarterly at the 16% and 84% quantiles, and a classifier passed by the caller is kept.
   `perf_params=None` uses `PerfParams(freq='ME')` and hence the per-annum Sharpe convention.

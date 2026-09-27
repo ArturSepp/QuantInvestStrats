@@ -95,6 +95,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Make `plot_line(df, x=..., y=...)` generate one legend entry for the rendered y series instead
   of also describing the x-coordinate column as a plotted series. Wide-form and hue legends are
   unchanged.
+- **Behaviour change.** Invest the principal-overlay mixes of `create_overlay_portfolio_curve`
+  on the first price date. The backtests rebalanced at `rebalancing_freq` only, so they held no
+  position until the first scheduled rebalancing date: a history that started between
+  quarter-ends had a flat NAV, a zero return, in its first quarter in every mix, and the
+  zero-weight mix was not the principal portfolio. The curves of `SmartDiversificationReport`
+  now start at the principal's standalone point and, for funded mixes, end at the overlay's. On
+  the synthetic 60/40 principal from 3 January 2005 with a Treasury overlay, the principal point
+  moves from a Bear-Sharpe of -0.371 and a Sharpe ratio of 0.441 to -0.379 and 0.414, its
+  standalone values, and no point of either curve moves by more than 0.026 in Bear-Sharpe or
+  0.032 in Sharpe ratio. A history that starts on a calendar quarter-end business day is
+  unchanged.
 
 ### Documentation
 
@@ -116,10 +127,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   degenerate benchmark in a new executed block.
 - List `qis.regimes`, `qis.plots.derived.regime_premium` and `qis.utils.quantile_buckets` on the
   API reference page under *Explicitly imported modules*; they are not exported from `qis`.
-- Document two contracts of the smart-diversification report: its mixes hold a flat NAV until the
-  first quarter-end rebalance, so a history that starts between quarter-ends has a zero first
-  quarter in every mix, and its default Bear axis is the per-annum contribution rather than the
-  arithmetic one the premium uses.
+- Document two contracts of the smart-diversification report: its default Bear axis is the
+  per-annum contribution rather than the arithmetic one the premium uses, and its quarter-end
+  rebalancing day can differ from the classifier's quarter-end sample by one business day.
 
 ## [5.31.0] - 2026-09-26
 

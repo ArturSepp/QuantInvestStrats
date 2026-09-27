@@ -11,7 +11,7 @@
     "seaborn": "0.13.2",
     "statsmodels": "0.15.0"
   },
-  "generated_at_utc": "2026-09-27T07:29:55.564756+00:00",
+  "generated_at_utc": "2026-09-27T07:48:53.886884+00:00",
   "manifest": {
     "assets": [
       {
@@ -993,7 +993,7 @@
       "docs/images/strategy.png",
       "docs/images/strategy_vs_benchmark.png"
     ],
-    "published_at_utc": "2026-09-27T07:31:11.744154+00:00"
+    "published_at_utc": "2026-09-27T07:50:06.799027+00:00"
   },
   "python": "3.11.15",
   "qis_import_path": "/home/user/QuantInvestStrats/src/qis/__init__.py",
@@ -1358,10 +1358,11 @@
       "src/qis/portfolio/run_local/legend_capacity_run.py": "2afdb36e1db308a434054775caccf7a264064764e3f669694083d131e7856240",
       "src/qis/portfolio/signal_data.py": "db9110909a23b39eb7d2a2b8ec9db7dbe9af7a48d6c596e1e4da5ee8784e88b7",
       "src/qis/portfolio/smart_diversification/__init__.py": "b24448db5b83c2e588da1c4406570b8d04076b5c1a65b3ca2f3528818b9dd93f",
-      "src/qis/portfolio/smart_diversification/overlay_curve.py": "907525e419ca69b17e69b6dbef347ed9b5b9244e8396e0ec1f1ba0b5e9fe659d",
+      "src/qis/portfolio/smart_diversification/overlay_curve.py": "8cfffcd8a27a9e9b3caa29dda66479ac43998c7ab7a6e604593adba19fee05d5",
       "src/qis/portfolio/smart_diversification/report.py": "3be077fa8f612ca24a4037312bbaf451badacfd1de3dc71a68d9cda851d3b570",
       "src/qis/portfolio/smart_diversification/run_local/__init__.py": "f3b73212fd8a12fd9d88e351e08a0f87a720a2737fa0249f0ca0cd0c9f40ba66",
       "src/qis/portfolio/smart_diversification/run_local/smart_diversification_run.py": "9c2f95d9a1a635389acdf84da9776dc08727851579dea79ca3499bb37fefd9af",
+      "src/qis/portfolio/smart_diversification/tests/overlay_curve_first_date_test.py": "2328d9640af1eefae4b89eda9288cc35fa59b7ee5fb5c40eda44d50f39c96d76",
       "src/qis/portfolio/smart_diversification/tests/smart_diversification_test.py": "62fff0ce22ac3665e65dc69bf6971947462a51723629f174a2193fb204b6ac5a",
       "src/qis/portfolio/stress/__init__.py": "ae103139bcbfa1fa8a614bd9e32256e32428871b5ed0b11ad91263daad1fe4d4",
       "src/qis/portfolio/stress/_bands.py": "08c2bc3539fd129d2a7666fba365ffa7511f33ae9c4da18978fbd23ad73e29ee",
@@ -1509,7 +1510,7 @@
       "uv.lock": "600a4b535048c10463baff54555bb267b0bccb99aba680291a9e02ee40db4b4c"
     },
     "identity": "Effective source content, including dirty export files",
-    "sha256": "141dd94efc80b4894eda8d475e430016102d0ab725fb0a83b1b01d5547044e3b"
+    "sha256": "053e1541330335d80442a0c7108000ab43bc2c7a57d2c611b8626f0c993b4e57"
   },
   "status": "complete",
   "version_note": "dependencies.qis is installed distribution metadata; qis_source_version and the content fingerprint identify the imported source export"

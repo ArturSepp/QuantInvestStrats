@@ -2,9 +2,9 @@
 the principal-overlay mixes behind a smart-diversification curve.
 
 ``create_overlay_portfolio_curve`` mixes a principal portfolio with one overlay at eleven weights
-from zero to ``max_overlay_weight``, backtests each mix with ``backtest_model_portfolio`` at
-``rebalancing_freq`` and returns the navs, one column per mix. ``SmartDiversificationReport`` in
-``report.py`` reads its statistics off these navs.
+from zero to ``max_overlay_weight``, backtests each mix with ``backtest_model_portfolio`` on the
+first price date and at ``rebalancing_freq``, and returns the navs, one column per mix.
+``SmartDiversificationReport`` in ``report.py`` reads its statistics off these navs.
 """
 # packages
 import numpy as np
@@ -24,7 +24,9 @@ def create_overlay_portfolio_curve(principal_nav: pd.Series,
 
     The overlay weights run from zero to ``max_overlay_weight`` in equal steps, so the first
     column holds the principal portfolio alone. Each mix is a ``backtest_model_portfolio`` with
-    constant weights, rebalanced at ``rebalancing_freq``.
+    constant weights, invested on the first price date and rebalanced at ``rebalancing_freq``, so
+    a history that starts between two rebalancing dates is invested in its first period too.
+    Up to qis 5.31.0 the mixes held no position until the first scheduled rebalancing date.
 
     Args:
         principal_nav: nav of the principal portfolio
@@ -50,7 +52,9 @@ def create_overlay_portfolio_curve(principal_nav: pd.Series,
 
         portfolio_nav = backtest_model_portfolio(prices=prices,
                                                  weights=np.array(weights),
-                                                 rebalancing_freq=rebalancing_freq).get_portfolio_nav()
+                                                 rebalancing_freq=rebalancing_freq,
+                                                 is_rebalanced_at_first_date=True
+                                                 ).get_portfolio_nav()
         portfolio_nav.name = f"{overlay_nav.name} {'{:.2%}'.format(overlay_weight)}"
         portfolio_navs.append(portfolio_nav)
     portfolio_navs = pd.concat(portfolio_navs, axis=1, sort=True)
