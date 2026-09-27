@@ -522,7 +522,7 @@ def convexity_premium(params: dict):
 
 
 def smart_diversification(params: dict):
-    """Bear contribution and Sharpe ratio of funded benchmark-overlay blends, with and without CP."""
+    """Bear contribution and Sharpe ratio of funded blends with and without the premium."""
     from qis.regimes import compute_overlay_blend_frontier, compute_regime_premium_table
 
     sampled = _premium_sample(params)
