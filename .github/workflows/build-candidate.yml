@@ -1,0 +1,145 @@
+name: Build unpublished package artifact
+run-name: Build unpublished qis ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to put in the unpublished distribution files
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  MPLBACKEND: Agg
+  CANDIDATE_VERSION: ${{ inputs.version }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      - name: Stage candidate metadata in the runner
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          version = os.environ["CANDIDATE_VERSION"]
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit("Candidate version must be a stable major.minor.patch version")
+          current = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", current):
+              raise SystemExit("The checked-out project version is not stable")
+          if tuple(map(int, version.split("."))) <= tuple(map(int, current.split("."))):
+              raise SystemExit("Candidate version must be newer than the checked-out version")
+
+          def replace_once(filename: str, before: str, after: str) -> None:
+              path = Path(filename)
+              contents = path.read_bytes()
+              old_bytes, new_bytes = before.encode(), after.encode()
+              if contents.count(old_bytes) != 1:
+                  raise SystemExit(f"Expected exactly one {before!r} in {filename}")
+              path.write_bytes(contents.replace(old_bytes, new_bytes, 1))
+
+          replace_once("pyproject.toml", f'version = "{current}"', f'version = "{version}"')
+          replace_once("CITATION.cff", f"version: {current}", f"version: {version}")
+          citation = Path("CITATION.cff").read_text(encoding="utf-8")
+          previous_date = re.search(r'^date-released: "([0-9]{4}-[0-9]{2}-[0-9]{2})"', citation, re.M)
+          if previous_date is None:
+              raise SystemExit("CITATION.cff has no ISO release date")
+          intended_date = dt.datetime.now(dt.timezone.utc).date().isoformat()
+          replace_once("CITATION.cff", previous_date.group(0), f'date-released: "{intended_date}"')
+          replace_once("README.md", f"version={{{current}}}", f"version={{{version}}}")
+          PY
+      - name: Reconcile only the root package version in the lockfile
+        run: |
+          uv lock
+          python - <<'PY'
+          import os
+          import subprocess
+          import tomllib
+          from pathlib import Path
+
+          original = tomllib.loads(subprocess.check_output(["git", "show", "HEAD:uv.lock"], text=True))
+          updated = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
+          root = lambda lock: next(
+              package for package in lock["package"]
+              if package["name"] == "qis" and package["source"] == {"editable": "."}
+          )
+          if root(updated)["version"] != os.environ["CANDIDATE_VERSION"]:
+              raise SystemExit("Candidate lockfile has the wrong root version")
+          root(original)["version"] = root(updated)["version"]
+          if original != updated:
+              raise SystemExit("The candidate lockfile changed dependencies")
+          changed = set(subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines())
+          expected = {"pyproject.toml", "CITATION.cff", "README.md", "uv.lock"}
+          if not changed.issubset(expected) or not {"pyproject.toml", "CITATION.cff", "README.md"}.issubset(changed):
+              raise SystemExit(f"Unexpected candidate source changes: {sorted(changed)}")
+          PY
+      - name: Test the candidate source
+        run: |
+          uv sync --locked --group test
+          uv run --no-sync pytest
+      - name: Build the candidate documentation with warnings as errors
+        run: |
+          uv sync --locked --extra docs
+          uv run --no-sync python -m sphinx -E -W --keep-going -b html docs "$RUNNER_TEMP/candidate-docs"
+      - name: Build and check one sdist and its wheel
+        run: |
+          uv build --sdist --out-dir "$RUNNER_TEMP/candidate-dist"
+          uv build --wheel "$RUNNER_TEMP/candidate-dist/"*.tar.gz --out-dir "$RUNNER_TEMP/candidate-dist"
+          uvx --from twine twine check "$RUNNER_TEMP/candidate-dist/"*
+      - name: Import the candidate wheel outside the checkout
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/candidate-wheel-env"
+          uv pip install --python "$RUNNER_TEMP/candidate-wheel-env/bin/python" "$RUNNER_TEMP/candidate-dist/"*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/candidate-wheel-env/bin/python" -I - <<'PY'
+          import importlib.metadata
+          import os
+          import qis
+
+          assert importlib.metadata.version("qis") == os.environ["CANDIDATE_VERSION"]
+          print(qis.__file__)
+          PY
+      - name: Verify artifact metadata and write provenance
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import runpy
+          import tomllib
+          from pathlib import Path
+
+          dist = Path(os.environ["RUNNER_TEMP"]) / "candidate-dist"
+          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]
+          hashes = runpy.run_path(".github/scripts/release_guard.py")["inspect_artifacts"](dist, project, "qis")
+          manifest = {
+              "version": os.environ["CANDIDATE_VERSION"],
+              "source_commit": os.environ["GITHUB_SHA"],
+              "published": False,
+              "sha256": hashes,
+          }
+          (dist / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(manifest, indent=2))
+          PY
+      - name: Upload unpublished distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qis-${{ inputs.version }}-unpublished
+          path: ${{ runner.temp }}/candidate-dist/
+          if-no-files-found: error
+          retention-days: 30
