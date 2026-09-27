@@ -7,8 +7,83 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Add the subpackage `qis.regimes`, regime-conditional analytics for any benchmark-return
+  partition of the regime classifiers, the one-sigma Bear, Normal and Bull cut by default:
+  - Gaussian and Student-t null loadings of the regime Sharpe contributions for any partition,
+    kappa, and the null contributions (`compute_regime_null_loadings`, `compute_regime_kappa`,
+    `calibrate_student_t_nu`, `compute_null_regime_contributions`);
+  - a per-asset table of the regime contributions, the null of the lowest bucket, the convexity
+    premium and the benchmark-adjusted premium (`compute_regime_premium_table`), with stationary
+    block-bootstrap intervals that reclassify the regimes in each resample
+    (`compute_regime_premium_bootstrap`);
+  - per-regime OLS betas with bootstrap standard errors (`compute_regime_betas`,
+    `compute_regime_betas_bootstrap`), regime-time EWMA means and betas
+    (`compute_regime_ewm_avg`, `compute_regime_ewm_betas`), the regime-mixture covariance and
+    Gaussian regime moments (`compute_regime_mixture_covar`, `compute_gaussian_regime_moments`);
+  - the closed forms of the portfolio aggregation identity and of a benchmark-overlay blend
+    (`compute_portfolio_bear_sharpe`, `compute_overlay_blend_frontier`), and
+    `create_sampled_returns_with_regime_id` for panels of periodic returns.
+
+  Import it as `qis.regimes`; its names are not re-exported from `qis`, so `qis.__all__` is
+  unchanged. It depends on `qis.utils`, `qis.perfstats` and `qis.models` only, which a test
+  enforces. Classification is the classifiers' `pd.qcut` rule throughout, including inside the
+  bootstraps, where resamples repeat observations and a return equal to an interior quantile
+  falls in the lower bucket.
+- Add `qis.plots.derived.regime_premium` with `plot_regime_sharpe_decomposition` and
+  `plot_regime_beta_profiles`, drawn from the `qis.regimes` tables. They are not re-exported
+  from `qis`.
+- Add `qis.utils.quantile_buckets`, the one rule for classifying observations into quantile
+  buckets: linear-interpolation edges (a position within 1e-9 of a whole number is snapped to
+  it), buckets closed on the right with open outer ends, a value on an edge in the lower bucket,
+  NaN and infinite values unclassified, and an `EmptyQuantileBucketError` reporting the occupied
+  count when an estimated partition leaves a bucket empty. Within these rules it equals
+  `pd.qcut` of pandas 3. pandas 2 computes the `qcut` edges with `np.percentile` at `100 p`,
+  which can leave an edge one ulp off the order statistic at a whole-number position; there
+  `pd.qcut` puts that observation in the upper bucket and this rule in the lower.
+
+### Changed
+
+- Route every quantile classification in qis through `qis.utils.quantile_buckets`:
+  `BenchmarkReturnsQuantilesRegime`, `compute_regime_sharpe_decomposition`,
+  `BenchmarkVolsQuantilesRegime`, the open-ended default of `x_bins_cut` and with it
+  `add_classification` and `add_quantile_classification` (scatter, boxplot and regime-class-table
+  hue buckets), the bucket reduction of the signal-diagnostics plot, and `qis.regimes`. The
+  regime classifiers and the Sharpe decomposition are unchanged under pandas 3: they already used
+  `pd.qcut`. Under pandas 2 they also keep every label for the one-sigma, 10/90 and 5/95 cuts,
+  quartiles and quintiles; for tertiles, deciles and seven buckets an observation exactly at a
+  whole-number position of an edge moves to the lower bucket. The other paths change only on
+  ties and degenerate samples:
+  - the volatility regimes and the quantile hue buckets put a value equal to an edge in the lower
+    bucket, as the return regimes do; they computed the probabilities as `(1 / k) * i`, which can
+    fall a hair short of `i / k`, and could put it in the upper bucket. On the synthetic panel no
+    label changes;
+  - `x_bins_cut` on its default path leaves an infinite value unclassified, where `pd.cut` put
+    `+inf` in the last bin;
+  - a degenerate benchmark is rejected when a band is empty, and the message counts occupied
+    bands: constant volatility reports 1 of `q` bands, all values sitting in the lowest, where it
+    reported 0. A benchmark whose lowest quantile edge equals its minimum is classified when every
+    band is occupied, where it was rejected;
+  - the signal-diagnostics boxplot lowers its bucket count until every bucket is occupied, where
+    it required unique edges.
+  `BenchmarkReturnsPositiveNegativeRegime` is a sign rule and keeps zero in Positive.
+
+- Move the smart-diversification report from `qis/portfolio/reports/overlays_smart_diversification.py`
+  to the new subpackage `qis.portfolio.smart_diversification`: `SmartDiversificationReport` in
+  `report.py`, `create_overlay_portfolio_curve` in `overlay_curve.py`, and the development runner in
+  its `run_local/`. `qis.SmartDiversificationReport` and `qis.create_overlay_portfolio_curve` are
+  unchanged, and the old module path remains valid as a re-export of the same objects. Computed
+  values are unchanged: on the synthetic panel every curve, mix and point is bit-identical to
+  5.31.0.
+
 ### Fixed
 
+- Make `SmartDiversificationReport` keep a `regime_classifier` passed by the caller.
+  `__post_init__` replaced it unconditionally with `BenchmarkReturnsQuantilesRegime()`, so a
+  supplied classifier, a monthly one for example, was silently ignored. The default is unchanged:
+  quarterly regimes at the 16%/84% quantiles. The unused module-level `regime_classifier` of the
+  old module is removed.
 - Make `df_resample_at_int_index` apply a numpy aggregation such as `np.nansum` itself on every
   pandas version. pandas 2 swapped the bare callable for the groupby's own sum, which adds in
   another order, and emitted a FutureWarning that failed four tests on Python 3.10. Under pandas 3

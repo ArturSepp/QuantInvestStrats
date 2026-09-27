@@ -1,12 +1,10 @@
-"""Development runner extracted from ``qis.portfolio.reports.overlays_smart_diversification``."""
+"""Development runner for ``qis.portfolio.smart_diversification``."""
 
 import matplotlib.pyplot as plt
 from enum import Enum
 from qis import PerfStat
 
-from qis.portfolio.reports.overlays_smart_diversification import (
-    SmartDiversificationReport,
-)
+from qis.portfolio.smart_diversification import SmartDiversificationReport
 
 class Locals(Enum):
     CURVE = 1

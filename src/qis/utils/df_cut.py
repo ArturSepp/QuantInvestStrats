@@ -1,15 +1,21 @@
 """
-bucketing a variable into labelled bins on top of ``pd.cut``. ``x_bins_cut`` is the primitive:
-``lower_infinite`` and ``upper_infinite`` extend the outer bins to +-inf, so values outside the
-supplied edges are captured rather than dropped to nan, and on that path it returns the
-categorical with its labels - with both flags off it passes ``pd.cut`` straight through and
+bucketing a variable into labelled bins. ``x_bins_cut`` is the primitive: ``lower_infinite`` and
+``upper_infinite`` extend the outer bins to +-inf, so values outside the supplied edges are captured
+rather than dropped to nan, and on that path it returns the categorical with its labels. With both
+outer bins open and right-closed bins, the default, the assignment is the one quantile rule of qis,
+``qis.utils.quantile_buckets.assign_bucket_codes``: a value equal to an edge falls in the lower bin
+and NaN or infinite values get none. With both flags off it passes ``pd.cut`` straight through and
 returns the categorical alone. ``add_classification`` and ``add_quantile_classification`` attach
-the result to a frame as a hue column, the latter taking its edges from ``np.nanquantile``.
+the result to a frame as a hue column, the latter taking its edges from
+``qis.utils.quantile_buckets``.
 """
 import numpy as np
 import pandas as pd
 from typing import Optional, Union, List, Tuple
 from pandas import Categorical
+# qis
+from qis.utils.quantile_buckets import (assign_bucket_codes, compute_quantile_edges,
+                                        compute_sample_quantiles)
 
 
 def x_bins_cut(a: np.ndarray,
@@ -89,6 +95,15 @@ def x_bins_cut(a: np.ndarray,
         if bucket_prefix is not None:
             new_label = f"{bucket_prefix}{new_label}"
         labels.append(new_label)
+    if lower_infinite and upper_infinite and right:
+        # the one quantile rule of qis: right-closed bins with open outer ends
+        if len(set(labels)) < len(labels):  # repeated edges repeat labels
+            labels = [f"bin_{n+1}" for n, _ in enumerate(bins_final[1:])]
+        codes = assign_bucket_codes(x=a, edges=np.asarray(bins, dtype=float))
+        out = pd.Categorical.from_codes(codes, categories=labels, ordered=True)
+        if isinstance(a, pd.Series):
+            out = pd.Series(out, index=a.index, name=a.name)
+        return out, labels
     try:
         out = pd.cut(a, bins_final, labels=labels)
     except ValueError:   # labels must be unique if ordered=True
@@ -132,11 +147,11 @@ def add_quantile_classification(df: pd.DataFrame,
                                 bucket_prefix: str = None,
                                 **kwargs
                                 ) -> Tuple[pd.DataFrame, List[str]]:
-    if num_buckets is not None:  # create bins
-        if isinstance(num_buckets, int):
-            bins = np.nanquantile(df[x_column], q=[(1.0 / num_buckets) * (n + 1) for n in np.arange(num_buckets - 1)])
-        else:
-            bins = np.nanquantile(df[x_column], q=num_buckets)
+    if num_buckets is not None:  # quantile edges by the one qis rule
+        if isinstance(num_buckets, (int, np.integer)):
+            bins = compute_quantile_edges(x=df[x_column], q=int(num_buckets))
+        else:  # the interior probabilities
+            bins = compute_sample_quantiles(x=df[x_column], probs=num_buckets)
     df, labels = add_classification(df=df,
                                     class_var_col=x_column,
                                     bins=bins,
