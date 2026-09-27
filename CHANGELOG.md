@@ -11,6 +11,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Require Numba 0.64 or newer: 0.63 fails to compile the EWM array kernel with the
   supported NumPy 2 floor, breaking the Python 3.10 minimum-dependency test run.
+- Make `compute_ewm`, `compute_ewm_vol`, the related shared-decay estimators, and the covariance
+  and beta EWM kernels reject non-finite spans, spans below one, and decay values outside `[0, 1)`
+  before recursion. Per-column mean/volatility arrays now reject the complete request when any
+  entry is invalid, while span precedence and the `span=1` pass-through remain unchanged.
 
 ## [5.32.1] - 2026-09-30
 

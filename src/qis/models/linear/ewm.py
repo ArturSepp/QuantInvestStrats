@@ -13,6 +13,10 @@ The column-wise path takes a vector decay, one per column; the covariance kernel
 
 The seed is the state before a column's first finite observation, s_{t0-1}, and every finite
 observation, the first included, updates it. Rows before the first observation are NaN.
+The general EWM recursion and covariance/beta entry points validate the selected smoothing
+parameter before recursion: ``span`` must be finite and at least one, while ``ewm_lambda`` must be
+finite and in ``[0, 1)``. A supplied ``span`` takes precedence, and ``span=1`` remains the
+unsmoothed pass-through boundary.
 
 Four enums carry the conventions, and they are the arguments worth getting right:
 
@@ -272,10 +276,34 @@ def _check_mean_init_type(init_type: InitType, name: str) -> None:
                          f"recursion takes ZERO, X0 or MEAN")
 
 
+@_njit_cached
+def _validate_ewm_parameter(value: Union[float, np.ndarray], is_span: bool) -> None:
+    """Validate a span or decay before a numba recursion can update any state."""
+    if isinstance(value, (bool, np.bool_)):
+        if is_span:
+            raise ValueError("span must be finite and >= 1")
+        raise ValueError("ewm_lambda must be finite and in [0, 1)")
+    if np.any(~np.isfinite(value)):
+        if is_span:
+            raise ValueError("span must be finite and >= 1")
+        raise ValueError("ewm_lambda must be finite and in [0, 1)")
+    if is_span:
+        if np.any(value < 1.0):
+            raise ValueError("span must be finite and >= 1")
+    elif np.any(value < 0.0) or np.any(value >= 1.0):
+        raise ValueError("ewm_lambda must be finite and in [0, 1)")
+
+
 def _to_decay(span: Optional[Union[float, np.ndarray]],
               ewm_lambda: Union[float, np.ndarray]
               ) -> Union[float, np.ndarray]:
-    """``lambda = 1 - 2 / (span + 1)`` when ``span`` is given, else ``ewm_lambda``."""
+    """Validate and select decay, with ``span`` taking precedence when supplied."""
+    value = ewm_lambda if span is None else span
+    if isinstance(value, np.ndarray) and np.issubdtype(value.dtype, np.bool_):
+        if span is None:
+            raise ValueError("ewm_lambda must be finite and in [0, 1)")
+        raise ValueError("span must be finite and >= 1")
+    _validate_ewm_parameter(value=value, is_span=span is not None)
     if span is None:
         return ewm_lambda
     if isinstance(span, np.ndarray):
@@ -291,11 +319,15 @@ def _kernel_args(a: np.ndarray,
     vector with one entry per column for a 2-d array."""
     if a.ndim == 1:
         seed = float(np.asarray(init_value, dtype=float).reshape(-1)[0])
-        decay = float(np.asarray(ewm_lambda, dtype=float).reshape(-1)[0])
+        decay_values = np.asarray(ewm_lambda, dtype=float).reshape(-1)
+        if decay_values.size != 1:
+            raise ValueError("one-dimensional data requires one decay value")
+        decay = float(decay_values[0])
         return seed, decay
     seed = np.broadcast_to(np.asarray(init_value, dtype=float), (a.shape[1],)).copy()
     if isinstance(ewm_lambda, np.ndarray):
-        return seed, ewm_lambda.astype(float)
+        decay = np.broadcast_to(ewm_lambda.astype(float), (a.shape[1],)).copy()
+        return seed, decay
     return seed, float(ewm_lambda)
 
 
@@ -346,9 +378,15 @@ def ewm_recursion(a: np.ndarray,
 
     Returns:
         the EWM path, same shape as ``a``
+
+    Raises:
+        ValueError: if the selected span or decay is outside the stable EWM domain
     """
     if span is not None:
+        _validate_ewm_parameter(value=span, is_span=True)
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    else:
+        _validate_ewm_parameter(value=ewm_lambda, is_span=False)
 
     ewm_lambda_1 = 1.0 - ewm_lambda
     is_nan_fill = nan_backfill == NanBackfill.NAN_FILL
@@ -609,7 +647,8 @@ def compute_ewm_covar(a: np.ndarray,
         covariance matrix, shape (n, n)
 
     Raises:
-        ValueError: if ``b`` is given with a shape different from ``a``
+        ValueError: if the selected span or decay is outside the stable EWM domain, or ``b`` is
+            given with a shape different from ``a``
     """
     if b is None:
         b = a
@@ -617,7 +656,10 @@ def compute_ewm_covar(a: np.ndarray,
         raise ValueError("a and b must have the same shape")
 
     if span is not None:
+        _validate_ewm_parameter(value=span, is_span=True)
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    else:
+        _validate_ewm_parameter(value=ewm_lambda, is_span=False)
 
     if a.ndim == 1:  # ndarry
         n = a.shape[0]
@@ -676,9 +718,15 @@ def compute_ewm_covar_newey_west(a: np.ndarray,
 
     Returns:
         the Newey-West covariance matrix, shape (n, n)
+
+    Raises:
+        ValueError: if the selected span or decay is outside the stable EWM domain
     """
     if span is not None:
+        _validate_ewm_parameter(value=span, is_span=True)
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    else:
+        _validate_ewm_parameter(value=ewm_lambda, is_span=False)
     ewm0 = compute_ewm_covar(a=a, ewm_lambda=ewm_lambda, covar0=covar0, is_corr=False,
                              nan_backfill=nan_backfill)
     if num_lags > 0:
@@ -732,10 +780,14 @@ def compute_ewm_covar_tensor(a: np.ndarray,
         covariance tensor, shape (t, n, n), one matrix per observation date
 
     Raises:
-        ValueError: if ``a`` is not 2-d
+        ValueError: if the selected span or decay is outside the stable EWM domain, or ``a`` is
+            not 2-d
     """
     if span is not None:
+        _validate_ewm_parameter(value=span, is_span=True)
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    else:
+        _validate_ewm_parameter(value=ewm_lambda, is_span=False)
 
     if not a.ndim == 2:
         raise ValueError("only 2-d arrays are supported")
@@ -800,10 +852,14 @@ def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
         ``is_corr``, correlation) tensor, and the EWM vols of shape ``(t, n)``
 
     Raises:
-        ValueError: if ``a`` is not 2-d
+        ValueError: if the selected span or decay is outside the stable EWM domain, or ``a`` is
+            not 2-d
     """
     if span is not None:
+        _validate_ewm_parameter(value=span, is_span=True)
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    else:
+        _validate_ewm_parameter(value=ewm_lambda, is_span=False)
 
     if not a.ndim == 2:
         raise ValueError("only 2-d arrays are supported")
@@ -923,6 +979,7 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
 
     Raises:
         TypeError: If an input is not one- or two-dimensional, or time dimensions differ.
+        ValueError: If the selected span or decay is outside the stable EWM domain.
     """
     if x.ndim not in [1, 2] or y.ndim not in [1, 2]:
         raise TypeError("Expected 1- or 2-dimensional NumPy array for x and y")
@@ -945,8 +1002,9 @@ def compute_ewm_xy_beta_tensor(x: np.ndarray,  # factor returns
     nt = x.shape[0]
     betas_ts = np.full((nt, nx, ny), np.nan)
 
-    if span is not None:
-        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    ewm_lambda = _to_decay(span=span, ewm_lambda=ewm_lambda)
+    if np.asarray(ewm_lambda).ndim != 0:
+        raise ValueError("covariance and beta EWM kernels require a scalar smoothing parameter")
     for t in range(nt):  # over time index
         row_x = x[t]  # time series row
         row_y = y[t]
@@ -1044,7 +1102,8 @@ def compute_ewm(data: Union[pd.DataFrame, pd.Series, np.ndarray],
         smoothed data, same container and shape as ``data``
 
     Raises:
-        ValueError: if ``init_type`` is ``InitType.VAR``, a variance seed for a mean
+        ValueError: if the selected span or decay is outside the stable EWM domain, the decay
+            shape is incompatible with the data, or ``init_type`` is ``InitType.VAR``
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
 
@@ -1145,6 +1204,10 @@ def compute_ewm_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
 
     Returns:
         volatility or variance, same container and shape as ``data``
+
+    Raises:
+        ValueError: if the selected span or decay is outside the stable EWM domain or its shape
+            is incompatible with the data
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
     ewm_lambda = _to_decay(span=span, ewm_lambda=ewm_lambda)
@@ -1296,6 +1359,10 @@ def compute_ewm_newey_west_vol(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     Returns:
         the corrected estimate and its ratio to the uncorrected EWM variance; the ratio is NaN
         where the EWM variance is not positive
+
+    Raises:
+        ValueError: if the selected span or decay is outside the stable EWM domain or its shape
+            is incompatible with the data
     """
     a = npo.to_finite_np(data=data, fill_value=np.nan)
     ewm_lambda = _to_decay(span=span, ewm_lambda=ewm_lambda)
