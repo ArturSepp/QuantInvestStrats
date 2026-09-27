@@ -251,7 +251,6 @@ def replay_discrete_portfolio(
         # Pandas metadata remains mutable even inside a frozen dataclass, so the strategy gets an
         # independent snapshot rather than the state retained for accounting and reporting.
         strategy_state = deepcopy(state)
-        observed_prices.to_numpy(copy=False).flags.writeable = False
         new_orders = strategy.on_bar(timestamp, observed_prices, strategy_state)
         if new_orders is None:
             raise TypeError('strategy.on_bar must return a sequence of Order objects')

@@ -99,7 +99,7 @@ class MovingAverageCross:
         ]
 ```
 
-The `prices` row and every Series in `state` are read-only snapshots. `quantity` is signed:
+The `prices` row and every Series in `state` are isolated snapshots. `quantity` is signed:
 positive means buy and negative means sell. Order identifiers must be unique within a replay.
 
 ## Running a replay
