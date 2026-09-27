@@ -11,7 +11,7 @@
     "seaborn": "0.13.2",
     "statsmodels": "0.15.0"
   },
-  "generated_at_utc": "2026-09-27T07:26:51.920474+00:00",
+  "generated_at_utc": "2026-09-27T07:29:55.564756+00:00",
   "manifest": {
     "assets": [
       {
@@ -993,7 +993,7 @@
       "docs/images/strategy.png",
       "docs/images/strategy_vs_benchmark.png"
     ],
-    "published_at_utc": "2026-09-27T07:28:21.788196+00:00"
+    "published_at_utc": "2026-09-27T07:31:11.744154+00:00"
   },
   "python": "3.11.15",
   "qis_import_path": "/home/user/QuantInvestStrats/src/qis/__init__.py",
@@ -1500,7 +1500,7 @@
       "src/qis/utils/tests/truncate_prior_to_start_test.py": "65a7985b933144d4d89e1a8987c03c7947adb48a5d1a1c586d715c2a31ee303c",
       "src/qis/utils/tests/weight_allocation_zero_net_test.py": "a7a8bfd93b1115c79ebea4f441752634f1a55af4a676a67059c6d59b1270605e",
       "tools/docs_analytics/gallery.py": "7a414759db54f05051539d4fc0c70bfdf1665b6ade748d0239cd353527639c03",
-      "tools/docs_analytics/handbook.py": "2e23dc562e71e05b1b1306216489bdb4b9c3cf21cfa6849d9226ba69d68ab7e1",
+      "tools/docs_analytics/handbook.py": "2a9b73142d75e6764869c394aa16a5ff04a0e9f53fb759957d190db372e4cd32",
       "tools/docs_analytics/manifest.json": "6ff7c1a46278ee2792dc855516384ed138de935d6031ba148109d4a9c2a93392",
       "tools/docs_analytics/model_layer.py": "bb1a6572320cb63135343c4f1d88b2c6777cdf9c353d9fa486d2e9b0e7e9ae47",
       "tools/docs_analytics/publish.py": "8925b7ece371eff423d8eb1a095d04b8da4485b1f15f28c429fe01fe7ff713ec",
@@ -1509,7 +1509,7 @@
       "uv.lock": "600a4b535048c10463baff54555bb267b0bccb99aba680291a9e02ee40db4b4c"
     },
     "identity": "Effective source content, including dirty export files",
-    "sha256": "9bfdead08631b1fc98035870cee615aed7b17a305adbacf116cb846ca195e069"
+    "sha256": "141dd94efc80b4894eda8d475e430016102d0ab725fb0a83b1b01d5547044e3b"
   },
   "status": "complete",
   "version_note": "dependencies.qis is installed distribution metadata; qis_source_version and the content fingerprint identify the imported source export"
