@@ -111,8 +111,48 @@ def test_adjust_returns_with_factor_lag_keeps_warmup_prefix_unavailable() -> Non
 
 
 @pytest.mark.parametrize("factor_lag_order", [1, 2])
+def test_adjust_returns_with_factor_lag_none_disables_every_warmup_layer(
+    factor_lag_order: int,
+) -> None:
+    """The disabled sentinel must not acquire the beta tensor's default warmup."""
+    returns, factor = _factor_lag_returns()
+    disabled = _adjust_with_diagnostics(
+        returns,
+        factor,
+        factor_lag_order=factor_lag_order,
+        mean_adj_type=MeanAdjType.NONE,
+        warmup_period=None,
+        sign_tie_to_contemporaneous=False,
+        apply_ewma_mean_smoother=False,
+    )
+    zero = _adjust_with_diagnostics(
+        returns,
+        factor,
+        factor_lag_order=factor_lag_order,
+        mean_adj_type=MeanAdjType.NONE,
+        warmup_period=0,
+        sign_tie_to_contemporaneous=False,
+        apply_ewma_mean_smoother=False,
+    )
+
+    # Position zero is unidentified, so disabling the mask and masking only position zero converge.
+    for disabled_panel, zero_panel in zip(disabled, zero, strict=True):
+        pd.testing.assert_frame_equal(disabled_panel, zero_panel, check_exact=True)
+
+    corrected, beta_d, r_squared = disabled
+    first_coefficient = returns.index[factor_lag_order]
+    assert beta_d.first_valid_index() == first_coefficient
+    assert r_squared.first_valid_index() == first_coefficient
+    # The first lag-1 coefficient is available at position one and applies one period later.
+    pd.testing.assert_frame_equal(corrected.iloc[:2], returns.iloc[:2])
+    assert not corrected.iloc[2].equals(returns.iloc[2])
+
+
+@pytest.mark.parametrize("factor_lag_order", [1, 2])
+@pytest.mark.parametrize("warmup_period", [4, None])
 def test_adjust_returns_with_factor_lag_ewma_mean_is_prefix_invariant(
     factor_lag_order: int,
+    warmup_period: int | None,
 ) -> None:
     """The default point-in-time mean seed must not depend on the eventual sample end."""
     returns, factor = _factor_lag_returns()
@@ -120,17 +160,22 @@ def test_adjust_returns_with_factor_lag_ewma_mean_is_prefix_invariant(
         returns.head(50),
         factor.head(50),
         factor_lag_order=factor_lag_order,
+        warmup_period=warmup_period,
     )
     longer = _adjust_with_diagnostics(
         returns,
         factor,
         factor_lag_order=factor_lag_order,
+        warmup_period=warmup_period,
     )
 
     _assert_prefix_equal(shorter=shorter, longer=longer)
 
 
-def test_adjust_returns_with_factor_lag_mixed_panel_is_causal_without_warnings() -> None:
+@pytest.mark.parametrize("warmup_period", [4, None])
+def test_adjust_returns_with_factor_lag_mixed_panel_is_causal_without_warnings(
+    warmup_period: int | None,
+) -> None:
     """Complete, ragged, and all-missing assets must remain independent and causal."""
     returns, factor = _factor_lag_returns()
     returns.loc[returns.index[:7], "negative"] = np.nan
@@ -140,8 +185,10 @@ def test_adjust_returns_with_factor_lag_mixed_panel_is_causal_without_warnings()
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        shorter = _adjust_with_diagnostics(returns.head(50), factor.head(50))
-        longer = _adjust_with_diagnostics(returns, factor)
+        shorter = _adjust_with_diagnostics(
+            returns.head(50), factor.head(50), warmup_period=warmup_period
+        )
+        longer = _adjust_with_diagnostics(returns, factor, warmup_period=warmup_period)
 
     _assert_prefix_equal(shorter=shorter, longer=longer)
     for panel in shorter:

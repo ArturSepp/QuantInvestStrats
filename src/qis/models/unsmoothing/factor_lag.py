@@ -151,7 +151,7 @@ def adjust_returns_with_factor_lag(returns: pd.DataFrame,
         y = y_adj[col].to_numpy(float)
         bt = compute_ewm_xy_beta_tensor(
             x=x, y=y, span=span,
-            warmup_period=warmup_period if warmup_period is not None else 20,
+            warmup_period=-1 if warmup_period is None else warmup_period,
             is_x_correlated=True,                        # joint (p+1)x(p+1) inverse
             nan_backfill=NanBackfill.FFILL,
         )                                                # shape [t, p+1, 1]

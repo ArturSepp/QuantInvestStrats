@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Make `adjust_returns_with_factor_lag(warmup_period=None)` disable both the public and delegated
+  beta-tensor warmup masks instead of silently retaining the tensor's 20-period default. The first
+  identified rolling beta and its next-period correction are now available without an extra
+  warmup; integer warmups are unchanged.
+
 ## [5.32.0] - 2026-09-27
 
 ### Added
