@@ -18,6 +18,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Make `long_short_to_relative_nav` compute the long and short legs by role instead of using
   Series names as lookup keys. Absent, duplicate, and distinct names now produce the same relative
   NAV values and neutral result name.
+- Make `compute_turnover()` and delegated `PortfolioData.get_turnover()` reject negative or
+  infinite aligned unit notionals and infinite volatility inputs before calculation, while
+  preserving nullable missing values and zero-denominator warnings.
 
 ## [5.33.0] - 2026-09-30
 

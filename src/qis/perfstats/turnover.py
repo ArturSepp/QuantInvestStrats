@@ -101,6 +101,12 @@ def _align_unit_notional(units: pd.DataFrame,
     return unit_notional.reindex(index=units.index, columns=units.columns)
 
 
+def _validate_nonnegative_finite_values(data: pd.DataFrame, name: str) -> None:
+    if (data.lt(0.0).any(axis=None)
+            or data.isin([float('-inf'), float('inf')]).any(axis=None)):
+        raise ValueError(f"{name} must not contain negative or infinite values")
+
+
 def _validate_vols_alignment(input_weights: pd.DataFrame,
                              vols: pd.DataFrame
                              ) -> None:
@@ -108,8 +114,7 @@ def _validate_vols_alignment(input_weights: pd.DataFrame,
         raise ValueError("vols index must exactly match input_weights index")
     if not vols.columns.equals(input_weights.columns):
         raise ValueError("vols columns must exactly match input_weights columns and order")
-    if vols.lt(0.0).any(axis=None):
-        raise ValueError("vols must not contain negative values")
+    _validate_nonnegative_finite_values(data=vols, name='vols')
 
 
 def _divide_by_denominator(traded_notional: pd.DataFrame,
@@ -154,7 +159,9 @@ def compute_turnover(
         computation_type: Holdings and denominator convention. The default is executed traded
             notional divided by portfolio NAV.
         units: Executed units or contracts held on each date. Required by both executed modes.
-        unit_notional: Current value of one unit or contract. Required by both executed modes.
+        unit_notional: Current value of one unit or contract. Required by both executed modes;
+            aligned values used in the calculation must be finite and non-negative while missing
+            values propagate.
         nav: Portfolio NAV in the same currency as ``unit_notional``. Required by
             ``EXECUTED_NOTIONAL_NAV``.
         input_weights: Requested target weights. Required by ``TARGET_WEIGHTS`` and
@@ -162,7 +169,7 @@ def compute_turnover(
         vols: Annualized fractional volatility for each target weight. Required by
             ``VOLATILITY_NORMALIZED_WEIGHTS`` and required to have exactly the same dated index
             after chronological ordering, columns, and column order as ``input_weights``.
-            Warm-up NaNs are preserved.
+            Observed values must be finite and non-negative; warm-up NaNs are preserved.
 
     Returns:
         Per-instrument two-sided turnover on the input index, ordered chronologically for dated
@@ -170,9 +177,10 @@ def compute_turnover(
 
     Raises:
         TypeError: If a required input is not a pandas object of the expected type.
-        ValueError: If ``unit_notional`` does not contain every unit column, if ``vols`` is not
-            exactly aligned or contains negative values, if an applicable dated input contains
-            duplicate or ``NaT`` dates, or if the computation type is unsupported.
+        ValueError: If ``unit_notional`` does not contain every unit column, if an aligned
+            ``unit_notional`` value or an observed ``vols`` value is negative or infinite, if
+            ``vols`` is not exactly aligned, if an applicable dated input contains duplicate or
+            ``NaT`` dates, or if the computation type is unsupported.
     """
     computation_type = TurnoverComputationType(computation_type)
     if computation_type == TurnoverComputationType.TARGET_WEIGHTS:
@@ -193,6 +201,7 @@ def compute_turnover(
     units = _chronological_dated_input(units, 'units')
     unit_notional = _chronological_dated_input(unit_notional, 'unit_notional')
     unit_notional = _align_unit_notional(units=units, unit_notional=unit_notional)
+    _validate_nonnegative_finite_values(data=unit_notional, name='unit_notional')
     if computation_type == TurnoverComputationType.EXECUTED_NOTIONAL_NAV:
         if not isinstance(nav, pd.Series):
             raise TypeError(

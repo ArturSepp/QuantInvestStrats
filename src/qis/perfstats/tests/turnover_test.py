@@ -157,6 +157,113 @@ def test_volatility_normalized_turnover_requires_aligned_annualized_vols() -> No
     assert pd.isna(actual.iloc[1, 0])
 
 
+@pytest.mark.parametrize(
+    'computation_type',
+    (
+        TurnoverComputationType.EXECUTED_NOTIONAL_NAV,
+        TurnoverComputationType.EXECUTED_NOTIONAL_GROSS,
+    ),
+)
+@pytest.mark.parametrize('invalid_notional', (-1.0, float('inf'), float('-inf')))
+def test_compute_turnover_rejects_invalid_unit_notionals_without_mutation(
+        computation_type: TurnoverComputationType,
+        invalid_notional: float,
+        ) -> None:
+    """Reject invalid observed notionals while leaving the caller's mixed panel unchanged."""
+    units, unit_notional, nav, _ = _turnover_inputs()
+    unit_notional = unit_notional.astype('Float64')
+    unit_notional.iloc[0, 1] = pd.NA
+    unit_notional.iloc[1, 0] = invalid_notional
+    original = unit_notional.copy(deep=True)
+
+    with pytest.raises(ValueError, match='unit_notional must not contain'):
+        compute_turnover(
+            computation_type=computation_type,
+            units=units,
+            unit_notional=unit_notional,
+            nav=nav,
+        )
+
+    pd.testing.assert_frame_equal(unit_notional, original)
+
+
+@pytest.mark.filterwarnings('error')
+def test_compute_turnover_rejects_notional_before_zero_denominator_warning() -> None:
+    """Validate the numerator before a later zero denominator can emit its warning."""
+    units, unit_notional, nav, _ = _turnover_inputs()
+    unit_notional.iloc[1, 0] = -1.0
+    nav.iloc[1] = 0.0
+
+    with pytest.raises(ValueError, match='unit_notional must not contain'):
+        compute_turnover(
+            computation_type=TurnoverComputationType.EXECUTED_NOTIONAL_NAV,
+            units=units,
+            unit_notional=unit_notional,
+            nav=nav,
+        )
+
+
+@pytest.mark.parametrize('invalid_volatility', (float('inf'), float('-inf')))
+def test_compute_turnover_rejects_infinite_volatility_without_mutation(
+        invalid_volatility: float,
+        ) -> None:
+    """Reject either signed infinity while retaining nullable warm-up observations."""
+    _, _, _, input_weights = _turnover_inputs()
+    vols = pd.DataFrame(0.20, index=input_weights.index, columns=input_weights.columns)
+    vols = vols.astype('Float64')
+    vols.iloc[0, 1] = pd.NA
+    vols.iloc[1, 0] = invalid_volatility
+    original = vols.copy(deep=True)
+
+    with pytest.raises(ValueError, match='vols must not contain'):
+        compute_turnover(
+            computation_type=TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS,
+            input_weights=input_weights,
+            vols=vols,
+        )
+
+    pd.testing.assert_frame_equal(vols, original)
+
+
+def test_compute_turnover_preserves_nullable_missing_and_zero_scales() -> None:
+    """Keep missing scales unavailable and accept exact zero in both affected calculations."""
+    units, unit_notional, nav, input_weights = _turnover_inputs()
+    unit_notional = unit_notional.astype('Float64')
+    unit_notional.iloc[1, 0] = 0.0
+    unit_notional.iloc[1, 1] = pd.NA
+    vols = pd.DataFrame(0.20, index=input_weights.index, columns=input_weights.columns)
+    vols = vols.astype('Float64')
+    vols.iloc[1, 0] = 0.0
+    vols.iloc[1, 1] = pd.NA
+
+    actual_notional = compute_turnover(
+        computation_type=TurnoverComputationType.EXECUTED_NOTIONAL_NAV,
+        units=units,
+        unit_notional=unit_notional,
+        nav=nav,
+    )
+    actual_volatility = compute_turnover(
+        computation_type=TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS,
+        input_weights=input_weights,
+        vols=vols,
+    )
+
+    expected_notional = pd.DataFrame(
+        [[pd.NA, pd.NA], [0.0, pd.NA], [0.1, 0.2]],
+        index=units.index,
+        columns=units.columns,
+        dtype='Float64',
+    )
+    expected_volatility = pd.DataFrame(
+        [[pd.NA, pd.NA], [0.0, pd.NA], [0.02, 0.04]],
+        index=input_weights.index,
+        columns=input_weights.columns,
+        dtype='Float64',
+    )
+    pd.testing.assert_frame_equal(actual_notional, expected_notional)
+    pd.testing.assert_frame_equal(actual_volatility, expected_volatility)
+
+
 def test_portfolio_turnover_uses_portfolio_default_and_legacy_mapping() -> None:
     units, unit_notional, nav, input_weights = _turnover_inputs()
     qis_default = PortfolioData(
@@ -200,6 +307,39 @@ def test_portfolio_turnover_uses_portfolio_default_and_legacy_mapping() -> None:
     pd.testing.assert_frame_equal(actual_nav, expected_nav)
     pd.testing.assert_frame_equal(actual_gross, expected_gross)
     pd.testing.assert_frame_equal(actual_target, input_weights.diff().abs())
+
+
+def test_portfolio_turnover_requires_explicit_notional_for_negative_prices() -> None:
+    """Require a valid contract notional when return prices are not valid unit notionals."""
+    units, unit_notional, nav, input_weights = _turnover_inputs()
+    negative_prices = unit_notional.multiply(-1.0)
+    default_notional = PortfolioData(
+        nav=nav,
+        prices=negative_prices,
+        weights=input_weights,
+        input_weights=input_weights,
+        units=units,
+    )
+    explicit_notional = PortfolioData(
+        nav=nav,
+        prices=negative_prices,
+        weights=input_weights,
+        input_weights=input_weights,
+        units=units,
+        turnover_unit_notional=unit_notional,
+    )
+
+    with pytest.raises(ValueError, match='unit_notional must not contain'):
+        default_notional.get_turnover(roll_period=None, add_total=False)
+
+    actual = explicit_notional.get_turnover(roll_period=None, add_total=False)
+    expected = pd.DataFrame(
+        [[None, None], [0.1, 0.2], [0.1, 0.2]],
+        index=units.index,
+        columns=units.columns,
+        dtype=float,
+    )
+    pd.testing.assert_frame_equal(actual, expected)
 
 
 def test_volatility_normalized_attribution_excludes_executed_position_drift() -> None:
