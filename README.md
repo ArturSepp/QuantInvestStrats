@@ -103,6 +103,17 @@ Covariance-implied Euler attribution also lives here for the whole OSS stack:
 `compute_group_portfolio_risk_contribution_ratios` aggregates those shares over clusters,
 sectors, asset classes, or any other complete labelled partition.
 
+Regime analytics beyond the Bear, Normal and Bull tables live in the subpackage `qis.regimes`,
+imported explicitly and not re-exported from `qis`: Gaussian and Student-t nulls of the regime
+Sharpe contributions, the convexity premium of Sepp and Kastenholz (2026, *Journal of Investment
+Management*, forthcoming) with block-bootstrap intervals, the portfolio aggregation identity,
+closed-form overlay frontiers, regime betas and regime-mixture covariances.
+`qis.SmartDiversificationReport`, in `qis.portfolio.smart_diversification`, draws what an overlay
+adds to a principal portfolio in Bear periods against what it adds to the Sharpe ratio. Every
+quantile classification in qis follows one rule, `qis.utils.quantile_buckets`. The
+[convexity premium chapter](https://quantinveststrats.readthedocs.io/en/latest/convexity_premium.html)
+derives the formulas.
+
 `qis.market_data` is an auxiliary module of market-data containers and FX analytics. `FxRatesData`
 holds FX spot and domestic short-rate panels and derives cross rates, covered-interest-parity
 forward premia, carry decomposition, and reference-currency / FX-hedged return translation of
@@ -118,7 +129,7 @@ analytics. It is intentionally separate from the installed `qis` package:
 
 * `examples/models` — numba-vs-pandas EWM kernel benchmarks, multivariate EWM linear factor models, multivariate OLS, EWM correlation tables, intraday/overnight return decomposition, rolling correlations, and block bootstrap of price paths.
 
-* `examples/regimes` — regime-conditional analytics: bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study.
+* `examples/regimes` — regime-conditional analytics: bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study. The convexity premium and smart-diversification curves are worked through in the [handbook chapter](https://quantinveststrats.readthedocs.io/en/latest/convexity_premium.html).
 
 * `examples/portfolios` — backtests using `backtest_model_portfolio`: balanced 60/40 with and without a BTC sleeve, constant-notional short, leveraged-ETF combinations, long/short pairs, vol-target / trend-following parameter sweeps, and separate offline ex-ante and ex-post tracking-error workflows.
 

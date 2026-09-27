@@ -172,6 +172,19 @@
             "2016-12-31",
             0.6
           ]
+        ],
+        "premium_assets": [
+          "SBM_6040",
+          "SEQ_US",
+          "SBD_TSY",
+          "SCM_GLD",
+          "SAL_HF"
+        ],
+        "premium_start": "2005-03-31",
+        "overlays": [
+          "SBD_TSY",
+          "SCM_GLD",
+          "SAL_HF"
         ]
       },
       "conventions": {
@@ -194,7 +207,9 @@
         "fee_navs",
         "benchmark_regression",
         "risk_contributions",
-        "vol_targeting"
+        "vol_targeting",
+        "convexity_premium",
+        "smart_diversification"
       ],
       "checks": [
         "ewm_kernels",
@@ -207,7 +222,9 @@
         "fee_navs",
         "benchmark_regression",
         "risk_contributions",
-        "vol_targeting"
+        "vol_targeting",
+        "convexity_premium",
+        "smart_diversification"
       ]
     }
   },
@@ -318,6 +335,18 @@
       "id": "handbook_vol_targeting",
       "document": "docs/risk_adjusted_returns.md",
       "path": "docs/images/handbook_vol_targeting.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_convexity_premium",
+      "document": "docs/convexity_premium.md",
+      "path": "docs/images/handbook_convexity_premium.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_smart_diversification",
+      "document": "docs/convexity_premium.md",
+      "path": "docs/images/handbook_smart_diversification.png",
       "producer": "handbook"
     }
   ],

@@ -11,7 +11,7 @@
     "seaborn": "0.13.2",
     "statsmodels": "0.15.0"
   },
-  "generated_at_utc": "2026-09-26T05:26:25.945914+00:00",
+  "generated_at_utc": "2026-09-27T07:26:51.920474+00:00",
   "manifest": {
     "assets": [
       {
@@ -121,6 +121,18 @@
         "id": "handbook_vol_targeting",
         "path": "docs/images/handbook_vol_targeting.png",
         "producer": "handbook"
+      },
+      {
+        "document": "docs/convexity_premium.md",
+        "id": "handbook_convexity_premium",
+        "path": "docs/images/handbook_convexity_premium.png",
+        "producer": "handbook"
+      },
+      {
+        "document": "docs/convexity_premium.md",
+        "id": "handbook_smart_diversification",
+        "path": "docs/images/handbook_smart_diversification.png",
+        "producer": "handbook"
       }
     ],
     "dependencies": [
@@ -222,7 +234,9 @@
           "fee_navs",
           "benchmark_regression",
           "risk_contributions",
-          "vol_targeting"
+          "vol_targeting",
+          "convexity_premium",
+          "smart_diversification"
         ],
         "conventions": {
           "annualisation": "AN = 12 monthly, 4 quarterly, 252 daily as set by qis frequency maps",
@@ -254,7 +268,20 @@
             36
           ],
           "man_fee": 0.02,
+          "overlays": [
+            "SBD_TSY",
+            "SCM_GLD",
+            "SAL_HF"
+          ],
           "perf_fee": 0.2,
+          "premium_assets": [
+            "SBM_6040",
+            "SEQ_US",
+            "SBD_TSY",
+            "SCM_GLD",
+            "SAL_HF"
+          ],
+          "premium_start": "2005-03-31",
           "regime_assets": [
             "SEQ_US",
             "SBD_TSY",
@@ -297,7 +324,9 @@
           "fee_navs",
           "benchmark_regression",
           "risk_contributions",
-          "vol_targeting"
+          "vol_targeting",
+          "convexity_premium",
+          "smart_diversification"
         ]
       },
       "model_layer": {
@@ -356,6 +385,12 @@
       "sha256": "e06cc89994a5b09b2a9ba984998e2832709e011a3bc5539bf4e8f607a9ddca99",
       "width": 1422
     },
+    "images/handbook_convexity_premium.png": {
+      "bytes": 119949,
+      "height": 932,
+      "sha256": "fb315fe0febbe22dbd5f5216fb30aa7fe17bb5fbde92883c67fed9e307879695",
+      "width": 1582
+    },
     "images/handbook_drawdown.png": {
       "bytes": 161473,
       "height": 932,
@@ -397,6 +432,12 @@
       "height": 932,
       "sha256": "28bd313acff3471016725a372977600c8a09db3e4a3a2f6679139754f09a35c4",
       "width": 1438
+    },
+    "images/handbook_smart_diversification.png": {
+      "bytes": 178449,
+      "height": 932,
+      "sha256": "c18f4baf85996d8bf5f1cc61c3766b978016f9c43be1320a43b6cfba1bfd32e7",
+      "width": 1567
     },
     "images/handbook_smoothed_acf.png": {
       "bytes": 104616,
@@ -506,6 +547,12 @@
       "rows_including_header": 251,
       "sha256": "f0aba7ceefe749d6d3d9261e36b4e9cf2be305eba45c0bb827bd49676e69a86f"
     },
+    "tables/handbook/convexity_premium.csv": {
+      "bytes": 1153,
+      "columns": 11,
+      "rows_including_header": 6,
+      "sha256": "0657d204fd80f6b96be47b8710302b8482ad7d8441eaec02b60236fc0c11d50e"
+    },
     "tables/handbook/drawdown_path.csv": {
       "bytes": 55551,
       "columns": 3,
@@ -547,6 +594,12 @@
       "columns": 6,
       "rows_including_header": 11,
       "sha256": "7a206d3eff91c01baf92ea34410014b87c6e79f1752a2b3ac7d623bfcee2ce54"
+    },
+    "tables/handbook/smart_diversification.csv": {
+      "bytes": 3570,
+      "columns": 7,
+      "rows_including_header": 34,
+      "sha256": "9620878278922251a72fe63e9aca68d2e7eeb25e270bbd9454b776758933dd7d"
     },
     "tables/handbook/smoothed_acf.csv": {
       "bytes": 400,
@@ -712,6 +765,7 @@
       "checks": {
         "benchmark_regression": true,
         "bootstrap_frequencies": true,
+        "convexity_premium": true,
         "drawdown_path": true,
         "ewm_kernels": true,
         "fee_navs": true,
@@ -719,6 +773,7 @@
         "regime_sharpe": true,
         "risk_contributions": true,
         "sharpe_wedge": true,
+        "smart_diversification": true,
         "smoothed_acf": true,
         "vol_targeting": true
       },
@@ -741,7 +796,20 @@
           36
         ],
         "man_fee": 0.02,
+        "overlays": [
+          "SBD_TSY",
+          "SCM_GLD",
+          "SAL_HF"
+        ],
         "perf_fee": 0.2,
+        "premium_assets": [
+          "SBM_6040",
+          "SEQ_US",
+          "SBD_TSY",
+          "SCM_GLD",
+          "SAL_HF"
+        ],
+        "premium_start": "2005-03-31",
         "regime_assets": [
           "SEQ_US",
           "SBD_TSY",
@@ -785,6 +853,28 @@
             "Truncating (before 5.1.0)": 0.11
           }
         },
+        "convexity_premium": {
+          "SAL_HF": {
+            "convexity_premium": 0.02166090859770048,
+            "cp_star": -0.005535397135061182
+          },
+          "SBD_TSY": {
+            "convexity_premium": 0.06360042020382686,
+            "cp_star": 0.06791055738012089
+          },
+          "SBM_6040": {
+            "convexity_premium": 0.05429598064155089,
+            "cp_star": 0.0
+          },
+          "SCM_GLD": {
+            "convexity_premium": -0.17032822111512064,
+            "cp_star": -0.18010588030786942
+          },
+          "SEQ_US": {
+            "convexity_premium": 0.044890568935749775,
+            "cp_star": -0.007876671201976902
+          }
+        },
         "drawdown_path": {
           "max_drawdown": -0.5704347256687985,
           "trough": "2017-08-21"
@@ -817,6 +907,11 @@
         },
         "sharpe_wedge": {
           "max_abs_gap_to_half_vol": 0.03150200301728276
+        },
+        "smart_diversification": {
+          "SAL_HF": 0.02166090859770048,
+          "SBD_TSY": 0.06360042020382686,
+          "SCM_GLD": -0.17032822111512064
         },
         "smoothed_acf": {
           "band": 0.12371410300716942,
@@ -879,6 +974,7 @@
     "paths": [
       "docs/images/handbook_benchmark_regression.png",
       "docs/images/handbook_bootstrap_frequencies.png",
+      "docs/images/handbook_convexity_premium.png",
       "docs/images/handbook_drawdown.png",
       "docs/images/handbook_ewm_kernels.png",
       "docs/images/handbook_fee_navs.png",
@@ -886,6 +982,7 @@
       "docs/images/handbook_regime_sharpe.png",
       "docs/images/handbook_risk_contributions.png",
       "docs/images/handbook_sharpe_wedge.png",
+      "docs/images/handbook_smart_diversification.png",
       "docs/images/handbook_smoothed_acf.png",
       "docs/images/handbook_vol_targeting.png",
       "docs/images/model_feature_attribution_simulated.png",
@@ -896,7 +993,7 @@
       "docs/images/strategy.png",
       "docs/images/strategy_vs_benchmark.png"
     ],
-    "published_at_utc": "2026-09-26T05:27:30.946038+00:00"
+    "published_at_utc": "2026-09-27T07:28:21.788196+00:00"
   },
   "python": "3.11.15",
   "qis_import_path": "/home/user/QuantInvestStrats/src/qis/__init__.py",
@@ -1011,7 +1108,7 @@
       "src/qis/perfstats/config.py": "27120d4ddff369d94fdad310d37409339dd21779b300df335d759a4c5d670dfb",
       "src/qis/perfstats/desc_table.py": "8e8e8bf3bef83705ab0f25ebdd838c0ea715977e2cc63f3e58cd234a62bccad9",
       "src/qis/perfstats/perf_stats.py": "d8ff9cfff2cd2da2c2e34da3ae1747fdadd1cf6b0b3a527ae520810021a925d0",
-      "src/qis/perfstats/regime_classifier.py": "1eada60c80faaf27efc5b48a73192a30a2e4097b4fb01e6ea91ffa42ac0cd07f",
+      "src/qis/perfstats/regime_classifier.py": "06d69b57a9f00f2c218015afdbeb02c1b319cb4bcbcb3e0225054c907d823661",
       "src/qis/perfstats/returns.py": "5326ea3deb391b7c349584688dd115a7aeea46a30bbf56bf05fe3597406d26b3",
       "src/qis/perfstats/run_local/__init__.py": "80830516c225596848a7de379c801dd5a48861e18ffa1691428bba1af79d90fe",
       "src/qis/perfstats/run_local/cond_regression_run.py": "e2dad826c6e24c5c9ac0e8acd787041e0eb1d02d92414491aa67e67cb124d4cc",
@@ -1063,7 +1160,7 @@
       "src/qis/perfstats/tests/regime_sign_contract_test.py": "1dc4039f4ad576df7af5a6bb9036dc3c24dddc87ffadb5ff19002eb4887ad98a",
       "src/qis/perfstats/tests/regime_sign_missing_test.py": "321733ed391fe151e5e3a964ad1e9b70b3d72460dd93eb1aeae33a06590becc7",
       "src/qis/perfstats/tests/regime_table_forwarding_convention_test.py": "fab2117f8ef52013a7158bd65711eb324298effc827284bb7877e62d184802b1",
-      "src/qis/perfstats/tests/regime_volatility_degenerate_test.py": "669a90204d5e2cd1d5516fb28e4c31fcd3120045478f8b4a95efaf9711ab013d",
+      "src/qis/perfstats/tests/regime_volatility_degenerate_test.py": "7494dafd9d4cf45b12eac61bcce244e8df18fb421f32ac5347a2e9dae0d4b562",
       "src/qis/perfstats/tests/regime_volatility_drop_benchmark_test.py": "dbbc5dcab0e45e39404a1cfc15bb693f9b7846870fa29338388bfa84486b34ad",
       "src/qis/perfstats/tests/regime_volatility_missing_test.py": "5babea98bb2446293da6423a8db9a318f65e1c54e74e4212ac02907cd45b6bb1",
       "src/qis/perfstats/tests/returns_boundaries_test.py": "aeae99f7c7fe53783557256e8a0bbc78440d4155e36b9eb25c98590108ba8b48",
@@ -1124,6 +1221,7 @@
       "src/qis/plots/derived/regime_class_table.py": "ebdf4a48824d0847ae1d28b67b969965c7ef99a464353e7972a953ee12203039",
       "src/qis/plots/derived/regime_data.py": "84f4ee1411b7077b69a2409c7afe73db85651c29972ba6414c27cfcdc70d4f62",
       "src/qis/plots/derived/regime_pdf.py": "108b448d92b65eef7afd606783efb38f4a55705c34714cfd4fac2a08dcd47fe1",
+      "src/qis/plots/derived/regime_premium.py": "5800f359073aa35d656d8ae8fb81b9d95c98326289308d3bb1a48658dbe266b1",
       "src/qis/plots/derived/regime_scatter.py": "b3925e1ed38c01f54360328cadbaabe7cf1fa118856422bcbdb0321c6f25909c",
       "src/qis/plots/derived/returns_heatmap.py": "02b242db1890ce64a89df6660dc3f3e61da13658a5f3b25c93a08588ed31c501",
       "src/qis/plots/derived/returns_scatter.py": "d9d681ca22e61fe7dd75b2175b57da9eb2ea3f543042b4d5c831430d9b6eb730",
@@ -1136,13 +1234,14 @@
       "src/qis/plots/derived/run_local/regime_pdf_run.py": "f3a2f9ad4b71fb356bf79e82c0181a96e7d8b979aef2ea5f6f8ddad52b8d085f",
       "src/qis/plots/derived/run_local/returns_heatmap_run.py": "3dabb86bbefceb0cde6d185b48379de3b1ddf4feecd3ee7b9b94765fec4a62f7",
       "src/qis/plots/derived/run_local/returns_scatter_run.py": "be554c275bb5cf1adfe4a8b757f5556a1e787f4257e964b1e51d2221250b55f9",
-      "src/qis/plots/derived/signal_diagnostics_plot.py": "3a6c4eb8137fb86b4dfeb7f1941c61b76a44c5ef26acf5dad309e4ad73310055",
+      "src/qis/plots/derived/signal_diagnostics_plot.py": "bf3fde17910073feb1a3cc20d6551f166795504a8cb8d985d8b8958a1232da61",
       "src/qis/plots/derived/tests/clustering_test.py": "56c6ea3334b1704cedaed4558993381535f5fe77b94409f144f7850dfa002db5",
       "src/qis/plots/derived/tests/model_layer_attribution_plot_test.py": "9c5f7a1405911fa7607242fc6f06f8fe1f8f9cdcb2bbe73bea93735924447fcb",
       "src/qis/plots/derived/tests/model_layer_zero_cost_plot_test.py": "2955d1f92262fddfe7787ff136bf67307bbc1df4c6cb523630d4afd08c567de1",
       "src/qis/plots/derived/tests/periodic_returns_ragged_start_test.py": "8e53d9c5b1a7f22ba383bd88e86e6e8bdbb7cb4b7bdd2e8b1d85dbbee1ab1325",
       "src/qis/plots/derived/tests/portfolio_breadth_plot_test.py": "a6e08558a6f72049af17ee66b06bc6ae2ba7f19aa051b796d2695669513023cf",
       "src/qis/plots/derived/tests/regime_plot_title_scatter_test.py": "1296717b36d4cdd848667a3be7ced2d521c19b55e8eb418a4c8414c16b69d0e8",
+      "src/qis/plots/derived/tests/regime_premium_plot_test.py": "a9b014a95bc8250a5fbc844fe8a3e93e05595cbd43e167277103afc71756ea9f",
       "src/qis/plots/derived/tests/returns_heatmap_test.py": "8cb0e2aef36b2ec1e2faec0a2a1243f93b083c96f41d033d092728b41546b78b",
       "src/qis/plots/derived/tests/signal_diagnostics_intercept_title_test.py": "f86a300ce107db565948e6662c082f0e08fe9b7ebf56edecfe76b9e8b19568ea",
       "src/qis/plots/derived/tests/test_returns_heatmap_sorting.py": "8a1718bb6de0d508b77c84842474fd153b95ad779c099143df261abb1515a2be",
@@ -1152,7 +1251,7 @@
       "src/qis/plots/heatmap.py": "6cc38496904b09c5616ae2911ecbab3d2366411f579225274a2defa85d624eba",
       "src/qis/plots/histogram.py": "3a7033b730bc27994b03cf11f33e3d1477a29cdfe12aee6d776437c4390352e3",
       "src/qis/plots/histplot2d.py": "8e4cc0db652ccfd0e07651171a2fb1cebbafc473269f5692d11d4aa8142f43ba",
-      "src/qis/plots/lineplot.py": "14ff101b3af9e2edb2bb6def238375ff3ddb150078e49327cd050cb104308130",
+      "src/qis/plots/lineplot.py": "b2030152b74e60b088abfcc6c235236c6f486e17d2c595afab7a96cb49c02092",
       "src/qis/plots/pie.py": "dc45b9a92ff7a3b5d35e76d5019898a9c2087d06a68bee9b5f51795805017e00",
       "src/qis/plots/qqplot.py": "174bf4aa381239381726193bd19b2cdd6d747e6f08458a325fecd572b84eb8e2",
       "src/qis/plots/run_local/__init__.py": "082ced5d083a6d3762bd069f2716198f9962f313c04f5269a689c30ab3f53336",
@@ -1188,6 +1287,7 @@
       "src/qis/plots/tests/legend_nullable_missing_display_test.py": "649755a84dd84b00ca11ac76d86870ccbe5205618dd9dc1302ff7960265eb5f7",
       "src/qis/plots/tests/legend_std_boundaries_test.py": "ecb4c9650a8a2e6d43724fbac008c67316aa7f250bb3aca14d6afd560feb47e9",
       "src/qis/plots/tests/legend_tstat_boundaries_test.py": "f58387e6bfb74782a4a0ef5b86e7f4fe677350d15f20f67189f54fa17547f819",
+      "src/qis/plots/tests/lineplot_xy_legend_test.py": "80e74b099fe5bd293fc8448400f6bd172df8d127752f4a35789826b9916835aa",
       "src/qis/plots/tests/non_finite_desc_plot_test.py": "01141f68700ee860feade51c67778e07ee08a43d6d822966eaf6d628b6ccc59b",
       "src/qis/plots/tests/plot_smoke_test.py": "423488fe7d4e2f5f73737d2926d4b50383eae09e389e7051230b8977e11da868",
       "src/qis/plots/tests/regime_plot_drop_benchmark_test.py": "e048ccf38b55c5c9d1a988e32e21b005260dbe0eb35354c7bf732c8cf6268f14",
@@ -1196,12 +1296,13 @@
       "src/qis/plots/tests/utils_test.py": "4c9362b2b9f19676e558ecbf942acdfbf9a6faae6801aec5e59c93b5d3a75994",
       "src/qis/plots/time_series.py": "d3d2d6c088b3660c99fac2807fd86bffa87af7d752d0063af4ceaf427ea96ec7",
       "src/qis/plots/utils.py": "73d595fc91ce24b91c9f4364d4fa057079724f6fc400dc1461980272dfbb146a",
-      "src/qis/portfolio/__init__.py": "d34490bec8d4210a1e0f24989548887301d578c23312f3c1328fde4c4f756739",
+      "src/qis/portfolio/__init__.py": "9e679ffdf957dcb0f0990a0359951d6fa473f4941c1ead1948f0fd45a543f80c",
       "src/qis/portfolio/attribution/__init__.py": "e589d1e4c768f6ecfacdf745996befdb7675b3e4c89a359a29aa3f9383fbbb51",
-      "src/qis/portfolio/attribution/brinson.py": "85b9f30535e90d817bca9baa1f0beca5ddc9804861d9afea95a077c8c7d061f5",
+      "src/qis/portfolio/attribution/brinson.py": "516db93bff63718d384b90310466cc15d0dcec6ff578a5f2320033166718bf65",
       "src/qis/portfolio/attribution/model_feature.py": "796b6d9eaf7f8ad9820dfc85b9d348fb3d2f8de69f51d973fbf875c456702d00",
       "src/qis/portfolio/attribution/model_layer.py": "62078498385af3c7655ff653c2f84add09bacdc6870c5d55bc3dac4aa4abeee1",
       "src/qis/portfolio/attribution/portfolio_breadth.py": "34462bc21bfda005481aa2c0308e202d6c31813da8e64ed54f9a316238f0e649",
+      "src/qis/portfolio/attribution/tests/brinson_display_names_test.py": "05668f7c37e4bf70f7c42295d30804238a5d2346e2f975172f60acc9f5d58e4a",
       "src/qis/portfolio/attribution/tests/brinson_test.py": "375472f5d3638ca375d1fde06537cc9ab40e84b1f39386aaadbd266dd5b60a95",
       "src/qis/portfolio/attribution/tests/model_feature_test.py": "e5b09157e88679b84de1fb6c7c9d5d14d0bd610d6d4daec67c51ab2eaacce429",
       "src/qis/portfolio/attribution/tests/model_layer_reporting_test.py": "4aeadb2d36c7ce9477f4cdb00ca4d5dfe97a86232d28d7834c3b58372d7b83c8",
@@ -1217,10 +1318,9 @@
       "src/qis/portfolio/reports/multi_assets_factsheet.py": "f1905b0acc8438d733dded84c58a4fb6f72411b0342140319b40c35cd1e02e72",
       "src/qis/portfolio/reports/multi_strategy_factsheet.py": "0dea067e70c9819d7a6a02e86a222046fdc6929441c16de9a8284e3948da7aa6",
       "src/qis/portfolio/reports/multi_strategy_factsheet_pybloqs.py": "f04d9493afb6f6653f899146208ce905afc946159d703521ca7c4db3d5547cf7",
-      "src/qis/portfolio/reports/overlays_smart_diversification.py": "f856f744e6f12bd0d1a352f383d72203f7530155ccdc674206beabf9ca0d8f95",
+      "src/qis/portfolio/reports/overlays_smart_diversification.py": "4675f135bbf4fc1db85458d9870084f92e97e8a6846539674d3212bc76cb32a0",
       "src/qis/portfolio/reports/run_local/__init__.py": "087270db60fe3b09907e85df4c1f216f67aa121f8c680a00d7c5022bf2fc7144",
       "src/qis/portfolio/reports/run_local/brinson_attribution_run.py": "f75dd9de92186361c5e4a833ebba6c4ad99e62d548639be927880d3b67c0fd68",
-      "src/qis/portfolio/reports/run_local/overlays_smart_diversification_run.py": "0e3982dba90ffa3d991cea923f6b53da49d9f115b5cfa721cb8e214558da4ae0",
       "src/qis/portfolio/reports/strategy_benchmark_factsheet.py": "3ecbf7b3d5579eba9a6f994ba9d3a8ece06ace0e7fff712dc03c377fe5c77249",
       "src/qis/portfolio/reports/strategy_benchmark_factsheet_pybloqs.py": "ff293f2eb5c1b09d5385234b98ed0e571bf690b30222c11add39d1daa61040f3",
       "src/qis/portfolio/reports/strategy_benchmark_tre_factsheet.py": "6ce5e07882dde8924303c504261d0c1260daed47d686e673067e88b7c5c4cbc7",
@@ -1257,6 +1357,12 @@
       "src/qis/portfolio/run_local/backtester_run.py": "c9283cc573250c95f5a1c5a31140b9153ccc8a481cee4241991ee4f2e58fd024",
       "src/qis/portfolio/run_local/legend_capacity_run.py": "2afdb36e1db308a434054775caccf7a264064764e3f669694083d131e7856240",
       "src/qis/portfolio/signal_data.py": "db9110909a23b39eb7d2a2b8ec9db7dbe9af7a48d6c596e1e4da5ee8784e88b7",
+      "src/qis/portfolio/smart_diversification/__init__.py": "b24448db5b83c2e588da1c4406570b8d04076b5c1a65b3ca2f3528818b9dd93f",
+      "src/qis/portfolio/smart_diversification/overlay_curve.py": "907525e419ca69b17e69b6dbef347ed9b5b9244e8396e0ec1f1ba0b5e9fe659d",
+      "src/qis/portfolio/smart_diversification/report.py": "3be077fa8f612ca24a4037312bbaf451badacfd1de3dc71a68d9cda851d3b570",
+      "src/qis/portfolio/smart_diversification/run_local/__init__.py": "f3b73212fd8a12fd9d88e351e08a0f87a720a2737fa0249f0ca0cd0c9f40ba66",
+      "src/qis/portfolio/smart_diversification/run_local/smart_diversification_run.py": "9c2f95d9a1a635389acdf84da9776dc08727851579dea79ca3499bb37fefd9af",
+      "src/qis/portfolio/smart_diversification/tests/smart_diversification_test.py": "62fff0ce22ac3665e65dc69bf6971947462a51723629f174a2193fb204b6ac5a",
       "src/qis/portfolio/stress/__init__.py": "ae103139bcbfa1fa8a614bd9e32256e32428871b5ed0b11ad91263daad1fe4d4",
       "src/qis/portfolio/stress/_bands.py": "08c2bc3539fd129d2a7666fba365ffa7511f33ae9c4da18978fbd23ad73e29ee",
       "src/qis/portfolio/stress/_clusters.py": "dc9a6ffa693d964d582aa3a44c42e6de69a06dadea0b34c385a61879859214ab",
@@ -1304,12 +1410,22 @@
       "src/qis/portfolio/tests/test_backtester_costs.py": "de9b71de57c7ed572dbf23e833e1b86ebc39592acc8f0ef0cac4c4ea4b957e84",
       "src/qis/portfolio/tests/test_backtester_weights_consistency.py": "f74aeae512455bfa9fe38d134fec1b2bdf50a0da40d024c8e3be72e31d8a9b7f",
       "src/qis/portfolio/tests/tracking_error_report_test.py": "cc3e6ca2899f16a30841cc8de13932cba41a1a578b997ffdde923203eb8ffb73",
+      "src/qis/regimes/__init__.py": "10bc1dd68a39160adf4cfbe9acf32235cb14b0f34ddb19d90daa1182366e24ff",
+      "src/qis/regimes/betas.py": "5c8ae797dd738a9b6f0c2550901fbc93e97cf6d826ce2fb7fa63fc379d9653da",
+      "src/qis/regimes/covariance.py": "ffdb196113797bcaa15b208f15d9f6600cb6e5e0d67422b5a9e6a602cdb48053",
+      "src/qis/regimes/ewma.py": "4bb45ea03f4e6535d7de7a8d7bbeea41c6c12c40bddcbe7a8f348dd7459554ca",
+      "src/qis/regimes/nulls.py": "1768f44037f9a78a912ee703704f7ffa32e0656de9826b66d7aa7dcf5366ba25",
+      "src/qis/regimes/partition.py": "021e075af12ee431ce3595568a62b5e22ee174449eccc0f5a805c64969dc6897",
+      "src/qis/regimes/premium.py": "51be69ca5bf573077747bfe33e83547ca2768210fd8873a3dea8400203900046",
+      "src/qis/regimes/tests/betas_moments_test.py": "f4bf7ad368eef93ae63926995c6425d03155f367d7f6ae938cb5fae6b62df86d",
+      "src/qis/regimes/tests/nulls_test.py": "2ff705d2e7cb33f890a2934636bf2eb6798d5749f42e5d599de4ec00d871626e",
+      "src/qis/regimes/tests/premium_test.py": "b043ecdd1b82b16ddc52af07f86db1cc8fc3b7f3273fe31708e8be78d9776d78",
       "src/qis/run_local/__init__.py": "c09a2ce779a04ab3aa3f288bfb254e6d67a0266fc8dd7184d5cb5cbaa2c4ef77",
       "src/qis/run_local/file_utils_run.py": "524e252caa4ca9dbbeb9cf5fbe4dbdf4898fe4a2e5c3dc56c0f01520d6f3f32a",
       "src/qis/run_local/price_data_run.py": "f4d2809042991517aa6fa10998fb24cc4b989e1f1a6c7547bbe9fa615995bf3d",
       "src/qis/sql_engine.py": "3976594d378a5fadfa8680fdc8763b8cd0b12fc2507d03a522b331d08600bc5a",
       "src/qis/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "src/qis/tests/documentation_analytics_test.py": "f324b3f615e52d58cb25ad369258ff5528347613eac4dd1a2df2c0f4e57f4a6f",
+      "src/qis/tests/documentation_analytics_test.py": "125005c05fa20f03f650047f8a461940adfe7d4942d8b66f27c697cedc9899dc",
       "src/qis/tests/documentation_bibliography_test.py": "35baf71a71c4585ecc2f7b375c35b2bcb0c4cf09bf9cb8a266d41b350fc6ef7f",
       "src/qis/tests/documentation_callouts_test.py": "a945845de31b78aef51adf59ac1e6c81207c566b6d78cbd72f018cd4ea8d2409",
       "src/qis/tests/documentation_coverage_test.py": "847af66de8dbb5e22c11df4b770a20804f1aa2b98fd1e1e850fd19333df3a4a8",
@@ -1334,10 +1450,10 @@
       "src/qis/tests/test_version_metadata.py": "1ec8b51f02053ef8ee1a596e7e11d366e2e7f320870490e378882bd3ff88b36d",
       "src/qis/utils/__init__.py": "4ddac73a090daf759d42f0f68e009dd8b5487f050d91808f9b067be40c66a757",
       "src/qis/utils/annualisation.py": "71aaf4dee7efe6d590787d6f1ce7d3f908ff3f4e07bd3b1555d24093dd389cb3",
-      "src/qis/utils/dates.py": "ef06f9423b3e049b1da4c6dfd4cc4a80b8d08de83226f6b84480352d65a8d71f",
+      "src/qis/utils/dates.py": "ba541b8ecba2c41523bf2d5e8949927716fd6f5c6f0983ab3321bf08de4954ab",
       "src/qis/utils/df_agg.py": "7950bb8e09adfa9750c9333ab11c7cbecf6dc92cea017875993dec2dbe2412ed",
-      "src/qis/utils/df_cut.py": "38604766a4e5f1cef42524a8c9a11243060fd46ad2dc0dbb38375b6e96edeb04",
-      "src/qis/utils/df_freq.py": "8950fc8b64483ba09501bc845ae17ab043c625cdbf7cee320f66bf64238290cf",
+      "src/qis/utils/df_cut.py": "aedd9c5bbd793aa5c29d8b17e650ef36c3ce5d6412ebd6174a17ecb8b822c641",
+      "src/qis/utils/df_freq.py": "91908f48d2ba45852894b8632626bcc47fccf06521fc7525f3da25c6381ec22d",
       "src/qis/utils/df_groups.py": "c16ae34c0390c5ecc7f53ea9954557709d691a50a27772b073ebab5f57783497",
       "src/qis/utils/df_melt.py": "6acd0b4987d4b3f217932fec3c74626ff68901432c0a8b7a5791f9f53e3e70a2",
       "src/qis/utils/df_ops.py": "833e62b4dd4ad4b0ed6c39bdffee26871d33a5e8675ac3916f2cde8756ba104a",
@@ -1346,6 +1462,7 @@
       "src/qis/utils/df_to_weights.py": "1119fc09a8b479de3fe046f2b704197d5195d1e5c121076d5cc4c73e3ade6ec9",
       "src/qis/utils/generic.py": "4a47a88f664efd275623d89ce68ce39bc4d969e37eb8707fb3819da223a71c62",
       "src/qis/utils/np_ops.py": "d80b028a7ab0c887499f502c0d56878016949fea7a7c2d2d548bcb258e98924c",
+      "src/qis/utils/quantile_buckets.py": "294ff5c72838f7ae09c2198ef557c16d235090c7f480cb383934c1a29ae44b1a",
       "src/qis/utils/regression.py": "a370156d0e29bcb11fe59d95bdb062c23c48c09b225cb4f7ebbebd1cd1cae86b",
       "src/qis/utils/run_local/__init__.py": "d3f049ad458bed0d599dd02089a754a37fd36d47ff9cb1eee86d959e7db9e02a",
       "src/qis/utils/run_local/annualisation_run.py": "323019a114d4f8e11fa88b42c91315b347560d458f64e8b23ea5e58e6cdce187",
@@ -1370,8 +1487,9 @@
       "src/qis/utils/tests/annualisation_three_quarter_test.py": "1abdde653c95bcbfd40effb91ad3b1356958358c8926df601f3b0735d0662482",
       "src/qis/utils/tests/dates_upto_unsorted_test.py": "c3304015391d786d597307c0d03f5dfd2919e247b56b164fe0d586db92d12810",
       "src/qis/utils/tests/df_freq_calendar_index_test.py": "a37b6a3a11ff32f54ac39d36b1a77e99d45e6bdcd146fbe6c1697507dc078b89",
-      "src/qis/utils/tests/int_index_partial_block_test.py": "92eb0179c559fc2364a8d1823ef423c161eaabdc410ccbfc69efbe5581f310eb",
+      "src/qis/utils/tests/int_index_partial_block_test.py": "6a95bbd6673c4ecc7f9ff2f0da7c95340d7b365fb32c585f09fb593dacb15874",
       "src/qis/utils/tests/np_ops_covar_to_corr_test.py": "2e6cc736f55cb47be65826532670df7ca52f6fc2888ad473369f97e31981cff5",
+      "src/qis/utils/tests/quantile_buckets_test.py": "987a4b36cf0eca5f5dcdf68815a02e2e78dd00106bb1e1fe10ef2b4c4eda1033",
       "src/qis/utils/tests/rate_accrual_timing_test.py": "e34fbc067ae35c15838c8f2e196c1d8df46dbdfbcbcffa6c8a16f768ada0b1c5",
       "src/qis/utils/tests/regression_nullable_test.py": "885fd32868e8a8e89c433048476c4e70e66a7011a69650f1ac11c8e0d57505e8",
       "src/qis/utils/tests/regression_test.py": "66a966574c0ba0a008987936a5926125fa342d8a6efc09a5347587f844c62312",
@@ -1382,16 +1500,16 @@
       "src/qis/utils/tests/truncate_prior_to_start_test.py": "65a7985b933144d4d89e1a8987c03c7947adb48a5d1a1c586d715c2a31ee303c",
       "src/qis/utils/tests/weight_allocation_zero_net_test.py": "a7a8bfd93b1115c79ebea4f441752634f1a55af4a676a67059c6d59b1270605e",
       "tools/docs_analytics/gallery.py": "7a414759db54f05051539d4fc0c70bfdf1665b6ade748d0239cd353527639c03",
-      "tools/docs_analytics/handbook.py": "6c19c8f6ff3cdf709dc4b80517f2a25dcc124985e74302be567a51faf66d8af7",
-      "tools/docs_analytics/manifest.json": "c69596a0eecc8bc96c9179016931015b31dbe27a44bc45e6792d47e5c66e4b99",
+      "tools/docs_analytics/handbook.py": "2e23dc562e71e05b1b1306216489bdb4b9c3cf21cfa6849d9226ba69d68ab7e1",
+      "tools/docs_analytics/manifest.json": "6ff7c1a46278ee2792dc855516384ed138de935d6031ba148109d4a9c2a93392",
       "tools/docs_analytics/model_layer.py": "bb1a6572320cb63135343c4f1d88b2c6777cdf9c353d9fa486d2e9b0e7e9ae47",
       "tools/docs_analytics/publish.py": "8925b7ece371eff423d8eb1a095d04b8da4485b1f15f28c429fe01fe7ff713ec",
       "tools/docs_analytics/run.py": "813fc48ec75282b43f99a119ba1f6df277cd2150c93525bd65aaf4c8a01ee1cd",
       "tools/docs_analytics/style.py": "94813ba0bd1672c112342d735855088f1be339c5543a3c41649fe8ff82747cac",
-      "uv.lock": "597d7494a9b3ec0444de85793770c5950415072c27897c4f8cb801c73476da2e"
+      "uv.lock": "600a4b535048c10463baff54555bb267b0bccb99aba680291a9e02ee40db4b4c"
     },
     "identity": "Effective source content, including dirty export files",
-    "sha256": "0a661ec15ed1e4742d4a3047c4eb265ff6c9d15df6d923ba61911fababee4b2f"
+    "sha256": "9bfdead08631b1fc98035870cee615aed7b17a305adbacf116cb846ca195e069"
   },
   "status": "complete",
   "version_note": "dependencies.qis is installed distribution metadata; qis_source_version and the content fingerprint identify the imported source export"

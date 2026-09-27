@@ -152,6 +152,23 @@ deprecation path.
 
 SECTION_ORDER = ['Enums', 'Dataclasses', 'Classes', 'Functions']
 
+EXPLICIT_HEADING = """Explicitly imported modules
+---------------------------
+
+Not exported from ``qis``: import these names from their module, for example
+``from qis.regimes import compute_regime_premium_table``. They carry ``Args`` blocks and are
+covered by the handbook chapters linked under each module.
+
+"""
+
+# modules whose public names are documented without being exported from the package root, with
+# the handbook chapters that derive them
+EXPLICIT_MODULES: Dict[str, List[str]] = {
+    'qis.regimes': ['convexity_premium'],
+    'qis.plots.derived.regime_premium': ['convexity_premium'],
+    'qis.utils.quantile_buckets': ['regime_conditional_performance', 'convexity_premium'],
+}
+
 # the handbook chapters that derive the formulas behind each core capability; the API page links
 # to them so that a reader of a signature is one click from its methodology
 CAPABILITY_CHAPTERS: Dict[str, List[str]] = {
@@ -166,7 +183,7 @@ CAPABILITY_CHAPTERS: Dict[str, List[str]] = {
     'Factsheets and reporting': ['factsheets_and_reporting', 'frequency_convention_note'],
     'EWM estimation': ['ewm_estimators', 'covariance_correlation_pca', 'risk_adjusted_returns'],
     'Market data and FX': ['fx_hedging_and_market_data'],
-    'Regime reporting': ['regime_conditional_performance'],
+    'Regime reporting': ['regime_conditional_performance', 'convexity_premium'],
     'Bootstrap': ['reproducibility'],
     'Unsmoothing': ['private_asset_unsmoothing', 'serial_dependence'],
     'Dates, schedules and annualisation': ['frequency_convention_note',
@@ -203,6 +220,7 @@ def _autosummary_block(names: List[str],
                        title: str,
                        count_label: str,
                        chapters: List[str] = (),
+                       module: str = 'qis',
                        ) -> List[str]:
     """
     Render one titled autosummary block.
@@ -213,6 +231,7 @@ def _autosummary_block(names: List[str],
         title: section heading
         count_label: the noun after the count, e.g. ``'documented'``
         chapters: handbook pages, without suffix, that explain the methodology of the block
+        module: the module that the names are imported from
 
     Returns:
         rst lines
@@ -225,9 +244,31 @@ def _autosummary_block(names: List[str],
         links = ', '.join(f':doc:`/{page}`' for page in chapters)
         lines.append(f"Methodology: {links}.\n\n")
     lines.append(".. autosummary::\n   :toctree: generated\n   :nosignatures:\n\n")
-    lines.extend(f"   qis.{name}\n" for name in names)
+    lines.extend(f"   {module}.{name}\n" for name in names)
     lines.append("\n")
     return lines
+
+
+def _explicit_names(module_name: str) -> List[str]:
+    """
+    Public functions and classes defined in an explicitly imported module or subpackage.
+
+    Args:
+        module_name: dotted module name, e.g. ``'qis.regimes'``
+
+    Returns:
+        sorted names whose objects are defined under ``module_name``
+    """
+    import importlib
+    module = importlib.import_module(module_name)
+    names = []
+    for name in sorted(dir(module)):
+        obj = getattr(module, name)
+        if name.startswith('_') or not (inspect.isclass(obj) or inspect.isfunction(obj)):
+            continue
+        if getattr(obj, '__module__', '').startswith(module_name):
+            names.append(name)
+    return names
 
 
 def _write_api_index() -> None:
@@ -268,6 +309,12 @@ def _write_api_index() -> None:
             continue
         lines.extend(_autosummary_block(names=names, underline='~', title=section,
                                         count_label='exported'))
+
+    lines.append(EXPLICIT_HEADING)
+    for module_name, chapters in EXPLICIT_MODULES.items():
+        lines.extend(_autosummary_block(names=_explicit_names(module_name), underline='~',
+                                        title=module_name, count_label='documented',
+                                        chapters=chapters, module=module_name))
 
     api_dir = DOCS_DIR.joinpath('api')
     api_dir.mkdir(exist_ok=True)

@@ -447,6 +447,149 @@ def vol_targeting(params: dict):
     return fig, rolling.resample('W-FRI').last(), check, summary
 
 
+def _premium_sample(params: dict) -> pd.DataFrame:
+    """Quarterly returns of the 60/40 benchmark and the premium assets with their regimes."""
+    universe = generate_synthetic_universe(start=params['start'], end=params['end'],
+                                           seed=params['seed'], apply_quirks=False)
+    prices = pd.concat([universe.benchmark_prices, universe.prices], axis=1)
+    prices = prices[params['premium_assets']].loc[params['premium_start']:]
+    classifier = qis.BenchmarkReturnsQuantilesRegime(freq='QE')
+    return classifier.compute_sampled_returns_with_regime_id(
+        prices=prices, benchmark=params['premium_assets'][0])
+
+
+def convexity_premium(params: dict):
+    """Regime contributions of each asset against the Gaussian null of its Bear contribution."""
+    from scipy.stats import norm
+    from qis.plots.derived.regime_premium import plot_regime_sharpe_decomposition
+    from qis.regimes import compute_regime_premium_table
+
+    sampled = _premium_sample(params)
+    benchmark = params['premium_assets'][0]
+    table = compute_regime_premium_table(sampled, benchmark=benchmark, af=4.0)
+    # independent check: numpy moments, the scipy kappa and the OLS form of the adjusted premium
+    data = sampled.dropna(subset=['regime'])
+    bear = (data['regime'].astype(str) == 'Bear').to_numpy()
+    b = data[benchmark].to_numpy()
+    kappa = 2.0 * norm.pdf(norm.ppf(0.84))
+    checks = []
+    for asset in table.index:
+        r = data[asset].to_numpy()
+        sigma = np.std(r, ddof=1)
+        sharpe = 2.0 * np.mean(r) / sigma
+        rho = np.corrcoef(r, b)[0, 1]
+        contribution = 2.0 * np.mean(bear) * np.mean(r[bear]) / sigma
+        premium = contribution - (0.16 * sharpe - kappa * rho)
+        slope, intercept = np.polyfit(b, r, 1)
+        residual = r - intercept - slope * b
+        sharpe_b = 2.0 * np.mean(b) / np.std(b, ddof=1)
+        adjusted = (2.0 * np.mean(bear) * np.mean(residual[bear]) / sigma
+                    + (np.mean(bear) - 0.16) * (sharpe - rho * sharpe_b))
+        row = table.loc[asset]
+        checks.append(np.allclose([row['bear_sharpe'], row['convexity_premium'], row['cp_star']],
+                                  [contribution, premium, adjusted], atol=1e-12))
+        checks.append(abs(row[['bear_sharpe', 'normal_sharpe', 'bull_sharpe']].sum()
+                          - row['sharpe']) < 1e-12)
+    fig, ax = _new_figure()
+    # segment values stay in the table; the plot labels only the premium of each row
+    plot_regime_sharpe_decomposition(table, min_label_width=np.inf,
+                                     xlabel='Contribution to the Sharpe ratio', legend_loc=None,
+                                     ax=ax)
+    positions = np.arange(len(table))[::-1]
+    for y, (_, row) in zip(positions, table.iterrows()):
+        right = row[['bear_sharpe', 'normal_sharpe', 'bull_sharpe']].clip(lower=0.0).sum()
+        ax.annotate(f"CP {row['convexity_premium']:+.2f}", xy=(max(right, row['sharpe']), y),
+                    xytext=(10, 0), textcoords='offset points', va='center', fontsize=11)
+    low, high = ax.get_xlim()
+    ax.set_xlim(low, high + 0.18 * (high - low))
+    handles, labels = ax.get_legend_handles_labels()
+    short = {'Total Sharpe ratio': 'Sharpe ratio', 'Null of the Bear contribution': 'Bear null',
+             'Bear contribution': 'Bear', 'Normal contribution': 'Normal',
+             'Bull contribution': 'Bull'}
+    ax.legend(handles, [short.get(label, label) for label in labels], loc='lower center',
+              bbox_to_anchor=(0.5, 1.0), ncol=5, frameon=False)
+    handbook_exhibit(
+        fig, title='Bear contributions against their Gaussian null',
+        subtitle=f'Synthetic universe | quarterly returns {params["premium_start"][:4]}-2025 | '
+                 f'regimes by {benchmark} quantiles 16% / 84% | AN = 4',
+        footer='Bars: sqrt(AN) p_g m_g / s(r) from qis.regimes.compute_regime_premium_table; '
+               'tick: their sum, the Sharpe ratio.\nDiamond: the null 0.16 SR - kappa rho of the '
+               f'Bear contribution, kappa = {kappa:.3f}; its gap to the Bear bar is the '
+               'convexity premium.')
+    summary = {asset: {'convexity_premium': float(table.loc[asset, 'convexity_premium']),
+                       'cp_star': float(table.loc[asset, 'cp_star'])} for asset in table.index}
+    return fig, table, all(checks), summary
+
+
+def smart_diversification(params: dict):
+    """Bear contribution and Sharpe ratio of funded benchmark-overlay blends, with and without CP."""
+    from qis.regimes import compute_overlay_blend_frontier, compute_regime_premium_table
+
+    sampled = _premium_sample(params)
+    benchmark = params['premium_assets'][0]
+    table = compute_regime_premium_table(sampled, benchmark=benchmark, af=4.0)
+    data = sampled.dropna(subset=['regime'])
+    weights = np.linspace(0.0, 1.0, 11)
+    rows, checks = [], []
+    fig, ax = _new_figure()
+    for color, overlay in zip(SERIES, params['overlays']):
+        blends = {f'{x:.1f}': (1.0 - x) * data[benchmark] + x * data[overlay] for x in weights}
+        frame = pd.concat([data[[benchmark, 'regime']], pd.DataFrame(blends)], axis=1)
+        realised = compute_regime_premium_table(frame, benchmark=benchmark,
+                                                af=4.0).loc[list(blends)]
+        kwargs = dict(sr_b=table.loc[benchmark, 'sharpe'], vol_b=table.loc[benchmark, 'ann_vol'],
+                      sr_a=table.loc[overlay, 'sharpe'], vol_a=table.loc[overlay, 'ann_vol'],
+                      rho=table.loc[overlay, 'rho'], af=4.0, overlay_weights=weights)
+        frontier = compute_overlay_blend_frontier(
+            premium_a=table.loc[overlay, 'convexity_premium'], **kwargs)
+        at_null = compute_overlay_blend_frontier(premium_a=0.0, **kwargs)
+        # the frontier sets the benchmark's own premium to zero; add it back for the realised blends
+        benchmark_term = ((1.0 - weights) * table.loc[benchmark, 'ann_vol']
+                          / frontier['portfolio_vol'].to_numpy()
+                          * table.loc[benchmark, 'convexity_premium'])
+        checks.append(np.allclose(frontier['bear_sharpe'].to_numpy() + benchmark_term,
+                                  realised['bear_sharpe'].to_numpy(), atol=1e-12))
+        checks.append(np.allclose(frontier['sharpe'].to_numpy(), realised['sharpe'].to_numpy(),
+                                  atol=1e-12))
+        null_bear = at_null['bear_sharpe'].to_numpy() + benchmark_term
+        ax.plot(realised['bear_sharpe'], realised['sharpe'], color=color, marker='o',
+                linewidth=2.0, label=overlay)
+        ax.plot(null_bear, realised['sharpe'], color=color, linestyle='--', linewidth=1.5)
+        ax.annotate(f'100% {overlay}', xy=(realised['bear_sharpe'].iloc[-1],
+                                           realised['sharpe'].iloc[-1]),
+                    xytext=(6, -14), textcoords='offset points', color=color, fontsize=11)
+        rows.append(pd.DataFrame({'overlay': overlay, 'overlay_weight': weights,
+                                  'sharpe': realised['sharpe'].to_numpy(),
+                                  'benchmark_corr': realised['rho'].to_numpy(),
+                                  'bear_sharpe': realised['bear_sharpe'].to_numpy(),
+                                  'bear_sharpe_at_null': null_bear}))
+    from matplotlib.lines import Line2D
+    ax.scatter([table.loc[benchmark, 'bear_sharpe']], [table.loc[benchmark, 'sharpe']],
+               color='black', marker='D', s=50, zorder=4, label=f'100% {benchmark}')
+    ax.axvline(0.0, color=MUTED, linewidth=1.0)
+    ax.set_xlabel('Bear contribution to the Sharpe ratio')
+    ax.set_ylabel('Sharpe ratio')
+    handles, labels = ax.get_legend_handles_labels()
+    handles += [Line2D([], [], color='black', linewidth=2.0),
+                Line2D([], [], color='black', linewidth=1.5, linestyle='--')]
+    labels += ['realised', 'overlay at its null']
+    low, high = ax.get_ylim()
+    ax.set_ylim(low - 0.35 * (high - low), high)
+    ax.legend(handles, labels, loc='lower right', ncol=3)
+    handbook_exhibit(
+        fig, title='Diversifying through correlation and through convexity',
+        subtitle=f'Synthetic universe | quarterly returns {params["premium_start"][:4]}-2025 | '
+                 f'funded blends (1 - x) {benchmark} + x overlay, x = 0, 0.1, ..., 1',
+        footer='Solid: realised Bear contribution and Sharpe ratio of each blend. Dashed: the '
+               'same blends with the overlay\'s convexity\npremium set to zero, from '
+               'qis.regimes.compute_overlay_blend_frontier; the horizontal gap is '
+               'x sigma_a CP_a / sigma_p.')
+    table_out = pd.concat(rows, ignore_index=True)
+    summary = {overlay: float(table.loc[overlay, 'convexity_premium'])
+               for overlay in params['overlays']}
+    return fig, table_out, all(checks), summary
+
+
 def _percent():
     """Percent tick formatter."""
     from matplotlib.ticker import PercentFormatter
@@ -465,6 +608,8 @@ FIGURES = {
     'handbook_benchmark_regression.png': ('benchmark_regression', benchmark_regression),
     'handbook_risk_contributions.png': ('risk_contributions', risk_contributions),
     'handbook_vol_targeting.png': ('vol_targeting', vol_targeting),
+    'handbook_convexity_premium.png': ('convexity_premium', convexity_premium),
+    'handbook_smart_diversification.png': ('smart_diversification', smart_diversification),
 }
 
 

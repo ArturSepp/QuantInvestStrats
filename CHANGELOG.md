@@ -96,6 +96,31 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   of also describing the x-coordinate column as a plotted series. Wide-form and hue legends are
   unchanged.
 
+### Documentation
+
+- Add the handbook chapter *The convexity premium and smart diversification*
+  (`docs/convexity_premium.md`), after the regime chapter in Part II. It derives the Gaussian and
+  Student-t nulls of the regime Sharpe contributions, identifies the benchmark-adjusted premium
+  with the Bear-regime mean of the regression residual (exactly in sample, up to a
+  frequency-mismatch term), proves the portfolio aggregation identity and the closed-form blend
+  frontier, and treats regime betas, regime-time EWMA moments, the regime-mixture covariance and
+  the smart-diversification report. Seven executed examples check every number on the frozen
+  synthetic universe, and it cites Sepp and Kastenholz (2026), *The Convexity Premium of
+  Portfolio Overlays*, *Journal of Investment Management*, forthcoming, now in the bibliography.
+- Add two handbook figures from `tools/docs_analytics/handbook.py`, each with an independent
+  check: the regime contributions of five synthetic assets against the Gaussian null of their
+  Bear contributions, and the Bear contribution against the Sharpe ratio of funded 60/40 and
+  overlay blends with and without each overlay's premium. The analytics bundle has 20 previews.
+- State the quantile rule of `qis.utils.quantile_buckets` in the classification section of the
+  regime chapter, with its pandas 2 difference, and check it against `pd.qcut`, on a tie and on a
+  degenerate benchmark in a new executed block.
+- List `qis.regimes`, `qis.plots.derived.regime_premium` and `qis.utils.quantile_buckets` on the
+  API reference page under *Explicitly imported modules*; they are not exported from `qis`.
+- Document two contracts of the smart-diversification report: its mixes hold a flat NAV until the
+  first quarter-end rebalance, so a history that starts between quarter-ends has a zero first
+  quarter in every mix, and its default Bear axis is the per-annum contribution rather than the
+  arithmetic one the premium uses.
+
 ## [5.31.0] - 2026-09-26
 
 **This release changes computed values.** It fixes the defects found while the analytics

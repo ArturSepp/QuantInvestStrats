@@ -108,10 +108,35 @@ $$
 \text{Bull if } r_{b,t}>\hat Q_b(0.84).
 $$
 
-This is `pd.qcut(x=r_b, q=[0.0, 0.16, 0.84, 1.0], labels=['Bear', 'Normal', 'Bull'])`:
-right-closed bins with the minimum included in the lowest one. The 16% and 84% probabilities
-are the one-sigma cut of a normal distribution, $\Phi(-1)=0.1587$, so the Normal band holds the
-central 68%.
+The 16% and 84% probabilities are the one-sigma cut of a normal distribution,
+$\Phi(-1)=0.1587$, so the Normal band holds the central 68%.
+
+**Definition (the quantile rule of qis).** Every quantile classification in qis, including the
+return and volatility regimes, the regime Sharpe decomposition, the analytics of `qis.regimes`
+and the quantile hue buckets of the plots, goes through `qis.utils.quantile_buckets`, so a period
+is Bear in one exhibit exactly when it is Bear in every other:
+
+- *Edges.* An interior edge is the sample quantile by linear interpolation between order
+  statistics at position $(T-1)\,q$ (Hyndman and Fan's type 7, the numpy and pandas default). A
+  position within $10^{-9}$ of a whole number is taken as that number, so the order statistic
+  itself is the edge and floating-point noise cannot decide a bucket.
+- *Assignment.* Buckets are closed on the right with open outer ends,
+  $(-\infty,e_1],(e_1,e_2],\dots,(e_{G-1},+\infty)$: the bucket of an observation is the number of
+  interior edges strictly below it. The sample minimum is in the first bucket and the maximum in
+  the last.
+- *Ties.* An observation equal to an interior edge falls in the lower bucket. Block-bootstrap
+  resamples repeat observations and put them on edges routinely.
+- *Missing values.* NaN and infinite observations are left out of the edges and get no bucket.
+- *Occupancy.* When the edges are estimated from the data, every bucket must hold an
+  observation, else `qis.utils.quantile_buckets.EmptyQuantileBucketError`, a `ValueError`,
+  reports how many buckets are occupied.
+
+Within these rules the classification equals
+`pd.qcut(x=r_b, q=[0.0, 0.16, 0.84, 1.0], labels=['Bear', 'Normal', 'Bull'])` of pandas 3.
+pandas 2 computes the `qcut` edges with `np.percentile` at $100\,q$, which can leave an edge one
+unit in the last place off the order statistic at a whole-number position; there `pd.qcut` puts
+that observation in the upper bucket and qis in the lower. This happens for tertiles, deciles
+and seven buckets, not for the one-sigma, 10/90 or 5/95 cuts, quartiles or quintiles.
 
 With $T$ distinct returns, the edges sit at positions $0.16(T-1)$ and $0.84(T-1)$ of the
 sorted sample, counted from zero, so Bear holds $\lfloor 0.16(T-1)\rfloor+1$ periods and Bull
@@ -147,8 +172,10 @@ equal-count buckets at full-sample quantiles. The labels carry the thresholds, f
 `'SPY vol<12%'`, so they are known only after classification. The volatility is measured over
 the same period whose returns are conditioned on, and the thresholds use the full sample.
 
-A classifier whose benchmark returns cannot fill every band, such as a constant or back-padded
-zero-return block, raises `ValueError` before bucketing.
+The volatility buckets follow the same quantile rule as the return regimes, so a volatility
+equal to an edge falls in the lower bucket. A classifier whose benchmark cannot fill every band,
+such as a constant or back-padded zero-return block, raises `EmptyQuantileBucketError`, whose
+message counts the occupied bands: a constant volatility reports 1 of `q` bands.
 
 ### Regime frequencies and conditional means
 
@@ -566,6 +593,33 @@ simulated = [np.corrcoef(x_b[mask], x_a[mask])[0, 1] for mask in (bear, normal)]
 np.testing.assert_allclose(simulated, predicted, atol=0.01)
 ```
 
+The quantile rule reproduces the `pd.qcut` labels of the first block. On six returns with a
+tie at the median, the median edge is 2 and all three returns equal to it fall in the lower
+half. A benchmark with five zero returns and one positive return cannot fill three bands: the
+16% and 84% edges are 0 and 0.2, and the error reports two occupied bands of three.
+
+```python
+from qis.utils.quantile_buckets import (EmptyQuantileBucketError, classify_quantile_buckets,
+                                        compute_bucket_codes, compute_quantile_edges)
+
+rule = classify_quantile_buckets(q_returns['Benchmark'], q=[0.0, 0.16, 0.84, 1.0],
+                                 labels=['Bear', 'Normal', 'Bull'])
+assert (rule.astype(str) == labels.astype(str)).all()
+
+ties = np.array([1.0, 2.0, 2.0, 2.0, 3.0, 4.0])
+np.testing.assert_allclose(compute_quantile_edges(ties, q=2), [2.0])
+np.testing.assert_array_equal(compute_bucket_codes(ties, q=2), [0, 0, 0, 0, 1, 1])
+
+degenerate = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+np.testing.assert_allclose(compute_quantile_edges(degenerate, q=[0.0, 0.16, 0.84, 1.0]), [0.0, 0.2])
+try:
+    compute_bucket_codes(degenerate, q=[0.0, 0.16, 0.84, 1.0])
+except EmptyQuantileBucketError as error:
+    assert (error.num_occupied, error.num_buckets) == (2, 3)
+else:
+    raise AssertionError('a degenerate benchmark must be rejected')
+```
+
 ## Implementation in qis
 
 | Quantity | Formula | qis entry point |
@@ -584,6 +638,8 @@ np.testing.assert_allclose(simulated, predicted, atol=0.01)
 | Panels | $m_g$; $\tilde C_g$; $\mathrm{SR}_g$ in the selected convention | `qis.RegimeData.REGIME_AVG`, `REGIME_PA`, `REGIME_SHARPE` |
 | Table columns | $m_g$, $\tilde C_g$, $\mathrm{SR}_g$ | `PerfStat.BEAR_AVG` (`'Bear Average'`), `PerfStat.BEAR_PA`, `PerfStat.BEAR_SHARPE`, and the Normal and Bull analogues; `qis.SD_PERF_COLUMNS` carries the three Sharpe columns |
 | Exhibits | stacked regime bars; boxplots; shading | `qis.plot_regime_data`, `qis.plot_regime_boxplot`, `qis.add_bnb_regime_shadows` |
+| Quantile rule | edges, right-closed buckets, ties in the lower bucket | `qis.utils.quantile_buckets.classify_quantile_buckets`, `compute_bucket_codes`, `compute_quantile_edges` |
+| Nulls, premia, regime betas | Gaussian null of each contribution and the convexity premium | `qis.regimes`; see [the convexity premium](convexity_premium.md) |
 
 The classification and tables are in
 [regime_classifier.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/regime_classifier.py),
@@ -662,6 +718,13 @@ regime. The hedge
 of the worked example is the first kind: its regime means are the line
 $\hat\alpha+\hat\beta\,m_{b,g}$ to within 0.9% a quarter.
 
+[The convexity premium](convexity_premium.md) turns this distinction into one number per asset.
+Under a jointly Gaussian null each regime contribution is a closed form in the Sharpe ratio and
+the correlation with the benchmark, and the excess of the realised Bear
+contribution over its null, net of the benchmark's own departure, is the Bear-regime residual
+mean in Sharpe units. The premium adds up across a portfolio with risk weights, which is how
+[Sepp and Kastenholz (2026)](bibliography.md) rank overlays of a principal portfolio.
+
 ### Conditional correlations and the conditioning bias
 
 The chapter's statistics are conditional *means*. Conditional *correlations* and betas
@@ -738,6 +801,7 @@ regime-switching estimation.
 
 ## See also
 
+- [The convexity premium and smart diversification](convexity_premium.md)
 - [Sharpe ratios: conventions and inference](performance_analytics_and_sharpe.md)
 - [The performance-statistic catalogue: every PerfStat column](performance_statistics.md)
 - [Alpha, beta and benchmark-relative performance](benchmark_relative_performance.md)
@@ -756,4 +820,5 @@ regime-switching estimation.
 5. Longin, F., and Solnik, B. (2001). Extreme Correlation of International Equity Markets. *The Journal of Finance*, 56(2), 649–676. [DOI: 10.1111/0022-1082.00340](https://doi.org/10.1111/0022-1082.00340). Exceedance correlations and the asymmetry between bear and bull markets.
 6. Ang, A., and Bekaert, G. (2002). International Asset Allocation with Regime Shifts. *The Review of Financial Studies*, 15(4), 1137–1187. [DOI: 10.1093/rfs/15.4.1137](https://doi.org/10.1093/rfs/15.4.1137). The regime-switching alternative to descriptive labels.
 7. Hamilton, J. D. (1994). *Time Series Analysis*. Princeton University Press. The filter and smoother of Markov-switching models.
-8. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+8. Sepp, A., and Kastenholz, M. (2026). The Convexity Premium of Portfolio Overlays. *Journal of Investment Management*, forthcoming. The Gaussian null of the regime contributions and the convexity premium.
+9. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

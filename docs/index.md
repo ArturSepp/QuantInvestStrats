@@ -65,6 +65,9 @@ the [bibliography](bibliography.md).
   the single-index regression, alpha inference, EWMA betas and beta attribution.
 - [Regime-conditional performance](regime_conditional_performance.md): benchmark regimes and
   the additive decomposition of the Sharpe ratio.
+- [The convexity premium and smart diversification](convexity_premium.md): Gaussian and
+  Student-t nulls of the regime contributions, the convexity premium, its aggregation across a
+  portfolio, overlay frontiers and regime betas.
 
 ### Part III: Estimation
 
@@ -185,6 +188,7 @@ performance_analytics_and_sharpe
 drawdowns
 benchmark_relative_performance
 regime_conditional_performance
+convexity_premium
 ```
 
 ```{toctree}

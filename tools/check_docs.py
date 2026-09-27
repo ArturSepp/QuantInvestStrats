@@ -41,7 +41,7 @@ LEGACY_NOTATION = (
     (re.compile(r'(?<!\\)\b(?:Sigma_|sqrt\()'), 'Write formulas as TeX, not plain text.'),
 )
 METHODOLOGY_PAGES = frozenset({
-    'benchmark_relative_performance.md', 'brinson_attribution.md',
+    'benchmark_relative_performance.md', 'brinson_attribution.md', 'convexity_premium.md',
     'covariance_correlation_pca.md', 'drawdowns.md', 'ewm_estimators.md',
     'factor_risk_models.md', 'factsheets_and_reporting.md', 'frequency_convention_note.md',
     'fx_hedging_and_market_data.md', 'incomplete_and_mixed_frequency_data.md',
@@ -75,7 +75,7 @@ ADOPTED_PAGES = frozenset({
     'benchmark_relative_performance.md', 'regime_conditional_performance.md',
     'ewm_estimators.md', 'covariance_correlation_pca.md', 'serial_dependence.md',
     'regression_and_hac.md', 'risk_adjusted_returns.md', 'signal_diagnostics.md',
-    'risk_contributions.md', 'factor_risk_models.md',
+    'risk_contributions.md', 'factor_risk_models.md', 'convexity_premium.md',
 })
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
