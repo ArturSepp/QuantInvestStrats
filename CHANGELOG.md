@@ -13,6 +13,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   beta-tensor warmup masks instead of silently retaining the tensor's 20-period default. The first
   identified rolling beta and its next-period correction are now available without an extra
   warmup; integer warmups are unchanged.
+- Prevent `replay_discrete_portfolio` and `backtest_discrete_portfolio` strategies from rewriting
+  retained state values, labels, names, or metadata through their pandas callback objects, keeping
+  point-in-time history and reporting output unchanged by strategy-side mutation.
 
 ## [5.32.0] - 2026-09-27
 

@@ -36,6 +36,7 @@ unique across a replay and provide the stable join between the order and trade l
 from __future__ import annotations
 
 # packages
+from copy import deepcopy
 from dataclasses import asdict
 from typing import Dict, List, Optional, Set
 
@@ -247,10 +248,11 @@ def replay_discrete_portfolio(
         states.append(state)
         cash_by_time[timestamp] = cash
 
-        # The strategy receives a read-only price row and immutable state, so it cannot mutate
-        # the engine's accounting history. Its orders are eligible only on the next observation.
+        # Pandas metadata remains mutable even inside a frozen dataclass, so the strategy gets an
+        # independent snapshot rather than the state retained for accounting and reporting.
+        strategy_state = deepcopy(state)
         observed_prices.to_numpy(copy=False).flags.writeable = False
-        new_orders = strategy.on_bar(timestamp, observed_prices, state)
+        new_orders = strategy.on_bar(timestamp, observed_prices, strategy_state)
         if new_orders is None:
             raise TypeError('strategy.on_bar must return a sequence of Order objects')
         for order in new_orders:
