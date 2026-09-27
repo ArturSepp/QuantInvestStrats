@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "4d648b685ae503f4b064d0062e77d3472f0336db",
+  "measured_at_commit": "6caa2a86ce51f8d5acad233005acbdbf51bcfc28",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": "in 39 of the 46 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 87,
+      "value": 97,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -22,7 +22,7 @@
       "paper_phrase": null
     },
     "ai_coauthored_last_day": {
-      "value": "2026-09-26",
+      "value": "2026-09-27",
       "how": "latest AI co-authored commit",
       "live": false,
       "paper_phrase": null
@@ -46,26 +46,26 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 5149,
+      "value": 5272,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 835,
+      "value": 852,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
-      "value": 932,
-      "how": "tools/audit_consumers.py at 3a5e970fb364",
+      "value": 969,
+      "how": "tools/audit_consumers.py at 86dd4ce5ff4e",
       "live": false,
-      "paper_phrase": "at 932 sites"
+      "paper_phrase": "at 969 sites"
     },
     "consumer_optimalportfolios_symbols": {
       "value": 123,
-      "how": "tools/audit_consumers.py at 3a5e970fb364",
+      "how": "tools/audit_consumers.py at 86dd4ce5ff4e",
       "live": false,
       "paper_phrase": "references 123 of its symbols"
     },
@@ -82,14 +82,14 @@
       "paper_phrase": null
     },
     "consumer_trendfollowing_call_sites": {
-      "value": 441,
-      "how": "tools/audit_consumers.py at 43efdab8fc5f",
+      "value": 439,
+      "how": "tools/audit_consumers.py at 3325af65db6b",
       "live": false,
-      "paper_phrase": "at 441 sites"
+      "paper_phrase": "at 439 sites"
     },
     "consumer_trendfollowing_symbols": {
       "value": 87,
-      "how": "tools/audit_consumers.py at 43efdab8fc5f",
+      "how": "tools/audit_consumers.py at 3325af65db6b",
       "live": false,
       "paper_phrase": "references 87 symbols"
     },

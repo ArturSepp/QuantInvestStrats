@@ -143,8 +143,8 @@ smoothing.
 # Research impact statement
 
 We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 123 of its symbols
-at 932 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
-at 441 sites. Both counts are taken at the commits recorded in
+at 969 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
+at 439 sites. Both counts are taken at the commits recorded in
 `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
 
 A third public package, `privateassets`, applies the unsmoothing layer to private-asset

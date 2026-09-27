@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.32.0] - 2026-09-27
+
 ### Added
 
 - Add the subpackage `qis.regimes`, regime-conditional analytics for any benchmark-return
