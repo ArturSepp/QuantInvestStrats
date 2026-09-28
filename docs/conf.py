@@ -94,6 +94,8 @@ intersphinx_mapping = {
 linkcheck_ignore = [
     r"https://doi\.org/.*",
     r"https://frongello\.com/support/Works/JPMSpring2002\.pdf",
+    # The article is available to readers, but its publisher returns 403 to the CI link checker.
+    r"https://thehedgefundjournal\.com/trend-following-ctas-vs-alternative-risk-premia/$",
     r"https://github\.com/ArturSepp/QuantInvestStrats/(?:blob|tree)/main/.*",
 ]
 
