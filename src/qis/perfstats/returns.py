@@ -801,11 +801,102 @@ def adjust_component_navs_to_portfolio(portfolio_nav: pd.Series,
     return component_navs_adj
 
 
+def _compute_net_returns_ex_perf_man_fees(
+        gross_returns: np.ndarray,
+        dates: pd.DatetimeIndex,
+        first_valid_positions: np.ndarray,
+        man_fee: float,
+        perf_fee: float,
+        perf_fee_frequency: str,
+) -> np.ndarray:
+    """Compute independent fee-account returns in one date-wise matrix recurrence.
+
+    Args:
+        gross_returns: Gross simple returns with shape ``(dates, assets)``.
+        dates: Chronologically ordered return dates.
+        first_valid_positions: First fee-account date per asset, or ``-1`` if all missing.
+        man_fee: Annual management fee.
+        perf_fee: Performance fee rate on profits above the high-water mark.
+        perf_fee_frequency: Frequency for performance fee crystallization.
+
+    Returns:
+        Net simple returns with the same shape as ``gross_returns``.
+    """
+    n_periods, n_assets = gross_returns.shape
+    net_returns = np.full((n_periods, n_assets), np.nan)
+    valid_assets = first_valid_positions >= 0
+    if not np.any(valid_assets):
+        return net_returns
+
+    # Preseed each valid account at 100; it stays inactive until its own zero-return inception.
+    asset_positions = np.flatnonzero(valid_assets)
+    net_returns[first_valid_positions[asset_positions], asset_positions] = 0.0
+    gav = np.full(n_assets, np.nan)
+    hwm = np.full(n_assets, np.nan)
+    previous_nav = np.full(n_assets, np.nan)
+    gav[valid_assets] = 100.0
+    hwm[valid_assets] = 100.0
+    previous_nav[valid_assets] = 100.0
+
+    # Relative frequencies can depend on inception, so each distinct start owns its schedule.
+    perf_crystallization = np.zeros((n_periods, n_assets), dtype=bool)
+    for first_position in np.unique(first_valid_positions[valid_assets]):
+        schedule = da.generate_dates_schedule(
+            time_period=da.TimePeriod(dates[first_position], dates[-1]),
+            freq=perf_fee_frequency,
+        )
+        schedule_positions = np.asarray(
+            dates.searchsorted(schedule, side='right'),
+            dtype=int,
+        ) - 1
+        schedule_positions = schedule_positions[schedule_positions >= first_position]
+        same_start_assets = np.flatnonzero(first_valid_positions == first_position)
+        perf_crystallization[np.ix_(schedule_positions, same_start_assets)] = True
+
+    # Iterate through dates once, updating every active fee account together.
+    for position in range(1, n_periods):
+        active_assets = valid_assets & (first_valid_positions < position)
+        if not np.any(active_assets):
+            continue
+
+        # Accrue management fees against each active account's carried GAV.
+        man_fee_dt = man_fee * (dates[position] - dates[position - 1]).days / 365.0
+        gav[active_assets] = (
+            1.0 + gross_returns[position, active_assets] - man_fee_dt
+        ) * gav[active_assets]
+        # Accrue performance fees only on GAV above each account's prior HWM.
+        accrued_perf_fee = np.zeros(n_assets)
+        accrued_perf_fee[active_assets] = perf_fee * np.maximum(
+            gav[active_assets] - hwm[active_assets],
+            0.0,
+        )
+        nav = np.full(n_assets, np.nan)
+        nav[active_assets] = gav[active_assets] - accrued_perf_fee[active_assets]
+
+        # Crystallize performance fees at period end. NAV already reflects the accrued fee:
+        # raise HWM to max(NAV, prior HWM), then pay the fee from GAV so the next iteration
+        # carries the post-fee capital (= current NAV). Do not recompute NAV after payment.
+        crystallizing_assets = active_assets & perf_crystallization[position]
+        hwm[crystallizing_assets] = np.maximum(
+            nav[crystallizing_assets],
+            hwm[crystallizing_assets],
+        )
+        gav[crystallizing_assets] -= accrued_perf_fee[crystallizing_assets]
+
+        # Convert each account's NAV change to its reported net return.
+        net_returns[position, active_assets] = (
+            nav[active_assets] / previous_nav[active_assets] - 1.0
+        )
+        previous_nav[active_assets] = nav[active_assets]
+
+    return net_returns
+
+
 def compute_net_return_ex_perf_man_fees(gross_return: pd.Series,
-                       man_fee: float = 0.01,
-                       perf_fee: float = 0.2,
-                       perf_fee_frequency: str = 'YE'
-                       ) -> pd.Series:
+                                        man_fee: float = 0.01,
+                                        perf_fee: float = 0.2,
+                                        perf_fee_frequency: str = 'YE'
+                                        ) -> pd.Series:
     """Compute net returns after management and performance fees.
 
     Args:
@@ -826,66 +917,16 @@ def compute_net_return_ex_perf_man_fees(gross_return: pd.Series,
     if not gross_return.index.is_unique:
         raise ValueError("gross_return index must not contain duplicate dates")
     gross_return = gross_return.sort_index()
-
-    # Generate performance fee crystallization dates
-    perf_fee_cristalization_schedule = da.generate_dates_schedule(
-        time_period=da.TimePeriod(gross_return.index[0], gross_return.index[-1]),
-        freq=perf_fee_frequency)
-
-    # Map off-grid calendar ends backward so later returns never enter the prior fee period.
-    perf_cris_positions = np.asarray(
-        gross_return.index.searchsorted(perf_fee_cristalization_schedule, side='right'),
-        dtype=int,
-    ) - 1
-    perf_cris_positions = perf_cris_positions[perf_cris_positions >= 0]
-    perf_cris_dates = np.zeros(len(gross_return.index), dtype=bool)
-    perf_cris_dates[perf_cris_positions] = True
-
-    # Initialize tracking DataFrame
-    nav_data = pd.DataFrame(data=0.0,
-                            index=gross_return.index,
-                            columns=['Net Return', 'NAV', 'GAV', 'PF', 'HWM', 'CPF'])
-    nav_data.insert(loc=0, column='gross return', value=gross_return.to_numpy())
-    nav_data = nav_data.copy()
-
-    # Set initial values
-    nav_data.loc[nav_data.index[0], 'GAV'] = 100.0
-    nav_data.loc[nav_data.index[0], 'NAV'] = 100.0
-    nav_data.loc[nav_data.index[0], 'HWM'] = 100.0
-
-    # Iterate through dates to compute fees
-    for date, last_date, perf_cris_date in zip(nav_data.index[1:], nav_data.index[0:], perf_cris_dates[1:]):
-        # Accrue management fee
-        man_fee_dt = man_fee * (date-last_date).days/365.0
-        nav_data.loc[date, 'GAV'] = (1.0+nav_data.loc[date, 'gross return']-man_fee_dt)*nav_data.loc[last_date, 'GAV']
-
-        # Compute performance fee on profits above HWM
-        nav_data.loc[date, 'PF'] = perf_fee*np.maximum(nav_data.loc[date, 'GAV']-nav_data.loc[last_date, 'HWM'], 0.0)
-        nav_data.loc[date, 'NAV'] = nav_data.loc[date, 'GAV']-nav_data.loc[date, 'PF']
-        nav_data.loc[date, 'HWM'] = nav_data.loc[last_date, 'HWM']
-
-        # Crystallize performance fee at period end.
-        # On crystallization day, CPF (crystallized perf fee) is recorded as
-        # the accrued PF, HWM is bumped up to max(NAV, prior HWM), and GAV is
-        # reduced by CPF so that GAV on the next iteration represents the
-        # capital actually carried forward (= NAV before the next period's
-        # gross return is applied). NAV is intentionally NOT recomputed here;
-        # the relevant invariant is `nav_data[last_date, 'GAV'] == NAV after
-        # crystallization` going into the next iteration. The displayed
-        # GAV column therefore has a discontinuity at crystallization dates,
-        # which is the audit-trail intent (fee paid out of GAV).
-        if perf_cris_date:
-            nav_data.loc[date, 'CPF'] = nav_data.loc[date, 'PF']
-            nav_data.loc[date, 'HWM'] = np.maximum(nav_data.loc[date, 'NAV'], nav_data.loc[last_date, 'HWM'])
-            nav_data.loc[date, 'GAV'] = nav_data.loc[date, 'GAV'] - nav_data.loc[date, 'CPF']
-
-    # Convert NAV to returns
-    net_return = nav_data['NAV'] / nav_data['NAV'].shift(1)-1.0
-    net_return = net_return.copy()
-    net_return.iloc[0] = 0.0
-    net_return = net_return.rename(gross_return.name)
-
-    return net_return
+    gross_returns = gross_return.to_numpy(dtype=float, na_value=np.nan).reshape(-1, 1)
+    net_returns = _compute_net_returns_ex_perf_man_fees(
+        gross_returns=gross_returns,
+        dates=gross_return.index,
+        first_valid_positions=np.array([0]),
+        man_fee=man_fee,
+        perf_fee=perf_fee,
+        perf_fee_frequency=perf_fee_frequency,
+    )
+    return pd.Series(net_returns[:, 0], index=gross_return.index, name=gross_return.name)
 
 
 def compute_net_navs_ex_perf_man_fees(navs: Union[pd.Series, pd.DataFrame],
@@ -910,31 +951,49 @@ def compute_net_navs_ex_perf_man_fees(navs: Union[pd.Series, pd.DataFrame],
     Returns:
         Net NAV time series after fees, equal to one on each column's first observed date and
         missing before it
-    """
-    def _net_returns(gross_navs: pd.Series) -> pd.Series:
-        """Net returns of one column over its observed range, on the full index."""
-        first_date = gross_navs.first_valid_index()
-        if first_date is None:
-            return pd.Series(np.nan, index=gross_navs.index, name=gross_navs.name)
-        # Missing gross returns before the first NAV would otherwise enter the fee recursion
-        # and make the whole path missing. State the historical pandas default explicitly so
-        # dependency versions cannot choose the missing-price return policy.
-        gross_returns = gross_navs.loc[first_date:].ffill().pct_change(fill_method=None)
-        net = compute_net_return_ex_perf_man_fees(gross_return=gross_returns,
-                                                  man_fee=man_fee,
-                                                  perf_fee=perf_fee,
-                                                  perf_fee_frequency=perf_fee_frequency)
-        return net.reindex(gross_navs.index)
 
+    Raises:
+        ValueError: If dates or DataFrame column labels are duplicated.
+    """
     if not navs.index.is_monotonic_increasing:
         navs = navs.sort_index()
-    if isinstance(navs, pd.Series):
-        net_returns = _net_returns(navs)
-    else:
-        net_returns = pd.concat([_net_returns(navs[column]) for column in navs.columns],
-                                axis=1, sort=True)
+    if not navs.index.is_unique:
+        raise ValueError("gross_return index must not contain duplicate dates")
+
+    is_series = isinstance(navs, pd.Series)
+    nav_frame = navs.to_frame() if is_series else navs
+    if not nav_frame.columns.is_unique:
+        raise ValueError("navs columns must not contain duplicate labels")
+
+    valid_values = nav_frame.notna().to_numpy()
+    valid_assets = np.any(valid_values, axis=0)
+    first_valid_positions = np.full(len(nav_frame.columns), -1, dtype=int)
+    first_valid_positions[valid_assets] = np.argmax(
+        valid_values[:, valid_assets],
+        axis=0,
+    )
+    # State begins at each column's first NAV; subsequent gaps retain the last gross level.
+    gross_returns = nav_frame.ffill().pct_change(fill_method=None).to_numpy(
+        dtype=float,
+        na_value=np.nan,
+    )
+    net_return_values = _compute_net_returns_ex_perf_man_fees(
+        gross_returns=gross_returns,
+        dates=nav_frame.index,
+        first_valid_positions=first_valid_positions,
+        man_fee=man_fee,
+        perf_fee=perf_fee,
+        perf_fee_frequency=perf_fee_frequency,
+    )
+    net_returns = pd.DataFrame(
+        net_return_values,
+        index=nav_frame.index,
+        columns=nav_frame.columns,
+    )
     # Each column's first net return is already zero: no further initialisation.
     net_nav = returns_to_nav(returns=net_returns, init_period=None)
+    if is_series:
+        return net_nav.iloc[:, 0].rename(navs.name)
     return net_nav
 
 
