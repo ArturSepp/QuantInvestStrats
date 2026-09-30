@@ -1195,9 +1195,9 @@ def long_short_to_relative_nav(long_price: pd.Series, short_price: pd.Series) ->
     Returns:
         Relative NAV series (long return minus short return)
     """
-    returns = to_returns(pd.concat([long_price, short_price],
-                                   axis=1, sort=True).ffill(), is_first_zero=True)
-    relative_returns = np.subtract(returns[long_price.name], returns[short_price.name])
+    prices = pd.concat({'long': long_price, 'short': short_price}, axis=1, sort=True).ffill()
+    returns = to_returns(prices, is_first_zero=True)
+    relative_returns = np.subtract(returns['long'], returns['short']).rename(None)
     relative_nav = returns_to_nav(returns=relative_returns, init_period=1)
     return relative_nav
 

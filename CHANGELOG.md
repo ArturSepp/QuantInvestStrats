@@ -15,6 +15,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   and beta EWM kernels reject non-finite spans, spans below one, and decay values outside `[0, 1)`
   before recursion. Per-column mean/volatility arrays now reject the complete request when any
   entry is invalid, while span precedence and the `span=1` pass-through remain unchanged.
+- Make `long_short_to_relative_nav` compute the long and short legs by role instead of using
+  Series names as lookup keys. Absent, duplicate, and distinct names now produce the same relative
+  NAV values and neutral result name.
 
 ## [5.33.0] - 2026-09-30
 
