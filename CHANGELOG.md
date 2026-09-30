@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Vectorize multi-asset net-of-fee NAV calculation in `compute_net_navs_ex_perf_man_fees` while
+  preserving each asset's inception and performance-fee crystallization schedule.
+
 ### Fixed
 
 - Make `adjust_returns_with_factor_lag(warmup_period=None)` disable both the public and delegated
