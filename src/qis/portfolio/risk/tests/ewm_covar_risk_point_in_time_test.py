@@ -188,7 +188,7 @@ def test_var_functions_share_same_date_weights_and_covariance() -> None:
 
 
 def test_var_limit_annualises_like_business_day_returns() -> None:
-    """The default converts annual volatility to one day with AN=252, qis's 'B' factor."""
+    """The default converts annual volatility to one day with af=252, qis's 'B' factor."""
     weights = np.array([0.5, 0.3, 0.2])
     vols = np.array([0.20, 0.10, 0.15])
     an = qis.get_annualization_factor('B')

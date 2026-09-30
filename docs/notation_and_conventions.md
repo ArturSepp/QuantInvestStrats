@@ -38,7 +38,7 @@ argument `annualize_less_1y`; the two refer to the same concept.
 |---|---|
 | Return basis | Simple and log returns, both defined here |
 | Sampling grid | Any regular pandas frequency; examples use month-ends (`ME`) |
-| Annualisation | $\mathrm{AN}$ periods per year from `qis.get_annualization_factor` |
+| Annualisation | $\mathrm{af}$ periods per year from `qis.get_annualization_factor` |
 | Mean adjustment | Sample moments are demeaned, with `ddof=1`, unless a chapter states otherwise |
 | Timing | A return at $t$ covers $(t-1,t]$; a decision at $t$ applies over $(t,t+1]$; cash accrued over $(t-1,t]$ uses the rate known at $t-1$ |
 | Output units | Decimal fractions: `0.10` means 10% |
@@ -50,7 +50,7 @@ The table defines each convention-card row:
 |---|---|
 | Return basis | Simple or log returns, and whether they are total or in excess of cash |
 | Sampling grid | The pandas frequency on which returns are formed before estimation |
-| Annualisation | The factor $\mathrm{AN}$ and how it is applied: $\mathrm{AN}$ for means, $\sqrt{\mathrm{AN}}$ for volatilities |
+| Annualisation | The factor $\mathrm{af}$ and how it is applied: $\mathrm{af}$ for means, $\sqrt{\mathrm{af}}$ for volatilities |
 | Mean adjustment | Which mean, if any, is removed before second moments are formed |
 | Timing | Which information a quantity dated $t$ may use, and when it is applied |
 | Output units | The units of the result |
@@ -74,7 +74,7 @@ sample mean.
 | $\mathrm{TR}$, $R_{\mathrm{pa}}$ | Total return and per-annum (compound) return |
 | $Y$ | Elapsed calendar years, days divided by 365.25 |
 | $\tau$ | A horizon or maturity measured in years |
-| $\mathrm{AN}$ | Annualisation factor: periods per year of the sampling grid |
+| $\mathrm{af}$ | Annualisation factor: periods per year of the sampling grid |
 | $w_{i,t}$, $w^{*}_{i,t}$ | Realised (drifted) weight; target weight |
 | $u_{i,t}$ | Units held |
 | $\mu$, $\sigma$, $\Sigma$, $\rho$ | Mean, volatility, covariance matrix, correlation |
@@ -85,8 +85,10 @@ sample mean.
 | $\mathrm{SR}$, $\mathrm{TE}$, $\mathrm{IR}$, $\mathrm{IC}$ | Sharpe ratio, tracking error, information ratio, information coefficient |
 | $^{\top}$, $\operatorname{Var}$, $\operatorname{Cov}$, $\mathbb{E}$ | Transpose, variance, covariance, expectation |
 
-$\mathrm{AN}$ is set upright and read as one symbol, like $\mathrm{TE}$; it is never the product
-of $A$ and $N$. Counts with decorations, such as an effective number $N_{\mathrm{eff}}$, keep the
+$\mathrm{af}$ is set upright and read as one symbol, like $\mathrm{TE}$; it is never the product
+of $a$ and $f$. It is written as the code writes it: the `af` argument of the regime and
+performance functions, which some model and portfolio functions call `annualization_factor`.
+Counts with decorations, such as an effective number $N_{\mathrm{eff}}$, keep the
 count meaning of $N$. A chapter that needs a symbol outside this table declares it locally and
 does not reuse a reserved one.
 
@@ -152,27 +154,27 @@ $Y$ is the number of calendar days divided by 365.25. A history of one year or l
 total return by default; it is not extrapolated to a one-year figure.
 
 **Identity (per-annum return and log returns).** For $Y>1$ and $T$ returns on a grid with
-$\mathrm{AN}$ periods per year,
+$\mathrm{af}$ periods per year,
 
 $$
-\log(1+R_{\mathrm{pa}})=\frac{1}{Y}\sum_{t=1}^{T}\ell_t=\frac{T}{Y}\,\bar\ell\approx\mathrm{AN}\,\bar\ell .
+\log(1+R_{\mathrm{pa}})=\frac{1}{Y}\sum_{t=1}^{T}\ell_t=\frac{T}{Y}\,\bar\ell\approx\mathrm{af}\,\bar\ell .
 $$
 
 **Proof.** By the aggregation identity, $\log(1+\mathrm{TR})=\sum_t\ell_t$, and
 $\log(1+R_{\mathrm{pa}})=\log(1+\mathrm{TR})/Y$. On a regular grid $T/Y$ is close to
-$\mathrm{AN}$. $\square$
+$\mathrm{af}$. $\square$
 
 > **Insight.** The per-annum return is the exponential map of the annualised mean log return.
 > This is why a Sharpe ratio built on $R_{\mathrm{pa}}$ is numerically close to one built on
-> $\mathrm{AN}\,\bar\ell$. Both numerators sit below the arithmetic one, $\mathrm{AN}\,\bar r$,
+> $\mathrm{af}\,\bar\ell$. Both numerators sit below the arithmetic one, $\mathrm{af}\,\bar r$,
 > by roughly half the annualised variance, because $\ell\approx r-r^2/2$.
 
 ### Annualisation
 
-**Definition.** $\mathrm{AN}$ is the number of periods per year of the sampling grid, returned
+**Definition.** $\mathrm{af}$ is the number of periods per year of the sampling grid, returned
 by `qis.get_annualization_factor`:
 
-| Grid | Pandas frequency | $\mathrm{AN}$ |
+| Grid | Pandas frequency | $\mathrm{af}$ |
 |---|---|---:|
 | Business day | `B` | 252 |
 | Calendar day | `D` | 365 |
@@ -181,13 +183,13 @@ by `qis.get_annualization_factor`:
 | Quarter-end | `QE` | 4 |
 | Year-end | `YE` | 1 |
 
-A periodic mean is annualised by $\mathrm{AN}$ and a periodic standard deviation by
-$\sqrt{\mathrm{AN}}$:
+A periodic mean is annualised by $\mathrm{af}$ and a periodic standard deviation by
+$\sqrt{\mathrm{af}}$:
 
 $$
-\hat\mu_{\mathrm{ann}}=\mathrm{AN}\,\bar x,
+\hat\mu_{\mathrm{ann}}=\mathrm{af}\,\bar x,
 \qquad
-\hat\sigma_{\mathrm{ann}}=\sqrt{\mathrm{AN}}\,s(x).
+\hat\sigma_{\mathrm{ann}}=\sqrt{\mathrm{af}}\,s(x).
 $$
 
 **Proposition (square-root-of-time).** If $\ell_1,\ldots,\ell_k$ are uncorrelated with common
@@ -299,7 +301,7 @@ The last check shows the lag of one return period: the March excess return uses 
 | Levels from returns | $P_0\prod(1+r_t)$ | `qis.returns_to_nav` |
 | Elapsed years | days / 365.25 | `qis.compute_num_years` |
 | Total and per-annum return | $\mathrm{TR}$, $R_{\mathrm{pa}}$ | `qis.compute_total_return`, `qis.compute_pa_return` |
-| Annualisation factor | $\mathrm{AN}$ | `qis.get_annualization_factor`, `qis.infer_annualisation_factor_from_df` |
+| Annualisation factor | $\mathrm{af}$ | `qis.get_annualization_factor`, `qis.infer_annualisation_factor_from_df` |
 | Excess returns | $\tilde r_t$ | `qis.compute_excess_returns` |
 | Statistic conventions | the convention card | `qis.PerfParams` |
 
@@ -316,7 +318,7 @@ warns and falls back to 252, so resample to an explicit grid before estimating.
 - The square-root-of-time rule assumes uncorrelated increments. Smoothed or illiquid returns
   violate it; see [private-asset unsmoothing](private_asset_unsmoothing.md).
 - Three day counts coexist by design: 365.25-day years for per-annum returns, ACT/365 for
-  cash accrual, and $\mathrm{AN}$ periods per year for sampled statistics.
+  cash accrual, and $\mathrm{af}$ periods per year for sampled statistics.
 - A convention card states defaults. An explicit argument overrides them, and a report that
   changes a default should say so.
 

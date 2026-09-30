@@ -67,11 +67,11 @@ class RegimeData(Enum):
     Attributes:
         REGIME_AVG: conditional mean periodic return within each regime, m_g, on the
             classifier's grid and return basis
-        REGIME_PA: per-annum contribution of each regime, exp(AN * p_g * m_g) - 1 with p_g the
+        REGIME_PA: per-annum contribution of each regime, exp(af * p_g * m_g) - 1 with p_g the
             regime frequency, shifted by p_g times the residual so the regimes add up to the
             table's ``PA_RETURN`` (native endpoints)
         REGIME_SHARPE: Sharpe-ratio contribution of each regime in the convention carried on
-            ``PerfParams.sharpe_convention``: under ARITHMETIC and LOG, sqrt(AN) * p_g * m_g
+            ``PerfParams.sharpe_convention``: under ARITHMETIC and LOG, sqrt(af) * p_g * m_g
             over the full-sample standard deviation, adding up to the Sharpe ratio on the
             regime grid; under PA, the REGIME_PA contribution over ``VOL``, adding up to
             ``PA_RETURN / VOL``, which equals ``SHARPE_RF0`` only when the native endpoints lie
@@ -271,10 +271,10 @@ class SharpeConvention(Enum):
             the per-annum regime returns are patched to add up to the table's ``PA_RETURN``
             and divided by ``VOL``. The reporting default and the BarclayHedge tradition;
             leaves every pre-5.0.2 output unchanged
-        ARITHMETIC: ``sqrt(AN) * mean / std`` of periodic simple returns - the Sharpe (1994)
+        ARITHMETIC: ``sqrt(af) * mean / std`` of periodic simple returns - the Sharpe (1994)
             plug-in estimator and the convention of the Sharpe-inference literature. The regime
             contributions add up exactly to it
-        LOG: ``sqrt(AN) * mean / std`` of periodic log returns; the regime contributions add up
+        LOG: ``sqrt(af) * mean / std`` of periodic log returns; the regime contributions add up
             exactly to it
     """
     PA = 1

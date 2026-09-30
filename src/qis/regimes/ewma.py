@@ -12,6 +12,12 @@ Both functions seed the recursion with the stream's full-sample mean (``InitType
 look-ahead seed), so at a span far longer than the stream they return the equal-weighted
 estimates. Inside a backtest they must be evaluated on the data available at each decision date,
 as an expanding window does.
+
+These are the regime-time estimators of Sepp and Kastenholz (2026, Appendix C): the regime means
+of equation (14) and the regime betas of equation (15), with their span of 40 regime-time periods
+as the default. The unconditional Sharpe ratio, volatility and correlation stay in calendar time,
+equation (16), so regime contributions formed from these means and a calendar-time volatility
+need not add up to the total Sharpe ratio: they are forecasts, not the exact decomposition.
 """
 # packages
 import numpy as np
@@ -59,12 +65,14 @@ def compute_regime_ewm_betas(sampled_returns_with_regime_id: pd.DataFrame,
     Args:
         sampled_returns_with_regime_id: periodic returns with a regime column
         benchmark: name of the benchmark column
-        span: EWMA span in periods
+        span: EWMA span, counted in regime-time periods for the betas and in calendar periods for
+            the residual variances
         regime_column: name of the regime column
 
     Returns:
         the betas, assets in rows and regimes in columns in bucket order, and the per-period
-        residual variance of each asset, to be annualised by the caller
+        residual variance of each asset, to be annualised by the caller; unlike ``idio_vol`` of
+        ``compute_regime_betas``, it is a variance and not annualised
     """
     data = sampled_returns_with_regime_id.dropna(subset=[regime_column])
     regimes = get_ordered_regimes(data[regime_column])

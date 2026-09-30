@@ -28,6 +28,12 @@ def create_overlay_portfolio_curve(principal_nav: pd.Series,
     a history that starts between two rebalancing dates is invested in its first period too.
     Up to qis 5.31.0 the mixes held no position until the first scheduled rebalancing date.
 
+    With ``is_principal_weight_fixed`` the mixes are levered, and the backtest finances the
+    leverage at a zero rate. On excess-of-cash navs, with ``principal_weight=1``, a mix is then the
+    stacked portfolio ``r_B + w r_A`` of Sepp and Kastenholz (2026, Definition 3), up to the drift
+    between rebalancing dates; on total-return navs it overstates the mix by ``w`` times the cash
+    return.
+
     Args:
         principal_nav: nav of the principal portfolio
         overlay_nav: nav of the overlay; its name labels the columns

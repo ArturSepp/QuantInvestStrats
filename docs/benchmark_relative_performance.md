@@ -39,8 +39,8 @@ The chapter's main messages:
 1. The table's alpha and beta are a full-sample ordinary least squares (OLS) fit on the grid
    `PerfParams.freq_reg`, quarterly by default. They describe the sample; they are not point in
    time.
-2. `ALPHA_AN` annualises alpha linearly, $\mathrm{AN}\,\hat\alpha$, and scatter-plot legends use
-   the same convention. Compounding, $e^{\mathrm{AN}\hat\alpha}-1$, differs at second order.
+2. `ALPHA_AN` annualises alpha linearly, $\mathrm{af}\,\hat\alpha$, and scatter-plot legends use
+   the same convention. Compounding, $e^{\mathrm{af}\hat\alpha}-1$, differs at second order.
 3. Alpha is estimated with a standard error of about the residual volatility divided by the
    square root of the sample length. When $R^2$ is low, alpha is as noisy as a mean return.
 4. Tracking error is the volatility of the return *difference*. It is not the difference of
@@ -58,7 +58,7 @@ the whole-sample estimators and links to that chapter for the rest.
 |---|---|
 | Return basis | Table regression: simple returns (`is_log_returns=False`), in excess of cash on both sides when `PerfParams.rates_data` is set. EWMA betas: log returns. Attribution: simple returns |
 | Sampling grid | `PerfParams.freq_reg`, default `QE`; with `perf_params=None` the grid is inferred from the price index. EWMA betas and attribution: `freq_beta`, default the input grid for the `qis.*` functions and `'B'` for the `PortfolioData` methods |
-| Annualisation | `ALPHA_AN` is $\mathrm{AN}\,\hat\alpha$ with $\mathrm{AN}$ of `freq_reg`; TE is $\sqrt{\mathrm{AN}}\,s(x)$ and IR is $\sqrt{\mathrm{AN}}\,\bar x/s(x)$ with $\mathrm{AN}$ inferred from the return index; beta and $R^2$ are not annualised |
+| Annualisation | `ALPHA_AN` is $\mathrm{af}\,\hat\alpha$ with $\mathrm{af}$ of `freq_reg`; TE is $\sqrt{\mathrm{af}}\,s(x)$ and IR is $\sqrt{\mathrm{af}}\,\bar x/s(x)$ with $\mathrm{af}$ inferred from the return index; beta and $R^2$ are not annualised |
 | Mean adjustment | OLS with an intercept and a centred $R^2$; TE demeaned with `ddof=1`; EWMA betas demeaned by an EWMA mean (`MeanAdjType.EWMA`) |
 | Timing | Table statistics and TE/IR are full-sample and descriptive. Attribution applies the beta known at $t-1$ to the return over $(t-1,t]$ |
 | Output units | Alpha as a decimal return per `freq_reg` period (`ALPHA`) and per year (`ALPHA_AN`); beta, IR dimensionless; $R^2$ in $[0,1]$; TE annualised decimal |
@@ -83,7 +83,7 @@ the whole-sample estimators and links to that chapter for the rest.
 | $A_{q,t}$ | Return attributed to benchmark $q$ over $(t-1,t]$ | Decimal per period |
 | $\eta_t$ | Attribution residual, the column `Alpha` | Decimal per period |
 | $\lambda$, $N$ | EWM decay and span, $\lambda=1-2/(N+1)$ | `factor_beta_span` or `span` is $N$ |
-| $\mathrm{AN}$, $Y$ | Periods per year; elapsed years $T/\mathrm{AN}$ | 12 for `ME`, 4 for `QE` |
+| $\mathrm{af}$, $Y$ | Periods per year; elapsed years $T/\mathrm{af}$ | 12 for `ME`, 4 for `QE` |
 
 Inputs are price or NAV levels with a sorted `DatetimeIndex`. The benchmark is either a column of
 `prices` (argument `benchmark`) or a separate Series (`benchmark_price`). Each asset is regressed
@@ -177,21 +177,21 @@ estimated far less precisely than its beta (see [Inference for alpha](#inference
 is
 
 $$
-\hat\alpha_{\mathrm{an}}=\mathrm{AN}\,\hat\alpha ,
+\hat\alpha_{\mathrm{an}}=\mathrm{af}\,\hat\alpha ,
 $$
 
-with $\mathrm{AN}$ from `qis.get_annualization_factor(freq_reg)`. This is the arithmetic-mean
-convention: $\hat\alpha$ is a difference of means, and means annualise by $\mathrm{AN}$.
+with $\mathrm{af}$ from `qis.get_annualization_factor(freq_reg)`. This is the arithmetic-mean
+convention: $\hat\alpha$ is a difference of means, and means annualise by $\mathrm{af}$.
 
 Scatter-plot legends follow the same convention. `qis.plot_scatter` and `qis.plot_returns_scatter`
 format the fitted equation with the internal helper `qis.utils.regression.reg_model_params_to_str`.
 When the keyword `alpha_an_factor` is passed through their keyword arguments, the legend prints
-$\mathrm{AN}\,\hat\alpha$ as a whole percentage, the table's figure. Without it, the legend prints
+$\mathrm{af}\,\hat\alpha$ as a whole percentage, the table's figure. Without it, the legend prints
 the per-period intercept with `alpha_format`, by default a two-decimal number, which rounds a
 typical monthly alpha to `+0.00`; `alpha_format='{0:+0.2%}'` prints it as a percentage. Until the
-handbook follow-up the legend compounded, printing $e^{\mathrm{AN}\hat\alpha}-1$.
+handbook follow-up the legend compounded, printing $e^{\mathrm{af}\hat\alpha}-1$.
 
-**Proposition (gap between linear and compounded annualisation).** For $z=\mathrm{AN}\hat\alpha$,
+**Proposition (gap between linear and compounded annualisation).** For $z=\mathrm{af}\hat\alpha$,
 
 $$
 e^{z}-1-z=\tfrac12 z^{2}e^{\xi}\quad\text{for some }\xi\text{ between }0\text{ and }z .
@@ -259,12 +259,12 @@ small: at 8% per annum and 16% volatility on monthly data it adds about 1%. Henc
 $\mathrm{se}(\hat\alpha)\approx s_\varepsilon/\sqrt{T}$ per period, and for the annualised alpha
 
 $$
-\mathrm{se}(\mathrm{AN}\,\hat\alpha)\approx\frac{\sqrt{\mathrm{AN}}\,s_\varepsilon}{\sqrt{Y}},
-\qquad Y=\frac{T}{\mathrm{AN}} .
+\mathrm{se}(\mathrm{af}\,\hat\alpha)\approx\frac{\sqrt{\mathrm{af}}\,s_\varepsilon}{\sqrt{Y}},
+\qquad Y=\frac{T}{\mathrm{af}} .
 $$
 
 The $t$-statistic of alpha is therefore about the residual information ratio,
-$\mathrm{AN}\hat\alpha/(\sqrt{\mathrm{AN}}\,s_\varepsilon)$, times $\sqrt{Y}$: the rule of
+$\mathrm{af}\hat\alpha/(\sqrt{\mathrm{af}}\,s_\varepsilon)$, times $\sqrt{Y}$: the rule of
 thumb $t\approx\mathrm{IR}\sqrt{Y}$ of Grinold and Kahn (2000), with IR the residual ratio.
 
 When $R^2$ is low, $s_\varepsilon$ is close to the portfolio's own volatility. For a 15% volatile
@@ -276,7 +276,7 @@ shrinks $s_\varepsilon$.
 > **Insight.** Sampling more often helps beta but not alpha. Over a fixed calendar span,
 > $\mathrm{se}(\hat\beta)\approx s_\varepsilon/(\sqrt{T}\,\hat\sigma_b)$: the ratio
 > $s_\varepsilon/\hat\sigma_b$ does not depend on the period length, so the error falls as $T$
-> grows. $\mathrm{se}(\mathrm{AN}\hat\alpha)$ depends on the calendar length $Y$ only. Monthly
+> grows. $\mathrm{se}(\mathrm{af}\hat\alpha)$ depends on the calendar length $Y$ only. Monthly
 > instead of quarterly returns sharpen beta, subject to the asynchronous-price bias above; they do
 > not make a six-year alpha significant.
 
@@ -303,9 +303,9 @@ Other degenerate cases:
 **Definition.** With $x_t=r_{p,t}-r_{b,t}$ on a regular grid,
 
 $$
-\mathrm{TE}=\sqrt{\mathrm{AN}}\,s(x),
+\mathrm{TE}=\sqrt{\mathrm{af}}\,s(x),
 \qquad
-\mathrm{IR}=\frac{\sqrt{\mathrm{AN}}\,\bar x}{s(x)} .
+\mathrm{IR}=\frac{\sqrt{\mathrm{af}}\,\bar x}{s(x)} .
 $$
 
 TE is the volatility and IR the Sharpe ratio of the active return
@@ -561,7 +561,7 @@ years = T / 12
 assert abs(np.sqrt(12.0) * s_eps - 0.0188) < 5e-5
 assert np.isclose(12.0 * se[0], np.sqrt(12.0) * s_eps / np.sqrt(years), rtol=0.01)
 
-# default PerfParams(): quarterly grid, AN = 4
+# default PerfParams(): quarterly grid, af = 4
 table_q = qis.compute_ra_perf_table_with_benchmark(prices=prices, benchmark='Benchmark',
                                                    perf_params=qis.PerfParams())
 quarterly = prices.iloc[::3].pct_change().dropna()  # 2019-12-31 is a quarter-end
@@ -695,11 +695,11 @@ because the synthetic fund does not time its exposure.
 | Quantity | Formula | qis entry point |
 |---|---|---|
 | Alpha, beta, $R^2$ | OLS of $r_p$ (or $\tilde r_p$) on $r_b$ (or $\tilde r_b$) on `freq_reg` | `qis.compute_ra_perf_table_with_benchmark` columns `PerfStat.ALPHA`, `PerfStat.BETA`, `PerfStat.R2`; internal `qis.utils.regression.estimate_ols_alpha_beta` |
-| Annualised alpha | $\mathrm{AN}\,\hat\alpha$ with $\mathrm{AN}$ of `freq_reg` | `PerfStat.ALPHA_AN` |
+| Annualised alpha | $\mathrm{af}\,\hat\alpha$ with $\mathrm{af}$ of `freq_reg` | `PerfStat.ALPHA_AN` |
 | Alpha p-value | Student $t$, $T-2$ degrees of freedom, classical standard error; 1.0 for the benchmark row | `PerfStat.ALPHA_PVALUE` |
-| Legend alpha | $\mathrm{AN}\,\hat\alpha$ when `alpha_an_factor` is passed, else the periodic $\hat\alpha$ | `qis.plot_scatter`, `qis.plot_returns_scatter`; internal `qis.utils.regression.reg_model_params_to_str` |
+| Legend alpha | $\mathrm{af}\,\hat\alpha$ when `alpha_an_factor` is passed, else the periodic $\hat\alpha$ | `qis.plot_scatter`, `qis.plot_returns_scatter`; internal `qis.utils.regression.reg_model_params_to_str` |
 | HAC alpha inference | Bartlett-kernel HAC standard error | internal `qis.utils.regression.estimate_ols_alpha_beta_hac`; `qis.estimate_ewma_alpha_beta_hac` |
-| Tracking error, information ratio | $\sqrt{\mathrm{AN}}\,s(x)$, $\sqrt{\mathrm{AN}}\,\bar x/s(x)$ | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
+| Tracking error, information ratio | $\sqrt{\mathrm{af}}\,s(x)$, $\sqrt{\mathrm{af}}\,\bar x/s(x)$ | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
 | One-factor EWMA beta and alpha | $\mathrm{EWM}(r_br_i)/\mathrm{EWM}(r_b^2)$, $\mathrm{EWM}(r_i-\beta_ir_b)$ | `qis.compute_ewm_beta_alpha_forecast` |
 | Portfolio EWMA benchmark betas | $\sum_iw_{i,t}\beta_{i,q,t}$ on log returns | `qis.compute_portfolio_ewm_benchmark_betas`, `PortfolioData.compute_portfolio_benchmark_betas` |
 | Beta attribution | $A_{q,t}=\beta_{p,q,t-1}r_{q,t}$, $\eta_t=r_{p,t}-\sum_qA_{q,t}$ | `qis.compute_benchmarks_beta_attribution_from_prices`, `qis.compute_benchmarks_beta_attribution_from_returns` |
@@ -782,5 +782,5 @@ Sources:
 6. Newey, W. K., and West, K. D. (1987). A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix. *Econometrica*, 55(3), 703–708. [Working paper and published-version record](https://www.nber.org/papers/t0055). The HAC alternative to the table's classical standard errors.
 7. Scholes, M., and Williams, J. (1977). Estimating Betas from Nonsynchronous Data. *Journal of Financial Economics*, 5(3), 309–327. [DOI: 10.1016/0304-405X(77)90041-1](https://doi.org/10.1016/0304-405X%2877%2990041-1). Bias of betas from non-synchronous prices.
 8. Dimson, E. (1979). Risk Measurement When Shares Are Subject to Infrequent Trading. *Journal of Financial Economics*, 7(2), 197–226. [DOI: 10.1016/0304-405X(79)90013-8](https://doi.org/10.1016/0304-405X%2879%2990013-8). Aggregated-lag betas for infrequently traded assets.
-9. Sepp, A. (2019). Trend-Following CTAs vs Alternative Risk-Premia: Crisis Beta vs Risk-Premia Alpha. *The Hedge Fund Journal*. [Article](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/). Regime-dependent betas of convex strategies.
+9. Sepp, A., and Dézeraud, L. (2019). Trend-Following CTAs vs Alternative Risk-Premia: Crisis Beta vs Risk-Premia Alpha. *The Hedge Fund Journal*, 138, 20–31. [Article](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/). Regime-dependent betas of convex strategies.
 10. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

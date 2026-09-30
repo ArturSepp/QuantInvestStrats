@@ -43,7 +43,7 @@ Choose the transformation from the economic question:
 |---|---|
 | Return basis | Simple returns for de-levering; simple or log returns, retained throughout, for unsmoothing |
 | Sampling grid | The reporting grid of each sleeve, `freq`, for example `QE` |
-| Annualisation | Financing rates are divided by $\mathrm{AN}$ periods per year |
+| Annualisation | Financing rates are divided by $\mathrm{af}$ periods per year |
 | Mean adjustment | EWMA mean with `InitType.X0` for rolling fits; full-sample fit for the static filter |
 | Timing | Coefficients estimated through $t-1$ are applied to the return at $t$ |
 | Output units | Decimal returns and reconstructed NAV levels |
@@ -57,8 +57,8 @@ Choose the transformation from the economic question:
 | $b_{j,t}$ | Estimated coefficient on observed lag $j$ | Dimensionless; rolling estimate dated $t$ |
 | $\Theta_t=\sum_{j=1}^{q}b_{j,t}$ | Coefficient sum | Controls the inversion denominator |
 | $L$ | Debt divided by equity | Nonnegative scalar; $L=0.5$ corresponds to 1.5x assets/equity |
-| $y_t$, $\mathrm{AN}$ | Annual financing rate and periods per year | Decimal annual rate; e.g. $\mathrm{AN}=12$ monthly |
-| $c_t=y_t/\mathrm{AN}$ | Financing cost for the return period | Simple periodic rate under the helper's convention |
+| $y_t$, $\mathrm{af}$ | Annual financing rate and periods per year | Decimal annual rate; e.g. $\mathrm{af}=12$ monthly |
+| $c_t=y_t/\mathrm{af}$ | Financing cost for the return period | Simple periodic rate under the helper's convention |
 | $r^{V}_t$, $r^{A}_t$ | Vehicle and unlevered asset returns | **Simple** periodic returns |
 
 Use date-indexed Series/DataFrames, with columns identifying assets. The price-level wrapper
@@ -69,7 +69,7 @@ grid and is not a fixed-length window.
 Annual financing quotes supplied as a Series are point in time in `delever_returns`: the period
 ending on a return date is charged the latest quote dated on or before the previous return date,
 so a quote first known at a period's end finances the next period, and the first return date takes
-the latest quote dated before it. Missing leading quotes remain unavailable. The helper divides by $\mathrm{AN}$,
+the latest quote dated before it. Missing leading quotes remain unavailable. The helper divides by $\mathrm{af}$,
 rather than applying an elapsed-day accrual.
 
 ## Methodology

@@ -53,7 +53,7 @@ called while scenarios are evaluated or rendered.
 |---|---|
 | Return basis | Factor, response, quote and FX shocks are log returns; scenario P&L is in reference currency and portfolio return is P&L divided by $V$ |
 | Sampling grid | One model-date snapshot, no resampling; historical replay uses at most one complete factor log-return vector per calendar month |
-| Annualisation | $\Sigma$, residual variances and $\Omega$ are supplied annual; qis applies no $\mathrm{AN}$; horizon volatility is $\sqrt{\tau v}$ with $\tau$ in years |
+| Annualisation | $\Sigma$, residual variances and $\Omega$ are supplied annual; qis applies no $\mathrm{af}$; horizon volatility is $\sqrt{\tau v}$ with $\tau$ in years |
 | Mean adjustment | Zero-mean conditioning and zero-mean bands; no drift, carry, theta or roll is added |
 | Timing | Holdings, marks, quotes, FX, strikes, loadings and covariance frozen at the model date; shocks are instantaneous; months after the valuation date are excluded from replay |
 | Output units | Reference-currency values, P&L and dollar sensitivities per unit log return; returns, betas and volatilities as decimal fractions of $V$ |

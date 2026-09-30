@@ -42,7 +42,8 @@ mechanical ones.
   Annualisation, Mean adjustment, Timing, Output units, qis default. The
   [notation chapter](notation_and_conventions.md) defines each row.
 - **Reserved notation.** Symbols listed in the notation chapter keep one meaning in every
-  article. The annualisation factor is $\mathrm{AN}$, set upright as one symbol. A local
+  article. The annualisation factor is $\mathrm{af}$, set upright as one symbol and
+  named after the code's `af` argument. A local
   symbol is declared in the article's notation table and never reuses a reserved one. Write
   the transpose as `\top` and variance or covariance as `\operatorname{Var}` and
   `\operatorname{Cov}`; the checker rejects `\mathsf{T}`, `\intercal`, `\mathrm{Var}` and

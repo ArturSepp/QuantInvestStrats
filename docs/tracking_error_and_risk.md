@@ -40,7 +40,7 @@ absolute return or low total portfolio volatility.
 |---|---|
 | Return basis | Simple or log returns via `is_log_returns`; the difference is formed before estimation |
 | Sampling grid | `freq` of the ex-post estimators, default `ME`; covariance dates for ex-ante risk |
-| Annualisation | Ex post: $\sqrt{\mathrm{AN}}$ from the return index; ex ante: the covariance scale |
+| Annualisation | Ex post: $\sqrt{\mathrm{af}}$ from the return index; ex ante: the covariance scale |
 | Mean adjustment | Whole-sample TE is demeaned; the EWMA TE is a second moment about zero |
 | Timing | Ex-ante weights as of each covariance date; ex-post estimates are descriptive |
 | Output units | Decimal TE in the units of the covariance or annualised; dimensionless IR |
@@ -53,7 +53,7 @@ absolute return or low total portfolio volatility.
 | $\Sigma$ | Asset-return covariance | Periodic or annualised fractional covariance; state which |
 | $x_t=r_{p,t}-r_{b,t}$ | Realised active return | Difference of returns using the same convention and grid |
 | $s(x)$ | Sample standard deviation | `ddof=1`; NaNs omitted per column |
-| $\mathrm{AN}$ | Periods per year | Inferred from the return-difference index; 12 for regular month-end observations |
+| $\mathrm{af}$ | Periods per year | Inferred from the return-difference index; 12 for regular month-end observations |
 | `ewma_span` | EWMA span | Count of sampled return periods, not calendar days |
 
 Supply positive NAVs over an explicitly aligned sample. Choose simple or log returns with
@@ -122,9 +122,9 @@ qis does not silently repair inconsistent model views.
 For a regularly sampled active-return series, the whole-sample estimators are:
 
 $$
-\widehat{\mathrm{TE}}=\sqrt{\mathrm{AN}}\,s(x),
+\widehat{\mathrm{TE}}=\sqrt{\mathrm{af}}\,s(x),
 \qquad
-\widehat{\mathrm{IR}}=\frac{\sqrt{\mathrm{AN}}\,\overline{x}}{s(x)}.
+\widehat{\mathrm{IR}}=\frac{\sqrt{\mathrm{af}}\,\overline{x}}{s(x)}.
 $$
 
 TE is in annualised return units; IR is dimensionless. The difference must be formed before

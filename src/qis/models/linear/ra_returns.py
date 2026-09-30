@@ -9,7 +9,7 @@ with sigma an EWM volatility at ``span`` or ``ewm_lambda``. Three conventions ho
 The weight is lagged by ``weight_lag``, 1 by default, so the scaling applied over [t, t+1] uses
 the volatility known at t and the construction carries no look-ahead. Sigma is never annualised:
 it is a volatility per period of the return grid, so ``vol_target`` is a target per period too,
-and an annual target enters as ``sigma_annual / sqrt(AN)`` (for example ``0.15 / sqrt(252)`` on
+and an annual target enters as ``sigma_annual / sqrt(af)`` (for example ``0.15 / sqrt(252)`` on
 business days). And ``vol_target=None`` means a non-dimensional unit target rather than no
 scaling: the output is then in units of risk, comparable across assets and summable across a
 panel, but not a tradeable return stream. Pass an explicit target to size a position. The
@@ -71,7 +71,7 @@ def compute_ra_returns(returns: Union[pd.Series, pd.DataFrame],
 
     The volatility is never annualised. ``sigma_t`` is the per-period EWM volatility of the
     supplied returns, so ``vol_target`` is a volatility per period of the same grid: an annual
-    target ``sigma_annual`` is passed as ``sigma_annual / sqrt(AN)``, for example
+    target ``sigma_annual`` is passed as ``sigma_annual / sqrt(af)``, for example
     ``0.15 / np.sqrt(252)`` on business-day returns. ``vol_target=0.15`` on daily returns targets
     15% per day.
 

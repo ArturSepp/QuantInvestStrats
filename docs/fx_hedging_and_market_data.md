@@ -37,7 +37,7 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 |---|---|
 | Return basis | Simple returns; log output is $\log(1+R_t)$ of the complete payoff |
 | Sampling grid | The `freq` grid of the pair calculation, default `ME` |
-| Annualisation | Annual rates are divided by $\mathrm{AN}$; the CIP period is $\Delta=1/\mathrm{AN}$ |
+| Annualisation | Annual rates are divided by $\mathrm{af}$; the CIP period is $\Delta=1/\mathrm{af}$ |
 | Mean adjustment | Not applicable |
 | Timing | Hedge ratio and forward premium set at $t-1$ apply to the return at $t$ |
 | Output units | Decimal returns in the reference currency |
@@ -50,7 +50,7 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 | $P_t$ | Asset price in local currency | Positive level on a dated index |
 | $r^{L}_t$, $r^{FX}_t$ | Local asset and cross-rate returns over $[t-1,t]$ | Simple periodic returns |
 | $y^L_t$, $y^R_t$ | Local and reference short rates | Annualised decimal rates |
-| $\mathrm{AN}$, $\Delta$ | Periods per year and CIP period | $\Delta=1/\mathrm{AN}$, selected from `freq` |
+| $\mathrm{af}$, $\Delta$ | Periods per year and CIP period | $\Delta=1/\mathrm{af}$, selected from `freq` |
 | $f_t$ | qis local/reference cash-growth premium | Simple fraction; inverse quote to $F_t/S_t-1$ |
 | $F_t$ | Forward fixed at $t$ for the next period | Reference per local, same direction as $S_t$ |
 | $h_t$ | Local opening principal sold forward | Fraction; 0 unhedged, 1 principal hedge |
@@ -172,7 +172,7 @@ variance recursion is seeded with $0.08^2/12$, the monthly variance of an 8% ann
 on every grid. The beta's cross moment starts at zero and its FX variance at the first squared FX
 return; up to qis 5.30.3 that variance was seeded with its full-sample mean square, so the early
 betas used later FX returns. The carry $c$ is the
-short-forward cost $f/(1+f)$ divided by the period length $\Delta=1/\mathrm{AN}$. The default
+short-forward cost $f/(1+f)$ divided by the period length $\Delta=1/\mathrm{af}$. The default
 $\lambda=4/3$ is a modelling choice, not an estimate.
 
 > **Pitfall.** The optimum rises one-for-one with $\beta$. A positive local-on-FX beta, common

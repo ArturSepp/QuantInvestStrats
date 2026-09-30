@@ -1961,7 +1961,7 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
                        ) -> pd.DataFrame:
     """Annualised EWM Sharpe-ratio paths of return columns.
 
-    Missing returns are set to zero and the annualisation factor ``AN`` is inferred from the
+    Missing returns are set to zero and the annualisation factor ``af`` is inferred from the
     index. The EWM mean ``m_t`` and the EWM second moment run from zero seeds (or from the
     ``initial_sharpes`` prior) as the state before row 0, so the first return enters with weight
     ``1 - lambda``. The ratio is NaN where its denominator is zero.
@@ -1969,13 +1969,13 @@ def compute_ewm_sharpe(returns: pd.DataFrame,
     Args:
         returns: periodic returns, one column per strategy, with a frequency-bearing index
         span: EWM span of both moments
-        norm_type: ``0`` the annualised EWM mean ``AN m_t``, not a ratio; ``1`` (default)
-            ``sqrt(AN) m_t / sqrt(EWM(r^2)_t)``, the mean over the root mean square, which is
+        norm_type: ``0`` the annualised EWM mean ``af m_t``, not a ratio; ``1`` (default)
+            ``sqrt(af) m_t / sqrt(EWM(r^2)_t)``, the mean over the root mean square, which is
             the second moment about zero and compresses the Sharpe ratio by
-            ``1 / sqrt(1 + SR^2 / AN)``; ``2`` ``sqrt(AN) m_t / sqrt(EWM((r - m)^2)_t)``, the
+            ``1 / sqrt(1 + SR^2 / af)``; ``2`` ``sqrt(af) m_t / sqrt(EWM((r - m)^2)_t)``, the
             mean over the EWM deviation from the running mean
         initial_sharpes: optional annualised Sharpe prior per column; seeds the mean with
-            ``0.1 SR / AN`` and the second moment with ``0.01 / AN``, a 10% annual volatility
+            ``0.1 SR / af`` and the second moment with ``0.01 / af``, a 10% annual volatility
 
     Returns:
         the EWM Sharpe (or mean, for ``norm_type=0``) paths with the index and columns of

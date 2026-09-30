@@ -58,7 +58,7 @@ The chapter answers five questions.
 |---|---|
 | Return basis | Any input series; the estimators do not transform it. The examples use simple returns |
 | Sampling grid | The rows of the input. The decay applies per row, so a span counts observations, not calendar time |
-| Annualisation | Off by default. With `annualize=True` variances are multiplied by $\mathrm{AN}$ inferred from the index, so volatilities scale by $\sqrt{\mathrm{AN}}$; a bare ndarray uses 1 with a warning |
+| Annualisation | Off by default. With `annualize=True` variances are multiplied by $\mathrm{af}$ inferred from the index, so volatilities scale by $\sqrt{\mathrm{af}}$; a bare ndarray uses 1 with a warning |
 | Mean adjustment | `MeanAdjType.NONE` by default: second moments about zero. `EWMA` and `EXPANDING` are point in time; `INSAMPLE` is full sample |
 | Timing | An estimate dated $t$ uses rows up to and including $t$ and applies from $t+1$. The seeds `InitType.MEAN` and `InitType.VAR` use the full sample; no default uses them |
 | Output units | Per period in the units of the input: $x$ for a mean or volatility, $x^2$ for a variance; betas and correlations are dimensionless |
@@ -328,7 +328,7 @@ was exactly zero, a genuine zero covariance included, as missing.
 
 $$
 v_t=\lambda v_{t-1}+(1-\lambda)\tilde x_t^2,\qquad
-\hat\sigma_t=\sqrt{\mathrm{AN}\,\max\big(v_t,\underline v_t\big)} .
+\hat\sigma_t=\sqrt{\mathrm{af}\,\max\big(v_t,\underline v_t\big)} .
 $$
 
 `compute_ewm_vol` applies the steps in this order: mean adjustment, squaring, seeding (with `X0`,
@@ -337,10 +337,10 @@ and the square root (`apply_sqrt=False` returns the variance). An explicit `init
 seed $v_{-1}$ before the first observation, so $v_{t_0}=\lambda v_{-1}+(1-\lambda)\tilde x_{t_0}^2$.
 
 - **Annualisation.** It applies when `annualize=True` or `annualization_factor` is given. For
-  pandas input $\mathrm{AN}$ is inferred from the index by
+  pandas input $\mathrm{af}$ is inferred from the index by
   `qis.infer_annualisation_factor_from_df`, which returns 12 for month-ends and 252 for business
   days, and falls back to 252 with a warning when no frequency can be inferred. A bare ndarray
-  has no index and uses $\mathrm{AN}=1$ with a warning. Otherwise $\mathrm{AN}=1$.
+  has no index and uses $\mathrm{af}=1$ with a warning. Otherwise $\mathrm{af}=1$.
 - **Floor.** With `vol_floor_quantile` $=\gamma$, $\underline v_t$ is the trailing rolling
   $\gamma$-quantile of $v$ over `vol_floor_quantile_roll_period` rows (default 1300, five years of
   260 days), with at least 20% of the window present and the `'lower'` interpolation. The floor
@@ -659,7 +659,7 @@ modified sequence: `FFILL` holds the estimate at a gap and pairs each observatio
 previous *observed* ones, the estimator on the observed rows; `DEFLATED_FFILL` makes the gap a
 zero observation; `ZERO_FILL` and `NAN_FILL` restart the estimator after the gap, `NAN_FILL`
 reporting the gap as missing. The second output is the ratio $v^{\mathrm{NW}}_t/v_t$, missing
-where $v_t$ is not positive. Annualisation multiplies $v^{\mathrm{NW}}_t$ by $\mathrm{AN}$, and
+where $v_t$ is not positive. Annualisation multiplies $v^{\mathrm{NW}}_t$ by $\mathrm{af}$, and
 the square root is taken last. `compute_ewm_covar_newey_west` is the matrix analogue, with the
 same factor $\lambda^{k/2}$, and is positive semidefinite for complete data and
 `DEFLATED_FFILL` gaps by the same argument applied to $a^{\top}x_s$.
@@ -676,26 +676,26 @@ $\lambda=0.94$ relative to that estimator.
 ### EWM Sharpe ratios
 
 `compute_ewm_sharpe(returns, span=260, norm_type=1)` fills missing returns with zero, infers
-$\mathrm{AN}$ from the index and runs $m_t$ and a second-moment recursion from zero seeds, the
+$\mathrm{af}$ from the index and runs $m_t$ and a second-moment recursion from zero seeds, the
 states before row 0, so the first return enters with weight $1-\lambda$ (before this release it
 was discarded). With `initial_sharpes` $=\mathrm{SR}_0$ the seeds are instead a prior with 10%
-annual volatility, $m_{-1}=0.1\,\mathrm{SR}_0/\mathrm{AN}$ and $v_{-1}=0.01/\mathrm{AN}$.
+annual volatility, $m_{-1}=0.1\,\mathrm{SR}_0/\mathrm{af}$ and $v_{-1}=0.01/\mathrm{af}$.
 
 | `norm_type` | Output $\mathrm{SR}^{(n)}_t$ | Reading |
 |---|---|---|
-| 0 | $\mathrm{AN}\,m_t$ | Annualised EWM mean return, not a ratio |
-| 1 (default) | $\sqrt{\mathrm{AN}}\,m_t\big/\sqrt{\mathcal{E}_\lambda(x^2)_t}$ | Mean over root mean square |
-| 2 | $\sqrt{\mathrm{AN}}\,m_t\big/\sqrt{\mathcal{E}_\lambda\big((x-m)^2\big)_t}$ | Mean over the root EWM of squared deviations from the running mean $m_s$ |
+| 0 | $\mathrm{af}\,m_t$ | Annualised EWM mean return, not a ratio |
+| 1 (default) | $\sqrt{\mathrm{af}}\,m_t\big/\sqrt{\mathcal{E}_\lambda(x^2)_t}$ | Mean over root mean square |
+| 2 | $\sqrt{\mathrm{af}}\,m_t\big/\sqrt{\mathcal{E}_\lambda\big((x-m)^2\big)_t}$ | Mean over the root EWM of squared deviations from the running mean $m_s$ |
 
 Norms 1 and 2 are missing where the denominator is zero, which happens only while every return
 so far is zero. Norm 1 divides by the root mean square, the second moment about zero of the
 `MeanAdjType.NONE` convention; norm 2 divides by the EWM deviation from the running mean.
 
 **Proposition (EWM Sharpe biases).** With zero seeds,
-$\lvert\mathrm{SR}^{(1)}_t\rvert\le\sqrt{\mathrm{AN}}$. For IID returns with per-period Sharpe
+$\lvert\mathrm{SR}^{(1)}_t\rvert\le\sqrt{\mathrm{af}}$. For IID returns with per-period Sharpe
 ratio $s=\mu/\sigma$, the ratio of stationary expectations is
-$\sqrt{\mathrm{AN}}\,s/\sqrt{1+s^2}$ for norm 1 and
-$\sqrt{\mathrm{AN}}\,s\,\sqrt{N(N+1)}/(N-1)$ for norm 2.
+$\sqrt{\mathrm{af}}\,s/\sqrt{1+s^2}$ for norm 1 and
+$\sqrt{\mathrm{af}}\,s\,\sqrt{N(N+1)}/(N-1)$ for norm 2.
 
 **Proof.** The weights of $m_t$ sum to $1-\lambda^{t+1}\le 1$, so by Cauchy–Schwarz
 $m_t^2\le\mathcal{E}_\lambda(x^2)_t$. The stationary expectations are $\mathbb{E}m_t=\mu$ and
@@ -703,7 +703,7 @@ $\mathbb{E}x^2=\mu^2+\sigma^2$, which gives norm 1; for norm 2 use the shrinkage
 $\mathbb{E}(x_t-m_t)^2=\sigma^2(N-1)^2/(N(N+1))$. $\square$
 
 Norm 1 compresses the annualised Sharpe ratio $\mathrm{SR}$ by the factor
-$1/\sqrt{1+\mathrm{SR}^2/\mathrm{AN}}$: by 4% for $\mathrm{SR}=1$ on monthly data and by 0.2%
+$1/\sqrt{1+\mathrm{SR}^2/\mathrm{af}}$: by 4% for $\mathrm{SR}=1$ on monthly data and by 0.2%
 on daily data. Norm 2 inflates it by 4.3% at $N=36$ and 0.6% at $N=260$. Both statements are
 about ratios of expectations; the ratio of two noisy EWMs has additional small-sample bias.
 `compute_ewm_sharpe_from_prices` resamples prices to `freq` (default `'QE'`), takes log returns
@@ -844,7 +844,7 @@ The third block uses 119 month-end simple returns (February 2015 to December 202
 synthetic US equity and Treasury series. `compute_ewm` with span 36 equals pandas
 `ewm(span=36, adjust=False)`, and the annualised `compute_ewm_vol` equals
 $\sqrt{12\,v_t}$ from an independent loop seeded with $x_0^2$. The index is month-end, so qis
-infers $\mathrm{AN}=12$. The last EWM volatilities are 19.3% for equities and 5.9% for
+infers $\mathrm{af}=12$. The last EWM volatilities are 19.3% for equities and 5.9% for
 Treasuries, against full-sample volatilities of 18.5% and 5.8%. With the leading missing row that
 `qis.to_returns` keeps by default, the first volatility is the absolute first return, and the
 rest of the path is unchanged. `InitType.VAR` seeds the variance with the sample variance of the
@@ -1106,7 +1106,7 @@ assert np.isnan(qis.filter_outliers(shocked, qis.OutlierPolicy(std_ewm_ceil=pres
 | EWM recursion (numba, ndarray only) | $m_t=\lambda m_{t-1}+(1-\lambda)x_t$, seed before the first observation | `qis.ewm_recursion(a, init_value, span, ewm_lambda, is_unit_vol_scaling, nan_backfill)` |
 | EWM mean | the recursion with `InitType` seed | `qis.compute_ewm(data, span, ewm_lambda=0.94, init_type=InitType.X0)` |
 | Unit-variance EWM | $\sqrt{N}\,m_t$ | `qis.compute_ewm(..., is_unit_vol_scaling=True)` |
-| EWM volatility | $\sqrt{\mathrm{AN}\max(v_t,\underline v_t)}$ | `qis.compute_ewm_vol(data, span, mean_adj_type, annualize, vol_floor_quantile, warmup_period)` |
+| EWM volatility | $\sqrt{\mathrm{af}\max(v_t,\underline v_t)}$ | `qis.compute_ewm_vol(data, span, mean_adj_type, annualize, vol_floor_quantile, warmup_period)` |
 | Newey–West EWM volatility | $v_t+\sum_k(1-k/(q+1))\,2\lambda^{k/2}c_{k,t}$ | `qis.compute_ewm_newey_west_vol(data, num_lags=2)`, second output the ratio to $v_t$ |
 | Newey–West EWM covariance | $\hat\Sigma_{T-1}+\sum_k(1-k/(q+1))\lambda^{k/2}(C_k+C_k^{\top})$ | `qis.compute_ewm_covar_newey_west(a, num_lags=2, nan_backfill=NanBackfill.DEFLATED_FFILL)` |
 | Covariance at the last date | $\hat\Sigma_{T-1}$ | `qis.compute_ewm_covar(a, span, covar0, is_corr, nan_backfill=NanBackfill.DEFLATED_FFILL)` |
@@ -1119,7 +1119,7 @@ assert np.isnan(qis.filter_outliers(shocked, qis.OutlierPolicy(std_ewm_ceil=pres
 | Lagged cross dependence | CORR or BETA of $h$-row sums | `qis.ewm_xy_convolution(returns, freq, signals, convolution_type)` |
 | Two-span filter | $\kappa^{-1}\sum_k(\lambda_L^k-\lambda_S^k)x_{t-k}$ | `qis.compute_ewm_long_short_filter(data, long_span=63, short_span=5, warmup_period=21)`; kernel `qis.compute_ewm_long_short` |
 | Unit-variance normalised signal | $\eta\sqrt{N}\,\mathcal{E}_\lambda(\tilde x/\hat\sigma)_t$, $\eta=\sqrt{1+\lambda}$ under EWMA demeaning | `qis.compute_ewm_std1_norm(data, span=260, is_demean=True)` |
-| EWM Sharpe ratio | $\mathrm{AN}\,m_t$ or $\sqrt{\mathrm{AN}}\,m_t/\sqrt{\cdot}$ | `qis.compute_ewm_sharpe(returns, span=260, norm_type=1)` |
+| EWM Sharpe ratio | $\mathrm{af}\,m_t$ or $\sqrt{\mathrm{af}}\,m_t/\sqrt{\cdot}$ | `qis.compute_ewm_sharpe(returns, span=260, norm_type=1)` |
 | EWM score | $(x_t-m_t)/\max(\hat\sigma_t,c)$, $c$ per column | `qis.compute_ewm_score(data, ewm_lambda=0.94, is_clip=True, clip_quantile=0.16)` |
 | Outlier filter | policy steps, then optional EWM-mean fill | `qis.filter_outliers(data, qis.OutlierPolicy(...))` |
 | Score winsorising | full-sample score quantiles | `qis.ewm_insample_winsorising(data, quantile_cut=0.025)` |

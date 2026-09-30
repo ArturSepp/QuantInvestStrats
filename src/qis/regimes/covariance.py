@@ -12,6 +12,15 @@ with ``m_s`` and ``S_s`` the benchmark's regime mean and second moment. The benc
 an asset with unit betas and zero residual, and equal regime betas reduce the expression to the
 single-factor covariance. ``compute_gaussian_regime_moments`` supplies ``m_s`` and ``S_s`` under a
 Gaussian benchmark from one volatility, the zero-estimation variant of these inputs.
+``compute_sample_regime_moments`` supplies their empirical counterparts, with the empirical regime
+frequencies, and ``compute_regime_mixture_covar_from_sample`` assembles the covariance of a
+classified panel in one call: it estimates or takes the regime betas, converts ``idio_vol`` to
+per-period variances and inserts the benchmark row.
+
+The expression is equation (10) of Sepp and Kastenholz (2026), derived in their Appendix B. The
+residuals are uncorrelated across assets by construction, which overstates diversification when
+overlays share a strategy: the paper reads the mixture covariance as a weighting engine for the
+allocation and not as a risk forecast.
 """
 # packages
 import numpy as np
@@ -33,6 +42,10 @@ def compute_regime_mixture_covar(betas: pd.DataFrame,
                                  regime_probs: Optional[pd.Series] = None
                                  ) -> pd.DataFrame:
     """Annualised regime-mixture covariance by the law of total covariance.
+
+    Equation (10) of Sepp and Kastenholz (2026) from caller-supplied inputs. The default regime
+    probabilities are the partition's population probabilities; with sample moments, pass the
+    empirical frequencies, as ``compute_regime_mixture_covar_from_sample`` does.
 
     Args:
         betas: regime betas, assets in rows and regimes in columns; include the benchmark with
@@ -118,24 +131,27 @@ def compute_sample_regime_moments(sampled_returns_with_regime_id: pd.DataFrame,
                                   benchmark: str,
                                   regime_column: str = REGIME_COLUMN
                                   ) -> pd.DataFrame:
-    """Per-period empirical benchmark moments on one supplied classification.
+    """Per-period empirical regime moments of the benchmark on a supplied classification.
 
-    Unclassified observations are excluded. Every classified benchmark return must
-    be finite, and every declared regime must be populated. Means and second moments
-    are equal-weighted population moments (ddof=0), not sample variances. This function
-    neither classifies nor resamples returns and does not infer a decision date.
+    The empirical counterpart of ``compute_gaussian_regime_moments``. Unclassified periods are
+    excluded; every classified benchmark return must be finite and every regime occupied. The means
+    and second moments are equal-weighted population moments (``ddof=0``), not sample variances.
+    The function neither classifies nor resamples, and it uses every period it is given: a rolling
+    caller passes only the periods known at the decision date.
 
     Args:
-        sampled_returns_with_regime_id: periodic simple returns and string regime labels
-        benchmark: benchmark return column
-        regime_column: supplied classification column
+        sampled_returns_with_regime_id: periodic simple returns with a regime column of string
+            labels
+        benchmark: name of the benchmark column
+        regime_column: name of the regime column
 
     Returns:
-        Regimes in bucket order, with probability, mean and second_moment columns.
-        Probabilities are empirical frequencies of the classified observations.
+        regimes in rows, in bucket order, and the columns ``probability``, the empirical frequency
+        of the classified periods, ``mean`` and ``second_moment``
 
     Raises:
-        ValueError: if columns, labels, classified benchmark returns or regimes are invalid
+        ValueError: if the columns, the labels, the classified benchmark returns or the regimes
+            are invalid
     """
     data = _sample_regime_data(sampled_returns_with_regime_id, benchmark, regime_column)
     regimes = get_ordered_regimes(data[regime_column])
@@ -155,37 +171,38 @@ def compute_regime_mixture_covar_from_sample(
         betas: Optional[pd.DataFrame] = None,
         regime_column: str = REGIME_COLUMN,
 ) -> pd.DataFrame:
-    """Annualised regime-mixture covariance from one complete classified sample.
+    """Annualised regime-mixture covariance of one complete classified panel.
 
-    Delegates estimation to compute_regime_betas and covariance assembly to
-    compute_regime_mixture_covar. Empirical probabilities and population benchmark
-    moments use all classified observations. Ragged classified panels are rejected:
-    choose a common sample explicitly before classifying it. The existing residual
-    standard deviation convention (ddof=1) is retained. Residuals are uncorrelated
-    across assets and with the benchmark; fitted regime intercepts are discarded.
+    Equation (10) of Sepp and Kastenholz (2026) in one call. The betas come from
+    ``compute_regime_betas`` unless a frozen sheet is supplied, and ``compute_regime_mixture_covar``
+    assembles the covariance with the empirical regime frequencies and the population benchmark
+    moments of ``compute_sample_regime_moments``, all over the classified periods. The residual
+    volatilities keep the sample convention of ``compute_regime_betas`` (``ddof=1``). Residuals are
+    uncorrelated across assets and with the benchmark, and the fitted regime intercepts are
+    discarded. A ragged panel is rejected: choose the common sample before classifying it.
 
     Args:
-        sampled_returns_with_regime_id: periodic simple returns with supplied regimes;
-            unclassified rows are excluded, all other asset returns must be finite;
-            regime label 'total' (case-insensitive) is reserved by beta_total
-        benchmark: benchmark column, inserted first with unit betas and zero residual
-        af: finite positive annualisation factor for the input return frequency
-        betas: optional frozen compute_regime_betas-format sheet, indexed by exactly
-            the non-benchmark assets, with beta_<lowercase regime> and idio_vol columns.
-            idio_vol is annualised using the same af, finite and nonnegative. Additional
-            statistics columns are ignored. None estimates on this sample, requiring
-            24 periods and at least two distinct benchmark returns within every regime.
-        regime_column: supplied classification column
+        sampled_returns_with_regime_id: periodic simple returns with a regime column;
+            unclassified periods are excluded and every other asset return must be finite. The
+            regime label ``total``, in any case, is reserved by the ``beta_total`` column
+        benchmark: name of the benchmark column, inserted first with unit betas and zero residual
+        af: annualisation factor of the periodic returns, finite and positive
+        betas: optional frozen sheet in the format of ``compute_regime_betas``, indexed by
+            exactly the non-benchmark assets, with ``beta_<regime id in lower case>`` columns and
+            a finite, non-negative ``idio_vol`` annualised with the same ``af``; other columns
+            are ignored. None estimates the betas on this panel, which needs 24 periods and two
+            distinct benchmark returns in every regime
+        regime_column: name of the regime column
 
     Returns:
-        Annual covariance, benchmark first followed by the panel's other asset columns.
-        Full-sample inputs give a descriptive estimate; rolling callers must supply
-        only observations available at their decision date. Frozen betas' estimation
-        dates and annualisation provenance remain the caller's responsibility.
+        the annualised covariance, the benchmark first and then the other assets in the panel's
+        column order. On a full sample it is descriptive; a rolling caller passes only the
+        periods, and frozen betas, known at the decision date, and answers for the estimation
+        dates and the annualisation of frozen betas
 
     Raises:
-        ValueError: if sample, annualisation, regression identification or frozen inputs
-            violate the contract
+        ValueError: if the panel, ``af``, the identification of a regression or the frozen betas
+            are invalid
     """
     if not np.isfinite(af) or af <= 0.0:
         raise ValueError("af must be finite and positive")

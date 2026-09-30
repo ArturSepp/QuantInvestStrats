@@ -247,7 +247,7 @@ def regime_sharpe(params: dict):
         fig, title='Where the Sharpe ratio is earned',
         subtitle=f'Synthetic universe | quarterly returns | regimes by {benchmark} quantiles '
                  '16% / 84% | 2005-2025',
-        footer='Bars: sqrt(AN) p_g m_g / s(r) for each regime under SharpeConvention.ARITHMETIC. '
+        footer='Bars: sqrt(af) p_g m_g / s(r) for each regime under SharpeConvention.ARITHMETIC. '
                'Diamonds: their\nsum, equal to the arithmetic Sharpe ratio of the same quarterly '
                'returns.')
     return fig, table, check, {'totals': {k: float(v) for k, v in table['Total'].items()}}
@@ -357,7 +357,7 @@ def benchmark_regression(params: dict):
         subtitle='Synthetic universe | monthly simple returns | 2005-2025',
         footer='Line: the OLS fit reported as BETA and ALPHA by '
                'qis.compute_ra_perf_table_with_benchmark\nwith freq_reg=\'ME\'. Alpha is '
-               'annualised linearly as AN x alpha.')
+               'annualised linearly as af x alpha.')
     return fig, table, check, {'beta': beta, 'alpha_annualised': 12 * alpha, 'r2': r2}
 
 
@@ -511,8 +511,8 @@ def convexity_premium(params: dict):
     handbook_exhibit(
         fig, title='Bear contributions against their Gaussian null',
         subtitle=f'Synthetic universe | quarterly returns {params["premium_start"][:4]}-2025 | '
-                 f'regimes by {benchmark} quantiles 16% / 84% | AN = 4',
-        footer='Bars: sqrt(AN) p_g m_g / s(r) from qis.regimes.compute_regime_premium_table; '
+                 f'regimes by {benchmark} quantiles 16% / 84% | af = 4',
+        footer='Bars: sqrt(af) p_g m_g / s(r) from qis.regimes.compute_regime_premium_table; '
                'tick: their sum, the Sharpe ratio.\nDiamond: the null 0.16 SR - kappa rho of the '
                f'Bear contribution, kappa = {kappa:.3f}; its gap to the Bear bar is the '
                'convexity premium.')

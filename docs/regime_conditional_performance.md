@@ -29,8 +29,8 @@ A full-sample Sharpe ratio says how much return a strategy earned per unit of ri
 say *when* the return was earned. Two strategies with the same Sharpe ratio can earn it in
 opposite states of the world: one in the quarters in which equities fall, the other in quiet
 quarters, giving part of it back when equities fall.
-[Sepp (2019)](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/)
-uses this distinction to separate the *crisis beta* of trend-following managers from the
+[Sepp and Dézeraud (2019)](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/)
+use this distinction to separate the *crisis beta* of trend-following managers from the
 *risk-premia alpha* of alternative risk premia, and the regime decomposition of this chapter is
 the tool that makes the distinction measurable.
 
@@ -57,7 +57,7 @@ performance and does not forecast regimes.
 |---|---|
 | Return basis | Simple total returns on the regime grid (`ReturnTypes.RELATIVE`); the `LOG` convention uses $\log(1+r)$ of the same returns; no cash is deducted |
 | Sampling grid | Classifier `freq`, default quarter-ends `QE`, with a stub period at each end of an off-grid history; table volatility on `PerfParams.freq_vol`, default `ME` |
-| Annualisation | $\mathrm{AN}$ of the regime grid (4 for `QE`) for regime contributions: $\mathrm{AN}$ for means, $\sqrt{\mathrm{AN}}$ for Sharpe ratios; the per-annum branch divides by the table volatility annualised on `freq_vol` |
+| Annualisation | $\mathrm{af}$ of the regime grid (4 for `QE`) for regime contributions: $\mathrm{af}$ for means, $\sqrt{\mathrm{af}}$ for Sharpe ratios; the per-annum branch divides by the table volatility annualised on `freq_vol` |
 | Mean adjustment | Conditional means are raw regime averages; the Sharpe denominator $s(r)$ is the unconditional, demeaned standard deviation with `ddof=1` |
 | Timing | Descriptive and full sample: quantile edges use the whole history, and period $(t-1,t]$ is labelled by the benchmark return over the same period |
 | Output units | Average and P.a. columns in decimals; Sharpe contributions dimensionless and additive to a total |
@@ -75,11 +75,11 @@ performance and does not forecast regimes.
 | $p_g$ | Regime frequency | $T_g/T$, shared by all assets |
 | $m_g$, $m^{\ell}_g$ | Mean simple and log return of the asset in regime $g$ | Periodic, decimal |
 | $\mathrm{SR}_g$, $\mathrm{SR}^{\ell}_g$ | Arithmetic and log Sharpe contribution of regime $g$ | Dimensionless |
-| $x_g$ | Linear per-annum contribution $\mathrm{AN}\,p_g m_g$ | Decimal per year |
+| $x_g$ | Linear per-annum contribution $\mathrm{af}\,p_g m_g$ | Decimal per year |
 | $C_g$, $\tilde C_g$ | Compounded and patched per-annum regime return | Decimal per year |
 | $\Delta$ | Per-annum residual $R_{\mathrm{pa}}-\sum_g C_g$ | Decimal per year |
 | $\mathrm{SR}^{\mathrm{pa}}_g$ | Per-annum Sharpe contribution $\tilde C_g/\hat\sigma_{\mathrm{ann}}$ | Dimensionless |
-| $\hat\sigma_{\mathrm{ann}}$, $v_t$ | Table volatility `PerfStat.VOL` and the returns it uses | $v_t$ log by default, on `freq_vol` with factor $\mathrm{AN}_{\mathrm{vol}}$ |
+| $\hat\sigma_{\mathrm{ann}}$, $v_t$ | Table volatility `PerfStat.VOL` and the returns it uses | $v_t$ log by default, on `freq_vol` with factor $\mathrm{af}_{\mathrm{vol}}$ |
 | $\bar\varepsilon_g$ | Mean OLS residual in regime $g$ | Decimal per period |
 | $\sigma_g$ | Within-regime standard deviation of $r_t$ | Decimal per period |
 | $\mathcal{A}$, $\theta_{\mathcal{A}}$ | Conditioning event and its variance ratio | $\theta_{\mathcal{A}}=\operatorname{Var}(r_b\mid\mathcal{A})/\operatorname{Var}(r_b)$ |
@@ -196,17 +196,17 @@ computed by `qis.compute_mean_freq_regimes` with a pandas `groupby` on the regim
 **Definition.** The arithmetic Sharpe contribution of regime $g$ is
 
 $$
-\mathrm{SR}_g=\frac{\sqrt{\mathrm{AN}}\;p_g\,m_g}{s(r)},
+\mathrm{SR}_g=\frac{\sqrt{\mathrm{af}}\;p_g\,m_g}{s(r)},
 $$
 
 where $s(r)$ is the unconditional sample standard deviation of the asset's returns on the
-regime grid and $\mathrm{AN}$ is the annualisation factor of that grid.
+regime grid and $\mathrm{af}$ is the annualisation factor of that grid.
 
-**Proposition (additivity, Sepp 2019).** If the asset is observed on every classified date and
+**Proposition (additivity, Sepp and Dézeraud 2019).** If the asset is observed on every classified date and
 $s(r)$ is computed on those dates, then
 
 $$
-\sum_{g}\mathrm{SR}_g=\frac{\sqrt{\mathrm{AN}}\;\bar r}{s(r)},
+\sum_{g}\mathrm{SR}_g=\frac{\sqrt{\mathrm{af}}\;\bar r}{s(r)},
 $$
 
 the arithmetic Sharpe ratio of the asset's returns on the regime grid.
@@ -218,14 +218,14 @@ measure. The denominator is common to all terms. $\square$
 
 The decomposition splits the numerator only. The denominator is the full-sample standard
 deviation, so $\mathrm{SR}_g$ is a *contribution* to the Sharpe ratio, not the Sharpe ratio
-*within* regime $g$, which would be $\sqrt{\mathrm{AN}}\,m_g/\sigma_g$ and would not add up to
+*within* regime $g$, which would be $\sqrt{\mathrm{af}}\,m_g/\sigma_g$ and would not add up to
 anything. The same argument on log returns gives the log decomposition.
 
 **Proposition (log decomposition).** With $m^{\ell}_g$ the mean of $\ell_t=\log(1+r_t)$ in
 regime $g$,
 
 $$
-\sum_g \mathrm{SR}^{\ell}_g=\sum_g\frac{\sqrt{\mathrm{AN}}\;p_g\,m^{\ell}_g}{s(\ell)}=\frac{\sqrt{\mathrm{AN}}\;\bar\ell}{s(\ell)} .
+\sum_g \mathrm{SR}^{\ell}_g=\sum_g\frac{\sqrt{\mathrm{af}}\;p_g\,m^{\ell}_g}{s(\ell)}=\frac{\sqrt{\mathrm{af}}\;\bar\ell}{s(\ell)} .
 $$
 
 **Proof.** Apply the previous proof to $\ell_t$. The labels do not change, because
@@ -264,7 +264,7 @@ per-annum return, and divides them by the table volatility.
 **Definition.** Let $R_{\mathrm{pa}}$ be the table's `PerfStat.PA_RETURN`: the compound return
 $(P_{\mathrm{end}}/P_{\mathrm{start}})^{1/Y}-1$ between the asset's native first and last
 observations, with $Y$ in years of 365.25 days, or the total return when $Y\le 1$. With
-$x_g=\mathrm{AN}\,p_g m_g$ built from mean *simple* returns,
+$x_g=\mathrm{af}\,p_g m_g$ built from mean *simple* returns,
 
 $$
 \begin{aligned}
@@ -275,7 +275,7 @@ C_g&=e^{x_g}-1,
 \qquad
 \mathrm{SR}^{\mathrm{pa}}_g=\frac{\tilde C_g}{\hat\sigma_{\mathrm{ann}}},
 \qquad
-\hat\sigma_{\mathrm{ann}}=\sqrt{\mathrm{AN}_{\mathrm{vol}}}\;s(v).
+\hat\sigma_{\mathrm{ann}}=\sqrt{\mathrm{af}_{\mathrm{vol}}}\;s(v).
 \end{aligned}
 $$
 
@@ -294,19 +294,19 @@ described an equal split, $\tilde C_g=C_g+\Delta/G$, which also restores the tot
 what the code computes.
 
 **Proposition (anatomy of the residual).** Suppose the native endpoints lie on the regime grid
-and $T/Y=\mathrm{AN}$, and write $X=\sum_g x_g=\mathrm{AN}\,\bar r$. Then
+and $T/Y=\mathrm{af}$, and write $X=\sum_g x_g=\mathrm{af}\,\bar r$. Then
 
 $$
-\Delta=\big(e^{\mathrm{AN}\,\bar\ell}-e^{X}\big)+\sum_{g<h}x_g\,x_h+O\big(\max_g\lvert x_g\rvert^3\big).
+\Delta=\big(e^{\mathrm{af}\,\bar\ell}-e^{X}\big)+\sum_{g<h}x_g\,x_h+O\big(\max_g\lvert x_g\rvert^3\big).
 $$
 
-**Proof.** $\log(1+R_{\mathrm{pa}})=Y^{-1}\sum_t\ell_t=\mathrm{AN}\,\bar\ell$, so
-$R_{\mathrm{pa}}-(e^{X}-1)=e^{\mathrm{AN}\bar\ell}-e^{X}$. Expanding the exponentials to second
+**Proof.** $\log(1+R_{\mathrm{pa}})=Y^{-1}\sum_t\ell_t=\mathrm{af}\,\bar\ell$, so
+$R_{\mathrm{pa}}-(e^{X}-1)=e^{\mathrm{af}\bar\ell}-e^{X}$. Expanding the exponentials to second
 order, $(e^{X}-1)-\sum_g(e^{x_g}-1)=\tfrac12\big(X^2-\sum_g x_g^2\big)+O(\lvert x\rvert^3)
 =\sum_{g<h}x_g x_h+O(\lvert x\rvert^3)$. Add the two pieces. $\square$
 
 The first term is the volatility drag: $\ell_t\approx r_t-r_t^2/2$, so it is close to
-$-e^{X}\,\mathrm{AN}\,T^{-1}\sum_t r_t^2/2$, negative and of the order of half the annualised
+$-e^{X}\,\mathrm{af}\,T^{-1}\sum_t r_t^2/2$, negative and of the order of half the annualised
 variance. The second is the sum of cross-products of the linear contributions; it is negative
 when the product of a negative Bear and a positive Bull contribution dominates, as it does for
 an equity-like benchmark. For the benchmark of the worked example,
@@ -314,9 +314,9 @@ $\Delta=-2.80\%$, of which $-1.90\%$ is drag and $-0.90\%$ cross-products.
 
 > **Insight.** The drag accrues where squared returns are large, which is the Bear and Bull
 > tails, but the $p_g$ allocation charges the residual by time spent, so the Normal regime
-> absorbs 65% of it. In the log decomposition each term $\mathrm{AN}\,p_g m^{\ell}_g$ carries
+> absorbs 65% of it. In the log decomposition each term $\mathrm{af}\,p_g m^{\ell}_g$ carries
 > the drag of its own periods, because $\ell_t\approx r_t-r_t^2/2$ period by period, and the
-> terms add up to $\mathrm{AN}\,\bar\ell=\log(1+R_{\mathrm{pa}})$. In the worked example 78% of
+> terms add up to $\mathrm{af}\,\bar\ell=\log(1+R_{\mathrm{pa}})$. In the worked example 78% of
 > the benchmark's drag accrues in the 35% of quarters labelled Bear or Bull, and its Normal
 > contribution is 1.1% under the $p_g$ patch against 2.5%, in log units, under the log
 > decomposition.
@@ -343,7 +343,7 @@ m_g=\hat\alpha+\hat\beta\,m_{b,g}+\bar\varepsilon_g,
 \qquad
 \sum_g p_g\,\bar\varepsilon_g=0,
 \qquad
-\mathrm{SR}_g=\frac{\sqrt{\mathrm{AN}}\,p_g\big(\hat\alpha+\hat\beta\,m_{b,g}+\bar\varepsilon_g\big)}{s(r)},
+\mathrm{SR}_g=\frac{\sqrt{\mathrm{af}}\,p_g\big(\hat\alpha+\hat\beta\,m_{b,g}+\bar\varepsilon_g\big)}{s(r)},
 $$
 
 where $m_{b,g}$ is the benchmark's own conditional mean.
@@ -362,15 +362,15 @@ $\bar\varepsilon_{\mathrm{Normal}}<0$.
 ### Sampling error of a contribution
 
 **Proposition.** Condition on the labels, suppose the returns in regime $g$ are independent with
-variance $\sigma_g^2$, treat $s(r)$ as fixed, and let the sample span $Y=T/\mathrm{AN}$ years.
+variance $\sigma_g^2$, treat $s(r)$ as fixed, and let the sample span $Y=T/\mathrm{af}$ years.
 Then
 
 $$
-\operatorname{se}(\mathrm{SR}_g)=\frac{\sqrt{\mathrm{AN}}\,p_g\,\sigma_g}{\sqrt{T_g}\;s(r)}=\sqrt{\frac{p_g}{Y}}\;\frac{\sigma_g}{s(r)} .
+\operatorname{se}(\mathrm{SR}_g)=\frac{\sqrt{\mathrm{af}}\,p_g\,\sigma_g}{\sqrt{T_g}\;s(r)}=\sqrt{\frac{p_g}{Y}}\;\frac{\sigma_g}{s(r)} .
 $$
 
 **Proof.** $\operatorname{Var}(m_g)=\sigma_g^2/T_g$, and $\mathrm{SR}_g$ is $m_g$ times the
-constant $\sqrt{\mathrm{AN}}\,p_g/s(r)$. Substitute $T_g=p_gT=p_g\,\mathrm{AN}\,Y$. $\square$
+constant $\sqrt{\mathrm{af}}\,p_g/s(r)$. Substitute $T_g=p_gT=p_g\,\mathrm{af}\,Y$. $\square$
 
 For a Bear regime with $p_g=0.175$ over ten years, $\sqrt{p_g/Y}=0.13$: a Bear contribution
 carries a standard error of about 0.13 times the ratio of within-regime to total volatility.
@@ -486,7 +486,7 @@ np.testing.assert_allclose([alpha, beta], [0.0144, -0.2758], atol=5e-5)
 np.testing.assert_allclose(residual_means, [-0.0017, 0.0027, -0.0082], atol=5e-5)
 np.testing.assert_allclose((freqs * residual_means).sum(), 0.0, atol=1e-15)
 
-# conditional standard errors of the contributions: sqrt(AN) p_g sigma_g / (sqrt(T_g) s(r))
+# conditional standard errors of the contributions: sqrt(af) p_g sigma_g / (sqrt(T_g) s(r))
 within_std = q_returns['Hedge'].groupby(labels, observed=False).std()
 se = 2.0 * freqs * within_std / (np.sqrt(40 * freqs) * q_returns['Hedge'].std())
 np.testing.assert_allclose(se, np.sqrt(freqs / 10.0) * within_std / q_returns['Hedge'].std())
@@ -550,7 +550,7 @@ log_means_b = pd.Series(log_q[:, 0], index=q_returns.index).groupby(labels, obse
 log_contrib = 4.0 * freqs * log_means_b
 np.testing.assert_allclose(log_contrib, [-0.0945, 0.0249, 0.0996], atol=5e-5)
 np.testing.assert_allclose(log_contrib.sum(), np.log1p(r_pa[0]), atol=1e-4)
-log_drag = log_contrib.to_numpy() - x[0]  # AN p_g (m_g^log - m_g)
+log_drag = log_contrib.to_numpy() - x[0]  # af p_g (m_g^log - m_g)
 np.testing.assert_allclose((log_drag[0] + log_drag[2]) / log_drag.sum(), 0.78, atol=5e-3)
 ```
 
@@ -658,7 +658,7 @@ Implementation contracts that affect the numbers:
   returns only the table. The classifier's `compute_regimes_pa_perf_table` classifies, then
   calls `compute_regimes_pa_perf_table_from_sampled_returns` and returns the table together with
   a dictionary keyed by `RegimeData.REGIME_AVG`, `REGIME_PA` and `REGIME_SHARPE`.
-- **Frequency and convention.** $\mathrm{AN}$ is `get_annualization_factor(freq)` of the
+- **Frequency and convention.** $\mathrm{af}$ is `get_annualization_factor(freq)` of the
   classifier's `freq`. The Sharpe convention is `perf_params.sharpe_convention`;
   `perf_params=None` means `SharpeConvention.PA`, and the attached table then infers its
   frequency from the price index.
@@ -702,8 +702,8 @@ Implementation contracts that affect the numbers:
 
 ### Crisis beta and risk-premia alpha
 
-[Sepp (2019)](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/)
-reads the regime profile as a classification of strategies. A strategy whose Bear contribution
+[Sepp and Dézeraud (2019)](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/)
+read the regime profile as a classification of strategies. A strategy whose Bear contribution
 is positive earns part of its Sharpe ratio when the benchmark falls: crisis beta, the profile
 of trend-following managers. A strategy that earns its Sharpe ratio in the Normal regime and
 loses in the Bear regime is paid a premium for bearing crisis risk: risk-premia alpha, the
@@ -813,7 +813,7 @@ regime-switching estimation.
 
 ## References
 
-1. Sepp, A. (2019). Trend-Following CTAs vs Alternative Risk-Premia: Crisis Beta vs Risk-Premia Alpha. *The Hedge Fund Journal*. [Article](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/). Uses the Bear, Normal and Bull decomposition of Sharpe ratios to separate crisis beta from risk-premia alpha.
+1. Sepp, A., and Dézeraud, L. (2019). Trend-Following CTAs vs Alternative Risk-Premia: Crisis Beta vs Risk-Premia Alpha. *The Hedge Fund Journal*, 138, 20–31. [Article](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/). Uses the Bear, Normal and Bull decomposition of Sharpe ratios to separate crisis beta from risk-premia alpha.
 2. Sharpe, W. F. (1994). The Sharpe Ratio. *The Journal of Portfolio Management*, 21(1), 49–58. [Author's copy](https://web.stanford.edu/~wfsharpe/art/sr/SR.htm). The arithmetic Sharpe ratio of periodic returns that the additive decomposition splits.
 3. Lo, A. W. (2002). The Statistics of Sharpe Ratios. *Financial Analysts Journal*, 58(4), 36–52. [DOI: 10.2469/faj.v58.n4.2453](https://doi.org/10.2469/faj.v58.n4.2453). The sampling error of a full-sample Sharpe ratio used as the comparison for regime contributions.
 4. Boyer, B. H., Gibson, M. S., and Loretan, M. (1999). Pitfalls in tests for changes in correlations. Federal Reserve Board, International Finance Discussion Papers 597. [PDF](https://www.federalreserve.gov/pubs/ifdp/1997/597/ifdp597.pdf). The conditioning bias of correlations estimated in subsamples.

@@ -56,7 +56,7 @@ questions:
 |---|---|
 | Return basis | Simple returns (`ReturnTypes.RELATIVE`) unless stated; log, difference and level modes are defined below; excess returns subtract an ACT/365 cash accrual from simple returns |
 | Sampling grid | The input index, or the `freq` grid when given: prices are sampled at `freq` boundaries before differencing |
-| Annualisation | Per-annum returns use $Y$ = days/365.25; cash and fees accrue ACT/365; leverage financing uses the annual rate divided by $\mathrm{AN}$; `compute_sampled_vols` scales by $\sqrt{\mathrm{AN}}$ |
+| Annualisation | Per-annum returns use $Y$ = days/365.25; cash and fees accrue ACT/365; leverage financing uses the annual rate divided by $\mathrm{af}$; `compute_sampled_vols` scales by $\sqrt{\mathrm{af}}$ |
 | Mean adjustment | None in return, NAV, fee and leverage transforms; `estimate_vol` removes the sample mean at 20 or more observations and none below 20 |
 | Timing | A return dated $t$ covers $(t-1,t]$; cash accrued over it, in the excess helpers and in the backtest cash leg alike, uses the rate known on the return date $t-1$, as does leverage financing; backtest carry uses the latest quote at or before $t$; `to_portfolio_returns` lags weights by one row; interpolated returns up to a report date use data up to that date |
 | Output units | Decimal returns; NAVs start at 1 unless `init_value` or `terminal_value` rescales them |
@@ -81,7 +81,7 @@ questions:
 | $f_{\mathrm{man}}$, $f_{\mathrm{perf}}$ | Annual management fee and performance-fee rate | Decimals, e.g. 0.02 and 0.20 |
 | $\chi_t$ | Crystallisation indicator | 1 on a crystallisation date, else 0 |
 | $L$, $E$ | Debt divided by equity; equity | Nonnegative; $L=0.5$ is 1.5x assets/equity |
-| $c_t$ | Financing cost per return period | $y_{(q_{t-1})}/\mathrm{AN}$ |
+| $c_t$ | Financing cost per return period | $y_{(q_{t-1})}/\mathrm{af}$ |
 | $r^{A}_t$, $r^{V}_t$ | Unlevered asset return and levered vehicle return | Simple |
 | $\hat\sigma$ | Output of `estimate_vol` | Per period, not annualised |
 | $\ell^{\mathrm{rep}}_b$, $d_{(b)}$ | Reported log return $b=0,\ldots,K$ and its report date | $\log(1+r)$ of a reported simple return |
@@ -439,7 +439,7 @@ discusses when the inverse is economically meaningful. Both use simple returns. 
 is
 
 $$
-c_t=\frac{y_{(q_{t-1})}}{\mathrm{AN}},
+c_t=\frac{y_{(q_{t-1})}}{\mathrm{af}},
 $$
 
 the rate known at the start of the period: a Series of annual rates is sorted, and the period
@@ -447,15 +447,15 @@ ending on return date $t$ is charged the latest quote dated on or before the pre
 $t-1$. A quote dated on a return date applies from the next period. The first return date takes
 the latest quote dated strictly before it, and is missing when there is none; so is every return
 whose period starts before the first quote. Up to qis 5.30.3 the quote dated on the return date
-itself was used. A scalar `financing_rate` is constant. $\mathrm{AN}$ is
+itself was used. A scalar `financing_rate` is constant. $\mathrm{af}$ is
 `periods_per_year`, or, when it is `None`, the factor inferred from the return index and rounded to
 an integer; an irregular index falls back to 252 with a warning. There is no day count: every
-period costs $y/\mathrm{AN}$ whatever its length. `leverage=0` returns a copy of the input, even
+period costs $y/\mathrm{af}$ whatever its length. `leverage=0` returns a copy of the input, even
 without financing data. The leverage must be a finite nonnegative real and `periods_per_year` a
 positive integer.
 
 **Proposition (lever and de-lever round trip).** For $L\ge0$, the same financing input and the
-same $\mathrm{AN}$, `delever_returns(lever_returns(r))` equals `r` and
+same $\mathrm{af}$, `delever_returns(lever_returns(r))` equals `r` and
 `lever_returns(delever_returns(r))` equals `r` on every date with an available financing quote.
 
 **Proof.** Both helpers compute the same $c_t$ from the same inputs. Then
@@ -463,7 +463,7 @@ $\big((1+L)r_t-Lc_t+Lc_t\big)/(1+L)=r_t$ and
 $(1+L)\big(r_t+Lc_t\big)/(1+L)-Lc_t=r_t$. $\square$
 
 In floating point the round trip is exact to about $10^{-16}$. It fails if the two calls infer
-different $\mathrm{AN}$ values or receive different rate series.
+different $\mathrm{af}$ values or receive different rate series.
 
 **Definition (implied leverage).** `qis.implied_leverage(levered_returns, unlevered_returns)`
 inner-joins the two series, drops dates where either is missing and, if at least 10 joint
@@ -514,8 +514,8 @@ code. $C_{t-1}$ is the backtest cash balance and $V_{t-1}$ its NAV.
 | `qis.backtest_model_portfolio`, `management_fee` | ACT/365 | Constant | $f_{\mathrm{man}}\delta_t V_{t-1}$ deducted from cash |
 | `qis.backtest_model_portfolio`, `instruments_carry` | ACT/365 | Latest quote, no lag | Carry rate times $\delta_t$ on current notional |
 | `qis.compute_net_return_ex_perf_man_fees`, `qis.compute_net_navs_ex_perf_man_fees` | ACT/365 | Constant | $f_{\mathrm{man}}\delta_t$ subtracted from $r_t$ |
-| `qis.lever_returns`, `qis.delever_returns` | Periods per year | $y_{(q_{t-1})}$: known at $t-1$ on the return grid | $y_{(q_{t-1})}/\mathrm{AN}$, independent of period length |
-| `qis.compute_sampled_vols` | $\sqrt{\mathrm{AN}}$ inferred from the return index | None | None |
+| `qis.lever_returns`, `qis.delever_returns` | Periods per year | $y_{(q_{t-1})}$: known at $t-1$ on the return grid | $y_{(q_{t-1})}/\mathrm{af}$, independent of period length |
+| `qis.compute_sampled_vols` | $\sqrt{\mathrm{af}}$ inferred from the return index | None | None |
 | `qis.interpolate_infrequent_returns` | Pivot periods; `annualization_factor` sets no time scale | None | None |
 
 The ACT/365 helpers all go through the internal `qis.utils.df_ops.multiply_df_by_dt`, which aligns
@@ -561,8 +561,8 @@ $\sum_t(x_t-\bar x)^2=(T-1)s(x)^2$. $\square$
 
 `qis.compute_sampled_vols(prices, freq_vol='ME', freq_return=None)` forms returns on the
 `freq_return` grid (the input grid when `None`), splits them into windows ending at each `freq_vol`
-boundary, applies `estimate_vol` to each window and multiplies by $\sqrt{\mathrm{AN}}$, with
-$\mathrm{AN}$ inferred from the return index. Each window is right-closed: it runs from just after
+boundary, applies `estimate_vol` to each window and multiplies by $\sqrt{\mathrm{af}}$, with
+$\mathrm{af}$ inferred from the return index. Each window is right-closed: it runs from just after
 the previous boundary to the current one, so a return dated exactly on a boundary closes the
 window that ends there and is counted once. Business-day returns in monthly windows give 20 to 23
 observations and the demeaned branch, but on an exchange calendar a month with a holiday can have
@@ -645,7 +645,7 @@ arrive: it is point in time as of each report date, though not before it, since 
 return is known only at the end of its interval. Both the bridge variance and the reported-return
 variance are measured per pivot period, so `annualization_factor` sets no time scale and the path
 is the same for every value of it; the bridge volatility per year is
-$\kappa\sqrt{\mathrm{AN}\,\hat v_b}$ with $\mathrm{AN}$ = `annualization_factor`.
+$\kappa\sqrt{\mathrm{af}\,\hat v_b}$ with $\mathrm{af}$ = `annualization_factor`.
 
 qis 5.30.3 and earlier used the standardised pivot return as a level deviation around
 a linear path, with full-sample moments, a scale read in units of `annualization_factor` calendar
@@ -953,10 +953,10 @@ assert abs(daily.dropna().autocorr(1) - 0.03) < 5e-3
 | Excess NAV | $\prod(1+\tilde r)$ | `qis.compute_excess_return_navs`, `qis.get_excess_returns_nav` |
 | Per-annum excess return | $R_{\mathrm{pa}}$ of $\prod(1+\tilde r)$ over the window with known cash | `qis.compute_pa_excess_compounded_returns` |
 | Net-of-fee returns and NAV | The fee recursion | `qis.compute_net_return_ex_perf_man_fees`, `qis.compute_net_navs_ex_perf_man_fees` |
-| Lever, de-lever | $(1+L)r^A-Lc$ and its inverse, $c=y/\mathrm{AN}$ | `qis.lever_returns`, `qis.delever_returns` |
+| Lever, de-lever | $(1+L)r^A-Lc$ and its inverse, $c=y/\mathrm{af}$ | `qis.lever_returns`, `qis.delever_returns` |
 | Implied leverage | $\hat\beta-1$, at least 10 joint observations | `qis.implied_leverage(levered_returns, unlevered_returns)` |
 | Short-sample volatility | $s(x)$ at $T\ge20$, root mean square below | `qis.estimate_vol(sampled_returns)` |
-| Sampled volatility | `estimate_vol` per right-closed window times $\sqrt{\mathrm{AN}}$ | `qis.compute_sampled_vols(prices, freq_vol='ME', freq_return=None)` |
+| Sampled volatility | `estimate_vol` per right-closed window times $\sqrt{\mathrm{af}}$ | `qis.compute_sampled_vols(prices, freq_vol='ME', freq_return=None)` |
 | Interpolated returns | $\hat\ell_j=\ell^{\mathrm{rep}}_b/m_b+\kappa\sqrt{\hat v_b}\,e_j$ | `qis.interpolate_infrequent_returns(span=12, is_to_log_returns=False, vol_adjustment=1.0)` |
 | Additive component NAVs | $V_{c,t}\gamma^{Y_t}$ | `qis.adjust_component_navs_to_portfolio`, `qis.portfolio_navs_to_additive` |
 | Spliced history | Older returns before the newer start | `qis.bfill_timeseries(df_newer, df_older, freq='B', is_prices=False)` |

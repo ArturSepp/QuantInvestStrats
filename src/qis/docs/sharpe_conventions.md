@@ -5,21 +5,21 @@ errors, regime decomposition and a worked example are in the handbook chapter
 [Sharpe ratios: conventions and inference](https://quantinveststrats.readthedocs.io/en/latest/performance_analytics_and_sharpe.html).
 Symbols follow the handbook's
 [Notation and conventions](https://quantinveststrats.readthedocs.io/en/latest/notation_and_conventions.html):
-`AN` is the annualisation factor of the sampling grid, `r` simple returns, `l` log returns and
+`af` is the annualisation factor of the sampling grid, `r` simple returns, `l` log returns and
 `s(x)` a sample standard deviation.
 
 ## The three table conventions
 
 `compute_ra_perf_table` computes all six columns on every call. Returns are sampled on
 `PerfParams.freq_vol`; `R_pa` is the compound per-annum return between the first and last
-complete `freq_vol` boundaries, and `VOL = sqrt(AN) * s(v)` with `v` the
+complete `freq_vol` boundaries, and `VOL = sqrt(af) * s(v)` with `v` the
 `PerfParams.return_type` returns, log returns by default.
 
 | Convention | Columns | Formula |
 |---|---|---|
 | Per annum (compound) | `SHARPE_RF0`, `SHARPE_EXCESS` | `R_pa / VOL` |
 | Log | `SHARPE_LOG_AN`, `SHARPE_LOG_EXCESS` | `log(1 + R_pa) / VOL` |
-| Arithmetic | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS` | `sqrt(AN) * mean(r) / s(r)` on simple returns |
+| Arithmetic | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS` | `sqrt(af) * mean(r) / s(r)` on simple returns |
 
 The excess columns replace the numerator by its excess counterpart when `rates_data` is given;
 without it they equal the zero-rate columns. Reporting presets and factsheets show the per-annum
@@ -45,7 +45,7 @@ sampling grid.
 `PerfParams.sharpe_convention` selects the convention of regime-conditional Sharpe ratios only:
 `compute_bnb_regimes_pa_perf_table`, the regime classifiers and `plot_regime_data`. It does not
 change the six table columns. Under `SharpeConvention.ARITHMETIC` and `LOG` the regime
-contributions `sqrt(AN) * p_g * mean_g / s` add up exactly to the Sharpe ratio of that
+contributions `sqrt(af) * p_g * mean_g / s` add up exactly to the Sharpe ratio of that
 convention on the regime grid, whatever the classifier's return type. Under
 `SharpeConvention.PA`, the default, the per-regime per-annum returns are patched so that they
 add up to the visible `PA_RETURN`, with the residual allocated in proportion to regime

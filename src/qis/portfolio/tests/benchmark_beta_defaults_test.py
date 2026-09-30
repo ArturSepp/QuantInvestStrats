@@ -3,7 +3,7 @@
 ``PortfolioData.compute_portfolio_benchmark_betas`` and
 ``PortfolioData.compute_portfolio_benchmark_attribution`` describe the same beta; with default
 arguments they must estimate it on the same grid ('B') with the same quarterly span (63 business
-days at AN=252), so the betas a report plots are the betas its attribution applies.
+days at af=252), so the betas a report plots are the betas its attribution applies.
 """
 
 # packages

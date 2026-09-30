@@ -54,7 +54,7 @@ regime columns in [Regime-conditional performance](regime_conditional_performanc
 |---|---|
 | Return basis | Simple returns for total, per-annum, arithmetic and extreme-return columns; `PerfParams.return_type` returns (log by default) for `VOL`, `DOWNSIDE_VOL`, `AVG_LOG_RETURN`, `SKEWNESS` and `KURTOSIS`; returns in excess of `rates_data` for every excess column |
 | Sampling grid | Native observations for visible return columns; `freq_vol` for volatility, the Sharpe and Sortino numerators and the arithmetic family; `freq_drawdown`, followed by each asset's final observation, for drawdowns, `WORST` and `BEST`; `freq_skewness` for moments; `freq_reg` for regressions |
-| Annualisation | $\mathrm{AN}$ inferred from the sampled `freq_vol` index: $\sqrt{\mathrm{AN}}$ for volatilities, $\mathrm{AN}$ for arithmetic means; 365.25-day years for per-annum returns; moments, drawdowns and extreme returns are not annualised |
+| Annualisation | $\mathrm{af}$ inferred from the sampled `freq_vol` index: $\sqrt{\mathrm{af}}$ for volatilities, $\mathrm{af}$ for arithmetic means; 365.25-day years for per-annum returns; moments, drawdowns and extreme returns are not annualised |
 | Mean adjustment | `VOL`: sample mean removed, `ddof=1`; `DOWNSIDE_VOL`: mean of the negative returns removed, `ddof=1`; table moments: bias-corrected $G_1$, $G_2$; descriptive-table and rolling moments: uncorrected $g_1$, $g_2$ |
 | Timing | Full-sample and descriptive: every column uses the whole history, so none is point in time; cash accrued over $(t-1,t]$ uses the rate known at $t-1$ on the return grid |
 | Output units | Decimal fractions for returns, volatilities and drawdowns; dimensionless ratios, moments and p-values; dates, prices, counts and years where labelled |
@@ -72,8 +72,8 @@ regime columns in [Regime-conditional performance](regime_conditional_performanc
 | $r^{\mathrm{dd}}_t$ | Simple returns on the `freq_drawdown` grid, which ends at the asset's final observation $t_1$ | Daily by default |
 | $x_k$ | A generic sample: `freq_skewness` returns in the risk table, one supplied column in the descriptive table | Units of the input |
 | $T$ | Number of observations of the sample at hand; `NUM_OBS` for $v_k$ | Count |
-| $\mathrm{AN}$, $\mathrm{AN}_{\mathrm{reg}}$, $\mathrm{AN}_{\mathrm{c}}$ | Periods per year of `freq_vol`, of `freq_reg` and of a regime classifier's grid | 12 for `ME`, 4 for `QE` |
-| $\sigma_v$ | `VOL`, equal to $\sqrt{\mathrm{AN}}\,s(v)$ | Annualised decimal |
+| $\mathrm{af}$, $\mathrm{af}_{\mathrm{reg}}$, $\mathrm{af}_{\mathrm{c}}$ | Periods per year of `freq_vol`, of `freq_reg` and of a regime classifier's grid | 12 for `ME`, 4 for `QE` |
+| $\sigma_v$ | `VOL`, equal to $\sqrt{\mathrm{af}}\,s(v)$ | Annualised decimal |
 | $T_{-}$, $\bar v_{-}$ | Number and mean of the negative $v_k$ | Count; decimal per period |
 | $\sigma^{-}$ | `DOWNSIDE_VOL` as implemented | Annualised decimal |
 | $\theta$, $\delta_{\theta}$ | Minimum acceptable return; target downside deviation | Decimal per period; annualised decimal |
@@ -103,10 +103,10 @@ available at earlier dates, so it describes a history and must not be used insid
 | Field | Default | Read by | Governs |
 |---|---|---|---|
 | `freq` | `None`, stored as `'ME'` | Factsheet panels only, not the table functions | A shortcut that overwrites the fields below |
-| `freq_vol` | `'ME'` | `compute_risk_table`, `compute_ra_perf_table` | `VOL`, `DOWNSIDE_VOL`, `NUM_OBS`, the arithmetic family, the Sharpe and Sortino numerators, and $\mathrm{AN}$ |
+| `freq_vol` | `'ME'` | `compute_risk_table`, `compute_ra_perf_table` | `VOL`, `DOWNSIDE_VOL`, `NUM_OBS`, the arithmetic family, the Sharpe and Sortino numerators, and $\mathrm{af}$ |
 | `freq_skewness` | `'ME'` | `compute_risk_table` | `SKEWNESS` and `KURTOSIS` |
 | `freq_drawdown` | `'D'` | `compute_risk_table` | `MAX_DD`, `CURRENT_DD`, `WORST`, `BEST` and the numerator of `MAX_DD_VOL`; the grid ends at each asset's final observation |
-| `freq_reg` | `'QE'` | `compute_ra_perf_table_with_benchmark` | `ALPHA`, `ALPHA_AN`, `BETA`, `R2`, `ALPHA_PVALUE` and $\mathrm{AN}_{\mathrm{reg}}$ |
+| `freq_reg` | `'QE'` | `compute_ra_perf_table_with_benchmark` | `ALPHA`, `ALPHA_AN`, `BETA`, `R2`, `ALPHA_PVALUE` and $\mathrm{af}_{\mathrm{reg}}$ |
 | `freq_excess_return` | `'ME'` | No calculation; stored, printed and copied | Nothing: excess returns are formed on the grid of the column that uses them |
 | `return_type` | `ReturnTypes.LOG` | `compute_risk_table` | The basis of $v_k$ and $x_k$: `VOL`, `DOWNSIDE_VOL`, `AVG_LOG_RETURN`, `SKEWNESS`, `KURTOSIS` |
 | `sharpe_convention` | `SharpeConvention.PA` | Regime tables only | `BEAR_SHARPE`, `NORMAL_SHARPE`, `BULL_SHARPE` |
@@ -177,16 +177,16 @@ asset's own observations, `freq_vol`, `freq_drawdown`, `freq_skewness` and `freq
 | `AVG_LOG_RETURN` | `AvgLogReturn` | $\bar v$ | `freq_vol`, `return_type` | decimal per period |
 | `AVG_ARITH_RETURN` | `Avg Arith Return` | $\bar r$ | `freq_vol`, simple | decimal per period |
 | `AVG_ARITH_EXCESS_RETURN` | `Avg Arith Ex return` | $\bar{\tilde r}$ | `freq_vol`, excess | decimal per period |
-| `AN_ARITH_RETURN` | `An. arith return` | $\mathrm{AN}\,\bar r$ | `freq_vol`, simple | decimal p.a. |
-| `AN_ARITH_EXCESS_RETURN` | `An. arith excess return` | $\mathrm{AN}\,\bar{\tilde r}$ | `freq_vol`, excess | decimal p.a. |
+| `AN_ARITH_RETURN` | `An. arith return` | $\mathrm{af}\,\bar r$ | `freq_vol`, simple | decimal p.a. |
+| `AN_ARITH_EXCESS_RETURN` | `An. arith excess return` | $\mathrm{af}\,\bar{\tilde r}$ | `freq_vol`, excess | decimal p.a. |
 | `SHARPE_RF0` | `Sharpe (rf=0)` | $R^{\mathrm{smp}}_{\mathrm{pa}}/\sigma_v$ | `freq_vol` | ratio |
 | `SHARPE_EXCESS` | `Ex Sharpe` | $\tilde R^{\mathrm{smp}}_{\mathrm{pa}}/\sigma_v$ | `freq_vol`, excess | ratio |
 | `SHARPE_LOG_AN` | `Log Sharpe` | $\log(1+R^{\mathrm{smp}}_{\mathrm{pa}})/\sigma_v$ | `freq_vol` | ratio |
 | `SHARPE_LOG_EXCESS` | `Log Ex Sharpe` | $\log(1+\tilde R^{\mathrm{smp}}_{\mathrm{pa}})/\sigma_v$ | `freq_vol`, excess | ratio |
-| `SHARPE_ARITH` | `Sharpe Arith` | $\sqrt{\mathrm{AN}}\,\bar r/s(r)$ | `freq_vol`, simple | ratio |
-| `SHARPE_ARITH_EXCESS` | `Ex Sharpe Arith` | $\sqrt{\mathrm{AN}}\,\bar{\tilde r}/s(\tilde r)$ | `freq_vol`, excess | ratio |
-| `VOL` | `Vol` | $\sigma_v=\sqrt{\mathrm{AN}}\,s(v)$ | `freq_vol`, `return_type` | decimal p.a. |
-| `DOWNSIDE_VOL` | `DownVol` | $\sigma^{-}=\sqrt{\mathrm{AN}}\,s(v\mid v<0)$; missing if $T_{-}<2$ | `freq_vol`, `return_type` | decimal p.a. |
+| `SHARPE_ARITH` | `Sharpe Arith` | $\sqrt{\mathrm{af}}\,\bar r/s(r)$ | `freq_vol`, simple | ratio |
+| `SHARPE_ARITH_EXCESS` | `Ex Sharpe Arith` | $\sqrt{\mathrm{af}}\,\bar{\tilde r}/s(\tilde r)$ | `freq_vol`, excess | ratio |
+| `VOL` | `Vol` | $\sigma_v=\sqrt{\mathrm{af}}\,s(v)$ | `freq_vol`, `return_type` | decimal p.a. |
+| `DOWNSIDE_VOL` | `DownVol` | $\sigma^{-}=\sqrt{\mathrm{af}}\,s(v\mid v<0)$; missing if $T_{-}<2$ | `freq_vol`, `return_type` | decimal p.a. |
 | `SORTINO_RATIO` | `Sortino` | $\tilde R^{\mathrm{smp}}_{\mathrm{pa}}/\sigma^{-}$; missing unless $\sigma^{-}>0$ | `freq_vol`, excess numerator | ratio |
 | `CALMAR_RATIO` | `Calmar` | $\tilde R_{\mathrm{pa}}/\lvert\mathrm{MDD}\rvert$; missing if $\mathrm{MDD}=0$ | native numerator, `freq_drawdown` | ratio |
 | `MAX_DD` | `Max DD` | $\mathrm{MDD}=\min_t D_t$ | `freq_drawdown` and $t_1$ | decimal, at most 0 |
@@ -207,7 +207,7 @@ strings; `compute_desc_freq_table` returns numbers.
 |---|---|---|---|---|
 | `AVG` | `Avg` | $\bar x$ | supplied | units of $x$ |
 | `STD` | `Std` | $s(x)$ | supplied | units of $x$ |
-| `STD_AN` | `Std An` | $\sqrt{\mathrm{AN}}\,s(x)$, $\mathrm{AN}$ inferred from the index | supplied | units of $x$ p.a. |
+| `STD_AN` | `Std An` | $\sqrt{\mathrm{af}}\,s(x)$, $\mathrm{af}$ inferred from the index | supplied | units of $x$ p.a. |
 | `T_STAT` | `T-stat` | $\bar x\,\sqrt{T}/s(x)$ | supplied | dimensionless |
 | `MEDIAN` | `Median` | $\hat q_{0.5}$ | supplied | units of $x$ |
 | `MIN` | `Min` | $\min_k x_k$ | supplied | units of $x$ |
@@ -230,7 +230,7 @@ fitted by ordinary least squares on their joint `freq_reg` support.
 | `PerfStat` | Label | Formula | Grid and basis | Units |
 |---|---|---|---|---|
 | `ALPHA` | `Alpha` | $\hat\alpha$ | `freq_reg`, simple or log, excess with `rates_data` | decimal per period |
-| `ALPHA_AN` | `An Alpha` | $\mathrm{AN}_{\mathrm{reg}}\,\hat\alpha$ | `freq_reg` | decimal p.a. |
+| `ALPHA_AN` | `An Alpha` | $\mathrm{af}_{\mathrm{reg}}\,\hat\alpha$ | `freq_reg` | decimal p.a. |
 | `BETA` | `Beta` | $\hat\beta$ | `freq_reg` | dimensionless |
 | `R2` | `R2` | $R^2$ | `freq_reg` | fraction |
 | `ALPHA_PVALUE` | `p-Alpha` | Two-sided OLS t-test p-value of $\hat\alpha$; 1 for the benchmark row | `freq_reg` | probability |
@@ -244,7 +244,7 @@ periodic return of the asset in regime $\omega$.
 | `PerfStat` | Label | Formula | Grid and basis | Units |
 |---|---|---|---|---|
 | `BEAR_AVG`, `NORMAL_AVG`, `BULL_AVG` | `Bear Average`, `Normal Average`, `Bull Average` | $\bar r_{\mid\omega}$ | classifier grid, simple | decimal per period |
-| `BEAR_PA`, `NORMAL_PA`, `BULL_PA` | `Bear P.a.`, `Normal P.a.`, `Bull P.a.` | $e^{\mathrm{AN}_{\mathrm{c}}\,p_{\omega}\,\bar r_{\mid\omega}}-1$, shifted pro rata to sum to $R_{\mathrm{pa}}$ | classifier grid | decimal p.a. |
+| `BEAR_PA`, `NORMAL_PA`, `BULL_PA` | `Bear P.a.`, `Normal P.a.`, `Bull P.a.` | $e^{\mathrm{af}_{\mathrm{c}}\,p_{\omega}\,\bar r_{\mid\omega}}-1$, shifted pro rata to sum to $R_{\mathrm{pa}}$ | classifier grid | decimal p.a. |
 | `BEAR_SHARPE`, `NORMAL_SHARPE`, `BULL_SHARPE` | `Bear-Sharpe`, `Normal-Sharpe`, `Bull-Sharpe` | regime p.a. over $\sigma_v$ under `SharpeConvention.PA` | classifier grid, `freq_vol` | ratio |
 
 ### Return, date and count columns
@@ -277,7 +277,7 @@ derivation of excess returns and NAVs is in
 [Returns, NAVs, excess returns, fees and leverage](returns_and_navs.md).
 
 The arithmetic columns are periodic means of simple returns on the `freq_vol` grid, and their
-`AN_` versions multiply by $\mathrm{AN}$. They sit above the compound columns by roughly half the
+`AN_` versions multiply by $\mathrm{af}$. They sit above the compound columns by roughly half the
 annualised variance.
 
 ### The Sharpe columns
@@ -293,7 +293,7 @@ sampling error and the reconciliation of the three conventions follow
 
 ### Volatility and downside risk
 
-**Definition (volatility).** `VOL` is $\sigma_v=\sqrt{\mathrm{AN}}\,s(v)$: the sample standard
+**Definition (volatility).** `VOL` is $\sigma_v=\sqrt{\mathrm{af}}\,s(v)$: the sample standard
 deviation of the `freq_vol` returns in the `return_type` basis, with `ddof=1`, annualised with
 the factor inferred from the sampled index.
 
@@ -301,7 +301,7 @@ the factor inferred from the sampled index.
 $T_{-}$ negative returns and $\bar v_{-}$ their mean. Then
 
 $$
-\sigma^{-}=\sqrt{\mathrm{AN}}\,\sqrt{\frac{1}{T_{-}-1}\sum_{k\in\mathcal{N}}\big(v_k-\bar v_{-}\big)^2},
+\sigma^{-}=\sqrt{\mathrm{af}}\,\sqrt{\frac{1}{T_{-}-1}\sum_{k\in\mathcal{N}}\big(v_k-\bar v_{-}\big)^2},
 \qquad T_{-}\ge 2 .
 $$
 
@@ -313,20 +313,20 @@ $\theta$, averaged over all observations. Its sample analogue, in the form given
 is
 
 $$
-\delta_{\theta}=\sqrt{\mathrm{AN}}\,\sqrt{\frac{1}{T}\sum_{k=1}^{T}\min\big(v_k-\theta,\,0\big)^2}.
+\delta_{\theta}=\sqrt{\mathrm{af}}\,\sqrt{\frac{1}{T}\sum_{k=1}^{T}\min\big(v_k-\theta,\,0\big)^2}.
 $$
 
 **Proposition (what the implemented downside volatility leaves out).** For $\theta=0$,
 
 $$
-\delta_{0}^{2}=\frac{T_{-}-1}{T}\,\big(\sigma^{-}\big)^{2}+\frac{T_{-}}{T}\,\mathrm{AN}\,\bar v_{-}^{2}.
+\delta_{0}^{2}=\frac{T_{-}-1}{T}\,\big(\sigma^{-}\big)^{2}+\frac{T_{-}}{T}\,\mathrm{af}\,\bar v_{-}^{2}.
 $$
 
 **Proof.** Only negative returns contribute to $\delta_0$. Split their second moment about zero
 into dispersion and level:
 $\sum_{k\in\mathcal{N}}v_k^2=\sum_{k\in\mathcal{N}}(v_k-\bar v_{-})^2+T_{-}\bar v_{-}^2
-=(T_{-}-1)(\sigma^{-})^2/\mathrm{AN}+T_{-}\bar v_{-}^2$. Divide by $T$ and multiply by
-$\mathrm{AN}$. $\square$
+=(T_{-}-1)(\sigma^{-})^2/\mathrm{af}+T_{-}\bar v_{-}^2$. Divide by $T$ and multiply by
+$\mathrm{af}$. $\square$
 
 The implemented $\sigma^{-}$ keeps the first term, rescaled, and drops the second: it ignores how
 large the losses are on average and how often they occur. A strategy that loses exactly 1% in
@@ -438,7 +438,7 @@ prices and zero returns, so `WORST` is at most zero and `BEST` at least zero.
 `compute_desc_table` works on whatever it is given, typically a panel of returns on one grid. It
 drops missing values per column, rejects infinite values, and formats every number as a string.
 `AVG` is the mean, `STD` the sample standard deviation with `ddof=1`, and `STD_AN` replaces `STD`
-when `annualize_vol=True`, scaling by $\sqrt{\mathrm{AN}}$ with $\mathrm{AN}$ inferred from the
+when `annualize_vol=True`, scaling by $\sqrt{\mathrm{af}}$ with $\mathrm{af}$ inferred from the
 index (252 with a warning on an irregular index). `MEDIAN`, `QUANT_M_1STD` and `QUANT_P1_STD` are
 the 50%, 16% and 84% empirical quantiles with NumPy's linear interpolation; the labels `-1std` and
 `+1std` recall that these are the one-sigma quantiles of a normal distribution. `POSITIVE` counts
@@ -450,11 +450,11 @@ observed value and `RANK` its percentile rank within the column, computed by
 $s(x)=0$. It is not annualised and does not depend on `annualize_vol`.
 
 **Identity (t-statistic and arithmetic Sharpe).** If $x_k=r_k$ are the simple `freq_vol`
-returns, then `T_STAT` equals `SHARPE_ARITH` times $\sqrt{T/\mathrm{AN}}$, which is close to
+returns, then `T_STAT` equals `SHARPE_ARITH` times $\sqrt{T/\mathrm{af}}$, which is close to
 $\sqrt{Y_{\mathrm{smp}}}$.
 
-**Proof.** `SHARPE_ARITH` is $\sqrt{\mathrm{AN}}\,\bar r/s(r)$; multiply by
-$\sqrt{T/\mathrm{AN}}$. On a regular grid $T/\mathrm{AN}$ is the sampled number of years. $\square$
+**Proof.** `SHARPE_ARITH` is $\sqrt{\mathrm{af}}\,\bar r/s(r)$; multiply by
+$\sqrt{T/\mathrm{af}}$. On a regular grid $T/\mathrm{af}$ is the sampled number of years. $\square$
 
 A Sharpe ratio of 0.5 therefore needs 16 years of data to reach a t-statistic of 2, before any
 correction for serial correlation.
@@ -484,7 +484,7 @@ compounding `agg_func`.
 The benchmark table regresses each asset on the benchmark by ordinary least squares on the
 `freq_reg` grid, with simple returns by default (log returns with `is_log_returns=True`) and
 excess returns for both sides when `rates_data` is given. `ALPHA` is the periodic intercept of
-Jensen (1968), `ALPHA_AN` multiplies it linearly by $\mathrm{AN}_{\mathrm{reg}}$, and
+Jensen (1968), `ALPHA_AN` multiplies it linearly by $\mathrm{af}_{\mathrm{reg}}$, and
 `ALPHA_PVALUE` is the conventional two-sided p-value of the OLS t-test, which assumes serially
 uncorrelated, homoskedastic residuals. The benchmark's own row has its p-value set to 1. Tracking
 error, information ratio and robust inference are in
@@ -492,7 +492,7 @@ error, information ratio and robust inference are in
 
 The regime columns condition on benchmark regimes. Under the default `SharpeConvention.PA` the
 regime Sharpe is the adjusted regime per-annum return divided by $\sigma_v$; under
-`ARITHMETIC` and `LOG` it is $\mathrm{AN}_{\mathrm{c}}\,p_{\omega}$ times the conditional mean,
+`ARITHMETIC` and `LOG` it is $\mathrm{af}_{\mathrm{c}}\,p_{\omega}$ times the conditional mean,
 divided by the annualised standard deviation of the same returns, which adds up exactly to the
 Sharpe ratio of that convention on the classifier's grid. No convention deducts cash. The regime
 table labels its average columns `Bear Average`, `Normal Average` and `Bull Average`, and every
@@ -555,7 +555,7 @@ def column(stat: qis.PerfStat) -> pd.Series:
 month_end = prices.resample('ME').last()
 log_m = np.log(month_end).diff().dropna()
 simple_m = month_end.pct_change().dropna()
-T, AN = len(log_m), 12.0
+T, af = len(log_m), 12.0
 years_smp = (month_end.index[-1] - month_end.index[0]).days / 365.25
 accrual_m = 0.01 * month_end.index.to_series().diff().dt.days.iloc[1:].to_numpy() / 365.0
 pa_smp = (month_end.iloc[-1] / month_end.iloc[0]) ** (1.0 / years_smp) - 1.0
@@ -563,7 +563,7 @@ pa_excess_smp = (1.0 + simple_m.sub(accrual_m, axis=0)).prod() ** (1.0 / years_s
 assert T == 143 and (column(Stat.NUM_OBS) == T).all()
 
 # Native endpoints for visible returns, sampled boundaries for ratio numerators.
-vol = np.sqrt(AN) * log_m.std(ddof=1)
+vol = np.sqrt(af) * log_m.std(ddof=1)
 np.testing.assert_allclose(column(Stat.VOL), vol, rtol=1e-12)
 np.testing.assert_allclose(column(Stat.SHARPE_RF0) * vol, pa_smp, rtol=1e-10)
 np.testing.assert_allclose(pa_smp['SEQ_US'], 0.0151, atol=5e-5)
@@ -571,7 +571,7 @@ np.testing.assert_allclose(column(Stat.PA_RETURN)['SEQ_US'], 0.0130, atol=5e-5)
 np.testing.assert_allclose(column(Stat.PA_RETURN)['SEQ_US'] / vol['SEQ_US'], 0.076, atol=5e-4)
 
 # Downside volatility: standard deviation of the losses about their own mean.
-down_vol = log_m.apply(lambda x: np.sqrt(AN) * x[x < 0.0].std(ddof=1))
+down_vol = log_m.apply(lambda x: np.sqrt(af) * x[x < 0.0].std(ddof=1))
 np.testing.assert_allclose(column(Stat.DOWNSIDE_VOL), down_vol, rtol=1e-12)
 np.testing.assert_allclose(column(Stat.SORTINO_RATIO), pa_excess_smp / down_vol, rtol=1e-10)
 np.testing.assert_allclose(vol, [0.1710, 0.0559], atol=5e-5)
@@ -582,8 +582,8 @@ np.testing.assert_allclose(column(Stat.SORTINO_RATIO), [0.056, 0.946], atol=5e-4
 # The target downside deviation and the decomposition proposition.
 losses = log_m.where(log_m < 0.0)
 n_neg, mean_neg = losses.count(), losses.mean()
-target_dd = np.sqrt(AN * (np.minimum(log_m, 0.0) ** 2).mean())
-level_term = n_neg / T * AN * mean_neg ** 2
+target_dd = np.sqrt(af * (np.minimum(log_m, 0.0) ** 2).mean())
+level_term = n_neg / T * af * mean_neg ** 2
 np.testing.assert_allclose(target_dd ** 2, (n_neg - 1) / T * down_vol ** 2 + level_term,
                            rtol=1e-12)
 assert list(n_neg) == [74, 63]
@@ -643,7 +643,7 @@ assert list(desc[Stat.POSITIVE.to_str()]) == [f'{share:.1%}' for share in positi
 
 t_stat = simple_m.mean() * np.sqrt(T) / simple_m.std(ddof=1)
 np.testing.assert_allclose(desc[Stat.T_STAT.to_str()].astype(float), t_stat, atol=1e-6)
-np.testing.assert_allclose(t_stat, column(Stat.SHARPE_ARITH) * np.sqrt(T / AN), rtol=1e-10)
+np.testing.assert_allclose(t_stat, column(Stat.SHARPE_ARITH) * np.sqrt(T / af), rtol=1e-10)
 np.testing.assert_allclose(t_stat, [0.592, 2.415], atol=5e-4)
 np.testing.assert_allclose(column(Stat.SHARPE_ARITH), [0.172, 0.700], atol=5e-4)
 
@@ -716,9 +716,9 @@ assert np.isnan(rising_row[[Stat.CALMAR_RATIO.to_str(), Stat.DOWNSIDE_VOL.to_str
 | Risk-adjusted table | All risk-adjusted columns | `qis.compute_ra_perf_table(prices, perf_params=None)` |
 | Visible return columns | $\mathrm{TR}$, $R_{\mathrm{pa}}$, $\tilde R_{\mathrm{pa}}$, $Y$ | `qis.compute_performance_table(prices, perf_params)` |
 | Risk columns | $\sigma_v$, $\sigma^{-}$, $\mathrm{MDD}$, $G_1$, $G_2$, $\min r^{\mathrm{dd}}_t$, arithmetic family | `qis.compute_risk_table(prices, perf_params=None)` |
-| Downside volatility | $\sqrt{\mathrm{AN}}\,s(v\mid v<0)$ | internal `_safe_downside_vol` in `qis/perfstats/perf_stats.py` |
+| Downside volatility | $\sqrt{\mathrm{af}}\,s(v\mid v<0)$ | internal `_safe_downside_vol` in `qis/perfstats/perf_stats.py` |
 | Maximum and current drawdown | $\min_t D_t$, last $D_t$ | `qis.compute_max_current_drawdown` |
-| Benchmark columns | $\hat\alpha$, $\mathrm{AN}_{\mathrm{reg}}\hat\alpha$, $\hat\beta$, $R^2$, p-value | `qis.compute_ra_perf_table_with_benchmark(prices, benchmark, benchmark_price, perf_params)` |
+| Benchmark columns | $\hat\alpha$, $\mathrm{af}_{\mathrm{reg}}\hat\alpha$, $\hat\beta$, $R^2$, p-value | `qis.compute_ra_perf_table_with_benchmark(prices, benchmark, benchmark_price, perf_params)` |
 | Regime columns | $\bar r_{\mid\omega}$, regime p.a., regime Sharpe | `qis.compute_bnb_regimes_pa_perf_table` |
 | Formatted preset table | Columns of a preset, as strings | `qis.get_ra_perf_columns`, `qis.plot_ra_perf_table`, `qis.plot_ra_perf_table_benchmark` |
 | Descriptive table | $\bar x$, $s(x)$, t-statistic, quantiles, positive share, rank, $K^2$ p-value | `qis.compute_desc_table(df, desc_table_type, annualize_vol, is_add_tstat)` |

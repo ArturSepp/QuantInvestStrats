@@ -106,7 +106,7 @@ def test_fit_multivariate_ols_returns_prediction_first() -> None:
 
 
 def test_legend_annualises_alpha_linearly_like_the_tables() -> None:
-    """``alpha_an_factor`` prints AN times the periodic alpha, as ``PerfStat.ALPHA_AN`` does."""
+    """``alpha_an_factor`` prints af times the periodic alpha, as ``PerfStat.ALPHA_AN`` does."""
     x = np.array([-0.04, -0.01, 0.0, 0.02, 0.05])
     y = 0.013 + 0.9 * x  # monthly alpha 1.3%: 12 x 1.3% = 15.6%, expm1(0.156) = 16.9%
     model = fit_ols(x=x, y=y)

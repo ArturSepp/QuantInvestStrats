@@ -74,7 +74,7 @@ def test_classifier_forwards_the_patch_switch() -> None:
 
 
 def test_base_method_forwards_its_keywords() -> None:
-    """The base method passes is_report_pa_returns through: linear contributions AN p_g m_g."""
+    """The base method passes is_report_pa_returns through: linear contributions af p_g m_g."""
     classifier = BenchmarkReturnsQuantilesRegime()
     prices = _prices()
     _, datas = RegimeClassifier.compute_regimes_pa_perf_table(

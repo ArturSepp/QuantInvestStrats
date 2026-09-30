@@ -110,10 +110,10 @@ maintaining unchanged exposure when a unit's notional changes.
 
 [Sepp and Lucic (2026), Definition 4.5 and equation 4.15](https://arxiv.org/html/2607.19497v1#S4.SS4)
 define volatility-normalised turnover using periodic volatility $\sigma_{i,t}$ and
-annualisation factor $\mathrm{AN}$:
+annualisation factor $\mathrm{af}$:
 
 $$
-U_{i,t}=\sqrt{\mathrm{AN}}\,\sigma_{i,t}
+U_{i,t}=\sqrt{\mathrm{af}}\,\sigma_{i,t}
 \left|w^*_{i,t}-w^*_{i,t-1}\right|.
 $$
 
@@ -123,7 +123,7 @@ $$
 U_{i,t}=\sigma^{\mathrm{ann}}_{i,t}
 \left|w^*_{i,t}-w^*_{i,t-1}\right|,
 \qquad
-\sigma^{\mathrm{ann}}_{i,t}=\sqrt{\mathrm{AN}}\,\sigma_{i,t}.
+\sigma^{\mathrm{ann}}_{i,t}=\sqrt{\mathrm{af}}\,\sigma_{i,t}.
 $$
 
 This weights target changes by instrument risk. It includes changes caused by the target rule's

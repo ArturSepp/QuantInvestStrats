@@ -4,8 +4,8 @@ myst:
     description: >-
       The convexity premium in qis: Gaussian and Student-t nulls of the regime Sharpe
       contributions, the premium and its benchmark-adjusted form, the portfolio aggregation
-      identity, overlay blend frontiers, smart-diversification curves, regime betas and
-      regime-mixture moments.
+      identity, overlay blend frontiers, smart-diversification curves, the coverage floor,
+      regime betas and regime-mixture moments, mapped to Sepp and Kastenholz (2026).
 ---
 
 # The convexity premium and smart diversification
@@ -26,6 +26,13 @@ portfolio in the periods when the principal falls. The subpackage `qis.regimes` 
 the premia, their bootstrap intervals, regime betas and regime-mixture moments, and
 `qis.SmartDiversificationReport` draws the curves that trade the Bear contribution against the
 Sharpe ratio.
+
+Sepp and Kastenholz (2026), accepted by the *Journal of Investment Management*, name `qis` as the
+implementation of their regime statistics, Gaussian null and mixture covariance. This chapter is
+its reference: the [correspondence section](#correspondence-with-sepp-and-kastenholz-2026) maps
+the paper's notation, results and exhibits to the functions here and states the settings that
+reproduce its monthly analysis. The chapter's own examples are quarterly, the frequency of the
+long-run companion study (Sepp and Kastenholz, 2026, working paper).
 
 ## Overview
 
@@ -48,7 +55,9 @@ The calculation has four steps:
    benchmark-adjusted premium.
 4. **Aggregate.** A portfolio's Bear contribution is its null plus the risk-weighted sum of its
    constituents' premia. Mixing a principal portfolio with one overlay traces a curve of Bear
-   contribution against Sharpe ratio: the smart-diversification curve.
+   contribution against Sharpe ratio: the smart-diversification curve. In return units the Bear
+   contribution is linear in the overlay weights, so a floor on it is a linear constraint of a
+   maximum-Sharpe allocation.
 
 The chapter proves the null, identifies what the premium measures, derives the aggregation
 identity and the closed-form blend frontier, and treats regime betas and the regime-mixture
@@ -61,7 +70,7 @@ statistic here is descriptive: the quantile edges use the whole sample.
 |---|---|
 | Return basis | Simple total returns on the regime grid, as in the arithmetic regime decomposition; no cash is deducted, so pass excess-return NAVs for excess statistics |
 | Sampling grid | The regime grid of the sampled frame: quarter-ends from `BenchmarkReturnsQuantilesRegime(freq='QE')`, or any periodic returns through `create_sampled_returns_with_regime_id`; the report's per-annum statistics use `PerfParams(freq='ME')` |
-| Annualisation | $\mathrm{AN}$ of the regime grid, passed as `af` (4 for quarters): $\sqrt{\mathrm{AN}}$ in contributions, loadings and $\kappa$; `ann_vol` is $\sqrt{\mathrm{AN}}\,s(r)$ |
+| Annualisation | $\mathrm{af}$ of the regime grid, passed as `af` (4 for quarters): $\sqrt{\mathrm{af}}$ in contributions, loadings and $\kappa$; `ann_vol` is $\sqrt{\mathrm{af}}\,s(r)$ |
 | Mean adjustment | Regime means are raw; $s(r)$ is demeaned with `ddof=1`; correlations are Pearson; regression intercepts are estimated and then discarded |
 | Timing | Descriptive and full sample: quantile edges use the whole history; the bootstraps reclassify every resample; the regime-time EWMA is seeded with each stream's full-sample mean |
 | Output units | Contributions, nulls and premia in annualised Sharpe units; `<tail>_return_pa` in decimal per year; betas dimensionless; covariances annualised |
@@ -75,13 +84,13 @@ statistic here is descriptive: the quantile edges use the whole sample.
 | $\pi_g$ | Partition probability of regime $g$, $q_g-q_{g-1}$ | 0.16, 0.68, 0.16 on the one-sigma cut |
 | $p_g$ | Realised frequency of regime $g$ | $T_g/T$, as in the regime chapter |
 | $m_g$, $m_{b,g}$ | Mean return of the asset and of the benchmark in regime $g$ | Decimal per period |
-| $\mathrm{SR}$, $\mathrm{SR}_b$ | Arithmetic Sharpe ratios $\sqrt{\mathrm{AN}}\,\bar r/s(r)$ on the regime grid | Annualised |
-| $\mathrm{SR}_g$ | Regime contribution $\sqrt{\mathrm{AN}}\,p_g m_g/s(r)$ | Adds up to $\mathrm{SR}$ over $g$ |
+| $\mathrm{SR}$, $\mathrm{SR}_b$ | Arithmetic Sharpe ratios $\sqrt{\mathrm{af}}\,\bar r/s(r)$ on the regime grid | Annualised |
+| $\mathrm{SR}_g$ | Regime contribution $\sqrt{\mathrm{af}}\,p_g m_g/s(r)$ | Adds up to $\mathrm{SR}$ over $g$ |
 | $\rho$ | Correlation of the asset with the benchmark | Sample Pearson correlation |
 | $Z$ | Unit-variance benchmark shock, $(r_b-\mu_b)/\sigma_b$ | Gaussian or Student-t margin |
 | $z_g$ | Edge of regime $g$ in units of $Z$, $z_0=-\infty$, $z_G=+\infty$ | Quantile $q_g$ of the margin |
 | $\phi$, $\Phi$ | Standard normal density and distribution function | |
-| $k_g$ | Null loading of regime $g$, $\sqrt{\mathrm{AN}}\,\mathbb{E}[Z\,1\{z_{g-1}<Z\le z_g\}]$ | Sums to zero over $g$ |
+| $k_g$ | Null loading of regime $g$, $\sqrt{\mathrm{af}}\,\mathbb{E}[Z\,1\{z_{g-1}<Z\le z_g\}]$ | Sums to zero over $g$ |
 | $\kappa$ | Bull loading of a symmetric three-bucket cut, the Bear one being $-\kappa$ | 0.487 quarterly, 0.843 monthly |
 | $\nu$ | Degrees of freedom of a Student-t null | $\nu>2$; calibrated as $4+6/\text{kurtosis}$ |
 | $\mathrm{CP}$, $\mathrm{CP}_b$ | Convexity premium of the asset and of the benchmark | Lowest bucket, annualised Sharpe units |
@@ -91,6 +100,8 @@ statistic here is descriptive: the quantile edges use the whole sample.
 | $\sigma_p$, $\rho_p$, $\mathrm{SR}_p$ | Volatility, benchmark correlation and Sharpe ratio of a portfolio | Annualised |
 | $\beta_{i,g}$ | Regime beta of asset $i$ on the benchmark in regime $g$ | OLS slope within the regime |
 | $v_i$ | Per-period residual variance of asset $i$ | `idio_vars` |
+| $L$ | Bear-regime return contribution $\mathrm{af}\,p_1m_1$, the Bear-regime loss of a benchmark | Decimal per year; `bear_return_pa` |
+| $\theta$ | Coverage floor: the share of the benchmark's Bear-regime loss an overlay portfolio must offset | Fraction, 0 to 1 |
 
 Inputs are the frame a regime classifier returns: periodic returns with a categorical `regime`
 column, built by `BenchmarkReturnsQuantilesRegime.compute_sampled_returns_with_regime_id` from
@@ -110,28 +121,28 @@ buckets closed on the right, and a return equal to an interior edge in the lower
 returns of a period be jointly normal with means $\mu$, $\mu_b$, volatilities $\sigma$,
 $\sigma_b$ and correlation $\rho$, and let regime $g$ be the event
 $z_{g-1}<Z\le z_g$ with $z_g=\Phi^{-1}(q_g)$. The population regime contribution
-$\mathrm{SR}_g=\sqrt{\mathrm{AN}}\,\mathbb{E}[r\,1\{g\}]/\sigma$ is
+$\mathrm{SR}_g=\sqrt{\mathrm{af}}\,\mathbb{E}[r\,1\{g\}]/\sigma$ is
 
 $$
 \mathrm{SR}_g=\pi_g\,\mathrm{SR}+\rho\,k_g,
 \qquad
-k_g=\sqrt{\mathrm{AN}}\,\big(\phi(z_{g-1})-\phi(z_g)\big),
+k_g=\sqrt{\mathrm{af}}\,\big(\phi(z_{g-1})-\phi(z_g)\big),
 $$
 
-with $\mathrm{SR}=\sqrt{\mathrm{AN}}\,\mu/\sigma$ and $\phi(\pm\infty)=0$.
+with $\mathrm{SR}=\sqrt{\mathrm{af}}\,\mu/\sigma$ and $\phi(\pm\infty)=0$.
 
 **Proof.** For a jointly normal pair the conditional mean is linear,
 $\mathbb{E}[r\mid Z]=\mu+\rho\,\sigma Z$, so
 $\mathbb{E}[r\,1\{g\}]=\mu\,\pi_g+\rho\,\sigma\,\mathbb{E}[Z\,1\{g\}]$. Because
 $\phi'(z)=-z\,\phi(z)$, $\int_a^b z\,\phi(z)\,dz=\phi(a)-\phi(b)$. Divide by $\sigma$ and
-multiply by $\sqrt{\mathrm{AN}}$. $\square$
+multiply by $\sqrt{\mathrm{af}}$. $\square$
 
-The loadings telescope, $\sum_g k_g=\sqrt{\mathrm{AN}}\,(\phi(-\infty)-\phi(+\infty))=0$, so the
+The loadings telescope, $\sum_g k_g=\sqrt{\mathrm{af}}\,(\phi(-\infty)-\phi(+\infty))=0$, so the
 null contributions add up to $\mathrm{SR}$ for any partition. On a symmetric three-bucket cut
 the loadings are $-\kappa$, $0$ and $\kappa$ with
 
 $$
-\kappa=\sqrt{\mathrm{AN}}\;\phi\big(\Phi^{-1}(1-\pi_1)\big),
+\kappa=\sqrt{\mathrm{af}}\;\phi\big(\Phi^{-1}(1-\pi_1)\big),
 $$
 
 which is 0.487 for quarterly and 0.843 for monthly regimes on the one-sigma cut. The Bear null is
@@ -152,7 +163,7 @@ freedom, so that $Z=\sqrt{(\nu-2)/\nu}\,W$ with $W$ Student-t of density $f_\nu$
 $w_g$ be the quantile $q_g$ of $W$. The conditional mean is still linear, and
 
 $$
-k_g=\sqrt{\mathrm{AN}}\,\sqrt{\frac{\nu-2}{\nu}}\,\big(h_\nu(w_{g-1})-h_\nu(w_g)\big),
+k_g=\sqrt{\mathrm{af}}\,\sqrt{\frac{\nu-2}{\nu}}\,\big(h_\nu(w_{g-1})-h_\nu(w_g)\big),
 \qquad
 h_\nu(w)=\frac{\nu+w^2}{\nu-1}\,f_\nu(w).
 $$
@@ -196,17 +207,17 @@ $\operatorname{Cov}(\varepsilon,r_b)=0$, and let the buckets be the population q
 of $r_b$ with any margin. Then
 
 $$
-\mathrm{CP}=\rho\,\mathrm{CP}_b+\frac{\sqrt{\mathrm{AN}}\,\pi_1\,\mathbb{E}[\varepsilon\mid 1]}{\sigma},
+\mathrm{CP}=\rho\,\mathrm{CP}_b+\frac{\sqrt{\mathrm{af}}\,\pi_1\,\mathbb{E}[\varepsilon\mid 1]}{\sigma},
 \qquad
-\mathrm{CP}^{*}=\frac{\sqrt{\mathrm{AN}}\,\pi_1\,\mathbb{E}[\varepsilon\mid 1]}{\sigma}.
+\mathrm{CP}^{*}=\frac{\sqrt{\mathrm{af}}\,\pi_1\,\mathbb{E}[\varepsilon\mid 1]}{\sigma}.
 $$
 
 **Proof.** Write $r_b=\mu_b+\sigma_b Z$. Since $\alpha+\beta\mu_b=\mu$ and
 $\beta\sigma_b=\rho\sigma$, $\mathbb{E}[r\,1\{1\}]=\mu\,\pi_1+\rho\,\sigma\,\mathbb{E}[Z\,1\{1\}]
 +\mathbb{E}[\varepsilon\,1\{1\}]$. For the benchmark, with $\rho=1$ and no residual,
-$\mathrm{SR}_{b,1}=\pi_1\mathrm{SR}_b+\sqrt{\mathrm{AN}}\,\mathbb{E}[Z\,1\{1\}]$. Substituting,
+$\mathrm{SR}_{b,1}=\pi_1\mathrm{SR}_b+\sqrt{\mathrm{af}}\,\mathbb{E}[Z\,1\{1\}]$. Substituting,
 $\mathrm{SR}_1=\pi_1\mathrm{SR}+\rho(\mathrm{SR}_{b,1}-\pi_1\mathrm{SR}_b)
-+\sqrt{\mathrm{AN}}\,\pi_1\mathbb{E}[\varepsilon\mid1]/\sigma$. Subtract the null
++\sqrt{\mathrm{af}}\,\pi_1\mathbb{E}[\varepsilon\mid1]/\sigma$. Subtract the null
 $\pi_1\mathrm{SR}+\rho k_1$ and recognise $\mathrm{CP}_b=\mathrm{SR}_{b,1}-\pi_1\mathrm{SR}_b-k_1$.
 $\square$
 
@@ -222,15 +233,15 @@ $\bar\varepsilon_1$ be the mean residual of the lowest bucket and $\hat\rho$ the
 correlation. Then
 
 $$
-\mathrm{CP}^{*}=\frac{\sqrt{\mathrm{AN}}\,p_1\,\bar\varepsilon_1}{s(r)}
+\mathrm{CP}^{*}=\frac{\sqrt{\mathrm{af}}\,p_1\,\bar\varepsilon_1}{s(r)}
 +(p_1-\pi_1)\big(\mathrm{SR}-\hat\rho\,\mathrm{SR}_b\big).
 $$
 
 **Proof.** From the regime chapter, $m_1=\hat\alpha+\hat\beta m_{b,1}+\bar\varepsilon_1$, with
 $\hat\alpha=\bar r-\hat\beta\bar r_b$ and $\hat\beta=\hat\rho\,s(r)/s(r_b)$. Multiplying by
-$\sqrt{\mathrm{AN}}\,p_1/s(r)$ gives
+$\sqrt{\mathrm{af}}\,p_1/s(r)$ gives
 $\mathrm{SR}_1=p_1\mathrm{SR}+\hat\rho(\mathrm{SR}_{b,1}-p_1\mathrm{SR}_b)
-+\sqrt{\mathrm{AN}}\,p_1\bar\varepsilon_1/s(r)$. Subtract the null
++\sqrt{\mathrm{af}}\,p_1\bar\varepsilon_1/s(r)$. Subtract the null
 $\pi_1\mathrm{SR}+\hat\rho k_1$, then $\hat\rho$ times
 $\mathrm{CP}_b=\mathrm{SR}_{b,1}-\pi_1\mathrm{SR}_b-k_1$. $\square$
 
@@ -343,8 +354,11 @@ overlay with `qis.backtest_model_portfolio`, rebalanced at `rebalancing_freq` (q
 default), with overlay weights from zero to `max_overlay_weight`. Two mixing rules are available:
 
 - `is_principal_weight_fixed=True` (default) keeps the principal at `principal_weight` and adds
-  the overlay on top, weights $(1, x)$. The mix is levered, which suits an overlay that is an
-  unfunded, excess-return strategy such as a futures programme.
+  the overlay on top, weights $(1, x)$: the stacked portfolio of Sepp and Kastenholz (2026). The
+  mix is levered, which suits an overlay that is an unfunded, excess-return strategy such as a
+  futures programme. The backtest finances the leverage at a zero rate, so pass excess-of-cash
+  NAVs for the principal and the overlays; on total-return NAVs every levered mix overstates its
+  return by $x$ times the cash return.
 - `is_principal_weight_fixed=False` funds the overlay from the principal, weights $(1-x, x)$:
   the blends of the frontier above.
 
@@ -360,6 +374,58 @@ not the arithmetic contribution that the null and the premium use. Pass
 `perf_params=qis.PerfParams(freq='ME', sharpe_convention=qis.SharpeConvention.ARITHMETIC)` to
 put the curves in the coordinates of this chapter; the funded curves then match the closed-form
 frontier, up to the rebalancing dates discussed in the implementation notes.
+
+**Definition (smart diversifier, Sepp and Kastenholz 2026).** An overlay is a smart diversifier
+of a benchmark when the stacked portfolio, the benchmark at weight one plus the overlay, has a
+higher Sharpe ratio and a higher Bear contribution than the benchmark alone.
+
+The definition formalises the property that [Sepp and Dézeraud (2019)](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/)
+and Sepp (2020) describe for trend-following overlays. In the report's coordinates a smart
+diversifier's curve leaves the principal's point to the right and upwards; the aggregation
+identity prices its horizontal step as the null plus the risk-weighted premium.
+
+### The coverage floor
+
+The Bear contribution of the stacked portfolio aggregates linearly, which lets a tail budget
+enter a standard maximum-Sharpe program. Measure it in return units,
+$L=\sqrt{\mathrm{af}}\,s(r)\,\mathrm{SR}_1=\mathrm{af}\,p_1\,m_1$, the contribution of the
+lowest bucket to the annualised mean return: `<tail>_return_pa` of the premium table.
+
+**Identity (linear Bear-regime loss).** Let $r_{p,t}=r_{b,t}+\sum_i w_i\,r_{i,t}$ on the regime
+grid, with every series classified by the benchmark. Then $L_p=L_b+\sum_i w_i\,L_i$.
+
+**Proof.** The lowest-bucket mean is linear in the weights,
+$m_{p,1}=m_{b,1}+\sum_i w_i\,m_{i,1}$, and the frequency $p_1$ is common to every series.
+Multiply by $\mathrm{af}\,p_1$. $\square$
+
+For a benchmark that loses in its lowest bucket, $L_b<0$, the coverage of an overlay portfolio is
+$1-L_p/L_b$: zero for the benchmark alone and one for an overlay portfolio that offsets the
+Bear-regime loss in full. Sepp and Kastenholz (2026) maximise the Sharpe ratio of the stacked
+portfolio subject to a coverage floor $\theta$,
+
+$$
+\max_{w\ge0,\;\sum_i w_i=1}\;
+\frac{\mu_b+w^{\top}\mu}{\sqrt{(1,w^{\top})\,\Sigma\,(1,w^{\top})^{\top}}}
+\qquad\text{subject to}\qquad
+L_b+\sum_i w_i\,L_i\ \ge\ (1-\theta)\,L_b ,
+$$
+
+with $\mu_b$ and $\mu$ the annualised mean excess returns of the benchmark and the overlays and
+$\Sigma$ their joint covariance, the regime-mixture covariance below. The floor is linear in the
+weights, so the program stays a quadratic-fractional program that a maximum-Sharpe solver takes
+unchanged. The work splits between two packages. `qis` supplies every input:
+$\mu$ as `sharpe` times `ann_vol` and the coefficients $L_i$ as `bear_return_pa` from
+`compute_regime_premium_table`, and $\Sigma$ from `compute_regime_mixture_covar_from_sample`.
+`optimalportfolios` solves the program with `cvx_maximize_portfolio_sharpe`; its
+[overlay tail-floor chapter](https://github.com/ArturSepp/OptimalPortfolios/blob/main/docs/overlay_tail_floor.md)
+states how to pass the floor, whose right-hand side is negative.
+`qis.plot_overlay_allocation_frontier` then draws the stacked portfolios and the solved frontier
+from their `compute_regime_premium_table` statistics, as in Figure 4 of the paper; the worked
+example below builds its input.
+
+> **Pitfall.** A point of the frontier exhibit is a stacked portfolio, not a standalone overlay.
+> Pass the premium table of the stacked returns $r_b+w\,r_i$, classified by the benchmark; the
+> table of the overlays alone puts every point at the overlay's own coordinates.
 
 ### Regime betas
 
@@ -383,6 +449,9 @@ selection that leaves the slope unbiased shrinks a within-regime correlation, be
 the benchmark's variance but not the residual's. `compute_regime_betas_bootstrap` resamples whole
 rows of the panel with the stationary block bootstrap, which keeps the cross-section, reclassifies
 each resample and re-estimates, and reports the standard deviation of the resampled betas.
+Sepp and Kastenholz (2026) state the Gaussian case as capture symmetry: the down- and up-capture
+ratios practitioners compute are the regime slopes plus an intercept term, so they differ under
+the null whenever the asset has an alpha, while the regime betas do not.
 
 `compute_regime_ewm_betas` and `compute_regime_ewm_avg` run EWMA recursions over each regime's own
 stream of periods rather than calendar time. A calendar-time EWMA discounts a crisis by its
@@ -390,7 +459,10 @@ calendar age, so the Bear moments of a long sample are set by whichever Bear per
 in regime time the last Bear period carries the most weight among Bear periods however long ago
 it occurred. Both recursions are seeded with the stream's full-sample mean (`InitType.MEAN`), so
 at a span far longer than the stream they return the equal-weighted estimates, and inside a
-backtest they must be evaluated on the data known at each decision date.
+backtest they must be evaluated on the data known at each decision date. They are the regime-time
+estimators of the live pipeline of Sepp and Kastenholz (2026), whose span of 40 regime-time
+periods is the default; the unconditional Sharpe ratio, volatility and correlation of that
+pipeline stay in calendar time, with the EWM estimators of `qis.models`.
 
 ### Regime-mixture moments
 
@@ -410,11 +482,13 @@ $\mathbb{E}[r_i]=\sum_g\pi_g\,\mathbb{E}[r_i\mid g]$. The intercept terms cancel
 $\mathbb{E}[r_ir_j]-\mathbb{E}[r_i]\mathbb{E}[r_j]$ because $a_i$ does not depend on $g$, and the
 residuals contribute $v_i$ on the diagonal only. $\square$
 
-`compute_regime_mixture_covar` evaluates the formula and multiplies by $\mathrm{AN}$; the
+`compute_regime_mixture_covar` evaluates the formula and multiplies by $\mathrm{af}$; the
 benchmark enters as an asset with unit betas and zero residual. With equal betas in every regime
 the first two terms reduce to $\beta_i\beta_j\operatorname{Var}(r_b)$, the single-factor
 covariance. The regime intercepts are discarded, as in the regime betas, and residual
-correlations are not modelled.
+correlations are not modelled. This is the covariance that Sepp and Kastenholz (2026) build from
+their input sheet for the coverage-floor program; they read it as a weighting engine for the
+allocation rather than a risk forecast, a limitation discussed below.
 
 **Identity (Gaussian regime moments).** For a standard normal $Z$ and a bucket $a<Z\le b$ with
 probability $\pi$,
@@ -674,7 +748,49 @@ np.testing.assert_allclose(unaligned.iloc[:, 0] / unaligned.iloc[0, 0],
                            full_principal / full_principal.iloc[0], rtol=1e-12)
 ```
 
-The sixth block estimates regime betas. Each equals the within-regime covariance ratio. The
+The sixth block builds the input of the coverage-floor exhibit: the stacked portfolios of the
+60/40 benchmark plus each overlay at a full budget, and plus a 50/20/30 mix of Treasuries, gold
+and hedge funds, with the synthetic total returns read as excess returns. The mix's Bear-regime
+loss equals the benchmark's plus the weighted overlay coefficients to machine precision, so the
+floor is linear. All three single stacks are smart diversifiers: each raises the Sharpe ratio
+from 0.47 and the Bear contribution from $-0.36$. Only Treasuries cover part of the Bear-regime
+loss, 31%. The gold stack improves the Bear contribution in Sharpe units, to $-0.33$, yet deepens
+the loss from 3.6% to 6.7% a year, a coverage of $-85\%$, because it doubles the volatility: the
+floor is stated in return units for that reason. The block then draws the points with
+`qis.plot_overlay_allocation_frontier`; a solved frontier would be passed as `frontier_stats`.
+
+```python
+import matplotlib.pyplot as plt
+
+overlay_weights = pd.Series({'SBD_TSY': 0.5, 'SCM_GLD': 0.2, 'SAL_HF': 0.3})
+stacked = pd.DataFrame({f'60/40 + {a}': data['SBM_6040'] + data[a] for a in overlay_weights.index})
+stacked['60/40 + mix'] = data['SBM_6040'] + data[overlay_weights.index] @ overlay_weights
+stack_table = compute_regime_premium_table(
+    pd.concat([data[['SBM_6040', 'regime']], stacked], axis=1), benchmark='SBM_6040', af=4.0)
+
+# the Bear-regime loss is linear in the overlay weights: the floor is a linear constraint
+loss = table['bear_return_pa']
+np.testing.assert_allclose(stack_table.loc['60/40 + mix', 'bear_return_pa'],
+                           loss['SBM_6040'] + (overlay_weights * loss[overlay_weights.index]).sum(),
+                           atol=1e-12)
+coverage = 1.0 - stack_table['bear_return_pa'] / loss['SBM_6040']
+np.testing.assert_allclose(coverage, [0.0, 0.3098, -0.8471, -0.3503, -0.1196], atol=5e-4)
+
+# smart diversifiers: a higher Sharpe ratio and a higher Bear contribution than the benchmark
+singles = stack_table.loc[stacked.columns[:3]]
+benchmark_row = stack_table.loc['SBM_6040']
+assert (singles['sharpe'] > benchmark_row['sharpe']).all()
+assert (singles['bear_sharpe'] > benchmark_row['bear_sharpe']).all()
+np.testing.assert_allclose(stack_table.loc['60/40 + SCM_GLD', ['bear_sharpe', 'bear_return_pa']],
+                           [-0.3340, -0.0672], atol=5e-5)
+
+groups = pd.Series({'SBM_6040': 'Benchmark', **{name: 'Stacked' for name in stacked.columns}})
+fig = qis.plot_overlay_allocation_frontier(stack_table, groups=groups, benchmark='SBM_6040',
+                                           highlights={'60/40 + mix': {'label': 'Mix'}})
+plt.close(fig)
+```
+
+The seventh block estimates regime betas. Each equals the within-regime covariance ratio. The
 hedge-fund index has betas of 0.05, 0.83 and 0.02 in the three regimes against a total beta of
 0.42, a pattern that looks like strong non-linearity; its bootstrap standard errors, 0.74 in the
 Bear regime and 0.30 in the Bull, show that 14 quarters per tail cannot confirm it.
@@ -772,7 +888,7 @@ custom scenario moments; those are modelling choices rather than empirical recon
 | Partition | $\pi_g=q_g-q_{g-1}$; ids Bear, Normal, Bull or Q1 to Qn | `qis.regimes.get_partition_quantiles`, `get_regime_probabilities`, `get_regime_ids`, `ONE_SIGMA_QUANTILES` |
 | Sampled frame from returns | periodic returns with the benchmark-quantile regime | `qis.regimes.create_sampled_returns_with_regime_id(returns, benchmark, q=None)` |
 | Null loadings | $k_g$, Gaussian or Student-t | `qis.regimes.compute_regime_null_loadings(af, q=None, nu=None)` |
-| $\kappa$ | $\sqrt{\mathrm{AN}}\,\phi(\Phi^{-1}(1-\pi_1))$ | `qis.regimes.compute_regime_kappa(af, tail_prob=0.16, nu=None)` |
+| $\kappa$ | $\sqrt{\mathrm{af}}\,\phi(\Phi^{-1}(1-\pi_1))$ | `qis.regimes.compute_regime_kappa(af, tail_prob=0.16, nu=None)` |
 | Student-t calibration | $\nu=\max(4+6/K,\,4.5)$ | `qis.regimes.calibrate_student_t_nu(excess_kurtosis, min_nu=4.5)` |
 | Null contributions | $\pi_g\mathrm{SR}+\rho k_g$ | `qis.regimes.compute_null_regime_contributions(sr, rho, af, q=None, nu=None)` |
 | Convexity premium | $\mathrm{SR}_1-(\pi_1\mathrm{SR}-\kappa\rho)$ | `qis.regimes.compute_convexity_premium(sr_bear, sr, rho, af)` |
@@ -782,12 +898,14 @@ custom scenario moments; those are modelling choices rather than empirical recon
 | Blend frontier | $\sigma_p$, $\mathrm{SR}_p$, $\rho_p$, $\mathrm{SR}_{p,1}$ with $\mathrm{CP}_b=0$ | `qis.regimes.compute_overlay_blend_frontier` |
 | Regime betas | within-regime OLS slopes, pooled residual volatility | `qis.regimes.compute_regime_betas`, `compute_regime_betas_bootstrap(block_size=12)` |
 | Regime-time EWMA | EWMA over each regime's stream, seeded at its mean | `qis.regimes.compute_regime_ewm_avg`, `compute_regime_ewm_betas` |
-| Mixture covariance | law of total covariance times $\mathrm{AN}$ | `qis.regimes.compute_regime_mixture_covar` |
+| Mixture covariance | law of total covariance times $\mathrm{af}$ | `qis.regimes.compute_regime_mixture_covar` |
 | Sample mixture covariance | empirical probabilities and benchmark moments | `qis.regimes.compute_regime_mixture_covar_from_sample` |
 | Sample regime moments | probability, periodic mean and second moment | `qis.regimes.compute_sample_regime_moments` |
 | Gaussian regime moments | truncated normal mean and second moment | `qis.regimes.compute_gaussian_regime_moments(benchmark_vol, benchmark_mean=0.0, q=None)` |
 | Exhibits | stacked contributions with null; regime-beta profiles | `qis.plots.derived.regime_premium.plot_regime_sharpe_decomposition`, `plot_regime_beta_profiles` |
 | Smart diversification | eleven mixes, Bear contribution against Sharpe ratio | `qis.SmartDiversificationReport`, `qis.create_overlay_portfolio_curve` |
+| Bear-regime loss and coverage | $L=\mathrm{af}\,p_1m_1$; coverage $1-L_p/L_b$ | `bear_return_pa` of `qis.regimes.compute_regime_premium_table` |
+| Coverage-floor exhibit | stacked portfolios and a solved frontier | `qis.plot_overlay_allocation_frontier` |
 
 The analytics are in
 [src/qis/regimes/](https://github.com/ArturSepp/QuantInvestStrats/tree/main/src/qis/regimes),
@@ -800,15 +918,16 @@ and the quantile rule in
 The {doc}`API reference <api/index>` lists the explicitly imported subpackages beside the
 exported names.
 
-The table-driven `qis.plot_overlay_allocation_frontier` draws precomputed
-core-plus-overlay portfolios in Bear contribution versus total Sharpe coordinates,
-together with an optional solved allocation frontier. Pass `portfolio_stats` and
-`frontier_stats` with `bear_sharpe` and `sharpe` columns, plus group labels and
-optional highlighted portfolios. Both tables must use the same sample, benchmark
-regimes and Sharpe convention. The function connects the frontier in supplied policy
-order and retains duplicate slack solutions; it does not estimate, optimise or fit
-a curve. Portfolio construction remains in OptimalPortfolios, which supplies the
-allocations, while qis computes the statistics and renders the exhibit.
+The table-driven `qis.plot_overlay_allocation_frontier` draws the benchmark and its stacked
+portfolios, the benchmark at weight one plus an overlay, in Bear contribution versus Sharpe
+ratio coordinates, together with an optional solved coverage-floor frontier. Pass
+`portfolio_stats` and `frontier_stats` with `bear_sharpe` and `sharpe` columns, the premium
+table of the stacked returns as in the sixth worked block, plus group labels and optional
+highlighted portfolios. Both tables must use the same sample, benchmark regimes and Sharpe
+convention. The function connects the frontier in the order supplied and keeps duplicate slack
+solutions; it does not estimate, optimise or fit a curve. Portfolio construction remains in
+OptimalPortfolios, which solves the coverage-floor program, while qis computes the statistics and
+renders the exhibit.
 
 Implementation contracts that affect the numbers:
 
@@ -848,12 +967,64 @@ Implementation contracts that affect the numbers:
   per-period residual variances, the calendar-time EWMA of the squared pooled residuals, which the
   caller annualises.
 
+### Correspondence with Sepp and Kastenholz (2026)
+
+Sepp and Kastenholz (2026) implement their regime statistics, Gaussian null and mixture
+covariance in `qis` and their allocation in `optimalportfolios`. The tables map the paper to this
+chapter. Equation numbers follow the accepted manuscript and may change in the typeset article;
+the definitions and propositions keep their names.
+
+| Paper | This chapter | qis |
+|---|---|---|
+| $a_p$, periods per year | $\mathrm{af}$ | `af` |
+| $p_{16}$, $p_{68}$, regime frequencies of the rule | $\pi_1$, $\pi_2$ | `get_regime_probabilities()` |
+| $p_s$ of the exact decomposition | $p_g$, realised frequency | frequency of the `regime` labels |
+| $SR^{A}_{\text{Total}}$ | $\mathrm{SR}$ | `sharpe` |
+| $SR^{A}_{\text{Bear}}$, the Bear-Sharpe ratio | $\mathrm{SR}_1$, the Bear contribution | `bear_sharpe`, `PerfStat.BEAR_SHARPE` |
+| $CP$, $CP_{B}$, $CP^{*}$ | $\mathrm{CP}$, $\mathrm{CP}_b$, $\mathrm{CP}^{*}$ | `convexity_premium`, its benchmark row, `cp_star` |
+| $\sigma_i SR^{i}_{\text{Bear}}$, Bear-regime loss and coverage | $L$ | `bear_return_pa` |
+| $\beta_{i,g}$, $\sigma_{\varepsilon,i}$ | $\beta_{i,g}$, $\sqrt{\mathrm{af}\,v_i}$ | `beta_<id>`, `idio_vol` |
+| $m_g$, $S_g$ | $m_{b,g}$, $S_g$ | `compute_sample_regime_moments` |
+| benchmark | benchmark; principal portfolio in the report | `benchmark`, `principal_nav` |
+| stacked portfolio | fixed-principal mix with weights $(1,x)$ | `is_principal_weight_fixed=True` |
+| $\theta$, coverage floor | $\theta$ | the floor of the optimalportfolios program |
+| $N_{\mathrm{eff}}$, effective number of overlays | | `qis.compute_portfolio_breadth` |
+
+| Result of the paper | qis |
+|---|---|
+| Definition 1, Bear, Normal and Bull regimes | `ONE_SIGMA_QUANTILES`, `BenchmarkReturnsQuantilesRegime`, `create_sampled_returns_with_regime_id` |
+| Proposition 1 and equation (1), exact decomposition; equation (2), arithmetic Sharpe ratio | `<id>_sharpe` and `sharpe` of `compute_regime_premium_table`; `SharpeConvention.ARITHMETIC` |
+| Proposition 2 and equation (3), Gaussian regime contributions | `compute_null_regime_contributions`, `compute_regime_null_loadings`, `compute_regime_kappa` |
+| Definition 2 and equations (4) to (6), the premia | `compute_convexity_premium`; `convexity_premium` and `cp_star` |
+| Proposition 3, capture symmetry; equation (9), regime regression | `compute_regime_betas`, `compute_regime_betas_bootstrap` |
+| Definition 3 and equation (7), stacked portfolio | `create_overlay_portfolio_curve` with `is_principal_weight_fixed=True` on excess NAVs |
+| Proposition 4 and equation (8), portfolio aggregation | `compute_portfolio_bear_sharpe`, with the benchmark as an asset |
+| Definition 4, smart diversifier | the coordinates of `SmartDiversificationReport` |
+| Equation (10) and Appendix B, regime-mixture covariance | `compute_regime_mixture_covar`, `compute_regime_mixture_covar_from_sample` |
+| Program (11), Bear-beta coverage floor | inputs from `compute_regime_premium_table` and the mixture covariance; solved in optimalportfolios |
+| Equation (12), Student-t null | the `nu` arguments, `calibrate_student_t_nu` |
+| Equation (13), residual form of $CP^{*}$ | the in-sample identity of the Methodology section; `cp_star` |
+| Equations (14) and (15), regime-time EWMA | `compute_regime_ewm_avg`, `compute_regime_ewm_betas` |
+| Appendix D, bootstrap design | the defaults of `compute_regime_betas_bootstrap` |
+| Table 3, the allocator's input sheet | `compute_regime_premium_table` joined with `compute_regime_betas` |
+| Figures 2 and 3 | the layouts of `plot_regime_beta_profiles` and `plot_regime_sharpe_decomposition` |
+| Figure 4 | `qis.plot_overlay_allocation_frontier` |
+
+The paper's empirical section uses monthly excess returns of fifteen overlays and of a 60/40
+total-return benchmark in excess of the 3-month bill rate, August 2017 to June 2026. Its settings
+in qis are monthly regimes, `BenchmarkReturnsQuantilesRegime(freq='ME')` on
+excess NAVs or `create_sampled_returns_with_regime_id` on monthly excess returns, `af=12`, for
+which $\kappa=0.843$, and the arithmetic Sharpe convention. In the report, pass
+`perf_params=qis.PerfParams(freq='ME', sharpe_convention=qis.SharpeConvention.ARITHMETIC)` and
+`rebalancing_freq='ME'`. The regime-beta bootstrap defaults are the paper's. The fund and QIS
+returns of the paper are licensed and are not redistributed.
+
 ## Interpretation and limitations
 
 ### Crisis beta, convexity and the premium
 
-[Sepp (2019)](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/)
-reads a positive Bear contribution as crisis beta. The null makes the reading quantitative: a
+[Sepp and Dézeraud (2019)](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/)
+read a positive Bear contribution as crisis beta. The null makes the reading quantitative: a
 positive Bear contribution is expected of any asset with negative correlation, $-\kappa\rho>0$,
 and only the excess over $\pi_1\mathrm{SR}-\kappa\rho$ is a premium for convexity.
 [Sepp and Kastenholz (2026)](bibliography.md) use the premium to rank portfolio overlays by what
@@ -865,7 +1036,10 @@ identity shows that it is the Bear-regime mean of the regression residual in Sha
 A premium is not free. A long straddle earns a positive premium and pays for it with a negative
 mean in the Normal regime; the Sharpe ratio, which the frontier keeps on the other axis, is where
 that cost shows. The smart-diversification curve displays both: an overlay is attractive when it
-moves the blend to the right, a better Bear contribution, without moving it down.
+moves the blend to the right, a better Bear contribution, without moving it down, the smart
+diversifier of Sepp and Kastenholz (2026). In return units the test is stricter: the sixth worked
+block's gold stack is a smart diversifier in Sharpe units and still deepens the Bear-regime loss,
+because it raises the volatility that the Bear contribution is measured against.
 
 ### Limitations
 
@@ -887,9 +1061,17 @@ moves the blend to the right, a better Bear contribution, without moving it down
   not apply.
 - **Mixture covariance.** The regime-mixture covariance is a single-factor model with
   regime-dependent betas: it discards regime intercepts and ignores residual correlations,
-  which can dominate the covariance of two assets with little benchmark exposure.
+  which can dominate the covariance of two assets with little benchmark exposure. Overlays that
+  share a strategy share their residuals: on the fund panel of Sepp and Kastenholz (2026) the
+  one-factor residuals correlate at 0.66 within the trend followers and 0.58 within the
+  long-volatility indices, and the model Sharpe ratio of their unconstrained optimum is 1.46
+  against a realised 0.86. Read the covariance as a weighting engine for an allocation, as they
+  do, not as a risk forecast, and report realised statistics.
 - **Look-ahead in the regime-time EWMA.** Its seed is the stream's full-sample mean; evaluate it
   on an expanding window inside a backtest.
+- **Two clocks.** Regime means from the regime-time EWMA and a volatility from a calendar-time
+  EWMA are separate forecasts: regime contributions built from them need not add up to the total
+  Sharpe ratio, and the exact decomposition holds only for the equal-weighted estimates.
 
 ## See also
 
@@ -903,9 +1085,11 @@ moves the blend to the right, a better Bear contribution, without moving it down
 
 ## References
 
-1. Sepp, A., and Kastenholz, M. (2026). The Convexity Premium of Portfolio Overlays. *Journal of Investment Management*, forthcoming. The Gaussian and Student-t nulls of the regime contributions, the convexity premium, the aggregation identity and the overlay frontier.
-2. Sepp, A. (2019). Trend-Following CTAs vs Alternative Risk-Premia: Crisis Beta vs Risk-Premia Alpha. *The Hedge Fund Journal*. [Article](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/). The Bear, Normal and Bull decomposition that the null refines.
-3. Politis, D. N., and Romano, J. P. (1994). The Stationary Bootstrap. *Journal of the American Statistical Association*, 89(428), 1303–1313. [DOI: 10.1080/01621459.1994.10476870](https://doi.org/10.1080/01621459.1994.10476870). The block bootstrap behind the premium and beta standard errors.
-4. Choueifaty, Y., and Coignard, Y. (2008). Toward Maximum Diversification. *The Journal of Portfolio Management*, 35(1), 40–51. [DOI: 10.3905/JPM.2008.35.1.40](https://doi.org/10.3905/JPM.2008.35.1.40). The diversification ratio, the sum of the risk weights in the aggregation identity.
-5. Boyer, B. H., Gibson, M. S., and Loretan, M. (1999). Pitfalls in tests for changes in correlations. Federal Reserve Board, International Finance Discussion Papers 597. [PDF](https://www.federalreserve.gov/pubs/ifdp/1997/597/ifdp597.pdf). The conditioning bias that regime correlations suffer and regime betas do not.
-6. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Sepp, A., and Kastenholz, M. (2026). The Convexity Premium of Portfolio Overlays. *Journal of Investment Management*, forthcoming. Accepted on 25 September 2026. The Gaussian and Student-t nulls of the regime contributions, the convexity premium, the aggregation identity, the smart-diversifier definition, the regime-mixture covariance and the coverage-floor allocation; the correspondence section maps them to qis.
+2. Sepp, A., and Kastenholz, M. (2026). Smart Diversification in the Long Run: Trend-Following Overlays over Five Decades. Working paper. The long-run, quarterly evidence on trend-following overlays that the chapter's quarterly examples follow.
+3. Sepp, A., and Dézeraud, L. (2019). Trend-Following CTAs vs Alternative Risk-Premia: Crisis Beta vs Risk-Premia Alpha. *The Hedge Fund Journal*, 138, 20–31. [Article](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/). The Bear, Normal and Bull decomposition that the null refines.
+4. Sepp, A. (2020). 60/40 Portfolios and the Need for Smart Diversification. *HedgeNordic*, Systematic Strategies Special Report, 24–29. The practitioner statement of smart diversification.
+5. Politis, D. N., and Romano, J. P. (1994). The Stationary Bootstrap. *Journal of the American Statistical Association*, 89(428), 1303–1313. [DOI: 10.1080/01621459.1994.10476870](https://doi.org/10.1080/01621459.1994.10476870). The block bootstrap behind the premium and beta standard errors.
+6. Choueifaty, Y., and Coignard, Y. (2008). Toward Maximum Diversification. *The Journal of Portfolio Management*, 35(1), 40–51. [DOI: 10.3905/JPM.2008.35.1.40](https://doi.org/10.3905/JPM.2008.35.1.40). The diversification ratio, the sum of the risk weights in the aggregation identity.
+7. Boyer, B. H., Gibson, M. S., and Loretan, M. (1999). Pitfalls in tests for changes in correlations. Federal Reserve Board, International Finance Discussion Papers 597. [PDF](https://www.federalreserve.gov/pubs/ifdp/1997/597/ifdp597.pdf). The conditioning bias that regime correlations suffer and regime betas do not.
+8. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

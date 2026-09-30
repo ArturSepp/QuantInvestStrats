@@ -13,6 +13,11 @@ sits under the Gaussian null.
 Both functions take the output of ``compute_regime_premium_table`` and ``compute_regime_betas``
 rather than prices, so the numbers on the figure are the numbers in the table. The regime
 colours default to those of ``BenchmarkReturnsQuantilesRegime``.
+
+They are the qis forms of two exhibits of Sepp and Kastenholz (2026):
+``plot_regime_sharpe_decomposition`` has the layout of their Figure 3, the regime contributions
+with the Gaussian null as a diamond, and ``plot_regime_beta_profiles`` that of their Figure 2,
+the regime betas by group.
 """
 # packages
 import numpy as np

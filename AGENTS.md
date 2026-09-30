@@ -181,7 +181,7 @@ Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
   articles use `Implementation in qis`; utility pages use the shared shorter form.
 - Methodology pages form the qis analytics handbook: follow the
   [handbook conventions](docs/documentation_standard.md#handbook-conventions) for the
-  convention card, reserved notation ($\mathrm{AN}$ for annualisation), concise proofs,
+  convention card, reserved notation ($\mathrm{af}$ for annualisation), concise proofs,
   Insight/Pitfall callouts, executed worked examples and the single `docs/bibliography.md`.
 - Include ordinary links to the qis repository and `CITATION.cff` in every human-authored page.
   Define units, return convention, sampling/estimation frequency, annualisation, and timing

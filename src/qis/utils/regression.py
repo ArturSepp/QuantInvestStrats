@@ -13,7 +13,7 @@ small-sample correction, for a return series that has no regressor.
 ``estimate_ewma_alpha_beta_hac`` fits several dependent series on one common regressor using
 exponentially weighted least squares and returns their joint Bartlett-HAC covariance.
 ``reg_model_params_to_str`` formats the fitted equation for a chart legend, and annualises the
-intercept linearly as AN α, the convention of ``PerfStat.ALPHA_AN``, when ``alpha_an_factor`` is
+intercept linearly as af α, the convention of ``PerfStat.ALPHA_AN``, when ``alpha_an_factor`` is
 passed. ``newey_west_lag_rule`` supplies the opt-in Newey-West rule of thumb
 for callers that do not want to select a fixed Bartlett lag count.
 
@@ -716,8 +716,8 @@ def reg_model_params_to_str(reg_model: RegModel,
             None. The default ``'{0:+0.2f}'`` prints a monthly intercept of 0.013 as ``+0.01``;
             pass ``'{0:+0.2%}'`` to show it as a percentage, or ``alpha_an_factor``.
         fit_intercept: Whether the design has an intercept; without one no alpha is printed.
-        alpha_an_factor: Annualisation factor AN (12 for monthly returns). When given, the
-            intercept is printed as the linear ``AN * alpha`` in ``'{:+0.0%}'`` format, the same
+        alpha_an_factor: Annualisation factor af (12 for monthly returns). When given, the
+            intercept is printed as the linear ``af * alpha`` in ``'{:+0.0%}'`` format, the same
             convention as ``PerfStat.ALPHA_AN`` in the performance tables.
         **kwargs: Ignored; lets plotting wrappers forward their keyword arguments.
 

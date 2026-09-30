@@ -45,7 +45,7 @@ observation.
 |---|---|
 | Return basis | Periodic simple or log returns as supplied, total or excess; `is_log_returns_to_arithmetic=True` maps a log return to $e^{\ell}-1$ before scaling |
 | Sampling grid | The index of the supplied returns, usually business days (`B`); `compute_sum_freq_ra_returns` resamples to `freq` |
-| Annualisation | None inside the estimators: $\hat\sigma_t$ and `vol_target` are per period; an annual target $\sigma_{\mathrm{ann}}$ enters as $\sigma_{\mathrm{ann}}/\sqrt{\mathrm{AN}}$ |
+| Annualisation | None inside the estimators: $\hat\sigma_t$ and `vol_target` are per period; an annual target $\sigma_{\mathrm{ann}}$ enters as $\sigma_{\mathrm{ann}}/\sqrt{\mathrm{af}}$ |
 | Mean adjustment | None by default (`MeanAdjType.NONE`): an EWM second moment about zero; `EWMA` and `EXPANDING` are point in time, `INSAMPLE` is forward-looking |
 | Timing | $\hat\sigma_t$ uses returns through $t$; the return $r_t$ is divided by $\hat\sigma_{t-1}$ (`weight_lag=1`); a signal dated $t$ must be applied over $(t,t+1]$ by the caller |
 | Output units | Risk units (unit variance per period) when `vol_target=None`; per-period returns of the scaled position otherwise; weights as multiples of NAV |
@@ -70,7 +70,7 @@ observation.
 | $\theta$, $W$ | `vol_floor_quantile`, `vol_floor_quantile_roll_period` | Probability; rows |
 | $h$ | Summation horizon of the rolling functions (their `span`) | Rows |
 | $J$, $n_J$ | A calendar period of `freq` and its number of finite risk-adjusted returns | |
-| $\mathrm{AN}_f$ | Annualisation factor of `freq`, periods of `freq` per year | `qis.get_annualization_factor(freq)` |
+| $\mathrm{af}_f$ | Annualisation factor of `freq`, periods of `freq` per year | `qis.get_annualization_factor(freq)` |
 | $X^{(h)}_t$, $X^{f}_{J}$ | Normalised rolling and calendar sums of $x_t$ | Risk units |
 | $R^{(h)}_t$, $\hat\sigma^{(h)}_t$, $\lambda_h$ | Rolling $h$-row return sum, its EWM volatility and decay | Per $h$ rows; $\lambda_h=1-2/(h+1)$ |
 | $\lambda_m$, $N_m$, $m_t$ | Decay, span and state of the momentum EWM | `momentum_span`; $m=0$ before the first finite $x_t$ |
@@ -164,7 +164,7 @@ $\mathbb{E}[x_tx_s]=\mathbb{E}\big[x_s\,\mathbb{E}[x_t\mid\mathcal{F}_{t-1}]\big
 
 The lag is what makes the proposition possible: $\hat\sigma_{t-1}$ is known before $r_t$. With
 `MeanAdjType.NONE` the EWM estimates the conditional second moment, not the variance. The gap is
-$\mu^2/\sigma^2=\mathrm{SR}^2/\mathrm{AN}$ per period, about 0.001 for an annual Sharpe ratio of 0.5
+$\mu^2/\sigma^2=\mathrm{SR}^2/\mathrm{af}$ per period, about 0.001 for an annual Sharpe ratio of 0.5
 on daily data.
 
 **Proposition (estimation noise inflates the realised variance).** Let $r_t=\sigma z_t$ with
@@ -217,7 +217,7 @@ $$
 With rebalancing every period, no costs and a zero cash return, the output of `compute_ra_returns`
 with `vol_target` set is therefore the return series of the volatility-targeted position. The
 target is per period: an annual target $\sigma_{\mathrm{ann}}$ is passed as
-$\sigma_{\mathrm{ann}}/\sqrt{\mathrm{AN}}$, for example $0.15/\sqrt{252}$ on business days.
+$\sigma_{\mathrm{ann}}/\sqrt{\mathrm{af}}$, for example $0.15/\sqrt{252}$ on business days.
 
 The conditional volatility of the targeted return is
 $\sigma_{\mathrm{tgt}}\,\sigma_{t+1\mid t}/\hat\sigma_t$. The unmanaged asset carries
@@ -320,10 +320,10 @@ sums need autocorrelation-robust inference; see
 [Serial dependence and autocorrelation](serial_dependence.md) and
 [Regression and HAC inference](regression_and_hac.md).
 
-Up to qis 5.30.3, `compute_sum_freq_ra_returns` divided by $\sqrt{\mathrm{AN}_f}$, the number of
+Up to qis 5.30.3, `compute_sum_freq_ra_returns` divided by $\sqrt{\mathrm{af}_f}$, the number of
 periods of `freq` per year, instead of $\sqrt{n_J}$, the number of observations per period. For
 unit-variance daily terms that gave
-$\operatorname{Var}(X^{f}_{J})=n_J/\mathrm{AN}_f\approx252/\mathrm{AN}_f^2$, a standard deviation
+$\operatorname{Var}(X^{f}_{J})=n_J/\mathrm{af}_f\approx252/\mathrm{af}_f^2$, a standard deviation
 of about 0.31 weekly, 1.32 monthly and 3.97 quarterly, and the same scale entered
 `get_paired_rareturns_signals`. Dividing by $\sqrt{n_J}$ also normalises partial periods at the
 sample edges exactly.
@@ -595,7 +595,7 @@ The synthetic instruments have constant volatility, so a volatility regime is im
 The daily returns of `SEQ_US` from 2005 to 2014 are multiplied by 0.6 in 2005–2007, by 2.5 in
 2008, by 1.5 in 2009 and by 1 afterwards. The resulting asset has yearly realised volatilities
 from 9.6% (2006) to 41.8% (2008), and 20.1% over the full sample, all annualised with
-$\mathrm{AN}=252$. Targeting 15% per annum with the default $\lambda=0.94$ and a 21-day warm-up
+$\mathrm{af}=252$. Targeting 15% per annum with the default $\lambda=0.94$ and a 21-day warm-up
 mask, the yearly realised volatilities of the targeted position lie between 14.9% (2010) and
 17.2% (2008), and the full-sample figure is 15.6%. The largest yearly deviation from target falls
 from 26.8 to 2.2 percentage points. Leverage ranges from 0.29 (December 2008) to 2.07. Without
@@ -617,20 +617,20 @@ year = base.index.year
 regime_scale = np.select([year <= 2007, year == 2008, year == 2009], [0.6, 2.5, 1.5], default=1.0)
 asset = (base * regime_scale).rename('REGIME')
 
-AN, target, lam = 252, 0.15, 0.94
+af, target, lam = 252, 0.15, 0.94
 vt_returns, vt_weights, ewm_vol = qis.compute_ra_returns(
-    returns=asset, ewm_lambda=lam, vol_target=target / np.sqrt(AN), warmup_period=21)
+    returns=asset, ewm_lambda=lam, vol_target=target / np.sqrt(af), warmup_period=21)
 
 
 def yearly_vol(x: pd.Series) -> pd.Series:
     x = x.dropna()
-    return x.groupby(x.index.year).std() * np.sqrt(AN)
+    return x.groupby(x.index.year).std() * np.sqrt(af)
 
 
 raw_by_year, vt_by_year = yearly_vol(asset), yearly_vol(vt_returns)
 np.testing.assert_allclose([raw_by_year.min(), raw_by_year.max()], [0.096, 0.418], atol=0.001)
 np.testing.assert_allclose([vt_by_year.min(), vt_by_year.max()], [0.149, 0.172], atol=0.001)
-np.testing.assert_allclose([asset.std() * np.sqrt(AN), vt_returns.std() * np.sqrt(AN)],
+np.testing.assert_allclose([asset.std() * np.sqrt(af), vt_returns.std() * np.sqrt(af)],
                            [0.201, 0.156], atol=0.001)
 raw_dev, vt_dev = (raw_by_year - target).abs().max(), (vt_by_year - target).abs().max()
 np.testing.assert_allclose([raw_dev, vt_dev], [0.268, 0.022], atol=0.001)
@@ -638,7 +638,7 @@ assert vt_dev < 0.1 * raw_dev
 np.testing.assert_allclose([vt_weights.min(), vt_weights.max()], [0.29, 2.07], atol=0.005)
 np.testing.assert_allclose(vt_weights.loc['2008-01-01'], 1.54, atol=0.005)  # calm-regime leverage
 _, seed_weights, _ = qis.compute_ra_returns(returns=asset, ewm_lambda=lam,
-                                            vol_target=target / np.sqrt(AN))
+                                            vol_target=target / np.sqrt(af))
 assert seed_weights.idxmax() == seed_weights.first_valid_index()
 np.testing.assert_allclose(seed_weights.max(), 3.80, atol=0.005)
 
@@ -648,12 +648,12 @@ var = np.empty_like(x)
 var[0] = x[0] ** 2
 for t in range(1, len(x)):
     var[t] = lam * var[t - 1] + (1.0 - lam) * x[t] ** 2
-direct = x[1:] * (target / np.sqrt(AN)) / np.sqrt(var[:-1])
+direct = x[1:] * (target / np.sqrt(af)) / np.sqrt(var[:-1])
 assert vt_returns.iloc[:22].isna().all()
 np.testing.assert_allclose(vt_returns.iloc[22:], direct[21:], rtol=1e-12)
 
 # constant-volatility years: realised vol exceeds target by about 1/N, N = 2/(1 - lam) - 1
-calm = vt_returns[vt_returns.index.year >= 2010].std() * np.sqrt(AN)
+calm = vt_returns[vt_returns.index.year >= 2010].std() * np.sqrt(af)
 predicted = target * np.sqrt(1.0 + 2.0 * (1.0 - lam) / (1.0 + lam))
 np.testing.assert_allclose([calm, predicted], [0.154, 0.155], atol=0.001)
 ```
@@ -667,7 +667,7 @@ the risk-adjusted returns to machine precision.
 ```python
 nav = pd.concat([pd.Series([100.0], index=universe.prices.index[:1]),
                  100.0 * (1.0 + asset).cumprod()])
-target_weights = (target / np.sqrt(AN) / ewm_vol).to_frame('REGIME')
+target_weights = (target / np.sqrt(af) / ewm_vol).to_frame('REGIME')
 portfolio = qis.backtest_model_portfolio(prices=nav.to_frame('REGIME'), weights=target_weights,
                                          weight_implementation_lag=0)
 portfolio_returns = portfolio.get_portfolio_nav().pct_change()
@@ -883,7 +883,7 @@ functions of this chapter.
 - **Second moment, not variance.** With `MeanAdjType.NONE` a persistent drift remains in $x_t$. That
   is intended for momentum, where the drift is the signal, but it means $x_t$ is not demeaned.
 - **Per-period target.** `vol_target` has the units of the return grid. An annual target must be
-  divided by $\sqrt{\mathrm{AN}}$.
+  divided by $\sqrt{\mathrm{af}}$.
 - **No leverage cap.** Weights are unbounded as the estimated volatility falls; a floor bounds them
   only relative to past volatility. Cap before execution, and model the costs of the extra
   turnover.

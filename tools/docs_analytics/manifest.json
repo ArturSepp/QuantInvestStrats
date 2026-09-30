@@ -190,7 +190,7 @@
       "conventions": {
         "data": "Synthetic, fixed sample without quirks; not observed market performance",
         "returns": "Stated per exhibit: monthly log or simple, quarterly regime grid, daily targeting",
-        "annualisation": "AN = 12 monthly, 4 quarterly, 252 daily as set by qis frequency maps",
+        "annualisation": "af = 12 monthly, 4 quarterly, 252 daily as set by qis frequency maps",
         "rate_basis": "Zero cash rate; no risk-free-rate data",
         "cost_basis": "Gross returns except the fee exhibit: 2% management, 20% performance fee",
         "teaching_constructions": "Volatility regimes scale SEQ_US returns in the targeting exhibit; the truncating bootstrap draw comes from the example",

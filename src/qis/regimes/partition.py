@@ -4,7 +4,8 @@ the benchmark-return partition shared by every function of ``qis.regimes``.
 A partition is a vector of probabilities ``q`` running from 0 to 1; bucket ``s`` holds the
 periods whose benchmark return lies between the ``q[s]`` and ``q[s + 1]`` sample quantiles. The
 default is the one-sigma cut ``[0.0, 0.16, 0.84, 1.0]`` with the ids Bear, Normal and Bull, the
-default of ``BenchmarkReturnsQuantilesRegime`` and of ``compute_regime_sharpe_decomposition``.
+default of ``BenchmarkReturnsQuantilesRegime`` and of ``compute_regime_sharpe_decomposition``, and
+the Bear, Normal and Bull regimes of Definition 1 of Sepp and Kastenholz (2026).
 Other bucket counts use the ordered ids Q1 to Qn, again as the classifier does.
 
 Classification is ``qis.utils.quantile_buckets``, the one quantile rule of qis: buckets are closed

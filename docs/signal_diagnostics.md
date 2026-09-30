@@ -49,7 +49,7 @@ credible when both agree.
 |---|---|
 | Return basis | Log returns by default (`is_log_returns=True`): $h$ native log returns are summed; with `False`, simple returns are compounded. Returns are used as supplied, total or excess |
 | Sampling grid | Each asset's native grid, the pandas frequency key of `asset_returns_dict`; integer $h$ counts native periods and pairs are taken every $h$-th date; a string horizon resamples all NAVs to that frequency |
-| Annualisation | None for $\hat\beta$, the ICs and the pooled t-statistic; `IC_IR_an` multiplies the IC ratio by $\sqrt{\mathrm{AN}_h}$, the IC periods per year: $\mathrm{AN}/h$ for integer $h$, with $\mathrm{AN}$ from `qis.get_annualization_factor` of the finest native key (or `periods_per_year`), and `get_annualization_factor(label)` for a string horizon |
+| Annualisation | None for $\hat\beta$, the ICs and the pooled t-statistic; `IC_IR_an` multiplies the IC ratio by $\sqrt{\mathrm{af}_h}$, the IC periods per year: $\mathrm{af}/h$ for integer $h$, with $\mathrm{af}$ from `qis.get_annualization_factor` of the finest native key (or `periods_per_year`), and `get_annualization_factor(label)` for a string horizon |
 | Mean adjustment | Forward returns are demeaned across names at each date and divided by their cross-sectional $s_t$ (`ddof=1`); signals are not transformed; the pooled regression has no intercept, and its residual variance charges one degree of freedom per date for the demeaning; $s(\mathrm{IC})$ uses `ddof=1` |
 | Timing | The signal last observed in the native period ending at $t-1$ is paired with the return over $(t-1,t-1+h]$; qis applies exactly one native-period lag |
 | Output units | $\hat\beta$ in cross-sectional standard deviations of forward return per unit of signal; ICs, t-statistics and IC ratios dimensionless; hit rate a fraction |
@@ -73,7 +73,7 @@ credible when both agree.
 | $\mathrm{IC}^{\mathrm{P}}_t$, $\mathrm{IC}^{\mathrm{S}}_t$ | Pearson and Spearman IC at date $t$ | In $[-1,1]$ |
 | $\overline{\mathrm{IC}}$, $s(\mathrm{IC})$ | Time-series mean and standard deviation of the per-date IC | Over $T$ dates, `ddof=1` |
 | $\mathrm{IR}_{\mathrm{IC}}$ | IC information ratio | Per IC period; column `IC_IR` |
-| $\mathrm{AN}_h$ | Periods per year of the IC series of horizon $h$ | $\mathrm{AN}/h$, or the string horizon's own factor |
+| $\mathrm{af}_h$ | Periods per year of the IC series of horizon $h$ | $\mathrm{af}/h$, or the string horizon's own factor |
 | $\mathrm{HR}$ | Hit rate | Fraction of dates with $\mathrm{IC}_t>0$ |
 | $\mathrm{BR}$ | Breadth: independent bets per year | Grinold (1989) |
 | $\Phi$ | Standard normal distribution function | |
@@ -438,7 +438,7 @@ $$
 \qquad
 \mathrm{IR}_{\mathrm{IC}}=\frac{\overline{\mathrm{IC}}}{s(\mathrm{IC})},
 \qquad
-\mathrm{IR}^{\mathrm{ann}}_{\mathrm{IC}}=\mathrm{IR}_{\mathrm{IC}}\sqrt{\mathrm{AN}_h},\\
+\mathrm{IR}^{\mathrm{ann}}_{\mathrm{IC}}=\mathrm{IR}_{\mathrm{IC}}\sqrt{\mathrm{af}_h},\\
 \mathcal{T}_{\mathrm{IC}}&=\mathrm{IR}_{\mathrm{IC}}\sqrt{T},
 \qquad
 \mathrm{HR}=\frac{1}{T}\sum_{t}\mathbf{1}\big\{\mathrm{IC}_t>0\big\},
@@ -469,14 +469,14 @@ points to a skewed IC: many small wins and a few large losses.
 #### Annualisation of the IC ratio
 
 An integer horizon $h$ samples every $h$-th native period, so its IC series has
-$\mathrm{AN}_h=\mathrm{AN}/h$ periods per year. $\mathrm{AN}$ is `periods_per_year` if given and
+$\mathrm{af}_h=\mathrm{af}/h$ periods per year. $\mathrm{af}$ is `periods_per_year` if given and
 otherwise `qis.get_annualization_factor` of the finest native key among the pairs'
 `asset_freq`, which sets the IC dates when cadences are mixed. A string horizon is its own grid:
-$\mathrm{AN}_h$ is `qis.get_annualization_factor` of the label, and `periods_per_year` does not
+$\mathrm{af}_h$ is `qis.get_annualization_factor` of the label, and `periods_per_year` does not
 apply to it. The factors are those of every other annualised statistic in qis, whatever the
 sample length:
 
-| IC dates | Native key | $h$ | $\mathrm{AN}_h$ |
+| IC dates | Native key | $h$ | $\mathrm{af}_h$ |
 |---|---|---:|---:|
 | Month-ends | `'ME'` | 1 | 12 |
 | Every third month-end | `'ME'` | 3 | 4 |
@@ -485,7 +485,7 @@ sample length:
 | Business days | `'B'` | 1 | 252 |
 | Year-ends | string horizon `'YE'` | | 1 |
 
-Up to qis 5.30.3, $\mathrm{AN}_h$ was 365.25 divided by the median day gap of the IC dates, which
+Up to qis 5.30.3, $\mathrm{af}_h$ was 365.25 divided by the median day gap of the IC dates, which
 gave 11.78 on month-ends and 365.25 on business days, overstating the business-day annualised
 ratio by $\sqrt{365.25/252}=1.20$, and a `periods_per_year` argument was applied unscaled to every
 horizon.
@@ -513,10 +513,10 @@ $s(\mathrm{IC})\approx1/\sqrt{n_t-1}$ for the Pearson and the rank IC alike, hen
 $$
 \mathrm{IR}_{\mathrm{IC}}\approx\overline{\mathrm{IC}}\,\sqrt{n_t-1},
 \qquad
-\mathrm{IR}^{\mathrm{ann}}_{\mathrm{IC}}\approx\overline{\mathrm{IC}}\,\sqrt{(n_t-1)\,\mathrm{AN}} ,
+\mathrm{IR}^{\mathrm{ann}}_{\mathrm{IC}}\approx\overline{\mathrm{IC}}\,\sqrt{(n_t-1)\,\mathrm{af}} ,
 $$
 
-the fundamental law with $\mathrm{BR}=(n_t-1)\,\mathrm{AN}$; demeaning uses one degree of freedom
+the fundamental law with $\mathrm{BR}=(n_t-1)\,\mathrm{af}$; demeaning uses one degree of freedom
 per date. Read backwards, $1/s(\mathrm{IC})^2$ is an effective breadth per period. It falls below
 $n_t-1$ when names are correlated after normalisation or when the true IC varies through time.
 
@@ -665,7 +665,7 @@ np.testing.assert_allclose(design_effect, (n_names - 1) / breadth, atol=0.01)
 ```
 
 The rank IC averages 0.0467 with a standard deviation of 0.2176 across the 60 months, so
-$\mathrm{IR}_{\mathrm{IC}}=0.215$ per month. Annualised with $\mathrm{AN}_1=12$, the qis factor of
+$\mathrm{IR}_{\mathrm{IC}}=0.215$ per month. Annualised with $\mathrm{af}_1=12$, the qis factor of
 month-ends, it is 0.744; the calendar ratio $365.25/31=11.78$ used up to qis 5.30.3 gave 0.737.
 At horizon 3 the factor is $12/3=4$. The t-statistic
 is 1.66, identical to `scipy.stats.ttest_1samp`, and the IC is positive in 35 of 60 months
@@ -737,7 +737,7 @@ of 0.81, and the genuine signal is lost.
 | Per-asset slope | Pooled estimator on one asset's time series, at least 12 pairs, classical $n-1$ (or $n-2$) degrees of freedom | `qis.compute_per_asset_betas(result, min_obs_per_asset=12, fit_intercept=False)` |
 | Per-date IC | $\mathrm{IC}^{\mathrm{S}}_t$ or $\mathrm{IC}^{\mathrm{P}}_t$ with at least 5 names; any other `method` raises `ValueError` | `qis.compute_ic_timeseries(result, method='spearman', return_col='r_norm_univ', min_obs_per_date=5)` |
 | IC summary | $T$, $\overline{\mathrm{IC}}$, $s(\mathrm{IC})$, $\mathrm{IR}_{\mathrm{IC}}$, $\mathrm{IR}^{\mathrm{ann}}_{\mathrm{IC}}$, $\mathcal{T}_{\mathrm{IC}}$, $\mathrm{HR}$ | `qis.estimate_ic_ir(result, method='spearman', return_col='r_norm_univ', periods_per_year=None, min_obs_per_date=5)` |
-| Periods per year | $\mathrm{AN}_h=\mathrm{AN}/h$, or the string horizon's factor | `qis.get_annualization_factor`; internal `_ic_periods_per_year` |
+| Periods per year | $\mathrm{af}_h=\mathrm{af}/h$, or the string horizon's factor | `qis.get_annualization_factor`; internal `_ic_periods_per_year` |
 | Result container | Tables, pairs and labels | `qis.SignalDiagnosticsResult` |
 | Column names | `n`, `beta`, `se`, `t_stat`, `IC_pearson`, `IC_spearman` | `qis.SignalDiagnosticsColumns` members `N`, `BETA`, `SE`, `T_STAT`, `IC_PEARSON`, `IC_SPEARMAN` |
 | Conditional-return boxplot | $x$ by quantile bucket of $z$; title with $\hat\beta$, $\mathcal{T}_{\beta}$, pooled Pearson IC, $n$ | `qis.plot_signal_diagnostics_boxplot(result, horizon, num_buckets=10)` |
@@ -828,7 +828,7 @@ not the estimator's `(1, 3, 6)`, and they use the estimator's defaults for `fit_
   today's constituents tests the signal only on survivors. A window or a string-horizon period
   that contains a missing return is dropped, so a name's final, often large and negative, return
   before delisting is lost unless it is recorded, and the period in which it delists never enters.
-- **Annualisation.** `IC_IR_an` uses the qis factor of the IC grid, $\mathrm{AN}/h$: 12 on
+- **Annualisation.** `IC_IR_an` uses the qis factor of the IC grid, $\mathrm{af}/h$: 12 on
   month-ends, 252 on business days, 4 for $h=3$ on month-ends. A `periods_per_year` override is
   the factor of the native grid and is divided by $h$ in the same way.
 - **Many signals.** Screening many signals and horizons and reporting the best inflates the

@@ -1071,8 +1071,8 @@ def _ic_periods_per_year(
 
     A string horizon ('YE', 'QE', ...) is its own grid:
     ``get_annualization_factor(label)``. An integer horizon h samples every
-    h-th native period, so its IC series has ``AN / h`` periods per year,
-    where AN is ``periods_per_year`` if given, and otherwise the qis
+    h-th native period, so its IC series has ``af / h`` periods per year,
+    where af is ``periods_per_year`` if given, and otherwise the qis
     annualisation factor of the finest native frequency in the pairs
     (``asset_freq``), which sets the IC dates.
     """
@@ -1153,8 +1153,8 @@ def estimate_ic_ir(
 
     ``AN_h`` is the number of IC periods per year. A string horizon uses
     ``qis.get_annualization_factor(label)`` (1 for 'YE'). An integer
-    horizon h samples every h-th native period, so ``AN_h = AN / h`` with
-    AN the qis annualisation factor of the finest native frequency in the
+    horizon h samples every h-th native period, so ``AN_h = af / h`` with
+    af the qis annualisation factor of the finest native frequency in the
     pairs (12 for 'ME', 4 for 'QE', 252 for 'B'), or ``periods_per_year``
     when given.
 
