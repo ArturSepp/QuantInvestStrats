@@ -47,10 +47,10 @@ portfolios, and `matrix_regularization` for eigenvalue clipping.
 |---|---|
 | Return basis | Caller's returns for `compute_masked_covar_corr` and the EWM correlation functions; `estimate_rolling_ewma_covar` forms log returns from prices |
 | Sampling grid | Native rows of the input; `estimate_rolling_ewma_covar` samples prices at `returns_freq` and reports on `rebalancing_freq` dates |
-| Annualisation | Per period unless stated: a covariance annualises by $\mathrm{AN}$, a volatility by $\sqrt{\mathrm{AN}}$, a correlation not at all; `estimate_rolling_ewma_covar` multiplies by $\mathrm{AN}$ inferred from its return grid |
+| Annualisation | Per period unless stated: a covariance annualises by $\mathrm{af}$, a volatility by $\sqrt{\mathrm{af}}$, a correlation not at all; `estimate_rolling_ewma_covar` multiplies by $\mathrm{af}$ inferred from its return grid |
 | Mean adjustment | Sample mean with `ddof=1` (common sample); overlap means of each pair (pairwise covariance and correlation); EWM mean of the previous date, rescaled by $N/(N+1)$ (`estimate_rolling_ewma_covar`); none (EWM correlations) |
 | Timing | Full-sample and pairwise matrices use the whole sample and are descriptive; an EWM matrix dated $t$ uses returns up to and including $t$ and serves a decision at $t$ applied over $(t,t+1]$ |
-| Output units | Covariance in squared return units per period, or per year after $\mathrm{AN}$; correlations and variance shares dimensionless; eigen-portfolios scaled to unit variance in the units of $\Sigma$ |
+| Output units | Covariance in squared return units per period, or per year after $\mathrm{af}$; correlations and variance shares dimensionless; eigen-portfolios scaled to unit variance in the units of $\Sigma$ |
 | qis default | `estimate_rolling_ewma_covar(returns_freq='W-WED', rebalancing_freq='QE', span=52, demean=True, apply_an_factor=True)`; `compute_ewm_corr_df(ewm_lambda=0.94)`; `matrix_regularization(cut=1e-5)` |
 
 | Symbol or input | Meaning | Units and convention |
@@ -116,7 +116,7 @@ a congruence: $w^{\top}\rho w=u^{\top}\hat\Sigma u$ with $u=\Delta^{-1}w$. $\squ
 
 **Identity (scale invariance of correlation).** For $c>0$ and a positive diagonal $\Gamma$, the
 matrices $\Sigma$ and $c\,\Gamma\Sigma\Gamma$ have the same correlation matrix. In particular the
-annualised covariance $\mathrm{AN}\,\Sigma$, the per-period $\Sigma$, and the $d=0$ and $d=1$
+annualised covariance $\mathrm{af}\,\Sigma$, the per-period $\Sigma$, and the $d=0$ and $d=1$
 estimates all share one correlation matrix.
 
 **Proof.** The rescaling maps $\Sigma_{ij}\mapsto c\gamma_i\gamma_j\Sigma_{ij}$ and
@@ -124,8 +124,8 @@ $\sigma_i\mapsto\sqrt{c}\,\gamma_i\sigma_i$, so the factor $c\gamma_i\gamma_j$ c
 $\Sigma_{ij}/(\sigma_i\sigma_j)$. $\square$
 
 A covariance is a second moment and annualises like a variance:
-$\Sigma^{\mathrm{ann}}=\mathrm{AN}\,\Sigma$ and
-$\sigma^{\mathrm{ann}}_i=\sqrt{\mathrm{AN}}\,\sigma_i$. The invariance is algebraic. Whether the
+$\Sigma^{\mathrm{ann}}=\mathrm{af}\,\Sigma$ and
+$\sigma^{\mathrm{ann}}_i=\sqrt{\mathrm{af}}\,\sigma_i$. The invariance is algebraic. Whether the
 annualised matrix describes annual returns depends on serial and cross-serial correlation, which
 asynchronous closes and stale prices create; see [serial dependence](serial_dependence.md) and
 [reporting frequency and annualisation](frequency_convention_note.md).
@@ -246,10 +246,10 @@ this section states how the function uses them.
    returns as well, counted from its own first return, so an asset enters with at least $k+1$
    returns. The default `None` masks only the dates before the first return.
 5. **Sampling and annualisation.** The function returns a dictionary from each date in
-   $\mathcal{T}_{\mathrm{reb}}$ to $\mathrm{AN}\,\hat\Sigma_t$. A rebalancing date is the first
+   $\mathcal{T}_{\mathrm{reb}}$ to $\mathrm{af}\,\hat\Sigma_t$. A rebalancing date is the first
    return date on or after each scheduled `rebalancing_freq` date
    (`qis.generate_rebalancing_indicators`); a `time_period` keeps the dates within its start and
-   end, while the recursion still runs from the first price. $\mathrm{AN}$ comes from
+   end, while the recursion still runs from the first price. $\mathrm{af}$ comes from
    `qis.infer_annualisation_factor_from_df` on the return grid, 52 for `W-WED`; an irregular grid
    falls back to 252 with a warning. `apply_an_factor=False` returns per-period matrices.
 
@@ -688,7 +688,7 @@ np.testing.assert_allclose(np.linalg.eigvalsh(repaired), [0.0, 1.5, 1.5], atol=1
 The synthetic panel starts with three instruments whose design volatilities are 17%, 6% and 15%.
 The EWM mean of `qis.compute_ewm` equals the direct recursion, and $x_t-m_t$ is exactly
 $\lambda$ times the forecast error $x_t-m_{t-1}$, with $\lambda=51/53$ for a span of 52 weeks.
-The weekly grid gives $\mathrm{AN}=52$.
+The weekly grid gives $\mathrm{af}=52$.
 
 ```python
 from qis.datasets import generate_synthetic_prices
@@ -860,7 +860,7 @@ assert abs(residual_share - 0.573) < 5e-4 and np.sum(nu_all > scaled_edges[1]) =
 | Common-sample or pairwise covariance | $\hat\Sigma$, or $\hat\Sigma^{\mathrm{pair}}$ with NaN | `qis.compute_masked_covar_corr(data, is_covar=True, bias=False)` |
 | Common-sample or pairwise correlation | $\rho$, or $\hat\rho^{\mathrm{pair}}$ with NaN | `qis.compute_masked_covar_corr(data, is_covar=False)` |
 | Pearson correlation of matching columns | Centred, full sample | `qis.compute_path_corr(a1, a2)` |
-| Rolling EWM covariance | $\mathrm{AN}\,\hat\Sigma_t$ on $\mathcal{T}_{\mathrm{reb}}$, forecast errors $e_t$ scaled by $c_N$; NaN before each asset's first return | `qis.estimate_rolling_ewma_covar(prices, time_period, returns_freq, rebalancing_freq, span, is_apply_vol_normalised_returns, demean, apply_an_factor, warmup_period)` |
+| Rolling EWM covariance | $\mathrm{af}\,\hat\Sigma_t$ on $\mathcal{T}_{\mathrm{reb}}$, forecast errors $e_t$ scaled by $c_N$; NaN before each asset's first return | `qis.estimate_rolling_ewma_covar(prices, time_period, returns_freq, rebalancing_freq, span, is_apply_vol_normalised_returns, demean, apply_an_factor, warmup_period)` |
 | Uncentred EWM correlation paths | $\rho^{\mathrm{u}}_{ij,t}$ per pair | `qis.compute_ewm_corr_df(df, corr_matrix_output, span, ewm_lambda, init_value, init_type)`, `qis.CorrMatrixOutput` |
 | One uncentred EWM correlation path | $\rho^{\mathrm{u}}_{21,t}$ | `qis.compute_ewm_corr_single(returns, ewm_lambda, span, time_period)` |
 | Uncentred cosine similarity to a pivot | $\operatorname{cs}_k$ | `qis.corr_to_pivot_row(pivot, data, is_normalized=True, vol_scalers=None)` |

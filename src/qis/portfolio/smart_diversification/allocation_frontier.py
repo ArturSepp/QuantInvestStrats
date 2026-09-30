@@ -1,8 +1,15 @@
-"""Plot supplied overlay-stack statistics and solved allocation frontiers.
+"""
+the coverage-floor exhibit: stacked portfolios and a solved allocation frontier.
 
-This module performs no estimation or optimisation. Statistics must describe the same
-sample, benchmark regimes and Sharpe convention. Frontier rows are joined in supplied
-policy order, including repeated points where a constraint is slack.
+``plot_overlay_allocation_frontier`` draws, in the coordinates of Bear contribution and Sharpe
+ratio, the benchmark, the stacked portfolios of the benchmark plus one overlay each, and the
+optimal stacked portfolios along a coverage floor: Figure 4 of Sepp and Kastenholz (2026), whose
+replication draws it with this function. The module performs no estimation or optimisation. The
+statistics come from ``qis.regimes.compute_regime_premium_table`` on stacked-portfolio returns,
+and the allocations from the maximum-Sharpe program with a Bear coverage floor, the paper's
+program (11), which optimalportfolios solves. All statistics must share one sample, one benchmark
+classification and one Sharpe convention. Frontier rows are joined in the order supplied,
+including repeated points where the floor is slack.
 """
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
@@ -43,46 +50,50 @@ def plot_overlay_allocation_frontier(
         bbox_to_anchor: Optional[Tuple[float, float]] = (0.5, -0.14),
         ncols: int = 2,
 ) -> Optional[plt.Figure]:
-    """Draw grouped portfolio points and an optional solved coverage-floor frontier.
+    """Stacked portfolios by group and an optional solved coverage-floor frontier.
 
-    Pass tables produced by qis.regimes.compute_regime_premium_table or equivalent
-    precomputed coordinates. A fund point must describe the core plus that fund at the
-    chosen budget, rather than the standalone fund. Weights and optimiser objects are
-    not required. The function does not fit, sort, round or recompute coordinates.
+    Every point is a portfolio, not a standalone overlay: the benchmark itself, or the benchmark
+    at weight one plus an overlay at the chosen budget, the stacked portfolio of Sepp and
+    Kastenholz (2026, Definition 3). Build the stacked returns ``r_B + w r_i`` first and pass
+    them, with the benchmark, through ``qis.regimes.compute_regime_premium_table``, whose
+    ``bear_sharpe`` and ``sharpe`` columns are the default coordinates. Compute the frontier rows
+    the same way from the solved allocations. Weights and optimiser objects are not needed, and
+    the function does not fit, sort, round or recompute coordinates.
 
     Args:
-        portfolio_stats: statistics indexed by unique portfolio names.
-        frontier_stats: solved portfolios in policy order; None draws only the points.
-            Repeated coordinate pairs are retained, for example when the floor is slack.
-        groups: group labels indexed by portfolio name; must cover every plotted point.
-            None groups the points together and labels the benchmark separately.
-        benchmark: portfolio name whose x coordinate sets the vertical reference line.
-        group_styles: per-group matplotlib scatter options, such as color, marker, s
-            and label. Omitted groups use the matplotlib colour cycle.
-        highlights: per-portfolio scatter options for selected allocations. These points
-            are drawn once, separately from their groups, and labelled in the legend.
-        annotations: names to annotate; None annotates all non-highlighted points.
-            An empty sequence suppresses annotations.
-        label_offsets: text offsets in points keyed by portfolio name.
-        x_column: coordinate column in both tables, defaulting to the Bear contribution.
-        y_column: coordinate column in both tables, defaulting to total Sharpe.
-        frontier_label: legend label for the connected frontier.
-        frontier_color: colour of the frontier line.
-        xlabel: horizontal axis label, including the applicable convention if needed.
-        ylabel: vertical axis label.
-        title: optional plot title.
-        legend_loc: legend location; None suppresses the legend. The default places
-            its upper centre below the axes, with two columns and no frame.
-        figsize: size of a new figure.
-        ax: axis to draw on; None creates a figure.
-        bbox_to_anchor: legend anchor in axes coordinates; None uses legend_loc alone.
-        ncols: number of legend columns.
+        portfolio_stats: statistics of the benchmark and the stacked portfolios, indexed by
+            unique portfolio names
+        frontier_stats: statistics of the solved portfolios in the order of the floor; None
+            draws only the points. Repeated coordinate pairs are kept, as where the floor is slack
+        groups: group label by portfolio name, covering every point of ``portfolio_stats``; None
+            puts the points in one group and the benchmark in its own
+        benchmark: name of the benchmark row, whose x coordinate sets the dashed vertical line
+        group_styles: matplotlib scatter options by group, such as color, marker, s and label;
+            groups without options use the matplotlib colour cycle
+        highlights: scatter options by portfolio name for selected allocations, drawn once apart
+            from their groups and named in the legend
+        annotations: names of the points to label; None labels every point that is not
+            highlighted, and an empty sequence none
+        label_offsets: label offsets in points by portfolio name
+        x_column: column of the x coordinate in both tables, the Bear contribution by default
+        y_column: column of the y coordinate in both tables, the Sharpe ratio by default
+        frontier_label: legend label of the frontier
+        frontier_color: colour of the frontier line
+        xlabel: x-axis label; state the Sharpe convention when it matters
+        ylabel: y-axis label
+        title: optional title
+        legend_loc: legend location; None draws no legend. The default puts the legend's upper
+            centre below the axes, in two columns without a frame
+        figsize: size of a new figure
+        ax: axis to draw on; None creates a figure
+        bbox_to_anchor: legend anchor in axes coordinates; None uses ``legend_loc`` alone
+        ncols: number of legend columns
 
     Returns:
-        The new figure, or None when an axis is supplied.
+        the new figure, or None when ``ax`` is given
 
     Raises:
-        ValueError: if coordinates, row labels, groups or selected names are invalid.
+        ValueError: if the coordinates, the row labels, the groups or a selected name are invalid
     """
     if x_column == y_column:
         raise ValueError('x_column and y_column must differ.')

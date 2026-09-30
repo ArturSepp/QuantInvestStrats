@@ -49,7 +49,7 @@ above, which is why an undiversified VaR is never below a correlated one for the
 |---|---|
 | Return basis | Static contributions take $\Sigma$ as supplied; the VaR functions use log returns; `compute_portfolio_vol` uses the caller's returns; `PortfolioData.compute_portfolio_vol` and the P&L shares use simple returns |
 | Sampling grid | The covariance's own grid; `freq='B'` for the VaR functions; `W-WED` for `PortfolioData.compute_portfolio_vol` |
-| Annualisation | None for contributions and VaR, which keep the units of $\Sigma$ or of one period; `annualize=True` multiplies the variance by $\mathrm{AN}$, so the volatility scales by $\sqrt{\mathrm{AN}}$; the VaR cap converts annual volatilities to one day with $\mathrm{AN}=252$ |
+| Annualisation | None for contributions and VaR, which keep the units of $\Sigma$ or of one period; `annualize=True` multiplies the variance by $\mathrm{af}$, so the volatility scales by $\sqrt{\mathrm{af}}$; the VaR cap converts annual volatilities to one day with $\mathrm{af}=252$ |
 | Mean adjustment | None by default: EWM second moments about zero (`MeanAdjType.NONE`); P&L risk shares are sample covariances about the sample means |
 | Timing | Static weights and $\Sigma$ share one date; EWM volatility pairs $w_{t-1}$ with $\hat\Sigma_t$, which includes $r_t$; the VaR functions pair $w_t$ with $\hat\Sigma_t$; every recursion starts from a zero matrix, so no estimate uses a later observation |
 | Output units | Contributions in the volatility units of $\Sigma$; ratios dimensionless and summing to one; VaR as a decimal fraction of NAV per period; VaR limits in basis points |
@@ -321,8 +321,8 @@ $$
 
 with $\lambda=1-2/(N+1)$ when `span` $N$ is given and `ewm_lambda` otherwise; the default
 $\lambda=0.94$ is the RiskMetrics daily decay ([J.P. Morgan and Reuters, 1996](#references)). With
-`annualize=True` the variance is multiplied by $\mathrm{AN}$, inferred from the weights' index,
-and `is_return_vol=True` returns $\sqrt{\mathrm{AN}\,\hat\sigma^2_{p,t}}$. The weights applied
+`annualize=True` the variance is multiplied by $\mathrm{af}$, inferred from the weights' index,
+and `is_return_vol=True` returns $\sqrt{\mathrm{af}\,\hat\sigma^2_{p,t}}$. The weights applied
 over $(t-1,t]$ meet a covariance updated by the return $r_t$ they earn. The estimate is the EWM
 variance of the held portfolio as of $t$, not a forecast for $(t,t+1]$; that forecast pairs
 $w_t$ with $\hat\Sigma_t$ and is what `weight_lag=0` returns. Missing returns and weights are set
@@ -468,17 +468,17 @@ weights.
 > correlated figure's weights and seeded it from the full sample, so the order could invert.
 
 `limit_weights_to_max_var_limit(weights, vols, max_var_limit_bp=25.0, annualization_factor=252.0)`
-takes volatilities $\sigma_i$ annualised with $\mathrm{AN}$, converts them to one period with
-$\sqrt{\mathrm{AN}}$, and caps each weight whose standalone one-period VaR exceeds the limit:
+takes volatilities $\sigma_i$ annualised with $\mathrm{af}$, converts them to one period with
+$\sqrt{\mathrm{af}}$, and caps each weight whose standalone one-period VaR exceeds the limit:
 
 $$
-\mathrm{VaR}^{\mathrm{bp}}_i=10^{4}\,z_{0.99}\,\lvert w_i\rvert\,\frac{\sigma_i}{\sqrt{\mathrm{AN}}},
+\mathrm{VaR}^{\mathrm{bp}}_i=10^{4}\,z_{0.99}\,\lvert w_i\rvert\,\frac{\sigma_i}{\sqrt{\mathrm{af}}},
 \qquad
-w_i\leftarrow\operatorname{sign}(w_i)\,\frac{L_{\mathrm{bp}}\sqrt{\mathrm{AN}}}{10^{4}z_{0.99}\,\sigma_i}
+w_i\leftarrow\operatorname{sign}(w_i)\,\frac{L_{\mathrm{bp}}\sqrt{\mathrm{af}}}{10^{4}z_{0.99}\,\sigma_i}
 \quad\text{if }\mathrm{VaR}^{\mathrm{bp}}_i>L_{\mathrm{bp}} .
 $$
 
-The cap is per instrument and ignores correlation. The default $\mathrm{AN}=252$ is the factor qis
+The cap is per instrument and ignores correlation. The default $\mathrm{af}=252$ is the factor qis
 applies to business-day returns, so volatilities from `compute_ewm_vol(..., annualize=True)` on a
 `B` grid convert back to one day exactly. The former default of 260 understated the one-day VaR by
 the factor $\sqrt{252/260}\approx0.985$ and let a capped position run about 1.6% above the limit;
@@ -764,7 +764,7 @@ np.testing.assert_allclose(truncated.to_numpy(), port_var.iloc[:60].to_numpy(), 
                            atol=0.0)
 annualised = qis.compute_portfolio_vol(returns=returns, weights=weights, span=span,
                                        annualize=True)
-assert isclose(annualised.iloc[-1], ann_pit[-1], rel_tol=1e-12)  # AN = 252 on a 'B' index
+assert isclose(annualised.iloc[-1], ann_pit[-1], rel_tol=1e-12)  # af = 252 on a 'B' index
 ```
 
 The Numba kernel `compute_portfolio_var_np` takes the seed as `covar0`. Passing the final state of
@@ -854,10 +854,10 @@ np.testing.assert_allclose(standalone_shares.to_numpy(), [0.649, 0.130, 0.220], 
 | Factor active variance | $e^{\top}\Sigma_x e+d^{\top}\Psi d$ | internal `qis.portfolio.risk.contributions.calculate_active_risk_squared` |
 | Gradient of active variance | $2B^{\top}\Sigma_x e+2\Psi d$ | internal `qis.portfolio.risk.contributions.calculate_marginal_active_risk` |
 | EWM portfolio variance path | $w_t^{\top}\hat\Sigma_t w_t$ on the rows passed, $\hat\Sigma_0$ from `covar0` or zero | `qis.compute_portfolio_var_np(returns, weights, span=None, ewm_lambda=0.94, covar0=None)` |
-| EWM portfolio volatility | $\sqrt{\mathrm{AN}\,w_{t-1}^{\top}\hat\Sigma_t w_{t-1}}$; $w_t$ with `weight_lag=0` | `qis.compute_portfolio_vol(..., annualize=True, weight_lag=1)` |
+| EWM portfolio volatility | $\sqrt{\mathrm{af}\,w_{t-1}^{\top}\hat\Sigma_t w_{t-1}}$; $w_t$ with `weight_lag=0` | `qis.compute_portfolio_vol(..., annualize=True, weight_lag=1)` |
 | Correlated VaR by group | $z_{0.99}\sqrt{w_{g,t}^{\top}\hat\Sigma_{g,t}w_{g,t}}$ | `qis.compute_portfolio_correlated_var_by_groups` |
 | Undiversified VaR | $z_{0.99}\lvert w_{i,t}\rvert\hat\sigma_{i,t}$ and group sums | `qis.compute_portfolio_independent_var_by_ac` |
-| VaR weight cap | $\lvert w_i\rvert\le L_{\mathrm{bp}}\sqrt{\mathrm{AN}}/(10^{4}z_{0.99}\sigma_i)$, $\mathrm{AN}=252$ | `qis.limit_weights_to_max_var_limit` |
+| VaR weight cap | $\lvert w_i\rvert\le L_{\mathrm{bp}}\sqrt{\mathrm{af}}/(10^{4}z_{0.99}\sigma_i)$, $\mathrm{af}=252$ | `qis.limit_weights_to_max_var_limit` |
 | Backtest EWM volatility | as above, simple returns, `W-WED`, span 13 | `PortfolioData.compute_portfolio_vol` |
 | Backtest VaR | the two VaR functions on realised weights | `PortfolioData.compute_portfolio_vars(is_correlated=True, freq='B', vol_span=33)` |
 | Covariance-implied risk | $\sigma_p$ and $\mathrm{RC}_i$ with as-of weights | `PortfolioData.compute_ex_anti_portfolio_vol_implied_by_covar`, `PortfolioData.compute_risk_contributions_implied_by_covar` |

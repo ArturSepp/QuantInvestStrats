@@ -36,7 +36,7 @@ the page forms and links to scripts for regenerating their analytics.
 |---|---|
 | Return basis | Simple returns build levels; table volatility uses log returns |
 | Sampling grid | The reporting preset grid; running drawdowns use the native path |
-| Annualisation | $\mathrm{AN}$ of the base grid: 252, 52, 12 or 4 |
+| Annualisation | $\mathrm{af}$ of the base grid: 252, 52, 12 or 4 |
 | Mean adjustment | Sample moments, demeaned, as in the performance statistics |
 | Timing | Units are held between rebalancings; weights at $t$ apply over $(t,t+1]$ |
 | Output units | Decimal returns, dimensionless ratios and two-sided turnover |

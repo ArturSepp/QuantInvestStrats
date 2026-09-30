@@ -13,6 +13,10 @@ the principal too, with a cross-sectional fit.
 A candidate-overlay exhibit, not a track record: unlike ``strategy_factsheet.py`` it carries no
 realised weights, turnover or costs. Until qis 5.31.0 this module was
 ``qis/portfolio/reports/overlays_smart_diversification.py``; that import path remains valid.
+
+The two default coordinates are those of Definition 4 (smart diversifier) of Sepp and Kastenholz
+(2026): an overlay whose curve moves right, to a better Bear contribution, and up, to a higher
+Sharpe ratio, is a smart diversifier of the principal.
 """
 # packages
 import warnings
@@ -48,6 +52,23 @@ PERF_COLUMNS = (
 @dataclass
 class SmartDiversificationReport:
     """Diversification frontiers of candidate overlays stacked on a principal portfolio.
+
+    The fixed-principal mixes hold the principal at full weight and the overlay on top, and the
+    backtest finances that leverage at a zero rate. Pass excess-of-cash navs for both, as for the
+    stacked portfolio ``r_B + w r_A`` of Sepp and Kastenholz (2026, Definition 3); total-return navs
+    overstate every levered mix by the overlay weight times the cash return.
+
+    The defaults are quarterly regimes and the per-annum Sharpe convention. The paper's settings
+    are monthly regimes and the arithmetic Sharpe ratio of its equation (2)::
+
+        SmartDiversificationReport(
+            overlay_navs=excess_overlay_navs, principal_nav=excess_principal_nav,
+            regime_classifier=qis.BenchmarkReturnsQuantilesRegime(freq='ME'),
+            perf_params=qis.PerfParams(freq='ME',
+                                       sharpe_convention=qis.SharpeConvention.ARITHMETIC))
+
+    with ``rebalancing_freq='ME'`` in the curve methods, so that each mix return is the weighted
+    sum of the monthly returns, up to the rebalancing dates.
 
     Attributes:
         overlay_navs: navs of the candidate overlays, one column per overlay
@@ -178,19 +199,6 @@ class SmartDiversificationReport:
                               title=title,
                               ax=ax,
                               **kwargs)
-
-        if ax is None:
-            ax = fig.axes[0]
-        """
-        classification_data = sdi.create_regime_classification(
-            regime_classifier=self.regime_classifier, pivot_prices=principal_nav)
-
-        qis.add_regime_shadows_to_ax(ax=ax,
-                                     regime_classifier=self.regime_classifier,
-                                     classification_data=classification_data,
-                                     pivot_prices=principal_nav,
-                                     price_data_index=principal_nav.index)
-        """
         return fig
 
     def plot_ra_table(self,
@@ -613,14 +621,6 @@ def safe_polyfit(x, y, degree=3) -> np.ndarray:
     if len(x_clean) < degree + 1:
         # Not enough points for requested degree
         degree = max(1, len(x_clean) - 1)
-    """
-    # Normalize x for numerical stability
-    x_mean, x_std = np.mean(x_clean), np.std(x_clean)
-    if x_std > 0:
-        x_norm = (x_clean - x_mean) / x_std
-    else:
-        x_norm = x_clean - x_mean
-    """
     # Try fitting with decreasing polynomial degrees
     for deg in range(degree, 0, -1):
         try:

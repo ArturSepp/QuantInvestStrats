@@ -10,6 +10,11 @@ spread is the non-linearity the regimes reveal.
 ``compute_regime_betas_bootstrap`` resamples whole rows of the panel with the stationary block
 bootstrap, keeping the cross-section, and reclassifies the regimes inside each resample with the
 rule of ``qis.utils.quantile_buckets`` before re-estimating.
+
+In Sepp and Kastenholz (2026) the equality of the regime betas under the null is Proposition 3
+(capture symmetry), the regime regression is equation (9), and the betas and ``idio_vol`` are
+columns of the input sheet, Table 3. The bootstrap defaults, blocks of mean length 12 and 2,000
+resamples with reclassification, are those of their Appendix D on monthly returns.
 """
 # packages
 import numpy as np
@@ -42,7 +47,8 @@ def compute_regime_betas(sampled_returns_with_regime_id: pd.DataFrame,
     Returns:
         one row per asset other than the benchmark and, per regime id in bucket order,
         ``beta_<id>`` and ``n_<id>``, then ``beta_total`` and ``idio_vol``, the annualised
-        standard deviation of the pooled piecewise residuals
+        sample standard deviation (``ddof=1``) of the pooled piecewise residuals;
+        ``compute_regime_mixture_covar`` takes the per-period variance ``idio_vol ** 2 / af``
 
     Raises:
         ValueError: if an asset has fewer than ``min_periods`` common periods

@@ -8,6 +8,12 @@ classifiers produce. The subpackage depends on ``qis.utils``, ``qis.perfstats`` 
 ``qis.models`` only; drawing is in ``qis.plots.derived.regime_premium``.
 
 Imported explicitly, ``from qis.regimes import ...``; the names are not re-exported from ``qis``.
+
+The subpackage implements the regime statistics, the Gaussian null and the mixture covariance of
+Sepp, A., and Kastenholz, M. (2026), The Convexity Premium of Portfolio Overlays, Journal of
+Investment Management, forthcoming. Module and function docstrings name the result of the paper
+they implement; the handbook chapter maps every function to the paper's definitions, equations
+and exhibits: https://quantinveststrats.readthedocs.io/en/latest/convexity_premium.html
 """
 from qis.regimes.partition import (
     ONE_SIGMA_QUANTILES,

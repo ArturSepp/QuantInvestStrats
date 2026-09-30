@@ -49,8 +49,8 @@ total exposure, which is also the beta a long-horizon investor experiences.
 | Convention | This article |
 |---|---|
 | Return basis | Any stationary series; examples use periodic returns. For the Dimson beta, asset and market on the same basis (both total or both excess) |
-| Sampling grid | The input's own index: a lag $k$ counts rows, not calendar time. Block sums use `span` rows; `ewm_xy_convolution` uses $h=\mathrm{AN}$ of `freq` rows |
-| Annualisation | None: autocorrelations and betas are dimensionless. $\mathrm{AN}$ enters only through the variance-ratio scaling of $\sqrt{\mathrm{AN}}\,s(x)$ |
+| Sampling grid | The input's own index: a lag $k$ counts rows, not calendar time. Block sums use `span` rows; `ewm_xy_convolution` uses $h=\mathrm{af}$ of `freq` rows |
+| Annualisation | None: autocorrelations and betas are dimensionless. $\mathrm{af}$ enters only through the variance-ratio scaling of $\sqrt{\mathrm{af}}\,s(x)$ |
 | Mean adjustment | Standard ACF: full-sample mean. Lagged Pearson: each overlapping segment's own mean. EWM: an EWM mean or none, per function. Dimson: OLS intercept |
 | Timing | Full-sample estimators are descriptive. EWM estimates at $t$ use rows up to $t$: their states are seeded at zero by default, and a full-sample seed that looks ahead is available only on request |
 | Output units | Correlations in $[-1,1]$; EWM ratios can leave that range; betas in asset return per unit of market return; t-statistics |
@@ -271,8 +271,8 @@ sides vanish, and passes from $h$ to $h+1$ because both sides increase by
 $\phi(1-\phi^h)/(1-\phi)$. Dividing by $h$, doubling and adding one gives the formula, since
 $1+2\phi/(1-\phi)=(1+\phi)/(1-\phi)$. $\square$
 
-With $\mathrm{AN}$ periods per year, the population annual volatility of log returns is
-$\sqrt{\mathrm{AN}}\,\sigma\sqrt{\mathrm{VR}(\mathrm{AN})}$, not $\sqrt{\mathrm{AN}}\,\sigma$.
+With $\mathrm{af}$ periods per year, the population annual volatility of log returns is
+$\sqrt{\mathrm{af}}\,\sigma\sqrt{\mathrm{VR}(\mathrm{af})}$, not $\sqrt{\mathrm{af}}\,\sigma$.
 For monthly data:
 
 | Monthly $\phi$ | $\mathrm{VR}(12)$ | $\sqrt{\mathrm{VR}(12)}$ | Limit $\sqrt{(1+\phi)/(1-\phi)}$ |
@@ -462,7 +462,7 @@ forward-fills, drops rows with any remaining NaN, demeans with the chosen `qis.M
 prefix of the sample reproduces the prefix of the full run. `MeanAdjType.INSAMPLE` breaks that.
 
 **Definition (EWM horizon autocorrelation).** `qis.ewm_xy_convolution` with
-`convolution_type=qis.ConvolutionType.AUTO_CORR` sets $h=\mathrm{AN}$ of `freq` from
+`convolution_type=qis.ConvolutionType.AUTO_CORR` sets $h=\mathrm{af}$ of `freq` from
 `qis.get_annualization_factor` and treats it as a whole number of rows, with the input assumed
 daily; a frequency whose factor is not a whole number, such as `'3QE'`, is rejected.
 With the rolling sum $S^{(h)}_t$ of the last $h$ rows, it reports the EWM correlation of each
@@ -793,7 +793,7 @@ assert abs(ewm_path.iloc[500:].std() - 0.097) < 5e-4
 | Block autocorrelation | $\hat\rho^{(h)}_1$ of end-aligned $h$-row block sums | `qis.compute_autocorrelation_at_int_periods(data, span=30)` |
 | EWM autocorrelation, vector | $\tilde\rho_{k,t}=\hat\gamma^{\lambda}_{k,t}/\hat\gamma^{\lambda}_{0,t}$, zero seeds | `qis.compute_ewm_vector_autocorr(a, ewm_lambda=0.94, lag=1, var_init_type=qis.InitType.ZERO)`, `qis.compute_ewm_vector_autocorr_df(data, span=30)` |
 | EWM lagged cross moments, matrix | $\bar\psi^{\mathrm{diag}}_t$, $\bar\psi^{\mathrm{off}}_t$ from $\Psi_t$ | `qis.compute_ewm_matrix_autocorr(a, ewm_lambda=0.94)` returns a tuple; `qis.compute_ewm_matrix_autocorr_df(data)` |
-| EWM horizon autocorrelation | $\hat\rho^{(h)}_{1,t}$ with $h=\mathrm{AN}$ of `freq`, zero seeds | `qis.ewm_xy_convolution(returns, freq, convolution_type=qis.ConvolutionType.AUTO_CORR, var_init_type=qis.InitType.ZERO)` |
+| EWM horizon autocorrelation | $\hat\rho^{(h)}_{1,t}$ with $h=\mathrm{af}$ of `freq`, zero seeds | `qis.ewm_xy_convolution(returns, freq, convolution_type=qis.ConvolutionType.AUTO_CORR, var_init_type=qis.InitType.ZERO)` |
 | Dimson beta | $\hat\beta_0$, $\beta_{\mathrm{D}}$, $\beta_{\mathrm{D}}/\hat\beta_0$, $\mathrm{se}_{\mathrm{D}}$, classical t-statistics | `qis.estimate_dimson_beta(asset_returns, market_returns, num_lags=3, min_obs=36)` |
 
 The estimators live in
@@ -846,7 +846,7 @@ Contract details not visible in the formulas:
 - **Cause.** Positive autocorrelation can come from smoothing, stale prices, asynchronous
   closes, or genuine momentum in returns. A significant `t_sum_lag` in the Dimson
   regression points to staleness; its absence with a positive $\hat\rho_1$ points elsewhere.
-- **Scaling.** Correct annualised volatility and Sharpe ratios with $\mathrm{VR}(\mathrm{AN})$, or
+- **Scaling.** Correct annualised volatility and Sharpe ratios with $\mathrm{VR}(\mathrm{af})$, or
   measure at the horizon of interest. Both are estimates: $\mathrm{VR}$ built from sample
   autocorrelations inherits their noise.
 - **Off-diagonal EWM ratios.** `off-diag` from `compute_ewm_matrix_autocorr_df` is a mean of
@@ -854,7 +854,7 @@ Contract details not visible in the formulas:
   contemporaneous covariance can dominate it; the median aggregation is more robust but mixes
   in the diagonal.
 - **Horizon convolution.** In `ewm_xy_convolution` the horizon, lag and EWM span are all the one
-  number $h=\mathrm{AN}$ of `freq`, counted in rows of an input assumed daily: `freq='ME'` means
+  number $h=\mathrm{af}$ of `freq`, counted in rows of an input assumed daily: `freq='ME'` means
   12 rows, not one month, whatever the grid of the input. A frequency whose factor is not a whole
   number of rows is rejected rather than rounded.
 - **Dimson truncation.** The default $L=3$ recovers a finite lag structure exactly but truncates

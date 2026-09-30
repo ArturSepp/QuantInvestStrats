@@ -21,7 +21,7 @@ on annualised log returns, with those ratio-only numerators sampled on the same 
 return columns retain native observed endpoints. The arithmetic pair ``SHARPE_ARITH`` and
 ``SHARPE_ARITH_EXCESS``,
 
-    SR = sqrt(AN) E[r] / sqrt(Var[r])
+    SR = sqrt(af) E[r] / sqrt(Var[r])
 
 on simple returns, is computed inline in ``compute_risk_table`` so numerator and denominator
 share one return series. ``compute_sharpe_arithmetic`` is a standalone helper with the same
@@ -469,7 +469,7 @@ def compute_risk_table(prices: pd.DataFrame,
     avg_log_return = returns_vol.mean()  # nanmean equivalent for pandas
 
     # ── Arithmetic Sharpe family ──
-    # SR_arith = sqrt(AN) * mean(r_m) / std(r_m) on simple returns at freq_vol
+    # SR_arith = sqrt(af) * mean(r_m) / std(r_m) on simple returns at freq_vol
     # (Sharpe 1994 plug-in estimator). Numerator and denominator are paired on the
     # same simple-return series and do not reuse the table vol, which follows
     # perf_params.return_type (LOG by default). The std(r) vs std(l) gap is first order in

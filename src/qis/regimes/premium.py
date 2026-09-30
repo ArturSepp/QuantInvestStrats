@@ -16,6 +16,13 @@ includes the sampling error of the regime cutoffs.
 Column names follow the regime ids: the one-sigma cut gives ``bear_sharpe``, ``normal_sharpe``,
 ``bull_sharpe``, ``null_bear_sharpe`` and ``bear_return_pa``, and Q1 to Qn partitions give
 ``q1_sharpe`` and so on, with the premium columns always on the lowest bucket.
+
+The table is the input sheet of Sepp and Kastenholz (2026, Table 3) without the regime betas,
+which ``compute_regime_betas`` adds. The contributions are Proposition 1, the premium Definition 2,
+the benchmark's premium and ``cp_star`` equations (5) and (6), and the in-sample residual form of
+``cp_star`` equation (13). ``bear_return_pa``, ``ann_vol`` times ``bear_sharpe``, is the paper's
+Bear-regime return contribution: for the benchmark its Bear-regime loss, and for an overlay the
+coefficient of the coverage floor of their program (11).
 """
 # packages
 import numpy as np
@@ -116,7 +123,9 @@ def compute_regime_premium_bootstrap(returns: pd.DataFrame,
         benchmark: name of the benchmark column
         af: annualisation factor of the periodic returns
         q: partition probabilities; None is the one-sigma cut
-        block_size: mean block length in periods
+        block_size: mean block length in periods; the default 8 is two years of quarterly
+            returns, and 12 on monthly returns is the block length of the regime-beta bootstrap
+            of Sepp and Kastenholz (2026, Appendix D)
         n_boot: number of resamples
         seed: seed of the resampling indices
         ci: coverage of the percentile interval

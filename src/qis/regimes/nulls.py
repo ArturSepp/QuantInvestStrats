@@ -22,7 +22,12 @@ returns; for regimes set by volatility or sign the decomposition still adds up, 
 loadings do not apply.
 
 ``compute_portfolio_bear_sharpe`` and ``compute_overlay_blend_frontier`` are the closed forms of
-the aggregation identity and of a benchmark-overlay blend in these coordinates.
+the aggregation identity and of a funded benchmark-overlay blend in these coordinates.
+
+In Sepp and Kastenholz (2026) the decomposition is Proposition 1, the Gaussian null on the
+one-sigma cut is Proposition 2, the convexity premium is Definition 2, the Student-t constant is
+equation (12) of Appendix A and the aggregation identity is Proposition 4. This module extends
+the null to any partition of the benchmark's returns.
 """
 # packages
 import numpy as np
@@ -68,7 +73,8 @@ def compute_regime_null_loadings(af: float,
     """Correlation loading of each regime contribution under the Gaussian or Student-t null.
 
     The null contribution of regime ``s`` is ``p_s SR + rho k_s``, with
-    ``k_s = sqrt(af) E[Z 1{Z in bucket s}]`` for a unit-variance margin ``Z``.
+    ``k_s = sqrt(af) E[Z 1{Z in bucket s}]`` for a unit-variance margin ``Z``. On the one-sigma
+    cut the loadings are ``-kappa``, 0 and ``+kappa``, Proposition 2 of Sepp and Kastenholz (2026).
 
     Args:
         af: annualisation factor of the periodic returns, 4 for quarterly regimes
@@ -128,6 +134,10 @@ def calibrate_student_t_nu(excess_kurtosis: float,
                            ) -> Optional[float]:
     """Student-t degrees of freedom matching a sample excess kurtosis, ``nu = 4 + 6 / kurt``.
 
+    Sepp and Kastenholz (2026, Appendix A) calibrate their 60/40 benchmark this way, to ``nu = 26``
+    on quarterly and ``nu = 14`` on monthly returns, where the Student-t kappa differs from the
+    Gaussian one by less than 0.001 and 0.002.
+
     Args:
         excess_kurtosis: sample excess kurtosis of the benchmark returns
         min_nu: floor of the result, above 4 so that the matched fourth moment exists
@@ -180,6 +190,10 @@ def compute_convexity_premium(sr_bear: float,
                               ) -> float:
     """Convexity premium, the realised Bear contribution less its null ``p SR - kappa rho``.
 
+    Definition 2 of Sepp and Kastenholz (2026). The benchmark's premium against itself, ``CP_B``,
+    is this function at ``rho = 1``, and the benchmark-adjusted premium is
+    ``CP* = CP - rho CP_B``; ``compute_regime_premium_table`` reports both.
+
     Args:
         sr_bear: realised contribution of the lowest benchmark bucket to the Sharpe ratio
         sr: annualised Sharpe ratio of the asset
@@ -207,7 +221,14 @@ def compute_portfolio_bear_sharpe(weights: np.ndarray,
     """Bear contribution of a portfolio by the aggregation identity.
 
     ``sr_bear_p = p SR_p - kappa rho_p + sum_i (w_i sigma_i / sigma_p) CP_i``, where ``SR_p`` and
-    ``rho_p`` are the risk-weighted sums of the asset Sharpe ratios and correlations.
+    ``rho_p`` are the risk-weighted sums of the asset Sharpe ratios and correlations. The identity
+    is exact for sample moments on one classified sample when the portfolio return is the weighted
+    sum of the asset returns in every period.
+
+    Proposition 4 of Sepp and Kastenholz (2026) writes the stacked portfolio, the benchmark at
+    weight one plus overlays, with the benchmark's term apart. To evaluate it, pass the benchmark as
+    one of the assets with weight 1, ``rho = 1`` and its own premium ``CP_B`` as the premium; its
+    term is then ``(sigma_B / sigma_p) CP_B``.
 
     Args:
         weights: asset weights
@@ -250,6 +271,12 @@ def compute_overlay_blend_frontier(sr_b: float,
                                    tail_prob: float = 0.16
                                    ) -> pd.DataFrame:
     """Closed-form frontier of the blends ``(1 - x)`` benchmark plus ``x`` overlay.
+
+    The blend is funded: the overlay replaces benchmark capital. It is neither the stacked
+    portfolio of Sepp and Kastenholz (2026, Definition 3), which keeps the benchmark at weight one,
+    nor their coverage-floor frontier, which optimises over many overlays in optimalportfolios.
+    The benchmark is taken on its Gaussian null, ``CP_B = 0``; for a benchmark with a premium of
+    its own, add ``(1 - x) vol_b CP_B / portfolio_vol`` to the ``bear_sharpe`` column.
 
     Args:
         sr_b: annualised Sharpe ratio of the benchmark

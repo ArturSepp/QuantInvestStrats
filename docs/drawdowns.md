@@ -48,7 +48,7 @@ the same total return but a different maximum drawdown.
 |---|---|
 | Return basis | Levels, not returns: price, total-return index or NAV; $D_t$ is a relative (compounded) drawdown; the Calmar numerator is the p.a. compound excess return |
 | Sampling grid | Native index for `compute_rolling_drawdowns` and `compute_max_current_drawdown`; calendar days `D`, forward-filled, for the episode table, time under water and `PerfParams.freq_drawdown`; the table's `freq_drawdown` grid ends at each asset's final observation |
-| Annualisation | None for drawdowns and durations; the Calmar numerator uses 365.25-day years; `MAX_DD_VOL` divides by a volatility annualised with $\sqrt{\mathrm{AN}}$ on `freq_vol` |
+| Annualisation | None for drawdowns and durations; the Calmar numerator uses 365.25-day years; `MAX_DD_VOL` divides by a volatility annualised with $\sqrt{\mathrm{af}}$ on `freq_vol` |
 | Mean adjustment | None: drawdowns are path functionals, and `compute_avg_max_dd` averages the path over time without demeaning |
 | Timing | $D_t$ uses levels up to and including $t$ (point in time); maxima, episode ends and recovery flags are full-sample and known only ex post |
 | Output units | Decimal fractions in $(-1,0]$, so `-0.25` is 25% below the peak; episode durations in calendar days (in observations with `freq=None`); time under water in grid steps |
@@ -68,7 +68,7 @@ the same total return but a different maximum drawdown.
 | $t^{\mathrm{trough}}$, $t^{\mathrm{end}}$ | Trough and end of one episode | Points of the episode grid |
 | $A$, $q$ | Dates kept by `compute_avg_max_dd`, and its tail level | Default $q=0.1$ |
 | $R^{\mathrm{ex}}_{\mathrm{pa}}$ | P.a. compound excess return, column `PA_EXCESS_RETURN` | Decimal per annum; equals $R_{\mathrm{pa}}$ without a cash series |
-| $\sigma_v$ | Table volatility, column `VOL` | $\sqrt{\mathrm{AN}}\,s(v)$ on `freq_vol`, log returns by default |
+| $\sigma_v$ | Table volatility, column `VOL` | $\sqrt{\mathrm{af}}\,s(v)$ on `freq_vol`, log returns by default |
 | $\mathrm{CR}$ | Calmar ratio as implemented, column `CALMAR_RATIO` | Dimensionless |
 | $W_t$ | Standard Brownian motion | Time $t$ in years in the continuous model |
 | $\mu$, $\sigma$ | Drift and volatility of the log level $X_t$ | Per year |

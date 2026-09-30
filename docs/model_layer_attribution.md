@@ -59,7 +59,7 @@ counterfactual layer NAVs required here.
 |---|---|
 | Return basis | Log returns of the supplied layer NAVs; no cash or risk-free return is subtracted |
 | Sampling grid | `freq`: `QE` for full-sample attribution, `ME` for the EWMA estimators and feature attribution |
-| Annualisation | Linear, $\mathrm{AN}\,\hat\alpha$ and $\mathrm{AN}$ times mean components; Sharpe-contribution volatilities scale by $\sqrt{\mathrm{AN}}$; betas and $R^2$ are not annualised |
+| Annualisation | Linear, $\mathrm{af}\,\hat\alpha$ and $\mathrm{af}$ times mean components; Sharpe-contribution volatilities scale by $\sqrt{\mathrm{af}}$; betas and $R^2$ are not annualised |
 | Mean adjustment | OLS and WLS fit an intercept; lagged betas use point-in-time EWMA means (`MeanAdjType.EWMA`) |
 | Timing | Full-sample and endpoint fits are descriptive; lagged EWMA betas are applied `beta_lag` periods after estimation |
 | Output units | Annualised log-return contributions; dimensionless betas; periodic HAC standard errors |
@@ -79,7 +79,7 @@ counterfactual layer NAVs required here.
 | $N,\lambda$ | EWM span and decay, $\lambda=1-2/(N+1)$ | `span` or `beta_span`, default 36 |
 | $\mathcal{E}_t[z]$ | EWM of a series $z$ through $t$, seeded at its first row | Same span as the betas |
 | $\omega_t$, $T_{\mathrm{eff}}$ | Geometric WLS weight $\lambda^{T-1-t}$; Kish effective sample size | Latest row has weight one |
-| $T,\mathrm{AN}$ | Retained observations and periods per year | `ME` uses $\mathrm{AN}=12$; `QE` uses $\mathrm{AN}=4$ |
+| $T,\mathrm{af}$ | Retained observations and periods per year | `ME` uses $\mathrm{af}=12$; `QE` uses $\mathrm{af}=4$ |
 | $q$, $\gamma$, $z_{\gamma}$ | Bartlett lag count, confidence level, normal quantile $\Phi^{-1}((1+\gamma)/2)$ | `hac_lags` (3), `confidence_level` (0.95) |
 | $\hat\Sigma_{\alpha}$, $c$, $x_t$ | Joint HAC covariance of layer alphas; contrast vector; regressor row $(1,\ell_{B,t})^{\top}$ | Ordered $(F,R,S)$ |
 | $\hat\mu_K$, $\pi_K$, $\sigma_B$, $\sigma_{F^{*}}$ | Annualised mean of bridge component $K$, its Sharpe contribution; benchmark and endpoint-model volatility | $K\in\{\mathrm{sys},R,S,I,C\}$; $F^{*}$ is $F^{\mathrm{net}}$ when supplied, else $F$ |
@@ -146,7 +146,7 @@ by [ordinary least squares with an intercept](regression_and_hac.md#ordinary-lea
 the common sample, so $\hat\alpha_L=\bar\ell_L-\hat\beta_L\bar\ell_B$. The integration return is
 regressed as a layer of its own. The benchmark row of the table is fixed at $\hat\alpha_B=0$ and
 $\hat\beta_B=1$ rather than estimated. Alpha is
-[annualised](regression_and_hac.md#alpha-annualisation) linearly, $\mathrm{AN}\,\hat\alpha_L$,
+[annualised](regression_and_hac.md#alpha-annualisation) linearly, $\mathrm{af}\,\hat\alpha_L$,
 because a mean log return scales with the number of periods; beta, $R^2$ and the periodic
 standard error are not annualised.
 
@@ -209,10 +209,10 @@ annualised OLS alpha of its layer, and the four annualised components add to the
 full-model return:
 
 $$
-\frac{\mathrm{AN}}{T}\sum_{t=1}^{T}a_{L,t}=\mathrm{AN}\,\hat\alpha_L,\quad L\in\{R,S,I\},
+\frac{\mathrm{af}}{T}\sum_{t=1}^{T}a_{L,t}=\mathrm{af}\,\hat\alpha_L,\quad L\in\{R,S,I\},
 \qquad
-\mathrm{AN}\big(\hat\beta_F\bar\ell_B+\hat\alpha_R+\hat\alpha_S+\hat\alpha_I\big)
-=\mathrm{AN}\,\bar\ell_F .
+\mathrm{af}\big(\hat\beta_F\bar\ell_B+\hat\alpha_R+\hat\alpha_S+\hat\alpha_I\big)
+=\mathrm{af}\,\bar\ell_F .
 $$
 
 **Proof.** $a_{L,t}=\hat\alpha_L+\hat\varepsilon_{L,t}$ for $L\in\{R,S\}$ by the definition of
@@ -319,11 +319,11 @@ estimated beta is deliberately missing; a missing estimate after the first finit
 > $(N+1)/2=18.5$ ordinary returns of its date and above 5% for about $1.5N=54$ returns at $N=36$,
 > so early realised alpha depends on `beta_init_value`.
 
-The expanding annualised estimate through $t$ is $\mathrm{AN}\,t^{-1}\sum_{t'\le t}a_{L,t'}$. The
+The expanding annualised estimate through $t$ is $\mathrm{af}\,t^{-1}\sum_{t'\le t}a_{L,t'}$. The
 post-warm-up exhibit is the unannualised cumulative sum of $a_{L,t'}$ after a chosen base date,
 with an explicit zero row on that date; with a one-period lag qis checks that the first accrued
 return uses the beta available on the base date. The current estimate is
-$\mathrm{AN}\,\mathcal{E}_t[a_L]$, the same-span
+$\mathrm{af}\,\mathcal{E}_t[a_L]$, the same-span
 [EWM](ewm_estimators.md#the-recursion-and-its-weights) of the step-ahead residuals seeded with
 `InitType.X0`. It is a point-in-time EWMA of realised
 out-of-sample alpha, not the contemporaneous EWM alpha of the lower-level beta routine and
@@ -368,7 +368,7 @@ properties follow.
 - **Bars are the WLS alphas.** The WLS normal equations with an intercept give
   $\sum_t\omega_t\hat\varepsilon_{L,t}=0$, so the $\omega$-weighted mean of each alpha component is
   its WLS alpha, exactly the midpoint of its own confidence interval up to rounding.
-- **The covariances are stored.** `annualised_alpha_covariance` holds the $\mathrm{AN}^2$-scaled
+- **The covariances are stored.** `annualised_alpha_covariance` holds the $\mathrm{af}^2$-scaled
   joint covariance of the risk, signal and integration alphas, and `parameter_covariance` the
   periodic alpha and beta covariance of the directly observed layers.
 
@@ -379,8 +379,8 @@ $\omega$-weighted means of those periodic log-return components. Supplying `full
 adds the realised trading-cost drag and a net endpoint; it does not estimate a fee inside qis.
 
 The final endpoint bar makes that regression identity visible. It starts with gross-model
-systematic return $\mathrm{AN}\,\hat\beta_F\bar\ell^{\,\omega}_B$, applies realised trading-cost
-drag when a net NAV is present, and then adds gross total alpha $\mathrm{AN}\,\hat\alpha_F$. The
+systematic return $\mathrm{af}\,\hat\beta_F\bar\ell^{\,\omega}_B$, applies realised trading-cost
+drag when a net NAV is present, and then adds gross total alpha $\mathrm{af}\,\hat\alpha_F$. The
 label above the bar is gross return without a net NAV and net return with one. The black
 gross-alpha interval is translated by the systematic and cost segments, so its midpoint is the
 displayed endpoint. The beta and $R^2$ rows under this bar therefore come from the gross
@@ -435,7 +435,7 @@ the same positive denominator. $\square$
 
 These are contribution ratios, not standalone sleeve Sharpes. Both volatilities are the final row
 of `qis.compute_ewm_vol` with the attribution span, `MeanAdjType.EWMA` and `InitType.ZERO`,
-annualised by $\sqrt{\mathrm{AN}}$ ([EWM volatility](ewm_estimators.md#volatility-and-annualisation)).
+annualised by $\sqrt{\mathrm{af}}$ ([EWM volatility](ewm_estimators.md#volatility-and-annualisation)).
 For IID returns EWMA centring makes them about 4% low at $N=36$
 ([mean adjustment](ewm_estimators.md#mean-adjustment)), which raises every ratio alike and leaves
 additivity intact.
@@ -448,7 +448,7 @@ common-denominator measure instead.
 
 `compute_model_layer_in_sample_sharpe_contributions` uses the identical two-denominator
 construction with the exact full-sample alpha-attribution numerators and full-sample annualised
-log-return volatilities, $\sigma=\sqrt{\mathrm{AN}}\,s(\ell)$. It therefore reports full-history
+log-return volatilities, $\sigma=\sqrt{\mathrm{af}}\,s(\ell)$. It therefore reports full-history
 realised return per unit of full-history realised risk, with no EWMA window in either numerator or
 denominator. The endpoint bar in both public Sharpe plots is split into systematic, optional
 realised cost, and combined alpha contributions.
@@ -469,7 +469,7 @@ table reports the periodic $\mathrm{se}(\hat\alpha_L)$ as `Alpha HAC SE`, the tw
 p-value, and the annualised interval
 
 $$
-\mathrm{AN}\big(\hat\alpha_L\pm z_{\gamma}\,\mathrm{se}(\hat\alpha_L)\big),
+\mathrm{af}\big(\hat\alpha_L\pm z_{\gamma}\,\mathrm{se}(\hat\alpha_L)\big),
 $$
 
 with $z_{\gamma}=1.960$ at the default level. The estimator is the internal
@@ -503,7 +503,7 @@ A wide integration interval is a statement about the joint estimation error of t
 a computational artefact; adding three marginal variances instead would ignore the cross-layer
 covariances. The three intervals on a bridge chart are marginal intervals. They are not
 independent, and their widths do not add. The interval of the total alpha
-$\mathrm{AN}\,\hat\alpha_F$ is the `Full Model` row of the table.
+$\mathrm{af}\,\hat\alpha_F$ is the `Full Model` row of the table.
 
 The kernel follows [Newey and West (1987)](https://www.nber.org/papers/t0055);
 the correction and lag-rule convention follow the [statsmodels HAC implementation](https://www.statsmodels.org/stable/generated/statsmodels.stats.sandwich_covariance.cov_hac.html).
@@ -838,13 +838,13 @@ experiments.
 | Quantity | Formula | qis entry point |
 |---|---|---|
 | Common-sample layer log returns | $\ell_{L,t}=\log V_{L,t}-\log V_{L,t-1}$ on the intersection of valid ranges | `periodic_returns` of every result |
-| Full-sample layer regressions and intervals | OLS of $\ell_L$ on $\ell_B$; $\mathrm{AN}(\hat\alpha_L\pm z_{\gamma}\,\mathrm{se})$ | `qis.compute_model_layer_alpha_beta_attribution`, `regression_table` |
+| Full-sample layer regressions and intervals | OLS of $\ell_L$ on $\ell_B$; $\mathrm{af}(\hat\alpha_L\pm z_{\gamma}\,\mathrm{se})$ | `qis.compute_model_layer_alpha_beta_attribution`, `regression_table` |
 | Exact return bridge | $\ell_{F,t}=\hat\beta_F\ell_{B,t}+a_{R,t}+a_{S,t}+a_{I,t}$ | `component_returns`, `annualised_components` |
 | Lagged realised alpha | $a_{L,t}=\ell_{L,t}-b_{L,t}\ell_{B,t}$ with $b_{L,t}=\hat\beta_{L,t-h}$ | `qis.compute_model_layer_ewma_alpha_attribution` |
-| Current EWMA of realised alpha | $\mathrm{AN}\,\mathcal{E}_t[a_L]$ | `current_ewma_annualised_alpha` property |
+| Current EWMA of realised alpha | $\mathrm{af}\,\mathcal{E}_t[a_L]$ | `current_ewma_annualised_alpha` property |
 | Post-warm-up cumulative alpha | Sum of $a_{L,t'}$ after a base date, zero on it | `qis.compute_model_layer_cumulative_alpha_after_warmup` |
 | Endpoint EWMA-WLS attribution | WLS with $\omega_t=\lambda^{T-1-t}$; stacked Bartlett HAC | `qis.compute_model_layer_ewma_regression_attribution` |
-| Expanding-prefix EWMA-WLS alpha | $\mathrm{AN}\,\hat\alpha_{L,t}$ with $\omega_{t',t}=\lambda^{t-t'}$ | `qis.compute_model_layer_rolling_ewma_regression_alpha` |
+| Expanding-prefix EWMA-WLS alpha | $\mathrm{af}\,\hat\alpha_{L,t}$ with $\omega_{t',t}=\lambda^{t-t'}$ | `qis.compute_model_layer_rolling_ewma_regression_alpha` |
 | Common-denominator Sharpe contributions | $\pi_K=\hat\mu_K/\sigma_{F^{*}}$, $\mathrm{SR}_B=\hat\mu_B/\sigma_B$ | `qis.compute_model_layer_ewma_sharpe_contributions`, `qis.compute_model_layer_in_sample_sharpe_contributions` |
 | Sequential stage Sharpes | EWM Sharpe of cumulative bridge stages | `qis.compute_model_layer_ewma_stage_sharpes` |
 | Factorial and Shapley feature effects | $d^{\mathcal{C}}_{L,t}$, $\phi_{f,L,t}$, then the layer attribution of each | `qis.compute_model_feature_alpha_beta_attribution` |
@@ -890,7 +890,7 @@ endpoint is not a market-data freshness claim.
   supplied.
 
 `annualised_components`
-: $\mathrm{AN}$ times the column means of `component_returns`. These are the bar heights of a return
+: $\mathrm{af}$ times the column means of `component_returns`. These are the bar heights of a return
   bridge, and by the bar-height identity the three alpha entries equal the annualised alphas in
   `regression_table`.
 

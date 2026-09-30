@@ -48,7 +48,7 @@ difference from an accidental mismatch between estimates.
 |---|---|
 | Return basis | Log returns for the aggregation identities; tables follow `PerfParams.return_type` |
 | Sampling grid | The reporting grid: `B`, `W-WED`, `ME` or `QE` |
-| Annualisation | $\mathrm{AN}_f$ = 252, 52, 12 or 4; report windows count 260, 52, 12 or 4 per year |
+| Annualisation | $\mathrm{af}_f$ = 252, 52, 12 or 4; report windows count 260, 52, 12 or 4 per year |
 | Mean adjustment | Population identities; the estimators are those of the performance chapter |
 | Timing | Not applicable: reporting configuration |
 | Output units | Annualised decimals and dimensionless ratios |
@@ -56,7 +56,7 @@ difference from an accidental mismatch between estimates.
 
 | Symbol or setting | Definition |
 |---|---|
-| $f$, $\mathrm{AN}_f$ | Sampling frequency and its annualisation factor from `qis.get_annualization_factor`: business daily 252, weekly 52, monthly 12 or quarterly 4. |
+| $f$, $\mathrm{af}_f$ | Sampling frequency and its annualisation factor from `qis.get_annualization_factor`: business daily 252, weekly 52, monthly 12 or quarterly 4. |
 | $r_t$ | Simple return over one observation period, in decimal units. |
 | $\ell_t = \log(1+r_t)$ | Log return, additive over adjacent periods when wealth is positive. |
 | $\hat\sigma_f$ | Sample standard deviation at frequency $f$, for the stated return convention. |
@@ -92,7 +92,7 @@ change the presets and should be described in the report.
 The usual annualised volatility estimate is
 
 $$
-\hat\sigma_{\mathrm{ann}}(f) = \hat\sigma_f\sqrt{\mathrm{AN}_f}.
+\hat\sigma_{\mathrm{ann}}(f) = \hat\sigma_f\sqrt{\mathrm{af}_f}.
 $$
 
 Under independent additive increments, population variance scales with elapsed
@@ -111,7 +111,7 @@ $$
 = 1 + 2\sum_{j=1}^{k-1}\left(1-\frac{j}{k}\right)\rho_j.
 $$
 
-When the coarse annualisation factor is $\mathrm{AN}_f/k$, its population annualised
+When the coarse annualisation factor is $\mathrm{af}_f/k$, its population annualised
 log-return volatility equals the fine-frequency value times
 $\sqrt{\mathrm{VR}(k)}$. Sample estimates need not satisfy that identity exactly.
 A positive weighted sum of autocorrelations raises the variance ratio above one;
@@ -142,7 +142,7 @@ Counts are periods of the indicated grid, shown as **long · short**.
 | Monthly | `ME` | 36 · 12 | 36 · 12 | quarterly · monthly | 12 |
 | Quarterly | `QE` | 12 · 4 | 12 · 4 | quarterly · monthly | 4 |
 
-The last column sizes windows and spans only. It is not the annualisation factor $\mathrm{AN}_f$:
+The last column sizes windows and spans only. It is not the annualisation factor $\mathrm{af}_f$:
 a daily preset uses 260-observation windows, while its volatility is annualised with 252.
 
 The volatility and variance parameters are exponentially weighted spans; the
@@ -202,7 +202,7 @@ The multi-asset report widens its trailing correlation window using
 
 $$
 \mathrm{trailing\ years}
-= \max\left(1,\left\lceil\frac{n_{\min}}{\mathrm{AN}_f}\right\rceil\right).
+= \max\left(1,\left\lceil\frac{n_{\min}}{\mathrm{af}_f}\right\rceil\right).
 $$
 
 With the default $n_{\min}=12$, the nominal window is one year at daily, weekly

@@ -19,6 +19,29 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Series names as lookup keys. Absent, duplicate, and distinct names now produce the same relative
   NAV values and neutral result name.
 
+### Documentation
+
+- Write the annualisation factor as $\mathrm{af}$, the name of the code's `af` argument, instead
+  of $\mathrm{AN}$ in every handbook chapter, packaged note, docstring, worked example and
+  handbook figure footer. The notation chapter and the documentation standard define the new
+  symbol; functions that name the argument `annualization_factor` keep that name. No signature
+  or computed value changes.
+- Map the convexity-premium chapter to Sepp and Kastenholz (2026), accepted by the *Journal of
+  Investment Management*: tables of the paper's notation, results and exhibits against qis, and
+  the settings that reproduce its monthly analysis. Add the smart-diversifier definition, a
+  coverage-floor section with the linear Bear-regime loss identity and an executed stacked-
+  portfolio example that feeds `qis.plot_overlay_allocation_frontier`, and limitations on the
+  diagonal residuals of the mixture covariance and on the two EWMA clocks.
+- Name the paper's result in the docstrings of `qis.regimes` and
+  `qis.portfolio.smart_diversification`. `SmartDiversificationReport` and
+  `create_overlay_portfolio_curve` state that levered mixes are financed at a zero rate and need
+  excess-of-cash navs; `plot_overlay_allocation_frontier` states that its points are stacked
+  portfolios; `compute_overlay_blend_frontier` states that its blend is funded with the benchmark
+  on its null; `compute_regime_ewm_betas` states which clock its span counts. Remove two
+  commented-out code blocks from the report module.
+- Cite Sepp and Dézeraud (2019), with its issue and pages, where the handbook cited Sepp (2019),
+  and add Sepp (2020) and the long-run companion working paper to the bibliography.
+
 ## [5.33.0] - 2026-09-30
 
 ### Added

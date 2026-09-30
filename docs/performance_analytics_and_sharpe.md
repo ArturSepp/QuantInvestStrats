@@ -59,7 +59,7 @@ conventions are defined in [notation and conventions](notation_and_conventions.m
 |---|---|
 | Return basis | P.a. and log columns: compound growth over the sampled boundaries, volatility on `PerfParams.return_type` returns (log by default); arithmetic columns: simple returns in numerator and denominator; total, or in excess of `rates_data` |
 | Sampling grid | `PerfParams.freq_vol` (default `ME`) for every table Sharpe column, on each asset's complete boundaries; the regime classifier's grid (default `QE`); `roll_freq` for rolling ratios; the caller's grid for EWM ratios and the information ratio |
-| Annualisation | $\sqrt{\mathrm{AN}}$ of the sampled grid for volatilities and arithmetic ratios; compound numerators use $Y$ years of 365.25 days; $\mathrm{AN}$ is inferred from the sampled index |
+| Annualisation | $\sqrt{\mathrm{af}}$ of the sampled grid for volatilities and arithmetic ratios; compound numerators use $Y$ years of 365.25 days; $\mathrm{af}$ is inferred from the sampled index |
 | Mean adjustment | Standard deviations are demeaned, `ddof=1`; numerators are raw means or compound returns; the EWM ratio with `norm_type=1` uses a second moment about zero |
 | Timing | Table and regime ratios are full-sample and descriptive; rolling and EWM ratios at $t$ use data up to $t$; cash accrued over $(t-1,t]$ uses the rate known at $t-1$ on the return grid |
 | Output units | Dimensionless annualised ratios; the EWM ratio with `norm_type=0` is an annualised return; standard errors are in Sharpe-ratio units |
@@ -72,8 +72,8 @@ conventions are defined in [notation and conventions](notation_and_conventions.m
 | $Y$ | Elapsed years between the two boundaries | Calendar days divided by 365.25 |
 | $r_t$, $\ell_t$ | Simple and log returns on the `freq_vol` grid | Decimal |
 | $v_t$ | Returns used for the `VOL` column | $\ell_t$ by default; $r_t$ with `ReturnTypes.RELATIVE` |
-| $\sigma_v$ | Table volatility $\sqrt{\mathrm{AN}}\,s(v)$ | Annualised decimal |
-| $\sigma_r$ | Volatility of simple returns $\sqrt{\mathrm{AN}}\,s(r)$ | Annualised decimal |
+| $\sigma_v$ | Table volatility $\sqrt{\mathrm{af}}\,s(v)$ | Annualised decimal |
+| $\sigma_r$ | Volatility of simple returns $\sqrt{\mathrm{af}}\,s(r)$ | Annualised decimal |
 | $R_{\mathrm{pa}}$, $\tilde R_{\mathrm{pa}}$ | P.a. return and p.a. excess return between the sampled boundaries | Decimal per year |
 | $y_t$, $d_t$ | Annual cash-rate quote; calendar date of observation $t$ | Decimal per year; date |
 | $\mathrm{SR}_{\mathrm{pa}}$, $\mathrm{SR}_{\log}$, $\mathrm{SR}_{\mathrm{arith}}$ | The three table conventions | Dimensionless, annualised |
@@ -119,7 +119,7 @@ differential returns and its annualised form are
 $$
 \hat\theta=\frac{\bar D}{s(D)},
 \qquad
-\mathrm{SR}=\sqrt{\mathrm{AN}}\,\hat\theta .
+\mathrm{SR}=\sqrt{\mathrm{af}}\,\hat\theta .
 $$
 
 With cash as the benchmark, $D_t$ is the excess return $\tilde r_t$. Sharpe (1966) introduced
@@ -154,23 +154,23 @@ $$
 \qquad
 \mathrm{SR}_{\log}=\frac{\log(1+R_{\mathrm{pa}})}{\sigma_v},
 \qquad
-\mathrm{SR}_{\mathrm{arith}}=\frac{\sqrt{\mathrm{AN}}\,\bar r}{s(r)},
+\mathrm{SR}_{\mathrm{arith}}=\frac{\sqrt{\mathrm{af}}\,\bar r}{s(r)},
 $$
 
-with $\sigma_v=\sqrt{\mathrm{AN}}\,s(v)$ the `VOL` column and $v_t=\ell_t$ by default.
+with $\sigma_v=\sqrt{\mathrm{af}}\,s(v)$ the `VOL` column and $v_t=\ell_t$ by default.
 
 | Convention | Columns | Numerator | Denominator |
 |---|---|---|---|
 | P.a. (compound) | `SHARPE_RF0`, `SHARPE_EXCESS` | $R_{\mathrm{pa}}$ or $\tilde R_{\mathrm{pa}}$ | `VOL` on `return_type` returns |
 | Log | `SHARPE_LOG_AN`, `SHARPE_LOG_EXCESS` | $\log(1+R_{\mathrm{pa}})$ or $\log(1+\tilde R_{\mathrm{pa}})$ | `VOL` on `return_type` returns |
-| Arithmetic | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS` | $\mathrm{AN}$ times the mean simple (excess) return | $\sqrt{\mathrm{AN}}$ times the standard deviation of the same series |
+| Arithmetic | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS` | $\mathrm{af}$ times the mean simple (excess) return | $\sqrt{\mathrm{af}}$ times the standard deviation of the same series |
 
 Three consequences of the implementation are easy to miss. First, the p.a. and log columns share
 `VOL`, so switching `return_type` to `ReturnTypes.RELATIVE` changes their denominator but not the
 arithmetic pair's, which always pairs the mean and standard deviation of one simple-return series.
-Second, `SHARPE_LOG_AN` annualises its numerator by calendar years, not by $\mathrm{AN}$; it is not
-the textbook $\sqrt{\mathrm{AN}}\,\bar\ell/s(\ell)$, although the next identity shows the two
-differ only by the factor $T/(\mathrm{AN}\,Y)$. Third, the column presets used by reporting
+Second, `SHARPE_LOG_AN` annualises its numerator by calendar years, not by $\mathrm{af}$; it is not
+the textbook $\sqrt{\mathrm{af}}\,\bar\ell/s(\ell)$, although the next identity shows the two
+differ only by the factor $T/(\mathrm{af}\,Y)$. Third, the column presets used by reporting
 (for example `RA_TABLE_COLUMNS` in `qis.perfstats.config`) select `SHARPE_RF0` or `SHARPE_EXCESS`;
 no preset includes the arithmetic pair, which must be selected by name.
 
@@ -181,16 +181,16 @@ no preset includes the arithmetic pair, which must be selected by name.
 $$
 \log(1+R_{\mathrm{pa}})=\frac{T}{Y}\,\bar\ell,
 \qquad
-\mathrm{SR}_{\log}=\frac{T}{\mathrm{AN}\,Y}\cdot\frac{\sqrt{\mathrm{AN}}\,\bar\ell}{s(\ell)}
+\mathrm{SR}_{\log}=\frac{T}{\mathrm{af}\,Y}\cdot\frac{\sqrt{\mathrm{af}}\,\bar\ell}{s(\ell)}
 \quad\text{when } v_t=\ell_t .
 $$
 
 **Proof.** $\log(1+R_{\mathrm{pa}})=\log(P_e/P_s)/Y$, and the log price ratio telescopes into
 $\sum_t\ell_t=T\bar\ell$, as in the per-annum identity of
 [notation and conventions](notation_and_conventions.md). Divide by
-$\sigma_v=\sqrt{\mathrm{AN}}\,s(\ell)$. $\square$
+$\sigma_v=\sqrt{\mathrm{af}}\,s(\ell)$. $\square$
 
-On a complete month-end grid the factor $T/(\mathrm{AN}\,Y)$ differs from one only through
+On a complete month-end grid the factor $T/(\mathrm{af}\,Y)$ differs from one only through
 unequal month lengths; it is 1.0001 in the worked example.
 
 **Proposition (p.a. versus log).** If $\sigma_v>0$, then $\mathrm{SR}_{\mathrm{pa}}\geq
@@ -225,8 +225,8 @@ $\bar r^{\,2}/2$, $s(r)^2/(2T)$ and the cubic moment, are of higher order in the
 return. $\square$
 
 **Proposition (convention wedge).** Assume (i) $Y>1$ on a regular grid, so that
-$T/Y\approx\mathrm{AN}$; (ii) small periodic returns, with mean of order $1/\mathrm{AN}$ and
-standard deviation of order $1/\sqrt{\mathrm{AN}}$, so that third-order terms are negligible;
+$T/Y\approx\mathrm{af}$; (ii) small periodic returns, with mean of order $1/\mathrm{af}$ and
+standard deviation of order $1/\sqrt{\mathrm{af}}$, so that third-order terms are negligible;
 and (iii) $\sigma_v\approx\sigma_r$. Then
 
 $$
@@ -239,8 +239,8 @@ $$
 For $\lvert\mathrm{SR}\rvert\ll 1$ both wedges are about $-\sigma_r/2$.
 
 **Proof.** By the two identities,
-$\log(1+R_{\mathrm{pa}})=(T/Y)\bar\ell\approx\mathrm{AN}\,\bar r-\mathrm{AN}\,s(r)^2/2
-=\mathrm{AN}\,\bar r-\sigma_r^2/2$. Dividing by $\sigma_v\approx\sigma_r$ gives
+$\log(1+R_{\mathrm{pa}})=(T/Y)\bar\ell\approx\mathrm{af}\,\bar r-\mathrm{af}\,s(r)^2/2
+=\mathrm{af}\,\bar r-\sigma_r^2/2$. Dividing by $\sigma_v\approx\sigma_r$ gives
 $\mathrm{SR}_{\log}\approx\mathrm{SR}_{\mathrm{arith}}-\sigma_r/2$. Adding the p.a.-minus-log
 difference $(\sigma_r/2)\,\mathrm{SR}_{\log}^2$ from the previous proposition gives the second
 wedge. $\square$
@@ -279,7 +279,7 @@ arithmetic Sharpe ratio by less than half the volatility difference: for a 20% a
 volatility asset, by less than 0.075. Rankings are usually preserved; in the worked example all
 ten synthetic assets rank identically under the three conventions.
 
-> **Insight.** Since $\log(1+R_{\mathrm{pa}})\approx\mathrm{AN}\,\bar r-\sigma_r^2/2$, the
+> **Insight.** Since $\log(1+R_{\mathrm{pa}})\approx\mathrm{af}\,\bar r-\sigma_r^2/2$, the
 > compound return of an asset is negative, to this approximation, exactly when its arithmetic
 > Sharpe ratio is below half its volatility. An equity index with 19% volatility and an
 > arithmetic Sharpe ratio of 0.05 has a positive mean return and loses money for a buy-and-hold
@@ -315,7 +315,7 @@ $$
 \qquad
 \mathrm{SR}^{\mathrm{ex}}_{\mathrm{pa}}=\frac{\tilde R_{\mathrm{pa}}}{\sigma_v},
 \qquad
-\mathrm{SR}^{\mathrm{ex}}_{\mathrm{arith}}=\frac{\sqrt{\mathrm{AN}}\,\overline{\tilde r}}{s(\tilde r)},
+\mathrm{SR}^{\mathrm{ex}}_{\mathrm{arith}}=\frac{\sqrt{\mathrm{af}}\,\overline{\tilde r}}{s(\tilde r)},
 $$
 
 and `SHARPE_LOG_EXCESS` is $\log(1+\tilde R_{\mathrm{pa}})/\sigma_v$. The p.a. and log excess
@@ -336,17 +336,17 @@ zero-rate Sharpe ratio.
 |---|---|---|---|
 | Table, p.a. | $R_{\mathrm{pa}}/\sigma_v$; excess $\tilde R_{\mathrm{pa}}/\sigma_v$ | Sampled `freq_vol` boundaries; `VOL` on `return_type` returns | `SHARPE_RF0`, `SHARPE_EXCESS` of `qis.compute_ra_perf_table`; the Sharpe ratio of column presets, factsheets and price-plot legends |
 | Table, log | $\log(1+R_{\mathrm{pa}})/\sigma_v$ | As above | `SHARPE_LOG_AN`, `SHARPE_LOG_EXCESS`; log-return presets |
-| Table, arithmetic | $\sqrt{\mathrm{AN}}\,\bar r/s(r)$ | Simple (excess) returns on `freq_vol` | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS`; select by name |
-| Arithmetic helper | $\sqrt{\mathrm{AN}}\,\bar x/s(x)$ | Returns supplied by the caller; $\mathrm{AN}$ inferred unless `af` is given | Internal `qis.perfstats.perf_stats.compute_sharpe_arithmetic`; not called by the table |
+| Table, arithmetic | $\sqrt{\mathrm{af}}\,\bar r/s(r)$ | Simple (excess) returns on `freq_vol` | `SHARPE_ARITH`, `SHARPE_ARITH_EXCESS`; select by name |
+| Arithmetic helper | $\sqrt{\mathrm{af}}\,\bar x/s(x)$ | Returns supplied by the caller; $\mathrm{af}$ inferred unless `af` is given | Internal `qis.perfstats.perf_stats.compute_sharpe_arithmetic`; not called by the table |
 | Regime, `SharpeConvention.PA` | Patched regime p.a. return over $\sigma_v$ | Classifier grid for regime returns; `freq_vol` for $\sigma_v$ | `qis.compute_bnb_regimes_pa_perf_table`, `qis.plot_regime_data` |
-| Regime, `ARITHMETIC` | $\sqrt{\mathrm{AN}}\,p_g\bar r_g/s(r)$ | Classifier grid, simple returns by default | As above |
+| Regime, `ARITHMETIC` | $\sqrt{\mathrm{af}}\,p_g\bar r_g/s(r)$ | Classifier grid, simple returns by default | As above |
 | Regime, `LOG` | The same on $\log(1+r_t)$ | Classifier grid | As above |
 | Returns-level regime split | As `ARITHMETIC` or `LOG` | Caller's returns, explicit `af` | Internal `qis.perfstats.regime_classifier.compute_regime_sharpe_decomposition`; rejects `PA` |
-| Rolling | $\sqrt{\mathrm{AN}}\,(e^{\bar\ell}-1)/s(\ell)$ within each window | Log returns on `roll_freq` | `qis.compute_rolling_perf_stat` with `RollingPerfStat.SHARPE`; rolling panels of factsheets |
-| EWM, `norm_type=0` | $\mathrm{AN}\,\hat\mu_t$, not a ratio | Caller's returns | `qis.compute_ewm_sharpe` |
-| EWM, `norm_type=1` | $\sqrt{\mathrm{AN}}\,\hat\mu_t/\hat\sigma_{1,t}$ | Caller's returns | `qis.compute_ewm_sharpe` default |
-| EWM, `norm_type=2` | $\sqrt{\mathrm{AN}}\,\hat\mu_t/\hat\sigma_{2,t}$ | Caller's returns; log returns on `freq` (default `QE`) from prices | `qis.compute_ewm_sharpe_from_prices` default; `qis.compute_model_layer_ewma_stage_sharpes` |
-| Information ratio | $\sqrt{\mathrm{AN}}\,\overline{(r_p-r_b)}/s(r_p-r_b)$ | Caller's active returns | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
+| Rolling | $\sqrt{\mathrm{af}}\,(e^{\bar\ell}-1)/s(\ell)$ within each window | Log returns on `roll_freq` | `qis.compute_rolling_perf_stat` with `RollingPerfStat.SHARPE`; rolling panels of factsheets |
+| EWM, `norm_type=0` | $\mathrm{af}\,\hat\mu_t$, not a ratio | Caller's returns | `qis.compute_ewm_sharpe` |
+| EWM, `norm_type=1` | $\sqrt{\mathrm{af}}\,\hat\mu_t/\hat\sigma_{1,t}$ | Caller's returns | `qis.compute_ewm_sharpe` default |
+| EWM, `norm_type=2` | $\sqrt{\mathrm{af}}\,\hat\mu_t/\hat\sigma_{2,t}$ | Caller's returns; log returns on `freq` (default `QE`) from prices | `qis.compute_ewm_sharpe_from_prices` default; `qis.compute_model_layer_ewma_stage_sharpes` |
+| Information ratio | $\sqrt{\mathrm{af}}\,\overline{(r_p-r_b)}/s(r_p-r_b)$ | Caller's active returns | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
 | Model-layer contributions | Annualised return component over a common annualised volatility | Full-sample or current EWM | `qis.compute_model_layer_in_sample_sharpe_contributions`, `qis.compute_model_layer_ewma_sharpe_contributions` |
 
 `PerfParams.sharpe_convention` enters one computation: the regime-conditional Sharpe branch of
@@ -356,9 +356,9 @@ are unchanged by it. The rolling, EWM and information-ratio estimators do not ta
 
 **Rolling ratio.** The rolling helper divides the periodic geometric mean return
 $e^{\bar\ell}-1$ of each window by the window's $s(\ell)$ and multiplies by
-$\sqrt{\mathrm{AN}}$. It counts `roll_periods` rows on `roll_freq` and requires all of them to be
+$\sqrt{\mathrm{af}}$. It counts `roll_periods` rows on `roll_freq` and requires all of them to be
 present. Over a full-sample window it equals `SHARPE_LOG_AN` times
-$\frac{e^{\bar\ell}-1}{\bar\ell}\cdot\frac{\mathrm{AN}\,Y}{T}\approx 1+\bar\ell/2$, a fourth
+$\frac{e^{\bar\ell}-1}{\bar\ell}\cdot\frac{\mathrm{af}\,Y}{T}\approx 1+\bar\ell/2$, a fourth
 formula that agrees with the log column to a fraction of a percent on monthly data.
 
 **EWM ratios.** With decay $\lambda=1-2/(N+1)$ for span $N$, missing returns set to zero, and a
@@ -374,14 +374,14 @@ $$
 $$
 
 `initial_sharpes` replaces the zero state by a prior of 10% annual volatility and the given
-annualised Sharpe ratio: $\hat\mu_0=0.1\,\mathrm{SR}_0/\mathrm{AN}$ and
-$\hat\sigma^2_0=0.01/\mathrm{AN}$. The ratios at $t$ use returns up to $t$ only, so they are
+annualised Sharpe ratio: $\hat\mu_0=0.1\,\mathrm{SR}_0/\mathrm{af}$ and
+$\hat\sigma^2_0=0.01/\mathrm{af}$. The ratios at $t$ use returns up to $t$ only, so they are
 point in time; [exponentially weighted estimators](ewm_estimators.md) covers the recursion.
 
 **Proposition (bound on the `norm_type=1` ratio).** With zero initial state,
 $\lvert\hat\mu_t\rvert\leq\hat\sigma_{1,t}$, so the ratio lies in
-$[-\sqrt{\mathrm{AN}},\sqrt{\mathrm{AN}}]$; for stationary returns it estimates
-$\sqrt{\mathrm{AN}}\,\theta/\sqrt{1+\theta^2}$ rather than $\sqrt{\mathrm{AN}}\,\theta$.
+$[-\sqrt{\mathrm{af}},\sqrt{\mathrm{af}}]$; for stationary returns it estimates
+$\sqrt{\mathrm{af}}\,\theta/\sqrt{1+\theta^2}$ rather than $\sqrt{\mathrm{af}}\,\theta$.
 
 **Proof.** $\hat\mu_t=\sum_k w_kx_k$ and $\hat\sigma^2_{1,t}=\sum_k w_kx_k^2$ with
 $w_k=(1-\lambda)\lambda^{t-k}\geq 0$ and $\sum_k w_k=1-\lambda^t\leq 1$. By Cauchy–Schwarz,
@@ -393,7 +393,7 @@ For monthly $\theta$ near 0.15 the shrinkage is about 1%; it matters for fast si
 periodic Sharpe ratios.
 
 **Information ratio.** `compute_te_ir_errors` returns the annualised tracking error
-$\sqrt{\mathrm{AN}}\,s(r_p-r_b)$ and the information ratio, which is the arithmetic Sharpe ratio
+$\sqrt{\mathrm{af}}\,s(r_p-r_b)$ and the information ratio, which is the arithmetic Sharpe ratio
 of the active return: the Sharpe (1994) differential return with a non-cash benchmark. See
 [tracking error](tracking_error_and_risk.md) and
 [signal diagnostics](signal_diagnostics.md).
@@ -404,7 +404,7 @@ of the active return: the Sharpe (1994) differential return with a non-cash benc
 frequencies $p_g=T_g/T$ and conditional means $\bar r_g$. Then
 
 $$
-\frac{\sqrt{\mathrm{AN}}\,\bar r}{s(r)}=\sum_g\frac{\sqrt{\mathrm{AN}}\,p_g\,\bar r_g}{s(r)} .
+\frac{\sqrt{\mathrm{af}}\,\bar r}{s(r)}=\sum_g\frac{\sqrt{\mathrm{af}}\,p_g\,\bar r_g}{s(r)} .
 $$
 
 **Proof.** $\sum_gp_g\bar r_g=\sum_g\frac{T_g}{T}\cdot\frac{1}{T_g}\sum_{t\in g}r_t=\bar r$;
@@ -414,7 +414,7 @@ divide by the common $s(r)$. $\square$
 `SharpeConvention.LOG` the same on $\log(1+r_t)$; both add up exactly to the total ratio of their
 convention on that grid. The compound numerator has no such identity, because
 $e^{\sum_g z_g}-1\neq\sum_g(e^{z_g}-1)$. The `PA` branch forms
-$\exp(\mathrm{AN}\,p_g\bar r_g)-1$ from mean simple returns, allocates the gap between their
+$\exp(\mathrm{af}\,p_g\bar r_g)-1$ from mean simple returns, allocates the gap between their
 sum and the visible `PA_RETURN` across regimes in proportion to $p_g$, and divides by `VOL`.
 Its bars therefore add up to `PA_RETURN` divided by `VOL`, which differs from `SHARPE_RF0` when
 the native endpoints are off the `freq_vol` grid. All three branches decompose total-return
@@ -426,7 +426,7 @@ Classifier grids, partial periods and the patch are treated in
 ### Sampling uncertainty
 
 A Sharpe ratio is an estimate. Let $\hat\theta=\bar r/s(r)$ on $T$ periodic returns; the
-arithmetic column is $\sqrt{\mathrm{AN}}\,\hat\theta$.
+arithmetic column is $\sqrt{\mathrm{af}}\,\hat\theta$.
 
 **Proposition (independent normal returns).** If the $r_t$ are independent
 $N(\mu,\sigma^2)$, then $\sqrt{T}(\hat\theta-\theta)$ is asymptotically normal with variance
@@ -465,12 +465,12 @@ $(-\gamma_3\theta+\frac{\gamma_4-3}{4}\theta^2)/T$. Negative skewness with a pos
 ratio raises it; fat tails raise it only at order $\theta^2$. For a monthly $\theta=0.15$ with
 $\gamma_3=-1$ and $\gamma_4=6$, the standard error rises by 8%.
 
-**Annualisation.** Since $\mathrm{SR}=\sqrt{\mathrm{AN}}\,\hat\theta$,
-$\operatorname{se}(\mathrm{SR})=\sqrt{\mathrm{AN}}\operatorname{se}(\hat\theta)$, and with
-$T\approx\mathrm{AN}\,Y$ the independent normal case gives
+**Annualisation.** Since $\mathrm{SR}=\sqrt{\mathrm{af}}\,\hat\theta$,
+$\operatorname{se}(\mathrm{SR})=\sqrt{\mathrm{af}}\operatorname{se}(\hat\theta)$, and with
+$T\approx\mathrm{af}\,Y$ the independent normal case gives
 
 $$
-\operatorname{se}(\mathrm{SR})\approx\sqrt{\frac{1+\mathrm{SR}^2/(2\,\mathrm{AN})}{Y}}
+\operatorname{se}(\mathrm{SR})\approx\sqrt{\frac{1+\mathrm{SR}^2/(2\,\mathrm{af})}{Y}}
 \approx\frac{1}{\sqrt{Y}} .
 $$
 
@@ -492,7 +492,7 @@ The proof is one line: the $q$-period sum has mean $q\mu$ and variance
 $\sigma^2\big(q+2\sum_{k=1}^{q-1}(q-k)\rho_k\big)$. Hence $\eta(q)=\sqrt{q}$ only without
 autocorrelation, and $\eta(q)=\sqrt{q}/\sqrt{\mathrm{VR}(q)}$ with the variance ratio of the
 [frequency convention](frequency_convention_note.md). Positive autocorrelation, typical of
-smoothed or appraisal-based marks, makes $\sqrt{\mathrm{AN}}$ scaling overstate the annual Sharpe
+smoothed or appraisal-based marks, makes $\sqrt{\mathrm{af}}$ scaling overstate the annual Sharpe
 ratio; see [private-asset unsmoothing](private_asset_unsmoothing.md) and
 [serial dependence](serial_dependence.md). Lo (2002) also gives heteroskedasticity- and
 autocorrelation-consistent standard errors for this case; the estimator family is covered in
@@ -527,7 +527,7 @@ alternative.
 
 With $Y\leq 1$ the p.a. helper returns the total return unannualised, so `SHARPE_RF0` divides a
 sub-annual total return by an annualised volatility, and `SHARPE_LOG_AN` equals
-$(T/\mathrm{AN})\cdot\sqrt{\mathrm{AN}}\,\bar\ell/s(\ell)$. A six-month history with a true
+$(T/\mathrm{af})\cdot\sqrt{\mathrm{af}}\,\bar\ell/s(\ell)$. A six-month history with a true
 annualised Sharpe ratio of 1 therefore shows about 0.5, while `SHARPE_ARITH` is annualised
 regardless of $Y$; for short histories the conventions differ by a factor close to $Y$, not by
 $\sigma_r/2$. The standalone `qis.compute_pa_return` offers `annualize_less_1y=True` for linear
@@ -624,7 +624,7 @@ The frozen synthetic universe (seed 20260725, reporting quirks disabled) starts 
 cash rate quoted from December 2013; a series starting on the first price date gives the same
 numbers. On the
 month-end grid there are $T=143$ returns over $Y=11.915$ years between 31 January 2014 and
-31 December 2025, and $T/(\mathrm{AN}\,Y)=1.0001$.
+31 December 2025, and $T/(\mathrm{af}\,Y)=1.0001$.
 
 The sampled p.a. return is 8.11% and the log volatility `VOL` is 15.79%, so
 `SHARPE_RF0` $=0.513$ and `SHARPE_LOG_AN` $=0.493$. The arithmetic column is
@@ -829,17 +829,17 @@ assert np.isclose(information_ratio.iloc[0], 0.301, atol=5e-4)
 | P.a. Sharpe ratio | $R_{\mathrm{pa}}/\sigma_v$ | `PerfStat.SHARPE_RF0` of `qis.compute_ra_perf_table` |
 | P.a. excess Sharpe ratio | $\tilde R_{\mathrm{pa}}/\sigma_v$ | `PerfStat.SHARPE_EXCESS`; cash from `PerfParams.rates_data` |
 | Log Sharpe ratio | $\log(1+R_{\mathrm{pa}})/\sigma_v$ | `PerfStat.SHARPE_LOG_AN`; excess: `PerfStat.SHARPE_LOG_EXCESS` |
-| Arithmetic Sharpe ratio | $\sqrt{\mathrm{AN}}\,\bar r/s(r)$ | `PerfStat.SHARPE_ARITH`, computed in `qis.compute_risk_table` |
-| Arithmetic excess Sharpe ratio | $\sqrt{\mathrm{AN}}\,\overline{\tilde r}/s(\tilde r)$ | `PerfStat.SHARPE_ARITH_EXCESS` |
-| Table volatility | $\sigma_v=\sqrt{\mathrm{AN}}\,s(v)$ | `PerfStat.VOL`; `PerfParams.freq_vol`, `PerfParams.return_type` |
+| Arithmetic Sharpe ratio | $\sqrt{\mathrm{af}}\,\bar r/s(r)$ | `PerfStat.SHARPE_ARITH`, computed in `qis.compute_risk_table` |
+| Arithmetic excess Sharpe ratio | $\sqrt{\mathrm{af}}\,\overline{\tilde r}/s(\tilde r)$ | `PerfStat.SHARPE_ARITH_EXCESS` |
+| Table volatility | $\sigma_v=\sqrt{\mathrm{af}}\,s(v)$ | `PerfStat.VOL`; `PerfParams.freq_vol`, `PerfParams.return_type` |
 | P.a. return | $R_{\mathrm{pa}}$ | `PerfStat.PA_RETURN` (native endpoints), `qis.compute_pa_return` |
 | Cash accrual and excess returns | $r^{f}_t$, $\tilde r_t$ | `qis.compute_excess_returns`, `qis.compute_pa_excess_compounded_returns` |
-| Regime Sharpe ratios | $\sqrt{\mathrm{AN}}\,p_g\bar r_g/s(r)$ or patched p.a. | `PerfParams.sharpe_convention`, `qis.SharpeConvention`, `qis.compute_bnb_regimes_pa_perf_table`, `qis.plot_regime_data` |
-| Rolling Sharpe ratio | $\sqrt{\mathrm{AN}}\,(e^{\bar\ell}-1)/s(\ell)$ per window | `qis.compute_rolling_perf_stat` with `qis.RollingPerfStat.SHARPE` |
-| EWM Sharpe ratios | $\mathrm{AN}\,\hat\mu_t$; $\sqrt{\mathrm{AN}}\,\hat\mu_t/\hat\sigma_{k,t}$ | `qis.compute_ewm_sharpe(norm_type=0, 1, 2)`, `qis.compute_ewm_sharpe_from_prices` |
-| Tracking error and information ratio | $\sqrt{\mathrm{AN}}\,s(r_p-r_b)$; $\sqrt{\mathrm{AN}}\,\overline{(r_p-r_b)}/s(r_p-r_b)$ | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
+| Regime Sharpe ratios | $\sqrt{\mathrm{af}}\,p_g\bar r_g/s(r)$ or patched p.a. | `PerfParams.sharpe_convention`, `qis.SharpeConvention`, `qis.compute_bnb_regimes_pa_perf_table`, `qis.plot_regime_data` |
+| Rolling Sharpe ratio | $\sqrt{\mathrm{af}}\,(e^{\bar\ell}-1)/s(\ell)$ per window | `qis.compute_rolling_perf_stat` with `qis.RollingPerfStat.SHARPE` |
+| EWM Sharpe ratios | $\mathrm{af}\,\hat\mu_t$; $\sqrt{\mathrm{af}}\,\hat\mu_t/\hat\sigma_{k,t}$ | `qis.compute_ewm_sharpe(norm_type=0, 1, 2)`, `qis.compute_ewm_sharpe_from_prices` |
+| Tracking error and information ratio | $\sqrt{\mathrm{af}}\,s(r_p-r_b)$; $\sqrt{\mathrm{af}}\,\overline{(r_p-r_b)}/s(r_p-r_b)$ | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
 | t-statistic of the mean | $\sqrt{T}\,\bar x/s(x)$ | `qis.compute_desc_table(..., is_add_tstat=True)` |
-| Arithmetic helper | $\sqrt{\mathrm{AN}}\,\bar x/s(x)$ | Internal `qis.perfstats.perf_stats.compute_sharpe_arithmetic` |
+| Arithmetic helper | $\sqrt{\mathrm{af}}\,\bar x/s(x)$ | Internal `qis.perfstats.perf_stats.compute_sharpe_arithmetic` |
 | Standard errors, PSR, DSR | See Sampling uncertainty | Not implemented; reader calculation |
 
 The block below shows the contract of `PerfParams.sharpe_convention` on two synthetic assets:

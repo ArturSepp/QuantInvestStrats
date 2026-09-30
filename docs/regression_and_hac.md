@@ -55,7 +55,7 @@ Three results carry the chapter:
 |---|---|
 | Return basis | Any periodic return series supplied by the caller; qis callers pass log returns (model-layer attribution, `qis.estimate_ewm_factor_model`) or simple returns (`qis.compute_ra_perf_table_with_benchmark` by default) |
 | Sampling grid | Rows as supplied; the estimators have no calendar logic and do not sort rows. The examples use month-end (`ME`) log returns |
-| Annualisation | None inside the estimators. Tables annualise alpha linearly, $\mathrm{AN}\,\hat\alpha$; chart legends do the same when `alpha_an_factor` is passed and otherwise print the periodic alpha |
+| Annualisation | None inside the estimators. Tables annualise alpha linearly, $\mathrm{af}\,\hat\alpha$; chart legends do the same when `alpha_an_factor` is passed and otherwise print the periodic alpha |
 | Mean adjustment | OLS and WLS fit an intercept, which removes the sample (or weighted) means. EWM betas use moments about zero by default (`MeanAdjType.NONE`) |
 | Timing | OLS/HAC and EWMA-WLS are descriptive endpoint fits over every retained row. An EWM beta dated $t$ uses rows up to and including $t$; lag it one period before applying it |
 | Output units | Coefficients in the units of the inputs: $\hat\alpha$ per period, $\hat\beta$ dimensionless, $R^2$ a fraction, standard errors per period |
@@ -529,7 +529,7 @@ centred: the residual is taken about the EWM alpha and $y$ about its EWM mean $m
 denominator seeded at zero. The moment, alpha and residual-variance recursions, and the optional
 demeaning under `mean_adj_type`, are seeded by `init_type` (`InitType.VAR` reads as `MEAN` for
 the means). `annualize=True` multiplies $\mathcal{E}[x^2]$, $\hat\sigma^2_{\varepsilon}$ and the
-$R^2$ denominator by $\mathrm{AN}$ inferred from the index, leaving $R^2$ unchanged. Beta is NaN
+$R^2$ denominator by $\mathrm{af}$ inferred from the index, leaving $R^2$ unchanged. Beta is NaN
 where $\mathcal{E}_t[x^2]$ is not strictly positive, a test that does not depend on the units of
 the data. `beta_init_value` $=\beta_0$ is a one-observation prior on row $t_1$, the first with a
 finite, non-zero factor return: it seeds both moments and replaces the pair $(x_{t_1},y_{t_1})$
@@ -614,15 +614,15 @@ Alpha is estimated per period. Every qis output that annualises it does so linea
 
 | Output | Annualised alpha | Where it is used |
 |---|---|---|
-| `PerfStat.ALPHA_AN` (`An Alpha`) | $\mathrm{AN}\,\hat\alpha$, $\mathrm{AN}$ of `PerfParams.freq_reg` (default `QE`, 4) | `qis.compute_ra_perf_table_with_benchmark` |
-| Model-layer tables, bars and intervals | $\mathrm{AN}\,\hat\alpha$ and $\mathrm{AN}(\hat\alpha\pm z_{\gamma}\,\mathrm{se})$ | `qis.compute_model_layer_alpha_beta_attribution` and its EWMA variants |
-| Scatter-plot legends with `alpha_an_factor` | $\mathrm{AN}\,\hat\alpha$, formatted `'{:+0.0%}'` | internal `reg_model_params_to_str`, through `qis.plot_scatter` and `qis.plot_returns_scatter` keyword arguments |
+| `PerfStat.ALPHA_AN` (`An Alpha`) | $\mathrm{af}\,\hat\alpha$, $\mathrm{af}$ of `PerfParams.freq_reg` (default `QE`, 4) | `qis.compute_ra_perf_table_with_benchmark` |
+| Model-layer tables, bars and intervals | $\mathrm{af}\,\hat\alpha$ and $\mathrm{af}(\hat\alpha\pm z_{\gamma}\,\mathrm{se})$ | `qis.compute_model_layer_alpha_beta_attribution` and its EWMA variants |
+| Scatter-plot legends with `alpha_an_factor` | $\mathrm{af}\,\hat\alpha$, formatted `'{:+0.0%}'` | internal `reg_model_params_to_str`, through `qis.plot_scatter` and `qis.plot_returns_scatter` keyword arguments |
 | Scatter-plot legends by default | periodic $\hat\alpha$, formatted by `alpha_format`, default `'{0:+0.2f}'` | the same, and the label of `qis.fit_multivariate_ols` |
 
 The linear form keeps alphas additive, which the attribution identities need. The compound form
-$e^{\mathrm{AN}\hat\alpha}-1$ is the annual growth of a constant periodic log alpha, exact on log
+$e^{\mathrm{af}\hat\alpha}-1$ is the annual growth of a constant periodic log alpha, exact on log
 returns and an approximation on simple returns, and it exceeds the linear form by about
-$(\mathrm{AN}\hat\alpha)^2/2$: a monthly alpha of 1.3% is 15.6% linearly and 16.9% compounded.
+$(\mathrm{af}\hat\alpha)^2/2$: a monthly alpha of 1.3% is 15.6% linearly and 16.9% compounded.
 Until the handbook follow-up, legends with `alpha_an_factor` printed the compounded figure
 (`+17%` against `+16%` in the table); they now print the table's figure. No qis report passes
 `alpha_an_factor`; by default a legend shows the periodic alpha to two decimals, so a monthly alpha
@@ -1002,7 +1002,7 @@ assert round(r2_oos['SEQ_EU'].iloc[-1], 3) == 0.410
 | Mean with Bartlett HAC | $\hat\Sigma_{\theta}$ with $p=1$ | internal `qis.utils.regression.estimate_hac_mean(y, hac_lags=3, confidence_level=0.95)`, returns `HacMeanResult` |
 | Lag rule | $\lfloor 4(T/100)^{2/9}\rfloor$ | internal `qis.utils.regression.newey_west_lag_rule(nobs)` |
 | Geometric WLS with stacked HAC | $(X^{\top}\Omega X)^{-1}X^{\top}\Omega y$, $\hat\Sigma_{\Theta}$, $T_{\mathrm{eff}}$ | `qis.estimate_ewma_alpha_beta_hac(x, y, span=36.0, hac_lags=3, confidence_level=0.95)`, returns `qis.EwmaAlphaBetaHacResult` |
-| Legend annualisation | $\mathrm{AN}\,\hat\alpha$ | internal `qis.utils.regression.reg_model_params_to_str(..., alpha_an_factor=None)`, via `qis.plot_scatter` |
+| Legend annualisation | $\mathrm{af}\,\hat\alpha$ | internal `qis.utils.regression.reg_model_params_to_str(..., alpha_an_factor=None)`, via `qis.plot_scatter` |
 | EWM loadings tensor | $B_t=M_t^{-1}C_t$, NaN where singular | `qis.compute_ewm_xy_beta_tensor(x, y, span=None, ewm_lambda=0.94, warmup_period=20, is_x_correlated=True)` |
 | One-factor EWM betas | $\mathcal{E}_t[xy]/\mathcal{E}_t[x^2]$, zero seeds | `qis.compute_one_factor_ewm_betas(x, y, span=None, ewm_lambda=0.94, warmup_period=20)` |
 | Linear model loadings | $B_t$ per factor | `qis.EwmLinearModel.fit(span=31, is_x_correlated=True, init_type=InitType.X0, warmup_period=20)`; `qis.estimate_ewm_factor_model` |

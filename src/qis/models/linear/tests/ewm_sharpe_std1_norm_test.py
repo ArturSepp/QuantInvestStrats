@@ -9,7 +9,7 @@ from qis.models.linear.ewm import compute_ewm_sharpe, compute_ewm_std1_norm, ewm
 
 
 def test_ewm_sharpe_uses_the_first_return() -> None:
-    """Row 0 enters the EWM mean: norm 0 is AN times (1 - lambda) r_0 at row 0."""
+    """Row 0 enters the EWM mean: norm 0 is af times (1 - lambda) r_0 at row 0."""
     returns = pd.DataFrame({'a': [0.1, 0.0, 0.0]},
                            index=pd.date_range('2020-01-31', periods=3, freq='ME'))
     sharpe = compute_ewm_sharpe(returns, span=3, norm_type=0)

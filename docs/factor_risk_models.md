@@ -50,7 +50,7 @@ only referenced here.
 |---|---|
 | Return basis | Total log returns of the supplied prices in `estimate_ewm_factor_model`; `RiskModel` inherits the returns its covariance describes |
 | Sampling grid | Weekly `W-WED` returns in `estimate_ewm_factor_model`; `RiskModel` evaluates on its covariance date grid |
-| Annualisation | None inside `RiskModel` or the EWM fit; the caller scales moments by $\mathrm{AN}$ (52 weekly) and volatilities by $\sqrt{\mathrm{AN}}$ |
+| Annualisation | None inside `RiskModel` or the EWM fit; the caller scales moments by $\mathrm{af}$ (52 weekly) and volatilities by $\sqrt{\mathrm{af}}$ |
 | Mean adjustment | None by default: EWM moments about zero (regression through the origin) and an uncentred $R^2$ |
 | Timing | $\hat B_t$ uses data up to and including $t$; apply $\hat B_{t-1}$ to $f_t$; weights as of each covariance date |
 | Output units | Exposures in weight units; variances in covariance units; contributions in volatility units or shares |
@@ -368,7 +368,7 @@ When `span` is given it overrides `ewm_lambda`, whose value 0.94 is the daily de
 RiskMetrics (J.P. Morgan and Reuters, 1996).
 
 `EwmLinearModel` estimates loadings only. A risk snapshot also needs $\Sigma_f$ and $\Psi$. The
-caller estimates them, for example as $\mathrm{AN}$ times EWM second moments of factor returns and
+caller estimates them, for example as $\mathrm{af}$ times EWM second moments of factor returns and
 of model residuals from `qis.compute_ewm_covar`, and assembles $\Sigma=B\Sigma_fB^{\top}+\Psi$;
 [Stress testing with options](stress_testing_with_options.md) shows this assembly on weekly data.
 

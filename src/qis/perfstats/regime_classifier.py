@@ -100,7 +100,7 @@ def compute_regime_avg(sampled_returns_with_regime_id: pd.DataFrame,
         sampled_returns_with_regime_id: DataFrame with returns and regime classification
         freq: Sampling frequency for annualization
         is_report_pa_returns: If True, report the compounded contribution
-            exp(AN * p_s * m_s) - 1; if False, the linear contribution AN * p_s * m_s
+            exp(af * p_s * m_s) - 1; if False, the linear contribution af * p_s * m_s
         regime_ids: Optional ordered list of regime IDs
         **kwargs: ignored
 
@@ -150,7 +150,7 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
     the patched p.a. contributions over the table's ``VOL`` and add up to ``PA_RETURN / VOL``,
     with ``PA_RETURN`` on each asset's native endpoints; this equals ``SHARPE_RF0`` only when
     those endpoints lie on the ``freq_vol`` grid. Under ARITHMETIC and LOG they are
-    sqrt(AN) * p_s * m_s / std on the sampled simple or log returns and add up exactly to the
+    sqrt(af) * p_s * m_s / std on the sampled simple or log returns and add up exactly to the
     Sharpe ratio of that convention on the regime grid. No cash is deducted.
 
     Args:
@@ -564,7 +564,7 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
             drop_benchmark: Exclude benchmark from results
             additive_pa_returns_to_pa_total: Shift the per-annum regime contributions in
                 proportion to regime frequency so they add up to the table's ``PA_RETURN``;
-                False reports the unpatched exp(AN * p_s * m_s) - 1
+                False reports the unpatched exp(af * p_s * m_s) - 1
             **kwargs: Accepted for call compatibility (plotting functions pass their own
                 options through) and ignored
 
@@ -715,7 +715,7 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
             drop_benchmark: Exclude benchmark from results
             additive_pa_returns_to_pa_total: Shift the per-annum regime contributions in
                 proportion to regime frequency so they add up to the table's ``PA_RETURN``;
-                False reports the unpatched exp(AN * p_s * m_s) - 1
+                False reports the unpatched exp(af * p_s * m_s) - 1
             **kwargs: Accepted for call compatibility (plotting functions pass their own
                 options through) and ignored
 
@@ -878,7 +878,7 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
             drop_benchmark: Exclude benchmark from results
             additive_pa_returns_to_pa_total: Shift the per-annum regime contributions in
                 proportion to regime frequency so they add up to the table's ``PA_RETURN``;
-                False reports the unpatched exp(AN * p_s * m_s) - 1
+                False reports the unpatched exp(af * p_s * m_s) - 1
             **kwargs: Accepted for call compatibility (plotting functions pass their own
                 options through) and ignored
 

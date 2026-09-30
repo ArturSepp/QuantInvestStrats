@@ -38,7 +38,9 @@ page. Remove the mark once it has.
 - Magdon-Ismail, M., Atiya, A. F., Pratap, A., and Abu-Mostafa, Y. S. (2004). On the Maximum Drawdown of a Brownian Motion. *Journal of Applied Probability*, 41(1), 147–161. [DOI: 10.1239/jap/1077134674](https://doi.org/10.1239/jap/1077134674). [pending publisher check]
 - Mertens, E. (2002). Comments on Variance of the IID Estimator in Lo (2002). Working paper, University of Basel. [pending publisher check]
 - Opdyke, J. D. (2007). Comparing Sharpe Ratios: So Where Are the p-Values? *Journal of Asset Management*, 8(5), 308–336. [DOI: 10.1057/palgrave.jam.2250084](https://doi.org/10.1057/palgrave.jam.2250084). [pending publisher check]
-- Sepp, A. (2019). Trend-Following CTAs vs Alternative Risk-Premia: Crisis Beta vs Risk-Premia Alpha. *The Hedge Fund Journal*. [Article](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/). [pending publisher check]
+- Sepp, A. (2020). 60/40 Portfolios and the Need for Smart Diversification. *HedgeNordic*, Systematic Strategies Special Report, 24–29. [pending publisher check]
+- Sepp, A., and Dézeraud, L. (2019). Trend-Following CTAs vs Alternative Risk-Premia: Crisis Beta vs Risk-Premia Alpha. *The Hedge Fund Journal*, 138, 20–31. [Article](https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/). [pending publisher check]
+- Sepp, A., and Kastenholz, M. (2026). Smart Diversification in the Long Run: Trend-Following Overlays over Five Decades. Working paper.
 - Sepp, A., and Kastenholz, M. (2026). The Convexity Premium of Portfolio Overlays. *Journal of Investment Management*, forthcoming.
 - Sharpe, W. F. (1966). Mutual Fund Performance. *The Journal of Business*, 39(1), 119–138. [DOI: 10.1086/294846](https://doi.org/10.1086/294846). [pending publisher check]
 - Sharpe, W. F. (1994). The Sharpe Ratio. *The Journal of Portfolio Management*, 21(1), 49–58. [Author's copy](https://web.stanford.edu/~wfsharpe/art/sr/SR.htm).

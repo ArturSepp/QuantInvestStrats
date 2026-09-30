@@ -61,7 +61,7 @@ computed on the draws are the caller's.
 |---|---|
 | Return basis | Rows are resampled as given; `bootstrap_price_data` resamples simple returns by default (`is_log_returns=False`) and recompounds them; the case study uses synthetic arithmetic returns |
 | Sampling grid | Row positions of the input: the samplers ignore dates, `block_size` counts rows, and a resampled path carries positions $0,\ldots,K-1$ rather than a calendar |
-| Annualisation | None inside the samplers; a statistic computed on the draws uses the $\mathrm{AN}$ of the input grid; the case study uses linear $\mathrm{AN}=260$ as a teaching convention |
+| Annualisation | None inside the samplers; a statistic computed on the draws uses the $\mathrm{af}$ of the input grid; the case study uses linear $\mathrm{af}=260$ as a teaching convention |
 | Mean adjustment | None: rows are drawn as observed and never recentred; AR(1) residuals have zero sample mean by construction |
 | Timing | Full sample, not point in time: any draw may use any row of the input; each resampled row keeps its own contemporaneous cross-section |
 | Output units | Units of the input; indices are zero-based integers; price paths are levels starting at an anchor price |
@@ -96,7 +96,7 @@ computed on the draws are the caller's.
 | $\underline{y}_i$ | Positivity floor of column $i$: 25% quantile of its observed values | Units of the input; defined only for a column whose observed values are all positive |
 | $\mathcal{T}$ | Dates with a complete lag pair in every column | Set of positions |
 | $C_h$, $f_h$ | Case study: draw count and relative draw frequency of source row $h$ | Count; 1 means uniform |
-| $\delta$, $\mathrm{AN}$ | Case study: resampled minus source mean; linear annualisation factor | Decimal per period; 260 |
+| $\delta$, $\mathrm{af}$ | Case study: resampled minus source mean; linear annualisation factor | Decimal per period; 260 |
 | Index seed, return seed | Case study: seed of the index sampler; NumPy seed of the source series | 7 and 3 |
 | $q$, $d$, $Z$, $e_t$, $A$, $B$ | Local dummies: product index; summation index; a non-negative integer variable; expected AR(1) path; two panels | Defined where used |
 
@@ -596,7 +596,7 @@ Here “bias” labels the measured difference $\delta$ for one fixed source and
 draws; it is not an exact expectation over all random sources and seeds. For the circular
 sampler its expectation is zero by the unbiased-mean identity.
 
-The table reports $10^4\delta$ in basis points per period and $100\,\mathrm{AN}\,\delta$ in
+The table reports $10^4\delta$ in basis points per period and $100\,\mathrm{af}\,\delta$ in
 annualised percentage points. This is **linear annualisation of a mean-return difference**, not
 a compounded annual return, CAGR, Sharpe ratio or probability of profit.
 
@@ -848,7 +848,7 @@ uniform in this finite experiment; it is not exactly uniform.
 
 Apply those same index arrays to the changing-drift source:
 
-| Convention | Resampled mean | Bias per period | Bias annualised, $\mathrm{AN}=260$ |
+| Convention | Resampled mean | Bias per period | Bias annualised, $\mathrm{af}=260$ |
 |---|---:|---:|---:|
 | Historical truncating | 13.62 bp | **+0.83 bp** | **+2.15%** |
 | Circular | 12.67 bp | −0.12 bp | −0.32% |
