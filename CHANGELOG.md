@@ -11,6 +11,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Require Numba 0.64 or newer: 0.63 fails to compile the EWM array kernel with the
   supported NumPy 2 floor, breaking the Python 3.10 minimum-dependency test run.
+- Make `compute_ewm`, `compute_ewm_vol`, the related shared-decay estimators, and the covariance
+  and beta EWM kernels reject non-finite spans, spans below one, and decay values outside `[0, 1)`
+  before recursion. Per-column mean/volatility arrays now reject the complete request when any
+  entry is invalid, while span precedence and the `span=1` pass-through remain unchanged.
 
 ## [5.33.0] - 2026-09-30
 
@@ -51,6 +55,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   beta-tensor warmup masks instead of silently retaining the tensor's 20-period default. The first
   identified rolling beta and its next-period correction are now available without an extra
   warmup; integer warmups are unchanged.
+- Prevent `replay_discrete_portfolio` and `backtest_discrete_portfolio` strategies from rewriting
+  retained state values, labels, names, or metadata through their pandas callback objects, keeping
+  point-in-time history and reporting output unchanged by strategy-side mutation.
 
 ## [5.32.0] - 2026-09-27
 

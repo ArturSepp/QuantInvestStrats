@@ -15,8 +15,9 @@ Every timestamp is processed in this order:
 
 1. Execute orders decided at the preceding observation using the current observed price.
 2. Apply fill notionals and transaction costs to cash and signed units.
-3. Mark all holdings and create an immutable `DiscretePortfolioState`.
-4. Pass only the current observed price row and post-fill state to the strategy.
+3. Mark all holdings and retain an isolated `DiscretePortfolioState`.
+4. Pass independent snapshots of the current observed price row and post-fill state to the
+   strategy, so pandas value or metadata changes cannot rewrite accounting history.
 5. Queue the strategy's new orders for the next observation.
 
 An order decided at time *t* therefore cannot fill before *t+1*. An order created on the final
@@ -98,7 +99,7 @@ class MovingAverageCross:
         ]
 ```
 
-The `prices` row and every Series in `state` are read-only snapshots. `quantity` is signed:
+The `prices` row and every Series in `state` are isolated snapshots. `quantity` is signed:
 positive means buy and negative means sell. Order identifiers must be unique within a replay.
 
 ## Running a replay
