@@ -4,11 +4,11 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "86dd4ce5ff4e2df6c325604ce035ea32edaa6a48",
-      "distinct_symbols": 123,
-      "call_sites": 969,
-      "files_scanned": 287,
-      "files_using_qis": 113,
+      "commit": "401e83fd9de65e1bdd212f1b17db37fb40220219",
+      "distinct_symbols": 127,
+      "call_sites": 1068,
+      "files_scanned": 305,
+      "files_using_qis": 130,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
         "CorrMatrixOutput",
@@ -43,6 +43,7 @@
         "StressTestConfig",
         "TimePeriod",
         "TrendLine",
+        "TurnoverComputationType",
         "Underlying",
         "__file__",
         "backtest_model_portfolio",
@@ -56,7 +57,10 @@
         "compute_ewm_covar_tensor_vol_norm_returns",
         "compute_ewm_long_short_filtered_ra_returns",
         "compute_ewm_vol",
+        "compute_group_portfolio_risk_contribution_ratios",
+        "compute_ic_timeseries",
         "compute_masked_covar_corr",
+        "compute_portfolio_risk_contribution_ratios",
         "compute_portfolio_risk_contributions",
         "compute_ra_perf_table",
         "compute_ra_perf_table_with_benchmark",
@@ -234,10 +238,10 @@
     },
     "privateassets": {
       "url": "https://github.com/ArturSepp/privateassets.git",
-      "commit": "cefe29ecbf0a091caf44ab9998d4d9b35da90fe6",
+      "commit": "cfb03a6cf1d3d7f5805c8f84cacdf7e58fddbf60",
       "distinct_symbols": 5,
       "call_sites": 9,
-      "files_scanned": 29,
+      "files_scanned": 31,
       "files_using_qis": 5,
       "symbols": [
         "BootstrapType",
