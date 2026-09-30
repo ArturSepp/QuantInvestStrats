@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.33.1] - 2026-09-30
+
 ### Fixed
 
 - Require Numba 0.64 or newer: 0.63 fails to compile the EWM array kernel with the
