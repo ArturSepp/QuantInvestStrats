@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Require Numba 0.64 or newer: 0.63 fails to compile the EWM array kernel with the
+  supported NumPy 2 floor, breaking the Python 3.10 minimum-dependency test run.
+
 ## [5.32.1] - 2026-09-30
 
 ### Added

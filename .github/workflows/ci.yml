@@ -209,4 +209,4 @@ jobs:
       - name: Check optional dependencies stay outside package-root import
         run: uv run --no-sync python .github/scripts/check_stack_imports.py --check-root
       - name: Test declared dependency floors without live provider credentials
-        run: uv run --no-sync pytest
+        run: uv run --no-sync pytest -x

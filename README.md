@@ -184,7 +184,7 @@ git clone https://github.com/ArturSepp/QuantInvestStrats.git
 
 Core dependencies:
     python = ">=3.10",
-    numba = ">=0.63.0",
+    numba = ">=0.64.0",
     numpy = ">=2.0",
     scipy = ">=1.12.0",
     statsmodels = ">=0.14.2",
@@ -197,7 +197,7 @@ Core dependencies:
 `src/qis/tests/test_documentation.py` asserts that this list is the `dependencies` table of
 `pyproject.toml`, so it cannot drift from what `pip install qis` actually pulls.
 
-Python 3.14 is supported (numba 0.63+ ships cp314 wheels).
+Python 3.14 is supported (numba 0.64+ ships cp314 wheels).
 
 Published extras keep optional integrations out of a core install:
 

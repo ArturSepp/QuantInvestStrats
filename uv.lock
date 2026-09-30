@@ -3877,7 +3877,7 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.8.0" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=4.0" },
     { name = "notebook", marker = "extra == 'jupyter'", specifier = ">=6.5.0" },
-    { name = "numba", specifier = ">=0.63.0" },
+    { name = "numba", specifier = ">=0.64.0" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pandas", specifier = ">=2.2.0" },
