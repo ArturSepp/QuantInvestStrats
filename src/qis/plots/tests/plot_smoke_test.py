@@ -211,6 +211,12 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
         'plot_clusters': dict(clusters={'ME': pd.Series([1, 2], index=['A', 'B'])},
                               linkages={'ME': np.array([[0., 1., .5, 2.]])},
                               cutoffs={'ME': .3}),
+        'plot_overlay_allocation_frontier': dict(
+            portfolio_stats=pd.DataFrame(
+                {'bear_sharpe': [-0.5, -0.2], 'sharpe': [0.5, 0.6]},
+                index=['Benchmark', 'Overlay']),
+            benchmark='Benchmark',
+        ),
         'plot_portfolio_breadth_concentration': dict(
             result=fx.portfolio_breadth,
             detailed_mode=False,

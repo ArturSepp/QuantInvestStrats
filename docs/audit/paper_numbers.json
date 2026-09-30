@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "2edf8ec25c652cae657d3db4e50bc8e2d616f8fb",
+  "measured_at_commit": "d87ed7b47b7a7154717cf7539e205ef56f6849c1",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,38 +46,38 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 5288,
+      "value": 5325,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 856,
+      "value": 858,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
-      "value": 969,
-      "how": "tools/audit_consumers.py at 86dd4ce5ff4e",
+      "value": 1068,
+      "how": "tools/audit_consumers.py at 401e83fd9de6",
       "live": false,
-      "paper_phrase": "at 969 sites"
+      "paper_phrase": "at 1068 sites"
     },
     "consumer_optimalportfolios_symbols": {
-      "value": 123,
-      "how": "tools/audit_consumers.py at 86dd4ce5ff4e",
+      "value": 127,
+      "how": "tools/audit_consumers.py at 401e83fd9de6",
       "live": false,
-      "paper_phrase": "references 123 of its symbols"
+      "paper_phrase": "references 127 of its symbols"
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
-      "how": "tools/audit_consumers.py at cefe29ecbf0a",
+      "how": "tools/audit_consumers.py at cfb03a6cf1d3",
       "live": false,
       "paper_phrase": null
     },
     "consumer_privateassets_symbols": {
       "value": 5,
-      "how": "tools/audit_consumers.py at cefe29ecbf0a",
+      "how": "tools/audit_consumers.py at cfb03a6cf1d3",
       "live": false,
       "paper_phrase": null
     },
@@ -106,10 +106,10 @@
       "paper_phrase": null
     },
     "exported_symbols": {
-      "value": 464,
+      "value": 465,
       "how": "len(qis.__all__)",
       "live": true,
-      "paper_phrase": "holds 464 names"
+      "paper_phrase": "holds 465 names"
     },
     "first_commit_month": {
       "value": "2022-12",

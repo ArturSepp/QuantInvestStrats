@@ -2,3 +2,5 @@
 
 from qis.portfolio.smart_diversification.overlay_curve import create_overlay_portfolio_curve
 from qis.portfolio.smart_diversification.report import SmartDiversificationReport
+
+from qis.portfolio.smart_diversification.allocation_frontier import plot_overlay_allocation_frontier

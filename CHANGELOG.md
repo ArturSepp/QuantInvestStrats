@@ -19,6 +19,26 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Series names as lookup keys. Absent, duplicate, and distinct names now produce the same relative
   NAV values and neutral result name.
 
+## [5.33.0] - 2026-09-30
+
+### Added
+
+- Add plot_overlay_allocation_frontier to draw precomputed core-plus-overlay points
+  and solved coverage frontiers, with configurable groups, selected allocations and
+  benchmark reference. It preserves supplied coordinates and policy order, including
+  repeated slack solutions, without estimation, optimisation or a fitted curve.
+  The default legend is centred below the axes in two columns, with configurable
+  bbox_to_anchor and ncols.
+
+- Add explicitly imported qis.regimes helpers compute_sample_regime_moments and
+  compute_regime_mixture_covar_from_sample. They use empirical regime probabilities,
+  consistent periodic moments and annual residual-volatility conversion, insert the
+  benchmark row, and accept frozen beta sheets. Classified asset returns must form
+  a complete common sample; malformed labels, the reserved `Total` regime name and
+  unidentified regressions fail explicitly.
+- Preserve the existing low-level mixture estimator, theoretical-probability default,
+  beta estimator and variance conventions.
+
 ## [5.32.1] - 2026-09-30
 
 ### Added

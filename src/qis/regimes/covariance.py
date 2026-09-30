@@ -19,7 +19,9 @@ import pandas as pd
 from scipy.stats import norm
 from typing import Optional, Sequence, Tuple, Union
 # qis
-from qis.regimes.partition import get_partition_quantiles, get_regime_ids, get_regime_probabilities
+from qis.regimes.partition import (REGIME_COLUMN, get_ordered_regimes, get_partition_quantiles,
+                                  get_regime_ids, get_regime_probabilities)
+from qis.regimes.betas import compute_regime_betas
 from qis.regimes.nulls import _edge_densities
 
 
@@ -87,3 +89,144 @@ def compute_gaussian_regime_moments(benchmark_vol: float,
     means = pd.Series(mean_z * benchmark_vol + benchmark_mean, index=ids)
     variances = pd.Series((second_z - mean_z ** 2) * benchmark_vol ** 2, index=ids)
     return means, variances + means ** 2
+
+
+def _sample_regime_data(sampled_returns_with_regime_id: pd.DataFrame,
+                        benchmark: str, regime_column: str) -> pd.DataFrame:
+    """Validate classified benchmark observations without changing the partition."""
+    data = sampled_returns_with_regime_id
+    if not data.columns.is_unique:
+        raise ValueError("sample columns must be unique")
+    if benchmark == regime_column or benchmark not in data or regime_column not in data:
+        raise ValueError("sample must contain distinct benchmark and regime columns")
+    data = data.dropna(subset=[regime_column])
+    if data.empty:
+        raise ValueError("sample has no classified observations")
+    if not np.isfinite(data[benchmark].to_numpy(dtype=float)).all():
+        raise ValueError("classified benchmark returns must be finite")
+    if not all(isinstance(label, str) for label in data[regime_column]):
+        raise ValueError("regime labels must be strings")
+    regimes = get_ordered_regimes(data[regime_column])
+    if len({label.lower() for label in regimes}) != len(regimes):
+        raise ValueError("regime labels must be unique ignoring case")
+    if any(not (data[regime_column] == label).any() for label in regimes):
+        raise ValueError("sample contains an empty regime")
+    return data
+
+
+def compute_sample_regime_moments(sampled_returns_with_regime_id: pd.DataFrame,
+                                  benchmark: str,
+                                  regime_column: str = REGIME_COLUMN
+                                  ) -> pd.DataFrame:
+    """Per-period empirical benchmark moments on one supplied classification.
+
+    Unclassified observations are excluded. Every classified benchmark return must
+    be finite, and every declared regime must be populated. Means and second moments
+    are equal-weighted population moments (ddof=0), not sample variances. This function
+    neither classifies nor resamples returns and does not infer a decision date.
+
+    Args:
+        sampled_returns_with_regime_id: periodic simple returns and string regime labels
+        benchmark: benchmark return column
+        regime_column: supplied classification column
+
+    Returns:
+        Regimes in bucket order, with probability, mean and second_moment columns.
+        Probabilities are empirical frequencies of the classified observations.
+
+    Raises:
+        ValueError: if columns, labels, classified benchmark returns or regimes are invalid
+    """
+    data = _sample_regime_data(sampled_returns_with_regime_id, benchmark, regime_column)
+    regimes = get_ordered_regimes(data[regime_column])
+    labels = data[regime_column]
+    grouped = data[benchmark].groupby(labels, observed=True)
+    return pd.DataFrame({
+        'probability': labels.value_counts(normalize=True),
+        'mean': grouped.mean(),
+        'second_moment': data[benchmark].pow(2).groupby(labels, observed=True).mean(),
+    }).reindex(regimes)
+
+
+def compute_regime_mixture_covar_from_sample(
+        sampled_returns_with_regime_id: pd.DataFrame,
+        benchmark: str,
+        af: float,
+        betas: Optional[pd.DataFrame] = None,
+        regime_column: str = REGIME_COLUMN,
+) -> pd.DataFrame:
+    """Annualised regime-mixture covariance from one complete classified sample.
+
+    Delegates estimation to compute_regime_betas and covariance assembly to
+    compute_regime_mixture_covar. Empirical probabilities and population benchmark
+    moments use all classified observations. Ragged classified panels are rejected:
+    choose a common sample explicitly before classifying it. The existing residual
+    standard deviation convention (ddof=1) is retained. Residuals are uncorrelated
+    across assets and with the benchmark; fitted regime intercepts are discarded.
+
+    Args:
+        sampled_returns_with_regime_id: periodic simple returns with supplied regimes;
+            unclassified rows are excluded, all other asset returns must be finite;
+            regime label 'total' (case-insensitive) is reserved by beta_total
+        benchmark: benchmark column, inserted first with unit betas and zero residual
+        af: finite positive annualisation factor for the input return frequency
+        betas: optional frozen compute_regime_betas-format sheet, indexed by exactly
+            the non-benchmark assets, with beta_<lowercase regime> and idio_vol columns.
+            idio_vol is annualised using the same af, finite and nonnegative. Additional
+            statistics columns are ignored. None estimates on this sample, requiring
+            24 periods and at least two distinct benchmark returns within every regime.
+        regime_column: supplied classification column
+
+    Returns:
+        Annual covariance, benchmark first followed by the panel's other asset columns.
+        Full-sample inputs give a descriptive estimate; rolling callers must supply
+        only observations available at their decision date. Frozen betas' estimation
+        dates and annualisation provenance remain the caller's responsibility.
+
+    Raises:
+        ValueError: if sample, annualisation, regression identification or frozen inputs
+            violate the contract
+    """
+    if not np.isfinite(af) or af <= 0.0:
+        raise ValueError("af must be finite and positive")
+    moments = compute_sample_regime_moments(
+        sampled_returns_with_regime_id, benchmark, regime_column)
+    data = sampled_returns_with_regime_id.dropna(subset=[regime_column])
+    assets = [name for name in data.columns if name not in (benchmark, regime_column)]
+    if not np.isfinite(data[assets].to_numpy(dtype=float)).all():
+        raise ValueError("classified asset returns must form a complete finite sample")
+    regimes = list(moments.index)
+    if any(name.lower() == 'total' for name in regimes):
+        raise ValueError("regime label 'total' is reserved by the beta_total summary column")
+    beta_columns = [f'beta_{name.lower()}' for name in regimes]
+    required = beta_columns + ['idio_vol']
+    if betas is None:
+        if assets:
+            for regime in regimes:
+                observations = data.loc[data[regime_column] == regime, benchmark]
+                if observations.nunique() < 2:
+                    raise ValueError(f"{regime}: need two distinct benchmark returns")
+            betas = compute_regime_betas(data, benchmark, af, regime_column=regime_column)
+        else:
+            betas = pd.DataFrame(index=assets, columns=required, dtype=float)
+    if (not betas.index.is_unique or not betas.columns.is_unique
+            or set(betas.index) != set(assets)):
+        raise ValueError("betas must have unique labels and exactly the non-benchmark assets")
+    missing = set(required).difference(betas.columns)
+    if missing:
+        raise ValueError(f"betas are missing required columns: {sorted(missing)}")
+    frozen = betas.loc[assets, required].astype(float)
+    if not np.isfinite(frozen.to_numpy()).all() or (frozen['idio_vol'] < 0.0).any():
+        raise ValueError("betas must be finite and annual idio_vol nonnegative")
+    names = [benchmark] + assets
+    loadings = frozen[beta_columns].copy()
+    loadings.columns = regimes
+    loadings.loc[benchmark] = 1.0
+    idio_vars = frozen['idio_vol'].pow(2) / af
+    idio_vars.loc[benchmark] = 0.0
+    return compute_regime_mixture_covar(
+        betas=loadings.reindex(names), idio_vars=idio_vars,
+        benchmark_regime_means=moments['mean'],
+        benchmark_regime_second_moments=moments['second_moment'],
+        regime_probs=moments['probability'], af=af,
+    )
