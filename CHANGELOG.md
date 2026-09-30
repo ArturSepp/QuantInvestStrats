@@ -7,6 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.32.1] - 2026-09-30
+
+### Added
+
+- Add `cash_rate_lag` to `FxRatesData` excess-return methods. The default remains one
+  return period (the cash quote known at period start); lag zero permits a contemporaneous
+  quote for descriptive factor-beta and covariance estimation without changing other callers.
+
 ### Changed
 
 - Vectorize multi-asset net-of-fee NAV calculation in `compute_net_navs_ex_perf_man_fees` while

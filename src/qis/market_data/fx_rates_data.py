@@ -375,10 +375,14 @@ class FxRatesData:
         return nav_ref
 
     def _get_period_cash_returns(self, return_index: pd.DatetimeIndex, local_ccy: str,
-                                 freq: str, is_log_returns: bool) -> pd.Series:
-        """Accrue starting-date simple cash rates on the actual asset return grid."""
+                                 freq: str, is_log_returns: bool,
+                                 cash_rate_lag: int = 1) -> pd.Series:
+        """Convert cash quotes on the asset return grid with the selected observation lag."""
+        if isinstance(cash_rate_lag, bool) or not isinstance(cash_rate_lag, (int, np.integer)) \
+                or cash_rate_lag < 0:
+            raise ValueError("cash_rate_lag must be a nonnegative integer")
         cash = self.domestic_rates[local_ccy].reindex(return_index, method='ffill')
-        cash = (cash / qis.get_annualization_factor(freq)).shift(1)
+        cash = (cash / qis.get_annualization_factor(freq)).shift(int(cash_rate_lag))
         if (cash <= -1.0).any():
             raise ValueError("Cash gross factors must be strictly positive")
         return np.log1p(cash) if is_log_returns else cash
@@ -387,7 +391,8 @@ class FxRatesData:
             self, asset_price_local_ccy: pd.Series,
             hedge_ratio: Union[float, pd.Series], local_ccy: str, reference_ccy: str,
             freq: str = 'ME', is_log_returns: bool = False,
-            is_excess_returns: bool = False) -> Tuple[pd.Series, pd.Series]:
+            is_excess_returns: bool = False,
+            cash_rate_lag: int = 1) -> Tuple[pd.Series, pd.Series]:
         """
         Calculate hedged asset performance in reference currency.
 
@@ -396,7 +401,9 @@ class FxRatesData:
         When ``is_excess_returns=True``, arithmetic excess is ``R - cash``;
         log excess is ``log1p(R) - log1p(cash)``, the log return relative to cash.
         Cash uses the reference-currency short rate observed at the start of
-        each actual asset-return period, scaled by the frequency's year fraction.
+        each actual asset-return period by default (``cash_rate_lag=1``).
+        ``cash_rate_lag=0`` uses the quote on the return date for descriptive
+        estimation; it does not represent cash accrued over the preceding period.
         The two excess conventions are not expm1 equivalents. A principal-only
         FX hedge leaves the local investment gain exposed to terminal FX.
         """
@@ -448,7 +455,8 @@ class FxRatesData:
         if is_excess_returns:
             ref_rate = self._get_period_cash_returns(
                 return_index=local_return.index, local_ccy=reference_ccy,
-                freq=freq, is_log_returns=is_log_returns)
+                freq=freq, is_log_returns=is_log_returns,
+                cash_rate_lag=cash_rate_lag)
             local_return = local_return - ref_rate
         if k > start:
             local_return.iloc[start:k] = np.nan
@@ -463,7 +471,8 @@ class FxRatesData:
                                          reference_ccy: str,
                                          freq: str = 'ME',
                                          is_log_returns: bool = False,
-                                         is_excess_returns: bool = False
+                                         is_excess_returns: bool = False,
+                                         cash_rate_lag: int = 1
                                          ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Convert a multi-asset panel to a reference-currency NAV + returns.
 
@@ -487,9 +496,12 @@ class FxRatesData:
                 hedge rebalance happens at this cadence and returns
                 are computed at the same cadence.
             is_log_returns: If True, returns are log; otherwise simple.
-            is_excess_returns: If True, subtract starting-period reference-currency
-                cash in the selected return convention. See
+            is_excess_returns: If True, subtract reference-currency cash in the
+                selected return convention. See
                 ``compute_fx_adjusted_returns`` for the excess-return definition.
+            cash_rate_lag: Return-grid periods to lag the cash quote before
+                subtraction. The default 1 uses the starting-period quote;
+                0 uses the quote on the return date for descriptive estimation.
 
         Returns:
             Tuple of (NAV DataFrame, Returns DataFrame). The NAV frame
@@ -518,7 +530,8 @@ class FxRatesData:
                     reference_ccy=reference_ccy,
                     freq=freq,
                     is_log_returns=is_log_returns,
-                    is_excess_returns=is_excess_returns)
+                    is_excess_returns=is_excess_returns,
+                    cash_rate_lag=cash_rate_lag)
             )
         fx_adjusted_navs = pd.DataFrame.from_dict(fx_adjusted_navs, orient='columns')
         fx_adjusted_returns = pd.DataFrame.from_dict(fx_adjusted_returns, orient='columns')
@@ -533,7 +546,8 @@ class FxRatesData:
                                     freq: Union[str, pd.Series] = 'ME',
                                     is_log_returns: bool = True,
                                     is_excess_returns: bool = False,
-                                    zero_return_to_nan: bool = True
+                                    zero_return_to_nan: bool = True,
+                                    cash_rate_lag: int = 1
                                     ) -> Dict[str, pd.DataFrame]:
         """Compute per-period returns of a multi-asset panel in a reference ccy.
 
@@ -567,12 +581,15 @@ class FxRatesData:
             freq: Single frequency string or per-asset Series. A Series
                 dispatches the panel into asset-frequency buckets.
             is_log_returns: If True, returns are log; otherwise simple.
-            is_excess_returns: If True, subtract starting-period reference-currency
-                cash in the selected return convention: simple cash from simple
+            is_excess_returns: If True, subtract reference-currency cash in the
+                selected return convention: simple cash from simple
                 returns, or log1p(cash) from log returns. A principal-only FX hedge
                 leaves local investment gains exposed to terminal FX.
             zero_return_to_nan: If True (default), treat exact-zero returns as
                 missing observations; if False, retain them as valid returns.
+            cash_rate_lag: Return-grid periods to lag the cash quote before
+                excess-return subtraction. The default 1 uses the starting-period
+                quote; 0 uses the quote on the return date for estimation.
 
         Returns:
             Mapping ``{freq_string: returns_dataframe}``. Single-freq
@@ -588,7 +605,8 @@ class FxRatesData:
                 reference_ccy=reference_ccy,
                 freq=freq,
                 is_log_returns=is_log_returns,
-                is_excess_returns=is_excess_returns
+                is_excess_returns=is_excess_returns,
+                cash_rate_lag=cash_rate_lag,
             )
             if zero_return_to_nan:
                 fx_adjusted_returns = fx_adjusted_returns.replace({0.0: np.nan})
@@ -610,7 +628,8 @@ class FxRatesData:
                     reference_ccy=reference_ccy,
                     freq=str(frequency),
                     is_log_returns=is_log_returns,
-                    is_excess_returns=is_excess_returns
+                    is_excess_returns=is_excess_returns,
+                    cash_rate_lag=cash_rate_lag,
                 )
                 if zero_return_to_nan:
                     fx_adjusted_returns = fx_adjusted_returns.replace({0.0: np.nan})
@@ -651,15 +670,17 @@ class FxRatesData:
                                                asset_prices: pd.DataFrame,
                                                local_ccys: pd.Series,
                                                freq: str = 'ME',
-                                               is_log_returns: bool = False
+                                               is_log_returns: bool = False,
+                                               cash_rate_lag: int = 1
                                                ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Native-currency returns and excess-over-local-rate returns for a panel.
 
         Computes each asset's return in its own local currency (no FX conversion)
         and the corresponding excess return over that currency's domestic short
         rate. Cash quotes are as-of aligned to the actual return grid and lagged
-        one period. Arithmetic excess subtracts simple cash; log excess subtracts
-        log1p(cash). The returned annual rate panel remains a quote/reporting panel,
+        ``cash_rate_lag`` periods (1 by default). Arithmetic excess subtracts
+        simple cash; log excess subtracts log1p(cash). The returned annual rate
+        panel remains a quote/reporting panel,
         not the lagged cash return deducted in the calculation.
 
         Args:
@@ -667,6 +688,8 @@ class FxRatesData:
             local_ccys: Per-asset local currency (Series indexed by asset).
             freq: Resampling frequency for the returns and rates.
             is_log_returns: If True compute log returns, otherwise simple returns.
+            cash_rate_lag: Return-grid periods to lag the cash quote; 0 uses the
+                current quote for descriptive estimation.
 
         Returns:
             Tuple ``(local_returns, excess_returns, local_rates)`` of DataFrames;
@@ -676,7 +699,8 @@ class FxRatesData:
             prices=asset_prices, freq=freq, is_log_returns=is_log_returns)
         local_rates = self.fetch_local_rates(local_ccys=local_ccys, freq=freq, annualise=True)
         cash_by_currency = {
-            ccy: self._get_period_cash_returns(local_returns.index, ccy, freq, is_log_returns)
+            ccy: self._get_period_cash_returns(
+                local_returns.index, ccy, freq, is_log_returns, cash_rate_lag)
             for ccy in local_ccys.unique()
         }
         local_rates_dt = pd.DataFrame({

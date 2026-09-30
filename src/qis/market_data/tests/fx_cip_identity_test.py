@@ -172,6 +172,51 @@ def test_excess_return_uses_previous_reference_cash_quote(
 
 
 @pytest.mark.parametrize('is_log', [False, True])
+def test_excess_cash_rate_lag_zero_uses_current_quote(is_log: bool) -> None:
+    """An explicit zero lag subtracts the contemporaneous cash quote, not the prior one."""
+    data, prices = _market()
+    _, total = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 0.0, 'USD', 'USD', is_log_returns=is_log)
+    _, default = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 0.0, 'USD', 'USD', is_log_returns=is_log, is_excess_returns=True)
+    _, lagged = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 0.0, 'USD', 'USD', is_log_returns=is_log, is_excess_returns=True,
+        cash_rate_lag=1)
+    _, current = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 0.0, 'USD', 'USD', is_log_returns=is_log, is_excess_returns=True,
+        cash_rate_lag=0)
+    current_cash = data.domestic_rates['USD'] / 12.0
+    expected = total - (np.log1p(current_cash) if is_log else current_cash)
+    np.testing.assert_allclose(default, lagged, rtol=1e-13, atol=1e-14, equal_nan=True)
+    np.testing.assert_allclose(current, expected, rtol=1e-13, atol=1e-14, equal_nan=True)
+    assert not np.allclose(current.iloc[1:], lagged.iloc[1:])
+
+
+def test_cash_rate_lag_reaches_panel_and_local_excess_returns() -> None:
+    """Both panel and native-currency entry points use the selected cash quote date."""
+    data, prices = _market()
+    panel = prices.to_frame()
+    currencies = pd.Series({'ASSET': 'USD'})
+    adjusted = data.compute_fx_adjusted_returns(
+        panel, pd.Series({'ASSET': 0.0}), currencies, is_excess_returns=True,
+        is_log_returns=False, cash_rate_lag=0, zero_return_to_nan=False)['ME']
+    local, local_excess, _ = data.compute_returns_adjusted_by_local_rate(
+        panel, currencies, cash_rate_lag=0)
+    expected = local['ASSET'] - data.domestic_rates['USD'] / 12.0
+    np.testing.assert_allclose(adjusted['ASSET'], expected, equal_nan=True)
+    np.testing.assert_allclose(local_excess['ASSET'], expected, equal_nan=True)
+
+
+@pytest.mark.parametrize('bad_lag', [-1, True, 0.5])
+def test_cash_rate_lag_rejects_invalid_values(bad_lag: object) -> None:
+    """The excess-return cash lag must be a nonnegative integer."""
+    data, prices = _market()
+    with pytest.raises(ValueError, match='cash_rate_lag'):
+        data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+            prices, 0.0, 'USD', 'USD', is_excess_returns=True, cash_rate_lag=bad_lag)
+
+
+@pytest.mark.parametrize('is_log', [False, True])
 @pytest.mark.parametrize('frequency', ['ME', '2W-WED'])
 def test_panel_excess_cash_uses_actual_return_grid(is_log: bool, frequency: str) -> None:
     """Panel and local excess paths use prior asset dates, including alternate biweekly phases."""
