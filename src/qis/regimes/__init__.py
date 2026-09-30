@@ -28,4 +28,9 @@ from qis.regimes.nulls import (
 from qis.regimes.premium import compute_regime_premium_bootstrap, compute_regime_premium_table
 from qis.regimes.betas import compute_regime_betas, compute_regime_betas_bootstrap
 from qis.regimes.ewma import compute_regime_ewm_avg, compute_regime_ewm_betas
-from qis.regimes.covariance import compute_gaussian_regime_moments, compute_regime_mixture_covar
+from qis.regimes.covariance import (
+    compute_gaussian_regime_moments,
+    compute_regime_mixture_covar,
+    compute_regime_mixture_covar_from_sample,
+    compute_sample_regime_moments,
+)

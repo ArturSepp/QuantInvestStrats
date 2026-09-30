@@ -732,6 +732,39 @@ bear_means = [short_span.loc['Bear', 'SBM_6040'], regime_means.loc['Bear', 'SBM_
 np.testing.assert_allclose(bear_means, [-0.0503, -0.0539], atol=5e-5)
 ```
 
+The empirical counterpart takes the already classified complete sample and supplies its
+probabilities and moments directly. It inserts the benchmark with unit betas and zero residual,
+so its benchmark diagonal equals the annualised population variance of the classified returns.
+
+```python
+from qis.regimes import (compute_sample_regime_moments,
+                         compute_regime_mixture_covar_from_sample)
+
+empirical_moments = compute_sample_regime_moments(sampled, benchmark='SBM_6040')
+empirical_covar = compute_regime_mixture_covar_from_sample(
+    sampled, benchmark='SBM_6040', af=4.0)
+classified_benchmark = sampled.dropna(subset=['regime'])['SBM_6040']
+np.testing.assert_allclose(empirical_moments['probability'].sum(), 1.0)
+np.testing.assert_allclose(empirical_covar.loc['SBM_6040', 'SBM_6040'],
+                           4.0 * classified_benchmark.var(ddof=0), rtol=1e-12)
+```
+
+Both helpers exclude unclassified rows without reclassifying. The covariance helper rejects
+missing or infinite asset returns on classified rows: choose the common sample before
+classification. Estimated betas require 24 observations overall and at least two distinct
+benchmark returns within each regime. Supplying `betas=` instead accepts a frozen
+`compute_regime_betas`-format sheet with exactly the non-benchmark assets and annual
+`idio_vol` using the same `af`; additional sheet statistics are ignored. The result orders
+the benchmark first and retains the panel's remaining column order. The covariance helper
+rejects the regime label `Total` (ignoring case), which conflicts with the beta
+estimator's overall `beta_total` summary column; use a different bucket name.
+
+Benchmark moments use population variance; pooled regression residual volatility retains its
+sample standard-deviation convention. These full-sample calculations are descriptive.
+Rolling callers must supply only information available at the decision date, including the
+frozen betas. The low-level mixture function still supports theoretical probabilities and
+custom scenario moments; those are modelling choices rather than empirical reconstruction.
+
 ## Implementation in qis
 
 | Quantity | Formula | qis entry point |
@@ -750,6 +783,8 @@ np.testing.assert_allclose(bear_means, [-0.0503, -0.0539], atol=5e-5)
 | Regime betas | within-regime OLS slopes, pooled residual volatility | `qis.regimes.compute_regime_betas`, `compute_regime_betas_bootstrap(block_size=12)` |
 | Regime-time EWMA | EWMA over each regime's stream, seeded at its mean | `qis.regimes.compute_regime_ewm_avg`, `compute_regime_ewm_betas` |
 | Mixture covariance | law of total covariance times $\mathrm{AN}$ | `qis.regimes.compute_regime_mixture_covar` |
+| Sample mixture covariance | empirical probabilities and benchmark moments | `qis.regimes.compute_regime_mixture_covar_from_sample` |
+| Sample regime moments | probability, periodic mean and second moment | `qis.regimes.compute_sample_regime_moments` |
 | Gaussian regime moments | truncated normal mean and second moment | `qis.regimes.compute_gaussian_regime_moments(benchmark_vol, benchmark_mean=0.0, q=None)` |
 | Exhibits | stacked contributions with null; regime-beta profiles | `qis.plots.derived.regime_premium.plot_regime_sharpe_decomposition`, `plot_regime_beta_profiles` |
 | Smart diversification | eleven mixes, Bear contribution against Sharpe ratio | `qis.SmartDiversificationReport`, `qis.create_overlay_portfolio_curve` |
@@ -764,6 +799,16 @@ and the quantile rule in
 [quantile_buckets.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/quantile_buckets.py).
 The {doc}`API reference <api/index>` lists the explicitly imported subpackages beside the
 exported names.
+
+The table-driven `qis.plot_overlay_allocation_frontier` draws precomputed
+core-plus-overlay portfolios in Bear contribution versus total Sharpe coordinates,
+together with an optional solved allocation frontier. Pass `portfolio_stats` and
+`frontier_stats` with `bear_sharpe` and `sharpe` columns, plus group labels and
+optional highlighted portfolios. Both tables must use the same sample, benchmark
+regimes and Sharpe convention. The function connects the frontier in supplied policy
+order and retains duplicate slack solutions; it does not estimate, optimise or fit
+a curve. Portfolio construction remains in OptimalPortfolios, which supplies the
+allocations, while qis computes the statistics and renders the exhibit.
 
 Implementation contracts that affect the numbers:
 
