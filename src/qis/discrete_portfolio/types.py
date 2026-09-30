@@ -7,10 +7,11 @@ The replay pipeline exchanges explicit records rather than loosely shaped dictio
 dataclasses validate accounting relationships at construction so an invalid record cannot enter
 a ledger and fail much later in reporting.
 
-Pandas Series stored on a state are copied and their current NumPy buffers made read-only. This
-prevents a strategy from mutating the engine's point-in-time history through a shared object.
-The state holds signed units, not target weights; realised weights are derived from position
-values and NAV at the mark.
+Pandas Series stored on a state are copied and their current NumPy buffers made read-only. The
+replay also gives each strategy callback an independent state snapshot because pandas can replace
+a read-only buffer and mutate Series metadata. Strategy changes therefore cannot rewrite the
+engine's point-in-time history. The state holds signed units, not target weights; realised weights
+are derived from position values and NAV at the mark.
 
 ``DiscreteStrategy`` and ``ExecutionModel`` are structural protocols. Research classes and live
 adapters need only implement the documented call signature; inheritance from a QIS base class is
@@ -175,7 +176,7 @@ class Trade:
 
 @dataclass(frozen=True)
 class DiscretePortfolioState:
-    """Immutable strategy-facing state after fills and marking at one timestamp.
+    """Isolated strategy-facing state after fills and marking at one timestamp.
 
     Attributes:
         timestamp: Current market observation timestamp.
@@ -244,8 +245,8 @@ class DiscreteStrategy(Protocol):
 
         Args:
             timestamp: Current observation timestamp.
-            prices: Read-only current observed prices; missing values are not forward-filled.
-            state: Immutable post-fill state marked at ``timestamp``.
+            prices: Isolated current observed prices; missing values are not forward-filled.
+            state: Isolated post-fill state marked at ``timestamp``.
 
         Returns:
             Orders decided at ``timestamp`` and eligible at the next observation.
