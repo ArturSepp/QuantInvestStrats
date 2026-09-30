@@ -55,6 +55,20 @@ def test_compute_ewm_rejects_mixed_invalid_per_column_parameters(parameter) -> N
         compute_ewm(pd.DataFrame(_PANEL, columns=["a", "b"]), **parameter)
 
 
+@pytest.mark.parametrize("span", [np.array([True, False]), np.array([True, True])])
+def test_ewm_recursion_rejects_boolean_span_arrays(span) -> None:
+    """Direct recursion reports the invalid span domain instead of a Numba typing error."""
+    with pytest.raises(ValueError, match="span must be finite and >= 1"):
+        ewm_recursion(_PANEL, init_value=np.zeros(2), span=span)
+
+
+def test_ewm_recursion_accepts_valid_per_column_span_arrays() -> None:
+    """Array spans retain their documented independent column recursions."""
+    actual = ewm_recursion(_PANEL, init_value=_PANEL[0], span=np.array([1.0, 3.0]))
+    expected = np.array([[1.0, 2.0], [3.0, 3.0], [3.0, 3.5], [5.0, 4.75]])
+    np.testing.assert_allclose(actual, expected)
+
+
 def test_compute_ewm_validates_decay_shape_before_recursion() -> None:
     """A one-dimensional input cannot silently use only the first of several decays."""
     with pytest.raises(ValueError, match="one decay value"):

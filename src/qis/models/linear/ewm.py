@@ -276,6 +276,9 @@ def _check_mean_init_type(init_type: InitType, name: str) -> None:
                          f"recursion takes ZERO, X0 or MEAN")
 
 
+_BOOL_DTYPE = np.dtype("bool")
+
+
 @_njit_cached
 def _validate_ewm_parameter(value: Union[float, np.ndarray], is_span: bool) -> None:
     """Validate a span or decay before a numba recursion can update any state."""
@@ -382,12 +385,35 @@ def ewm_recursion(a: np.ndarray,
     Raises:
         ValueError: if the selected span or decay is outside the stable EWM domain
     """
+    if hasattr(span, "dtype"):
+        if span.dtype == _BOOL_DTYPE:
+            raise ValueError("span must be finite and >= 1")
+        _validate_ewm_parameter(value=span, is_span=True)
+        decay = 1.0 - 2.0 / (span.astype(np.float64) + 1.0)
+        return _ewm_recursion_kernel(a=a, init_value=init_value, ewm_lambda=decay,
+                                     is_start_from_first_nonan=is_start_from_first_nonan,
+                                     is_unit_vol_scaling=is_unit_vol_scaling,
+                                     nan_backfill=nan_backfill)
     if span is not None:
         _validate_ewm_parameter(value=span, is_span=True)
         ewm_lambda = 1.0 - 2.0 / (span + 1.0)
     else:
         _validate_ewm_parameter(value=ewm_lambda, is_span=False)
 
+    return _ewm_recursion_kernel(a=a, init_value=init_value, ewm_lambda=ewm_lambda,
+                                 is_start_from_first_nonan=is_start_from_first_nonan,
+                                 is_unit_vol_scaling=is_unit_vol_scaling,
+                                 nan_backfill=nan_backfill)
+
+
+@_njit_cached
+def _ewm_recursion_kernel(a: np.ndarray,
+                          init_value: Union[float, np.ndarray],
+                          ewm_lambda: Union[float, np.ndarray],
+                          is_start_from_first_nonan: bool,
+                          is_unit_vol_scaling: bool,
+                          nan_backfill: NanBackfill) -> np.ndarray:
+    """Run the EWM recursion after its smoothing parameter has been validated."""
     ewm_lambda_1 = 1.0 - ewm_lambda
     is_nan_fill = nan_backfill == NanBackfill.NAN_FILL
     ewm = np.full_like(a, fill_value=np.nan, dtype=np.double)
