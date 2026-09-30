@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "d87ed7b47b7a7154717cf7539e205ef56f6849c1",
+  "measured_at_commit": "f1bc5c2d96af5b7f5ea5285d9b09fe443059aa3e",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": "in 39 of the 46 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 97,
+      "value": 98,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -22,7 +22,7 @@
       "paper_phrase": null
     },
     "ai_coauthored_last_day": {
-      "value": "2026-09-27",
+      "value": "2026-09-30",
       "how": "latest AI co-authored commit",
       "live": false,
       "paper_phrase": null
@@ -46,28 +46,28 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 5325,
+      "value": 5380,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 858,
+      "value": 867,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
-      "value": 1068,
-      "how": "tools/audit_consumers.py at 401e83fd9de6",
+      "value": 1091,
+      "how": "tools/audit_consumers.py at 212e2673e88d",
       "live": false,
-      "paper_phrase": "at 1068 sites"
+      "paper_phrase": "at 1091 sites"
     },
     "consumer_optimalportfolios_symbols": {
-      "value": 127,
-      "how": "tools/audit_consumers.py at 401e83fd9de6",
+      "value": 137,
+      "how": "tools/audit_consumers.py at 212e2673e88d",
       "live": false,
-      "paper_phrase": "references 127 of its symbols"
+      "paper_phrase": "references 137 of its symbols"
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
