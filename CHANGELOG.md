@@ -7,6 +7,20 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.33.2] - 2026-10-01
+
+### Changed
+
+- Make the legacy PyBloqs fallback in `strategy_benchmark_factsheet_pybloqs.py` delegate to the
+  canonical implementation instead of keeping a second, identical copy (#136). The signature,
+  report output, warnings and exceptions are unchanged.
+
+### Fixed
+
+- Lock tornado 6.5.10 (was 6.5.8). tornado is a transitive dependency of the Jupyter packages in
+  the lockfile; the published package's requirements do not change. Dependabot now opens
+  security-update pull requests for the uv lockfile, with routine version updates suppressed.
+
 ## [5.33.1] - 2026-09-30
 
 ### Fixed

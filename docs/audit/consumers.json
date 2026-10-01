@@ -4,11 +4,11 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "212e2673e88dc132722036e496ab6e9a1e469c59",
+      "commit": "648a302d2c0ac710276f025bcf8473a06ca967e8",
       "distinct_symbols": 137,
-      "call_sites": 1091,
-      "files_scanned": 310,
-      "files_using_qis": 131,
+      "call_sites": 1105,
+      "files_scanned": 311,
+      "files_using_qis": 132,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
         "CorrMatrixOutput",
@@ -151,10 +151,10 @@
     },
     "trendfollowing": {
       "url": "https://github.com/ArturSepp/TrendFollowingSystems.git",
-      "commit": "3325af65db6b1105f53beba42195c3c6ee74c26e",
+      "commit": "8c034b5289f4b3ea4805887271391a0748bcf243",
       "distinct_symbols": 87,
-      "call_sites": 439,
-      "files_scanned": 93,
+      "call_sites": 428,
+      "files_scanned": 103,
       "files_using_qis": 35,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
