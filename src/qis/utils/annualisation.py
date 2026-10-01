@@ -4,13 +4,15 @@ annualisation factors: periods per year for a pandas frequency string or a data 
 ``get_annualization_factor`` maps a frequency to periods per year, handling multipliers and
 anchors ('2W' -> 26, 'QE-DEC' -> 4) and falling back to a regex parse, with a UserWarning and a
 factor of 1.0 for a string it cannot read. Business month- and quarter-end aliases share their
-calendar counterparts' factors. 'D' is 365 always, 'B' is ``default_trading_days`` (252 by default),
-and ``is_calendar=True`` moves the business-day family to 365. Intraday aliases use 24 clock hours
-within each selected active day; they do not infer an exchange session.
+calendar counterparts' factors, while semi-month start and end aliases use 24 periods per year.
+'D' is 365 always, 'B' is ``default_trading_days`` (252 by default), and ``is_calendar=True`` moves
+the business-day family to 365. Intraday aliases use 24 clock hours within each selected active day;
+they do not infer an exchange session.
 ``get_annualisation_conversion_factor`` is the ratio of two such factors.
 
 Two inference paths differ on an irregular index. ``infer_annualisation_factor_from_df`` reads
-``pd.infer_freq``, and warns then returns ``BUS_DAYS_PER_YEAR`` when the index has gaps.
+``pd.infer_freq`` and retains valid semi-month metadata that its alternating spacing cannot infer;
+it warns then returns ``BUS_DAYS_PER_YEAR`` when neither source identifies the frequency.
 ``infer_data_periods_per_year`` instead classifies the median spacing into the tiers
 260 / 52 / 12 / 4 / 1, so holidays and weekends do not push monthly data into the daily tier.
 """
@@ -27,6 +29,7 @@ CALENDAR_DAYS_PER_YEAR = 365
 CALENDAR_DAYS_IN_MONTH = 30
 CALENDAR_DAYS_PER_YEAR_SHARPE = 365.25  # for total return computations for Sharpe
 DEFAULT_TRADING_YEAR_DAYS = 252  # How mny trading days we assume per year, see
+_SEMI_MONTH_FREQUENCY = re.compile(r'^(?:\d+)?SM[ES](?:-\d+)?$', re.IGNORECASE)
 
 
 def get_annualization_factor(freq: str,
@@ -38,7 +41,8 @@ def get_annualization_factor(freq: str,
     Handles various frequency formats including multipliers and anchors.
 
     Args:
-        freq: Pandas frequency string (e.g., 'D', 'W-FRI', '2ME', '2BME', 'QE-DEC', 'BQE')
+        freq: Pandas frequency string (e.g., 'D', 'W-FRI', 'SME-15', '2ME', '2BME',
+            'QE-DEC', 'BQE')
         is_calendar: If True, use 365 active days; otherwise use ``default_trading_days``.
             Intraday frequencies use 24 clock hours within each selected active day.
         default_trading_days: Active days per year outside calendar mode. This does not imply an
@@ -66,6 +70,14 @@ def get_annualization_factor(freq: str,
         1.3333333333333333
     """
     an_days = 365.0 if is_calendar else default_trading_days
+    semi_month_match = _SEMI_MONTH_FREQUENCY.fullmatch(freq)
+    if semi_month_match is not None:
+        try:
+            semi_month_offset = pd.tseries.frequencies.to_offset(freq.upper())
+        except ValueError:
+            semi_month_offset = None
+        if semi_month_offset is not None and semi_month_offset.n > 0:
+            return 24.0 / semi_month_offset.n
 
     # Intraday frequencies. Note: '1M'/'5M' as minute aliases collided with monthly
     # under pandas < 2.2 and have been replaced by 'min'/'5min' in pandas 3.0.
@@ -188,16 +200,21 @@ def infer_annualisation_factor_from_df(data: Union[pd.DataFrame, pd.Series]) -> 
 
     Args:
         data: frame or series with a date index. Fewer than three observations cannot support an
-            inference
+            inference. Valid semi-month frequency metadata is used because its alternating spacing
+            cannot be recovered by ``pd.infer_freq``.
 
     Returns:
-        periods per year. Falls back to the business-day count with a UserWarning when the index
-        frequency cannot be inferred - an irregular index, or one with gaps
+        periods per year. Falls back to the business-day count with a UserWarning when neither
+        inference nor supported index metadata identifies the frequency
     """
     if len(data.index) < 3:
         freq = None
     else:
         freq = pd.infer_freq(data.index)
+        # Semi-month intervals alternate lengths, so only the index metadata retains the cadence.
+        index_freq = getattr(data.index, 'freqstr', None)
+        if freq is None and index_freq is not None and _SEMI_MONTH_FREQUENCY.fullmatch(index_freq):
+            freq = index_freq
 
     if freq is None:
         warnings.warn(
