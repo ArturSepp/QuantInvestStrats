@@ -2,9 +2,9 @@
 the pybloqs rendering of the multi-portfolio factsheet, for cross-sectional comparison of many
 strategies and parameter sweeps. ``generate_multi_portfolio_factsheet_with_pybloqs`` returns a
 ``p.VStack`` of blocks, which scales past the point where a matplotlib page stops being legible;
-``generate_multi_portfolio_factsheet`` is the matplotlib fallback for structurally different
-strategies. This module is a near-duplicate of ``strategy_benchmark_factsheet_pybloqs.py`` and
-neither is exported; requires the optional ``pybloqs`` dependency.
+``generate_multi_portfolio_factsheet`` is the canonical matplotlib fallback for structurally
+different strategies and is shared by ``strategy_benchmark_factsheet_pybloqs.py``. Neither module
+is exported; both require the optional ``pybloqs`` dependency.
 """
 # packages
 import matplotlib.pyplot as plt
