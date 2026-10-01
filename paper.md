@@ -143,8 +143,8 @@ smoothing.
 # Research impact statement
 
 We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 137 of its symbols
-at 1091 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
-at 439 sites. Both counts are taken at the commits recorded in
+at 1105 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
+at 428 sites. Both counts are taken at the commits recorded in
 `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
 
 A third public package, `privateassets`, applies the unsmoothing layer to private-asset
@@ -156,7 +156,7 @@ cryptocurrency allocation [@sepp2023crypto], the regime-conditional layer work o
 systems [@sepp2026trend], and the resampling layer work on capital market assumptions built from
 multi-asset tradable factors [@sepp2026matf]. The last two are working papers.
 
-Commits run from December 2022 to September 2026, with activity in 39 of the 46 calendar months.
+Commits run from December 2022 to October 2026, with activity in 40 of the 47 calendar months.
 
 # AI usage disclosure
 
