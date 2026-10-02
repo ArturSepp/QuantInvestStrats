@@ -11,6 +11,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Annualize modern semi-month start and end aliases, including anchored and multiplied forms, at
   24 periods per year and preserve that cadence when it is carried by a pandas index.
+- Retain realised trading costs in net instrument and Brinson contributions when the corresponding
+  inactive-instrument P&L is missing, and reject sparse cost dates before they can erase valid
+  contributions.
 
 ## [5.33.2] - 2026-10-01
 
