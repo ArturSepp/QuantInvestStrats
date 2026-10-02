@@ -10,9 +10,10 @@ the business-day family to 365. Intraday aliases use 24 clock hours within each 
 they do not infer an exchange session.
 ``get_annualisation_conversion_factor`` is the ratio of two such factors.
 
-Two inference paths differ on an irregular index. ``infer_annualisation_factor_from_df`` reads
-``pd.infer_freq`` and retains valid semi-month metadata that its alternating spacing cannot infer;
-it warns then returns ``BUS_DAYS_PER_YEAR`` when neither source identifies the frequency.
+Two inference paths differ on an irregular index. ``infer_annualisation_factor_from_df`` prefers
+valid semi-month metadata because a short sample can resemble a fixed-day cadence and a longer
+sample's alternating spacing cannot be inferred; it warns then returns ``BUS_DAYS_PER_YEAR`` when
+neither metadata nor inference identifies the frequency.
 ``infer_data_periods_per_year`` instead classifies the median spacing into the tiers
 260 / 52 / 12 / 4 / 1, so holidays and weekends do not push monthly data into the daily tier.
 """
@@ -200,8 +201,8 @@ def infer_annualisation_factor_from_df(data: Union[pd.DataFrame, pd.Series]) -> 
 
     Args:
         data: frame or series with a date index. Fewer than three observations cannot support an
-            inference. Valid semi-month frequency metadata is used because its alternating spacing
-            cannot be recovered by ``pd.infer_freq``.
+            inference. Valid semi-month frequency metadata takes precedence because a short sample
+            can resemble fixed-day data and its general cadence is not recoverable from spacing.
 
     Returns:
         periods per year. Falls back to the business-day count with a UserWarning when neither
@@ -210,11 +211,19 @@ def infer_annualisation_factor_from_df(data: Union[pd.DataFrame, pd.Series]) -> 
     if len(data.index) < 3:
         freq = None
     else:
-        freq = pd.infer_freq(data.index)
-        # Semi-month intervals alternate lengths, so only the index metadata retains the cadence.
         index_freq = getattr(data.index, 'freqstr', None)
-        if freq is None and index_freq is not None and _SEMI_MONTH_FREQUENCY.fullmatch(index_freq):
+        if index_freq is not None and _SEMI_MONTH_FREQUENCY.fullmatch(index_freq):
+            try:
+                semi_month_offset = pd.tseries.frequencies.to_offset(index_freq.upper())
+            except ValueError:
+                semi_month_offset = None
+        else:
+            semi_month_offset = None
+        # A short semi-month sample can look like fixed-day data, so valid metadata comes first.
+        if semi_month_offset is not None and semi_month_offset.n > 0:
             freq = index_freq
+        else:
+            freq = pd.infer_freq(data.index)
 
     if freq is None:
         warnings.warn(

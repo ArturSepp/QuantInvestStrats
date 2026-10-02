@@ -73,6 +73,24 @@ def test_infer_annualisation_factor_from_df_uses_semimonth_metadata(
     assert actual == expected
 
 
+def test_semimonth_metadata_precedes_equal_spacing_inference() -> None:
+    """Prefer the known cadence when a short semi-month sample resembles 15-day data."""
+    dates = pd.date_range("2024-04-15", periods=3, freq="SME-15")
+    returns = pd.Series([-0.02, 0.01, 0.03], index=dates, name="Strategy")
+    periodic = cast(pd.Series, qis.compute_ewm_vol(returns, span=3, annualize=False))
+
+    assert dates.freqstr == "SME-15"
+    assert pd.infer_freq(dates) == "15D"
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        factor = qis.infer_annualisation_factor_from_df(returns)
+        actual = cast(pd.Series, qis.compute_ewm_vol(returns, span=3, annualize=True))
+
+    assert factor == _PERIODS_PER_YEAR
+    expected = periodic.multiply(np.sqrt(_PERIODS_PER_YEAR))
+    pd.testing.assert_series_equal(actual, expected, rtol=1e-14, atol=0.0)
+
+
 def test_compute_ewm_vol_semimonth_inference_uses_calendar_cadence() -> None:
     """Scale public volatility by the independently counted semi-month factor."""
     dates = pd.date_range("2024-01-01", "2024-12-31", freq="SME-15")
@@ -93,6 +111,17 @@ def test_infer_annualisation_factor_from_df_preserves_metadata_free_fallback() -
     dates = pd.date_range("2024-01-01", periods=8, freq="SME-15")
     metadata_free = pd.DatetimeIndex(dates.to_numpy())
     data = pd.Series(np.arange(len(dates), dtype=float), index=metadata_free)
+
+    with pytest.warns(UserWarning, match="cannot infer None"):
+        actual = qis.infer_annualisation_factor_from_df(data)
+
+    assert actual == 252
+
+
+def test_infer_annualisation_factor_from_df_preserves_short_index_fallback() -> None:
+    """Keep the warning fallback when semi-month metadata has fewer than three observations."""
+    dates = pd.date_range("2024-04-15", periods=2, freq="SME-15")
+    data = pd.Series([-0.02, 0.01], index=dates)
 
     with pytest.warns(UserWarning, match="cannot infer None"):
         actual = qis.infer_annualisation_factor_from_df(data)
