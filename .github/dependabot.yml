@@ -9,6 +9,10 @@ updates:
   - package-ecosystem: uv
     directory: "/"
     schedule:
-      interval: daily
-    # Security updates still open PRs; suppress routine version-update PRs.
-    open-pull-requests-limit: 0
+      interval: weekly
+    # Keep the reviewed lock current, including notebook tools outside the core tree.
+    open-pull-requests-limit: 5
+    groups:
+      python-dependencies:
+        applies-to: version-updates
+        patterns: ["*"]
