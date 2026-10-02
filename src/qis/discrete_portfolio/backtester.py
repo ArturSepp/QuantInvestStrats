@@ -104,17 +104,21 @@ def _validate_prices(prices: pd.DataFrame) -> None:
         raise ValueError('prices must contain at least one timestamp and ticker')
 
 
-def _validate_execution(order: Order, timestamp: pd.Timestamp, trade: Trade) -> None:
+def _validate_execution(
+        order: Order, timestamp: pd.Timestamp, trade: Trade, reference_price: float,
+) -> None:
     """Ensure an injected execution model preserves the version-one fill contract.
 
     Args:
         order: Submitted order awaiting execution.
         timestamp: Current observation, which is the required fill timestamp.
         trade: Response returned by the injected execution model.
+        reference_price: Observed market price supplied to that execution.
 
     Raises:
         TypeError: If the response is not a ``Trade``.
-        ValueError: If identity, timestamps, or filled quantity differ from the order.
+        ValueError: If identity, timestamps, or filled quantity differ from the order, or the
+            reference price differs from the observation supplied to execution.
     """
     if not isinstance(trade, Trade):
         raise TypeError('execution_model must return a Trade')
@@ -126,6 +130,9 @@ def _validate_execution(order: Order, timestamp: pd.Timestamp, trade: Trade) -> 
             trade.filled_quantity, order.quantity, rtol=1e-12, atol=1e-12,
     ):
         raise ValueError('version-one execution must fill the complete submitted quantity')
+    # This is an audit identity, not an approximate execution-price or slippage constraint.
+    if trade.reference_price != reference_price:
+        raise ValueError('execution response reference_price must match the observed market price')
 
 
 def _create_state(
@@ -192,7 +199,9 @@ def replay_discrete_portfolio(
         strategy: Object implementing ``on_bar(timestamp, prices, state)``.
         initial_cash: Finite starting cash balance.
         execution_model: Callable mapping a pending order and later price to a full fill. The
-            default fills at the unadjusted next observed price without fees.
+            returned reference price must exactly match the supplied observation, independently
+            of the executed price. The default fills at the unadjusted next observed price
+            without fees.
 
     Returns:
         Raw ledgers, cash series, and point-in-time states. ``portfolio_data`` is ``None`` so
@@ -200,7 +209,9 @@ def replay_discrete_portfolio(
 
     Raises:
         TypeError: If the price grid, strategy response, or execution response has wrong type.
-        ValueError: If the grid, cash, orders, prices, or execution response is invalid.
+        ValueError: If the grid, cash, orders, prices, or execution response is invalid, including
+            a reference price differing from the supplied observation. An invalid response is
+            rejected before applying that fill to units, cash, or ledgers.
     """
     _validate_prices(prices)
     if not np.isfinite(initial_cash):
@@ -235,7 +246,7 @@ def replay_discrete_portfolio(
                 record['status_reason'] = 'no finite positive execution price'
                 continue
             trade = execution(order, timestamp, reference_price)
-            _validate_execution(order, timestamp, trade)
+            _validate_execution(order, timestamp, trade, reference_price)
             units.loc[trade.ticker] += trade.filled_quantity
             cash -= trade.notional + trade.transaction_cost
             trades.append(trade)
