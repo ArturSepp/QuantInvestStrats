@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Annualize modern semi-month start and end aliases, including anchored and multiplied forms, at
+  24 periods per year and preserve that cadence when it is carried by a pandas index.
+
 ## [5.33.2] - 2026-10-01
 
 ### Changed
