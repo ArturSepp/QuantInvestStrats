@@ -367,8 +367,9 @@ class PortfolioData:
                 by the preceding NAV, the capital base of the arithmetic contributions, so for a
                 portfolio without fees, funding or carry the net contributions sum to the NAV
                 return of each period. The opening trade is paid out of the baseline NAV and is
-                not deducted from a return. A finite cost is retained when the corresponding
-                inactive-instrument contribution is missing.
+                not deducted from a return. Before aggregation, a missing contribution permits
+                a cost-only fill only with confirmed zero beginning-period exposure; held or
+                unknown exposure preserves missing P&L.
             is_unit_based_traded_volume: Normalise currency costs by the preceding NAV when true;
                 when false, deduct the currency costs unscaled.
             is_compounded: Apply ``expm1`` to the result.
@@ -388,8 +389,11 @@ class PortfolioData:
                 self._get_nav_for_report_index(costs.index, "cost")
                 costs = costs.divide(self.nav.shift(1), axis=0)
             # the first row has no preceding NAV: its opening cost is already in the baseline NAV
-            # Fill one-sided gaps so finite costs survive; two-sided gaps stay missing.
-            pnl = pnl.subtract(costs, fill_value=0.0)
+            # Lag before alignment: closing or unknown exposure cannot justify missing gross P&L.
+            net_pnl = pnl.subtract(costs, fill_value=0.0)
+            beginning_weights = self.weights.shift(1).reindex_like(net_pnl)
+            inactive = beginning_weights.eq(0.0).fillna(False)
+            pnl = net_pnl.where(pnl.reindex_like(net_pnl).notna() | inactive)
         if add_total:
             pnl.insert(loc=0, value=pnl.sum(axis=1), column='Total')
         if time_period is not None:
