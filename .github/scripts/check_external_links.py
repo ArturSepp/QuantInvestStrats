@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import traceback
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from check_new_references import inspect_url  # noqa: E402
@@ -54,7 +55,12 @@ def main(argv=None):
     parser.add_argument("--build", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.build:
-        return build_links(args.source, args.output_dir)
+        try:
+            return build_links(args.source, args.output_dir)
+        except Exception:
+            # A partial report cannot make an unexpected builder crash advisory.
+            traceback.print_exc()
+            return 2
     args.output_dir.mkdir(parents=True, exist_ok=True)
     output = args.output_dir / "output.json"
     # A crashed builder must never reuse a successful report from an earlier run.

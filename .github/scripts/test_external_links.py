@@ -98,6 +98,28 @@ class ExternalLinkTests(unittest.TestCase):
             {"uri": self.address + "/outage", "status": "broken"}
         ]), 0)
 
+    def test_builder_crash_after_partial_report_still_fails(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source"
+            source.mkdir()
+            (source / "conf.py").write_text(
+                'project = "Crash regression"\n'
+                'def setup(app):\n'
+                '    def crash(app, exception):\n'
+                '        raise RuntimeError("intentional build-finished failure")\n'
+                '    app.connect("build-finished", crash)\n', encoding="utf-8"
+            )
+            (source / "index.rst").write_text(
+                "References\n==========\n\n"
+                f"`Outage <{self.address}/outage>`_\n", encoding="utf-8"
+            )
+            output = Path(temporary) / "build"
+            with contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(SystemExit) as failure:
+                    checker.main(["--source", str(source), "--output-dir", str(output)])
+            self.assertEqual(failure.exception.code, 2)
+            self.assertTrue((output / "output.json").is_file())
+
     def test_confirmed_missing_link_fails_even_with_an_outage(self):
         self.assertEqual(self.run_builder([
             {"uri": self.address + "/outage", "status": "broken"},
