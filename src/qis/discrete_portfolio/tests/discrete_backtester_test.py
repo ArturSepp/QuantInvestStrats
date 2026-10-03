@@ -1,7 +1,7 @@
 """Contract tests for the deterministic discrete-portfolio replay boundary."""
 
 # packages
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, asdict
 
 import numpy as np
 import pandas as pd
@@ -15,6 +15,7 @@ from qis.discrete_portfolio import (
     OrderStatus,
     Trade,
     backtest_discrete_portfolio,
+    replay_discrete_portfolio,
 )
 from qis.portfolio.backtester import backtest_model_portfolio
 
@@ -422,3 +423,195 @@ def test_execution_response_must_preserve_order_identity() -> None:
 
     with pytest.raises(ValueError, match='order_id and ticker must match'):
         backtest_discrete_portfolio(prices, BuyOnce(), execution_model=wrong_ticker)
+
+
+@pytest.mark.parametrize('prior_fill', [False, True])
+@pytest.mark.parametrize(
+    'field, value, error_type, message',
+    [
+        ('reference_price', 1100.0, ValueError, 'reference_price must match'),
+        # Even the adjacent representable price is not the observation passed to execution.
+        ('reference_price', np.nextafter(101.0, np.inf), ValueError, 'reference_price must match'),
+        ('reference_price', np.nan, ValueError, 'must be finite'),
+        ('reference_price', np.inf, ValueError, 'must be finite'),
+        ('reference_price', 0.0, ValueError, 'must be positive'),
+        ('reference_price', -1.0, ValueError, 'must be positive'),
+        ('order_id', 'different', ValueError, 'order_id and ticker must match'),
+        ('ticker', 'NOT-SPY', ValueError, 'order_id and ticker must match'),
+        ('decision_time', pd.Timestamp('2026-01-04'), ValueError, 'timestamps must match'),
+        ('fill_time', pd.Timestamp('2026-01-07'), ValueError, 'timestamps must match'),
+        ('filled_quantity', 2.0, ValueError, 'complete submitted quantity'),
+        ('notional', 1.0, ValueError, 'notional must equal'),
+        ('transaction_cost', -1.0, ValueError, 'must be non-negative'),
+        ('slippage', -1.0, ValueError, 'must be non-negative'),
+        (None, None, TypeError, 'must return a Trade'),
+    ],
+)
+def test_replay_discrete_portfolio_rejects_execution_before_fill_mutation(
+        prior_fill: bool, field: str | None, value: object, error_type: type, message: str,
+) -> None:
+    """A rejected fill changes no accounting state, even after an accepted same-bar fill."""
+    index = pd.date_range('2026-01-05', periods=2, freq='D')
+    prices = pd.DataFrame({'SPY': [100.0, 101.0]}, index=index)
+    original_prices = prices.copy(deep=True)
+    callbacks: list[float] = []
+
+    class SubmitOrders:
+        def on_bar(self, timestamp, current_prices, state):
+            if timestamp != index[0]:
+                return []
+            orders = [Order('rejected', timestamp, 'SPY', 1.0)]
+            return [Order('accepted', timestamp, 'SPY', 1.0), *orders] if prior_fill else orders
+
+    def execution(order, fill_time, reference_price):
+        callbacks.append(reference_price)
+        if order.order_id == 'accepted':
+            return FullFillExecution()(order, fill_time, reference_price)
+        if field is None:
+            return None
+        fields = asdict(FullFillExecution()(order, fill_time, reference_price))
+        fields[field] = value
+        # Earlier validation errors keep their precedence over the new reference-price guard.
+        if field != 'reference_price':
+            fields['reference_price'] = 1100.0
+        if field == 'filled_quantity':
+            fields['notional'] = value * reference_price
+        return Trade(**fields)
+
+    with pytest.raises(error_type, match=message) as error:
+        replay_discrete_portfolio(prices, SubmitOrders(), 1000.0, execution)
+
+    # Inspect the real first-mutation owner after rejection: strategy snapshots alone cannot
+    # reveal a unit/cash update or ledger append that occurred before the exception.
+    traceback = error.value.__traceback__
+    while traceback.tb_frame.f_code is not replay_discrete_portfolio.__code__:
+        traceback = traceback.tb_next
+    engine = traceback.tb_frame.f_locals
+    assert callbacks == [101.0] * (1 + int(prior_fill))
+    assert engine['cash'] == (899.0 if prior_fill else 1000.0)
+    pd.testing.assert_series_equal(
+        engine['units'], pd.Series(float(prior_fill), index=prices.columns, name='units'),
+    )
+    accepted_trade = {
+        'order_id': 'accepted', 'decision_time': index[0], 'fill_time': index[1],
+        'ticker': 'SPY', 'filled_quantity': 1.0, 'reference_price': 101.0,
+        'executed_price': 101.0, 'notional': 101.0, 'transaction_cost': 0.0, 'slippage': 0.0,
+    }
+    assert [asdict(trade) for trade in engine['trades']] == (
+        [accepted_trade] if prior_fill else []
+    )
+    assert [order.order_id for order in engine['pending_orders']] == (
+        ['accepted', 'rejected'] if prior_fill else ['rejected']
+    )
+    assert engine['seen_order_ids'] == ({'accepted', 'rejected'} if prior_fill else {'rejected'})
+    assert len(engine['order_records']) == 1 + int(prior_fill)
+    for record in engine['order_records']:
+        is_accepted = record['order_id'] == 'accepted'
+        assert record == {
+            'order_id': 'accepted' if is_accepted else 'rejected',
+            'decision_time': index[0], 'ticker': 'SPY', 'quantity': 1.0, 'reason': None,
+            'status': OrderStatus.FILLED if is_accepted else OrderStatus.PENDING,
+            'fill_time': index[1] if is_accepted else pd.NaT, 'status_reason': None,
+        }
+        assert engine['records_by_id'][record['order_id']] is record
+    assert engine['cash_by_time'] == {index[0]: 1000.0}
+    assert len(engine['states']) == 1
+    state = engine['states'][0]
+    assert state.timestamp == index[0] and state.cash == state.nav == 1000.0
+    for name, expected, series_name in (
+            ('units', 0.0, 'units'), ('prices', 100.0, 'prices'),
+            ('position_values', 0.0, None), ('weights', 0.0, None),
+    ):
+        pd.testing.assert_series_equal(
+            getattr(state, name), pd.Series(expected, index=prices.columns, name=series_name),
+        )
+    pd.testing.assert_frame_equal(prices, original_prices)
+
+
+@pytest.mark.parametrize('quantity', [1.0, -1.0])
+@pytest.mark.parametrize('dtype', ['float64', 'Float64'])
+@pytest.mark.parametrize('replay', [replay_discrete_portfolio, backtest_discrete_portfolio])
+def test_replay_discrete_portfolio_preserves_exact_execution_reference(
+        quantity: float, dtype: str, replay,
+) -> None:
+    """Exact references preserve custom fills on ordinary ragged and complete nullable panels."""
+    index = pd.date_range('2026-01-05', periods=2, freq='D', tz='UTC', name='observation')
+    columns = pd.Index(['SPY', 'OTHER'], name='ticker')
+    # Nullable missing rows fail before execution; their existing rejection is tested separately.
+    neighbor = np.nan if dtype == 'float64' else 50.0
+    prices = pd.DataFrame([[100.0, neighbor], [101.0, neighbor]], index=index,
+                          columns=columns, dtype=dtype)
+    original_prices = prices.copy(deep=True)
+    captured: list[tuple] = []
+
+    class SubmitOrders:
+        def on_bar(self, timestamp, current_prices, state):
+            if timestamp == index[0]:
+                orders = [Order('filled', timestamp, 'SPY', quantity)]
+                if dtype == 'float64':
+                    orders.append(Order('missing', timestamp, 'OTHER', quantity))
+                return orders
+            return []
+
+    def execution(order, fill_time, reference_price):
+        captured.append((order, fill_time, reference_price))
+        # Executed price is independent of the audit reference and must not be equality-gated.
+        executed_price = 102.0 if quantity > 0 else 100.0
+        return Trade(order.order_id, order.decision_time, fill_time, order.ticker, quantity,
+                     reference_price, executed_price, quantity * executed_price, 0.5, 1.0)
+
+    result = replay(prices, SubmitOrders(), 1000.0, execution)
+    expected_price = 102.0 if quantity > 0 else 100.0
+    expected_cash = 1000.0 - quantity * expected_price - 0.5
+    expected_nav = expected_cash + quantity * 101.0
+    assert captured == [(Order('filled', index[0], 'SPY', quantity), index[1], 101.0)]
+    assert result.trade_ledger.to_dict('records') == [{
+        'order_id': 'filled', 'decision_time': index[0], 'fill_time': index[1], 'ticker': 'SPY',
+        'filled_quantity': quantity, 'reference_price': 101.0, 'executed_price': expected_price,
+        'notional': quantity * expected_price, 'transaction_cost': 0.5, 'slippage': 1.0,
+    }]
+    pd.testing.assert_series_equal(
+        result.cash, pd.Series([1000.0, expected_cash], index=index, name='cash'),
+    )
+    pd.testing.assert_series_equal(
+        result.states[-1].units, pd.Series([quantity, 0.0], index=columns, name='units'),
+    )
+    assert result.states[-1].nav == expected_nav
+    expected_statuses = [OrderStatus.FILLED]
+    if dtype == 'float64':
+        expected_statuses.append(OrderStatus.UNFILLED_MISSING_PRICE)
+    assert result.order_ledger['status'].to_list() == expected_statuses
+    if replay is backtest_discrete_portfolio:
+        assert result.portfolio_data is not None
+        pd.testing.assert_series_equal(
+            result.portfolio_data.nav,
+            pd.Series([1000.0, expected_nav], index=index, name='DiscretePortfolio'),
+        )
+        pd.testing.assert_frame_equal(
+            result.portfolio_data.instrument_pnl,
+            pd.DataFrame([[0.0, 0.0], [-0.0015, 0.0]], index=index, columns=columns),
+        )
+    else:
+        assert result.portfolio_data is None
+    pd.testing.assert_frame_equal(prices, original_prices)
+
+
+@pytest.mark.parametrize('replay', [replay_discrete_portfolio, backtest_discrete_portfolio])
+def test_replay_discrete_portfolio_preserves_nullable_missing_input_rejection(replay) -> None:
+    """Nullable missing rows retain their existing rejection before any callback or fill."""
+    index = pd.date_range('2026-01-05', periods=2, freq='D')
+    prices = pd.DataFrame({'SPY': [100.0, 101.0], 'OTHER': [np.nan, np.nan]},
+                          index=index, dtype='Float64')
+    original_prices = prices.copy(deep=True)
+
+    class UnexpectedStrategy:
+        def on_bar(self, timestamp, current_prices, state):
+            pytest.fail('nullable missing input must be rejected before strategy evaluation')
+
+    def unexpected_execution(order, fill_time, reference_price):
+        pytest.fail('nullable missing input must be rejected before execution')
+
+    # iterrows produces object scalars, so the unchanged astype(float) rejects pd.NA.
+    with pytest.raises(TypeError, match='NAType'):
+        replay(prices, UnexpectedStrategy(), execution_model=unexpected_execution)
+    pd.testing.assert_frame_equal(prices, original_prices)

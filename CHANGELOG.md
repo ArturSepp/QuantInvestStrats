@@ -9,6 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Reject discrete-portfolio execution responses whose reference price differs from the observed
+  price supplied by `replay_discrete_portfolio` or `backtest_discrete_portfolio`, before applying
+  that fill to units, cash, or ledgers. Custom executed prices, slippage, and fees are unchanged.
 - Annualize modern semi-month start and end aliases, including anchored and multiplied forms, at
   24 periods per year and preserve that cadence when it is carried by a pandas index.
 - Retain realised trading costs in native net instrument and Brinson inputs when missing P&L has
