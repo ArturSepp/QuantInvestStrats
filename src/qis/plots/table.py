@@ -392,7 +392,7 @@ def set_data_colors(table: Table,
                     ) -> None:
     for k, cell in table._cells.items():
         if k[1] > header_column_id and k[0] > header_row_id:
-            cell.set_facecolor(data_colors[k[0]-1][k[1]-1])
+            cell.set_facecolor(data_colors[k[0]-1][k[1]-header_column_id-1])
             cell.set_alpha(alpha)
             if bold_font:
                 txt = cell.get_text()

@@ -9,6 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Keep per-cell colours aligned when a table omits its index column, including stable
+  strategy colours across years in `plot_sorted_periodic_returns`. Return values and
+  rankings are unchanged.
 - Retain valid zero total returns and their cash-relative excess returns in
   `FxRatesData.compute_performance_of_local_ccy_asset_in_reference_ccy` and its panel wrappers,
   while keeping inception missing and the explicit panel zero-to-NaN policy unchanged.
