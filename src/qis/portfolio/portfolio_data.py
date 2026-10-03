@@ -367,7 +367,9 @@ class PortfolioData:
                 by the preceding NAV, the capital base of the arithmetic contributions, so for a
                 portfolio without fees, funding or carry the net contributions sum to the NAV
                 return of each period. The opening trade is paid out of the baseline NAV and is
-                not deducted from a return.
+                not deducted from a return. Before aggregation, a missing contribution permits
+                a cost-only fill only with confirmed zero beginning-period exposure; held or
+                unknown exposure preserves missing P&L.
             is_unit_based_traded_volume: Normalise currency costs by the preceding NAV when true;
                 when false, deduct the currency costs unscaled.
             is_compounded: Apply ``expm1`` to the result.
@@ -375,15 +377,23 @@ class PortfolioData:
 
         Returns:
             Instrument P&L contributions indexed by date.
+
+        Raises:
+            ValueError: If NAV-normalized costs and NAV do not have identical unique row labels.
         """
         pnl = self.instrument_pnl.copy()
         if is_net:
             costs = self.get_costs(add_total=False, is_unit_based_traded_volume=False,
                                    roll_period=None)
             if is_unit_based_traded_volume:
+                self._get_nav_for_report_index(costs.index, "cost")
                 costs = costs.divide(self.nav.shift(1), axis=0)
             # the first row has no preceding NAV: its opening cost is already in the baseline NAV
-            pnl = pnl.subtract(costs.fillna(0.0))
+            # Lag before alignment: closing or unknown exposure cannot justify missing gross P&L.
+            net_pnl = pnl.subtract(costs, fill_value=0.0)
+            beginning_weights = self.weights.shift(1).reindex_like(net_pnl)
+            inactive = beginning_weights.eq(0.0).fillna(False)
+            pnl = net_pnl.where(pnl.reindex_like(net_pnl).notna() | inactive)
         if add_total:
             pnl.insert(loc=0, value=pnl.sum(axis=1), column='Total')
         if time_period is not None:
@@ -1015,16 +1025,13 @@ class PortfolioData:
 
         Returns:
             Arithmetic instrument return contributions and their applied weight panel.
+
+        Raises:
+            ValueError: If net costs and NAV do not have identical unique row labels.
         """
-        # Brinson deducts individual realised costs on the preceding-NAV basis of the arithmetic
-        # returns, which is also the convention of get_instruments_pnl(is_net=True).
-        pnl = self.get_instruments_pnl(is_net=False)
+        # Keep the public net-P&L path as the single owner of cost subtraction and validation.
+        pnl = self.get_instruments_pnl(is_net=is_net)
         weights = self.weights.shift(1)
-        if is_net:
-            previous_nav = self.nav.shift(1)
-            costs = self.get_costs(
-                add_total=False, is_unit_based_traded_volume=False, roll_period=None)
-            pnl = pnl - costs.div(previous_nav, axis=0)
         # The initial NAV is a baseline, not a realised return; never manufacture its weight.
         pnl = pnl.iloc[1:]
         weights = weights.reindex(pnl.index)

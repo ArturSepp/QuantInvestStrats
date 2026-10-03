@@ -30,6 +30,16 @@ jobs:
         run: uv sync --locked --extra docs
       - name: Build documentation with the shared profile
         run: uv run --no-sync python .github/oss_checks.py docs --working-tree --output-dir "$RUNNER_TEMP/oss-docs"
+      - name: Test external-link failure classification
+        run: uv run --no-sync python .github/scripts/test_external_links.py
       - name: Check documentation links
         if: inputs.online || github.event_name == 'workflow_dispatch'
-        run: uv run --no-sync python -m sphinx -E -W -b linkcheck docs docs/_build/linkcheck
+        run: uv run --no-sync python .github/scripts/check_external_links.py --output-dir docs/_build/linkcheck
+
+      - name: Retain external-link health evidence
+        if: always() && (inputs.online || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: external-link-health
+          path: docs/_build/linkcheck/*.json
+          if-no-files-found: error
