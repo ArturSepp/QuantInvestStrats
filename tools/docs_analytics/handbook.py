@@ -590,6 +590,172 @@ def smart_diversification(params: dict):
     return fig, table_out, all(checks), summary
 
 
+def fx_hedging_results(params: dict) -> dict:
+    """Compute the teaching hedge comparisons and verify forward wealth independently.
+
+    Synthetic assets come from the frozen universe. CHF per USD is a stated power of the
+    synthetic Treasury price, not an observed currency or a fitted currency model. All actual
+    hedge decisions, NAVs and performance statistics use the public qis implementations.
+    """
+    cfg = params['fx_hedging']
+    prices = _universe(params)
+    cross = (prices[cfg['fx_proxy']] / prices[cfg['fx_proxy']].iloc[0]) ** cfg['fx_power']
+    fx = qis.FxRatesData(
+        fx_spots=pd.DataFrame({'USD': 1.0, 'CHF': 1.0 / cross}),
+        domestic_rates=pd.DataFrame({'USD': cfg['usd_rate'], 'CHF': cfg['chf_rate']},
+                                    index=prices.index),
+    )
+    forward = fx.get_forward_rate_for_local_ccy(
+        local_ccy='USD', reference_ccy='CHF', freq='ME', is_log_returns=False)
+    sample = qis.TimePeriod(cfg['report_start'], params['end'])
+    metrics = qis.compute_multi_asset_fx_hedging(
+        asset_prices=prices[cfg['assets']], fx_rates_data=fx, time_period=sample,
+        local_ccys='USD', reference_ccy='CHF', freq='ME', span=cfg['span'],
+        risk_aversion_lambda=cfg['risk_aversion'], min_max_hedge=(0.0, 1.0),
+    )
+    names = ['Unhedged', '50% hedge', '100% hedge', 'Beta hedge', 'Carry hedge', 'Optimal']
+    report_names = ['h=0.0', 'h=0.5', 'h=1.0', 'Beta-Hedged', 'Carry-Hedged', 'Optimal-Hedged']
+    checks = {'hedge_rules': True, 'lagged_forward_payoff': True,
+              'performance_reference': True}
+    panels, performance, single_hedges = {}, [], None
+    for asset in cfg['assets']:
+        arguments = dict(asset_price_local_ccy=prices[asset],
+                         local_to_reference_fx_rate=cross,
+                         forward_rate_for_local_ccy=forward, freq='ME')
+        optimal, carry, beta = qis.compute_fx_optimal_hedge(
+            **arguments, span=cfg['span'], risk_aversion_lambda=cfg['risk_aversion'],
+            min_max_hedge=(0.0, 1.0))
+        vol, loading = qis.compute_fx_vol_beta(
+            asset_price_local_ccy=prices[asset], local_to_reference_fx_rate=cross,
+            freq='ME', span=cfg['span'])
+        aligned = pd.concat([vol.rename('vol'), loading.rename('beta'),
+                             forward.rename('forward')], axis=1, sort=True).ffill().asfreq('ME')
+        annual_cost = 12.0 * (1.0 - 1.0 / (1.0 + aligned['forward']))
+        tilt = annual_cost / (2.0 * cfg['risk_aversion'] * aligned['vol'] ** 2)
+        # Closed-form objective checks, independent of the hedge constructor's cost helper.
+        expected = [1.0 + aligned['beta'] - tilt, 1.0 - tilt, 1.0 + aligned['beta']]
+        for actual, reference in zip((optimal, carry, beta), expected):
+            checks['hedge_rules'] &= bool(np.allclose(
+                actual, reference.clip(0.0, 1.0), atol=1e-12, equal_nan=True))
+        hedge_rules = [0.0, 0.5, 1.0, beta, carry, optimal]
+        navs = {}
+        monthly = pd.concat([prices[asset].rename('asset'), cross.rename('spot')],
+                            axis=1).resample('ME').last()
+        for name, hedge in zip(names, hedge_rules):
+            nav, returns = qis.compute_performance_of_local_ccy_asset_in_reference_ccy(
+                **arguments, hedge_ratio=hedge, is_log_returns=False)
+            h = (pd.Series(hedge, index=monthly.index) if isinstance(hedge, float)
+                 else hedge.reindex(monthly.index).ffill()).shift(1)
+            contracted = forward.reindex(monthly.index).ffill().shift(1)
+            # Independent terminal-wealth identity: P_t/P_(t-1) * S_t/S_(t-1)
+            # plus the short forward's h * (F_(t-1)/S_(t-1) - S_t/S_(t-1)).
+            gross_spot = monthly['spot'] / monthly['spot'].shift(1)
+            gross = (monthly['asset'] / monthly['asset'].shift(1) * gross_spot
+                     + h * (1.0 / (1.0 + contracted) - gross_spot))
+            gross.iloc[0] = 1.0
+            reference_nav = np.cumprod(gross.fillna(1.0).to_numpy())
+            checks['lagged_forward_payoff'] &= bool(
+                np.allclose(returns, gross - 1.0, atol=1e-12, equal_nan=True)
+                and np.allclose(nav, reference_nav, rtol=1e-11, atol=1e-12))
+            navs[name] = sample.locate(nav)
+        panel = pd.DataFrame(navs)
+        panel = panel / panel.iloc[0]
+        panels[asset] = panel
+        years = (panel.index[-1] - panel.index[0]).days / 365.25
+        pa = panel.iloc[-1].to_numpy() ** (1.0 / years) - 1.0
+        log_vol = np.std(np.diff(np.log(panel.to_numpy()), axis=0), axis=0, ddof=1)
+        log_vol *= np.sqrt(12.0)
+        for key, reference in [('pas', pa), ('vols', log_vol), ('sharpes', pa / log_vol)]:
+            checks['performance_reference'] &= bool(np.allclose(
+                metrics[key].loc[asset, report_names], reference, rtol=1e-10, atol=1e-12))
+        for name, report_name in zip(names, report_names):
+            performance.append({'asset': asset, 'strategy': name,
+                                'pa_return': float(metrics['pas'].loc[asset, report_name]),
+                                'log_vol': float(metrics['vols'].loc[asset, report_name]),
+                                'sharpe_pa_rf0': float(metrics['sharpes'].loc[asset, report_name])})
+        if asset == cfg['single_asset']:
+            single_hedges = sample.locate(pd.concat(
+                [optimal.rename('Optimal'), beta.rename('Beta hedge'),
+                 carry.rename('Carry hedge')], axis=1))
+    return {'navs': panels[cfg['single_asset']], 'all_navs': panels,
+            'hedges': single_hedges, 'performance': pd.DataFrame(performance),
+            'checks': checks, 'fx_data': fx, 'prices': prices[cfg['assets']]}
+
+
+def fx_hedge_strategies(params: dict):
+    """Single-asset optimal/beta/carry hedge decisions and the six realised NAV paths."""
+    result = fx_hedging_results(params)
+    cfg = params['fx_hedging']
+    fig, axes = _new_figure(nrows=2)
+    qis.plot_time_series(
+        result['hedges'], ax=axes[0], colors=list(SERIES), linestyles=['-', '--', ':'],
+        linewidth=1.8, legend_stats=qis.LegendStats.NONE, var_format='{:.0%}',
+        x_date_freq='3YE', date_format='%Y', ylabel='Opening principal hedged',
+        legend_loc='upper right')
+    qis.plot_time_series(
+        result['navs'], ax=axes[1],
+        colors=[MUTED, '#984ea3', '#a6761d', SERIES[1], SERIES[2], SERIES[0]],
+        linestyles=['--', ':', '-.', '--', ':', '-'], linewidth=1.8,
+        legend_stats=qis.LegendStats.NONE, var_format='{:.1f}',
+        x_date_freq='3YE', date_format='%Y', ylabel='CHF NAV, initially 1',
+        legend_loc='upper left', ncols=3)
+    axes[0].set_ylim(-0.03, 1.03)
+    handbook_exhibit(
+        fig, title='Optimal, beta and carry currency hedges',
+        subtitle=f'Synthetic {cfg["single_asset"]} in USD, viewed in CHF | '
+                 '31 Dec 2010-31 Dec 2025 | monthly decisions',
+        footer='36-month EWMA log-return estimates; hedge ratios clipped to [0, 1].\n'
+               'Simple-payoff NAVs use the previous month-end hedge; no additional trading costs.',
+        size=(10.0, 9.0))
+    for ax in axes:
+        ax.tick_params(axis='x', labelrotation=0)
+        ax.get_legend().get_frame().set_facecolor('white')
+        ax.get_legend().get_frame().set_alpha(0.95)
+    table = pd.concat([result['hedges'].add_prefix('hedge_'),
+                       result['navs'].add_prefix('nav_')], axis=1)
+    table.index.name = 'date'
+    summary = result['performance'].loc[
+        result['performance']['asset'].eq(cfg['single_asset'])]
+    summary = summary.set_index('strategy').drop(columns='asset').to_dict(orient='index')
+    summary['last_hedges'] = result['hedges'].iloc[-1].to_dict()
+    return fig, table, all(result['checks'].values()), summary
+
+
+def fx_hedge_performance(params: dict):
+    """Multi-asset performance tables for fixed, beta, carry and optimal currency hedges."""
+    from matplotlib.colors import LinearSegmentedColormap
+
+    result = fx_hedging_results(params)
+    table = result['performance']
+    strategies = result['navs'].columns
+    fig, axes = _new_figure(nrows=3)
+    cmap = LinearSegmentedColormap.from_list('fx_preview', ['#f3f7fb', '#bad1ed'])
+    for ax, column, label, fmt in zip(
+            axes, ['pa_return', 'log_vol', 'sharpe_pa_rf0'],
+            ['Geometric return p.a.', 'Annualised monthly log-return volatility',
+             'Compounded-return Sharpe (rf = 0)'], ['{:.1%}', '{:.1%}', '{:.2f}']):
+        values = table.pivot(index='asset', columns='strategy', values=column)
+        values = values.reindex(index=params['fx_hedging']['assets'], columns=strategies)
+        qis.plot_heatmap(values, ax=ax, cmap=cmap, var_format=fmt, fontsize=11,
+                         top_x_label=False, labelpad=4)
+        ax.text(0.0, 1.06, label, transform=ax.transAxes, fontsize=12, weight='bold')
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        ax.tick_params(axis='x', rotation=0)
+    handbook_exhibit(
+        fig, title='Currency hedging across four synthetic assets',
+        subtitle='USD assets viewed in CHF | 31 Dec 2010-31 Dec 2025 | six strategies',
+        footer='The FX cross and 3.5% USD / 3.0% CHF annual rates are synthetic.\n'
+               'Sharpe = geometric p.a. return / annualised monthly log volatility; '
+               'no cash deduction.',
+        size=(10.0, 10.0))
+    for ax in axes:
+        ax.grid(False)
+    summary = table.set_index(['asset', 'strategy']).to_dict(orient='index')
+    summary = {f'{asset}|{strategy}': values for (asset, strategy), values in summary.items()}
+    return fig, table, all(result['checks'].values()), summary
+
+
 def _percent():
     """Percent tick formatter."""
     from matplotlib.ticker import PercentFormatter
@@ -610,6 +776,8 @@ FIGURES = {
     'handbook_vol_targeting.png': ('vol_targeting', vol_targeting),
     'handbook_convexity_premium.png': ('convexity_premium', convexity_premium),
     'handbook_smart_diversification.png': ('smart_diversification', smart_diversification),
+    'handbook_fx_hedge_strategies.png': ('fx_hedge_strategies', fx_hedge_strategies),
+    'handbook_fx_hedge_performance.png': ('fx_hedge_performance', fx_hedge_performance),
 }
 
 

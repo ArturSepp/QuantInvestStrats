@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Twenty synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
+  "description": "Twenty-two synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
   "dependencies": [
     "numpy",
     "pandas",
@@ -185,15 +185,27 @@
           "SBD_TSY",
           "SCM_GLD",
           "SAL_HF"
-        ]
+        ],
+        "fx_hedging": {
+          "assets": ["SEQ_US", "SBD_TSY", "SBD_IG", "SCM_GLD"],
+          "single_asset": "SEQ_US",
+          "fx_proxy": "SBD_TSY",
+          "fx_power": 1.5,
+          "usd_rate": 0.035,
+          "chf_rate": 0.03,
+          "span": 36,
+          "risk_aversion": 1.3333333333333333,
+          "report_start": "2010-12-31"
+        }
       },
       "conventions": {
         "data": "Synthetic, fixed sample without quirks; not observed market performance",
         "returns": "Stated per exhibit: monthly log or simple, quarterly regime grid, daily targeting",
         "annualisation": "af = 12 monthly, 4 quarterly, 252 daily as set by qis frequency maps",
-        "rate_basis": "Zero cash rate; no risk-free-rate data",
+        "rate_basis": "Zero cash rate except the FX exhibits: synthetic 3.5% USD and 3.0% CHF annual quotes for CIP only; no cash subtraction",
         "cost_basis": "Gross returns except the fee exhibit: 2% management, 20% performance fee",
-        "teaching_constructions": "Volatility regimes scale SEQ_US returns in the targeting exhibit; the truncating bootstrap draw comes from the example",
+        "teaching_constructions": "Volatility regimes scale SEQ_US returns in the targeting exhibit; the truncating bootstrap draw comes from the example; FX exhibits define CHF per USD as normalised SBD_TSY raised to 1.5",
+        "fx_hedging": "36-month EWMA log-return FX volatility/beta from 2005; performance from 31Dec2010 to 31Dec2025; monthly hedge and CIP quote lagged one month; [0,1] clip; simple total NAVs; geometric p.a./monthly-log-vol Sharpe with rf=0; no additional trading costs",
         "checks": "Each exhibit has an independent closed-form or numpy check of its plotted values"
       },
       "tables": [
@@ -209,7 +221,9 @@
         "risk_contributions",
         "vol_targeting",
         "convexity_premium",
-        "smart_diversification"
+        "smart_diversification",
+        "fx_hedge_strategies",
+        "fx_hedge_performance"
       ],
       "checks": [
         "ewm_kernels",
@@ -224,7 +238,9 @@
         "risk_contributions",
         "vol_targeting",
         "convexity_premium",
-        "smart_diversification"
+        "smart_diversification",
+        "fx_hedge_strategies",
+        "fx_hedge_performance"
       ]
     },
     "cash_rate_case_study": {
@@ -4338,6 +4354,18 @@
       "id": "handbook_smart_diversification",
       "document": "docs/convexity_premium.md",
       "path": "docs/images/handbook_smart_diversification.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_fx_hedge_strategies",
+      "document": "docs/fx_hedging_and_market_data.md",
+      "path": "docs/images/handbook_fx_hedge_strategies.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_fx_hedge_performance",
+      "document": "docs/fx_hedging_and_market_data.md",
+      "path": "docs/images/handbook_fx_hedge_performance.png",
       "producer": "handbook"
     },
     {

@@ -544,7 +544,7 @@ class FxRatesData:
                                     reference_ccy: Union[
                                         str, Literal['CHF', 'EUR', 'GBP', 'USD']] = 'USD',
                                     freq: Union[str, pd.Series] = 'ME',
-                                    is_log_returns: bool = True,
+                                    is_log_returns: bool = False,
                                     is_excess_returns: bool = False,
                                     zero_return_to_nan: bool = True,
                                     cash_rate_lag: int = 1
@@ -557,6 +557,11 @@ class FxRatesData:
         mapping. This is the primary entry point consumed by the
         covariance estimator and the alpha aggregator in the PM and CMA
         pipelines.
+
+        Returns are simple (arithmetic) by default, matching ``qis.to_returns``
+        and the single-asset conversion method. Callers should specify the
+        convention explicitly; use ``is_log_returns=True`` for log-return
+        estimation inputs.
 
         **Zero-return to NaN substitution** (the default):
         step-function PE series (prices constant between quarterly
@@ -580,7 +585,7 @@ class FxRatesData:
             reference_ccy: Target currency for conversion.
             freq: Single frequency string or per-asset Series. A Series
                 dispatches the panel into asset-frequency buckets.
-            is_log_returns: If True, returns are log; otherwise simple.
+            is_log_returns: If True, returns are log; otherwise simple (default).
             is_excess_returns: If True, subtract reference-currency cash in the
                 selected return convention: simple cash from simple
                 returns, or log1p(cash) from log returns. A principal-only FX hedge

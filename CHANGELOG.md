@@ -18,6 +18,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   confirmed zero beginning-period exposure; preserve missing P&L for held or unknown exposure,
   and reject sparse cost dates before they can erase valid contributions.
 
+## [5.35.0.dev1] - 2026-10-03
+
+### Changed
+
+- Default `FxRatesData.compute_fx_adjusted_returns` to simple returns
+  (`is_log_returns=False`), matching `qis.to_returns` and the single-asset FX method.
+  This changes calls that omit the flag; pass `is_log_returns=True` explicitly to
+  retain log-return output. Explicit simple/log calls keep their existing results,
+  cash-rate timing, frequency dispatch and zero-return policy. Stack estimation
+  callers already pass their return convention explicitly.
+
 ## [5.34.0] - 2026-10-02
 
 ### Added

@@ -11,7 +11,7 @@
     "seaborn": "0.13.2",
     "statsmodels": "0.14.6"
   },
-  "generated_at_utc": "2026-10-02T22:37:00.456465+00:00",
+  "generated_at_utc": "2026-10-03T09:00:56.408671+00:00",
   "manifest": {
     "assets": [
       {
@@ -261,6 +261,18 @@
         "producer": "handbook"
       },
       {
+        "document": "docs/fx_hedging_and_market_data.md",
+        "id": "handbook_fx_hedge_strategies",
+        "path": "docs/images/handbook_fx_hedge_strategies.png",
+        "producer": "handbook"
+      },
+      {
+        "document": "docs/fx_hedging_and_market_data.md",
+        "id": "handbook_fx_hedge_performance",
+        "path": "docs/images/handbook_fx_hedge_performance.png",
+        "producer": "handbook"
+      },
+      {
         "document": "docs/cash_rate_timing_and_fx_adjustments.md",
         "id": "cash_rate_case_study_usd",
         "path": "docs/images/cash_rate_case_study_usd.png",
@@ -452,7 +464,7 @@
       "Pillow",
       "qis"
     ],
-    "description": "Twenty synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
+    "description": "Twenty-two synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
     "non_analytics": [
       {
         "document": "docs/quickstart.md",
@@ -942,16 +954,19 @@
           "risk_contributions",
           "vol_targeting",
           "convexity_premium",
-          "smart_diversification"
+          "smart_diversification",
+          "fx_hedge_strategies",
+          "fx_hedge_performance"
         ],
         "conventions": {
           "annualisation": "af = 12 monthly, 4 quarterly, 252 daily as set by qis frequency maps",
           "checks": "Each exhibit has an independent closed-form or numpy check of its plotted values",
           "cost_basis": "Gross returns except the fee exhibit: 2% management, 20% performance fee",
           "data": "Synthetic, fixed sample without quirks; not observed market performance",
-          "rate_basis": "Zero cash rate; no risk-free-rate data",
+          "fx_hedging": "36-month EWMA log-return FX volatility/beta from 2005; performance from 31Dec2010 to 31Dec2025; monthly hedge and CIP quote lagged one month; [0,1] clip; simple total NAVs; geometric p.a./monthly-log-vol Sharpe with rf=0; no additional trading costs",
+          "rate_basis": "Zero cash rate except the FX exhibits: synthetic 3.5% USD and 3.0% CHF annual quotes for CIP only; no cash subtraction",
           "returns": "Stated per exhibit: monthly log or simple, quarterly regime grid, daily targeting",
-          "teaching_constructions": "Volatility regimes scale SEQ_US returns in the targeting exhibit; the truncating bootstrap draw comes from the example"
+          "teaching_constructions": "Volatility regimes scale SEQ_US returns in the targeting exhibit; the truncating bootstrap draw comes from the example; FX exhibits define CHF per USD as normalised SBD_TSY raised to 1.5"
         },
         "fixture": "qis.datasets.generate_synthetic_universe",
         "module": "tools.docs_analytics.handbook",
@@ -973,6 +988,22 @@
             12,
             36
           ],
+          "fx_hedging": {
+            "assets": [
+              "SEQ_US",
+              "SBD_TSY",
+              "SBD_IG",
+              "SCM_GLD"
+            ],
+            "chf_rate": 0.03,
+            "fx_power": 1.5,
+            "fx_proxy": "SBD_TSY",
+            "report_start": "2010-12-31",
+            "risk_aversion": 1.3333333333333333,
+            "single_asset": "SEQ_US",
+            "span": 36,
+            "usd_rate": 0.035
+          },
           "man_fee": 0.02,
           "overlays": [
             "SBD_TSY",
@@ -1032,7 +1063,9 @@
           "risk_contributions",
           "vol_targeting",
           "convexity_premium",
-          "smart_diversification"
+          "smart_diversification",
+          "fx_hedge_strategies",
+          "fx_hedge_performance"
         ]
       },
       "hedged_index_case_study": {
@@ -4628,6 +4661,18 @@
       "sha256": "9d687ad66eb1c50211e53771dff4ba56070f9a72cf726b6e51d6268808a8d309",
       "width": 1430
     },
+    "images/handbook_fx_hedge_performance.png": {
+      "bytes": 219724,
+      "height": 1440,
+      "sha256": "ec3956525a40dd1eb6005f7f99fc6c3093d97008f677354980796798c83d85fa",
+      "width": 1462
+    },
+    "images/handbook_fx_hedge_strategies.png": {
+      "bytes": 313968,
+      "height": 1299,
+      "sha256": "67803f676412172e99dfbb8010580c7faa9b5cb50649356844655593d12f8218",
+      "width": 1447
+    },
     "images/handbook_pca_eigenvalues.png": {
       "bytes": 85200,
       "height": 932,
@@ -5053,6 +5098,18 @@
       "columns": 3,
       "rows_including_header": 1097,
       "sha256": "618c7155811254f9ae0a02de3e1c9107121bbf3b8e57732817bc3948d9187f75"
+    },
+    "tables/handbook/fx_hedge_performance.csv": {
+      "bytes": 1993,
+      "columns": 6,
+      "rows_including_header": 25,
+      "sha256": "712f2e1ef98e6de5f1695d3de39df92db268ee87b948b68e2ddf99cc6f98432a"
+    },
+    "tables/handbook/fx_hedge_strategies.csv": {
+      "bytes": 32582,
+      "columns": 10,
+      "rows_including_header": 182,
+      "sha256": "69fd5eb8e7db42a340786170416e0cf620c35068448ba738324dd109d9546780"
     },
     "tables/handbook/pca_eigenvalues.csv": {
       "bytes": 452,
@@ -5693,6 +5750,8 @@
         "drawdown_path": true,
         "ewm_kernels": true,
         "fee_navs": true,
+        "fx_hedge_performance": true,
+        "fx_hedge_strategies": true,
         "pca_eigenvalues": true,
         "regime_sharpe": true,
         "risk_contributions": true,
@@ -5719,6 +5778,22 @@
           12,
           36
         ],
+        "fx_hedging": {
+          "assets": [
+            "SEQ_US",
+            "SBD_TSY",
+            "SBD_IG",
+            "SCM_GLD"
+          ],
+          "chf_rate": 0.03,
+          "fx_power": 1.5,
+          "fx_proxy": "SBD_TSY",
+          "report_start": "2010-12-31",
+          "risk_aversion": 1.3333333333333333,
+          "single_asset": "SEQ_US",
+          "span": 36,
+          "usd_rate": 0.035
+        },
         "man_fee": 0.02,
         "overlays": [
           "SBD_TSY",
@@ -5812,6 +5887,165 @@
         "fee_navs": {
           "terminal_gross": 226.78638868540762,
           "terminal_net": 131.18083695141652
+        },
+        "fx_hedge_performance": {
+          "SBD_IG|100% hedge": {
+            "log_vol": 0.07247291081157586,
+            "pa_return": 0.03315205682795952,
+            "sharpe_pa_rf0": 0.45744066930266375
+          },
+          "SBD_IG|50% hedge": {
+            "log_vol": 0.10530473465083541,
+            "pa_return": 0.060777987020039115,
+            "sharpe_pa_rf0": 0.577162909356013
+          },
+          "SBD_IG|Beta hedge": {
+            "log_vol": 0.07247291081157588,
+            "pa_return": 0.03315205682795952,
+            "sharpe_pa_rf0": 0.4574406693026637
+          },
+          "SBD_IG|Carry hedge": {
+            "log_vol": 0.08971265336529956,
+            "pa_return": 0.04769516990969325,
+            "sharpe_pa_rf0": 0.5316437327461938
+          },
+          "SBD_IG|Optimal": {
+            "log_vol": 0.07247291081157585,
+            "pa_return": 0.03315205682795952,
+            "sharpe_pa_rf0": 0.45744066930266386
+          },
+          "SBD_IG|Unhedged": {
+            "log_vol": 0.1434794066326735,
+            "pa_return": 0.0870846993368235,
+            "sharpe_pa_rf0": 0.6069491182088033
+          },
+          "SBD_TSY|100% hedge": {
+            "log_vol": 0.05828372954786274,
+            "pa_return": 0.03404790198770158,
+            "sharpe_pa_rf0": 0.5841750734180687
+          },
+          "SBD_TSY|50% hedge": {
+            "log_vol": 0.10135958075068309,
+            "pa_return": 0.06115367001534655,
+            "sharpe_pa_rf0": 0.6033338887398113
+          },
+          "SBD_TSY|Beta hedge": {
+            "log_vol": 0.058283729547862734,
+            "pa_return": 0.03404790198770158,
+            "sharpe_pa_rf0": 0.5841750734180688
+          },
+          "SBD_TSY|Carry hedge": {
+            "log_vol": 0.08235997518749535,
+            "pa_return": 0.04829823439956038,
+            "sharpe_pa_rf0": 0.5864284719562842
+          },
+          "SBD_TSY|Optimal": {
+            "log_vol": 0.058283729547862734,
+            "pa_return": 0.03404790198770158,
+            "sharpe_pa_rf0": 0.5841750734180688
+          },
+          "SBD_TSY|Unhedged": {
+            "log_vol": 0.14430100808669905,
+            "pa_return": 0.0869101003444972,
+            "sharpe_pa_rf0": 0.6022833900944047
+          },
+          "SCM_GLD|100% hedge": {
+            "log_vol": 0.15339457396556416,
+            "pa_return": 0.03320567834949473,
+            "sharpe_pa_rf0": 0.2164723137922019
+          },
+          "SCM_GLD|50% hedge": {
+            "log_vol": 0.1523293543429215,
+            "pa_return": 0.06405890742247045,
+            "sharpe_pa_rf0": 0.4205289761700297
+          },
+          "SCM_GLD|Beta hedge": {
+            "log_vol": 0.15317321807122128,
+            "pa_return": 0.04579852461187639,
+            "sharpe_pa_rf0": 0.2989982530143184
+          },
+          "SCM_GLD|Carry hedge": {
+            "log_vol": 0.1507339105242297,
+            "pa_return": 0.049614279356669844,
+            "sharpe_pa_rf0": 0.3291514111464295
+          },
+          "SCM_GLD|Optimal": {
+            "log_vol": 0.155104389351515,
+            "pa_return": 0.059098774235605944,
+            "sharpe_pa_rf0": 0.38102580128580155
+          },
+          "SCM_GLD|Unhedged": {
+            "log_vol": 0.16319947771965757,
+            "pa_return": 0.09371860493231976,
+            "sharpe_pa_rf0": 0.5742579954410678
+          },
+          "SEQ_US|100% hedge": {
+            "log_vol": 0.17455334592579425,
+            "pa_return": 0.028645932070797464,
+            "sharpe_pa_rf0": 0.16410989957749283
+          },
+          "SEQ_US|50% hedge": {
+            "log_vol": 0.16709036427191265,
+            "pa_return": 0.06055721666641878,
+            "sharpe_pa_rf0": 0.36242195610916056
+          },
+          "SEQ_US|Beta hedge": {
+            "log_vol": 0.16938783852048764,
+            "pa_return": 0.07181189411177136,
+            "sharpe_pa_rf0": 0.4239495275399339
+          },
+          "SEQ_US|Carry hedge": {
+            "log_vol": 0.16922623063378137,
+            "pa_return": 0.045524301206475215,
+            "sharpe_pa_rf0": 0.2690144490956211
+          },
+          "SEQ_US|Optimal": {
+            "log_vol": 0.16943658651407803,
+            "pa_return": 0.08510999066798064,
+            "sharpe_pa_rf0": 0.5023117640587564
+          },
+          "SEQ_US|Unhedged": {
+            "log_vol": 0.1709155347732053,
+            "pa_return": 0.09131265353582907,
+            "sharpe_pa_rf0": 0.5342560210047349
+          }
+        },
+        "fx_hedge_strategies": {
+          "100% hedge": {
+            "log_vol": 0.17455334592579425,
+            "pa_return": 0.028645932070797464,
+            "sharpe_pa_rf0": 0.16410989957749283
+          },
+          "50% hedge": {
+            "log_vol": 0.16709036427191265,
+            "pa_return": 0.06055721666641878,
+            "sharpe_pa_rf0": 0.36242195610916056
+          },
+          "Beta hedge": {
+            "log_vol": 0.16938783852048764,
+            "pa_return": 0.07181189411177136,
+            "sharpe_pa_rf0": 0.4239495275399339
+          },
+          "Carry hedge": {
+            "log_vol": 0.16922623063378137,
+            "pa_return": 0.045524301206475215,
+            "sharpe_pa_rf0": 0.2690144490956211
+          },
+          "Optimal": {
+            "log_vol": 0.16943658651407803,
+            "pa_return": 0.08510999066798064,
+            "sharpe_pa_rf0": 0.5023117640587564
+          },
+          "Unhedged": {
+            "log_vol": 0.1709155347732053,
+            "pa_return": 0.09131265353582907,
+            "sharpe_pa_rf0": 0.5342560210047349
+          },
+          "last_hedges": {
+            "Beta hedge": 0.35525139098187275,
+            "Carry hedge": 0.6720662742800358,
+            "Optimal": 0.027317665261908597
+          }
         },
         "pca_eigenvalues": {
           "first_share": 0.40050640146532823,
@@ -9415,6 +9649,8 @@
       "docs/images/handbook_drawdown.png",
       "docs/images/handbook_ewm_kernels.png",
       "docs/images/handbook_fee_navs.png",
+      "docs/images/handbook_fx_hedge_performance.png",
+      "docs/images/handbook_fx_hedge_strategies.png",
       "docs/images/handbook_pca_eigenvalues.png",
       "docs/images/handbook_regime_sharpe.png",
       "docs/images/handbook_risk_contributions.png",
@@ -9473,17 +9709,17 @@
       "docs/images/unhedged_index_case_study_nddlsz.png",
       "docs/images/unhedged_index_case_study_nddluk.png"
     ],
-    "published_at_utc": "2026-10-02T22:50:24.315633+00:00"
+    "published_at_utc": "2026-10-03T09:13:25.226157+00:00"
   },
   "python": "3.12.14",
-  "qis_import_path": "C:\\Users\\artur\\AppData\\Local\\AgentWork\\ARTURDESKTOP\\QuantInvestStrats\\analyses\\unhedged-index-docs-20261003\\source\\src\\qis\\__init__.py",
-  "qis_source_version": "5.34.0",
+  "qis_import_path": "C:\\Users\\artur\\AppData\\Local\\AgentWork\\ARTURDESKTOP\\QuantInvestStrats\\analyses\\fx-hedge-doc-examples-20261003\\source\\src\\qis\\__init__.py",
+  "qis_source_version": "5.35.0.dev1",
   "schema_version": 1,
   "source": {
     "files": {
       "examples/models/bootstrap_convention.py": "c94e4ac5c5a68299beebe79891b15403ec97230de47d82e8bebfd31a0edc7172",
       "examples/portfolios/model_layer_attribution_simulated.py": "fb3c8fabb316d1cd7d881c4da048b62e1bca299166bf1cf689ae9fbe43cb0d17",
-      "pyproject.toml": "9e04df7de5f155d32541579c64ef7c9a6274ae2a016b42232a028de207dc4b4e",
+      "pyproject.toml": "85dbd1c97ebfea0f03b3853605810a8e534ad17028d552f690f1d1b861599e26",
       "src/qis/__init__.py": "cacca3e3207fd1e9046d617e3f9a21fc1dfed060703db5d91a03d07ba6cc7be9",
       "src/qis/api.py": "59e907e928ed180715605d991c987c3b3364ab86448d889abb69f197570ac671",
       "src/qis/datasets/__init__.py": "02ff1fb80068eab1888c0dd875326c5b24b99177f1f7ac44c91f9ef9246a7d23",
@@ -9492,10 +9728,10 @@
       "src/qis/datasets/synthetic.py": "e65e071cfb944e74a599c10bcc1d3924e3b4dead8ce0f26482c14b8431e85016",
       "src/qis/datasets/tests/synthetic_test.py": "3b931143ee35a723c8ea32dd2668f8a43a73eb75d907664dbb330d0067997748",
       "src/qis/discrete_portfolio/__init__.py": "d628bf7f8b74d5099834b24dfefea7604d0cfc8c922c3f019ebaf66847b5402d",
-      "src/qis/discrete_portfolio/backtester.py": "2f6ea6ec4aa1a5d2fe31d2b0de2643acd0d437d090685b8f97b9f428db156a99",
+      "src/qis/discrete_portfolio/backtester.py": "0a22174f05298c39564a9d2548c564992296e3b304c381623c3ce226b8124d0c",
       "src/qis/discrete_portfolio/execution.py": "71616034ae8a37e161724a323364bdabbb23a26a48c2fa9164df592ee72e1901",
       "src/qis/discrete_portfolio/portfolio_adapter.py": "3c92508cff6dd17e45f9bc9a35ef59dcda8589adef71e8ffa43f2428dfbe0f1d",
-      "src/qis/discrete_portfolio/tests/discrete_backtester_test.py": "dcca472771b125b22c877c0e9d034707cc5f898d79dbbea7aaf9bdeb2930d618",
+      "src/qis/discrete_portfolio/tests/discrete_backtester_test.py": "dc1951c504d56d76ee70e34f6bdab51b4800fd5793989f0de23e0cb27c957406",
       "src/qis/discrete_portfolio/tests/discrete_state_immutability_test.py": "8110cf07445426680a2cf0395fee28a39df7b16b6dca339247fd519554eec917",
       "src/qis/discrete_portfolio/types.py": "e5b8f1c253b88e39b50d05363d2e237c35535dab16b9dca9c7c693afe4b9fcdd",
       "src/qis/file_utils.py": "77403d555a66de66f0fbc8990f3a255ac057220e1c3644e2783770228800957e",
@@ -9503,7 +9739,7 @@
       "src/qis/market_data/__init__.py": "6f164d1db9d93e6d05894bcbf58069700005bd38ef316b04f58de7cb8b1a6390",
       "src/qis/market_data/factors_data.py": "3921b59652fb8ba657f8583f786577057d0eaccb9c2fd677716639009cb03657",
       "src/qis/market_data/fx_hedging.py": "2e745c7a0c3b78b7dab6b1887c30678ebf60ee44c259117d5c91fa909b22e329",
-      "src/qis/market_data/fx_rates_data.py": "46cb6d994fb9a5f20f1a2114abe952050e1097c9ca14808771714bc0e7fe1f09",
+      "src/qis/market_data/fx_rates_data.py": "59a98bef65424471c08dd866fa9f1c031318bef07b98bdf705c6dec54747698d",
       "src/qis/market_data/reports/__init__.py": "b2dc1fc1602d3760d88059f305c6fdf7702a56aacd70e380d2e158a18d8e210b",
       "src/qis/market_data/reports/fx_hedging_report.py": "25fbf4ee82b06d05cbb8fe11ac651e9b79acebd107a818850e3c7ad87060e459",
       "src/qis/market_data/run_local/__init__.py": "9d9c4074b4d29c6468f339946726ffc2e5cc472d60d3c1ea4523f02243491b44",
@@ -9514,6 +9750,7 @@
       "src/qis/market_data/tests/fx_cip_identity_test.py": "54b8a2e339ce61a1e46885d13dff8f58e1a6cf87efdc254d378f8a0f5270c542",
       "src/qis/market_data/tests/fx_nav_period_end_test.py": "6982118dcdfe026394fae3d97f5d735919f9be24bebda7c6b351f650d0f86e4e",
       "src/qis/market_data/tests/fx_rates_data_causality_test.py": "b947d5ed33a5dae6bc1784976c3b56abde37f8b4d2387d78056d270cc0c83221",
+      "src/qis/market_data/tests/fx_return_convention_default_test.py": "f71be15182fe9350fdea44c65cf841bc60d1f00448f82dbfb42e0bdbe086366c",
       "src/qis/market_data/tests/fx_spot_alignment_causality_test.py": "1e92ae08d397eb3ee6035ba34870f9832867fd5e529da761969ff8260c40ad1a",
       "src/qis/market_data/tests/fx_vol_beta_point_in_time_test.py": "e9555cc2ba3b786aca1a3aa9bda2ad03a515d0242b65f9de9eb681ca83673528",
       "src/qis/market_data/tests/fx_zero_return_policy_test.py": "8162301fde83b160542451bdd1b1c9db19488ce846f133e056a4b3f6a078756a",
@@ -9796,7 +10033,7 @@
       "src/qis/portfolio/attribution/tests/portfolio_breadth_test.py": "3845f8b783b45cdc4cc54bff547ae4e62786dbc6b32fd8246dcdcca8beec4be4",
       "src/qis/portfolio/backtester.py": "9617c8680461b59a05693fae857c5f86a42cb90b18a2b28af7442bb7fc9aa4af",
       "src/qis/portfolio/multi_portfolio_data.py": "496eb4bf92601ee0fcf306dde6ca2e1b2e89c60649542de887b2deb2b96b94a9",
-      "src/qis/portfolio/portfolio_data.py": "4a796ae4cabde52cb232a939c17bb6426bbd8e880420926a83a31ba7ee7bc583",
+      "src/qis/portfolio/portfolio_data.py": "30495818171630aca01ad06a124f2533d39f9f3bd84c9521d341fd2ded526173",
       "src/qis/portfolio/reports/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/qis/portfolio/reports/brinson_attribution.py": "980054b47fd0fefed6710703a71291db0d76f3f9beb97627e8c735068ece5aa6",
       "src/qis/portfolio/reports/config.py": "ac5e160b29c29f8588162a2a6c78adefa39f1287844c6bbf1580b79da8559dc4",
@@ -9888,7 +10125,7 @@
       "src/qis/portfolio/tests/backtester_price_date_order_test.py": "ca5402cf4231685b40fd72e170f25a9653e10435e629bedd3d87e8e103192028",
       "src/qis/portfolio/tests/backtester_weight_date_order_test.py": "2bf005d4eafaae20f218f162955f6c4181b9b83451ba95dce49331bba64b3c1e",
       "src/qis/portfolio/tests/benchmark_beta_defaults_test.py": "5e42d50767037ace74e8949bc01f5dc157600c59a0969ed027568dd652b158cf",
-      "src/qis/portfolio/tests/brinson_inputs_test.py": "fa54645469be0d83308b3e8ed0c39e4b37691566daf3fb3e63c25c0844833e12",
+      "src/qis/portfolio/tests/brinson_inputs_test.py": "63e22b436feae0230b191545c6d41fd1f928f5c75be2a37f527f03e65c04ab53",
       "src/qis/portfolio/tests/brinson_wrapper_test.py": "259432c7513c9b9d2733aef642b0e17b474ef48073e4f18ec5010bd828f7431c",
       "src/qis/portfolio/tests/covar_implied_risk_asof_test.py": "624780842278d9827ae3e951be7b919f803f2ddef239b2a516ceb93cc4a827a5",
       "src/qis/portfolio/tests/instruments_pnl_net_test.py": "05fa6e287407cc3ec0c7431d87b93cd9da12d31d03f459b95d9d5211637eb294",
@@ -9916,7 +10153,7 @@
       "src/qis/run_local/price_data_run.py": "f4d2809042991517aa6fa10998fb24cc4b989e1f1a6c7547bbe9fa615995bf3d",
       "src/qis/sql_engine.py": "3976594d378a5fadfa8680fdc8763b8cd0b12fc2507d03a522b331d08600bc5a",
       "src/qis/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "src/qis/tests/documentation_analytics_test.py": "718bccab64726258924373f7e5217a1059f986e715f634f5ade48d2a410199d6",
+      "src/qis/tests/documentation_analytics_test.py": "40437b3fd6287eebfcc96c4a6564a81c2c08700c0104ce2e2a4a50130f940e41",
       "src/qis/tests/documentation_bibliography_test.py": "35baf71a71c4585ecc2f7b375c35b2bcb0c4cf09bf9cb8a266d41b350fc6ef7f",
       "src/qis/tests/documentation_callouts_test.py": "a945845de31b78aef51adf59ac1e6c81207c566b6d78cbd72f018cd4ea8d2409",
       "src/qis/tests/documentation_coverage_test.py": "847af66de8dbb5e22c11df4b770a20804f1aa2b98fd1e1e850fd19333df3a4a8",
@@ -9993,18 +10230,18 @@
       "src/qis/utils/tests/weight_allocation_zero_net_test.py": "a7a8bfd93b1115c79ebea4f441752634f1a55af4a676a67059c6d59b1270605e",
       "tools/docs_analytics/cash_rate_case_study.py": "8dee292626c28b44c4550d0efd285bc7d74ec11b22f5acd7ac43e5b9ec23f0f3",
       "tools/docs_analytics/gallery.py": "7a414759db54f05051539d4fc0c70bfdf1665b6ade748d0239cd353527639c03",
-      "tools/docs_analytics/handbook.py": "3ce37baf6e1055b3177d1e05d112f24e183923dc41ea295612b75ec3dd5ed73f",
+      "tools/docs_analytics/handbook.py": "83561fe88eab4945eb6e654407d8f55d9a8b443d096ddc979c8875b9f3f6e386",
       "tools/docs_analytics/hedged_index_case_study.py": "e423b36025ec2ccf2c0d30184e6209c2f61d8f7d0b30c104d58a6ef0ca962f20",
-      "tools/docs_analytics/manifest.json": "9c210d1eda9b6716c50c82ade14e72ce24a6110745652a0ebc5515412b9f3a1e",
+      "tools/docs_analytics/manifest.json": "c0ca9470c1adf124a168f62772d50c1678ba033dde3b30b8200f211028459771",
       "tools/docs_analytics/model_layer.py": "bb1a6572320cb63135343c4f1d88b2c6777cdf9c353d9fa486d2e9b0e7e9ae47",
       "tools/docs_analytics/publish.py": "8925b7ece371eff423d8eb1a095d04b8da4485b1f15f28c429fe01fe7ff713ec",
       "tools/docs_analytics/run.py": "89b31841ff6faa61ff8cfe503efa0fae10e1e9a39d08ca901fada47374de3197",
       "tools/docs_analytics/style.py": "94813ba0bd1672c112342d735855088f1be339c5543a3c41649fe8ff82747cac",
       "tools/docs_analytics/unhedged_index_case_study.py": "420f35698d842787982fffe9eddd5a6b5447a35b66bb90c11dce7c716bba6e69",
-      "uv.lock": "01e851c115011362d58a580e29024738fefcdde89fe4ae1470d6d6b276a4b20b"
+      "uv.lock": "cf72c1b1797ad85ad70c2b47e2cdcee3a1c4183f26930096f0eee7f3aab4a2ae"
     },
     "identity": "Effective source content, including dirty export files",
-    "sha256": "363fb8abcc32cdd9f3cfd52172aad6a3b2d9a027a4b11789407234ac9331db5e"
+    "sha256": "f65ef3cf07443b02ad7d53159912177834d35d5a65ab95c358091069e05a287f"
   },
   "status": "complete",
   "version_note": "dependencies.qis is installed distribution metadata; qis_source_version and the content fingerprint identify the imported source export"

@@ -1,7 +1,7 @@
 # Reproducible documentation analytics
 
-This repository-only tool builds all 71 registered documentation previews, supporting aggregate
-CSV tables and provenance. Twenty exhibits use offline synthetic inputs. Eight approved empirical
+This repository-only tool builds all 73 registered documentation previews, supporting aggregate
+CSV tables and provenance. Twenty-two exhibits use offline synthetic inputs. Eight approved empirical
 cash-rate previews preserve reviewed bytes and aggregate fits without distributing raw vendor
 observations. Twenty-one hedged-index previews preserve the corresponding reviewed figures
 and 42 aggregate records. Twenty-two unhedged-index previews compare supplied spots and
@@ -43,7 +43,7 @@ mirrors are excluded.
 
 A complete bundle contains:
 
-- `images/*.png`: the 71 registered previews; synthetic images and empirical refits use 150 dpi.
+- `images/*.png`: the 73 registered previews; synthetic images and empirical refits use 150 dpi.
 - `tables/gallery/*.csv`, `tables/model_layer/*.csv` and `tables/handbook/*.csv`: inputs and
   supporting computed values.
 - `analytics_manifest.json`: generation timestamp, fixed sample dates, parameters, conventions,
@@ -84,12 +84,17 @@ intervals. It preserves that simulation's known layer and feature effects and ca
 independent identity/design checks. Tables and figures share the same computed attribution
 objects. This named fixture is an exception to the market-panel fixture rule.
 
-[handbook.py](handbook.py) draws thirteen teaching exhibits for twelve methodology chapters from the
+[handbook.py](handbook.py) draws fifteen teaching exhibits for thirteen methodology chapters from the
 frozen synthetic universe (seed 20260725, 2005–2025, no quirks); the convexity-premium chapter has
-two, both on quarterly returns from 2005-03-31 against the universe's `SBM_6040` benchmark. Two
-exhibits use an explicitly stated teaching construction on top of it: the volatility-targeting
+two, both on quarterly returns from 2005-03-31 against the universe's `SBM_6040` benchmark. Three
+explicit teaching constructions are applied on top of it: the volatility-targeting
 figure scales the US equity returns by recorded volatility regimes, and the bootstrap figure
-compares the qis draw with the truncating draw of `examples/models/bootstrap_convention.py`. Each
+compares the qis draw with the truncating draw of `examples/models/bootstrap_convention.py`; the
+two FX-hedging exhibits define a synthetic CHF-per-USD cross as normalised `SBD_TSY` raised to
+1.5, with constant 3.5% USD and 3.0% CHF annual quotes. FX estimation uses the 2005–2025 monthly
+history and a 36-month EWMA span; performance starts on 31 December 2010. Their public-QIS hedge
+rules, lagged forward wealth, geometric returns and monthly-log-volatility Sharpe are checked
+against independent formula/NumPy references. Each
 exhibit has an independent check against a closed form or a direct numpy calculation, named after
 its table.
 
@@ -203,7 +208,7 @@ the figures and supporting CSVs. Publish the reviewed bundle using an explicit t
 
 Set `$targetCheckout` to the intended repository path; use the C-local export first to review the
 rendered site. The publisher validates every bundle output and requires the target's producer
-source and manifest to match. It copies all 71 allowlisted PNGs together and writes
+source and manifest to match. It copies all 73 allowlisted PNGs together and writes
 `docs/images/analytics_manifest.json` last. Supporting CSVs stay in the build bundle.
 
 The publisher saves previous files in a new C-local backup directory beside the bundle and

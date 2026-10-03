@@ -22,7 +22,39 @@ MANIFEST = json.loads((RUNNER.parent / 'manifest.json').read_text(encoding='utf-
 
 
 def test_registered_images_cover_documentation():
-    assert len(RUN['load_manifest']()['assets']) == 71
+    assert len(RUN['load_manifest']()['assets']) == 73
+
+
+def test_fx_hedging_examples_have_independent_numerical_checks():
+    """The chapter's hedge decisions, lagged payoffs and performance agree with references."""
+    from tools.docs_analytics import handbook
+
+    result = handbook.fx_hedging_results(MANIFEST['producers']['handbook']['parameters'])
+    assert all(result['checks'].values())
+    assert result['navs'].index[0].strftime('%Y-%m-%d') == '2010-12-31'
+    assert len(result['performance']) == 24  # four assets, six reference-currency strategies
+    assert result['hedges'].dropna().ge(0.0).all().all()
+    assert result['hedges'].dropna().le(1.0).all().all()
+
+
+def test_fx_hedging_examples_reject_same_period_hedge_execution(monkeypatch):
+    """An independently reconstructed forward payoff detects a deliberately unlagged hedge."""
+    import pandas as pd
+    import qis
+    from tools.docs_analytics import handbook
+
+    original = qis.compute_performance_of_local_ccy_asset_in_reference_ccy
+
+    def remove_decision_lag(**kwargs):
+        """Inject the next hedge decision so the canonical shift applies the current one."""
+        if isinstance(kwargs['hedge_ratio'], pd.Series):
+            kwargs['hedge_ratio'] = kwargs['hedge_ratio'].shift(-1)
+        return original(**kwargs)
+
+    monkeypatch.setattr(qis, 'compute_performance_of_local_ccy_asset_in_reference_ccy',
+                        remove_decision_lag)
+    result = handbook.fx_hedging_results(MANIFEST['producers']['handbook']['parameters'])
+    assert not result['checks']['lagged_forward_payoff']
 
 
 @pytest.fixture

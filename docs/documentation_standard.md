@@ -125,7 +125,7 @@ the comparison rather than only naming a file. Keep figures readable at normal p
 provide access to full-resolution factsheets when a small preview cannot show every panel.
 
 The [batch producer registry](https://github.com/ArturSepp/QuantInvestStrats/tree/main/tools/docs_analytics)
-covers all 71 current previews: 20 synthetic exhibits, eight empirical cash-rate previews,
+covers all 73 current previews: 22 synthetic exhibits, eight empirical cash-rate previews,
 21 empirical hedged-index comparisons and 22 empirical unhedged-index comparisons.
 One command regenerates synthetic images and supporting CSVs, preserves reviewed empirical
 image bytes and records provenance. Review the bundle, then use the publisher to validate the

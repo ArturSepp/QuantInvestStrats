@@ -38,10 +38,10 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 | Return basis | Simple returns; log output is $\log(1+R_t)$ of the complete payoff |
 | Sampling grid | The `freq` grid of the pair calculation, default `ME` |
 | Annualisation | Annual rates are divided by $\mathrm{af}$; the CIP period is $\Delta=1/\mathrm{af}$ |
-| Mean adjustment | Not applicable |
+| Mean adjustment | None for currency valuation; EWMA for hedge volatility and beta estimation |
 | Timing | Hedge ratio and forward premium set at $t-1$ apply to the return at $t$ |
 | Output units | Decimal returns in the reference currency |
-| qis default | `hedge_ratio` has no default: 0 is unhedged, 1 hedges the opening principal; `freq='ME'` |
+| qis default | Pair and panel conversion use `is_log_returns=False`; `hedge_ratio` has no default: 0 is unhedged, 1 hedges the opening principal; `freq='ME'` |
 
 | Symbol or input | Meaning | Units or convention |
 |---|---|---|
@@ -251,6 +251,88 @@ _, covered_cash = fx.compute_performance_of_local_ccy_asset_in_reference_ccy(
 assert isclose(covered_cash.iloc[-1], 0.004, abs_tol=1e-12)
 ```
 
+### Comparing fixed, beta, carry and optimal hedges
+
+The following offline comparison uses four assets from the frozen synthetic universe, seed
+20260725: US equity (`SEQ_US`), Treasuries (`SBD_TSY`), investment-grade bonds (`SBD_IG`) and gold
+(`SCM_GLD`), without missing-price quirks. Treat these teaching assets as USD-denominated and
+view them in CHF. **Neither the currency path nor the rates are observed market data.**
+
+To make the local/FX relationship visible, the CHF-per-USD cross is the synthetic Treasury
+price divided by its initial value, raised to 1.5. `fx_spots['CHF']` is its inverse because
+the container stores USD per CHF. Constant annual rates are 3.5% for USD and 3.0% for CHF.
+This explicit construction illustrates the method; it is not an estimated model of USD/CHF.
+
+Hedge estimation starts in January 2005, using monthly log-return legs and a 36-month EWMA
+span. The report covers **31 December 2010–31 December 2025**, allowing almost six years of
+pre-report observations. At each month-end, the beta, carry and optimal decisions use only
+information available then; their hedge ratios and contracted forwards apply to the next month.
+All dynamic ratios are clipped to $[0,1]$ and compared with fixed 0%, 50% and 100% hedges.
+
+![Synthetic US-equity optimal, beta and carry hedge ratios above the six resulting CHF NAV paths](images/handbook_fx_hedge_strategies.png)
+
+[Open Figure 1 at full resolution](images/handbook_fx_hedge_strategies.png).
+
+*Figure 1.* Does the asset/FX beta change the hedge chosen from carry alone? The upper panel
+compares the three month-end decisions from `qis.compute_fx_optimal_hedge`; the lower panel
+shows NAVs from `qis.compute_performance_of_local_ccy_asset_in_reference_ccy`, rebased to one
+at the report start. Beta hedging responds to local/FX co-movement; the carry hedge ignores it;
+the optimal rule combines both before clipping. A month-end decision is not applied to the
+return that was just observed. NAVs use simple total payoffs with the local/FX cross-product,
+not a linear sum of log returns. No additional trading costs are included.
+
+![Geometric annual returns, monthly-log-return volatility and compounded-return Sharpe for four synthetic assets under six currency hedge strategies](images/handbook_fx_hedge_performance.png)
+
+[Open Figure 2 at full resolution](images/handbook_fx_hedge_performance.png).
+
+*Figure 2.* Does one currency rule perform best for every asset? The tables use
+`qis.compute_multi_asset_fx_hedging` on the same inputs and sample as Figure 1. Annual returns
+are geometric; volatility is the sample standard deviation of monthly log returns times
+$\sqrt{12}$; Sharpe is geometric p.a. return divided by that volatility, with **rf = 0**.
+The synthetic rates price CIP forwards only: no cash return is deducted from these statistics.
+These are realised teaching-sample outcomes, not proof that a mean-variance rule will maximise
+future returns or Sharpe. The unconstrained formula and its clipping have different effects
+across assets.
+
+In this teaching sample, unhedged synthetic US equity returns **9.13% p.a.** with Sharpe
+**0.53**, compared with **8.51% / 0.50** for the optimal rule and **7.18% / 0.42** for beta
+hedging. The optimal rule's ex-ante objective does not promise the best realised Sharpe.
+The Treasury-driven currency construction also makes some bond hedge ratios hit the 100%
+cap, explaining why their dynamic and fully hedged outcomes can coincide.
+
+The [canonical figure producer](https://github.com/ArturSepp/QuantInvestStrats/blob/main/tools/docs_analytics/handbook.py)
+contains both the public-QIS calculation and independent checks of the hedge formulas,
+lagged terminal-forward wealth, geometric returns and volatility. The
+[analytics manifest](https://github.com/ArturSepp/QuantInvestStrats/blob/main/tools/docs_analytics/manifest.json)
+records the fixed inputs. From a prepared repository source checkout, the numerical comparison
+is reproducible without optional packages or network access:
+
+```python
+from tools.docs_analytics.handbook import fx_hedging_results
+from tools.docs_analytics.run import load_manifest
+
+parameters = load_manifest()['producers']['handbook']['parameters']
+comparison = fx_hedging_results(parameters)
+assert all(comparison['checks'].values())
+assert comparison['hedges'].dropna().ge(0.0).all().all()
+assert comparison['hedges'].dropna().le(1.0).all().all()
+equity_comparison = comparison['performance'].loc[
+    comparison['performance']['asset'].eq('SEQ_US')]
+equity_comparison = equity_comparison.set_index('strategy')
+assert round(100 * equity_comparison.loc['Unhedged', 'pa_return'], 2) == 9.13
+assert round(100 * equity_comparison.loc['Optimal', 'pa_return'], 2) == 8.51
+assert round(100 * equity_comparison.loc['Beta hedge', 'pa_return'], 2) == 7.18
+assert [round(equity_comparison.loc[name, 'sharpe_pa_rf0'], 2)
+        for name in ['Unhedged', 'Optimal', 'Beta hedge']] == [0.53, 0.50, 0.42]
+print(equity_comparison[['pa_return', 'log_vol', 'sharpe_pa_rf0']])
+```
+
+Generate the complete preview bundle with `python -m tools.docs_analytics.run --all
+--output-dir <new-C-local-directory>`; follow the
+[analytics generation and review instructions](https://github.com/ArturSepp/QuantInvestStrats/blob/main/tools/docs_analytics/README.md)
+before publishing. The supporting hedge/NAV and 24-row performance CSVs stay in that bundle.
+The two figures can be opened at full resolution from their image links.
+
 ## Implementation in qis
 
 | Quantity | Formula | qis entry point |
@@ -260,8 +342,8 @@ assert isclose(covered_cash.iloc[-1], 0.004, abs_tol=1e-12)
 | Local and FX legs | $r^{L}_t$, $r^{FX}_t$ or their logs | `qis.compute_local_and_fx_return` |
 | Hedged reference-currency NAV | $R_t$ at hedge ratio $h$ | `qis.compute_performance_of_local_ccy_asset_in_reference_ccy` |
 | Cash and futures translation | funded vs P&L-only exposure | `qis.compute_cash_fx_adjusted_returns`, `qis.compute_futures_fx_adjusted_returns` |
-| FX volatility and beta | $\sigma_{FX}$, $eta$ | `qis.compute_fx_vol_beta` |
-| Optimal, beta and carry hedges | $h^{*}$, $1+eta$, $1-c/(2\lambda\sigma^2_{FX})$ | `qis.compute_fx_optimal_hedge` |
+| FX volatility and beta | $\sigma_{FX}$, $\beta$ | `qis.compute_fx_vol_beta` |
+| Optimal, beta and carry hedges | $h^{*}$, $1+\beta$, $1-c/(2\lambda\sigma^2_{FX})$ | `qis.compute_fx_optimal_hedge` |
 | Panel of assets and its report | hedged NAVs and statistics | `qis.compute_multi_asset_fx_hedging`, `qis.run_asset_fx_hedging_report`, `qis.plot_multi_asset_fx_hedging_report` |
 | Factor price levels | validated factor panel | `qis.FactorsData` |
 
@@ -306,8 +388,11 @@ The cross, premium and each NAV/return output are Series. EUR rates below USD ra
 
 For panels, `compute_returns_in_reference_ccy` returns NAV and return DataFrames at one frequency.
 `compute_fx_adjusted_returns` groups per-asset frequencies and returns a dictionary of return
-DataFrames. By default `zero_return_to_nan=True` replaces every exact zero return with NaN
-for estimation, including a genuine zero. Set it to False to retain valid zero observations;
+DataFrames. Its `is_log_returns=False` default matches `qis.to_returns` and the pair method.
+Specify the return convention explicitly, particularly `is_log_returns=True` for log-return
+covariance, beta and alpha estimation. By default `zero_return_to_nan=True` replaces every
+exact zero return with NaN for estimation, including a genuine zero. Set it to False to retain
+valid zero observations;
 that policy is separate from currency valuation and `cash_rate_lag`.
 
 `compute_fx_optimal_hedge` estimates carry-tilted and beta-aware ratios using EWMA risk estimates,
@@ -320,6 +405,22 @@ and [hedge/payoff functions](https://github.com/ArturSepp/QuantInvestStrats/blob
 The [CIP and payoff tests](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/tests/fx_cip_identity_test.py)
 check cash-flow identities; [alignment tests](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/tests/fx_spot_alignment_causality_test.py)
 check that later quotes do not leak into earlier calculations.
+
+### Existing real-data hedging examples
+
+The offline exhibits complement, rather than replace, the existing runnable examples:
+
+| Canonical example | Inputs and cases | Requirements and limits |
+|---|---|---|
+| [Yahoo hedging example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_hedging_yahoo_example.py) | SPY, TLT, LQD, HYG and GLD in USD viewed in CHF; `HEDGE_RATIOS`, `HEDGED_NAVS`, `FX_VOL_BETA`, `ASSET_HEDGE_REPORT`, `MULTI_ASSET_METRICS`, `MULTI_ASSET_REPORT` | `qis[data]` and network access; real asset prices and spots, but non-USD rate differentials are explicitly illustrative |
+| [CSV-backed hedging example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_hedging_example.py) | Supplied USD benchmark assets and FX/rate CSVs; `CHECK_HEDGED_RETURN`, `PLOT_HEDGE_REPORT`, `MULTI_ASSET_HEDGE`, `MULTI_ASSET_HEDGE_REPORT` | Local resource configuration and supplied `fx_hedging_data` CSVs, including `usd_assets`; no data acquisition by the runner |
+
+Each script exposes `Locals` and `run_local(local=...)`. Choose `Locals.HEDGE_RATIOS` in the
+Yahoo example for the three hedge decisions, or `Locals.MULTI_ASSET_REPORT` for its performance
+comparison. In the CSV-backed example, the corresponding report case is
+`Locals.MULTI_ASSET_HEDGE_REPORT`. These longer examples can generate single-asset tearsheets
+and multi-asset tables, whereas the chapter embeds the focused, offline teaching previews.
+Live-provider histories and supplied local data are not frozen by these scripts.
 
 ### Data acquisition boundary
 

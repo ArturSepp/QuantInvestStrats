@@ -107,6 +107,11 @@ expanding-window statistics.
 
 The primary entry point consumed by the covariance estimator and the alpha aggregator:
 
+`compute_fx_adjusted_returns` defaults to simple (arithmetic) returns, matching
+`qis.to_returns` and the single-asset FX method. Specify `is_log_returns` at each
+call site. The estimation examples below explicitly request log returns; their
+convention does not depend on the library default.
+
 ```python
 returns_by_freq = fx.compute_fx_adjusted_returns(
     prices=prices,            # native-ccy price panel (columns = assets)
