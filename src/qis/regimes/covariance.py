@@ -34,6 +34,34 @@ from qis.regimes.betas import compute_regime_betas
 from qis.regimes.nulls import _edge_densities
 
 
+def _finite_mixture_values(data: Union[pd.Series, pd.DataFrame], name: str) -> np.ndarray:
+    """Validate real components without changing their pandas arithmetic or precision."""
+    raw = data.to_numpy()
+    if (raw.dtype.kind not in 'biufO'
+            or (raw.dtype.kind == 'O' and any(
+                not isinstance(value, (int, float, np.integer, np.floating))
+                for value in raw.flat))):
+        raise ValueError(f"{name} must contain finite real numeric values")
+    try:
+        values = data.to_numpy(dtype=float, na_value=np.nan)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError(f"{name} must contain finite real numeric values") from error
+    if not np.isfinite(values).all():
+        raise ValueError(f"{name} must contain finite real numeric values")
+    return values
+
+
+def _mixture_roundoff(*series: pd.Series) -> float:
+    """Relative allowance for a few rounding steps at the supplied moment precision."""
+    eps = np.finfo(float).eps
+    for data in series:
+        try:
+            eps = max(eps, np.finfo(getattr(data.dtype, 'numpy_dtype', data.dtype)).eps)
+        except (TypeError, ValueError):
+            pass  # Non-floating containers use double precision for validation.
+    return 8. * eps
+
+
 def compute_regime_mixture_covar(betas: pd.DataFrame,
                                  idio_vars: pd.Series,
                                  benchmark_regime_means: pd.Series,
@@ -48,27 +76,86 @@ def compute_regime_mixture_covar(betas: pd.DataFrame,
     empirical frequencies, as ``compute_regime_mixture_covar_from_sample`` does.
 
     Args:
-        betas: regime betas, assets in rows and regimes in columns; include the benchmark with
-            unit betas to carry it in the covariance
-        idio_vars: per-period residual variance of each asset, zero for the benchmark
-        benchmark_regime_means: per-period benchmark mean in each regime
-        benchmark_regime_second_moments: per-period benchmark second moment in each regime
-        af: annualisation factor of the periodic moments
-        regime_probs: probability of each regime; None is ``get_regime_probabilities()``, the
+        betas: finite real regime betas, unique assets in rows and unique nonempty regimes in
+            columns; include the benchmark with unit betas to carry it in the covariance
+        idio_vars: finite nonnegative per-period residual variance of exactly the assets in
+            ``betas``, zero for the benchmark; unique labels may be reordered
+        benchmark_regime_means: finite per-period benchmark mean of exactly the regimes in
+            ``betas``; unique labels may be reordered
+        benchmark_regime_second_moments: finite nonnegative per-period benchmark second moment
+            of exactly those regimes, compatible with the means: the absolute mean must not
+            exceed the square root of the second moment, allowing eight machine epsilons of
+            relative roundoff at the least precise supplied floating dtype
+        af: finite positive annualisation factor of the periodic moments
+        regime_probs: finite probabilities in [0, 1] for exactly those regimes, summing to one
+            within eight machine epsilons at their supplied precision, without normalization.
+            Unique labels may be reordered. None is ``get_regime_probabilities()``, the
             one-sigma cut, which requires the Bear, Normal and Bull columns
 
     Returns:
-        the annualised covariance, indexed by the assets of ``betas``
+        the finite annualised covariance, indexed by the assets of ``betas``. The native
+        arithmetic is retained, including cancellation roundoff at zero variance; the result
+        is not projected to positive semi-definiteness
+
+    Raises:
+        ValueError: if labels, finite real components, variances, probabilities, benchmark
+            moments or ``af`` are invalid, or covariance arithmetic cannot produce finite values
     """
+    try:
+        if np.ndim(af) != 0 or np.iscomplexobj(af) or not np.isfinite(af) or af <= 0.:
+            raise ValueError("af must be finite and positive")
+    except (TypeError, ValueError):
+        raise ValueError("af must be finite and positive") from None
+    if (not isinstance(betas, pd.DataFrame) or not betas.index.is_unique
+            or not betas.columns.is_unique or len(betas.columns) == 0):
+        raise ValueError("betas must have unique assets and nonempty unique regimes")
     if regime_probs is None:
         regime_probs = get_regime_probabilities()
+    components = {}
+    for name, data, labels in (
+            ('idio_vars', idio_vars, betas.index),
+            ('benchmark_regime_means', benchmark_regime_means, betas.columns),
+            ('benchmark_regime_second_moments', benchmark_regime_second_moments, betas.columns),
+            ('regime_probs', regime_probs, betas.columns)):
+        if (not isinstance(data, pd.Series) or not data.index.is_unique
+                or not data.index.difference(labels).empty
+                or not labels.difference(data.index).empty):
+            raise ValueError(f"{name} must have unique labels matching betas exactly")
+        components[name] = data.reindex(labels)
+    _finite_mixture_values(betas, 'betas')
+    values = {name: _finite_mixture_values(data, name) for name, data in components.items()}
+    idio_vars = components['idio_vars']
+    benchmark_regime_means = components['benchmark_regime_means']
+    benchmark_regime_second_moments = components['benchmark_regime_second_moments']
+    regime_probs = components['regime_probs']
+    if (values['idio_vars'] < 0.).any():
+        raise ValueError("idio_vars must be nonnegative")
+    probs = values['regime_probs']
+    if ((probs < 0.).any() or (probs > 1.).any()
+            or not np.isclose(probs.sum(), 1., rtol=0., atol=_mixture_roundoff(regime_probs))):
+        raise ValueError("regime_probs must be in [0, 1] and sum to one")
+    seconds = values['benchmark_regime_second_moments']
+    if (seconds < 0.).any():
+        raise ValueError("benchmark_regime_second_moments must be nonnegative")
+    # Compare standard deviations rather than squaring a finite mean that could overflow.
+    bound = np.sqrt(seconds)
+    means = np.abs(values['benchmark_regime_means'])
+    tolerance = _mixture_roundoff(benchmark_regime_means, benchmark_regime_second_moments)
+    if ((means > bound) & ~np.isclose(means, bound, rtol=tolerance, atol=0.)).any():
+        raise ValueError("benchmark_regime_second_moments are incompatible with the means")
     regimes = list(betas.columns)
-    second = sum(regime_probs[g] * np.outer(betas[g], betas[g]) * benchmark_regime_second_moments[g]
-                 for g in regimes)
-    mean_vec = sum(regime_probs[g] * betas[g] * benchmark_regime_means[g] for g in regimes)
-    factor = (second - np.outer(mean_vec, mean_vec)) * af
-    return pd.DataFrame(factor + np.diag(idio_vars.reindex(betas.index) * af),
-                        index=betas.index, columns=betas.index)
+    try:
+        with np.errstate(over='raise', invalid='raise'):
+            second = sum(regime_probs[g] * np.outer(betas[g], betas[g])
+                         * benchmark_regime_second_moments[g] for g in regimes)
+            mean_vec = sum(regime_probs[g] * betas[g] * benchmark_regime_means[g] for g in regimes)
+            factor = (second - np.outer(mean_vec, mean_vec)) * af
+            covariance = factor + np.diag(idio_vars * af)
+    except (FloatingPointError, OverflowError) as error:
+        raise ValueError("covariance arithmetic must produce finite values") from error
+    if not np.isfinite(np.asarray(covariance, dtype=float)).all():
+        raise ValueError("covariance arithmetic must produce finite values")
+    return pd.DataFrame(covariance, index=betas.index, columns=betas.index)
 
 
 def compute_gaussian_regime_moments(benchmark_vol: float,
