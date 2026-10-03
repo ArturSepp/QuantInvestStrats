@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Retain valid zero total returns and their cash-relative excess returns in
+  `FxRatesData.compute_performance_of_local_ccy_asset_in_reference_ccy` and its panel wrappers,
+  while keeping inception missing and the explicit panel zero-to-NaN policy unchanged.
+
 ## [5.33.3] - 2026-10-03
 
 ### Fixed
