@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "2d821c41d5033ead281258bbe2118a1101bc0060",
+  "measured_at_commit": "40dc48e20a5875ead0ab89ff2b515d93618c3388",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,26 +46,26 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 5430,
+      "value": 5672,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 872,
+      "value": 878,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
       "value": 1105,
-      "how": "tools/audit_consumers.py at 648a302d2c0a",
+      "how": "tools/audit_consumers.py at 12af26c2bbb4",
       "live": false,
       "paper_phrase": "at 1105 sites"
     },
     "consumer_optimalportfolios_symbols": {
       "value": 137,
-      "how": "tools/audit_consumers.py at 648a302d2c0a",
+      "how": "tools/audit_consumers.py at 12af26c2bbb4",
       "live": false,
       "paper_phrase": "references 137 of its symbols"
     },
@@ -83,13 +83,13 @@
     },
     "consumer_trendfollowing_call_sites": {
       "value": 428,
-      "how": "tools/audit_consumers.py at 8c034b5289f4",
+      "how": "tools/audit_consumers.py at d257ba886715",
       "live": false,
       "paper_phrase": "at 428 sites"
     },
     "consumer_trendfollowing_symbols": {
       "value": 87,
-      "how": "tools/audit_consumers.py at 8c034b5289f4",
+      "how": "tools/audit_consumers.py at d257ba886715",
       "live": false,
       "paper_phrase": "references 87 symbols"
     },

@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.33.3] - 2026-10-03
+
 ### Fixed
 
 - Reject discrete-portfolio execution responses whose reference price differs from the observed
@@ -18,8 +20,6 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   confirmed zero beginning-period exposure; preserve missing P&L for held or unknown exposure,
   and reject sparse cost dates before they can erase valid contributions.
 
-## [5.35.0.dev1] - 2026-10-03
-
 ### Changed
 
 - Default `FxRatesData.compute_fx_adjusted_returns` to simple returns
@@ -28,8 +28,6 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   retain log-return output. Explicit simple/log calls keep their existing results,
   cash-rate timing, frequency dispatch and zero-return policy. Stack estimation
   callers already pass their return convention explicitly.
-
-## [5.34.0] - 2026-10-02
 
 ### Added
 
