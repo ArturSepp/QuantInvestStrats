@@ -125,8 +125,10 @@ the comparison rather than only naming a file. Keep figures readable at normal p
 provide access to full-resolution factsheets when a small preview cannot show every panel.
 
 The [batch producer registry](https://github.com/ArturSepp/QuantInvestStrats/tree/main/tools/docs_analytics)
-covers all 20 current previews. One command regenerates their images, supporting CSVs and
-provenance. Review the bundle, then use the publisher described in its README to validate the
+covers all 71 current previews: 20 synthetic exhibits, eight empirical cash-rate previews,
+21 empirical hedged-index comparisons and 22 empirical unhedged-index comparisons.
+One command regenerates synthetic images and supporting CSVs, preserves reviewed empirical
+image bytes and records provenance. Review the bundle, then use the publisher to validate the
 complete set before updating the allowlisted previews and their shared provenance record.
 `python -m tools.docs_analytics.publish --verify --repo <checkout>` checks published image hashes.
 
@@ -139,6 +141,29 @@ Keep fixed synthetic sample periods fixed. Record generation time separately. Us
 synthetic universe for new market-panel demonstrations; preserve established teaching simulations
 with known model effects and their existing seeds. Live-data refresh must be an explicit operation.
 Displayed tables and numerical captions should be checked against the same result used to plot.
+
+The [cash-rate timing case study](cash_rate_timing_and_fx_adjustments.md) is a specifically
+approved empirical exception. Its producer preserves reviewed historical PNGs and recorded
+aggregate statistics without distributing raw vendor returns or private mandate results.
+The complete offline batch validates frozen hashes and aggregate integrity; it does not claim
+to refit undistributed observations. A separate, explicit private-input command can refit the
+fixed sample and check all recorded statistics. Record input hashes, observation cutoff,
+actual refit source, generation time and the limits of public reproducibility.
+
+The [hedged-index replication study](hedged_index_replication.md) is a second specifically
+approved empirical exception. It preserves 21 reviewed previews and 42 aggregate records
+covering recent and full available histories. The explicit private-input helper rechecks
+the recent 69-month derived panel only; it does not claim to refit undistributed full
+histories or re-fetch vendor data. Original payoff/source verification and current bundle
+generation have separate provenance. Raw return panels and private mandate data remain excluded.
+
+The [unhedged-index replication study](unhedged_index_replication.md) is an approved empirical
+exception with 22 reviewed three-panel previews and 44 aggregate records. Each preview compares
+supplied generic spots and FX implied by a different index family. The latter is a held-out
+consistency diagnostic, not an independent WMR replication. Offline generation validates
+frozen records and image hashes; the explicit private helper rechecks both FX methods on
+the recent 69-month derived panel. It neither acquires vendor data nor refits undistributed
+full histories. Input hashes and original numerical review remain separate from bundle generation.
 
 ## Verification and migration
 

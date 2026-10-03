@@ -1,8 +1,11 @@
 # Reproducible documentation analytics
 
-This repository-only tool generates all 20 analytics images referenced by the documentation,
-their supporting CSV tables, and a provenance record. It uses qis calculations and offline synthetic
-inputs. The package does not import this tooling.
+This repository-only tool builds all 71 registered documentation previews, supporting aggregate
+CSV tables and provenance. Twenty exhibits use offline synthetic inputs. Eight approved empirical
+cash-rate previews preserve reviewed bytes and aggregate fits without distributing raw vendor
+observations. Twenty-one hedged-index previews preserve the corresponding reviewed figures
+and 42 aggregate records. Twenty-two unhedged-index previews compare supplied spots and
+different-family index-implied FX, with 44 aggregate records. The package does not import this tooling.
 
 ## Run all analytics
 
@@ -40,7 +43,7 @@ mirrors are excluded.
 
 A complete bundle contains:
 
-- `images/*.png`: the 20 preview filenames, saved at 150 dpi.
+- `images/*.png`: the 71 registered previews; synthetic images and empirical refits use 150 dpi.
 - `tables/gallery/*.csv`, `tables/model_layer/*.csv` and `tables/handbook/*.csv`: inputs and
   supporting computed values.
 - `analytics_manifest.json`: generation timestamp, fixed sample dates, parameters, conventions,
@@ -95,6 +98,66 @@ Boolean checks, actual parameters and result summaries. Unexpected output sets o
 checks fail the whole run. Producers must not access vendor data, local undistributed files,
 test-private fixtures or `run_local` code.
 
+### Approved empirical cash-rate case study
+
+[cash_rate_case_study.py](cash_rate_case_study.py) preserves eight registered historical preview
+PNGs and reconstructs the 24-row aggregate table from manifest parameters. This is the named
+empirical exception: its default offline producer reads only allowlisted public PNGs and
+aggregate records. It returns validated paths so the batch copies PNG bytes without re-rendering.
+Hash and summary validation is not a claim to refit raw observations.
+
+The explicit private-input refit command is separate from the unattended batch:
+
+~~~console
+python -m tools.docs_analytics.cash_rate_case_study --source-csv /private/cash_rate_monthly_comparison.csv --output-dir /local/new-refit
+~~~
+
+It verifies the input snapshot hash, reconstructs lag 0, lag 1 and midpoint from annual quotes,
+checks all 24 recorded fits against SciPy linear regression and direct error moments, and uses
+`qis.plot_scatter` with a linear fit and intercept. It requires authorised private input but no
+data acquisition or network. Raw observations stay outside the repository. A refit with changed
+inputs must be a new reviewed study rather than silently replacing this sample.
+
+### Approved empirical hedged-index study
+
+[hedged_index_case_study.py](hedged_index_case_study.py) preserves 21 registered comparison
+PNGs and reconstructs the 42-row aggregate table. Its offline integrity checks cover
+ticker/window completeness, the 69-month common sample, finite statistics, error bounds,
+sample TE/RMSE consistency, geometric-return differences and frozen preview hashes.
+Neither this producer nor the unattended batch reads private vendor observations.
+
+~~~console
+python -m tools.docs_analytics.hedged_index_case_study --source-csv /private/monthly_comparison.csv --output-dir /local/new-private-recheck
+~~~
+
+This explicit private command checks the frozen input hash, 21 recent-period regression
+fits and error moments, the derived opening-principal hedge identity, canonical QIS sample
+TE and geometric returns, then plots through QIS. It verifies the recent 69-month derived
+panel, not undistributed full histories or raw FX acquisition. Full-history records retain
+the original independently checked analysis. The registry records the original QIS
+implementation hash separately from the complete bundle's current effective-source hash.
+The original reviewed empirical PNG bytes are preserved by default; a new private refit
+does not silently replace published previews. Raw returns and private mandates stay private.
+
+### Approved empirical unhedged index study
+
+[unhedged_index_case_study.py](unhedged_index_case_study.py) preserves 22 reviewed three-panel
+previews, 44 aggregate rows, matched-pair identities and cross-family currency diagnostics.
+Each figure has supplied-spot and held-out index-FX scatterplots plus cumulative relative NAV.
+The diagnostic withholds the target family; it is not a temporally out-of-sample model or an
+independently observed WMR series. The offline producer validates both sets of error bounds,
+sample completeness, non-circular anchors, aggregate identities and frozen image hashes.
+
+~~~console
+python -m tools.docs_analytics.unhedged_index_case_study --source-csv /private/monthly_comparison.csv --output-dir /local/new-private-recheck
+~~~
+
+The explicit private command reconstructs both FX paths from the recent derived panel using
+`FxRatesData`, rechecks regression, sample tracking error and geometric returns, and replots
+through QIS. It does not re-fetch quotes or recheck full-history inputs. Publicly frozen image
+bytes retain their original review and source identity. Raw histories and private mandates
+are not part of the bundle.
+
 ## Complete gallery reports
 
 For the complete reports, call the gallery producer with `full_reports=True` from the same
@@ -140,7 +203,7 @@ the figures and supporting CSVs. Publish the reviewed bundle using an explicit t
 
 Set `$targetCheckout` to the intended repository path; use the C-local export first to review the
 rendered site. The publisher validates every bundle output and requires the target's producer
-source and manifest to match. It copies all 20 allowlisted PNGs together and writes
+source and manifest to match. It copies all 71 allowlisted PNGs together and writes
 `docs/images/analytics_manifest.json` last. Supporting CSVs stay in the build bundle.
 
 The publisher saves previous files in a new C-local backup directory beside the bundle and

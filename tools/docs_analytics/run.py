@@ -11,6 +11,7 @@ import json
 import os
 import platform
 import re
+import shutil
 import socket
 import sys
 import uuid
@@ -331,8 +332,15 @@ def generate(output: Path, manifest: dict, root: Path = ROOT) -> Path:
                         for filename, fig in figures.items():
                             dest = staging / 'images' / filename
                             dest.parent.mkdir(parents=True, exist_ok=True)
-                            save_figure(fig, dest)
-                            plt.close(fig)
+                            if name in ('cash_rate_case_study', 'hedged_index_case_study',
+                                        'unhedged_index_case_study') and (
+                                    isinstance(fig, Path)):
+                                # Approved empirical exception: preserve reviewed bytes,
+                                # not a claim to regenerate undistributed vendor history.
+                                shutil.copyfile(fig, dest)
+                            else:
+                                save_figure(fig, dest)
+                                plt.close(fig)
                         for label, table in tables.items():
                             dest = staging / 'tables' / name / f'{label}.csv'
                             dest.parent.mkdir(parents=True, exist_ok=True)

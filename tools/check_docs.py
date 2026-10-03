@@ -41,6 +41,9 @@ LEGACY_NOTATION = (
     (re.compile(r'(?<!\\)\b(?:Sigma_|sqrt\()'), 'Write formulas as TeX, not plain text.'),
 )
 METHODOLOGY_PAGES = frozenset({
+    'unhedged_index_replication.md',
+    'hedged_index_replication.md',
+    'cash_rate_timing_and_fx_adjustments.md',
     'benchmark_relative_performance.md', 'brinson_attribution.md', 'convexity_premium.md',
     'covariance_correlation_pca.md', 'drawdowns.md', 'ewm_estimators.md',
     'factor_risk_models.md', 'factsheets_and_reporting.md', 'frequency_convention_note.md',
@@ -61,6 +64,9 @@ UTILITY_PAGES = frozenset({
 })
 # Adoption is explicit. Do not infer it from a byline or let new pages evade the inventory.
 ADOPTED_PAGES = frozenset({
+    'unhedged_index_replication.md',
+    'hedged_index_replication.md',
+    'cash_rate_timing_and_fx_adjustments.md',
     'documentation_standard.md', 'index.md', 'portfolio_breadth.md',
     'frequency_convention_note.md', 'brinson_attribution.md',
     'performance_analytics_and_sharpe.md', 'tracking_error_and_risk.md',

@@ -112,6 +112,12 @@ the [bibliography](bibliography.md).
   five stocks, ten short VOP-priced options and a four-ETF EWMA risk model.
 - [FX hedging and market data](fx_hedging_and_market_data.md):
   currency conversion, hedging assumptions and data contracts.
+- [Cash rate timing and FX adjustments](cash_rate_timing_and_fx_adjustments.md):
+  separate spot, hedge-carry and excess-return timing, with an empirical cash-index comparison.
+- [Hedged index replication](hedged_index_replication.md): observed CHF, EUR and GBP index
+  comparisons, distinguishing close monthly fit from persistent compounded-return differences.
+- [Unhedged index replication](unhedged_index_replication.md): paired scatterplots using
+  supplied spot FX and different-family index-implied FX, with explicit diagnostic limitations.
 
 ### Part VI: Attribution
 
@@ -228,6 +234,9 @@ Factor stress testing <stress_testing>
 Instrument portfolios and stress reports <portfolio_stress>
 Stress testing with options <stress_testing_with_options>
 FX hedging and market data <fx_hedging_and_market_data>
+Cash rate timing and FX adjustments <cash_rate_timing_and_fx_adjustments>
+Hedged index replication <hedged_index_replication>
+Unhedged index replication <unhedged_index_replication>
 ```
 
 ```{toctree}

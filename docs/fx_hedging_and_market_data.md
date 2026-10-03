@@ -194,8 +194,12 @@ Simple and log **total** returns describe the same NAV when converted consistent
 
 For `compute_returns_in_reference_ccy` and `compute_returns_adjusted_by_local_rate`, raw annual
 rate quotes are as-of aligned to the asset grid, divided by its annualisation factor, and shifted
-one observation. The latter helper's third output is the annual rate quote panel for reporting.
+by `cash_rate_lag` observations, default 1. The setting affects cash subtraction only, not spot
+translation or the one-period hedge carry. The latter helper's third output is the annual rate
+quote panel for reporting.
 Do not substitute that panel directly for periodic lagged cash accruals.
+See [cash rate timing and FX adjustments](cash_rate_timing_and_fx_adjustments.md) for lag 0,
+lag 1 and midpoint comparisons against observed cash-index returns.
 
 ## Worked example
 
@@ -302,8 +306,9 @@ The cross, premium and each NAV/return output are Series. EUR rates below USD ra
 
 For panels, `compute_returns_in_reference_ccy` returns NAV and return DataFrames at one frequency.
 `compute_fx_adjusted_returns` groups per-asset frequencies and returns a dictionary of return
-DataFrames. It replaces every exact zero return with NaN for estimation, including a genuine
-zero; that policy is separate from currency valuation.
+DataFrames. By default `zero_return_to_nan=True` replaces every exact zero return with NaN
+for estimation, including a genuine zero. Set it to False to retain valid zero observations;
+that policy is separate from currency valuation and `cash_rate_lag`.
 
 `compute_fx_optimal_hedge` estimates carry-tilted and beta-aware ratios using EWMA risk estimates,
 the same exact forward cost, and clipping bounds. Supply enough history and distinguish any
@@ -342,6 +347,8 @@ Local CSV loading reads supplied files; it does not itself update market observa
 
 ## See also
 
+- [Unhedged index replication](unhedged_index_replication.md): supplied spots versus held-out index-implied FX
+- [Hedged index replication](hedged_index_replication.md): empirical fit, tracking error and carry drift
 - [Incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md)
 - [Performance analytics](performance_analytics_and_sharpe.md)
 - [Reporting-frequency convention](_included/reporting_frequencies.md) and

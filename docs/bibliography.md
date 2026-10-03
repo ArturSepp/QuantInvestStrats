@@ -104,6 +104,9 @@ page. Remove the mark once it has.
 
 ## Stress testing, derivatives and currencies
 
+- LSEG. *Access WMR Benchmark Rates Via Bloomberg*. [Access guide](https://www.lseg.com/content/dam/ftse-russell/en_us/documents/methodology/access-wmr-rates-via-bloomberg.pdf).
+- Bloomberg Index Services Limited (2026). *Bloomberg Fixed Income Index Methodology*, 8 January. [Methodology PDF](https://assets.bbhub.io/professional/sites/10/Bloomberg-Index-Publications-Fixed-Income-Index-Methodology.pdf).
+- MSCI. *MSCI USA 100% Hedged to CHF Index*. [Index definition](https://www.msci.com/indexes/index/137694/msci-usa-100-hedged-to-chf-index).
 - Anderson, T. W. (2003). *An Introduction to Multivariate Statistical Analysis*, 3rd edition. Wiley.
 - Black, F., and Scholes, M. (1973). The Pricing of Options and Corporate Liabilities. *Journal of Political Economy*, 81(3), 637–654. [DOI: 10.1086/260062](https://doi.org/10.1086/260062).
 - Borio, C., McCauley, R., McGuire, P., and Sushko, V. (2016). Covered interest parity lost: understanding the cross-currency basis. *BIS Quarterly Review*, September. [Publisher page](https://www.bis.org/publications/qr-201609/covered-interest-parity-lost-understanding-cross-currency-basis).

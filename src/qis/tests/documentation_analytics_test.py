@@ -22,7 +22,190 @@ MANIFEST = json.loads((RUNNER.parent / 'manifest.json').read_text(encoding='utf-
 
 
 def test_registered_images_cover_documentation():
-    assert len(RUN['load_manifest']()['assets']) == 20
+    assert len(RUN['load_manifest']()['assets']) == 71
+
+
+@pytest.fixture
+def frozen_empirical(tmp_path, monkeypatch):
+    """Prepare public aggregate statistics and eight synthetic stand-ins for preview bytes."""
+    import hashlib
+    from tools.docs_analytics import cash_rate_case_study
+
+    monkeypatch.setattr(cash_rate_case_study, 'ROOT', tmp_path)
+    spec = copy.deepcopy(MANIFEST['producers']['cash_rate_case_study'])
+    for item in spec['parameters']['frozen_images']:
+        path = tmp_path / 'docs/images' / item['filename']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'preview stand-in for producer hash validation')
+        item['sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return cash_rate_case_study, spec
+
+
+def test_frozen_empirical_hash_contract(frozen_empirical):
+    """Reject any alteration to an already reviewed historical preview."""
+    module, spec = frozen_empirical
+    first = module.ROOT / 'docs/images' / spec['parameters']['frozen_images'][0]['filename']
+    first.write_bytes(b'changed preview')
+    with pytest.raises(ValueError, match='hash mismatch'):
+        module.produce(spec)
+
+
+@pytest.mark.parametrize('defect', ['duplicate', 'r_squared', 'rmse', 'nonfinite'])
+def test_frozen_empirical_summary_contract(frozen_empirical, defect):
+    """Reject an incomplete or mathematically inconsistent public aggregate record."""
+    module, spec = frozen_empirical
+    records = spec['parameters']['statistics']
+    if defect == 'duplicate':
+        records.append(records[0])
+    elif defect == 'r_squared':
+        records[0]['R_squared'] = 1.1
+    elif defect == 'rmse':
+        records[0]['RMSE_bp'] = 0.0
+    else:
+        records[0]['Bias_bp'] = float('nan')
+    with pytest.raises(ValueError):
+        module.produce(spec)
+
+
+def test_frozen_empirical_produces_public_inputs_only(frozen_empirical):
+    """Complete offline generation requires no private observation panel."""
+    module, spec = frozen_empirical
+    result = module.produce(spec)
+    assert len(result['figures']) == 8
+    assert len(result['tables']['statistics']) == 24
+    assert all(result['checks'].values())
+    assert result['summary']['raw_vendor_data_distributed'] is False
+
+
+@pytest.fixture
+def frozen_hedged_indices(tmp_path, monkeypatch):
+    """Prepare aggregate records and stand-in bytes without reading private inputs."""
+    import hashlib
+    from tools.docs_analytics import hedged_index_case_study
+
+    monkeypatch.setattr(hedged_index_case_study, 'ROOT', tmp_path)
+    spec = copy.deepcopy(MANIFEST['producers']['hedged_index_case_study'])
+    for item in spec['parameters']['frozen_images']:
+        path = tmp_path / 'docs/images' / item['filename']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'hedged-index preview stand-in for hash checks')
+        item['sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return hedged_index_case_study, spec
+
+
+def test_hedged_empirical_produces_public_inputs_only(frozen_hedged_indices):
+    """Reproduce aggregate records offline without claiming to refit vendor history."""
+    module, spec = frozen_hedged_indices
+    result = module.produce(spec)
+    assert len(result['figures']) == 21
+    assert len(result['tables']['statistics']) == 42
+    assert all(result['checks'].values())
+    assert result['summary']['raw_vendor_data_distributed'] is False
+
+
+@pytest.mark.parametrize('defect', [
+    'duplicate', 'r_squared', 'rmse', 'nonfinite', 'moment_identity', 'cagr_identity',
+    'sample_support', 'image_hash', 'missing_image',
+])
+def test_hedged_empirical_rejects_invalid_records(frozen_hedged_indices, defect):
+    """Reject corrupt figures, sample support and inconsistent numerical aggregates."""
+    module, spec = frozen_hedged_indices
+    records = spec['parameters']['statistics']
+    recent = next(row for row in records if row['Window'] == module.RECENT)
+    if defect == 'duplicate':
+        records.append(records[0])
+    elif defect == 'r_squared':
+        records[0]['R_squared'] = 1.1
+    elif defect == 'rmse':
+        records[0]['RMSE_monthly_bp'] = 0.0
+    elif defect == 'nonfinite':
+        records[0]['Beta'] = float('nan')
+    elif defect == 'moment_identity':
+        records[0]['Tracking_error_pa_bp'] += 1.0
+    elif defect == 'cagr_identity':
+        records[0]['CAGR_difference_bp'] += 1.0
+    elif defect == 'sample_support':
+        recent['Months'] = 68
+    elif defect == 'image_hash':
+        first = spec['parameters']['frozen_images'][0]['filename']
+        (module.ROOT / 'docs/images' / first).write_bytes(b'changed figure')
+    else:
+        spec['parameters']['frozen_images'].pop()
+    with pytest.raises((ValueError, AssertionError)):
+        module.produce(spec)
+
+
+@pytest.fixture
+def frozen_unhedged_indices(tmp_path, monkeypatch):
+    """Prepare both-FX aggregate records and synthetic stand-ins for preview bytes."""
+    import hashlib
+    from tools.docs_analytics import unhedged_index_case_study
+
+    monkeypatch.setattr(unhedged_index_case_study, 'ROOT', tmp_path)
+    spec = copy.deepcopy(MANIFEST['producers']['unhedged_index_case_study'])
+    for item in spec['parameters']['frozen_images']:
+        path = tmp_path / 'docs/images' / item['filename']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'unhedged-index preview stand-in for hash validation')
+        item['sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return unhedged_index_case_study, spec
+
+
+def test_unhedged_empirical_produces_public_inputs_only(frozen_unhedged_indices):
+    """Validate both FX inputs offline without reading private vendor histories."""
+    module, spec = frozen_unhedged_indices
+    result = module.produce(spec)
+    assert len(result['figures']) == 22
+    assert len(result['tables']['statistics']) == 44
+    assert len(result['tables']['pairs']) == 22
+    assert len(result['tables']['currency_diagnostics']) == 3
+    assert all(result['checks'].values())
+    assert result['summary']['independent_WMR_replication'] is False
+    assert result['summary']['raw_vendor_data_distributed'] is False
+
+
+@pytest.mark.parametrize('defect', [
+    'duplicate', 'r_squared', 'holdout_r_squared', 'holdout_te', 'nonfinite',
+    'moment_identity', 'cagr_identity', 'sample_support', 'circular_anchor',
+    'image_hash', 'missing_image', 'currency_support', 'pair_identity',
+])
+def test_unhedged_empirical_rejects_invalid_records(frozen_unhedged_indices, defect):
+    """Reject corrupt evidence, both-FX summaries and circular diagnostic anchors."""
+    module, spec = frozen_unhedged_indices
+    parameters = spec['parameters']
+    records = parameters['statistics']
+    recent = next(row for row in records if row['Window'] == module.RECENT)
+    if defect == 'duplicate':
+        records.append(records[0])
+    elif defect == 'r_squared':
+        records[0]['R_squared'] = 1.1
+    elif defect == 'holdout_r_squared':
+        records[0]['Index_FX_holdout_R_squared'] = 1.1
+    elif defect == 'holdout_te':
+        records[0]['Index_FX_holdout_TE_pa_bp'] = -1.0
+    elif defect == 'nonfinite':
+        records[0]['Beta'] = float('nan')
+    elif defect == 'moment_identity':
+        records[0]['Tracking_error_pa_bp'] += 1.0
+    elif defect == 'cagr_identity':
+        records[0]['CAGR_difference_bp'] += 1.0
+    elif defect == 'sample_support':
+        recent['Months'] = 68
+    elif defect == 'circular_anchor':
+        pair = parameters['pairs'][0]
+        pair['Index_FX_anchor_base'] = pair['Base_ticker']
+        pair['Index_FX_anchor_target'] = pair['Observed_ticker']
+    elif defect == 'image_hash':
+        first = parameters['frozen_images'][0]['filename']
+        (module.ROOT / 'docs/images' / first).write_bytes(b'changed figure')
+    elif defect == 'missing_image':
+        parameters['frozen_images'].pop()
+    elif defect == 'currency_support':
+        parameters['currency_diagnostics'][0]['Months'] = 68
+    else:
+        records[0]['Base_name'] = 'Different index'
+    with pytest.raises((ValueError, AssertionError)):
+        module.produce(spec)
 
 
 @pytest.mark.parametrize('source', [
