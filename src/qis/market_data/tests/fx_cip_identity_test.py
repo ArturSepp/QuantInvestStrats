@@ -272,6 +272,127 @@ def test_hedge_and_forward_shocks_are_lagged_once(is_log: bool) -> None:
     np.testing.assert_allclose(shocked.iloc[4:], baseline.iloc[4:], rtol=0, atol=0)
 
 
+@pytest.mark.filterwarnings('error')
+@pytest.mark.parametrize('nullable', [False, True])
+@pytest.mark.parametrize('cash_rate_lag', [0, 1])
+@pytest.mark.parametrize('currency', ['USD', 'CHF'])
+@pytest.mark.parametrize('is_log', [False, True])
+def test_compute_performance_of_local_ccy_asset_in_reference_ccy_retains_flat_periods(
+        nullable: bool, cash_rate_lag: int, currency: str, is_log: bool) -> None:
+    """Real zero returns accrue cash without turning inception into an observation."""
+    dates = pd.date_range('2024-01-31', periods=6, freq='ME', tz='UTC', name='Date')
+    prices = pd.Series([100.0, 100.0, 100.0, 110.0, 110.0, 100.0],
+                       index=dates, name='ASSET', dtype='Float64' if nullable else float)
+    annual_cash = np.array([0.12, 0.24, 0.36, 0.48, 0.60, 0.72])
+    data = FxRatesData(pd.DataFrame({'USD': 1.0, 'CHF': 1.0}, index=dates),
+                       pd.DataFrame({'USD': annual_cash, 'CHF': annual_cash}, index=dates))
+    original = prices.copy(deep=True)
+    original_spots = data.fx_spots.copy(deep=True)
+    original_rates = data.domestic_rates.copy(deep=True)
+    simple_total = np.array([np.nan, 0.0, 0.0, 0.10, 0.0, 100.0 / 110.0 - 1.0])
+    cash = annual_cash / 12.0
+    if cash_rate_lag:
+        cash = np.r_[np.nan, cash[:-1]]
+    total_reference = np.log1p(simple_total) if is_log else simple_total
+
+    for excess in [False, True]:
+        expected_values = total_reference.copy()
+        if excess:
+            expected_values -= np.log1p(cash) if is_log else cash
+        # Cash subtraction leaves the native excess Series unnamed; its NAV uses column 0.
+        expected_name = None if excess else prices.name
+        expected = pd.Series(expected_values, index=dates, name=expected_name, dtype=prices.dtype)
+        nav, actual = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+            prices, 0.0, currency, 'USD', is_log_returns=is_log,
+            is_excess_returns=excess, cash_rate_lag=cash_rate_lag)
+        pd.testing.assert_series_equal(actual, expected, rtol=1e-13, atol=1e-14)
+        # Compound literal cash-relative returns, not another production NAV conversion.
+        observed = np.nan_to_num(expected_values, nan=0.0)
+        nav_values = np.exp(np.cumsum(observed)) if is_log else np.cumprod(1.0 + observed)
+        expected_nav = pd.Series(nav_values, index=dates, name=0 if excess else prices.name,
+                                 dtype=prices.dtype)
+        pd.testing.assert_series_equal(nav, expected_nav, rtol=1e-13, atol=1e-14)
+    pd.testing.assert_series_equal(prices, original)
+    pd.testing.assert_frame_equal(data.fx_spots, original_spots)
+    pd.testing.assert_frame_equal(data.domestic_rates, original_rates)
+
+
+@pytest.mark.filterwarnings('error')
+@pytest.mark.parametrize('nullable', [False, True])
+@pytest.mark.parametrize('per_asset_frequency', [False, True])
+@pytest.mark.parametrize('is_log', [False, True])
+def test_compute_fx_adjusted_returns_preserves_mixed_flat_and_missing_support(
+        nullable: bool, per_asset_frequency: bool, is_log: bool) -> None:
+    """Each currency keeps its native fill policy beside flat, ragged and absent neighbors."""
+    dates = pd.date_range('2024-01-31', periods=6, freq='ME', name='Date')
+    histories = {'FLAT': [100.0] * 6,
+                 'MOVING': [100.0, 110.0, 121.0, 121.0, 121.0, 133.1],
+                 'RAGGED': [np.nan, np.nan, 100.0, 100.0, 110.0, 110.0],
+                 'MISSING': [100.0, 100.0, np.nan, 100.0, 110.0, 110.0],
+                 'ABSENT': [np.nan] * 6}
+    references = {'FLAT': [np.nan, 0.0, 0.0, 0.0, 0.0, 0.0],
+                  'MOVING': [np.nan, 0.10, 0.10, 0.0, 0.0, 0.10],
+                  'RAGGED': [np.nan, np.nan, np.nan, 0.0, 0.10, 0.0],
+                  'MISSING': [np.nan, 0.0, np.nan, np.nan, 0.10, 0.0],
+                  'ABSENT': [np.nan] * 6}
+    prices = pd.DataFrame({f'{kind}_{currency}': values
+                           for kind, values in histories.items() for currency in ['USD', 'CHF']},
+                          index=dates, dtype='Float64' if nullable else float)
+    expected_total = pd.DataFrame({f'{kind}_{currency}': values
+                                   for kind, values in references.items()
+                                   for currency in ['USD', 'CHF']},
+                                  index=dates, dtype='Float64' if nullable else float)
+    # The cross-currency kernel forward-fills asset prices before conversion; same-ccy does not.
+    expected_total.loc[dates[2:4], 'MISSING_CHF'] = 0.0
+    currencies = pd.Series({asset: asset.rsplit('_', 1)[1] for asset in prices.columns})
+    hedges = pd.Series(0.0, index=prices.columns)
+    frequency = pd.Series('ME', index=prices.columns) if per_asset_frequency else 'ME'
+    data = FxRatesData(pd.DataFrame({'USD': 1.0, 'CHF': 1.0}, index=dates),
+                       pd.DataFrame({'USD': 0.12, 'CHF': 0.12}, index=dates))
+    original = prices.copy(deep=True)
+    original_currencies = currencies.copy(deep=True)
+    original_hedges = hedges.copy(deep=True)
+
+    for excess in [False, True]:
+        expected = np.log1p(expected_total) if is_log else expected_total.copy()
+        if excess:
+            expected -= np.log1p(0.01) if is_log else 0.01
+        for replace_zero in [False, True]:
+            actual = data.compute_fx_adjusted_returns(
+                prices, hedges, currencies, freq=frequency, is_log_returns=is_log,
+                is_excess_returns=excess, zero_return_to_nan=replace_zero)['ME']
+            # Replacement is a separate, post-valuation policy on the final return space.
+            selected = expected.replace({0.0: np.nan}) if replace_zero else expected
+            pd.testing.assert_frame_equal(actual, selected, rtol=1e-13, atol=1e-14)
+        _, direct = data.compute_returns_in_reference_ccy(
+            prices, hedges, currencies, 'USD', is_log_returns=is_log, is_excess_returns=excess)
+        pd.testing.assert_frame_equal(direct, expected, rtol=1e-13, atol=1e-14)
+    pd.testing.assert_frame_equal(prices, original)
+    pd.testing.assert_series_equal(currencies, original_currencies)
+    pd.testing.assert_series_equal(hedges, original_hedges)
+
+
+@pytest.mark.filterwarnings('error')
+@pytest.mark.parametrize('is_log', [False, True])
+def test_compute_performance_of_local_ccy_asset_in_reference_ccy_retains_hedged_zeros(
+        is_log: bool) -> None:
+    """A principal hedge can produce real zeros even while the FX quote moves."""
+    data, _ = _market()
+    prices = pd.Series([100.0, 100.0, 100.0, 110.0, 110.0, 110.0],
+                       index=data.fx_spots.index, name='ASSET')
+    data.domestic_rates.loc[:, :] = 0.12
+    # Equal deposit rates imply F = opening spot. The sold opening principal offsets only
+    # spot changes on that principal; the local gain remains exposed to terminal spot.
+    initial = prices.shift(1) * data.fx_spots['CHF'].shift(1)
+    terminal = (prices * data.fx_spots['CHF']
+                + prices.shift(1) * (data.fx_spots['CHF'].shift(1) - data.fx_spots['CHF']))
+    simple = (terminal / initial - 1.0).rename(prices.name)
+    expected = np.log1p(simple) if is_log else simple
+    _, actual = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
+        prices, 1.0, 'CHF', 'USD', is_log_returns=is_log)
+    pd.testing.assert_series_equal(actual, expected, rtol=1e-13, atol=1e-14)
+
+
 @pytest.mark.parametrize('is_log', [False, True])
 @pytest.mark.parametrize('currency', ['USD', 'CHF'])
 def test_leading_missing_prices_preserve_return_support(is_log: bool, currency: str) -> None:

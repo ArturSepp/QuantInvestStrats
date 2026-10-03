@@ -397,6 +397,8 @@ class FxRatesData:
         Calculate hedged asset performance in reference currency.
 
         Returns NAV and returns adjusted for hedge ratio and forward costs.
+        Valid zero total returns remain observations and accrue cash in excess
+        returns. Inception without a preceding price stays missing.
 
         When ``is_excess_returns=True``, arithmetic excess is ``R - cash``;
         log excess is ``log1p(R) - log1p(cash)``, the log return relative to cash.
@@ -410,7 +412,7 @@ class FxRatesData:
         if local_ccy == reference_ccy:
             local_return = qis.to_returns(
                 prices=asset_price_local_ccy, freq=freq,
-                is_log_returns=is_log_returns, is_first_zero=True)
+                is_log_returns=is_log_returns)
 
         else:
             local_to_reference_fx_rate = self.get_local_to_reference_fx_rate(
@@ -426,31 +428,10 @@ class FxRatesData:
                 forward_rate_for_local_ccy=forward_rate_for_local_ccy,
                 freq=freq,
                 is_log_returns=is_log_returns)
-
-        # The first valid period(s) are a SYNTHETIC zero — both branches force
-        # the inception return to 0 (same-ccy via is_first_zero=True; cross-ccy
-        # via hedged_return.iloc[0] = 0.0) to anchor the NAV at 1.0. There is
-        # no real price observation there. In the total-return path
-        # this synthetic 0 is harmless and is dropped downstream. In the
-        # excess path, ``0 - rf = -rf`` turns the synthetic head into a
-        # genuine non-zero value that then survives every NaN-dropping step,
-        # so the excess panel gains a spurious leading -rf observation.
-        #
-        # The synthetic zero sits at the FIRST VALID index of local_return,
-        # which is NOT necessarily index[0]: when the asset price has leading
-        # NaNs (inception later than the panel/FX grid), to_returns places the
-        # forced 0 at the asset's first real date, after a NaN gap. So locate
-        # the leading run of synthetic zeros starting from the first non-NaN
-        # observation, and mask it to NaN in BOTH return spaces so the total
-        # and excess panels carry identical observation support. The NAV still
-        # anchors at 1.0 via returns_to_nav (leading NaN treated as start).
-        nz = local_return.to_numpy()
-        start = 0
-        while start < len(nz) and np.isnan(nz[start]):  # skip leading NaN gap
-            start += 1
-        k = start
-        while k < len(nz) and nz[k] == 0.0:             # leading run of synthetic zeros
-            k += 1
+            # Only the kernel's forced first-index zero is synthetic; subsequent zeros
+            # can be real returns. Mask before cash subtraction to avoid spurious funding.
+            if not local_return.empty:
+                local_return.iloc[0] = np.nan
 
         if is_excess_returns:
             ref_rate = self._get_period_cash_returns(
@@ -458,8 +439,6 @@ class FxRatesData:
                 freq=freq, is_log_returns=is_log_returns,
                 cash_rate_lag=cash_rate_lag)
             local_return = local_return - ref_rate
-        if k > start:
-            local_return.iloc[start:k] = np.nan
         local_nav = qis.returns_to_nav(returns=local_return, is_log_returns=is_log_returns)
         return local_nav, local_return
 
