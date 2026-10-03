@@ -9,6 +9,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Reject missing, duplicate, misaligned, non-finite or invalid variance/probability/moment inputs
+  in `qis.regimes.compute_regime_mixture_covar` before covariance arithmetic. Preserve valid
+  labeled inputs, zero variances, supplied probabilities and native floating-point roundoff;
+  reject arithmetic that cannot produce a finite covariance without projecting the result.
 - Keep per-cell colours aligned when a table omits its index column, including stable
   strategy colours across years in `plot_sorted_periodic_returns`. Return values and
   rankings are unchanged.
