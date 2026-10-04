@@ -1,4 +1,4 @@
-"""Tests for the strategy factsheet's long-history monthly-return appendix."""
+"""Tests for strategy factsheet conventions, attribution, and rendered page layouts."""
 
 import inspect
 
@@ -608,3 +608,74 @@ def test_brinson_page_uses_requested_layout_titles_and_regime_backgrounds() -> N
             assert ax.patches
     finally:
         plt.close('all')
+
+
+@pytest.mark.parametrize('cost', [0.0, 0.002], ids=['zero-cost', 'trading-costs'])
+@pytest.mark.parametrize(
+    ('is_net', 'backtest_name', 'basis'),
+    [(None, 'Cost-bearing report', 'Gross'), (False, None, 'Gross'),
+     (True, 'Cost-bearing report', 'Net')],
+    ids=['default-gross', 'explicit-gross-unnamed', 'explicit-net'],
+)
+def test_generate_strategy_benchmark_factsheet_labels_brinson_trading_cost_basis(
+        monkeypatch, cost: float, is_net, backtest_name, basis: str,
+) -> None:
+    """The visible basis must follow the existing option, even when costs are zero."""
+    from qis.portfolio.tests.brinson_wrapper_test import make_portfolios
+
+    strategy, benchmark = make_portfolios(cost)
+    multi = qis.MultiPortfolioData(
+        [strategy, benchmark], benchmark_prices=strategy.prices[['SEQ_US']],
+    )
+    expected = {}
+    for net in (False, True):
+        wealth = []
+        for portfolio in (strategy, benchmark):
+            contributions = portfolio.instrument_pnl.iloc[1:]
+            if net:
+                # Trading costs use preceding NAV; opening costs belong to the NAV baseline.
+                contributions = contributions - portfolio.realized_costs.div(
+                    portfolio.nav.shift(1), axis=0,
+                ).iloc[1:]
+            wealth.append((1.0 + contributions.sum(axis=1)).prod())
+        expected[net] = wealth[0] - wealth[1]
+    nav_difference = (strategy.nav.iloc[-1] / strategy.nav.iloc[0]
+                      - benchmark.nav.iloc[-1] / benchmark.nav.iloc[0])
+    assert expected[True] == pytest.approx(nav_difference, abs=1e-12)
+    if cost:
+        assert abs(expected[False] - expected[True]) > 0.03
+    else:
+        assert expected[False] == pytest.approx(expected[True], abs=1e-12)
+
+    calls = []
+    original_compute = multi.compute_brinson_attribution
+
+    def capture_attribution(**kwargs):
+        result = original_compute(**kwargs)
+        calls.append((kwargs['is_net'], result[0].loc['Total Sum', 'Total\nActive']))
+        return result
+
+    monkeypatch.setattr(multi, 'compute_brinson_attribution', capture_attribution)
+    options = {} if is_net is None else {'is_net': is_net}
+    figs = generate_strategy_benchmark_factsheet_plt(
+        multi_portfolio_data=multi, backtest_name=backtest_name,
+        regime_classifier=qis.BenchmarkReturnsQuantilesRegime(freq='ME'), **options,
+    )
+    try:
+        page = figs[1]
+        page.canvas.draw()
+        assert len(figs) == 2
+        assert len(page.axes) == 6
+        net = bool(is_net)
+        assert calls == [(net, pytest.approx(expected[net], abs=1e-12))]
+        assert page._suptitle.get_text() == (
+            f'{backtest_name or ""} Brinson performance attribution report\n'
+            f'{basis} of realised trading costs. '
+            'Interaction returns added 100% to instrument selection'
+        )
+        title_bounds = page._suptitle.get_window_extent(page.canvas.get_renderer())
+        assert page.bbox.contains(title_bounds.x0, title_bounds.y0)
+        assert page.bbox.contains(title_bounds.x1, title_bounds.y1)
+    finally:
+        for fig in figs:
+            plt.close(fig)

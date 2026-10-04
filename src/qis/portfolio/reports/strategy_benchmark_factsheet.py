@@ -78,6 +78,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     separate report from :func:`generate_multi_portfolio_factsheet`, which compares strategies that
     share no common weights.
 
+    The Brinson page labels its realised-trading-cost basis: gross by default, or net when
+    ``is_net=True`` is passed through ``kwargs``. This option does not attribute management
+    fees, funding or other cash flows absent from instrument P&L.
+
     Args:
         multi_portfolio_data: the portfolios, strategy and benchmark among them
         strategy_idx: position of the strategy within ``multi_portfolio_data``
@@ -310,8 +314,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         with sns.axes_style("darkgrid"):
             fig1 = plt.figure(figsize=figsize, constrained_layout=True)
             this_name = backtest_name if backtest_name is not None else ''
+            cost_basis = 'Net' if kwargs.get('is_net', False) else 'Gross'
             fig1.suptitle(
                 f'{this_name} Brinson performance attribution report\n'
+                f'{cost_basis} of realised trading costs. '
                 'Interaction returns added 100% to instrument selection',
                 fontweight='bold', fontsize=8, color='blue')
             figs.append(fig1)
