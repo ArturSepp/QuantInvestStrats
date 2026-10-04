@@ -9,6 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Label the Brinson page in `generate_strategy_benchmark_factsheet_plt` as gross of realised
+  trading costs by default, or net when the existing `is_net=True` keyword is supplied.
+  Attribution calculations, defaults and interaction treatment are unchanged.
 - Reject missing, duplicate, misaligned, non-finite or invalid variance/probability/moment inputs
   in `qis.regimes.compute_regime_mixture_covar` before covariance arithmetic. Preserve valid
   labeled inputs, zero variances, supplied probabilities and native floating-point roundoff;
