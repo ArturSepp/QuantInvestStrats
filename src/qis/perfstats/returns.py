@@ -269,13 +269,14 @@ def to_total_returns(prices: Union[pd.Series, pd.DataFrame]) -> pd.Series:
         prices: Price time series. Valid uniquely dated histories are interpreted chronologically
 
     Returns:
-        Series of total returns indexed by asset
+        Series of total returns indexed by DataFrame columns or the input Series name
+        (0 when unnamed). A Series input also retains its name on the result.
     """
     total_returns = compute_total_return(prices=prices)
     if isinstance(prices, pd.DataFrame):
         total_returns = pd.Series(total_returns, index=prices.columns)
     elif isinstance(prices, pd.Series):
-        total_returns = pd.Series(total_returns, name=prices.name)
+        total_returns = pd.Series(total_returns, index=prices.to_frame().columns, name=prices.name)
     else:
         raise NotImplementedError(f"{type(prices)}")
 
