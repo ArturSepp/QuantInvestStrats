@@ -846,6 +846,32 @@ def compute_ewm_covar_tensor(a: np.ndarray,
 
 
 @njit
+def _compute_ewm_corr_top_row(a: np.ndarray,
+                            span: Optional[int] = None,
+                            ewm_lambda: float = 0.94) -> np.ndarray:
+    """Zero-seeded top-row history with the canonical whole-matrix normalization.
+
+    The full current covariance remains necessary: even an unrequested entry can determine
+    the normalizer's variance tolerance. Only its time history is reduced, to shape (t, 1, n).
+    """
+    if span is not None:
+        _validate_ewm_parameter(value=span, is_span=True)
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    else:
+        _validate_ewm_parameter(value=ewm_lambda, is_span=False)
+
+    t, n = a.shape
+    last_covar = np.zeros((n, n))
+    output = np.empty((t, 1, n))
+    for idx in range(t):
+        last_covar, _ = _covar_update(last_covar, np.outer(a[idx], a[idx]), ewm_lambda,
+                                     NanBackfill.DEFLATED_FFILL)
+        correlation, _, _ = npo._covar_to_corr_array(last_covar)
+        output[idx, 0] = correlation[0]
+    return output
+
+
+@njit
 def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
                                               span: Union[int, np.ndarray] = None,
                                               ewm_lambda: float = 0.94,
