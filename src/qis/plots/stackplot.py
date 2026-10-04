@@ -47,6 +47,9 @@ def plot_stack(df: pd.DataFrame,
                ) -> plt.Figure:
     """Plot DataFrame columns as stacked areas or stacked bars.
 
+    Total lines and total legend titles sum observed components. An all-missing row has an
+    undefined total, not zero.
+
     Args:
         df: Numeric values to stack. Nullable floating columns are supported; stacked-area
             rendering represents their missing values as NumPy ``nan``.
@@ -98,7 +101,7 @@ def plot_stack(df: pd.DataFrame,
     ax.set_xlim(re_indexed_data.index[0], re_indexed_data.index[-1])
 
     if add_total_line:  # add total as line
-        totals = re_indexed_data.sum(axis=1)
+        totals = re_indexed_data.sum(axis=1, min_count=1)
         sns.lineplot(x=re_indexed_data.index, y=totals, marker='None', color='black', ax=ax)
         # legend_labels.append('Total')
         colors.append('black')
@@ -164,7 +167,9 @@ def plot_stack(df: pd.DataFrame,
                                                  legend_stats=legend_stats,
                                                  var_format=var_format)
             if legend_stats in [put.LegendStats.LAST, put.LegendStats.FIRST_LAST_NON_ZERO]:
-                legend_title = f"Total: last={var_format.format(re_indexed_data.sum(axis=1).iloc[-1])}"
+                totals = re_indexed_data.sum(axis=1, min_count=1)
+                last_total = put._get_indexed_legend_endpoint(totals, np.nan)
+                legend_title = f"Total: last={var_format.format(last_total)}"
 
         put.set_legend(ax=ax,
                        labels=legend_labels,
