@@ -164,7 +164,8 @@ description; examples that need a Bloomberg terminal are flagged inline.
 9. [Changelog](#changelog)
 10. [License](#license)
 11. [Disclaimer](#disclaimer)
-12. [Citation](#citation)
+12. [Acknowledgments](#acknowledgments)
+13. [Citation](#citation)
 
 
 ## Installation <a name="installation"></a>
@@ -472,6 +473,11 @@ There are a number of requirements:
 - Each submodule has a unit test for core functions and a localised entry point to core functions.
 
 - Avoid "super" pythonic constructions. Readability is the priority.
+
+## Acknowledgments
+
+- [John D. Reynolds](https://github.com/JohnDReynolds), for multiple contributions to numerical
+  correctness, performance, reporting, and regression test coverage in QIS.
 
 ## Citation
 
