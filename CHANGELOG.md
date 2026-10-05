@@ -28,6 +28,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Preserve caller-owned DataFrame indexes when `save_df_to_excel` or
   `save_df_dict_to_excel(..., delocalize=True)` removes timezone information for Excel.
   Workbook local wall-clock timestamps, transpose and append behavior are unchanged.
+- Leave caller-owned figures and returned pages open in
+  `generate_strategy_signal_factsheet_by_instrument` and in
+  `generate_strategy_benchmark_factsheet_plt(..., add_exposures_comp=True)`.
+  Report contents and page order are unchanged; callers close figures after use.
 - Return NaN betas in `qis.regimes.compute_regime_ewm_betas` for constant within-regime
   benchmarks, zero EWMA benchmark variance, or assets with no observations in a regime,
   without invalid-division warnings. Return NaN residual variance when no fitted residual remains,

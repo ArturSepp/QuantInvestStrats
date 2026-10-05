@@ -149,7 +149,23 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                                                      regime_classifier: BenchmarkReturnsQuantilesRegime = None,
                                                      **kwargs
                                                      ) -> List[plt.Figure]:
+    """Plot signal, volatility, leverage and weight histories for each instrument.
 
+    Args:
+        strategy_signal_data: aligned strategy histories to display
+        time_period: reporting window; None uses the full history
+        figsize: page size in inches
+        fontsize: base font size
+        regime_classifier: benchmark-return regimes used for background shading
+        **kwargs: additional plotting options
+
+    Returns:
+        Open figures in instrument order. The caller closes them after display or saving;
+        unrelated figures are left open.
+
+    Raises:
+        ValueError: if strategy_signal_data is None
+    """
     if strategy_signal_data is None:
         raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
 
@@ -165,6 +181,7 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                        markersize=1,
                        framealpha=0.75)
     kwargs = qis.update_kwargs(kwargs, plot_kwargs)
+    # Returned pages stay caller-managed; global cleanup would also close unrelated figures.
     figs = []
     for instrument in strategy_signal_data.signal:
         with sns.axes_style('darkgrid'):
@@ -214,5 +231,4 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                                desc_table_type=None,
                                ax=axs[idx][1],
                                **kwargs)
-            plt.close('all')
     return figs

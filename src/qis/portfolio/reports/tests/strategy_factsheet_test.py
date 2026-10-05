@@ -5,6 +5,7 @@ import inspect
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib._pylab_helpers import Gcf
 import numpy as np
 import pandas as pd
 import pytest
@@ -25,6 +26,41 @@ from qis.portfolio.reports.multi_assets_factsheet import (
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 from qis.portfolio.reports import strategy_factsheet
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
+from qis.portfolio.signal_data import StrategySignalData
+
+
+@pytest.fixture
+def report_figure_cleanup():
+    """Clean partial reports after exceptions without closing pre-existing test figures."""
+    existing_managers = set(Gcf.get_all_fig_managers())
+    yield
+    for manager in Gcf.get_all_fig_managers():
+        if manager not in existing_managers:
+            plt.close(manager.canvas.figure)
+
+
+def _make_signal_data(n_assets: int) -> StrategySignalData:
+    """Provide nonconstant offline panels for every signal-factsheet row."""
+    rng = np.random.default_rng(159)
+    index = pd.bdate_range('2024-01-02', periods=260)
+    values = pd.DataFrame(rng.normal(0.0, 0.01, (len(index), n_assets)), index=index,
+                          columns=[f'Instrument {idx + 1}' for idx in range(n_assets)])
+    return StrategySignalData(
+        log_returns=values, signal=values * 10, instrument_vols=values.abs() + 0.1,
+        instrument_target_vols=values.abs() + 0.2,
+        instrument_target_signal_vol_weights=values,
+        instrument_portfolio_leverages=values + 1.0, weights=values + 0.5,
+    )
+
+
+def _assert_live_figures(figures) -> None:
+    """A closed Figure can still draw; registration must retain the same object too."""
+    for figure in figures:
+        manager = Gcf.get_fig_manager(figure.number)
+        assert manager is not None
+        # A later page can reuse a closed figure's number, hiding the loss of the original.
+        assert manager.canvas.figure is figure
+        figure.canvas.draw()
 
 
 def _make_portfolio_data(
@@ -54,6 +90,115 @@ def test_monthly_returns_summary_defaults() -> None:
     assert heatmap_parameters['fontsize'].default == 5
     assert 'heatmap_fontsize' not in strategy_parameters
     assert 'heatmap_fontsize' not in benchmark_parameters
+
+
+@pytest.mark.parametrize('n_assets', [1, 2], ids=['single-instrument', 'multiple-instruments'])
+def test_generate_strategy_signal_factsheet_by_instrument_preserves_figures(
+        n_assets: int, report_figure_cleanup,
+) -> None:
+    """Interactive callers must retain their figures and every instrument page."""
+    data = _make_signal_data(n_assets)
+    sentinel = plt.figure()
+
+    figures = qis.generate_strategy_signal_factsheet_by_instrument(data, time_period=None)
+
+    assert len(figures) == n_assets
+    assert [figure._suptitle.get_text() for figure in figures] == list(data.signal.columns)
+    assert all(len(figure.axes) == 14 for figure in figures)
+    _assert_live_figures([sentinel, *figures])
+
+
+@pytest.mark.parametrize(
+    ('exposures', 'brinson', 'facade', 'page_count'),
+    [(False, False, False, 1), (True, False, False, 3),
+     (True, True, False, 4), (True, False, True, 3)],
+    ids=['base-page', 'exposure-pages', 'brinson-and-exposures', 'facade-exposure-pages'],
+)
+def test_generate_strategy_benchmark_factsheet_plt_preserves_figures(
+        exposures: bool, brinson: bool, facade: bool, page_count: int, report_figure_cleanup,
+) -> None:
+    """Exposure-page cleanup must not close earlier report pages or caller figures."""
+    strategy, prices = _make_portfolio_data(n_assets=2, n_years=3)
+    benchmark, _ = _make_portfolio_data(n_assets=2, n_years=3)
+    benchmark.set_ticker('Benchmark Portfolio')
+    multi = qis.MultiPortfolioData([strategy, benchmark], benchmark_prices=prices)
+    sentinel = plt.figure()
+    options = dict(add_exposures_comp=exposures, add_brinson_attribution=brinson,
+                   is_grouped=False)
+
+    if facade:
+        figures = qis.factsheet(multi, kind='strategy_benchmark', add_rates_data=False, **options)
+    else:
+        figures = generate_strategy_benchmark_factsheet_plt(multi, **options)
+
+    assert len(figures) == page_count
+    assert len(figures[0].axes) == 14
+    if exposures:
+        assert [figure._suptitle.get_text() for figure in figures[-2:]] == [
+            f'{instrument} Exposures and Two-sided Turnover' for instrument in strategy.prices
+        ]
+        assert all(len(figure.axes) == 2 for figure in figures[-2:])
+    _assert_live_figures([sentinel, *figures])
+
+
+@pytest.mark.parametrize('report', ['signal', 'benchmark'])
+def test_factsheet_generators_preserve_caller_figures_after_later_plot_error(
+        report: str, monkeypatch, report_figure_cleanup,
+) -> None:
+    """A caller figure created between iterations must survive a later renderer failure."""
+    sentinel = plt.figure()
+    caller_figures = [sentinel]
+    error = RuntimeError('later instrument renderer failed')
+    if report == 'signal':
+        data = _make_signal_data(2)
+        original_plot = qis.plot_histogram
+        calls = 0
+
+        def plot_until_second_instrument(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 8:
+                raise error
+            result = original_plot(*args, **kwargs)
+            if calls == 7:
+                # The first page is complete: this figure belongs to a callback, not the report.
+                caller_figures.append(plt.figure())
+            return result
+
+        monkeypatch.setattr(qis, 'plot_histogram', plot_until_second_instrument)
+
+        def generate():
+            qis.generate_strategy_signal_factsheet_by_instrument(data, time_period=None)
+    else:
+        strategy, prices = _make_portfolio_data(n_assets=2, n_years=3)
+        benchmark, _ = _make_portfolio_data(n_assets=2, n_years=3)
+        benchmark.set_ticker('Benchmark Portfolio')
+        multi = qis.MultiPortfolioData([strategy, benchmark], benchmark_prices=prices)
+        original_plot = qis.plot_time_series
+        completed_exposure_page = False
+
+        def plot_until_second_instrument(*args, **kwargs):
+            nonlocal completed_exposure_page
+            if completed_exposure_page and kwargs.get('title') == 'Exposures':
+                raise error
+            result = original_plot(*args, **kwargs)
+            if kwargs.get('title') == 'Two-sided Turnover':
+                completed_exposure_page = True
+                caller_figures.append(plt.figure())
+            return result
+
+        monkeypatch.setattr(qis, 'plot_time_series', plot_until_second_instrument)
+
+        def generate():
+            generate_strategy_benchmark_factsheet_plt(
+                multi, add_brinson_attribution=False, add_exposures_comp=True, is_grouped=False,
+            )
+
+    with pytest.raises(RuntimeError) as caught:
+        generate()
+    assert caught.value is error
+    assert len(caller_figures) == 2
+    _assert_live_figures(caller_figures)
 
 
 def test_recent_ra_perf_table_start_date_public_defaults() -> None:
