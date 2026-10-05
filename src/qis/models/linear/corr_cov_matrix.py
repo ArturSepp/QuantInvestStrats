@@ -6,8 +6,8 @@ returns taken at ``returns_freq``, sampled on a ``rebalancing_freq`` schedule, o
 rebalancing date and annualised unless ``apply_an_factor`` is False. ``compute_masked_covar_corr``
 is the single-matrix path for a ragged panel - each pair is computed on the observations both
 series have, about the means of that overlap, which uses all the data and is not guaranteed
-positive semi-definite. ``compute_ewm_corr_df`` unstacks the correlation tensor into one column
-per pair, with ``CorrMatrixOutput`` choosing which pairs come back.
+positive semi-definite. ``compute_ewm_corr_df`` returns one correlation path per requested pair,
+with ``CorrMatrixOutput`` choosing which pairs come back.
 
 ``span`` is in units of ``returns_freq``, not days, and the estimation and rebalancing frequencies
 are separate arguments because one sets the sampling error and the other the turnover. The
@@ -299,6 +299,8 @@ def compute_ewm_corr_df(df: pd.DataFrame,
     Runs ``S_t = lambda S_{t-1} + (1 - lambda) x_t x_t'`` on the rows of ``df`` without removing
     a mean, from the seed ``init_value``, and normalises each matrix to a correlation. With the
     default zero seed the first row is the sign of ``x_i x_j``, so the path needs a warm-up.
+    For float32/float64 data, scalar smoothing and no explicit seed, ``TOP_ROW`` stores only the
+    requested row's history, while retaining the full current covariance for normalization.
 
     Args:
         df: returns, rows are dates and columns are assets
@@ -313,14 +315,25 @@ def compute_ewm_corr_df(df: pd.DataFrame,
     Returns:
         the correlation paths, indexed like ``df``
     """
-    if init_value is None:
+    default_seed = init_value is None
+    if default_seed:
         init_value = ewm.set_init_dim2(data=df.to_numpy(), init_type=init_type)
 
-    corr = ewm.compute_ewm_covar_tensor(a=df.to_numpy(),
-                                        span=span,
-                                        ewm_lambda=ewm_lambda,
-                                        is_corr=True,
-                                        covar0=init_value)
+    values = df.to_numpy()
+    scalar_types = (int, float, np.integer, np.floating)
+    # Unrequested pairs can determine the global normalization tolerance, so omit
+    # their history, not the full current covariance state.
+    if (corr_matrix_output == CorrMatrixOutput.TOP_ROW and default_seed
+            and values.shape[1] > 1 and values.dtype in (np.dtype('float32'), np.dtype('float64'))
+            and isinstance(ewm_lambda, scalar_types)
+            and (span is None or isinstance(span, scalar_types))):
+        corr = ewm._compute_ewm_corr_top_row(a=values, span=span, ewm_lambda=ewm_lambda)
+    else:
+        corr = ewm.compute_ewm_covar_tensor(a=values,
+                                          span=span,
+                                          ewm_lambda=ewm_lambda,
+                                          is_corr=True,
+                                          covar0=init_value)
     corr_ijs = []
     for idx_i, column_i in enumerate(df.columns):
         if corr_matrix_output == CorrMatrixOutput.SUB_TOP and idx_i == 0:  # skip for idx_i = 0

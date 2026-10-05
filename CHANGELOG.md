@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Reduce memory use in `compute_ewm_corr_df(..., corr_matrix_output=CorrMatrixOutput.TOP_ROW)`
+  for float32/float64 panels with scalar smoothing and no explicit seed by storing only the top-row
+  history. Whole-matrix normalization, results and other correlation modes are unchanged.
+
 ### Fixed
 
 - Label the Brinson page in `generate_strategy_benchmark_factsheet_plt` as gross of realised
