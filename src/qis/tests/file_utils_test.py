@@ -5,10 +5,12 @@ Uses tmp_path so tests never touch the configured RESOURCE_PATH / OUTPUT_PATH.
 """
 
 import importlib.util
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 import pytest
+from openpyxl import load_workbook
 
 import qis.file_utils as fu
 
@@ -245,6 +247,126 @@ class TestSaveDfDictToExcel:
             fu.save_df_dict_to_excel(datasets={'a': None, 'b': None},
                                      file_name='t',
                                      local_path=str(tmp_path))
+
+
+def _excel_ownership_frame(timezone):
+    """Mix nullable and ordinary values so serialization cannot hide input changes.
+
+    Args:
+        timezone: Timezone of the caller's index, or None for the naive control.
+
+    Returns:
+        A dated frame with named axes and nested provenance metadata.
+    """
+    frame = pd.DataFrame(
+        {'nullable': pd.array([1, pd.NA, 3], dtype='Float64'), 'value': [1.5, np.nan, -2.0]},
+        index=pd.date_range('2024-01-01', periods=3, tz=timezone, name='timestamp'),
+    )
+    frame.columns.name = 'asset'
+    frame.attrs = {'source': {'kind': 'synthetic'}}
+    return frame
+
+
+@pytest.mark.parametrize('timezone', ['UTC', 'US/Eastern', None])
+@pytest.mark.parametrize('shape, transpose', [
+    ('direct', False), ('list', False), ('dict', False), ('dedicated-dict', False),
+    ('direct', True), ('list', True), ('dict', True),
+])
+def test_save_df_to_excel_preserves_inputs_and_wall_clock_output(
+    tmp_path, timezone, shape, transpose,
+):
+    """Excel loses timezone information, but saving must not change reusable input frames."""
+    frame = _excel_ownership_frame(timezone)
+    before = frame.copy(deep=True)
+    caller_index = frame.index
+    # Reusing one frame on two sheets exercises aliases through the complete preparation loop.
+    data = frame if shape == 'direct' else (
+        [frame, frame] if shape == 'list' else {'one': frame, 'two': frame}
+    )
+    if shape == 'dedicated-dict':
+        path = fu.save_df_dict_to_excel(data, 'ownership', str(tmp_path), delocalize=True)
+    else:
+        path = fu.save_df_to_excel(data, 'ownership', str(tmp_path), transpose=transpose)
+
+    pd.testing.assert_frame_equal(frame, before, check_exact=True)
+    assert frame.index is caller_index
+    assert frame.attrs == {'source': {'kind': 'synthetic'}}
+    # Independent Excel inspection checks local wall time, not UTC conversion, and the complete
+    # sheet layout. The nullable missing value must remain an empty cell in either orientation.
+    dates = tuple(datetime(2024, 1, 1) + timedelta(days=i) for i in range(3))
+    expected = (
+        [('asset', *dates), ('nullable', 1, None, 3), ('value', 1.5, None, -2)]
+        if transpose else
+        [('timestamp', 'nullable', 'value'), (dates[0], 1, 1.5),
+         (dates[1], None, None), (dates[2], 3, -2)]
+    )
+    book = load_workbook(path)
+    try:
+        expected_names = ['Sheet1'] if shape == 'direct' else (
+            ['Sheet 1', 'Sheet 2'] if shape == 'list' else ['one', 'two']
+        )
+        assert book.sheetnames == expected_names
+        for sheet in book.worksheets:
+            assert list(sheet.values) == expected
+    finally:
+        book.close()
+
+
+@pytest.mark.parametrize('dedicated', [False, True])
+def test_save_df_to_excel_preserves_input_when_writer_cannot_open(tmp_path, monkeypatch, dedicated):
+    """Normalization happens before writer construction, so rejection must preserve the caller."""
+    frame = _excel_ownership_frame('US/Eastern')
+    before = frame.copy(deep=True)
+    caller_index = frame.index
+
+    def unavailable_writer(*args, **kwargs):
+        raise OSError('workbook is not writable')
+
+    monkeypatch.setattr(pd, 'ExcelWriter', unavailable_writer)
+    with pytest.raises(OSError, match='not writable'):
+        if dedicated:
+            fu.save_df_dict_to_excel({'one': frame}, 'rejected', str(tmp_path), delocalize=True)
+        else:
+            fu.save_df_to_excel(frame, 'rejected', str(tmp_path))
+    pd.testing.assert_frame_equal(frame, before, check_exact=True)
+    assert frame.index is caller_index
+    assert frame.attrs == before.attrs
+
+
+@pytest.mark.parametrize('timezone', ['UTC', 'US/Eastern'])
+def test_save_df_dict_to_excel_keeps_timezone_rejection_without_delocalize(tmp_path, timezone):
+    """Owning a normalized frame must not silently enable the dedicated writer's opt-in."""
+    frame = _excel_ownership_frame(timezone)
+    before = frame.copy(deep=True)
+    with pytest.raises(ValueError, match='timezones'):
+        fu.save_df_dict_to_excel({'one': frame}, 'aware', str(tmp_path), delocalize=False)
+    pd.testing.assert_frame_equal(frame, before, check_exact=True)
+
+
+def test_save_df_to_excel_preserves_timezone_aware_series_coercion(tmp_path):
+    """Series promotion already owns its frame; preserve that accepted warning and index."""
+    series = _excel_ownership_frame('US/Eastern')['value']
+    before = series.copy(deep=True)
+    with pytest.warns(UserWarning, match='Series converted'):
+        fu.save_df_to_excel([series], 'series', str(tmp_path))
+    pd.testing.assert_series_equal(series, before, check_exact=True)
+
+
+def test_save_df_to_excel_preserves_timezone_aware_append(tmp_path):
+    """An appended sheet needs the same ownership boundary without replacing the first sheet."""
+    first = pd.DataFrame({'value': [7.0]}, index=['sentinel'])
+    fu.save_df_to_excel({'first': first}, 'append', str(tmp_path))
+    frame = _excel_ownership_frame('US/Eastern')
+    before = frame.copy(deep=True)
+    path = fu.save_df_to_excel({'second': frame}, 'append', str(tmp_path), mode='a')
+    pd.testing.assert_frame_equal(frame, before, check_exact=True)
+    book = load_workbook(path)
+    try:
+        assert book.sheetnames == ['first', 'second']
+        assert list(book['first'].values) == [(None, 'value'), ('sentinel', 7)]
+        assert book['second'].cell(2, 1).value == datetime(2024, 1, 1)
+    finally:
+        book.close()
 
 
 # ---------------------------------------------------------------------------
