@@ -15,6 +15,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Return NaN betas in `qis.regimes.compute_regime_ewm_betas` for constant within-regime
+  benchmarks or zero EWMA benchmark variance, without invalid-division warnings. Return NaN
+  residual variance when no fitted residual remains, rather than raising an indexing error;
+  identified groups and their pooled residual calculation are unchanged.
 - Label the Brinson page in `generate_strategy_benchmark_factsheet_plt` as gross of realised
   trading costs by default, or net when the existing `is_net=True` keyword is supplied.
   Attribution calculations, defaults and interaction treatment are unchanged.

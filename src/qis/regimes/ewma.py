@@ -72,7 +72,9 @@ def compute_regime_ewm_betas(sampled_returns_with_regime_id: pd.DataFrame,
     Returns:
         the betas, assets in rows and regimes in columns in bucket order, and the per-period
         residual variance of each asset, to be annualised by the caller; unlike ``idio_vol`` of
-        ``compute_regime_betas``, it is a variance and not annualised
+        ``compute_regime_betas``, it is a variance and not annualised. Betas are NaN for a
+        constant benchmark within a regime or a non-positive EWMA benchmark variance. These
+        fits contribute no residuals; residual variance is NaN when no fitted residual remains
     """
     data = sampled_returns_with_regime_id.dropna(subset=[regime_column])
     regimes = get_ordered_regimes(data[regime_column])
@@ -82,16 +84,21 @@ def compute_regime_ewm_betas(sampled_returns_with_regime_id: pd.DataFrame,
     for regime, block in data.groupby(regime_column, sort=False, observed=True):
         x = block[benchmark].to_numpy()
         xm = float(compute_ewm(data=block[benchmark], span=span, init_type=InitType.MEAN).iloc[-1])
+        # A constant stream can acquire spurious variance from rounding its EWMA mean.
+        if block[benchmark].nunique() < 2:
+            for asset in assets:
+                betas.setdefault(asset, {})[regime] = np.nan
+            continue
         for asset in assets:
             y = block[asset].to_numpy()
             ym = float(compute_ewm(data=block[asset], span=span, init_type=InitType.MEAN).iloc[-1])
             xy = np.stack([x - xm, y - ym], axis=1)
             covar = compute_ewm_covar(a=xy, span=span, covar0=(xy.T @ xy) / len(xy))
-            beta = float(covar[0, 1] / covar[0, 0])
+            beta = float(covar[0, 1] / covar[0, 0]) if covar[0, 0] > 0.0 else np.nan
             betas.setdefault(asset, {})[regime] = beta
             residuals.loc[block.index, asset] = y - (ym - beta * xm) - beta * x
     betas = pd.DataFrame(betas).T[regimes]
     idio_vars = residuals.apply(
-        lambda r: float(compute_ewm(data=r.dropna() ** 2, span=span,
-                                    init_type=InitType.MEAN).iloc[-1]))
+        lambda r: np.nan if r.isna().all() else float(compute_ewm(
+            data=r.dropna() ** 2, span=span, init_type=InitType.MEAN).iloc[-1]))
     return betas, idio_vars
