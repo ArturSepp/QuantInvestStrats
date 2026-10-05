@@ -81,6 +81,123 @@ def test_regime_ewm_betas_tend_to_the_ols_betas(monthly):
     assert (idio_vars > 0.0).all()
 
 
+@pytest.mark.parametrize('dtype', ['float64', 'Float64', 'float32', 'Float32'])
+@pytest.mark.parametrize('levels', [[-.03125, 0., .03125], [-.1, .1, .3]],
+                         ids=['binary-constants', 'decimal-mean-roundoff'])
+@pytest.mark.filterwarnings('error')
+def test_compute_regime_ewm_betas_returns_nan_for_constant_groups(dtype, levels):
+    """Occupied quantile buckets need not identify a slope within any bucket."""
+    benchmark = np.repeat(levels, [5, 20, 5])
+    panel = pd.DataFrame({'BM': benchmark, 'A': .5 * benchmark + np.arange(30) / 1000},
+                         index=pd.date_range('2020-01-31', periods=30, freq='ME')).astype(dtype)
+    sampled = create_sampled_returns_with_regime_id(panel, benchmark='BM')
+    before = sampled.copy(deep=True)
+    assert sampled.groupby('regime', observed=True)['BM'].nunique().tolist() == [1, 1, 1]
+    betas, idio_vars = compute_regime_ewm_betas(sampled, benchmark='BM')
+    pd.testing.assert_frame_equal(
+        betas, pd.DataFrame(np.nan, index=['A'], columns=['Bear', 'Normal', 'Bull']))
+    pd.testing.assert_series_equal(idio_vars, pd.Series(np.nan, index=['A']))
+    pd.testing.assert_frame_equal(sampled, before)
+
+
+@pytest.mark.parametrize('dtype', ['float64', 'Float64', 'float32', 'Float32'])
+@pytest.mark.parametrize('span', [2., 40., 1e9])
+@pytest.mark.filterwarnings('error')
+def test_compute_regime_ewm_betas_preserves_missing_assets_as_undefined(dtype, span):
+    """Missing streams have no beta; observed zeros and identified neighbors remain fitted."""
+    sampled = pd.DataFrame({'BM': [-.0625, -.03125, 0., .03125, .0625, .125]},
+                           index=pd.date_range('2020-01-31', periods=6, freq='ME')).astype(dtype)
+    sampled['Healthy'] = 2. * sampled['BM']
+    sampled['Cash'] = pd.Series(0., index=sampled.index, dtype=dtype)
+    sampled['Unavailable'] = pd.Series(np.nan, index=sampled.index, dtype=dtype)
+    sampled['Ragged'] = .5 * sampled['BM']
+    sampled.loc[sampled.index[:2], 'Ragged'] = np.nan
+    sampled['regime'] = pd.Categorical(['Bear', 'Bear', 'Normal', 'Normal', 'Bull', 'Bull'],
+                                        categories=['Bear', 'Normal', 'Bull'], ordered=True)
+    before = sampled.copy(deep=True)
+    betas, idio_vars = compute_regime_ewm_betas(sampled, 'BM', span=span)
+    expected = pd.DataFrame([[2., 2., 2.], [0., 0., 0.], [np.nan] * 3, [np.nan, .5, .5]],
+                            index=['Healthy', 'Cash', 'Unavailable', 'Ragged'],
+                            columns=['Bear', 'Normal', 'Bull'])
+    pd.testing.assert_frame_equal(betas, expected)
+    assert np.isnan(idio_vars['Unavailable'])
+    np.testing.assert_allclose(idio_vars[['Healthy', 'Cash', 'Ragged']], 0., atol=1e-28)
+    pd.testing.assert_frame_equal(sampled, before)
+
+
+def _regime_stream_weights(size, span):
+    """Closed-form weights include the stream-mean seed and every subsequent update."""
+    decay = 1. - 2. / (span + 1.)
+    return decay ** size / size + (1. - decay) * decay ** np.arange(size - 1, -1, -1)
+
+
+@pytest.mark.parametrize('dtype', ['float64', 'Float64', 'float32', 'Float32'])
+@pytest.mark.parametrize('regime_column', ['regime', 'state'])
+@pytest.mark.parametrize('single_observation', [False, True])
+@pytest.mark.filterwarnings('error')
+def test_compute_regime_ewm_betas_preserves_identified_neighbors(
+        dtype, regime_column, single_observation):
+    """One unidentified group must not erase healthy slopes or their pooled residual variance."""
+    sampled = pd.DataFrame({'BM': [.1, 0., .03125, .0625, .1, .125, .1875],
+                            'A': [.2, .003, .061, .128, .201, .254, .373],
+                            'Cash': [0.] * 7,
+                            'Ragged': [np.nan, 0., .015625, .03125, np.nan, .0625, .09375]},
+                           index=pd.date_range('2020-01-31', periods=7, freq='ME')).astype(dtype)
+    sampled[regime_column] = pd.Categorical(
+        ['Bear', 'Normal', 'Normal', 'Normal', 'Bear', 'Bull', 'Bull'],
+        categories=['Bull', 'Bear', 'Normal'], ordered=True)
+    if single_observation:
+        sampled = sampled.drop(sampled.index[4])
+    before = sampled.copy(deep=True)
+    assets = ['A', 'Cash', 'Ragged']
+    expected = pd.DataFrame(np.nan, index=assets, columns=['Bull', 'Bear', 'Normal'])
+    residuals = pd.DataFrame(np.nan, index=sampled.index, columns=assets)
+    for regime in ['Normal', 'Bull']:
+        block = sampled.loc[sampled[regime_column] == regime, ['BM', *assets]].astype(float)
+        weights = _regime_stream_weights(len(block), 40.)
+        x = block['BM'].to_numpy()
+        xm = weights @ x
+        for asset in assets:
+            y = block[asset].to_numpy()
+            ym = weights @ y
+            beta = (weights @ ((x - xm) * (y - ym))) / (weights @ ((x - xm) ** 2))
+            expected.loc[asset, regime] = beta
+            residuals.loc[block.index, asset] = y - (ym - beta * xm) - beta * x
+    expected_vars = residuals.apply(
+        lambda r: _regime_stream_weights(r.notna().sum(), 40.) @ r.dropna().to_numpy() ** 2)
+    actual, idio_vars = compute_regime_ewm_betas(sampled, 'BM', regime_column=regime_column)
+    tolerance = 1e-5 if '32' in dtype else 1e-11
+    pd.testing.assert_frame_equal(actual, expected, rtol=tolerance, atol=1e-12)
+    pd.testing.assert_series_equal(idio_vars, expected_vars, rtol=tolerance, atol=1e-12)
+    pd.testing.assert_frame_equal(sampled, before)
+
+
+@pytest.mark.parametrize('dtype', ['float64', 'Float64', 'float32', 'Float32'])
+@pytest.mark.parametrize('span', [2., 40., 1e9])
+@pytest.mark.filterwarnings('error')
+def test_compute_regime_ewm_betas_preserves_small_positive_variance(dtype, span):
+    """Two distinct nearby returns identify beta 2; a numerical tolerance must not reject them."""
+    spacing = 1e-5 if '32' in dtype else 1e-8
+    sampled = pd.DataFrame({'BM': [.1, .1 + spacing] * 6}).astype(dtype)
+    sampled['A'] = 2. * sampled['BM']
+    sampled['regime'] = pd.Categorical(['Low'] * 6 + ['High'] * 6,
+                                        categories=['Low', 'High'], ordered=True)
+    betas, idio_vars = compute_regime_ewm_betas(sampled, 'BM', span=span)
+    pd.testing.assert_frame_equal(betas, pd.DataFrame([[2., 2.]],
+                                                     index=['A'], columns=['Low', 'High']))
+    np.testing.assert_allclose(idio_vars, 0., atol=1e-28)
+
+
+@pytest.mark.filterwarnings('error')
+def test_compute_regime_ewm_betas_handles_zero_variance_at_span_one(monthly):
+    """Span one centres on the final observation, whose instantaneous covariance is zero."""
+    sampled = create_sampled_returns_with_regime_id(monthly, benchmark='BM')
+    betas, idio_vars = compute_regime_ewm_betas(sampled, 'BM', span=1.)
+    pd.testing.assert_frame_equal(
+        betas, pd.DataFrame(np.nan, index=['A', 'B', 'C'], columns=['Bear', 'Normal', 'Bull']))
+    pd.testing.assert_series_equal(idio_vars, pd.Series(np.nan, index=['A', 'B', 'C']))
+
+
 def test_gaussian_moments_obey_total_expectation_and_the_published_constants():
     """sum p m = mu and sum p S = sigma^2 + mu^2; Bear mean -1.521 sigma on the one-sigma cut."""
     for q in (None, [0.0, 0.1, 0.5, 0.9, 1.0], [0.0, 0.3, 1.0]):
