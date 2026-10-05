@@ -73,8 +73,9 @@ def compute_regime_ewm_betas(sampled_returns_with_regime_id: pd.DataFrame,
         the betas, assets in rows and regimes in columns in bucket order, and the per-period
         residual variance of each asset, to be annualised by the caller; unlike ``idio_vol`` of
         ``compute_regime_betas``, it is a variance and not annualised. Betas are NaN for a
-        constant benchmark within a regime or a non-positive EWMA benchmark variance. These
-        fits contribute no residuals; residual variance is NaN when no fitted residual remains
+        constant benchmark within a regime, a non-positive EWMA benchmark variance, or an asset
+        with no observations in that regime. These fits contribute no residuals; residual
+        variance is NaN when no fitted residual remains
     """
     data = sampled_returns_with_regime_id.dropna(subset=[regime_column])
     regimes = get_ordered_regimes(data[regime_column])
@@ -90,6 +91,9 @@ def compute_regime_ewm_betas(sampled_returns_with_regime_id: pd.DataFrame,
                 betas.setdefault(asset, {})[regime] = np.nan
             continue
         for asset in assets:
+            if block[asset].isna().all():
+                betas.setdefault(asset, {})[regime] = np.nan
+                continue
             y = block[asset].to_numpy()
             ym = float(compute_ewm(data=block[asset], span=span, init_type=InitType.MEAN).iloc[-1])
             xy = np.stack([x - xm, y - ym], axis=1)

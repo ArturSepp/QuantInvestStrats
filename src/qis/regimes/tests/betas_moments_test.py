@@ -100,6 +100,31 @@ def test_compute_regime_ewm_betas_returns_nan_for_constant_groups(dtype, levels)
     pd.testing.assert_frame_equal(sampled, before)
 
 
+@pytest.mark.parametrize('dtype', ['float64', 'Float64', 'float32', 'Float32'])
+@pytest.mark.parametrize('span', [2., 40., 1e9])
+@pytest.mark.filterwarnings('error')
+def test_compute_regime_ewm_betas_preserves_missing_assets_as_undefined(dtype, span):
+    """Missing streams have no beta; observed zeros and identified neighbors remain fitted."""
+    sampled = pd.DataFrame({'BM': [-.0625, -.03125, 0., .03125, .0625, .125]},
+                           index=pd.date_range('2020-01-31', periods=6, freq='ME')).astype(dtype)
+    sampled['Healthy'] = 2. * sampled['BM']
+    sampled['Cash'] = pd.Series(0., index=sampled.index, dtype=dtype)
+    sampled['Unavailable'] = pd.Series(np.nan, index=sampled.index, dtype=dtype)
+    sampled['Ragged'] = .5 * sampled['BM']
+    sampled.loc[sampled.index[:2], 'Ragged'] = np.nan
+    sampled['regime'] = pd.Categorical(['Bear', 'Bear', 'Normal', 'Normal', 'Bull', 'Bull'],
+                                        categories=['Bear', 'Normal', 'Bull'], ordered=True)
+    before = sampled.copy(deep=True)
+    betas, idio_vars = compute_regime_ewm_betas(sampled, 'BM', span=span)
+    expected = pd.DataFrame([[2., 2., 2.], [0., 0., 0.], [np.nan] * 3, [np.nan, .5, .5]],
+                            index=['Healthy', 'Cash', 'Unavailable', 'Ragged'],
+                            columns=['Bear', 'Normal', 'Bull'])
+    pd.testing.assert_frame_equal(betas, expected)
+    assert np.isnan(idio_vars['Unavailable'])
+    np.testing.assert_allclose(idio_vars[['Healthy', 'Cash', 'Ragged']], 0., atol=1e-28)
+    pd.testing.assert_frame_equal(sampled, before)
+
+
 def _regime_stream_weights(size, span):
     """Closed-form weights include the stream-mean seed and every subsequent update."""
     decay = 1. - 2. / (span + 1.)
