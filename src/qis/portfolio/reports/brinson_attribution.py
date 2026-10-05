@@ -83,7 +83,7 @@ def plot_brinson_attribution_table(
     active_total_cumsum = active_total.cumsum(axis=0)
     fig_active_total = pts.plot_time_series(
         df=active_total_cumsum,
-        var_format='{:.0%}',
+        var_format=var_format,
         title='Cumulative Active Attribution Effects',
         legend_stats=qis.LegendStats.LAST_NONNAN,
         ax=axs[1],
@@ -96,7 +96,7 @@ def plot_brinson_attribution_table(
         ).drop(columns=total_column, errors='ignore')
         fig_ts_final = pts.plot_time_series(
             df=grouped_active_return.cumsum(axis=0),
-            var_format='{:.0%}',
+            var_format=var_format,
             title='Total Cumulative Active Effects by Groups',
             legend_stats=qis.LegendStats.LAST_NONNAN,
             ax=axs[2],
@@ -112,7 +112,7 @@ def plot_brinson_attribution_table(
     cum_allocation_return = grouped_allocation_return.cumsum(axis=0)
     fig_ts_alloc = pts.plot_time_series(
         df=cum_allocation_return,
-        var_format='{:.0%}',
+        var_format=var_format,
         title='Cumulative Asset Class Allocation Effects',
         legend_stats=qis.LegendStats.LAST_NONNAN,
         ax=allocation_ax,
@@ -123,7 +123,7 @@ def plot_brinson_attribution_table(
     cum_selection_return = grouped_selection_return.cumsum(axis=0)
     fig_ts_sel = pts.plot_time_series(
         df=cum_selection_return,
-        var_format='{:.0%}',
+        var_format=var_format,
         title='Cumulative Instrument Selection Effects',
         legend_stats=qis.LegendStats.LAST_NONNAN,
         ax=selection_ax,
@@ -135,7 +135,7 @@ def plot_brinson_attribution_table(
         fig_ts_final = pts.plot_time_series(
             df=cum_interaction_return,
             trend_line=pts.TrendLine.TREND_LINE,
-            var_format='{:.0%}',
+            var_format=var_format,
             title='Cumulative Asset Class Interaction Effects',
             ax=axs[4],
             **kwargs

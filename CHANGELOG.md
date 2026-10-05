@@ -15,6 +15,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Honor `var_format` in all cumulative legends and value-axis ticks of
+  `plot_brinson_attribution_table`, including separate interaction effects. The default
+  whole-percent format, summary table and attribution calculations are unchanged.
 - Return NaN betas in `qis.regimes.compute_regime_ewm_betas` for constant within-regime
   benchmarks, zero EWMA benchmark variance, or assets with no observations in a regime,
   without invalid-division warnings. Return NaN residual variance when no fitted residual remains,
