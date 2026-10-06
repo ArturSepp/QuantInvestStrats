@@ -18,6 +18,7 @@ All qis imports are deferred into the function bodies so importing this module n
 qis being fully initialised (keeps the top-level `qis.factsheet` export circular-import safe).
 """
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from typing import TYPE_CHECKING, List, Optional, Union
 
@@ -79,6 +80,42 @@ def _infer_time_period(data, prices):
     raise TypeError(f"cannot infer time_period from {type(data)!r}; pass time_period explicitly")
 
 
+def _returns_to_navs(returns: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.DataFrame]:
+    """
+    compound simple returns to navs that start from a base level of 1.0 before the first return.
+
+    qis.returns_to_nav keeps the returns index, so a non-zero return on the first row would become
+    the first nav level and drop out of every statistic in the report. Such columns get a base
+    level of 1.0 one native period before the first row. A missing or zero first return is
+    already a base, as from pct_change() or pct_change().fillna(0), and is left unchanged.
+    """
+    import qis as qis
+    from qis.utils.annualisation import infer_data_frequency_label
+    navs = qis.returns_to_nav(returns)
+    if len(returns.index) == 0:
+        return navs
+    first_row = np.atleast_1d(returns.iloc[0:1].to_numpy(dtype=float, na_value=np.nan)[0])
+    needs_base = ~np.isnan(first_row) & (first_row != 0.0)
+    if not needs_base.any():
+        return navs
+
+    # the exact pandas frequency keeps its anchor ('W-FRI', 'QE-NOV'); an irregular index, such as
+    # exchange trading days, falls back to its median-spacing tier
+    try:
+        freq = pd.infer_freq(returns.index) if len(returns.index) >= 3 else None
+    except (TypeError, ValueError):
+        freq = None
+    freq = freq or infer_data_frequency_label(returns.index) or 'B'
+    base_date = returns.index[0] - pd.tseries.frequencies.to_offset(freq)
+    base_index = pd.DatetimeIndex([base_date], name=returns.index.name)
+    if isinstance(navs, pd.Series):
+        base = pd.Series(1.0, index=base_index, name=navs.name)
+    else:
+        base = pd.DataFrame(np.where(needs_base, 1.0, np.nan)[np.newaxis, :],
+                            index=base_index, columns=navs.columns)
+    return pd.concat([base, navs])
+
+
 def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfolioData"],
               benchmark_prices: Optional[Union[pd.Series, pd.DataFrame]] = None,
               benchmark: Optional[str] = None,
@@ -119,8 +156,10 @@ def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfo
         reporting_frequency: 'daily', 'weekly', 'monthly', 'quarterly', or a ReportingFrequency
         time_period: reporting span; defaults to the full history of ``data``
         kind: force an archetype identifier; None auto-detects from the type of ``data``
-        data_is_returns: treat ``data`` and ``benchmark_prices`` as returns and compound them
-            to navs
+        data_is_returns: treat ``data`` and ``benchmark_prices`` as simple returns and compound
+            them to navs. A column whose first return is non-zero starts from a base level of 1.0
+            one native period earlier, so that return enters every statistic; a missing or zero
+            first return is already the base
         long_threshold_years: spans of at least this length use the long-horizon preset
         add_rates_data: download the risk-free rate for the excess-return statistics; needs the
             [data] extra
@@ -161,11 +200,11 @@ def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfo
     if kind == KIND_MULTI_ASSET:
         if not isinstance(data, (pd.Series, pd.DataFrame)):
             raise TypeError(f"kind='{KIND_MULTI_ASSET}' expects prices/returns, got {type(data)!r}")
-        prices = qis.returns_to_nav(data) if data_is_returns else data
+        prices = _returns_to_navs(data) if data_is_returns else data
         if isinstance(prices, pd.Series):
             prices = prices.to_frame()
         if data_is_returns and benchmark_prices is not None:
-            benchmark_prices = qis.returns_to_nav(benchmark_prices)
+            benchmark_prices = _returns_to_navs(benchmark_prices)
         # default the regime/beta reference to the first column when none is supplied
         if benchmark is None and benchmark_prices is None and prices.shape[1] >= 1:
             benchmark = str(prices.columns[0])
