@@ -97,6 +97,9 @@ the [bibliography](bibliography.md).
 
 ### Part V: Risk
 
+The [risk monitoring guide](risk_monitoring.md) maps everyday monitoring questions to the
+chapters below and computes a point-in-time risk snapshot of one portfolio.
+
 - [Portfolio risk and Euler contributions](risk_contributions.md): marginal, total and relative
   risk contributions and their grouping.
 - [Factor risk models](factor_risk_models.md): EWMA factor models, betas, residual risk and the
@@ -226,6 +229,7 @@ signal_diagnostics
 :maxdepth: 1
 :caption: Part V - Risk
 
+Risk monitoring guide <risk_monitoring>
 risk_contributions
 factor_risk_models
 Tracking error and risk <tracking_error_and_risk>

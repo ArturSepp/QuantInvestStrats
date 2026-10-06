@@ -43,6 +43,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `FxRatesData.compute_performance_of_local_ccy_asset_in_reference_ccy` and its panel wrappers,
   while keeping inception missing and the explicit panel zero-to-NaN policy unchanged.
 
+### Documentation
+
+- Add a risk monitoring guide that maps monitoring questions (volatility, risk sources, value at
+  risk, benchmark distance, drawdowns, diversification, stress and regimes) to qis functions
+  and handbook chapters, with an offline point-in-time risk snapshot of one portfolio. Link it
+  from Part V of the handbook. No signature or computed value changes.
+
 ## [5.33.3] - 2026-10-03
 
 ### Fixed
