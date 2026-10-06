@@ -15,6 +15,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Keep the first return in `qis.factsheet(..., data_is_returns=True)`. A return column whose
+  first value is observed and non-zero, the form pyfolio and QuantStats take, now compounds
+  from a base level of 1.0 one native period earlier, for `data` and `benchmark_prices` alike.
+  Previously the first return became the first NAV level and dropped out of every statistic
+  and the reporting span, a whole month for monthly returns. A missing or zero first return
+  already acts as the base and is unchanged, as are price input and `qis.returns_to_nav`, whose
+  `init_period` docstring now states that it never extends the index.
 - Honor `var_format` in all cumulative legends and value-axis ticks of
   `plot_brinson_attribution_table`, including separate interaction effects. The default
   whole-percent format, summary table and attribution calculations are unchanged.

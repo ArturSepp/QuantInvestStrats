@@ -82,11 +82,15 @@ r_t = \frac{P_t}{P_{t-1}} - 1,
 P_t = P_0 \prod_{j=1}^{t}(1+r_j).
 $$
 
-The multi-asset return switch uses `qis.returns_to_nav` with its simple-return defaults.
-Supply an explicit baseline row, and inspect missing observations before conversion.
-The helper has its own initialisation and forward-fill behaviour; the switch is not a
-general missing-data policy. See [incomplete and mixed-frequency data](
-incomplete_and_mixed_frequency_data.md).
+The multi-asset return switch compounds with `qis.returns_to_nav` and its simple-return
+defaults, from $P_0 = 1$. When a column's first return $r_1$ is observed and non-zero, the
+facade places $P_0$ one period of the inferred native frequency earlier (a business day for
+exchange trading days), so $r_1$ enters every statistic. A missing or zero first return, as
+from `pct_change()` or `pct_change().fillna(0)`, already marks the date of $P_0$. Called
+directly, `qis.returns_to_nav` keeps the returns index, so its first level is $1 + r_1$ unless
+the input has such a row. Inspect missing observations before conversion: the helper has its
+own initialisation and forward-fill behaviour, and the switch is not a general missing-data
+policy. See [incomplete and mixed-frequency data](incomplete_and_mixed_frequency_data.md).
 
 ### Frequency, annualisation, and missing values
 
