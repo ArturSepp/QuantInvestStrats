@@ -80,9 +80,11 @@ figures = qis.factsheet(
 The [factsheet reference](factsheets.md) covers the report types, including the single-strategy
 report built from a backtested portfolio.
 
-`qis.factsheet` also accepts returns with `data_is_returns=True`. That path compounds through
-`qis.returns_to_nav` without a base observation, so pass the NAVs above when the first return
-matters.
+`qis.factsheet` also accepts the returns themselves with `data_is_returns=True`. In qis releases
+after 5.33.3 that path adds the same base observation, one period of the inferred native
+frequency before a non-zero first return, so it renders the same report as the NAVs above. In
+qis 5.33.3 and earlier it compounds through `qis.returns_to_nav` without a base and drops the
+first return, so pass the NAVs above instead.
 
 ## QuantStats metrics and qis columns
 
