@@ -43,6 +43,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `FxRatesData.compute_performance_of_local_ccy_asset_in_reference_ccy` and its panel wrappers,
   while keeping inception missing and the explicit panel zero-to-NaN policy unchanged.
 
+### Documentation
+
+- Add migration guides from pyfolio-reloaded and QuantStats. They map tear sheets, reports,
+  statistics and plots to qis functions, and tabulate which statistics agree on a shared daily
+  series and which differ by convention: year count, Sharpe and Sortino definitions, alpha
+  annualisation and information-ratio scaling. Checked against pyfolio-reloaded 0.9.9 and
+  QuantStats 0.0.86. No signature or computed value changes.
+
 ## [5.33.3] - 2026-10-03
 
 ### Fixed
