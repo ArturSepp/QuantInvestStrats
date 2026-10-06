@@ -1012,7 +1012,10 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
 
     Args:
         returns: Return time series
-        init_period: If 1, set first non-NaN return to zero; if 0, set previous value to zero
+        init_period: For pandas input: if 0, set the return on the row before each column's
+            first non-NaN return to zero when that row exists and is NaN; if 1, set the first
+            non-NaN return to zero; None leaves the returns unchanged. The index is never
+            extended, so a series with no leading NaN row starts its NAV at 1 + the first return
         terminal_value: Target terminal NAV value for scaling
         init_value: Target initial NAV value (default: 1.0)
         first_date: Inclusive date through which observed returns are set to zero; missing
@@ -1024,7 +1027,9 @@ def returns_to_nav(returns: Union[np.ndarray, pd.Series, pd.DataFrame],
         is_log_returns: If True, convert from log returns
 
     Returns:
-        NAV time series starting at init_value (or 1.0)
+        NAV time series on the index of ``returns``, or on the ``freq`` grid when given. Before
+        any terminal_value or init_value scaling it starts at 1.0 on a zeroed row and otherwise
+        at 1 + the first return
     """
     # Apply an explicit pandas cutoff before the fallback initialization convention.
     if first_date is not None and isinstance(returns, (pd.Series, pd.DataFrame)):

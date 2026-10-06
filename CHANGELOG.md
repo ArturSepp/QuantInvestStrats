@@ -15,9 +15,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Keep the first return in `qis.factsheet(..., data_is_returns=True)`. A return column whose
+  first value is observed and non-zero, the form pyfolio and QuantStats take, now compounds
+  from a base level of 1.0 one native period earlier, for `data` and `benchmark_prices` alike.
+  Previously the first return became the first NAV level and dropped out of every statistic
+  and the reporting span, a whole month for monthly returns. A missing or zero first return
+  already acts as the base and is unchanged, as are price input and `qis.returns_to_nav`, whose
+  `init_period` docstring now states that it never extends the index.
 - Honor `var_format` in all cumulative legends and value-axis ticks of
   `plot_brinson_attribution_table`, including separate interaction effects. The default
   whole-percent format, summary table and attribution calculations are unchanged.
+- Preserve caller-owned DataFrame indexes when `save_df_to_excel` or
+  `save_df_dict_to_excel(..., delocalize=True)` removes timezone information for Excel.
+  Workbook local wall-clock timestamps, transpose and append behavior are unchanged.
 - Return NaN betas in `qis.regimes.compute_regime_ewm_betas` for constant within-regime
   benchmarks, zero EWMA benchmark variance, or assets with no observations in a regime,
   without invalid-division warnings. Return NaN residual variance when no fitted residual remains,
@@ -45,6 +55,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Documentation
 
+- Add migration guides from pyfolio-reloaded and QuantStats. They map tear sheets, reports,
+  statistics and plots to qis functions, and tabulate which statistics agree on a shared daily
+  series and which differ by convention: year count, Sharpe and Sortino definitions, alpha
+  annualisation and information-ratio scaling. Checked against pyfolio-reloaded 0.9.9 and
+  QuantStats 0.0.86. No signature or computed value changes.
 - Title each site page as `<page title> - qis`; the homepage and sidebar keep the full site
   title. Mark the `_included/` mirrors of the packaged notes `noindex, follow` and leave them
   out of the sitemap, so search engines index one page per topic.

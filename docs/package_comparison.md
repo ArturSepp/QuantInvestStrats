@@ -81,6 +81,8 @@ These operate on periodic returns; period win rates are not automatically trade 
 A target-weight execution engine, forecast-covariance portfolio-risk workflow, private-asset
 unsmoothing and FX hedge construction were not assessed in that material. This is a limit
 of the review, not a claim that no related function or extension exists.
+[Migrating from QuantStats](migrating_from_quantstats.md) maps its reports, metrics and plots
+to qis.
 
 ### pyfolio-reloaded
 
@@ -94,6 +96,8 @@ This is analysis of supplied strategy records. An execution simulator or a forec
 portfolio-risk interface was not assessed. The hosted API identifies an older documentation
 build; check the [maintained repository](https://github.com/stefan-jansen/pyfolio-reloaded)
 and installed release before relying on an exact signature.
+[Migrating from pyfolio-reloaded](migrating_from_pyfolio.md) maps its tear sheets, statistics
+and plots to qis.
 
 ### vectorbt
 
