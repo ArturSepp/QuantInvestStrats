@@ -769,6 +769,26 @@ def unsmooth_returns_glm(returns: Union[pd.Series, pd.DataFrame],
         return unsmoothed
 
     if isinstance(returns, pd.DataFrame):
+        fixed_values = (_unsmooth_glm_fixed_panel(returns, theta_fixed)
+                        if theta_fixed is not None else None)
+        if fixed_values is not None:
+            theta_sum = float(theta_fixed.sum())
+            # Use the established Series/dict construction: direct frame construction retains
+            # column metadata that the scalar path drops, changing the public result.
+            unsmoothed_df = pd.DataFrame({
+                col: pd.Series(fixed_values[:, i], index=returns.index, name=col)
+                for i, col in enumerate(returns.columns)
+            })
+            if return_diagnostics:
+                diagnostics = {
+                    col: GLMUnsmoothingDiagnostics(
+                        theta=theta_fixed, theta_sum=theta_sum,
+                        vol_inflation_factor=1.0 / (1.0 - theta_sum) if theta_sum < 1 else np.inf,
+                        ar_order=ar_order, is_severe=abs(theta_sum) > 0.95,
+                    ) for col in returns.columns
+                }
+                return unsmoothed_df, diagnostics
+            return unsmoothed_df
         unsmoothed_cols = {}
         diagnostics_dict = {}
         for col in returns.columns:
@@ -794,6 +814,46 @@ def _validate_fixed_theta(theta: Union[float, np.ndarray]) -> np.ndarray:
     if abs(1.0 - float(theta_fixed.sum())) < 1e-10:
         raise ValueError(f"theta sums to 1, the inversion is singular, got {theta!r}")
     return theta_fixed
+
+
+def _unsmooth_glm_fixed_panel(returns: pd.DataFrame,
+                             theta: np.ndarray) -> Optional[np.ndarray]:
+    """Invert ordinary numeric panels, or defer to scalar conversion and warning behavior.
+
+    A shared fixed filter has no cross-column state: vectorizing dates and funds removes
+    the expensive Python recurrence while retaining the scalar worker's lag accumulation order.
+    Extension/object dtypes, duplicate labels and exceptional arithmetic stay on the old path;
+    this optimization does not define new conversion, label or numerical-error semantics.
+    """
+    if not len(returns.columns) or not returns.columns.is_unique:
+        return None
+    if any(not isinstance(dtype, np.dtype) or dtype.kind not in 'biuf' or dtype.itemsize > 8
+           for dtype in returns.dtypes):
+        return None
+    values = returns.to_numpy(dtype=float, copy=True)
+    if np.isinf(values).any():
+        return None
+    out = values.copy()
+    q = len(theta)
+    try:
+        with np.errstate(all='raise'):
+            theta_sum = float(theta.sum())
+    except FloatingPointError:
+        return None
+    if len(values) > q:
+        # A vector ufunc can warn on cells the scalar worker skips after a missing lag.
+        # Detect exceptional arithmetic privately, then let the untouched scalar path emit
+        # exactly its own warnings/errors under the caller's NumPy error policy.
+        try:
+            with np.errstate(all='raise'):
+                correction = np.zeros_like(values[q:])
+                for i, weight in enumerate(theta):
+                    correction += weight * values[q - i - 1:len(values) - i - 1]
+                out[q:] = (values[q:] - correction) / (1.0 - theta_sum)
+        except FloatingPointError:
+            return None
+    # Keep the first q observations raw; NaNs in any required lag propagate only in its column.
+    return out
 
 
 def _unsmooth_glm_single(returns: pd.Series,
