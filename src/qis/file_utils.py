@@ -257,6 +257,9 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
     if_sheet_exists only for append mode
     mode = w: write new file
     mode = a: append to existing file
+
+    Caller-owned frames are unchanged. Datetime indexes are written as timezone-naive
+    local wall-clock times, before applying ``transpose`` if requested.
     """
     if add_current_date:
         file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
@@ -275,7 +278,9 @@ def save_df_to_excel(data: Union[pd.DataFrame, List[pd.DataFrame], Dict[str, pd.
         df = _coerce_to_df(obj, str(raw_name))
         if df is None:
             continue
-        df = delocalize_df(df)
+        # Excel cannot store timezones. Own the frame before replacing its index;
+        # a shallow copy suffices because normalization does not modify data values.
+        df = delocalize_df(df.copy(deep=False))
         if transpose:
             df = df.T
         frames.append((_sanitize_sheet_name(raw_name, taken), df))
@@ -360,6 +365,9 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
     """
     dictionary of pandas to same Excel with dfs as separate sheets
     w adds/replaces with new excel; a appends to exisiting
+
+    With ``delocalize=True``, write timezone-naive local wall-clock indexes without
+    changing caller-owned frames. The default leaves timezone normalization disabled.
     """
     if add_current_date:
         file_name = f"{file_name}_{pd.Timestamp.now().strftime(DATE_FORMAT)}"
@@ -377,7 +385,9 @@ def save_df_dict_to_excel(datasets: Dict[Union[str, Enum, NamedTuple], pd.DataFr
         if df is None:
             continue
         if delocalize:
-            df = delocalize_df(df)
+            # The opt-in conversion replaces the index, not values; keep that mutation
+            # on an owned frame without copying the underlying data buffers.
+            df = delocalize_df(df.copy(deep=False))
         frames.append((_sanitize_sheet_name(raw_name, taken), df))
 
     if not frames:
