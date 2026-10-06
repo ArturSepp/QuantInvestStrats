@@ -43,6 +43,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `FxRatesData.compute_performance_of_local_ccy_asset_in_reference_ccy` and its panel wrappers,
   while keeping inception missing and the explicit panel zero-to-NaN policy unchanged.
 
+### Documentation
+
+- Title each site page as `<page title> - qis`; the homepage and sidebar keep the full site
+  title. Mark the `_included/` mirrors of the packaged notes `noindex, follow` and leave them
+  out of the sitemap, so search engines index one page per topic.
+- Open the portfolio-breadth chapter with the Grinold (1989) definition of breadth and link it
+  to the signal-diagnostics treatment of the fundamental law. Point the README's documentation
+  links at the canonical `stable` version. No signature or computed value changes.
+
 ## [5.33.3] - 2026-10-03
 
 ### Fixed

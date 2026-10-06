@@ -12,7 +12,7 @@ own strategy logic and weight targets; `qis` measures, backtests, analyses, and 
 [![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square)](https://pypi.org/project/qis/)
 [![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square)](https://pypi.org/project/qis/)
 [![CI](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml)
-[![Docs](https://readthedocs.org/projects/quantinveststrats/badge/?version=latest)](https://quantinveststrats.readthedocs.io/en/latest/)
+[![Docs](https://readthedocs.org/projects/quantinveststrats/badge/?version=latest)](https://quantinveststrats.readthedocs.io/en/stable/)
 [![License](https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square)](LICENSE.txt)
 [![Downloads](https://static.pepy.tech/badge/qis)](https://pepy.tech/project/qis)
 [![Monthly](https://static.pepy.tech/badge/qis/month)](https://pepy.tech/project/qis)
@@ -111,7 +111,7 @@ closed-form overlay frontiers, regime betas and regime-mixture covariances.
 `qis.SmartDiversificationReport`, in `qis.portfolio.smart_diversification`, draws what an overlay
 adds to a principal portfolio in Bear periods against what it adds to the Sharpe ratio. Every
 quantile classification in qis follows one rule, `qis.utils.quantile_buckets`. The
-[convexity premium chapter](https://quantinveststrats.readthedocs.io/en/latest/convexity_premium.html)
+[convexity premium chapter](https://quantinveststrats.readthedocs.io/en/stable/convexity_premium.html)
 derives the formulas.
 
 `qis.market_data` is an auxiliary module of market-data containers and FX analytics. `FxRatesData`
@@ -129,7 +129,7 @@ analytics. It is intentionally separate from the installed `qis` package:
 
 * `examples/models` — numba-vs-pandas EWM kernel benchmarks, multivariate EWM linear factor models, multivariate OLS, EWM correlation tables, intraday/overnight return decomposition, rolling correlations, and block bootstrap of price paths.
 
-* `examples/regimes` — regime-conditional analytics: bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study. The convexity premium and smart-diversification curves are worked through in the [handbook chapter](https://quantinveststrats.readthedocs.io/en/latest/convexity_premium.html).
+* `examples/regimes` — regime-conditional analytics: bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study. The convexity premium and smart-diversification curves are worked through in the [handbook chapter](https://quantinveststrats.readthedocs.io/en/stable/convexity_premium.html).
 
 * `examples/portfolios` — backtests using `backtest_model_portfolio`: balanced 60/40 with and without a BTC sleeve, constant-notional short, leveraged-ETF combinations, long/short pairs, vol-target / trend-following parameter sweeps, and separate offline ex-ante and ex-post tracking-error workflows.
 
@@ -275,7 +275,7 @@ python examples/getting_started/offline_quickstart.py
 ```
 
 With only `pip install qis`, copy the complete code from the
-[hosted offline quickstart](https://quantinveststrats.readthedocs.io/en/latest/quickstart.html).
+[hosted offline quickstart](https://quantinveststrats.readthedocs.io/en/stable/quickstart.html).
 That page includes the runnable script directly, so the README, documentation, and example cannot
 develop independent full-code versions.
 
