@@ -61,7 +61,7 @@ UTILITY_PAGES = frozenset({
     'risk_monitoring.md',
     'documentation_standard.md', 'factsheets.md', 'gallery.md', 'index.md', 'install.md',
     'package_comparison.md', 'quickstart.md', 'REMOVED_5_0.md', 'software_design.md',
-    'bibliography.md',
+    'bibliography.md', 'migrating_from_pyfolio.md', 'migrating_from_quantstats.md',
 })
 # Adoption is explicit. Do not infer it from a byline or let new pages evade the inventory.
 ADOPTED_PAGES = frozenset({
@@ -84,6 +84,7 @@ ADOPTED_PAGES = frozenset({
     'ewm_estimators.md', 'covariance_correlation_pca.md', 'serial_dependence.md',
     'regression_and_hac.md', 'risk_adjusted_returns.md', 'signal_diagnostics.md',
     'risk_contributions.md', 'factor_risk_models.md', 'convexity_premium.md',
+    'migrating_from_pyfolio.md', 'migrating_from_quantstats.md',
 })
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
