@@ -81,9 +81,9 @@ def plot_scatter(df: pd.DataFrame,
         x: column for the horizontal axis. None takes the first column
         y: column for the vertical axis. None takes the second column
         hue: column whose values split the sample into separately fitted groups
-        annotation_labels: text to place beside each point, in row order
-        annotation_colors: colour per annotated point
-        annotation_markers: marker per annotated point
+        annotation_labels: text per point row, before removing missing x, y or hue values
+        annotation_colors: colour per point row, in the same order as ``annotation_labels``
+        annotation_markers: marker per point row, in the same order as ``annotation_labels``
         annotation_color: colour used when ``annotation_colors`` is None
         add_universe_model_label: report the full-sample fit in the legend
         add_universe_model_prediction: draw the full-sample fitted line
@@ -142,11 +142,20 @@ def plot_scatter(df: pd.DataFrame,
         else:
             ylabel = 'y'
 
-    # drop nans
-    if hue is not None:
-        df = df[[x, y, hue]].dropna()
-    else:
-        df = df[[x, y]].dropna()
+    df = df[[x, y, hue]] if hue is not None else df[[x, y]]
+    valid_rows = df.notna().all(axis=1)
+    if annotation_labels is not None:
+        # Annotation lists describe pre-filter point rows, not the compressed survivors.
+        # Apply the same positional mask to every supplied list: index labels may be duplicated,
+        # and zip preserves the existing truncation behavior for shorter metadata lists.
+        annotation_labels = [label for label, valid in zip(annotation_labels, valid_rows) if valid]
+        if annotation_colors is not None:
+            annotation_colors = [color for color, valid in zip(annotation_colors, valid_rows)
+                                 if valid]
+        if annotation_markers is not None:
+            annotation_markers = [marker for marker, valid in zip(annotation_markers, valid_rows)
+                                  if valid]
+    df = df.loc[valid_rows].copy()
 
     if hue is not None and add_hue_model_label is None:  # override to true unless false
         add_hue_model_label = True

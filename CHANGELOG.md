@@ -9,6 +9,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Keep annotation labels, colours and markers attached to their original point rows in
+  `plot_scatter` when missing x, y or hue values are removed, including fund names supplied by
+  `SmartDiversificationReport.plot_smart_diversification_scatter`. Unfiltered plots and fitted
+  relationships are unchanged.
 - Preserve caller-owned figures and earlier report pages in
   `generate_strategy_signal_factsheet_by_instrument` and in
   `generate_strategy_benchmark_factsheet_plt(..., add_exposures_comp=True)`.
