@@ -19,6 +19,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Close only completed instrument pages to avoid accumulating them in pyplot; returned pages
   remain drawable and saveable. Report contents and page order are unchanged.
 
+### Changed
+
+- Speed up `unsmooth_returns_glm` for ordinary numeric DataFrame panels with supplied `theta`
+  by applying the fixed filter across the panel. Results, diagnostics and missing-lag behavior
+  are unchanged; Series, estimated weights and exceptional inputs retain their existing paths.
+
 ## [5.33.4] - 2026-10-07
 
 ### Changed
