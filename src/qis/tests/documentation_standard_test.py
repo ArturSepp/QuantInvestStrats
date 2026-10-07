@@ -1,5 +1,6 @@
 """Documentation regressions that a successful Sphinx build alone cannot detect."""
 
+import ast
 import runpy
 from pathlib import Path
 
@@ -204,3 +205,16 @@ def test_invalid_author_metadata_is_rejected(byline):
     """Reject placeholders, broken attribution and dates without a valid evidence link."""
     issues = CHECK(HEADER.replace(DATED_BYLINE, byline), methodology=False)
     assert any('byline' in issue.message for issue in issues)
+
+
+def test_generated_api_page_states_a_meta_description():
+    """Give the generated API page a search description, which the Markdown checker cannot see.
+
+    ``docs/conf.py`` writes ``api/index.rst`` from ``API_HEADER`` on every build, so the page has
+    no front matter for ``check_docs.py`` to inspect; the description lives in the header.
+    """
+    tree = ast.parse((REPO_ROOT / 'docs' / 'conf.py').read_text(encoding='utf-8'))
+    header = next(node.value.value for node in tree.body if isinstance(node, ast.Assign)
+                  and any(getattr(target, 'id', None) == 'API_HEADER' for target in node.targets))
+    assert '\n.. meta::\n   :description: ' in header
+    assert header.index('\n.. meta::') < header.index('\nAPI reference\n')

@@ -70,6 +70,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   risk, benchmark distance, drawdowns, diversification, stress and regimes) to qis functions
   and handbook chapters, with an offline point-in-time risk snapshot of one portfolio. Link it
   from Part V of the handbook. No signature or computed value changes.
+- Give the generated API reference page a meta description, the only page of the site other than
+  the packaged-note mirrors without one. No signature or computed value changes.
 
 ## [5.33.3] - 2026-10-03
 
