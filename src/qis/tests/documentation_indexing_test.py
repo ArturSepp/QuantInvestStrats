@@ -15,7 +15,8 @@ EXTENSION = Path(__file__).resolve().parents[3] / 'docs' / '_ext' / 'qis_indexin
 if not EXTENSION.is_file():
     pytest.skip('Documentation sources are not shipped in the wheel.', allow_module_level=True)
 SEO = runpy.run_path(str(EXTENSION))
-BASE = 'https://quantinveststrats.readthedocs.io/en/latest/'
+BASE = 'https://quantinveststrats.readthedocs.io/en/stable/'
+LATEST = 'https://quantinveststrats.readthedocs.io/en/latest/'
 
 
 def make_app(tmp_path, *, base=BASE, builder='html'):
@@ -33,14 +34,12 @@ def make_app(tmp_path, *, base=BASE, builder='html'):
 
 
 @pytest.mark.parametrize(('base', 'expected_base'), [
-    (BASE, BASE.replace('/latest/', '/stable/')),
-    (BASE.rstrip('/'), BASE.replace('/latest/', '/stable/')),
-    (BASE.replace('/latest/', '/stable/'), BASE.replace('/latest/', '/stable/')),
-    (BASE.replace('/latest/', '/5.30.0/'), BASE.replace('/latest/', '/5.30.0/')),
+    (BASE, BASE),
+    (BASE.rstrip('/'), BASE),
+    (BASE.replace('/stable/', '/5.30.0/'), BASE.replace('/stable/', '/5.30.0/')),
 ])
-def test_homepage_canonical_and_sitemap_consolidate_moving_aliases(
-        tmp_path, base, expected_base):
-    """Use stable for moving aliases while preserving numbered release URLs."""
+def test_released_versions_keep_their_own_canonical_and_sitemap(tmp_path, base, expected_base):
+    """A released version is indexed under its own URLs, homepage included."""
     app = make_app(tmp_path, base=base)
     context = {'pageurl': base.rstrip('/') + '/index.html'}
     SEO['set_canonical_url'](app, 'index', 'page.html', context, None)
@@ -52,6 +51,19 @@ def test_homepage_canonical_and_sitemap_consolidate_moving_aliases(
         expected_base, expected_base + 'portfolio_breadth.html',
         expected_base + 'api/generated/qis.RiskModel.html',
     }
+
+
+@pytest.mark.parametrize('base', [LATEST, LATEST.rstrip('/')])
+def test_latest_is_kept_out_of_the_index_under_its_own_urls(tmp_path, base):
+    """latest never points a crawler at a stable URL that a page added since the tag lacks."""
+    app = make_app(tmp_path, base=base)
+    context = {'pageurl': base.rstrip('/') + '/risk_monitoring.html'}
+    SEO['set_canonical_url'](app, 'risk_monitoring', 'page.html', context, None)
+    SEO['set_robots_meta'](app, 'risk_monitoring', 'page.html', context, None)
+    SEO['write_sitemap'](app, None)
+    assert context['pageurl'] == LATEST + 'risk_monitoring.html'
+    assert context['metatags'] == SEO['ROBOTS_NOINDEX']
+    assert not (tmp_path / 'sitemap.xml').exists()
 
 
 @pytest.mark.parametrize('builder,base,exception', [
@@ -92,16 +104,15 @@ def test_package_note_mirrors_are_kept_out_of_the_search_index(tmp_path):
     assert b'_included' not in (tmp_path / 'sitemap.xml').read_bytes()
 
 
-def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
-    """Exercise Sphinx events and rendered canonical tags when the docs extra is installed."""
-    pytest.importorskip('sphinx')
+def build_sphinx_site(tmp_path, base):
+    """Build a three-page site with the extension and return its HTML output directory."""
     source = tmp_path / 'source'
     source.mkdir()
     (source / 'conf.py').write_text(
         'import sys\n'
         f'sys.path.insert(0, {str(EXTENSION.parent)!r})\n'
         "extensions = ['qis_indexing']\n"
-        f'html_baseurl = {BASE!r}\n'
+        f'html_baseurl = {base!r}\n'
         "project = 'Indexing test'\n", encoding='utf-8')
     (source / 'index.rst').write_text(
         'Home\n====\n\n.. toctree::\n\n   method\n   _included/note\n', encoding='utf-8')
@@ -115,32 +126,55 @@ def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
         capture_output=True, text=True, timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+    return output
 
-    class Canonicals(HTMLParser):
-        """Collect the browser-visible canonical link and robots declarations."""
 
-        def __init__(self):
-            super().__init__()
-            self.urls = []
-            self.robots = []
+class Canonicals(HTMLParser):
+    """Collect the browser-visible canonical link and robots declarations."""
 
-        def handle_starttag(self, tag, attrs):
-            attrs = dict(attrs)
-            if tag == 'link' and attrs.get('rel') == 'canonical':
-                self.urls.append(attrs['href'])
-            if tag == 'meta' and attrs.get('name') == 'robots':
-                self.robots.append(attrs['content'])
+    def __init__(self):
+        super().__init__()
+        self.urls = []
+        self.robots = []
 
-    stable_base = BASE.replace('/latest/', '/stable/')
-    expected = {'index': stable_base, 'method': stable_base + 'method.html'}
-    for name, url in expected.items():
-        parser = Canonicals()
-        parser.feed((output / f'{name}.html').read_text(encoding='utf-8'))
-        assert parser.urls == [url]
-        assert parser.robots == []
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == 'link' and attrs.get('rel') == 'canonical':
+            self.urls.append(attrs['href'])
+        if tag == 'meta' and attrs.get('name') == 'robots':
+            self.robots.append(attrs['content'])
+
+
+def read_page(path):
+    """Parse one rendered page's canonical and robots declarations."""
     parser = Canonicals()
-    parser.feed((output / '_included' / 'note.html').read_text(encoding='utf-8'))
-    assert parser.robots == ['noindex, follow']
+    parser.feed(path.read_text(encoding='utf-8'))
+    return parser
+
+
+def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
+    """Exercise Sphinx events and rendered canonical tags when the docs extra is installed."""
+    pytest.importorskip('sphinx')
+    output = build_sphinx_site(tmp_path, BASE)
+    expected = {'index': BASE, 'method': BASE + 'method.html'}
+    for name, url in expected.items():
+        page = read_page(output / f'{name}.html')
+        assert page.urls == [url]
+        assert page.robots == []
+    assert read_page(output / '_included' / 'note.html').robots == ['noindex, follow']
     tree = ElementTree.parse(output / 'sitemap.xml')
     assert {node.text for node in tree.findall(
         './/{http://www.sitemaps.org/schemas/sitemap/0.9}loc')} == set(expected.values())
+
+
+def test_real_sphinx_latest_build_is_noindex_under_its_own_urls(tmp_path):
+    """Render latest with Sphinx: own canonical on every page, noindex, and no sitemap."""
+    pytest.importorskip('sphinx')
+    output = build_sphinx_site(tmp_path, LATEST)
+    expected = {'index': LATEST, 'method': LATEST + 'method.html',
+                '_included/note': LATEST + '_included/note.html'}
+    for name, url in expected.items():
+        page = read_page(output / f'{name}.html')
+        assert page.urls == [url]
+        assert page.robots == ['noindex, follow']
+    assert not (output / 'sitemap.xml').exists()
