@@ -2,8 +2,8 @@
 myst:
   html_meta:
     description: >-
-      Point-in-time investable-universe, capital-breadth, risk-breadth, and allocation-efficiency
-      diagnostics for portfolio target weights in qis.
+      What portfolio breadth means and how to measure it: effective independent assets, capital
+      positions and risk contributors, computed point in time from portfolio target weights in qis.
 ---
 
 # Portfolio breadth and allocation efficiency
@@ -16,6 +16,13 @@ Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats
 Portfolio breadth describes how many opportunities, capital positions, or risk contributors a
 portfolio effectively contains. An instrument count measures participation; an effective count
 also accounts for concentration. These are allocation diagnostics, not measures of realised alpha.
+
+In active management, breadth usually means the $\mathrm{BR}$ of the fundamental law of
+[Grinold (1989)](https://doi.org/10.3905/jpm.1989.409211): the number of independent forecasts
+per year in $\mathrm{IR}\approx\mathrm{IC}\sqrt{\mathrm{BR}}$. That forecast-side breadth is
+measured in [Signal diagnostics](signal_diagnostics.md#the-ic-information-ratio). This article
+measures the allocation side: how many independent assets, capital positions and risk
+contributors the target weights actually use.
 
 ## Overview
 
@@ -280,6 +287,7 @@ For a Markdown viewer without Sphinx roles, use the
 
 ## See also
 
+- [Signal diagnostics: information coefficient and information ratio](signal_diagnostics.md)
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)
 - [Model-layer attribution](model_layer_attribution.md)
 - [Targets and held units in a backtest](portfolio_backtesting.md)
@@ -287,6 +295,7 @@ For a Markdown viewer without Sphinx roles, use the
 
 ## References
 
-1. Hill, M. O. (1973). Diversity and evenness: a unifying notation and its consequences. *Ecology*, 54(2), 427–432. [DOI: 10.2307/1934352](https://doi.org/10.2307/1934352). This supplies the effective-number construction, not a portfolio performance model.
-2. Tasche, D. (2008). Capital allocation to business units and sub-portfolios: the Euler principle. Working paper. [arXiv:0708.2542](https://arxiv.org/abs/0708.2542).
-3. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+1. Grinold, R. C. (1989). The Fundamental Law of Active Management. *The Journal of Portfolio Management*, 15(3), 30–37. [DOI: 10.3905/jpm.1989.409211](https://doi.org/10.3905/jpm.1989.409211). The forecast-side definition of breadth, contrasted with the allocation measures here.
+2. Hill, M. O. (1973). Diversity and evenness: a unifying notation and its consequences. *Ecology*, 54(2), 427–432. [DOI: 10.2307/1934352](https://doi.org/10.2307/1934352). This supplies the effective-number construction, not a portfolio performance model.
+3. Tasche, D. (2008). Capital allocation to business units and sub-portfolios: the Euler principle. Working paper. [arXiv:0708.2542](https://arxiv.org/abs/0708.2542).
+4. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

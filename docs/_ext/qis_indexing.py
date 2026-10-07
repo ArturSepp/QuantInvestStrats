@@ -6,6 +6,10 @@ The moving ``latest`` and ``stable`` aliases describe the same default documenta
 so both use ``stable`` as their canonical URL, matching the site's default version.
 Numbered releases keep their own
 canonical base URL because their API documentation can differ.
+
+The ``_included/`` pages mirror the notes shipped in ``src/qis/docs/``. Each repeats or points to
+a handbook chapter, so they stay readable on the site but carry ``noindex`` and are left out of
+the sitemap, leaving one indexed page per topic.
 """
 
 from pathlib import Path
@@ -16,6 +20,17 @@ from xml.etree import ElementTree
 
 SITEMAP_NAMESPACE = 'http://www.sitemaps.org/schemas/sitemap/0.9'
 READTHEDOCS_ALIAS_PATHS = {'/en/latest', '/en/stable'}
+NOINDEX_PREFIXES = ('_included/',)
+ROBOTS_NOINDEX = '<meta name="robots" content="noindex, follow">\n'
+
+
+def is_indexable(pagename: str) -> bool:
+    """Return whether a page is offered to search engines.
+
+    Args:
+        pagename: Sphinx document name, without the output suffix.
+    """
+    return not pagename.startswith(NOINDEX_PREFIXES)
 
 
 def canonical_baseurl(baseurl: str) -> str:
@@ -61,6 +76,21 @@ def set_canonical_url(app: Any, pagename: str, templatename: str,
         context['pageurl'] = canonical_url(app, pagename)
 
 
+def set_robots_meta(app: Any, pagename: str, templatename: str,
+                    context: dict, doctree: Any) -> None:
+    """Append a ``noindex, follow`` robots tag to pages kept out of the search index.
+
+    Args:
+        app: Sphinx application; unused.
+        pagename: Current document name.
+        templatename: HTML template selected by Sphinx; unchanged.
+        context: Template variables; metatags already holds the page's MyST description.
+        doctree: Parsed document, or None for generated helper pages.
+    """
+    if not is_indexable(pagename):
+        context['metatags'] = (context.get('metatags') or '') + ROBOTS_NOINDEX
+
+
 def write_sitemap(app: Any, exception: Exception | None) -> None:
     """Write a deterministic sitemap only after a successful HTML build.
 
@@ -74,7 +104,7 @@ def write_sitemap(app: Any, exception: Exception | None) -> None:
     root = ElementTree.Element(f'{{{namespace}}}urlset')
     pages = (name for name in app.env.found_docs
              if name not in {'search', 'genindex', 'py-modindex'}
-             and not name.startswith('_modules/'))
+             and not name.startswith('_modules/') and is_indexable(name))
     for url in sorted({canonical_url(app, name) for name in pages}):
         entry = ElementTree.SubElement(root, f'{{{namespace}}}url')
         ElementTree.SubElement(entry, f'{{{namespace}}}loc').text = url
@@ -95,5 +125,6 @@ def setup(app: Any) -> dict:
         Extension metadata; sitemap generation uses the complete merged inventory.
     """
     app.connect('html-page-context', set_canonical_url)
+    app.connect('html-page-context', set_robots_meta)
     app.connect('build-finished', write_sitemap)
     return {'version': '1', 'parallel_read_safe': True, 'parallel_write_safe': True}
