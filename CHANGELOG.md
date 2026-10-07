@@ -66,6 +66,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Open the portfolio-breadth chapter with the Grinold (1989) definition of breadth and link it
   to the signal-diagnostics treatment of the fundamental law. Point the README's documentation
   links at the canonical `stable` version. No signature or computed value changes.
+- Add a risk monitoring guide that maps monitoring questions (volatility, risk sources, value at
+  risk, benchmark distance, drawdowns, diversification, stress and regimes) to qis functions
+  and handbook chapters, with an offline point-in-time risk snapshot of one portfolio. Link it
+  from Part V of the handbook. No signature or computed value changes.
 
 ## [5.33.3] - 2026-10-03
 
