@@ -58,12 +58,14 @@ METHODOLOGY_PAGES = frozenset({
     'tracking_error_and_risk.md', 'turnover_conventions.md',
 })
 UTILITY_PAGES = frozenset({
+    'risk_monitoring.md',
     'documentation_standard.md', 'factsheets.md', 'gallery.md', 'index.md', 'install.md',
     'package_comparison.md', 'quickstart.md', 'REMOVED_5_0.md', 'software_design.md',
     'bibliography.md', 'migrating_from_pyfolio.md', 'migrating_from_quantstats.md',
 })
 # Adoption is explicit. Do not infer it from a byline or let new pages evade the inventory.
 ADOPTED_PAGES = frozenset({
+    'risk_monitoring.md',
     'unhedged_index_replication.md',
     'hedged_index_replication.md',
     'cash_rate_timing_and_fx_adjustments.md',
