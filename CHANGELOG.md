@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.33.4] - 2026-10-07
+
 ### Changed
 
 - Reduce memory use in `compute_ewm_corr_df(..., corr_matrix_output=CorrMatrixOutput.TOP_ROW)`
