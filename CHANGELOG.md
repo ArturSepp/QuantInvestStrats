@@ -82,6 +82,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   from Part V of the handbook. No signature or computed value changes.
 - Give the generated API reference page a meta description, the only page of the site other than
   the packaged-note mirrors without one. No signature or computed value changes.
+- Stop the `latest` site pointing search engines at `stable` URLs that do not exist yet. Every
+  `latest` page declared `/en/stable/<page>` as its canonical URL, so a chapter or exported symbol
+  added since the last release sent crawlers to a 404, which Google Search Console reported as
+  "Not found (404)". `latest` now keeps its own canonical URLs, carries `noindex, follow` on
+  every page and writes no sitemap. `stable` and numbered releases are unchanged and remain the
+  indexed versions. No signature or computed value changes.
 
 ## [5.33.3] - 2026-10-03
 
