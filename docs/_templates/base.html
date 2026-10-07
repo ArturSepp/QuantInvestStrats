@@ -1,5 +1,16 @@
 {% extends "!base.html" %}
 
+{#- Furo suffixes every page title with html_title, which pushes the page's own title past what
+    search results display. Keep html_title on the homepage and in the sidebar, and suffix the
+    other pages with the short project name. -#}
+{%- block htmltitle -%}
+  {%- if title and docstitle and pagename != master_doc -%}
+    <title>{{ title|striptags|e }} - {{ project|striptags|e }}</title>
+  {%- else -%}
+    {{ super() }}
+  {%- endif -%}
+{%- endblock -%}
+
 {% block extrahead %}
   {{ super() }}
   <meta name="google-site-verification" content="cddUZk3Gsd1MySw42Rwuq_rMzUDcMNkJWekObx-QS9Y">

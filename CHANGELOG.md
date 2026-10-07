@@ -60,6 +60,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   series and which differ by convention: year count, Sharpe and Sortino definitions, alpha
   annualisation and information-ratio scaling. Checked against pyfolio-reloaded 0.9.9 and
   QuantStats 0.0.86. No signature or computed value changes.
+- Title each site page as `<page title> - qis`; the homepage and sidebar keep the full site
+  title. Mark the `_included/` mirrors of the packaged notes `noindex, follow` and leave them
+  out of the sitemap, so search engines index one page per topic.
+- Open the portfolio-breadth chapter with the Grinold (1989) definition of breadth and link it
+  to the signal-diagnostics treatment of the fundamental law. Point the README's documentation
+  links at the canonical `stable` version. No signature or computed value changes.
 - Give the generated API reference page a meta description, the only page of the site other than
   the packaged-note mirrors without one. No signature or computed value changes.
 
