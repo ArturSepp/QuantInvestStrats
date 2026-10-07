@@ -4,10 +4,10 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "12af26c2bbb4e57731e73309a2a4e2a42afdc8c9",
+      "commit": "0c36adc657221e6e383504f1d460a3c811aaaf16",
       "distinct_symbols": 137,
       "call_sites": 1105,
-      "files_scanned": 313,
+      "files_scanned": 338,
       "files_using_qis": 132,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
@@ -151,7 +151,7 @@
     },
     "trendfollowing": {
       "url": "https://github.com/ArturSepp/TrendFollowingSystems.git",
-      "commit": "d257ba88671524f2dfa9a8d24af5126162405101",
+      "commit": "68e19b477f22a1c67df60136a159d14832830f7b",
       "distinct_symbols": 87,
       "call_sites": 428,
       "files_scanned": 103,
@@ -248,10 +248,10 @@
     },
     "privateassets": {
       "url": "https://github.com/ArturSepp/privateassets.git",
-      "commit": "cfb03a6cf1d3d7f5805c8f84cacdf7e58fddbf60",
+      "commit": "e252ac78c5726e8dd9636085c5215c063fb91cf9",
       "distinct_symbols": 5,
       "call_sites": 9,
-      "files_scanned": 31,
+      "files_scanned": 33,
       "files_using_qis": 5,
       "symbols": [
         "BootstrapType",

@@ -5,7 +5,6 @@ import inspect
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib._pylab_helpers import Gcf
 import numpy as np
 import pandas as pd
 import pytest
@@ -32,11 +31,12 @@ from qis.portfolio.signal_data import StrategySignalData
 @pytest.fixture
 def report_figure_cleanup():
     """Clean partial reports after exceptions without closing pre-existing test figures."""
-    existing_managers = set(Gcf.get_all_fig_managers())
+    existing_figures = {number: plt.figure(number) for number in plt.get_fignums()}
     yield
-    for manager in Gcf.get_all_fig_managers():
-        if manager not in existing_managers:
-            plt.close(manager.canvas.figure)
+    for number in plt.get_fignums():
+        figure = plt.figure(number)
+        if existing_figures.get(number) is not figure:
+            plt.close(figure)
 
 
 def _make_signal_data(n_assets: int) -> StrategySignalData:
@@ -54,12 +54,11 @@ def _make_signal_data(n_assets: int) -> StrategySignalData:
 
 
 def _assert_live_figures(figures) -> None:
-    """A closed Figure can still draw; registration must retain the same object too."""
+    """Caller figures must remain registered as the original objects, not replacements."""
     for figure in figures:
-        manager = Gcf.get_fig_manager(figure.number)
-        assert manager is not None
+        assert plt.fignum_exists(figure.number)
         # A later page can reuse a closed figure's number, hiding the loss of the original.
-        assert manager.canvas.figure is figure
+        assert plt.figure(figure.number) is figure
         figure.canvas.draw()
 
 
@@ -94,18 +93,49 @@ def test_monthly_returns_summary_defaults() -> None:
 
 @pytest.mark.parametrize('n_assets', [1, 2], ids=['single-instrument', 'multiple-instruments'])
 def test_generate_strategy_signal_factsheet_by_instrument_preserves_figures(
-        n_assets: int, report_figure_cleanup,
+        n_assets: int, report_figure_cleanup, tmp_path,
 ) -> None:
-    """Interactive callers must retain their figures and every instrument page."""
+    """Completed pages leave pyplot but remain usable without closing caller figures."""
     data = _make_signal_data(n_assets)
     sentinel = plt.figure()
 
     figures = qis.generate_strategy_signal_factsheet_by_instrument(data, time_period=None)
 
     assert len(figures) == n_assets
-    assert [figure._suptitle.get_text() for figure in figures] == list(data.signal.columns)
+    assert [figure.get_suptitle() for figure in figures] == list(data.signal.columns)
     assert all(len(figure.axes) == 14 for figure in figures)
-    _assert_live_figures([sentinel, *figures])
+    _assert_live_figures([sentinel])
+    for figure in figures:
+        assert not plt.fignum_exists(figure.number)
+        figure.canvas.draw()
+    qis.save_figs_to_pdf(figures, 'signal', local_path=str(tmp_path), add_current_date=False)
+    assert (tmp_path / 'signal.pdf').read_bytes().startswith(b'%PDF-')
+
+
+def test_signal_instrument_batch_bounds_registered_pages(
+        monkeypatch, report_figure_cleanup, recwarn,
+) -> None:
+    """A 30-instrument batch must not accumulate pages in pyplot's registry."""
+    data = _make_signal_data(30)
+    sentinel = plt.figure()
+    baseline = set(plt.get_fignums())
+    open_counts = []
+
+    def record_registered_figures(*args, **kwargs):
+        open_counts.append(len(plt.get_fignums()))
+
+    # Real rendering is covered above; isolate registry growth from panel-rendering cost here.
+    for name in ('plot_prices', 'plot_time_series', 'plot_histogram', 'add_bnb_regime_shadows'):
+        monkeypatch.setattr(qis, name, record_registered_figures)
+    with plt.rc_context({'figure.max_open_warning': 20}):
+        figures = qis.generate_strategy_signal_factsheet_by_instrument(data, time_period=None)
+
+    assert len(figures) == 30
+    assert [figure.get_suptitle() for figure in figures] == list(data.signal.columns)
+    assert max(open_counts) == len(baseline) + 1
+    assert set(plt.get_fignums()) == baseline
+    assert not any('More than 20 figures' in str(warning.message) for warning in recwarn)
+    _assert_live_figures([sentinel])
 
 
 @pytest.mark.parametrize(
@@ -116,6 +146,7 @@ def test_generate_strategy_signal_factsheet_by_instrument_preserves_figures(
 )
 def test_generate_strategy_benchmark_factsheet_plt_preserves_figures(
         exposures: bool, brinson: bool, facade: bool, page_count: int, report_figure_cleanup,
+        tmp_path,
 ) -> None:
     """Exposure-page cleanup must not close earlier report pages or caller figures."""
     strategy, prices = _make_portfolio_data(n_assets=2, n_years=3)
@@ -134,34 +165,36 @@ def test_generate_strategy_benchmark_factsheet_plt_preserves_figures(
     assert len(figures) == page_count
     assert len(figures[0].axes) == 14
     if exposures:
-        assert [figure._suptitle.get_text() for figure in figures[-2:]] == [
+        assert [figure.get_suptitle() for figure in figures[-2:]] == [
             f'{instrument} Exposures and Two-sided Turnover' for instrument in strategy.prices
         ]
         assert all(len(figure.axes) == 2 for figure in figures[-2:])
-    _assert_live_figures([sentinel, *figures])
+        assert all(not plt.fignum_exists(figure.number) for figure in figures[-2:])
+    retained_pages = figures[:-2] if exposures else figures
+    _assert_live_figures([sentinel, *retained_pages])
+    for figure in figures:
+        figure.canvas.draw()
+    qis.save_figs_to_pdf(figures, 'benchmark', local_path=str(tmp_path), add_current_date=False)
+    assert (tmp_path / 'benchmark.pdf').read_bytes().startswith(b'%PDF-')
 
 
 @pytest.mark.parametrize('report', ['signal', 'benchmark'])
 def test_factsheet_generators_preserve_caller_figures_after_later_plot_error(
         report: str, monkeypatch, report_figure_cleanup,
 ) -> None:
-    """A caller figure created between iterations must survive a later renderer failure."""
+    """A caller figure created during rendering must survive a later instrument's failure."""
     sentinel = plt.figure()
     caller_figures = [sentinel]
     error = RuntimeError('later instrument renderer failed')
     if report == 'signal':
         data = _make_signal_data(2)
         original_plot = qis.plot_histogram
-        calls = 0
-
         def plot_until_second_instrument(*args, **kwargs):
-            nonlocal calls
-            calls += 1
-            if calls == 8:
+            if kwargs['ax'].figure.get_suptitle() == data.signal.columns[1]:
                 raise error
             result = original_plot(*args, **kwargs)
-            if calls == 7:
-                # The first page is complete: this figure belongs to a callback, not the report.
+            if len(caller_figures) == 1:
+                # A renderer callback can open its own figure while the report page is active.
                 caller_figures.append(plt.figure())
             return result
 

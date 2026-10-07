@@ -97,6 +97,9 @@ the [bibliography](bibliography.md).
 
 ### Part V: Risk
 
+The [risk monitoring guide](risk_monitoring.md) maps everyday monitoring questions to the
+chapters below and computes a point-in-time risk snapshot of one portfolio.
+
 - [Portfolio risk and Euler contributions](risk_contributions.md): marginal, total and relative
   risk contributions and their grouping.
 - [Factor risk models](factor_risk_models.md): EWMA factor models, betas, residual risk and the
@@ -141,6 +144,9 @@ the [bibliography](bibliography.md).
 - [Bibliography](bibliography.md): every work cited by the handbook, in one style.
 - [Software design](software_design.md): module ownership, public API and dependency boundaries.
 - [Package comparison](package_comparison.md): documented workflows in qis and related libraries.
+- [Migrating from pyfolio-reloaded](migrating_from_pyfolio.md) and
+  [migrating from QuantStats](migrating_from_quantstats.md): tear sheets, statistics and plots
+  mapped to qis, with the conventions that make the numbers agree or differ.
 - [API migration history](REMOVED_5_0.md): renamed and removed symbols, with current module imports.
 - [Documentation standard](documentation_standard.md): article, equation, citation and figure rules.
 
@@ -226,6 +232,7 @@ signal_diagnostics
 :maxdepth: 1
 :caption: Part V - Risk
 
+Risk monitoring guide <risk_monitoring>
 risk_contributions
 factor_risk_models
 Tracking error and risk <tracking_error_and_risk>
@@ -266,6 +273,8 @@ api/index
 bibliography
 software_design
 Package comparison <package_comparison>
+Migrating from pyfolio-reloaded <migrating_from_pyfolio>
+Migrating from QuantStats <migrating_from_quantstats>
 REMOVED_5_0
 documentation_standard
 Sharpe convention summary <_included/sharpe_conventions>

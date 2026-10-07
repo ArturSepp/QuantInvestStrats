@@ -160,8 +160,8 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
         **kwargs: additional plotting options
 
     Returns:
-        Open figures in instrument order. The caller closes them after display or saving;
-        unrelated figures are left open.
+        Figures in instrument order, closed in pyplot after each page is completed but still
+        drawable and ready for saving. Unrelated figures are left open.
 
     Raises:
         ValueError: if strategy_signal_data is None
@@ -181,7 +181,6 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                        markersize=1,
                        framealpha=0.75)
     kwargs = qis.update_kwargs(kwargs, plot_kwargs)
-    # Returned pages stay caller-managed; global cleanup would also close unrelated figures.
     figs = []
     for instrument in strategy_signal_data.signal:
         with sns.axes_style('darkgrid'):
@@ -231,4 +230,7 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                                desc_table_type=None,
                                ax=axs[idx][1],
                                **kwargs)
+        # Bound pyplot's registry in large batches without closing caller figures. The returned
+        # Figure still supports canvas drawing and PDF saving after it leaves the registry.
+        plt.close(fig)
     return figs

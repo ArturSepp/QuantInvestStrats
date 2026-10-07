@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "40dc48e20a5875ead0ab89ff2b515d93618c3388",
+  "measured_at_commit": "8c36e45530c3e03449954f43d6275a92bc8dc323",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": "in 40 of the 47 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 100,
+      "value": 106,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -22,7 +22,7 @@
       "paper_phrase": null
     },
     "ai_coauthored_last_day": {
-      "value": "2026-10-01",
+      "value": "2026-10-07",
       "how": "latest AI co-authored commit",
       "live": false,
       "paper_phrase": null
@@ -46,50 +46,50 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 5672,
+      "value": 6101,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 878,
+      "value": 896,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
       "value": 1105,
-      "how": "tools/audit_consumers.py at 12af26c2bbb4",
+      "how": "tools/audit_consumers.py at 0c36adc65722",
       "live": false,
       "paper_phrase": "at 1105 sites"
     },
     "consumer_optimalportfolios_symbols": {
       "value": 137,
-      "how": "tools/audit_consumers.py at 12af26c2bbb4",
+      "how": "tools/audit_consumers.py at 0c36adc65722",
       "live": false,
       "paper_phrase": "references 137 of its symbols"
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
-      "how": "tools/audit_consumers.py at cfb03a6cf1d3",
+      "how": "tools/audit_consumers.py at e252ac78c572",
       "live": false,
       "paper_phrase": null
     },
     "consumer_privateassets_symbols": {
       "value": 5,
-      "how": "tools/audit_consumers.py at cfb03a6cf1d3",
+      "how": "tools/audit_consumers.py at e252ac78c572",
       "live": false,
       "paper_phrase": null
     },
     "consumer_trendfollowing_call_sites": {
       "value": 428,
-      "how": "tools/audit_consumers.py at d257ba886715",
+      "how": "tools/audit_consumers.py at 68e19b477f22",
       "live": false,
       "paper_phrase": "at 428 sites"
     },
     "consumer_trendfollowing_symbols": {
       "value": 87,
-      "how": "tools/audit_consumers.py at d257ba886715",
+      "how": "tools/audit_consumers.py at 68e19b477f22",
       "live": false,
       "paper_phrase": "references 87 symbols"
     },

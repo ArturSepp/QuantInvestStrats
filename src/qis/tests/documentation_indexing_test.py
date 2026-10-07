@@ -1,4 +1,4 @@
-"""Canonical URL and sitemap contracts, without importing optional documentation tools."""
+"""Canonical URL, robots and sitemap contracts, without importing optional documentation tools."""
 
 from html.parser import HTMLParser
 from pathlib import Path
@@ -26,6 +26,7 @@ def make_app(tmp_path, *, base=BASE, builder='html'):
         env=SimpleNamespace(found_docs={
             'index', 'portfolio_breadth', 'api/generated/qis.RiskModel',
             'search', 'genindex', 'py-modindex', '_modules/qis/example',
+            '_included/sharpe_conventions',
         }),
         outdir=str(tmp_path),
     )
@@ -74,6 +75,23 @@ def test_sitemap_includes_unchanged_pages_on_incremental_builds(tmp_path):
     assert (tmp_path / 'sitemap.xml').read_bytes() == initial
 
 
+def test_package_note_mirrors_are_kept_out_of_the_search_index(tmp_path):
+    """Mirrored package notes get noindex after their description and leave the sitemap."""
+    app = make_app(tmp_path)
+    description = '<meta name="description" content="A packaged note.">\n'
+    mirrored = {'metatags': description}
+    chapter = {'metatags': description}
+    helper = {}
+    SEO['set_robots_meta'](app, '_included/sharpe_conventions', 'page.html', mirrored, None)
+    SEO['set_robots_meta'](app, 'portfolio_breadth', 'page.html', chapter, None)
+    SEO['set_robots_meta'](app, '_included/plotting_kwargs', 'page.html', helper, None)
+    assert mirrored['metatags'] == description + SEO['ROBOTS_NOINDEX']
+    assert chapter['metatags'] == description
+    assert helper['metatags'] == SEO['ROBOTS_NOINDEX']
+    SEO['write_sitemap'](app, None)
+    assert b'_included' not in (tmp_path / 'sitemap.xml').read_bytes()
+
+
 def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
     """Exercise Sphinx events and rendered canonical tags when the docs extra is installed."""
     pytest.importorskip('sphinx')
@@ -86,8 +104,11 @@ def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
         f'html_baseurl = {BASE!r}\n'
         "project = 'Indexing test'\n", encoding='utf-8')
     (source / 'index.rst').write_text(
-        'Home\n====\n\n.. toctree::\n\n   method\n', encoding='utf-8')
+        'Home\n====\n\n.. toctree::\n\n   method\n   _included/note\n', encoding='utf-8')
     (source / 'method.rst').write_text('Method\n======\n\nA distinct method.\n', encoding='utf-8')
+    (source / '_included').mkdir()
+    (source / '_included' / 'note.rst').write_text(
+        'Note\n====\n\nA mirrored package note.\n', encoding='utf-8')
     output = tmp_path / 'html'
     result = subprocess.run(
         [sys.executable, '-m', 'sphinx', '-W', '-b', 'html', str(source), str(output)],
@@ -96,16 +117,19 @@ def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
 
     class Canonicals(HTMLParser):
-        """Collect the browser-visible canonical link declarations."""
+        """Collect the browser-visible canonical link and robots declarations."""
 
         def __init__(self):
             super().__init__()
             self.urls = []
+            self.robots = []
 
         def handle_starttag(self, tag, attrs):
             attrs = dict(attrs)
             if tag == 'link' and attrs.get('rel') == 'canonical':
                 self.urls.append(attrs['href'])
+            if tag == 'meta' and attrs.get('name') == 'robots':
+                self.robots.append(attrs['content'])
 
     stable_base = BASE.replace('/latest/', '/stable/')
     expected = {'index': stable_base, 'method': stable_base + 'method.html'}
@@ -113,6 +137,10 @@ def test_real_sphinx_theme_uses_the_same_urls_as_the_sitemap(tmp_path):
         parser = Canonicals()
         parser.feed((output / f'{name}.html').read_text(encoding='utf-8'))
         assert parser.urls == [url]
+        assert parser.robots == []
+    parser = Canonicals()
+    parser.feed((output / '_included' / 'note.html').read_text(encoding='utf-8'))
+    assert parser.robots == ['noindex, follow']
     tree = ElementTree.parse(output / 'sitemap.xml')
     assert {node.text for node in tree.findall(
         './/{http://www.sitemaps.org/schemas/sitemap/0.9}loc')} == set(expected.values())

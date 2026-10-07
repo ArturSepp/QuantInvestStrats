@@ -7,6 +7,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve caller-owned figures and earlier report pages in
+  `generate_strategy_signal_factsheet_by_instrument` and in
+  `generate_strategy_benchmark_factsheet_plt(..., add_exposures_comp=True)`.
+  Close only completed instrument pages to avoid accumulating them in pyplot; returned pages
+  remain drawable and saveable. Report contents and page order are unchanged.
+
+## [5.33.4] - 2026-10-07
+
 ### Changed
 
 - Reduce memory use in `compute_ewm_corr_df(..., corr_matrix_output=CorrMatrixOutput.TOP_ROW)`
@@ -28,10 +38,6 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Preserve caller-owned DataFrame indexes when `save_df_to_excel` or
   `save_df_dict_to_excel(..., delocalize=True)` removes timezone information for Excel.
   Workbook local wall-clock timestamps, transpose and append behavior are unchanged.
-- Leave caller-owned figures and returned pages open in
-  `generate_strategy_signal_factsheet_by_instrument` and in
-  `generate_strategy_benchmark_factsheet_plt(..., add_exposures_comp=True)`.
-  Report contents and page order are unchanged; callers close figures after use.
 - Return NaN betas in `qis.regimes.compute_regime_ewm_betas` for constant within-regime
   benchmarks, zero EWMA benchmark variance, or assets with no observations in a regime,
   without invalid-division warnings. Return NaN residual variance when no fitted residual remains,
@@ -56,6 +62,26 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Retain valid zero total returns and their cash-relative excess returns in
   `FxRatesData.compute_performance_of_local_ccy_asset_in_reference_ccy` and its panel wrappers,
   while keeping inception missing and the explicit panel zero-to-NaN policy unchanged.
+
+### Documentation
+
+- Add migration guides from pyfolio-reloaded and QuantStats. They map tear sheets, reports,
+  statistics and plots to qis functions, and tabulate which statistics agree on a shared daily
+  series and which differ by convention: year count, Sharpe and Sortino definitions, alpha
+  annualisation and information-ratio scaling. Checked against pyfolio-reloaded 0.9.9 and
+  QuantStats 0.0.86. No signature or computed value changes.
+- Title each site page as `<page title> - qis`; the homepage and sidebar keep the full site
+  title. Mark the `_included/` mirrors of the packaged notes `noindex, follow` and leave them
+  out of the sitemap, so search engines index one page per topic.
+- Open the portfolio-breadth chapter with the Grinold (1989) definition of breadth and link it
+  to the signal-diagnostics treatment of the fundamental law. Point the README's documentation
+  links at the canonical `stable` version. No signature or computed value changes.
+- Add a risk monitoring guide that maps monitoring questions (volatility, risk sources, value at
+  risk, benchmark distance, drawdowns, diversification, stress and regimes) to qis functions
+  and handbook chapters, with an offline point-in-time risk snapshot of one portfolio. Link it
+  from Part V of the handbook. No signature or computed value changes.
+- Give the generated API reference page a meta description, the only page of the site other than
+  the packaged-note mirrors without one. No signature or computed value changes.
 
 ## [5.33.3] - 2026-10-03
 
