@@ -7,6 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve caller-owned figures and earlier report pages in
+  `generate_strategy_signal_factsheet_by_instrument` and in
+  `generate_strategy_benchmark_factsheet_plt(..., add_exposures_comp=True)`.
+  Close only completed instrument pages to avoid accumulating them in pyplot; returned pages
+  remain drawable and saveable. Report contents and page order are unchanged.
+
 ## [5.33.4] - 2026-10-07
 
 ### Changed

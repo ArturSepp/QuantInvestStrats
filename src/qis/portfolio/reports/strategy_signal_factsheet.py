@@ -149,7 +149,23 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                                                      regime_classifier: BenchmarkReturnsQuantilesRegime = None,
                                                      **kwargs
                                                      ) -> List[plt.Figure]:
+    """Plot signal, volatility, leverage and weight histories for each instrument.
 
+    Args:
+        strategy_signal_data: aligned strategy histories to display
+        time_period: reporting window; None uses the full history
+        figsize: page size in inches
+        fontsize: base font size
+        regime_classifier: benchmark-return regimes used for background shading
+        **kwargs: additional plotting options
+
+    Returns:
+        Figures in instrument order, closed in pyplot after each page is completed but still
+        drawable and ready for saving. Unrelated figures are left open.
+
+    Raises:
+        ValueError: if strategy_signal_data is None
+    """
     if strategy_signal_data is None:
         raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
 
@@ -214,5 +230,7 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                                desc_table_type=None,
                                ax=axs[idx][1],
                                **kwargs)
-            plt.close('all')
+        # Bound pyplot's registry in large batches without closing caller figures. The returned
+        # Figure still supports canvas drawing and PDF saving after it leaves the registry.
+        plt.close(fig)
     return figs

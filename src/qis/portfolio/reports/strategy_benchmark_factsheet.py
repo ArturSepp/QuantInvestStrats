@@ -110,7 +110,9 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         add_joint_instrument_history_report: add the per-instrument history page
 
     Returns:
-        the pages, in order, ready for :func:`save_figs_to_pdf`
+        Pages in order, ready for :func:`save_figs_to_pdf`. Completed per-instrument exposure
+        comparison pages are closed in pyplot but remain drawable and saveable. Other pages
+        remain open for the caller to close after use; unrelated figures are left open.
     """
     if 'heatmap_fontsize' in kwargs:
         raise TypeError("heatmap_fontsize was removed; use fontsize")
@@ -395,8 +397,9 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                      legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
                                      var_format='{:,.2%}',
                                      ax=axs[1], **kwargs)
-
-            plt.close('all')
+            # Close only the completed exposure page: keep earlier report and caller figures
+            # registered, while the returned Figure remains usable by save_figs_to_pdf.
+            plt.close(fig1)
 
     if add_exposures_pnl_attribution:
         strategy_name = multi_portfolio_data.portfolio_datas[strategy_idx].ticker
