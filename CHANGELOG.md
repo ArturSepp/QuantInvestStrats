@@ -24,6 +24,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Reduce memory use in `plot_returns_ewm_corr_table(..., is_last=True)` for nonempty
+  float32/float64 panels with scalar smoothing by computing only the final covariance state.
+  Displayed correlations, normalization and average-mode behavior are unchanged.
 - Speed up `unsmooth_returns_glm` for ordinary numeric DataFrame panels with supplied `theta`
   by applying the fixed filter across the panel. Results, diagnostics and missing-lag behavior
   are unchanged; Series, estimated weights and exceptional inputs retain their existing paths.
