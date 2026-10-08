@@ -76,15 +76,25 @@ def compute_te_ir_errors(return_diffs: pd.DataFrame) -> Tuple[pd.Series, pd.Seri
     conditional tracking-error series is required.
 
     Args:
-        return_diffs: DataFrame of (strategy_return - benchmark_return) per period.
+        return_diffs: Real-numeric DataFrame of (strategy_return - benchmark_return) per period.
+            Nullable real-numeric columns are supported; missing values are omitted separately
+            for each column. Annualisation is inferred from the original time index.
 
     Returns:
         Tuple of (tracking_error_series, information_ratio_series), both indexed by
-        the columns of return_diffs and annualised.
+        the columns of return_diffs and annualised using the sample standard deviation (ddof=1).
+        Zero sample spread gives TE zero and IR NaN; undersized per-column samples give NaNs.
     """
     vol_dt = np.sqrt(infer_annualisation_factor_from_df(return_diffs))
-    avg = np.nanmean(return_diffs, axis=0)
-    vol = np.nanstd(return_diffs, axis=0, ddof=1)
+    values = return_diffs.to_numpy()
+    # Nullable columns expose pd.NA in object arrays, which NumPy's NaN mask cannot evaluate.
+    # Normalize real-numeric panels only; retain ordinary array precision and do not turn
+    # infinities into missing observations or parse nonnumeric inputs as returns.
+    if values.dtype == object and all(
+            pd.api.types.is_any_real_numeric_dtype(dtype) for dtype in return_diffs.dtypes):
+        values = return_diffs.to_numpy(dtype=float, na_value=np.nan)
+    avg = np.nanmean(values, axis=0)
+    vol = np.nanstd(values, axis=0, ddof=1)
     # NumPy 2.x: explicit out= buffer so masked positions (vol==0) are deterministic nan.
     ir = vol_dt * np.divide(
         avg, vol,
