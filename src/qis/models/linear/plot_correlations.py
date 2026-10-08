@@ -74,20 +74,43 @@ def plot_returns_ewm_corr_table(prices: pd.DataFrame,
                                 ax: plt.Subplot = None,
                                 **kwargs
                                 ) -> plt.Figure:
-    """
-     plot corr table of rices
+    """Plot the last EWM return correlation matrix or its time average.
+
+    Args:
+        prices: Price panel with assets in columns.
+        span: Smoothing span; when supplied, overrides ``ewm_lambda``.
+        ewm_lambda: EWM decay in [0, 1), used when ``span`` is None.
+        var_format: Format string for cell annotations.
+        return_type: Return convention; log returns by default.
+        init_type: Native covariance seed; ZERO and X0 both use a zero matrix.
+        freq: Optional price-sampling frequency before return conversion.
+        cmap: Heatmap colour map.
+        is_last: Display the final matrix when True, otherwise the time average of
+            normalized matrices. Nonempty float32/float64 panels with scalar smoothing
+            compute only the final state; other inputs retain the tensor path.
+        ax: Optional axis on which to draw.
+        **kwargs: Heatmap options; shared arguments are in ``qis/docs/plotting_kwargs.md``.
+
+    Returns:
+        The new figure, or None when drawing on a supplied axis.
     """
     returns = ret.to_returns(prices=prices, return_type=return_type, freq=freq)
-    init_value = ewm.set_init_dim2(data=returns.to_numpy(), init_type=init_type)
-    corr = ewm.compute_ewm_covar_tensor(a=returns.to_numpy(),
-                                        span=span,
-                                        ewm_lambda=ewm_lambda,
-                                        covar0=init_value,
-                                        is_corr=True)
-    if is_last:
-        ar = corr[-1]
+    values = returns.to_numpy()
+    init_value = ewm.set_init_dim2(data=values, init_type=init_type)
+    scalar_types = (int, float, np.integer, np.floating)
+    # The last matrix needs the full current covariance for global normalization, not
+    # its t*n*n history. Keep exceptional representations on their native dispatcher
+    # so reducing storage does not widen the accepted input or error behavior.
+    if (is_last and values.ndim == 2 and values.shape[0] > 0
+            and values.dtype in (np.dtype('float32'), np.dtype('float64'))
+            and isinstance(ewm_lambda, scalar_types)
+            and (span is None or isinstance(span, scalar_types))):
+        ar = ewm.compute_ewm_covar(a=values, span=span, ewm_lambda=ewm_lambda,
+                                   covar0=init_value, is_corr=True)
     else:
-        ar = npo.tensor_mean(corr)
+        corr = ewm.compute_ewm_covar_tensor(a=values, span=span, ewm_lambda=ewm_lambda,
+                                            covar0=init_value, is_corr=True)
+        ar = corr[-1] if is_last else npo.tensor_mean(corr)
 
     df = pd.DataFrame(ar, index=prices.columns, columns=prices.columns)
     fig = phe.plot_heatmap(df=df,
