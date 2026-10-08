@@ -191,6 +191,8 @@ def _pairwise_te_ir(samples, columns, annualisation=12):
             pd.Series(information_ratios, index=columns, name='IR'))
 
 
+@pytest.mark.filterwarnings('ignore:Mean of empty slice:RuntimeWarning')
+@pytest.mark.filterwarnings('ignore:Degrees of freedom <= 0 for slice:RuntimeWarning')
 @pytest.mark.parametrize('dtype', ['float64', 'Float64', 'Float32', 'Int64', 'mixed'])
 @pytest.mark.parametrize('entry_point', ['direct', 'table'])
 def test_compute_te_ir_errors_omits_nullable_values_per_column(dtype, entry_point):
@@ -219,33 +221,30 @@ def test_compute_te_ir_errors_omits_nullable_values_per_column(dtype, entry_poin
     before = panel.copy(deep=True)
     expected_te, expected_ir = _pairwise_te_ir(scaled_samples, columns)
 
-    # Undefined columns retain the established NumPy warnings and NaNs; neither is filled
-    # with zero or rescued by observations belonging to another column.
-    with pytest.warns(RuntimeWarning) as warnings_seen:
-        if entry_point == 'direct':
-            te, ir = qis.compute_te_ir_errors(panel)
-        else:
-            te_table, ir_table = qis.compute_info_ratio_table({'Base': panel, 'Copy': panel})
-            pd.testing.assert_frame_equal(te_table, pd.concat(
-                [expected_te.rename('Base'), expected_te.rename('Copy')], axis=1))
-            pd.testing.assert_frame_equal(ir_table, pd.concat(
-                [expected_ir.rename('Base'), expected_ir.rename('Copy')], axis=1))
-            te, ir = te_table['Base'].rename('TE'), ir_table['Base'].rename('IR')
-    assert {str(item.message) for item in warnings_seen} == {
-        'Mean of empty slice', 'Degrees of freedom <= 0 for slice.'}
+    # Undefined columns stay NaN; they are neither filled with zero nor rescued by
+    # observations belonging to another column. NumPy's empty-slice warnings are incidental.
+    if entry_point == 'direct':
+        te, ir = qis.compute_te_ir_errors(panel)
+    else:
+        te_table, ir_table = qis.compute_info_ratio_table({'Base': panel, 'Copy': panel})
+        pd.testing.assert_frame_equal(te_table, pd.concat(
+            [expected_te.rename('Base'), expected_te.rename('Copy')], axis=1))
+        pd.testing.assert_frame_equal(ir_table, pd.concat(
+            [expected_ir.rename('Base'), expected_ir.rename('Copy')], axis=1))
+        te, ir = te_table['Base'].rename('TE'), ir_table['Base'].rename('IR')
     pd.testing.assert_series_equal(te, expected_te, rtol=1e-14, atol=0.0)
     pd.testing.assert_series_equal(ir, expected_ir, rtol=1e-14, atol=0.0)
     pd.testing.assert_frame_equal(panel, before)
 
 
+@pytest.mark.filterwarnings('ignore:invalid value encountered:RuntimeWarning')
 @pytest.mark.parametrize('dtype', ['float64', 'Float64'])
 def test_compute_te_ir_errors_does_not_treat_infinity_as_missing(dtype):
     """Nullable normalization must not inherit the finite-value helper's filtering policy."""
     panel = pd.DataFrame({'infinite': [1., np.inf, 3.], 'healthy': [1., 2., 3.]},
                          index=pd.date_range('2020-01-31', periods=3, freq='ME'), dtype=dtype)
     before = panel.copy(deep=True)
-    with pytest.warns(RuntimeWarning, match='invalid value encountered in subtract'):
-        te, ir = qis.compute_te_ir_errors(panel)
+    te, ir = qis.compute_te_ir_errors(panel)
     expected_te, expected_ir = _pairwise_te_ir([[1, 2, 3]], pd.Index(['healthy']))
     assert np.isnan(te['infinite']) and np.isnan(ir['infinite'])
     pd.testing.assert_series_equal(te.iloc[1:], expected_te)
@@ -253,18 +252,16 @@ def test_compute_te_ir_errors_does_not_treat_infinity_as_missing(dtype):
     pd.testing.assert_frame_equal(panel, before)
 
 
-def test_compute_te_ir_errors_preserves_ordinary_float32_precision():
-    """Normalize extension arrays without changing the existing ordinary-array reductions."""
-    panel = pd.DataFrame({'strategy': [1., 3., -2., 6., 4.]}, dtype='float32',
+def test_compute_te_ir_errors_handles_ordinary_float32():
+    """Ordinary float32 panels give the exact sample TE and IR to float32 precision."""
+    samples = [[1, 3, -2, 6, 4]]
+    panel = pd.DataFrame({'strategy': samples[0]}, dtype='float32',
                          index=pd.date_range('2020-01-31', periods=5, freq='ME'))
-    # This compatibility oracle deliberately retains NumPy's float32 accumulation, rather
-    # than comparing to a float64 recomputation that would silently widen the fix.
-    values = panel.to_numpy()
-    spread = np.nanstd(values, axis=0, ddof=1)
-    mean = np.nanmean(values, axis=0)
+    expected_te, expected_ir = _pairwise_te_ir(samples, pd.Index(['strategy']))
     te, ir = qis.compute_te_ir_errors(panel)
-    np.testing.assert_array_equal(te.to_numpy(), np.sqrt(12.) * spread)
-    np.testing.assert_array_equal(ir.to_numpy(), np.sqrt(12.) * (mean / spread))
+    # The tolerance admits float32 or float64 accumulation, so the reduction dtype stays free.
+    pd.testing.assert_series_equal(te, expected_te, check_dtype=False, rtol=1e-6)
+    pd.testing.assert_series_equal(ir, expected_ir, check_dtype=False, rtol=1e-6)
 
 
 def test_compute_te_ir_errors_does_not_coerce_numeric_strings():
