@@ -1,5 +1,6 @@
 """Tests for canonical ex-post tracking-error estimators."""
 from fractions import Fraction
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -23,6 +24,115 @@ def _tracking_error(return_diff: np.ndarray, span: int = 6) -> pd.Series:
         benchmark_nav=benchmark_nav,
         ewma_span=span,
     )
+
+
+def _constant_magnitude_navs(index, is_log_returns=False, dtype='float64'):
+    """Build known active returns without using the production return converter."""
+    differences = 0.01 * np.resize([1.0, -1.0], len(index) - 1)
+    levels = (np.exp(np.cumsum(differences)) if is_log_returns
+              else np.cumprod(1.0 + differences))
+    portfolio = pd.Series(np.concatenate(([100.0], 100.0 * levels)), index=index,
+                          name='Portfolio', dtype=dtype)
+    benchmark = pd.Series(100.0, index=index, name='Benchmark', dtype=dtype)
+    return portfolio, benchmark
+
+
+@pytest.mark.parametrize('freq,periods,span,factor', [
+    ('B', 4, 3, 252), ('ME', 2, 1, 12), ('QE', 2, 1, 4), ('D', 4, 3, 365),
+    ('2ME', 2, 1, 6), ('BQE', 2, 1, 4), ('3QE', 2, 1, 4 / 3),
+    ('WOM-2WED', 2, 1, 12), ('SME-15', 2, 1, 24),
+])
+@pytest.mark.parametrize('is_log_returns', [False, True])
+@pytest.mark.parametrize('dtype', ['float64', 'Float64'])
+def test_compute_ewma_realised_tracking_error_honors_explicit_frequency(
+        freq, periods, span, factor, is_log_returns, dtype):
+    """Short samples cannot overrule the caller's grid or its periods-per-year units."""
+    index = pd.date_range('2026-06-01', periods=periods + 1, freq=freq, tz='UTC')
+    portfolio, benchmark = _constant_magnitude_navs(index, is_log_returns, dtype)
+    before_portfolio, before_benchmark = portfolio.copy(), benchmark.copy()
+
+    result = qis.compute_ewma_realised_tracking_error(
+        portfolio, benchmark, ewma_span=span, freq=freq, is_log_returns=is_log_returns)
+
+    # Each squared active return is .0001. X0 seeds that same value, so every EWMA update
+    # leaves it unchanged. Factors are independently counted, not taken from the helper.
+    values = np.full(periods, 0.01 * np.sqrt(factor))
+    values[:span] = np.nan
+    expected = pd.Series(values, index=index[1:], name='Tracking error')
+    pd.testing.assert_series_equal(result, expected, rtol=1e-12, atol=0.0)
+    pd.testing.assert_series_equal(portfolio, before_portfolio)
+    pd.testing.assert_series_equal(benchmark, before_benchmark)
+
+
+@pytest.mark.parametrize('is_log_returns', [False, True])
+def test_compute_ewma_realised_tracking_error_preserves_business_day_prefix(is_log_returns):
+    """Monday's arrival must not rescale Friday's already-observable risk estimate."""
+    index = pd.date_range('2026-06-01', periods=6, freq='B')
+    portfolio, benchmark = _constant_magnitude_navs(index, is_log_returns)
+    short = qis.compute_ewma_realised_tracking_error(
+        portfolio.iloc[:5], benchmark.iloc[:5], ewma_span=3, freq='B',
+        is_log_returns=is_log_returns)
+    extended = qis.compute_ewma_realised_tracking_error(
+        portfolio, benchmark, ewma_span=3, freq='B', is_log_returns=is_log_returns)
+
+    pd.testing.assert_series_equal(short, extended.iloc[:len(short)])
+    np.testing.assert_allclose(short.iloc[-1], 0.01 * np.sqrt(252), rtol=1e-12)
+
+
+@pytest.mark.parametrize('irregular', [False, True])
+def test_compute_ewma_realised_tracking_error_retains_inference_without_frequency(irregular):
+    """An omitted grid keeps the existing inference and irregular-index warning/fallback."""
+    index = (pd.DatetimeIndex(['2026-06-01', '2026-06-02', '2026-06-04',
+                               '2026-06-05', '2026-06-08']) if irregular
+             else pd.date_range('2026-06-01', periods=5, freq='B'))
+    portfolio, benchmark = _constant_magnitude_navs(index)
+    # Tuesday through Friday infer as D even though the original NAV index carries B.
+    # This compatibility path deliberately differs from explicitly requesting freq='B'.
+    if irregular:
+        with pytest.warns(UserWarning, match='cannot infer None - using 252'):
+            result = qis.compute_ewma_realised_tracking_error(
+                portfolio, benchmark, ewma_span=3, freq=None)
+    else:
+        result = qis.compute_ewma_realised_tracking_error(
+            portfolio, benchmark, ewma_span=3, freq=None)
+    factor = 252 if irregular else 365
+    expected = pd.Series([np.nan, np.nan, np.nan, 0.01 * np.sqrt(factor)],
+                         index=index[1:], name='Tracking error')
+    pd.testing.assert_series_equal(result, expected, rtol=1e-12, atol=0.0)
+
+
+@pytest.mark.parametrize('freq', ['D_8H', 'B_8H', 'M-FRI', 'Q-FRI', 'Q-3FRI', 'SE'])
+@pytest.mark.parametrize('is_log_returns', [False, True])
+@pytest.mark.parametrize('dtype', ['float64', 'Float64'])
+def test_compute_ewma_realised_tracking_error_preserves_bespoke_grids(
+        freq, is_log_returns, dtype):
+    """QIS-only schedules retain the existing inferred scaling and warning contract."""
+    index = pd.date_range('2020-01-01', periods=810, freq='D', tz='UTC')
+    portfolio, benchmark = _constant_magnitude_navs(index, is_log_returns, dtype)
+    before_portfolio, before_benchmark = portfolio.copy(), benchmark.copy()
+    prices = pd.concat([portfolio.rename('p'), benchmark.rename('b')], axis=1)
+    returns = qis.to_returns(prices, freq=freq, is_log_returns=is_log_returns, drop_first=True)
+    differences = (returns['p'] - returns['b']).dropna()
+
+    # Replay the established delegation, not a new annualisation convention for bespoke
+    # dates. SE also protects the all-warm-up result and short-index fallback warning.
+    with warnings.catch_warnings(record=True) as expected_warnings:
+        warnings.simplefilter('always', UserWarning)
+        expected = qis.compute_ewm_vol(
+            differences, span=3, annualize=True, warmup_period=3).rename('Tracking error')
+    with warnings.catch_warnings(record=True) as actual_warnings:
+        warnings.simplefilter('always', UserWarning)
+        result = qis.compute_ewma_realised_tracking_error(
+            portfolio, benchmark, ewma_span=3, freq=freq, is_log_returns=is_log_returns)
+
+    pd.testing.assert_series_equal(result, expected, check_exact=True)
+    assert [(w.category, str(w.message)) for w in actual_warnings] == [
+        (w.category, str(w.message)) for w in expected_warnings]
+    if freq == 'D_8H':
+        # Daily constant-magnitude active returns give an independent numerical check.
+        np.testing.assert_allclose(result.dropna(), 0.01 * np.sqrt(365), rtol=1e-12)
+    pd.testing.assert_series_equal(portfolio, before_portfolio)
+    pd.testing.assert_series_equal(benchmark, before_benchmark)
 
 
 def test_constant_magnitude_difference_has_exact_monthly_annualisation() -> None:

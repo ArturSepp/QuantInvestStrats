@@ -14,7 +14,8 @@ import pandas as pd
 
 from qis.models.linear.ewm import compute_ewm_vol
 from qis.perfstats.returns import to_returns
-from qis.utils.annualisation import infer_annualisation_factor_from_df
+from qis.utils.annualisation import (get_annualization_factor,
+                                    infer_annualisation_factor_from_df)
 
 
 def compute_ewma_realised_tracking_error(
@@ -27,8 +28,10 @@ def compute_ewma_realised_tracking_error(
     """Compute annualised EWMA realised (ex-post) tracking error from NAVs.
 
     Both NAVs are resampled to ``freq`` before their period returns are differenced.
-    The EWMA variance recursion, its initialisation, and the annualisation factor implied
-    by ``freq`` all come from ``compute_ewm_vol``. The first ``ewma_span`` estimates are
+    The EWMA variance recursion and its initialisation come from ``compute_ewm_vol``.
+    For pandas frequency aliases, annualisation uses the native periods-per-year factor
+    for ``freq``, rather than inferring it from the surviving sample. QIS-only schedules
+    retain index-based inference. The first ``ewma_span`` estimates are
     masked while the EWMA state warms up. For unconditional whole-sample TE and IR scalars,
     use ``compute_te_ir_errors`` or ``compute_info_ratio_table``.
 
@@ -36,7 +39,9 @@ def compute_ewma_realised_tracking_error(
         portfolio_nav: Portfolio NAV time series.
         benchmark_nav: Benchmark NAV time series.
         ewma_span: EWMA span in periods of ``freq``.
-        freq: Resampling frequency for the return differences.
+        freq: Resampling frequency; pandas aliases also determine annualisation.
+            None keeps the input grid. None and QIS-only schedules such as ``D_8H``
+            retain annualisation inferred from the surviving return index.
         is_log_returns: If True, use log returns; otherwise use simple returns.
 
     Returns:
@@ -60,10 +65,23 @@ def compute_ewma_realised_tracking_error(
         drop_first=True,
     )
     return_diff = (returns['portfolio'] - returns['benchmark']).dropna()
+    # A short B grid can look calendar-daily, and too few monthly/quarterly returns fall
+    # back to 252. Keep explicit pandas-grid risk units stable as observations arrive.
+    annualization_factor = None
+    if freq is not None:
+        try:
+            pd.tseries.frequencies.to_offset(freq)
+        except ValueError:
+            # QIS resampling also accepts bespoke schedules that pandas cannot parse.
+            # Keep their existing inference rather than the factor helper's unknown-grid 1.0.
+            pass
+        else:
+            annualization_factor = get_annualization_factor(freq)
     tracking_error = compute_ewm_vol(
         data=return_diff,
         span=ewma_span,
         annualize=True,
+        annualization_factor=annualization_factor,
         warmup_period=ewma_span,
     )
     return tracking_error.rename('Tracking error')

@@ -40,7 +40,7 @@ absolute return or low total portfolio volatility.
 |---|---|
 | Return basis | Simple or log returns via `is_log_returns`; the difference is formed before estimation |
 | Sampling grid | `freq` of the ex-post estimators, default `ME`; covariance dates for ex-ante risk |
-| Annualisation | Ex post: $\sqrt{\mathrm{af}}$ from the return index; ex ante: the covariance scale |
+| Annualisation | Ex post: $\sqrt{\mathrm{af}}$ from explicit pandas `freq` aliases for EWMA, otherwise from the return index; ex ante: the covariance scale |
 | Mean adjustment | Whole-sample TE is demeaned; the EWMA TE is a second moment about zero |
 | Timing | Ex-ante weights as of each covariance date; ex-post estimates are descriptive |
 | Output units | Decimal TE in the units of the covariance or annualised; dimensionless IR |
@@ -53,7 +53,7 @@ absolute return or low total portfolio volatility.
 | $\Sigma$ | Asset-return covariance | Periodic or annualised fractional covariance; state which |
 | $x_t=r_{p,t}-r_{b,t}$ | Realised active return | Difference of returns using the same convention and grid |
 | $s(x)$ | Sample standard deviation | `ddof=1`; NaNs omitted per column |
-| $\mathrm{af}$ | Periods per year | Inferred from the return-difference index; 12 for regular month-end observations |
+| $\mathrm{af}$ | Periods per year | Native factor for EWMA pandas `freq` aliases; index inference for `freq=None`, QIS-only schedules and whole-sample TE/IR |
 | `ewma_span` | EWMA span | Count of sampled return periods, not calendar days |
 
 Supply positive NAVs over an explicitly aligned sample. Choose simple or log returns with
@@ -137,7 +137,12 @@ the annualisation helper's fallback, so construct the intended regular return gr
 
 `compute_ewma_realised_tracking_error` concatenates the NAVs, removes jointly missing rows,
 forward-fills, samples to `freq`, forms the chosen returns, and passes their difference to qis's
-EWMA volatility estimator. The first `ewma_span` estimates are masked for warm-up. Clip both
+EWMA volatility estimator. Annualisation uses `get_annualization_factor(freq)` for an explicit
+pandas frequency alias (252 for `B`, 12 for `ME`, 4 for `QE`), so a short sample or newly arriving
+dates do not change its risk units. With `freq=None`, the input grid is retained. None and QIS-only
+schedules such as `D_8H`, the monthly/quarterly Friday schedules and `SE` retain annualisation
+inferred from the surviving return index, including its warning and fallback when inference fails.
+The first `ewma_span` estimates are masked for warm-up. Clip both
 ends to the intended common sample before calling it: forward-filling a terminated NAV would
 otherwise imply a stale investment value.
 
