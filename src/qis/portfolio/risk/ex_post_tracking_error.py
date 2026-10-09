@@ -70,13 +70,15 @@ def compute_ewma_realised_tracking_error(
     annualization_factor = None
     if freq is not None:
         try:
-            pd.tseries.frequencies.to_offset(freq)
+            offset = pd.tseries.frequencies.to_offset(freq)
         except ValueError:
             # QIS resampling also accepts bespoke schedules that pandas cannot parse.
             # Keep their existing inference rather than the factor helper's unknown-grid 1.0.
             pass
         else:
-            annualization_factor = get_annualization_factor(freq)
+            # The helper recognizes C but not 1C. Use pandas' canonical spelling to keep
+            # these equivalent aliases on the same annualisation path.
+            annualization_factor = get_annualization_factor(offset.freqstr)
     tracking_error = compute_ewm_vol(
         data=return_diff,
         span=ewma_span,

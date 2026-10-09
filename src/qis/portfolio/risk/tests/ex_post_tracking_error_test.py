@@ -64,6 +64,34 @@ def test_compute_ewma_realised_tracking_error_honors_explicit_frequency(
     pd.testing.assert_series_equal(benchmark, before_benchmark)
 
 
+@pytest.mark.parametrize('freq,factor', [
+    ('C', 252), ('1C', 252), ('WOM-2WED', 12), ('1WOM-2WED', 12),
+])
+@pytest.mark.parametrize('is_log_returns', [False, True])
+@pytest.mark.parametrize('dtype', ['float64', 'Float64'])
+def test_compute_ewma_realised_tracking_error_preserves_equivalent_frequency_aliases(
+        freq, factor, is_log_returns, dtype):
+    """An explicit unit multiplier must not change annual risk units or warn."""
+    index = pd.date_range('2026-01-01', periods=12, freq=freq, tz='UTC')
+    portfolio, benchmark = _constant_magnitude_navs(index, is_log_returns, dtype)
+    before_portfolio, before_benchmark = portfolio.copy(), benchmark.copy()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', UserWarning)
+        result = qis.compute_ewma_realised_tracking_error(
+            portfolio, benchmark, ewma_span=3, freq=freq, is_log_returns=is_log_returns)
+
+    # Both spellings describe the same grid. Constant squared active returns keep the
+    # EWMA variance at .0001; the native calendar conventions give 252 or 12 periods/year.
+    # Derive the expected scale here, independently of frequency parsing and factor lookup.
+    values = np.full(len(index) - 1, 0.01 * np.sqrt(factor))
+    values[:3] = np.nan
+    expected = pd.Series(values, index=index[1:], name='Tracking error')
+    pd.testing.assert_series_equal(result, expected, rtol=1e-12, atol=0.0)
+    pd.testing.assert_series_equal(portfolio, before_portfolio)
+    pd.testing.assert_series_equal(benchmark, before_benchmark)
+
+
 @pytest.mark.parametrize('is_log_returns', [False, True])
 def test_compute_ewma_realised_tracking_error_preserves_business_day_prefix(is_log_returns):
     """Monday's arrival must not rescale Friday's already-observable risk estimate."""
