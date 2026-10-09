@@ -236,16 +236,17 @@ def plot_scatter(df: pd.DataFrame,
             x1 = get_ols_x(x=x_, order=full_sample_order, fit_intercept=fit_intercept)
             reg_model = sm.OLS(y_, x1).fit()
 
+            # x/y name columns; overlays need the sorted numeric sample used by this fit.
+            # Reuse that sample for both plotting and residual-based confidence calculations.
             if add_universe_model_prediction:
                 prediction = reg_model.predict(x1)
-                ax.plot(x, prediction, color=full_sample_color, lw=linewidth, linestyle='--')
+                ax.plot(x_, prediction, color=full_sample_color, lw=linewidth, linestyle='--')
 
             if add_universe_model_ci:
                 y_model = reg_model.predict(x1)
-                ci = calc_ci(x=x, y=y, y_model=y_model)
-                # ax.fill_between(x, y + ci, y - ci, color="None", linestyle="--")
-                ax.plot(x, y_model - ci, "--", color="0.5")
-                ax.plot(x, y_model + ci, "--", color="0.5")
+                ci = calc_ci(x=x_, y=y_, y_model=y_model)
+                ax.plot(x_, y_model - ci, "--", color="0.5")
+                ax.plot(x_, y_model + ci, "--", color="0.5")
 
             if add_universe_model_label:
                 text_str = f"{full_sample_label} " \
