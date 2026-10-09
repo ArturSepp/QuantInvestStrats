@@ -13,6 +13,8 @@ the index via ``infer_annualisation_factor_from_df``, reporting ``STD_AN`` rathe
 ``is_add_tstat`` reports the signed sample mean divided by its standard error, independently of
 whether the volatility column is annualised. Risk-adjusted statistics are ``perf_stats.py``.
 """
+import sys
+
 # packages
 import numpy as np
 import pandas as pd
@@ -129,6 +131,49 @@ def _translate_finite_columns(data: np.ndarray) -> np.ndarray:
     return data - origins
 
 
+def _compute_sample_std(data: np.ndarray) -> np.ndarray:
+    """Compute column-wise sample spread without intermediate scale failure.
+
+    Args:
+        data: Two-dimensional finite or missing numerical observations.
+
+    Returns:
+        Sample standard deviation with ``ddof=1`` for each eligible column, or NaN when fewer
+        than two observations are available.
+    """
+    sample_stds = np.full(data.shape[1], np.nan, dtype=float)
+    minimum_safe_scale = np.sqrt(np.finfo(float).tiny)
+    for column_position in range(data.shape[1]):
+        observed = data[:, column_position]
+        observed = observed[np.logical_not(np.isnan(observed))]
+        if observed.size < 2:
+            continue
+
+        # Retain the accepted translated reduction unless its intermediate scale is unsafe.
+        with np.errstate(over="ignore"):
+            translated = observed - np.min(observed)
+        if np.all(np.isfinite(translated)):
+            scale = np.max(translated)
+            if scale == 0.0:
+                sample_stds[column_position] = 0.0
+                continue
+            maximum_safe_scale = np.sqrt(sys.float_info.max / observed.size)
+            if minimum_safe_scale <= scale <= maximum_safe_scale:
+                sample_stds[column_position] = np.std(translated, ddof=1)
+                continue
+            normalized = translated / scale
+        else:
+            # Scale wide signed levels before translating so their finite range cannot overflow.
+            scale = np.max(np.abs(observed))
+            normalized = observed / scale
+            normalized = normalized - np.min(normalized)
+
+        # Rescale once so only a genuinely unrepresentable result becomes zero or infinity.
+        with np.errstate(over="ignore", under="ignore"):
+            sample_stds[column_position] = scale * np.std(normalized, ddof=1)
+    return sample_stds
+
+
 def _reduce_standardized_moment(
         data: np.ndarray,
         reduction: Callable[[np.ndarray], np.ndarray],
@@ -227,8 +272,11 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     the normality p-value requires 20 observations.
     Finite samples are translated before sample standard deviation and standardized moments are
     evaluated, preserving their translation-invariant results when the spread is very small
-    relative to the level. Annualized volatility and the optional t-statistic use that stabilized
-    sample spread without changing the sample mean.
+    relative to the level. Extreme sample spread is additionally scale-normalized so finite
+    periodic results do not become zero, infinity, or missing through intermediate arithmetic.
+    Annualized volatility and the optional t-statistic use that stabilized sample spread without
+    changing the sample mean. A computed spread is infinite only when the periodic or annualized
+    result itself exceeds the finite binary64 range.
     Positive probabilities divide positive returns by non-missing observations in each column;
     zero returns are observed and non-positive.
 
@@ -277,17 +325,16 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     observation_counts = np.sum(np.logical_not(np.isnan(data_np)), axis=0)
     # Skip all-missing dated columns so undefined base statistics remain NaN without warnings.
     mean = _reduce_observed(data_np, lambda values: np.nanmean(values, axis=0))
-    # Sample spread is translation invariant; zero-base finite columns to avoid cancellation.
-    std = _reduce_observed(
-        data_np,
-        lambda values: np.nanstd(_translate_finite_columns(values), ddof=1, axis=0),
-        minimum_observations=2)
+    # Guard both relative-offset cancellation and extreme-scale intermediate arithmetic.
+    std = _compute_sample_std(data_np)
 
     descriptive_table[PerfStat.AVG.to_str()] = [var_format.format(x) for x in mean]
 
     if annualize_vol:
         an_factor = infer_annualisation_factor_from_df(data=df)
-        vol = std * np.sqrt(an_factor)
+        # A finite periodic spread can have an unrepresentable annualized display value.
+        with np.errstate(over="ignore"):
+            vol = std * np.sqrt(an_factor)
         volatility_column = PerfStat.STD_AN.value.name
     else:
         an_factor = 1.0
