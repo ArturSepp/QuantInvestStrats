@@ -9,6 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Honor explicit pandas `freq` aliases in `compute_ewma_realised_tracking_error`, avoiding
+  incorrect risk scaling on short histories and revisions to past estimates as new dates arrive.
+  EWMA calculation, warm-up and inference for `freq=None` or QIS-only schedules are unchanged.
 - Support nullable real-numeric return-difference panels in `compute_te_ir_errors` and
   `compute_info_ratio_table`, omitting missing values per strategy instead of raising on
   `pd.NA`. Annualisation, sample-spread conventions and ordinary numeric results are unchanged.
