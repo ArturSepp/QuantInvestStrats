@@ -1,7 +1,7 @@
 """Offline funded and derivative portfolios using the same public stress/report interface.
 
 Run: python -m examples.portfolios.instrument_portfolio_stress
-Optional: --case funded|mixed|all --output-dir <fresh directory>
+Optional: --case funded|mixed|account|all --output-dir <fresh directory>
 No files are written by default. Prices come from qis.datasets.synthetic; factor names,
 loadings, residual variances and contract terms are teaching inputs, not a fitted MATF model.
 """
@@ -211,7 +211,7 @@ def verify_result(portfolio, result, derivatives):
 
 
 def run_example(output_dir=None, case="all"):
-    """Compare funded and mixed books; optionally write both standard report packs."""
+    """Compare funded, mixed and financed-account books; optionally write report packs."""
     if output_dir is not None:
         output_dir = Path(output_dir)
         if output_dir.exists():
@@ -219,7 +219,11 @@ def run_example(output_dir=None, case="all"):
     model, date, history = build_model_and_history()
     requests, grids = scenario_inputs(model, date)
     results = {}
-    for label in (("funded", "mixed") if case == "all" else (case,)):
+    for label in (("funded", "mixed", "account") if case == "all" else (case,)):
+        if label == "account":
+            from examples.portfolios.account_equity_stress import run_example as run_account
+            results[label] = run_account(output_dir / label if output_dir is not None else None)
+            continue
         derivatives = label == "mixed"
         portfolio = build_portfolio(model, date, derivatives)
         result = qis.run_portfolio_stress_test(portfolio, requests, history, grids)
@@ -238,7 +242,7 @@ def run_example(output_dir=None, case="all"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", choices=("funded", "mixed", "all"), default="all")
+    parser.add_argument("--case", choices=("funded", "mixed", "account", "all"), default="all")
     parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
     run_example(args.output_dir, args.case)

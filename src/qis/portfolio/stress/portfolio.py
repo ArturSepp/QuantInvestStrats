@@ -18,6 +18,7 @@ from qis.portfolio.stress.instruments import (
     Underlying,
 )
 from qis.portfolio.stress._valuation import build_context
+from qis.portfolio.stress.accounting import PortfolioAccounting, ResponseProvenance
 
 
 @dataclass(frozen=True)
@@ -246,6 +247,8 @@ class InstrumentPortfolio:
         fx_rates: Currency to quote in reference-currency units per local unit.
             Each FX Underlying is quoted in reference_currency and uses a
             REFERENCE response; omit the reference currency itself.
+        accounting: Optional complete ledger and explicit denominator basis.
+        response_provenance: Optional response construction facts, keyed by fitted response ID.
     """
 
     holdings: tuple[PortfolioHolding, ...]
@@ -257,6 +260,8 @@ class InstrumentPortfolio:
     reporting_denominator: float
     denominator_label: str
     fx_rates: Mapping[str, Underlying] = field(default_factory=dict)
+    accounting: PortfolioAccounting | None = None
+    response_provenance: Mapping[str, ResponseProvenance] = field(default_factory=dict)
 
     def __post_init__(self):
         """Validate identities, exact dates, currencies and the complete factor block."""
@@ -287,6 +292,19 @@ class InstrumentPortfolio:
         betas = model.factor_loadings[risk_date]
         if betas.empty:
             raise ValueError("factor stress requires nonempty responses and factors")
+        if self.accounting is not None:
+            if not isinstance(self.accounting, PortfolioAccounting):
+                raise ValueError("accounting must be a PortfolioAccounting")
+            self.accounting.reconcile_holdings(holdings)
+            difference = self.reporting_denominator - self.accounting.denominator
+            if abs(difference) > self.accounting.tolerance:
+                raise ValueError("reporting denominator differs from the declared accounting basis")
+            object.__setattr__(self, "denominator_label", self.accounting.denominator_label)
+        provenance = dict(self.response_provenance)
+        if not set(provenance).issubset(betas.index) or any(
+                not isinstance(value, ResponseProvenance) for value in provenance.values()):
+            raise ValueError("provenance requires fitted IDs and ResponseProvenance values")
+        object.__setattr__(self, "response_provenance", MappingProxyType(provenance))
         if (model.residual_vars[risk_date] < 0).any():
             raise ValueError("residual variances must be nonnegative")
         for covariance in (model.covar[risk_date], model.factor_covar[risk_date]):

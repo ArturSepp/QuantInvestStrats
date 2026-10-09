@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "8c36e45530c3e03449954f43d6275a92bc8dc323",
+  "measured_at_commit": "743166bedc3ea5175e28dc3665891fe2303359f5",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -10,7 +10,7 @@
       "paper_phrase": "in 40 of the 47 calendar months"
     },
     "ai_coauthored_commits": {
-      "value": 106,
+      "value": 110,
       "how": "commits carrying a Co-authored-by trailer naming Claude",
       "live": false,
       "paper_phrase": null
@@ -22,7 +22,7 @@
       "paper_phrase": null
     },
     "ai_coauthored_last_day": {
-      "value": "2026-10-07",
+      "value": "2026-10-08",
       "how": "latest AI co-authored commit",
       "live": false,
       "paper_phrase": null
@@ -46,13 +46,13 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 6101,
+      "value": 6375,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 896,
+      "value": 908,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -94,10 +94,10 @@
       "paper_phrase": "references 87 symbols"
     },
     "core_symbols": {
-      "value": 158,
+      "value": 166,
       "how": "len(qis.api.core_api_names())",
       "live": true,
-      "paper_phrase": "documented core of 158 symbols"
+      "paper_phrase": "documented core of 166 symbols"
     },
     "exported_module_bindings": {
       "value": 9,
@@ -106,10 +106,10 @@
       "paper_phrase": null
     },
     "exported_symbols": {
-      "value": 466,
+      "value": 474,
       "how": "len(qis.__all__)",
       "live": true,
-      "paper_phrase": "holds 466 names"
+      "paper_phrase": "holds 474 names"
     },
     "first_commit_month": {
       "value": "2022-12",

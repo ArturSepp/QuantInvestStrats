@@ -49,6 +49,133 @@ called while scenarios are evaluated or rendered.
 
 ## Inputs, notation, and assumptions
 
+### Account equity and financing (qis 5.34.0)
+
+`InstrumentPortfolio.accounting` optionally supplies a `PortfolioAccounting` with
+a complete reference-currency ledger (`mtm`, `role`) and an explicit positive
+`net_equity`. Marks include accrued balances once. `PositionRole` distinguishes
+assets, cash, financing, short investments, derivatives and other balances;
+borrowing is never inferred from a negative mark alone.
+
+The ledger must reconcile to net equity, and every valued holding must agree
+with its ledger mark. The accounting ledger may include positions outside fitted
+risk coverage; these remain disclosed. `ReportingBasis.NET_EQUITY` makes the
+percentage denominator account equity after liabilities. `GROSS_ASSETS` uses
+positive accounting marks; `FIXED_NOTIONAL` requires an explicit hypothetical
+amount. Derivative risk notionals are separate from these accounting amounts.
+
+For a synthetic example with investments and cash of 110 and borrowing of 20,
+equity is 90. A 20 loss is `20 / 90 = 22.22%` of equity; remaining equity is 70.
+The report exports the complete ledger, assets/equity, debt/equity and equity
+remaining for every requested, historical and grid scenario. Fixed borrowing
+in the reference currency has no instantaneous P&L. Foreign-currency borrowing
+uses a deterministic local quote with a supplied FX response and retains FX risk.
+No loan interest accrual is added implicitly to an instantaneous stress.
+
+```python
+import pandas as pd
+import qis
+
+ledger = pd.DataFrame({
+    "mtm": [100.0, 10.0, -20.0],
+    "role": [qis.PositionRole.ASSET, qis.PositionRole.CASH, qis.PositionRole.FINANCING],
+}, index=["investment", "cash", "loan"])
+accounting = qis.PortfolioAccounting(
+    positions=ledger,  # index: source holding IDs; columns mtm and PositionRole role
+    net_equity=90.0,
+    reporting_basis=qis.ReportingBasis.NET_EQUITY,
+)
+assert accounting.gross_assets == 110.0
+assert accounting.denominator == 90.0
+```
+
+Attach this accounting when constructing an `InstrumentPortfolio`, or use
+`dataclasses.replace(portfolio, reporting_denominator=accounting.denominator, accounting=accounting)`
+on an existing portfolio whose holding IDs and marks reconcile to the ledger.
+
+Omitting accounting preserves the existing denominator, numerical outputs,
+historical ranking and report page order. The optional account page is added
+only when accounting is supplied.
+
+From qis 5.36.0 this page opens the report in statement-of-assets form. Optional
+ledger columns `asset_class` and `currency` provide allocation mapping per
+position. `AccountAssetClass` defines Liquidity, Borrowing, Fixed Income, Equity and
+Alternatives; its display strings are also accepted. Allocation currency is a
+caller classification and may differ from the fitted-return currency. Both
+mapping columns must be complete when supplied.
+
+The opening page shows the reconciled balance sheet, invested assets by
+class and currency, an asset-class bar plot and a currency pie. Amounts are in
+the reference currency, and allocation percentages use gross assets. Liabilities
+remain in the reconciliation; Borrowing is also shown as a separate negative row. For more
+than five currencies, the display retains the largest four and aggregates the
+remainder as Other. Full currency detail remains in CSV and workbook exports.
+No maturity distribution is presented.
+
+From qis 5.36.0, the account allocation bucket is named Borrowing. It shows
+signed financing amounts divided by gross invested assets. Invested asset
+classes still sum to 100%; Borrowing is a separate negative percentage. For
+100 of equity plus 50 of borrowing fully invested in bonds, Fixed Income is
+150 / 150 = 100% and Borrowing is -50 / 150 = -33.33%. The currency pie uses
+positive invested assets. The old CREDIT enum name and Credit financing label
+are accepted as compatibility aliases and displayed as Borrowing.
+
+Account stress panels are ordered percentage P&L, Total P&L, Equity after.
+The percentage P&L denominator and all valuation calculations are unchanged.
+
+The requested, conditional and historical scenario pages show three bar panels:
+percentage P&L, Total P&L, and Equity after. Equity after always uses starting
+account equity plus scenario P&L, even when the reporting basis is gross assets
+or hypothetical notional. Page references account for the added opening page.
+Reports without account accounting retain the existing two-panel presentation.
+
+### Run the offline account example
+
+The complete runnable source is
+[account_equity_stress.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/account_equity_stress.py).
+It uses seeded synthetic factors and prescribed response loadings, with 150m
+invested in bonds, 50m borrowing and 100m equity. It checks Fixed Income 100%,
+Borrowing -33.33%, zero instantaneous USD loan P&L, percentage P&L on net equity
+and equity remaining after every scenario. No client data or provider access is used.
+
+From a QIS checkout with qis 5.36.0 or later installed:
+
+```bash
+python -m examples.portfolios.account_equity_stress
+python -m examples.portfolios.account_equity_stress --output-dir /path/to/fresh/account-demo
+```
+
+The first command validates and prints results without writing files. The second
+also writes the standard statement cover, allocation charts, three scenario
+panels, numerical workbook, CSV audits and report manifest. Use a fresh output
+directory on local storage. The existing general example exposes the same case:
+
+```bash
+python -m examples.portfolios.instrument_portfolio_stress --case account
+```
+
+Its default `--case all` includes funded, mixed and account demonstrations.
+The scenario history starts at the first complete synthetic month; it does not
+claim observed historical market events or estimated client product exposures.
+
+### Independent historical windows and response provenance
+
+`StressTestConfig(historical_selection=HistoricalScenarioSelection(...))`
+selects the lowest monthly returns of a named factor within an explicit date
+window. The default policy uses ten worst Equity months since 2006. Each selected
+date replays all contemporaneous factor shocks on current holdings and loadings;
+the calibration sample does not limit the supplied scenario history. Selection
+does not depend on current-portfolio P&L. Missing ranking observations or a
+missing co-factor on a selected crisis date raise an error. Omitting this policy
+keeps the existing current-portfolio-loss ranking and incomplete-row disclosure.
+
+`InstrumentPortfolio.response_provenance` maps fitted response IDs to
+`ResponseProvenance`: observed/synthetic/proxy source, currency, total/excess/price
+return basis, construction, assumptions, limitations and optional fitted dates.
+`HistorySource` identifies observed, synthetic or proxy histories; `ReturnBasis`
+declares whether the supplied returns are total, excess or price returns.
+It documents the supplied fit and never transforms or refits a return series.
+
 | Convention | This article |
 |---|---|
 | Return basis | Factor, response, quote and FX shocks are log returns; scenario P&L is in reference currency and portfolio return is P&L divided by $V$ |
@@ -832,13 +959,14 @@ package, is also available as
 
 ### Runnable examples
 
-Both examples run on the core installation and the repository's synthetic data generator.
+These examples run on the core installation and the repository's synthetic data generator.
 They require no credentials, market-data service, estimator package or private consumer code.
 Their seven-factor names are illustrative; the inputs are not a production MATF calibration.
 
 | Example | What it demonstrates |
 |---|---|
-| [`examples/portfolios/instrument_portfolio_stress.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/instrument_portfolio_stress.py) | Funded and mixed portfolios; all four primitive types; continuing accumulator/decumulator legs; EUR local quotes with USD fitted responses; Credit and Carry families; monthly replay; four conditional grids; standard reporting. |
+| [`examples/portfolios/instrument_portfolio_stress.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/instrument_portfolio_stress.py) | Funded, mixed and financed-account portfolios; all four primitive types; continuing accumulator/decumulator legs; EUR local quotes with USD fitted responses; Credit and Carry families; monthly replay; four conditional grids; standard reporting. |
+| [`examples/portfolios/account_equity_stress.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/account_equity_stress.py) | Complete signed balance sheet; gross invested assets and negative borrowing allocation; P&L on net equity; equity after stress; named-factor historical selection and an opening account statement. |
 | [`examples/portfolios/composite_payoff_stress.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/composite_payoff_stress.py) | A terminal-knockout wrapper implementing `HoldingPayoff`, retaining source marks, vanilla valuation and shared-response risk; independent terminal-P&L and finite-difference checks. |
 
 From the source checkout, using its configured Python interpreter:
@@ -846,6 +974,7 @@ From the source checkout, using its configured Python interpreter:
 ~~~console
 python -m examples.portfolios.instrument_portfolio_stress
 python -m examples.portfolios.composite_payoff_stress
+python -m examples.portfolios.account_equity_stress
 ~~~
 
 By default the examples compute and verify results and write no files. To generate reports,
@@ -854,10 +983,12 @@ supply fresh output directories outside the source checkout:
 ~~~console
 python -m examples.portfolios.instrument_portfolio_stress --case all --output-dir /path/to/new/instrument_reports
 python -m examples.portfolios.composite_payoff_stress --output-dir /path/to/new/composite_report
+python -m examples.portfolios.account_equity_stress --output-dir /path/to/new/account_report
 ~~~
 
-`--case all` creates `funded/` and `mixed/`; `--case funded` and `--case mixed` select one.
-The custom-payoff example writes directly to its supplied directory. On Windows, replace the
+`--case all` creates `funded/`, `mixed/` and `account/`; `--case funded`, `--case mixed`
+and `--case account` select one. The standalone account and custom-payoff examples write
+directly to their supplied directories. On Windows, replace the
 example paths with quoted absolute paths on the local C drive and use the repository's external
 interpreter. An existing target is rejected before report output is written.
 
@@ -873,7 +1004,10 @@ simulation; its limitations are carried into the position audit and the report a
 `generate_portfolio_stress_report` renders a completed result; it never reprices a payoff, refits
 a model or obtains prices. The PDF has twelve analysis pages, an optional parser-owned coverage
 page, and a final notation guide: thirteen pages without the appendix and fourteen with it.
-Titles use `StressReportConfig.model_name`.
+Titles use `StressReportConfig.model_name`. With `PortfolioAccounting`, an opening statement
+of assets adds one page, giving fourteen pages without the parser appendix and fifteen with it.
+The three scenario pages then show percentage P&L, Total P&L and Equity after in that order.
+The table below gives the page numbers for a report without accounting.
 
 | Page | Subject | Content |
 |---|---|---|
@@ -898,8 +1032,8 @@ Reading notes:
   response. Options crossing strikes or barriers can lose heavily despite a small current beta.
 - **Requested and conditional pages** value the full payoff. Summed family exposures and summed
   Euler contributions answer aggregation questions; they do not use the scenario split weights.
-- **Historical months** are ranked by exact portfolio P&L on today's holdings and are not the
-  portfolio's realised investment history.
+- **Historical months** use the supplied named-factor selection policy, or exact portfolio P&L
+  on today's holdings by default. Neither is the portfolio's realised investment history.
 - **Page 5** selects factors or families by absolute Euler contribution, which need not be the
   largest betas or dollar exposures, then ranks their holding contributions. The PDF shows a
   subset; the exported tables are complete and additive.
@@ -947,7 +1081,8 @@ attached to a copied `report_diagnostics` mapping with `dataclasses.replace`.
 
 ### Verification
 
-The offline example harness executes both examples, and the package suite covers the engine:
+The offline example harness executes the instrument and custom-payoff examples; the instrument
+example also runs the financed-account case by default. The package suite covers the engine:
 
 ~~~console
 python -m pytest src/qis/tests/test_examples.py -k "instrument_portfolio_stress or composite_payoff_stress"
@@ -959,9 +1094,15 @@ Euler additivity, nonzero exposure on a zero-mark future, exact local FX convers
 terminal payoff and finite-difference factor sensitivities, label validation, ambiguous factor
 instructions, shared residuals and kink policies.
 
-#### Full source: funded and mixed portfolios
+#### Full source: funded, mixed and financed-account portfolios
 
 ~~~{literalinclude} ../examples/portfolios/instrument_portfolio_stress.py
+:language: python
+~~~
+
+#### Full source: account equity and borrowing
+
+~~~{literalinclude} ../examples/portfolios/account_equity_stress.py
 :language: python
 ~~~
 

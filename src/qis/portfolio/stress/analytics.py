@@ -13,6 +13,8 @@ from qis.portfolio.risk.stress_testing import (
 from qis.portfolio.stress.portfolio import InstrumentPortfolio, PortfolioValuationResult
 from qis.portfolio.stress.scenarios import ScenarioMode, StressScenarios
 from qis.portfolio.stress._bands import conditional_grid_bands
+from qis.portfolio.stress.historical import HistoricalScenarioSelection
+from qis.portfolio.stress.accounting import provenance_frame
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,7 @@ class StressTestConfig:
         include_conditional_comparison: Also evaluate joint conditional completion.
         ordinary_asset_bands: Legacy switch enabling conditional local-risk bands for all
             supported holdings, including derivatives. False disables risk-band calculations.
+        historical_selection: Optional factor-ranking policy with its own scenario window.
     """
 
     historical_count: int = 10
@@ -34,6 +37,7 @@ class StressTestConfig:
     confidence: float = 0.95
     include_conditional_comparison: bool = True
     ordinary_asset_bands: bool = True
+    historical_selection: HistoricalScenarioSelection | None = None
 
     def __post_init__(self):
         """Reject implicit or invalid horizon and ranking assumptions."""
@@ -50,6 +54,9 @@ class StressTestConfig:
             or not 0 < self.confidence < 1
         ):
             raise ValueError("positive horizon_years and confidence in (0, 1) required")
+        if self.historical_selection is not None and not isinstance(
+                self.historical_selection, HistoricalScenarioSelection):
+            raise ValueError("historical_selection must be a HistoricalScenarioSelection")
 
 
 @dataclass(frozen=True)
@@ -159,9 +166,12 @@ def _attribution(
     return contribution
 
 
-def _history(portfolio: InstrumentPortfolio, history: pd.DataFrame | None, count: int):
+def _history(portfolio: InstrumentPortfolio, history: pd.DataFrame | None, count: int,
+             selection: HistoricalScenarioSelection | None = None):
     """Validate monthly vectors, record omissions and rank every eligible revaluation."""
     if history is None:
+        if selection is not None:
+            raise ValueError("factor-based historical selection requires a scenario history")
         return None, pd.DataFrame(), pd.DataFrame(columns=["status"])
     factors = portfolio.risk_model.factor_loadings[portfolio.risk_date].columns
     if (
@@ -177,6 +187,10 @@ def _history(portfolio: InstrumentPortfolio, history: pd.DataFrame | None, count
     if history.index.to_period("M").has_duplicates:
         raise ValueError("historical input must contain at most one realization per month")
     history = history.reindex(columns=factors).sort_index().astype(float).copy()
+    selected = None
+    if selection is not None:
+        selected = selection.select(history, portfolio.risk_date)
+        history = selection.window(history, portfolio.risk_date)
     if np.isinf(history.to_numpy()).any():
         raise ValueError("historical returns must not contain infinite values")
     coverage = pd.DataFrame("eligible", index=history.index, columns=["status"])
@@ -186,11 +200,12 @@ def _history(portfolio: InstrumentPortfolio, history: pd.DataFrame | None, count
     if eligible.empty:
         return None, pd.DataFrame(), coverage
     valuation = portfolio.evaluate(eligible)
-    ranking = (
-        _summary(valuation, portfolio.reporting_denominator)
-        .sort_values("portfolio_pnl", kind="stable")
-        .head(count)
-    )
+    summary = _summary(valuation, portfolio.reporting_denominator)
+    ranking = (summary.sort_values("portfolio_pnl", kind="stable").head(count)
+               if selected is None else summary.loc[selected.index].copy())
+    if selected is not None:
+        ranking["selection_factor_log_return"] = selected[selection.factor]
+        ranking["selection_factor_simple_return"] = np.expm1(selected[selection.factor])
     ranking.insert(0, "rank", np.arange(1, len(ranking) + 1))
     return valuation, ranking, coverage
 
@@ -300,7 +315,8 @@ def run_portfolio_stress_test(
         grid_summaries[key] = summary
         grid_metadata.append(_grid_metadata(request, expanded, key, band_status))
     historical, ranking, historical_coverage = _history(
-        portfolio, historical_factor_log_returns, config.historical_count
+        portfolio, historical_factor_log_returns, config.historical_count,
+        config.historical_selection,
     )
     terms = []
     for holding in portfolio.holdings:
@@ -367,6 +383,54 @@ def run_portfolio_stress_test(
         name: pd.concat(tables, names=["grid", "factor_return"])
         for name, tables in grid_diagnostics.items()
     })
+    if config.historical_selection is not None:
+        selection = config.historical_selection
+        window = selection.window(historical_factor_log_returns, portfolio.risk_date)
+        metadata["historical_count"] = selection.count
+        metadata["historical_selection"] = selection.metadata(window)
+        audit = historical.factor_log_shocks.loc[ranking.index].copy()
+        audit.insert(0, "selection_rank", range(1, len(audit) + 1))
+        diagnostics["Historical selection audit"] = audit
+    if portfolio.accounting is not None:
+        accounting = portfolio.accounting
+        metadata["reporting_basis"] = accounting.reporting_basis.value
+        metadata["accounting"] = accounting.summary().to_dict()
+        covered = {holding.holding_id for holding in portfolio.holdings}
+        missing = accounting.positions.index.difference(list(covered)).tolist()
+        metadata["accounting_unvalued_position_ids"] = missing
+        ledger = accounting.positions.copy(deep=True)
+        ledger["role"] = ledger.role.map(lambda role: role.value)
+        ledger["valuation_covered"] = ledger.index.isin(covered)
+        diagnostics["Account positions"] = ledger
+        diagnostics["Account balance sheet"] = accounting.summary().to_frame("value")
+        allocation = accounting.gross_asset_allocation()
+        if not allocation.empty:
+            metadata["allocation_basis"] = "positive gross accounting marks"
+            diagnostics["Gross asset allocation"] = allocation
+            classes = allocation.sum(axis=1).rename("amount_ref")
+            currencies = allocation.sum(axis=0).rename("amount_ref")
+            diagnostics["Gross asset class allocation"] = pd.DataFrame({
+                "amount_ref": classes, "gross_asset_share": classes / accounting.gross_assets})
+            diagnostics["Gross currency allocation"] = pd.DataFrame({
+                "amount_ref": currencies,
+                "gross_asset_share": currencies / accounting.gross_assets})
+            funded_allocation = accounting.allocation_with_borrowing()
+            diagnostics["Asset allocation with borrowing"] = funded_allocation
+            class_amounts = funded_allocation.sum(axis=1).rename("amount_ref")
+            diagnostics["Asset class allocation with borrowing"] = pd.DataFrame({
+                "amount_ref": class_amounts,
+                "gross_asset_share": class_amounts / accounting.gross_assets})
+        batches = {**valuations, **{f"Grid {k}": v for k, v in grids.items()}}
+        if historical is not None:
+            batches["Historical"] = historical
+        for key, value in batches.items():
+            pnl = value.portfolio_pnl
+            diagnostics[f"{key} equity after stress"] = pd.DataFrame({
+                "portfolio_pnl": pnl, "pnl_to_net_equity": pnl / accounting.net_equity,
+                "equity_after_stress": accounting.net_equity + pnl,
+                "reporting_return": pnl / denominator})
+    if portfolio.response_provenance:
+        diagnostics["Response history provenance"] = provenance_frame(portfolio.response_provenance)
     return PortfolioStressResult(
         MappingProxyType(valuations),
         MappingProxyType(summaries),

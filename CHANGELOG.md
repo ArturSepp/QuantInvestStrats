@@ -7,6 +7,43 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.36.0] - 2026-10-09
+
+### Changed
+
+- Rename the account allocation Credit bucket to Borrowing and show signed
+  financing as a negative share of gross invested assets. Invested asset classes
+  retain their 100% total, and currency pies continue to use positive assets.
+  The `AccountAssetClass.CREDIT` name remains an alias for existing financing callers.
+- Account scenario panels now show percentage P&L, Total P&L and Equity after.
+  Risk-factor Credit labels and stress calculations retain their existing meaning.
+
+## [5.35.0] - 2026-10-09
+
+### Added
+
+- Optional account allocation mapping with `AccountAssetClass` and currency columns.
+  Opening statement pages show the reconciled balance sheet, positive gross assets
+  by class/currency, asset-class bars and a currency pie limited to five groups.
+- Account scenario pages show Total P&L, Equity after, and percentage P&L in that
+  order. Page numbers and analysis references account for the opening statement.
+  Numerical valuations and legacy reports without account accounting are preserved.
+
+## [5.34.0] - 2026-10-09
+
+### Added
+
+- Optional `PortfolioAccounting` for complete signed ledgers, explicit position roles,
+  reconciled net equity, declared percentage denominators and funding leverage ratios.
+  Stress reports export equity remaining under every scenario and an account funding page.
+- `HistoricalScenarioSelection` for factor-ranked full monthly vector replays with an
+  independent scenario window and strict selected-date coverage; the default remains
+  current-portfolio-P&L ranking.
+- `ResponseProvenance` records observed, synthetic and proxy return construction,
+  currency, total/excess basis, assumptions, dates and limitations without altering a fit.
+- New `InstrumentPortfolio` and `StressTestConfig` fields are appended and optional.
+  Existing callers retain their denominator, numerical results, exports and page order.
+
 ### Fixed
 
 - Draw opt-in full-sample prediction and confidence overlays in `plot_scatter` using the

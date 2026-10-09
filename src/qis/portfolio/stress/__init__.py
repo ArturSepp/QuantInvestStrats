@@ -1,6 +1,11 @@
 """Public instrument portfolio valuation and factor stress interfaces."""
 
 from qis.portfolio.risk.factor_groups import FactorGroupSpec
+from qis.portfolio.stress.accounting import (
+    PortfolioAccounting, PositionRole, ReportingBasis, ResponseProvenance,
+    HistorySource, ReturnBasis, AccountAssetClass,
+)
+from qis.portfolio.stress.historical import HistoricalScenarioSelection
 from qis.portfolio.stress.instruments import (
     HoldingPayoff,
     InstrumentLeg,

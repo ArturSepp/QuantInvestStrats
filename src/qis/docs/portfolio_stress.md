@@ -12,25 +12,68 @@ acquisition, factor estimation, contract interpretation and lending decisions.
 
 ## Choose the interface
 
+From qis 5.34.0, optional `PortfolioAccounting` reconciles a complete signed
+reference-currency ledger to net equity and declares `ReportingBasis`. Position
+roles distinguish borrowing from short and derivative liabilities. The report
+adds a funding/accounting page and equity-after-stress tables. Omitting accounting
+preserves the existing numerical outputs and page order.
+
+From qis 5.36.0 the account page opens the report. Supply optional `asset_class`
+and `currency` ledger columns to show allocations in Liquidity, Borrowing,
+Fixed Income, Equity and Alternatives. Currency displays use at most five
+groups; detailed exports retain every currency. Scenario pages show percentage P&L,
+Total P&L and Equity after, with equity after derived from net account
+equity. Maturity distributions and a separate requested-stress table are omitted.
+
+From qis 5.36.0, Credit is displayed as Borrowing, with negative financing
+amounts divided by gross invested assets. Invested asset allocations sum to
+100%; a 150 investment funded by 100 equity plus 50 debt shows Borrowing
+at -33.33%. Scenario charts are ordered percentage P&L, Total P&L, Equity after.
+
+Run the complete offline account example from a checkout:
+
+```bash
+python -m examples.portfolios.account_equity_stress
+python -m examples.portfolios.instrument_portfolio_stress --case account
+```
+
+Add `--output-dir <fresh directory>` to generate the standard PDF, numerical
+workbook and audits. Default execution writes no files. The synthetic example
+checks a 150m bond investment funded by 100m equity and 50m USD borrowing;
+the installed dependency is qis 5.36.0 or later. See the
+[complete example source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/account_equity_stress.py).
+
+`StressTestConfig.historical_selection` optionally accepts
+`HistoricalScenarioSelection(factor='Equity', start_date='2006-01-01', count=10)`.
+Supply the longer factor history separately from fitting. Named-factor selection
+replays full vectors and rejects missing selected-date coverage. Existing
+portfolio-P&L ranking remains the default.
+
+`InstrumentPortfolio.response_provenance` accepts `ResponseProvenance` records
+for observed, synthetic and proxy responses, with currency, total/excess/price basis,
+construction, assumptions and limitations. Reporting never changes those returns.
+
 Use `InstrumentPortfolio` for absolute holdings whose source IDs, observed marks,
 contract quantities and payoff rules must be preserved. `PortfolioData` remains
 history/backtest state. The lower-level functions described in
 [Factor stress testing](stress_testing.md) remain useful for factor shock construction
 and funded exposure matrices; this interface adds instrument valuation and reporting.
 
-The source checkout includes two unattended, synthetic examples:
+The source checkout includes three unattended, synthetic examples:
 
 ```console
 python -m examples.portfolios.instrument_portfolio_stress
 python -m examples.portfolios.composite_payoff_stress
+python -m examples.portfolios.account_equity_stress
 ```
 
-The first compares funded and mixed books and demonstrates all four primitive types,
+The first compares funded, mixed and financed-account books and demonstrates all four primitive types,
 continuing accumulator/decumulator legs, local FX, Credit/Carry families, monthly replay
 and conditional grids. The second implements a terminal-knockout wrapper using only
-`HoldingPayoff`, `PayoffContext` and public vanilla valuation. Both verify numerical
+`HoldingPayoff`, `PayoffContext` and public vanilla valuation. The third checks borrowing
+allocations, net-equity stress percentages and equity after stress. All verify numerical
 identities and write no files by default. Add `--output-dir <fresh directory>` to
-produce standard reports; the first also accepts `--case funded|mixed|all`.
+produce standard reports; the first also accepts `--case funded|mixed|account|all`.
 
 These examples are repository files, not installed package modules. Their complete
 source is included in the site guide `docs/portfolio_stress.md`. The self-contained
@@ -445,6 +488,11 @@ appendix is page 13, and a final page gives the notation and a guide to the anal
 thirteen pages without the appendix, fourteen with it. The layout preserves the
 original stress-report titles and explanatory notes; `model_name="MATF"` gives the MATF
 titles without a private model dependency.
+
+With `PortfolioAccounting`, the opening statement of assets adds one page: fourteen
+pages without the parser appendix and fifteen with it. Subsequent page numbers shift
+by one. The requested, conditional and historical panels show percentage P&L,
+Total P&L and Equity after in that order.
 
 Page four contains an annualised factor-model risk table and **family Euler
 volatility contributions**. Each family sums its signed constituent contributions;

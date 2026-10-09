@@ -285,6 +285,13 @@ import path, and runs that same mechanically checked source with no saved notebo
 
 ## Examples <a name="examples"></a>
 
+The offline [financed-account stress example](examples/portfolios/account_equity_stress.py)
+demonstrates borrowing, gross-asset allocations, stress P&L on net equity and equity after stress.
+From the repository root, run `python -m examples.portfolios.account_equity_stress` with QIS
+5.36.0 or newer. Add `--output-dir <fresh local directory>` to generate the standard report pack.
+See the [portfolio stress guide](docs/portfolio_stress.md#run-the-offline-account-example)
+for the input contract and independent accounting checks.
+
 ### 1. Visualisation of price data <a name="price"></a>
 
 This is an optional network-backed plotting example. For the core-install first-success path, use
@@ -490,7 +497,7 @@ If you use QIS in your research, please cite it as:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.33.4},
+  version={5.36.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

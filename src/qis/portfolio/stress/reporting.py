@@ -147,7 +147,8 @@ def _report_heading(result, config):
     meta = result.metadata
     name = config.report_name or config.title
     model = config.model_label or config.model_name
-    return (f"{name} | Notional {meta['reference_currency']} "
+    basis = meta["denominator_label"] if "reporting_basis" in meta else "Notional"
+    return (f"{name} | {basis} {meta['reference_currency']} "
             f"{meta['reporting_denominator']:,.0f} | Risk model {model}")
 
 
@@ -287,6 +288,8 @@ def _format_workbook(path):
         "annual_residual_vol", "annual_factor_model_vol", "lower_bound", "upper_bound",
         "band_half_width", "portfolio_weight", "response_weight",
         "nav_contribution", "nav_contribution_2", "nav_contribution_3",
+        "pnl_to_net_equity", "reporting_return", "selection_factor_simple_return",
+        "gross_asset_share",
     }
     for sheet in book:
         sheet.sheet_view.showGridLines = False
@@ -491,6 +494,7 @@ def generate_portfolio_stress_report(
             "factor_panels": 6,
             # the sensitivity page lays out two rows of three panels, one per selected grid
             "grid_panels": 6,
+            "allocation_currency_groups": 5,
         },
         "hashes": {
             str(path.relative_to(output_dir)): hashlib.sha256(path.read_bytes()).hexdigest()

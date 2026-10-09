@@ -75,15 +75,16 @@ from qis.portfolio.reports.brinson_attribution import (compute_brinson_attributi
                                                        plot_brinson_totals_table,
                                                        plot_brinson_attribution_table)
 
-from qis.portfolio.reports.multi_assets_factsheet import (MultiAssetsReport, generate_multi_asset_factsheet)
+from qis.portfolio.reports.multi_assets_factsheet import (
+    MultiAssetsReport, generate_multi_asset_factsheet)
 
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
 
-from qis.portfolio.reports.strategy_benchmark_factsheet import (generate_strategy_benchmark_factsheet_plt,
-                                                                generate_strategy_benchmark_active_perf_plt)
+from qis.portfolio.reports.strategy_benchmark_factsheet import (
+    generate_strategy_benchmark_factsheet_plt, generate_strategy_benchmark_active_perf_plt)
 
-from qis.portfolio.reports.strategy_benchmark_tre_factsheet import (weights_tracking_error_report_by_ac_subac,
-                                                                    plot_exposures_strategy_vs_benchmark_stack)
+from qis.portfolio.reports.strategy_benchmark_tre_factsheet import (
+    weights_tracking_error_report_by_ac_subac, plot_exposures_strategy_vs_benchmark_stack)
 
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 
@@ -99,7 +100,8 @@ from qis.portfolio.smart_diversification import (SmartDiversificationReport,
 
 
 # disable requirements for pybloqs
-# from qis.portfolio.reports.multi_strategy_factseet_pybloqs import generate_multi_portfolio_factsheet_with_pybloqs
+# from qis.portfolio.reports.multi_strategy_factseet_pybloqs import (
+#     generate_multi_portfolio_factsheet_with_pybloqs)
 
 from qis.portfolio.risk.stress_testing import (
     FactorScenarioProjection,
@@ -121,4 +123,6 @@ from qis.portfolio.stress import (
     PortfolioValuationResult, ResponseBasis, ScenarioMode, ShockConvention, StressScenarios,
     StressTestConfig, Underlying, run_portfolio_stress_test,
     StressReportArtifacts, StressReportConfig, generate_portfolio_stress_report,
+    PortfolioAccounting, PositionRole, ReportingBasis, ResponseProvenance,
+    HistorySource, ReturnBasis, HistoricalScenarioSelection, AccountAssetClass,
 )

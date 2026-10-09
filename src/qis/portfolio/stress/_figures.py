@@ -1,6 +1,7 @@
 """QIS plotting pages for already-computed portfolio stress results."""
 
 import textwrap
+import re
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ from qis.plots.derived.clustering import plot_clusters
 from qis.plots.scatter import plot_scatter
 from qis.models.linear.plot_correlations import plot_corr_matrix_from_covar
 from qis.portfolio.stress.reporting import _loading_table, _report_heading
+from qis.portfolio.stress.historical import historical_captions
 
 
 INK = "#18354B"
@@ -24,9 +26,20 @@ RED = "#A64045"
 FOOTNOTE_FONTSIZE = 9
 
 
+def _denominator_name(result):
+    """Resolve ratio captions from explicit accounting, preserving legacy labels."""
+    basis = result.metadata.get("reporting_basis")
+    if basis is not None:
+        return {"net_equity": "net equity", "gross_assets": "gross assets",
+                "fixed_notional": "hypothetical notional"}[basis]
+    return "NAV" if result.metadata["all_funded"] else "reporting denominator"
+
+
 def _page(result, config, number, title, subtitle):
     """Create a consistent landscape canvas with dated currency/denominator footers."""
     fig = plt.figure(figsize=(16.54, 11.69), facecolor="white")
+    if "accounting" in result.metadata and number <= 13:
+        number += 1
     title_y, subtitle_y = 0.955, 0.923
     if number == 1:
         heading = fig.text(0.04, 0.978, _report_heading(result, config),
@@ -84,7 +97,7 @@ def _table(ax, data, title="", first=0.25, fontsize=9, widths=None):
                 cell.get_text().set_ha("center")
 
 
-def _bars(ax, values, title, percent=False):
+def _bars(ax, values, title, percent=False, color_values=None, signed=True):
     """Use canonical QIS bars with signed labels in explicit currency or ratio units."""
     if values.empty:
         _empty(ax, "No applicable observations supplied.")
@@ -96,7 +109,8 @@ def _bars(ax, values, title, percent=False):
         )
         for item in values.index
     ]
-    colors = [RED if value < 0 else BLUE for value in values]
+    colors = [RED if value < 0 else BLUE
+              for value in (color_values.to_numpy() if color_values is not None else values)]
     plot_bars(
         values,
         ax=ax,
@@ -112,7 +126,7 @@ def _bars(ax, values, title, percent=False):
         xvar_format="{:+.1%}" if percent else "{:+,.1f}",
         yvar_format="{:+.1%}" if percent else "{:+,.1f}",
     )
-    fmt = "{:+.2%}" if percent else "{:+,.2f}"
+    fmt = "{:+.2%}" if percent else "{:+,.2f}" if signed else "{:,.2f}"
     for container in ax.containers:
         ax.bar_label(
             container, labels=[fmt.format(p.get_width()) for p in container], padding=4, fontsize=8
@@ -121,7 +135,7 @@ def _bars(ax, values, title, percent=False):
     ax.grid(axis="x", color="#E4EAF0", linewidth=0.5)
     ax.margins(x=0.3)
     ax.xaxis.set_major_locator(MaxNLocator(nbins=5))
-    axis_format = "{:+.2%}" if percent else "{:+,.2f}"
+    axis_format = fmt
     ax.xaxis.set_major_formatter(FuncFormatter(lambda value, position: axis_format.format(value)))
 
 
@@ -134,7 +148,7 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
         )
         return fig
     denominator = result.metadata["reporting_denominator"]
-    denominator_name = "NAV" if result.metadata["all_funded"] else "reporting denominator"
+    denominator_name = _denominator_name(result)
     currency = result.metadata["reference_currency"]
     scale = 1e6 if denominator >= 1e6 else 1.0
     unit = f"{currency} millions" if scale == 1e6 else currency
@@ -145,13 +159,27 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
     labels = result.metadata.get("scenario_descriptions", {}) if number != 3 else {}
     display_labels = {key: (str(labels.get(str(key), key))) if number != 3 else key for key in rows}
     pnl = pnl.rename(index=display_labels)
-    _bars(fig.add_axes([0.16, 0.57, 0.32, 0.28]), pnl / scale, f"Total P&L ({unit})")
-    _bars(
-        fig.add_axes([0.63, 0.57, 0.30, 0.28]),
-        pnl / denominator,
-        f"Portfolio P&L (% of {denominator_name})",
-        percent=True,
-    )
+    if "accounting" in result.metadata:
+        _bars(fig.add_axes([.17, .57, .22, .28]), pnl / denominator,
+              f"Portfolio P&L (% of {denominator_name})", percent=True)
+        total_ax = fig.add_axes([.46, .57, .22, .28])
+        _bars(total_ax, pnl / scale, f"Total P&L ({unit})")
+        equity = (result.metadata["accounting"]["net_equity"] + pnl) / scale
+        after = fig.add_axes([.75, .57, .21, .28])
+        _bars(after, equity, f"Equity after ({unit})", color_values=pnl, signed=False)
+        starting = result.metadata["accounting"]["net_equity"] / scale
+        baseline = after.axvline(starting, color=INK, lw=.8, ls="--")
+        after.set_xlim(min(0., float(equity.min()) * 1.1),
+                       max(starting, float(equity.max())) * 1.22)
+        after.legend(handles=[baseline], labels=[f"Starting equity: {starting:,.2f}"],
+                     loc="upper center", bbox_to_anchor=(.5, -.12), fontsize=7, frameon=False)
+        for ax in (total_ax, after):
+            ax.tick_params(axis="y", labelleft=False)
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+    else:
+        _bars(fig.add_axes([0.16, 0.57, 0.32, 0.28]), pnl / scale, f"Total P&L ({unit})")
+        _bars(fig.add_axes([0.63, 0.57, 0.30, 0.28]), pnl / denominator,
+              f"Portfolio P&L (% of {denominator_name})", percent=True)
     cells = []
     for label in rows:
         values = valuation.pnl.loc[label]
@@ -176,7 +204,8 @@ def _scenario_page(result, config, number, title, valuation, subtitle):
         fig.add_axes([0.04, 0.125, 0.92, 0.32]),
         frame,
         "Top 10 asset contributions by absolute size; signed percentage points of "
-        + ("portfolio NAV" if result.metadata["all_funded"] else "reporting denominator"),
+        + (_denominator_name(result) if "accounting" in result.metadata else
+           "portfolio NAV" if result.metadata["all_funded"] else "reporting denominator"),
         first=0.14,
         fontsize=7.5,
     )
@@ -445,7 +474,8 @@ def _grid_page(result, config):
             x="factor_return",
             y="portfolio_return",
             xlabel=xlabel,
-            ylabel=("Portfolio return (% of NAV)" if funded
+            ylabel=(f"Portfolio return (% of {_denominator_name(result)})"
+                    if "accounting" in result.metadata else "Portfolio return (% of NAV)" if funded
                     else "Portfolio P&L (% of reporting denominator)"),
             full_sample_order=0,
             add_universe_model_label=False,
@@ -747,7 +777,7 @@ def _cluster_contribution_page(result, config):
     summary = display_cluster_table(clusters.summary, clusters)
     scope = ("Modelled subtotal" if result.metadata.get("scope") == "modelled subtotal"
              else "Portfolio")
-    denominator_label = "NAV" if result.metadata["all_funded"] else "reporting denominator"
+    denominator_label = _denominator_name(result)
     fig = _page(result, config, 8, "Cluster contributions to stress, factor exposures and risk",
                 f"Fitted clusters ordered by gross MTM. Signed contributions use full "
                 f"{denominator_label}; {scope.lower()} includes {len(clusters.holdings)} holdings.")
@@ -1066,10 +1096,12 @@ def _analysis_guide_page(result, config):
     """Explain all twelve analysis exhibits and their table calculations on the final page."""
     model = config.model_name
     funded = result.metadata["all_funded"]
-    denominator = "portfolio NAV" if funded else "reporting denominator"
+    denominator = (_denominator_name(result) if "accounting" in result.metadata
+                   else "portfolio NAV" if funded else "reporting denominator")
     months = result.metadata["horizon_years"] * 12
     fig = _page(
-        result, config, 14 if config.appendix_table is not None else 13,
+        result, config,
+        (14 if config.appendix_table is not None else 13) + int("accounting" in result.metadata),
         "Notation and guide to the analysis",
         "Reading guide to analysis pages 1-12. Coverage and estimation quality is a "
         "separate source audit. All percentages use the stated units below.",
@@ -1218,6 +1250,13 @@ def _analysis_guide_page(result, config):
         "Off-diagonals use page 11's conditional formula. Zero variance or downside "
         "at/below -100% is n/a. Requested scenarios and the band horizon stay unchanged.",
     )))
+    if "historical_selection" in result.metadata:
+        title, _ = historical_captions(result.metadata["historical_selection"])
+        left[2] = ("3. " + title, (
+            "Select the lowest monthly returns of the named factor within the declared window. "
+            "Replay the complete factor vector from each selected month on current holdings "
+            "and fitted betas. Selection is independent of current-portfolio P&L. "
+            "Missing selected-date co-factors are errors. This is a scenario replay.",))
     # Balance twelve exhibits without shrinking the readable guide font.
     left.append(right.pop(0))
     _guide_column(fig, left, 0.04)
@@ -1225,7 +1264,12 @@ def _analysis_guide_page(result, config):
     return fig
 
 
-def report_pages(result, config):
+def _accounting_page(result, config):
+    """Render the SOA-style statement through the shared account opening-page builder."""
+    from qis.portfolio.stress._statement import statement_page
+    return statement_page(result, config)
+
+def _report_pages(result, config):
     """Yield twelve analysis exhibits, optional source coverage, and the final notation guide."""
     model = config.model_name
     meta = result.metadata
@@ -1233,6 +1277,9 @@ def report_pages(result, config):
     denominator = meta["reporting_denominator"]
     date = pd.Timestamp(meta["risk_date"])
     qualifier = " | Modelled subtotal only" if meta.get("scope") == "modelled subtotal" else ""
+    if "accounting" in meta:
+        yield (f"Statement of assets as of {pd.Timestamp(meta['valuation_date']):%d.%m.%Y}",
+               _accounting_page(result, config))
     overrides = meta.get("scenario_completion_overrides", {})
     subtitle = (
         "Level/price targets: correlated shocks. Explicit return shocks: other factors "
@@ -1255,7 +1302,9 @@ def report_pages(result, config):
             1,
             title,
             result.valuations["requested"],
-            subtitle + f" Using notional of {currency} {denominator:,.0f}." + qualifier,
+            subtitle + (f" Using {meta['denominator_label']} of {currency} {denominator:,.0f}."
+                        if "accounting" in meta else
+                        f" Using notional of {currency} {denominator:,.0f}.") + qualifier,
         ),
     )
     title = f"Requested scenarios with latest {model} co-moves"
@@ -1273,6 +1322,10 @@ def report_pages(result, config):
     )
     count = meta["historical_count"]
     title = f"{'Ten' if count == 10 else count} worst {model} historical scenario months"
+    historical_subtitle = ("Complete historical monthly factor vectors ranked by loss on today's "
+                           "holdings and loadings; descriptive replay, not realised performance.")
+    if "historical_selection" in meta:
+        title, historical_subtitle = historical_captions(meta["historical_selection"])
     yield (
         title,
         _scenario_page(
@@ -1281,8 +1334,7 @@ def report_pages(result, config):
             3,
             title,
             result.historical,
-            "Complete historical monthly factor vectors ranked by loss on today's holdings "
-            "and loadings; descriptive replay, not realised performance." + qualifier,
+            historical_subtitle + qualifier,
         ),
     )
     for title, builder in [
@@ -1301,3 +1353,25 @@ def report_pages(result, config):
         yield config.appendix_title, _coverage_page(result, config)
 
     yield "Notation and guide to the analysis", _analysis_guide_page(result, config)
+
+
+def report_pages(result, config):
+    """Yield standard figures with physical page references after the account cover."""
+    for title, figure in _report_pages(result, config):
+        if "accounting" in result.metadata:
+            for text in figure.texts:
+                value = text.get_text()
+                value = re.sub(r"\b(pages?\s+)(\d+)(?:-(\d+))?", _shift_page_reference,
+                               value, flags=re.IGNORECASE)
+                if title == "Notation and guide to the analysis":
+                    value = re.sub(r"^(\d+)\. ",
+                                   lambda m: f"{int(m[1]) + 1}. ", value)
+                text.set_text(value)
+        yield title, figure
+
+
+def _shift_page_reference(match):
+    """Translate analysis references once when the statement occupies page one."""
+    start = int(match[2]) + 1
+    end = f"-{int(match[3]) + 1}" if match[3] else ""
+    return f"{match[1]}{start}{end}"
