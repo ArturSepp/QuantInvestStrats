@@ -1,9 +1,8 @@
 % Bibliography for the qis JOSS submission.
 %
-% Discipline: no entry appears here until it has been checked. Each entry records where it was
-% checked and when. The author's own papers were taken from artursepp.com/research on
-% 2026-07-26, which is an authoritative source for their existence but not a publisher record.
-% Confirm volume, issue and pages against the publisher before submission.
+% Original research references were checked against artursepp.com/research on 2026-07-26.
+% Software documentation and the Risk publisher record were checked on 2026-10-11.
+% Documentation dates below denote the access year, not a software release date.
 
 @article{getmansky2004,
   author  = {Getmansky, Mila and Lo, Andrew W. and Makarov, Igor},
@@ -51,8 +50,7 @@
   pages   = {1--6},
   month   = {10},
   year    = {2023},
-  note    = {SSRN abstract 4217841},
-  doi     = {10.2139/ssrn.4217841}
+  url     = {https://www.risk.net/cutting-edge/7957914/optimal-allocation-to-cryptocurrencies-in-diversified-portfolios}
 }
 
 @unpublished{sepp2026trend,
@@ -89,7 +87,95 @@
   url     = {https://thehedgefundjournal.com/trend-following-ctas-vs-alternative-risk-premia/}
 }
 % ---------------------------------------------------------------------------------------------
-% Peer software named in State of the field. Versions checked on PyPI, 2026-07-26: ffn 1.1.5
-% (2026-03-24), bt 1.2.0 (2026-04-25), vectorbt 1.0.0 (2026-04-22). JOSS does not require
-% software citations, and none is added here because the section describes design rather than
-% making a quality claim.
+% Software and primary documentation supporting the comparison.
+
+@manual{pyfolio,
+  author = {{pyfolio-reloaded contributors}},
+  title  = {{pyfolio-reloaded}: API reference},
+  year   = {2026},
+  url    = {https://pyfolio.ml4trading.io/api-reference.html},
+  note   = {Accessed 2026-10-11}
+}
+
+@manual{bt,
+  author = {{bt contributors}},
+  title  = {{bt}: Flexible backtesting for Python},
+  year   = {2026},
+  url    = {https://pmorissette.github.io/bt/},
+  note   = {Accessed 2026-10-11}
+}
+
+@manual{vectorbt,
+  author = {{vectorbt contributors}},
+  title  = {{vectorbt}: Portfolio API reference},
+  year   = {2026},
+  url    = {https://vectorbt.dev/api/portfolio/base/},
+  note   = {Accessed 2026-10-11}
+}
+
+@manual{riskfolio,
+  author = {{Riskfolio-Lib contributors}},
+  title  = {{Riskfolio-Lib}: Portfolio optimization in Python},
+  year   = {2026},
+  url    = {https://riskfolio-lib.readthedocs.io/en/latest/},
+  note   = {Accessed 2026-10-11}
+}
+
+@manual{skfolio,
+  author = {{skfolio contributors}},
+  title  = {{skfolio}: Portfolio optimization in Python},
+  year   = {2026},
+  url    = {https://skfolio.org/},
+  note   = {Accessed 2026-10-11}
+}
+
+@manual{quantstats,
+  author = {{QuantStats contributors}},
+  title  = {{QuantStats}: Portfolio analytics for quants},
+  year   = {2026},
+  url    = {https://github.com/ranaroussi/quantstats},
+  note   = {Accessed 2026-10-11}
+}
+
+@manual{empyrical,
+  author = {{empyrical-reloaded contributors}},
+  title  = {{empyrical-reloaded}: Common financial risk and performance metrics},
+  year   = {2026},
+  url    = {https://empyrical.ml4trading.io/},
+  note   = {Accessed 2026-10-11}
+}
+
+@manual{ffn,
+  author = {{ffn contributors}},
+  title  = {{ffn}: Financial function library for Python},
+  year   = {2026},
+  url    = {https://pmorissette.github.io/ffn/},
+  note   = {Accessed 2026-10-11}
+}
+
+@article{Martin2021,
+  author  = {Martin, Robert Andrew},
+  title   = {{PyPortfolioOpt}: Portfolio optimization in Python},
+  journal = {Journal of Open Source Software},
+  year    = {2021},
+  volume  = {6},
+  number  = {61},
+  pages   = {3066},
+  doi     = {10.21105/joss.03066}
+}
+
+@manual{arch,
+  author = {{arch contributors}},
+  title  = {{arch}: StationaryBootstrap},
+  year   = {2026},
+  url    = {https://arch.readthedocs.io/en/stable/bootstrap/generated/arch.bootstrap.StationaryBootstrap.html},
+  note   = {Accessed 2026-10-11}
+}
+
+@manual{performanceanalytics,
+  author = {Peterson, Brian G. and Carl, Peter},
+  title  = {{PerformanceAnalytics}: Econometric tools for performance and risk analysis},
+  year   = {2026},
+  url    = {https://braverock.r-universe.dev/PerformanceAnalytics/doc/manual.html},
+  note   = {Reference manual, Return.Geltner; accessed 2026-10-11}
+}
