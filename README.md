@@ -225,9 +225,15 @@ Bloomberg access is supplied by the separately installed
 Contributor tests and linting use locked PEP 735 groups rather than a `dev` extra:
 
 ```bash
-uv sync --group test --locked
+uv sync --python 3.12 --group test --locked
 uv run --no-sync pytest
 ```
+
+This core setup is sufficient for the offline quickstart and core tests. `--all-extras` also
+installs the optional PostgreSQL driver, whose source build requires `pg_config` and native
+libraries. See the [installation guide](docs/install.md#postgresql-and-all-extras-installation-on-macos)
+for macOS setup, or select only the extras your workflow needs. The explicit Python version
+avoids accidentally using a different interpreter; other supported versions can be selected.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the CI-equivalent lint, documentation, and wheel
 commands.
