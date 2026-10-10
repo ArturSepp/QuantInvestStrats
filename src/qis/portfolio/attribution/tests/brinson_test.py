@@ -109,3 +109,37 @@ def test_linking_rejects_zero_or_negative_wealth():
     inputs['strategy_pnl'].iloc[0] = [-1., 0., 0.]
     with pytest.raises(ValueError, match='greater than -100%'):
         compute_brinson_attribution_table(**inputs)
+
+
+@pytest.mark.parametrize('linked', [False, True])
+@pytest.mark.parametrize('merged', [False, True])
+@pytest.mark.parametrize('dtype', ['float32', 'float64'])
+def test_compute_brinson_attribution_table_preserves_exact_grouped_row_sums(
+        linked, merged, dtype, monkeypatch):
+    """All five public outputs stay exact when several instruments share a group."""
+    from qis.portfolio.attribution import brinson
+
+    rng = np.random.default_rng(176)
+    dates = pd.date_range('2026-01-01', periods=40, freq='D', name='date')
+    columns = [f'Asset {i}' for i in range(32)]
+    members = {'Bonds': columns[:16], 'Equity': columns[16:]}
+    frames = [pd.DataFrame(rng.uniform(0.001, 0.005, (40, 32)),
+                           index=dates, columns=columns, dtype=dtype) for _ in range(4)]
+    groups = pd.Series(['Bonds'] * 16 + ['Equity'] * 16, index=columns)
+    inputs = dict(zip(('strategy_pnl', 'benchmark_pnl', 'strategy_weights',
+                       'benchmark_weights'), frames))
+    inputs.update(asset_class_data=groups, is_linked=linked,
+                  is_exclude_interaction_term=merged)
+    actual = compute_brinson_attribution_table(**inputs)
+
+    def series_row_reference(frame, group_data, group_order):
+        # Fixed fixture membership is independent of production group discovery.
+        # This reproduces the accepted per-row reduction, not a differently rounded
+        # whole-array sum. Existing formula/NAV tests supply the accounting oracle.
+        return pd.DataFrame({key: frame[tickers].apply(np.nansum, axis=1)
+                             for key, tickers in members.items()})
+
+    monkeypatch.setattr(brinson, 'agg_df_by_groups_ax1', series_row_reference)
+    expected = compute_brinson_attribution_table(**inputs)
+    for result, reference in zip(actual, expected):
+        pd.testing.assert_frame_equal(result, reference, check_exact=True)

@@ -12,6 +12,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Keep `compute_desc_table`'s upper-range sample spread independent of caller Decimal settings,
   avoiding incidental overflow or inexact exceptions for representable finite results.
 
+### Changed
+
+- Speed up grouped row sums used by Brinson attribution and portfolio reports for ordinary
+  NumPy numeric panels. Row-sum results are unchanged; nullable/object panels and custom
+  aggregation callables retain their existing Series-row path.
+
 ## [5.36.0] - 2026-10-11
 
 ### Fixed
