@@ -316,6 +316,7 @@ Run `python -m examples.perfstats.quickstart` from the repository root for the Y
 The embedded preview uses the same table API on the fixed synthetic universe, with a constant
 3% annual cash-rate input, monthly risk statistics and quarterly excess-return regression.
 
+<!-- docs-test: skip -->
 ```python
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -332,6 +333,7 @@ with sns.axes_style("darkgrid"):
     fig, ax = plt.subplots(1, 1, figsize=(10, 7))
     qis.plot_prices(prices=prices, x_date_freq='YE', ax=ax)
 ```
+<!-- docs-test: skip -->
 ```python
 # 2-axis plot with drawdowns using sns styles
 with sns.axes_style("darkgrid"):
@@ -339,6 +341,7 @@ with sns.axes_style("darkgrid"):
     qis.plot_prices_with_dd(prices=prices, x_date_freq='YE', axs=axs)
 ```
 
+<!-- docs-test: skip -->
 ```python
 # plot risk-adjusted performance table with excess Sharpe ratio
 ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
@@ -357,6 +360,7 @@ fig = qis.plot_ra_perf_table(prices=prices,
 
 
 
+<!-- docs-test: skip -->
 ```python
 # add benchmark regression using excess returns for linear beta
 # regression frequency is specified using perf_params.freq_reg

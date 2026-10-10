@@ -63,16 +63,18 @@ def _has_pytest_candidate(tree: ast.Module) -> bool:
     return False
 
 
-def _is_direct_run_local_call(node: ast.AST) -> bool:
+def _is_direct_run_local_call(node: ast.AST, optional_keywords: set[str] | None = None) -> bool:
     """Return whether a main-guard statement selects one ``Locals`` member."""
     if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
         return False
     call = node.value
     if not isinstance(call.func, ast.Name) or call.func.id != "run_local":
         return False
-    if call.args or len(call.keywords) != 1 or call.keywords[0].arg != "local":
+    keywords = [keyword.arg for keyword in call.keywords]
+    allowed = {"local"} | (optional_keywords or set())
+    if call.args or keywords.count("local") != 1 or any(name not in allowed for name in keywords):
         return False
-    value = call.keywords[0].value
+    value = next(keyword.value for keyword in call.keywords if keyword.arg == "local")
     return (
         isinstance(value, ast.Attribute)
         and isinstance(value.value, ast.Name)
@@ -155,7 +157,7 @@ def test_source_adjacent_development_runner_layout() -> None:
 
 @requires_development_runners
 def test_repository_examples_use_current_plural_dispatcher_api() -> None:
-    """Plural example dispatchers use ``Locals`` and ``run_local(local=...)``."""
+    """Example dispatchers select ``Locals`` and may accept optional named inputs/outputs."""
     failures: list[str] = []
     examples_root = REPO_ROOT.joinpath("examples")
 
@@ -178,26 +180,72 @@ def test_repository_examples_use_current_plural_dispatcher_api() -> None:
             continue
 
         dispatcher = functions.get("run_local")
+        optional_keywords: set[str] = set()
         if dispatcher is None:
             failures.append(f"{relative}: Locals enum requires run_local")
         else:
             args = dispatcher.args.args
-            annotation = args[0].annotation if len(args) == 1 else None
+            annotation = args[0].annotation if args else None
             if (
-                len(args) != 1
+                not args
                 or args[0].arg != "local"
                 or not isinstance(annotation, ast.Name)
                 or annotation.id != "Locals"
+                or dispatcher.args.posonlyargs
+                or len(args) - len(dispatcher.args.defaults) != 1
+                or any(default is None for default in dispatcher.args.kw_defaults)
+                or dispatcher.args.vararg is not None
+                or dispatcher.args.kwarg is not None
             ):
-                failures.append(f"{relative}: expected run_local(local: Locals)")
+                failures.append(f"{relative}: expected local: Locals plus optional named arguments")
+            else:
+                optional_keywords = {arg.arg for arg in args[1:] + dispatcher.args.kwonlyargs}
 
         guards = [node for node in tree.body if _is_main_guard(node)]
         if len(guards) != 1 or not any(
-            _is_direct_run_local_call(statement) for statement in guards[0].body
+            _is_direct_run_local_call(statement, optional_keywords) for statement in guards[0].body
         ):
             failures.append(f"{relative}: main guard must select one Locals member")
 
     assert failures == [], "example dispatcher violations:\n" + "\n".join(failures)
+
+
+@pytest.mark.parametrize("signature, call, valid", [
+    ("local: Locals", "local=Locals.REPORT", True),
+    ("local: Locals, output_path=None", "local=Locals.REPORT, output_path='report'", True),
+    ("local: Locals, *, input_dir=None", "input_dir='data', local=Locals.REPORT", True),
+    ("local: Locals, input_dir=None, output_path=None", "local=Locals.REPORT", True),
+    ("local: Locals, output_path", "local=Locals.REPORT, output_path='report'", False),
+    ("local: Locals, *, input_dir", "local=Locals.REPORT, input_dir='data'", False),
+    ("local: Locals = None", "local=Locals.REPORT", False),
+    ("local: str", "local=Locals.REPORT", False),
+    ("local: Locals, *args", "local=Locals.REPORT", False),
+    ("local: Locals, **kwargs", "local=Locals.REPORT", False),
+    ("local: Locals", "local=Locals.REPORT, output_path='report'", False),
+    ("local: Locals", "local='REPORT'", False),
+    ("local: Locals", "Locals.REPORT", False),
+    ("local: Locals", "**options", False),
+])
+def test_example_dispatcher_contract(tmp_path, monkeypatch, signature, call, valid) -> None:
+    """Accept optional I/O while rejecting required extras and untyped case selection."""
+    examples = tmp_path / "examples"
+    examples.mkdir()
+    (examples / "fixture.py").write_text(
+        f"class Locals:\n    REPORT = 1\ndef run_local({signature}):\n    pass\n"
+        f"if __name__ == '__main__':\n    run_local({call})\n", encoding="utf-8")
+    monkeypatch.setitem(test_repository_examples_use_current_plural_dispatcher_api.__globals__,
+                        "REPO_ROOT", tmp_path)
+    if valid:
+        test_repository_examples_use_current_plural_dispatcher_api()
+    else:
+        with pytest.raises(AssertionError, match="example dispatcher violations"):
+            test_repository_examples_use_current_plural_dispatcher_api()
+
+
+def test_component_dispatcher_rejects_example_options() -> None:
+    """Optional I/O belongs to examples; component main guards retain their strict contract."""
+    node = ast.parse("run_local(local=Locals.REPORT, output_path='report')").body[0]
+    assert not _is_direct_run_local_call(node)
 
 
 @requires_development_runners
