@@ -1,6 +1,6 @@
-"""Execute the Python worked examples in the methodology articles.
+"""Execute Python worked examples in the site, packaged notes and README.
 
-Every ```` ```python ```` or ``~~~python`` block in a methodology page runs in one namespace per
+Every ```` ```python ```` or ``~~~python`` block in these pages runs in one namespace per
 page, in source order, so a later block may continue an earlier one. The assertions inside the
 blocks are the numerical contract of each article: a calculation change that invalidates a
 number quoted in the prose fails here rather than silently leaving the text wrong.
@@ -13,7 +13,6 @@ because some articles import their canonical example from ``examples/``.
 
 # packages
 import re
-import runpy
 import socket
 from pathlib import Path
 from typing import List, NamedTuple
@@ -29,7 +28,6 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[3]
 CHECKER_PATH: Path = REPO_ROOT.joinpath('tools', 'check_docs.py')
 if not CHECKER_PATH.is_file():
     pytest.skip('Documentation sources are not shipped in the wheel.', allow_module_level=True)
-CHECKER = runpy.run_path(str(CHECKER_PATH))
 SKIP_MARKER = '<!-- docs-test: skip -->'
 OPENING_FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})[ \t]*python[ \t]*$')
 
@@ -77,14 +75,22 @@ def python_blocks(text: str) -> List[CodeBlock]:
     return blocks
 
 
-PAGES: List[str] = sorted(CHECKER['METHODOLOGY_PAGES'])
+PAGES: List[str] = sorted(
+    path.relative_to(REPO_ROOT).as_posix()
+    for path in [REPO_ROOT / 'README.md', *REPO_ROOT.joinpath('docs').glob('*.md'),
+                 *REPO_ROOT.joinpath('src/qis/docs').glob('*.md')]
+    if python_blocks(path.read_text(encoding='utf-8'))
+)
 
 
 def test_blocks_are_found() -> None:
     """The fence pattern still matches, so a green run is not an empty run."""
-    count = sum(len(python_blocks(REPO_ROOT.joinpath('docs', page).read_text(encoding='utf-8')))
+    count = sum(len(python_blocks(REPO_ROOT.joinpath(page).read_text(encoding='utf-8')))
                 for page in PAGES)
-    assert count >= 15, f'only {count} Python blocks found across methodology pages'
+    assert count >= 15, f'only {count} Python blocks found across documentation pages'
+    assert 'src/qis/docs/plotting_kwargs.md' in PAGES
+    assert 'src/qis/docs/reporting_frequencies.md' in PAGES
+    assert 'docs/risk_monitoring.md' in PAGES
 
 
 def test_skip_marker_is_recognised() -> None:
@@ -94,15 +100,17 @@ def test_skip_marker_is_recognised() -> None:
 
 
 @pytest.mark.parametrize('page', PAGES)
-def test_methodology_examples_execute(page: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_documentation_examples_execute(page: str, monkeypatch: pytest.MonkeyPatch,
+                                       tmp_path: Path) -> None:
     """Every unmarked block of one page runs, cumulatively and offline.
 
     Args:
-        page: methodology page file name under ``docs/``
+        page: repository-relative documentation path
         monkeypatch: pytest fixture used for the path and the network guard
+        tmp_path: isolated output directory for optional exports
     """
     blocks = [block for block in python_blocks(
-        REPO_ROOT.joinpath('docs', page).read_text(encoding='utf-8')) if not block.skipped]
+        REPO_ROOT.joinpath(page).read_text(encoding='utf-8')) if not block.skipped]
     if len(blocks) == 0:
         pytest.skip(f'{page} has no executable Python block')
 
@@ -110,15 +118,18 @@ def test_methodology_examples_execute(page: str, monkeypatch: pytest.MonkeyPatch
         raise OSError('documentation examples must run offline')
 
     monkeypatch.syspath_prepend(str(REPO_ROOT))
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(socket.socket, 'connect', refuse)
     monkeypatch.setattr(socket, 'create_connection', refuse)
     namespace = {'__name__': f'docs_{Path(page).stem}'}
     try:
         for block in blocks:
             try:
-                exec(compile(block.code, f'docs/{page}:{block.line}', 'exec'), namespace)
+                exec(compile(block.code, f'{page}:{block.line}', 'exec'), namespace)
+                for number in plt.get_fignums():
+                    plt.figure(number).canvas.draw()
             except Exception as error:
                 raise AssertionError(
-                    f'docs/{page} block at line {block.line} failed: {error!r}') from error
+                    f'{page} block at line {block.line} failed: {error!r}') from error
     finally:
         plt.close('all')

@@ -3,8 +3,11 @@
 Install the data extra with ``pip install "qis[data]"``. The strategy observes a 5-minute close,
 submits a signed unit order, and receives a full fill only at the next observation. Its
 instrument contribution returns are compounded back to timestamped NAV. Business-day closing
-NAV and position size are plotted with the QIS time-axis formatter and passed to a multi-asset
-factsheet.
+NAV and position size are plotted with the QIS time-axis formatter. Fewer than 63 daily marks
+produce a compact prices/drawdowns/performance factsheet, omitting rolling alpha/beta panels.
+Longer histories use the multi-asset factsheet with five-day rolling Sharpe/volatility windows
+and a five-observation EWMA beta span on business-day log returns. These short-window estimates
+illustrate reporting; they are not stable long-run risk estimates.
 
 Change ``INTERVAL`` to ``"1m"`` and ``PERIOD`` to ``"5d"`` for a denser recent sample supported
 by yfinance.
@@ -15,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter, ScalarFormatter
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -36,6 +40,7 @@ PERIOD = '1mo'
 FAST_WINDOW = 12
 SLOW_WINDOW = 36
 INITIAL_CASH = 100_000.0
+FULL_REPORT_MIN_DAILY_MARKS = 63  # leave history beyond the factor model's warm-up
 
 
 @dataclass
@@ -227,12 +232,43 @@ def plot_daily_navs_and_position(
 
 
 def generate_nav_factsheet(timestamped_navs: pd.DataFrame) -> plt.Figure:
-    """Generate a daily multi-asset factsheet for strategy and buy-and-hold NAVs."""
+    """Choose a compact or full factsheet according to the available daily history."""
     daily_navs = to_daily_reporting_navs(timestamped_navs)
+    perf_params = qis.PerfParams(freq='B', freq_reg='B')
+    if len(daily_navs) < FULL_REPORT_MIN_DAILY_MARKS:
+        fig, axes = plt.subplots(
+            3, 1, figsize=(9, 10), gridspec_kw={'height_ratios': [2, 1, 1]},
+        )
+        qis.plot_prices_with_dd(
+            prices=daily_navs, perf_params=perf_params,
+            perf_stats_labels=qis.PerfStatsLabels.TOTAL.value,
+            x_date_freq='B', date_format='%d-%b', axs=axes[:2],
+        )
+        axes[0].yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
+        axes[1].yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+        qis.plot_ra_perf_table(
+            prices=daily_navs, perf_params=perf_params,
+            perf_columns=[qis.PerfStat.TOTAL_RETURN, qis.PerfStat.VOL, qis.PerfStat.MAX_DD],
+            title='B-sampled statistics; volatility is annualised', ax=axes[2],
+        )
+        fig.suptitle(f'{TICKER} intraday momentum: short-history report ({len(daily_navs)} marks)')
+        fig.text(
+            0.5, 0.02,
+            'Business-day closing NAV. Rolling alpha/beta panels need more history.\n'
+            'Short-sample volatility is descriptive, not a stable risk estimate.',
+            ha='center', fontsize=9,
+        )
+        fig.tight_layout(rect=(0, 0.06, 1, 0.96))
+        return fig
     return generate_multi_asset_factsheet(
         prices=daily_navs,
         benchmark=f'{TICKER} buy-and-hold',
-        perf_params=qis.PerfParams(freq='B'),
+        perf_params=perf_params,
+        freq_beta='B',
+        factor_beta_span=5,
+        freq_sharpe='B',
+        sharpe_rolling_window=5,
+        vol_rolling_window=5,
         regime_classifier=qis.BenchmarkReturnsQuantilesRegime(freq='B'),
         heatmap_freq='W-FRI',
         factsheet_name=f'{TICKER} intraday momentum-event strategy',

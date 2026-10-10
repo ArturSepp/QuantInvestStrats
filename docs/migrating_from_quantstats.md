@@ -15,8 +15,10 @@ Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats
 
 This guide maps a [QuantStats](https://github.com/ranaroussi/quantstats) workflow onto qis: the
 reports, the `qs.stats` metrics and the `qs.plots` charts. For each metric it states whether the
-two packages agree on the same input and, where they do not, which convention differs. qis has no
-HTML tear sheet; its reports are matplotlib figures that can be saved as a PDF.
+two packages agree on the same input and, where they do not, which convention differs.
+The `qis.factsheet` facade returns Matplotlib figures or saves a PDF. A separate optional
+[PyBloqs backend and examples](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/pybloqs_factsheets.py)
+support HTML/PDF reporting.
 
 The mappings were checked on 6 October 2026 with qis 5.33.3 and QuantStats 0.0.86, on the frozen
 synthetic series used below. QuantStats has changed its statistic conventions between releases,

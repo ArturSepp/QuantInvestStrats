@@ -25,6 +25,8 @@ import numpy as np
 import pandas as pd
 from typing import Tuple
 
+from examples._helpers.output import get_output_dir, parse_output_dir
+
 import qis
 from qis import TimePeriod, PortfolioData, ReportingFrequency
 from qis.portfolio.reports.config import fetch_default_report_kwargs
@@ -50,7 +52,9 @@ def fetch_universe_data(start: str = "2003-12-31") -> Tuple[pd.DataFrame, pd.Dat
     """real-data path: daily prices from yfinance, made business-day frequency."""
     import yfinance as yf
     tickers = list(UNIVERSE_DATA.keys())
-    prices = yf.download(tickers=tickers, start=start, end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
+    prices = yf.download(tickers=tickers, start=start, end=None, ignore_tz=True, auto_adjust=True)[
+        'Close'
+    ][tickers]
     prices = prices.asfreq('B', method='ffill')
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, pd.Series(UNIVERSE_DATA)
@@ -72,7 +76,11 @@ def generate_synthetic_universe(start: str = '2003-12-31',
     market = rng.standard_normal(n)  # common factor to induce cross-asset correlation
     cols = {}
     for ticker in tickers:
-        beta = 0.6 if UNIVERSE_DATA[ticker] in ('Equities', 'HighYield') else (-0.1 if UNIVERSE_DATA[ticker] == 'Bonds' else 0.2)
+        beta = (
+            0.6
+            if UNIVERSE_DATA[ticker] in ('Equities', 'HighYield')
+            else (-0.1 if UNIVERSE_DATA[ticker] == 'Bonds' else 0.2)
+        )
         idio = rng.standard_normal(n)
         shock = beta * market + np.sqrt(max(1.0 - beta ** 2, 0.0)) * idio
         rets = ann_mu[ticker] * dt + ann_vol[ticker] * np.sqrt(dt) * shock
@@ -101,9 +109,9 @@ def generate_volparity_portfolio(prices: pd.DataFrame,
                                  rebalancing_costs: float = 0.0010
                                  ) -> PortfolioData:
     """equal-vol (vol-parity) weights, backtested once on the daily panel."""
-    ra_returns, weights, ewm_vol = qis.compute_ra_returns(returns=qis.to_returns(prices=prices, is_log_returns=True),
-                                                          span=span,
-                                                          vol_target=vol_target)
+    ra_returns, weights, ewm_vol = qis.compute_ra_returns(
+        returns=qis.to_returns(prices=prices, is_log_returns=True), span=span, vol_target=vol_target
+    )
     weights = weights.divide(weights.sum(axis=1), axis=0)
     portfolio = qis.backtest_model_portfolio(prices=prices,
                                              weights=weights,
@@ -123,23 +131,26 @@ def run_global_report(use_synthetic_data: bool = False,
     prices, benchmark_prices, group_data = load_universe(use_synthetic_data=use_synthetic_data)
 
     end = prices.index[-1]
-    time_period_long = TimePeriod(prices.index[0], end)                          # full history
-    time_period_short = TimePeriod(end - pd.DateOffset(years=short_period_years), end)  # last N years
+    time_period_long = TimePeriod(prices.index[0], end)  # full history
+    time_period_short = TimePeriod(
+        end - pd.DateOffset(years=short_period_years), end
+    )  # last N years
 
     portfolio_data = generate_volparity_portfolio(prices=prices, group_data=group_data)
     name = portfolio_data.nav.name
 
     spans = (('long', time_period_long), ('short', time_period_short))
     all_figs = []
-    if output_path is None:
-        output_path = qis.local_path.get_output_path()
+    output_path = get_output_dir(output_path)
 
     for reporting_frequency in REPORTING_FREQUENCIES:
         for span_label, time_period in spans:
             report_kwargs = fetch_default_report_kwargs(time_period=time_period,
                                                         reporting_frequency=reporting_frequency,
                                                         add_rates_data=add_rates_data)
-            factsheet_name = f"{name} factsheet \u2013 {reporting_frequency.name} reporting, {span_label} period"
+            factsheet_name = (
+                f'{name} factsheet \u2013 {reporting_frequency.name} reporting, {span_label} period'
+            )
             figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
                                                    benchmark_prices=benchmark_prices,
                                                    time_period=time_period,
@@ -160,4 +171,4 @@ def run_global_report(use_synthetic_data: bool = False,
 
 if __name__ == '__main__':
     # real-data run (yfinance). Pass use_synthetic_data=True to run fully offline.
-    run_global_report(use_synthetic_data=False)
+    run_global_report(use_synthetic_data=False, output_path=parse_output_dir())

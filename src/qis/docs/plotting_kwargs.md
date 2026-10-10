@@ -1,9 +1,13 @@
 # Shared plotting arguments
 
-Every `plot_*` function in qis draws onto a matplotlib axis and takes the same set of arguments
-for the things that are common to all plots â€” where to draw, what to title it, how to format
-numbers. Those are documented here once. A plot function's own docstring covers only what is
-specific to it, and points here for the rest.
+*Author: [Artur Sepp](https://github.com/ArturSepp)*
+
+Implemented in [qis](https://github.com/ArturSepp/QuantInvestStrats).
+See the [software citation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
+This page describes shared arguments used by qis Matplotlib plots: where to draw, what to title
+the plot, and how to format numbers. Check the individual function's signature and docstring
+for the applicable arguments and any plot-specific options.
 
 The intent is that these mean the same thing everywhere. If a function interprets one of them
 differently, that is a defect to report, not a local convention.
@@ -16,13 +20,22 @@ The axis to draw on. When `None` the function creates its own figure and axis, w
 one-off call in a script wants. Pass an axis when composing a multi-panel figure:
 
 ```python
-fig, axs = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True)
+import matplotlib.pyplot as plt
+import qis
+from qis.datasets.synthetic import generate_synthetic_prices
+
+prices = generate_synthetic_prices(apply_quirks=False)[['SEQ_US', 'SBD_TSY']]
+fig, axs = plt.subplots(3, 1, figsize=(10, 10), tight_layout=True)
 qis.plot_prices(prices=prices, ax=axs[0])
-qis.plot_prices_with_dd(prices=prices, ax=axs[1])
+qis.plot_prices_with_dd(prices=prices, axs=axs[1:])
+fig.canvas.draw()
 ```
 
-Every plot function returns the `plt.Figure` it drew on, so the return value is the figure to
-pass to `qis.save_fig` or `qis.save_figs_to_pdf` whether or not you supplied the axis.
+Multi-panel functions such as `plot_prices_with_dd` take an `axs` sequence: here its price and
+drawdown panels occupy the last two axes. Check each function's signature and return contract.
+For example, `plot_prices` and `plot_prices_with_dd` return `None` when supplied axes; when they
+create their own axes, they return the new `plt.Figure`. Retain the caller-owned `fig` above
+and pass it to `qis.save_fig` or `qis.save_figs_to_pdf` when exporting.
 
 ## Labelling
 
@@ -99,10 +112,11 @@ Most plot functions end in `**kwargs` and forward it to the helpers they call â€
 `qis.get_legend_lines`, the table renderers, and matplotlib itself. Two consequences worth
 knowing:
 
-- A keyword these functions do not recognise is **silently ignored** rather than raising. A
+- A keyword these functions do not recognise **may be silently ignored**. A
   misspelled argument name therefore produces a figure that looks nearly right, which is how
   `trend_line` went unnoticed against `plot_time_series_2ax`'s `trend_line1` / `trend_line2`.
-  When a plot ignores something you passed, check the spelling against the signature first.
+  Other keywords reach a downstream helper or Matplotlib and may raise an error. Check the
+  spelling against the function and helper signatures first.
 - Arguments documented here can be passed through a wrapper without being named at each level,
   which is how the factsheet generators pass one `fetch_default_report_kwargs` dict down to
   every panel.

@@ -28,13 +28,14 @@ matplotlib.use('Agg')  # batch PDF generation, no interactive display needed
 import pandas as pd
 from typing import List, Tuple
 
+from examples._helpers.output import get_output_dir, parse_output_dir
+
 import qis
-from qis import TimePeriod, MultiPortfolioData, ReportingFrequency
+from qis import TimePeriod, MultiPortfolioData
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 from qis.portfolio.reports.multi_strategy_factsheet import generate_multi_portfolio_factsheet
 # reuse the exact universe + reporting-frequency grid from the single-strategy runner
-from examples.factsheets.strategy_reporting_frequencies import (UNIVERSE_DATA,
-                                                                REPORTING_FREQUENCIES,
+from examples.factsheets.strategy_reporting_frequencies import (REPORTING_FREQUENCIES,
                                                                 load_universe)
 
 # EWMA spans for the vol-parity parameter sweep (one strategy per span), as in multi_strategy.py
@@ -48,11 +49,13 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
                                       vol_target: float = 0.15,
                                       rebalancing_costs: float = 0.0010
                                       ) -> MultiPortfolioData:
-    """vol-parity span sweep: one strategy per span, each backtested once on the full daily panel."""
+    """Backtest each vol-parity span once on the full daily panel."""
     returns = qis.to_returns(prices=prices, is_log_returns=True)
     portfolio_datas = []
     for span in spans:
-        ra_returns, weights, ewm_vol = qis.compute_ra_returns(returns=returns, span=span, vol_target=vol_target)
+        ra_returns, weights, ewm_vol = qis.compute_ra_returns(
+            returns=returns, span=span, vol_target=vol_target
+        )
         weights = weights.divide(weights.sum(axis=1), axis=0)
         portfolio_data = qis.backtest_model_portfolio(prices=prices,
                                                       weights=weights,
@@ -72,12 +75,14 @@ def run_global_multi_strategy_report(use_synthetic_data: bool = False,
                                      add_strategy_factsheets: bool = False,
                                      output_path: str = None
                                      ) -> str:
-    """render the multi-strategy span-sweep factsheet for the full {frequency} x {long, short} grid on one panel."""
+    """Render the multi-strategy factsheet across the frequency and time-span grid."""
     prices, benchmark_prices, group_data = load_universe(use_synthetic_data=use_synthetic_data)
 
     end = prices.index[-1]
-    time_period_long = TimePeriod(prices.index[0], end)                                 # full history
-    time_period_short = TimePeriod(end - pd.DateOffset(years=short_period_years), end)   # last N years
+    time_period_long = TimePeriod(prices.index[0], end)  # full history
+    time_period_short = TimePeriod(
+        end - pd.DateOffset(years=short_period_years), end
+    )  # last N years
 
     multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,
                                                              benchmark_prices=benchmark_prices,
@@ -88,8 +93,7 @@ def run_global_multi_strategy_report(use_synthetic_data: bool = False,
 
     report_windows = (('long', time_period_long), ('short', time_period_short))
     all_figs: List = []
-    if output_path is None:
-        output_path = qis.local_path.get_output_path()
+    output_path = get_output_dir(output_path)
 
     for reporting_frequency in REPORTING_FREQUENCIES:
         for span_label, time_period in report_windows:
@@ -119,4 +123,4 @@ def run_global_multi_strategy_report(use_synthetic_data: bool = False,
 
 if __name__ == '__main__':
     # real-data run (yfinance). Pass use_synthetic_data=True to run fully offline.
-    run_global_multi_strategy_report(use_synthetic_data=False)
+    run_global_multi_strategy_report(use_synthetic_data=False, output_path=parse_output_dir())

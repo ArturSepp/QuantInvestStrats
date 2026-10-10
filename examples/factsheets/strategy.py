@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from typing import Tuple, List
 from enum import Enum
+from examples._helpers.output import get_output_dir, parse_output_dir
 import yfinance as yf
 import qis
 from qis import TimePeriod, PortfolioData
@@ -30,7 +31,9 @@ def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
                          GLD='Gold')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
-    prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
+    prices = yf.download(
+        tickers=tickers, start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True
+    )['Close'][tickers]
     prices = prices.asfreq('B', method='ffill')  # make B frequency
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, group_data
@@ -44,7 +47,9 @@ def fetch_equity_bond() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
                          IEF='Bonds')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
-    prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
+    prices = yf.download(
+        tickers=tickers, start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True
+    )['Close'][tickers]
     benchmark_prices = prices[['SPY', 'IEF']]
     return prices, benchmark_prices, group_data
 
@@ -56,9 +61,9 @@ def generate_volparity_portfolio(prices: pd.DataFrame,
                                  vol_target: float = 0.15,
                                  rebalancing_costs: float = 0.0010
                                  ) -> PortfolioData:
-    ra_returns, weights, ewm_vol = qis.compute_ra_returns(returns=qis.to_returns(prices=prices, is_log_returns=True),
-                                                          span=span,
-                                                          vol_target=vol_target)
+    ra_returns, weights, ewm_vol = qis.compute_ra_returns(
+        returns=qis.to_returns(prices=prices, is_log_returns=True), span=span, vol_target=vol_target
+    )
     weights = weights.divide(weights.sum(axis=1), axis=0)
 
     if time_period is not None:
@@ -92,12 +97,13 @@ class Locals(Enum):
     DELTA1_STRATEGY = 3
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
+    output_path = get_output_dir(output_path)
 
     time_period = qis.TimePeriod('31Dec2005', '31Dec2025')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2022', time_period.end)
@@ -128,11 +134,11 @@ def run_local(local: Locals):
                                                **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_strategy_factsheet_long",
-                             local_path=qis.local_path.get_output_path())
+                             local_path=output_path)
         """
-        qis.save_fig(fig=figs[0], file_name=f"strategy1", local_path=qis.local_path.get_output_path())
-        qis.save_fig(fig=figs[1], file_name=f"strategy2", local_path=qis.local_path.get_output_path())
-        qis.save_fig(fig=figs[2], file_name=f"strategy3", local_path=qis.local_path.get_output_path())
+        qis.save_fig(fig=figs[0], file_name=f"strategy1", local_path=output_path)
+        qis.save_fig(fig=figs[1], file_name=f"strategy2", local_path=output_path)
+        qis.save_fig(fig=figs[2], file_name=f"strategy3", local_path=output_path)
         """
 
     elif local == Locals.EQUITY_BOND:
@@ -149,18 +155,20 @@ def run_local(local: Locals):
                                                **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_long",
-                             local_path=qis.local_path.get_output_path())
+                             local_path=output_path)
 
-        figs = qis.generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                               benchmark_prices=benchmark_prices,
-                                               time_period=TimePeriod('31Dec2019', time_period_short.end),
-                                               **fetch_default_report_kwargs(time_period=time_period_short))
+        figs = qis.generate_strategy_factsheet(
+            portfolio_data=portfolio_data,
+            benchmark_prices=benchmark_prices,
+            time_period=TimePeriod('31Dec2019', time_period_short.end),
+            **fetch_default_report_kwargs(time_period=time_period_short),
+        )
         qis.save_figs_to_pdf(figs=figs,
                              file_name=f"{portfolio_data.nav.name}_portfolio_factsheet_short",
-                             local_path=qis.local_path.get_output_path())
+                             local_path=output_path)
 
     elif local == Locals.DELTA1_STRATEGY:
-        from bbg_fetch import fetch_field_timeseries_per_tickers
+        from bbg_fetch import fetch_field_timeseries_per_tickers  # noqa: TID251 - optional vendor branch
         prices = fetch_field_timeseries_per_tickers(tickers={'UISYMH5S Index': 'CDX_HY'})
         benchmark_prices = fetch_field_timeseries_per_tickers(tickers={'HYG US Equity': 'HYG'})
         # prices = fetch_field_timeseries_per_tickers(tickers={'UISYMI5S Index': 'IG_5Y'})
@@ -176,12 +184,12 @@ def run_local(local: Locals):
                                                time_period=time_period,
                                                **fetch_default_report_kwargs(time_period=time_period))
         qis.save_figs_to_pdf(figs=figs,
-                             file_name=f"delta1_strategy_factsheet",
-                             local_path=qis.local_path.get_output_path())
+                             file_name="delta1_strategy_factsheet",
+                             local_path=output_path)
 
     # plt.show()
 
 
 if __name__ == '__main__':
 
-    run_local(local=Locals.VOLPARITY_PORTFOLIO)
+    run_local(local=Locals.VOLPARITY_PORTFOLIO, output_path=parse_output_dir())

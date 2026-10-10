@@ -61,7 +61,9 @@ def perf_wo_best_worst(prices: pd.Series,
         joint_data = pd.concat([prices, wo_best_perf.rename('W/O Best')], axis=1)
 
     elif wo_type == WoType.WORST:
-        joint_data = pd.concat([prices, wo_best_perf.rename('W/O Best'), wo_worst_perf.rename('W/O Worst')], axis=1)
+        joint_data = pd.concat(
+            [prices, wo_best_perf.rename('W/O Best'), wo_worst_perf.rename('W/O Worst')], axis=1
+        )
 
     else:
         joint_data = pd.concat([prices, wo_worst_perf.rename('W/O Best and Worst') ], axis=1)
@@ -85,10 +87,11 @@ def run_local(local: Locals):
     """
 
     ticker = 'SPY'
-    prices = yf.download(ticker, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].rename(ticker)
+    prices = yf.download(ticker, start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True)[
+        'Close'
+    ][ticker].rename(ticker)
 
     freq = 'ME'
-    wo_type = WoType.BEST
     if local == Locals.PERF1:
         fig, ax = plt.subplots(1, 1, figsize=(10, 10), tight_layout=True)
         perf_wo_best_worst(prices=prices, freq=freq, wo_type=WoType.WORST, ax=ax)

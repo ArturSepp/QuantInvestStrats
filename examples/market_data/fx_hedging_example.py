@@ -1,10 +1,13 @@
 """
 Examples for the FX hedging research pipeline (run_local dispatcher).
 
-Loads the USD benchmark universe and the FX rates data, then exercises the
-container methods and the hedging reports. Data creation lives in the
-production layer (rosaa.create_fx_rates_data), not here.
+By default, downloads free Yahoo FX spots and USD ETFs. Non-USD interest
+rates use the explicitly illustrative spreads in fx_rates_data_yahoo_example.
+Pass --input-dir to use your own fx_hedging_data_{fx_spots,domestic_rates,usd_assets}.csv
+files instead; those production inputs are not distributed with qis.
 """
+import argparse
+from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 import qis as qis
@@ -30,12 +33,40 @@ def load_usd_assets(local_path: str,
     ``load_fx_rates_data``.
     """
     data = qis.load_df_dict_from_csv(dataset_keys=['usd_assets'],
-                                     file_name=file_name, local_path=local_path)
+                                     file_name=file_name, local_path=local_path,
+                                     force_not_found_error=True)
     return data['usd_assets']
 
+
+def load_example_inputs(input_dir: str = None):
+    """Load explicit reader CSVs, or the public-data teaching universe by default."""
+    if input_dir is not None:
+        for key in ('fx_spots', 'domestic_rates', 'usd_assets'):
+            path = Path(input_dir) / f'fx_hedging_data_{key}.csv'
+            if not path.is_file():
+                raise FileNotFoundError(f'Missing {path}; omit --input-dir for the Yahoo demo.')
+        fx_spots, domestic_rates = load_fx_rates_data(local_path=input_dir)
+        usd_assets = load_usd_assets(local_path=input_dir)
+    else:
+        import yfinance as yf
+        from examples.market_data.fx_rates_data_yahoo_example import fetch_fx_rates_data_from_yahoo
+
+        fx = fetch_fx_rates_data_from_yahoo()
+        fx_spots, domestic_rates = fx.fx_spots, fx.domestic_rates
+        tickers = {'SPY': 'Equities', 'TLT': 'Govt Bonds', 'LQD': 'IG Bonds', 'HYG': 'HY Bonds'}
+        usd_assets = yf.download(list(tickers), start='2005-12-31', auto_adjust=True,
+                                 progress=False, threads=False)['Close'].reindex(columns=tickers)
+        missing = usd_assets.columns[usd_assets.isna().all()].tolist()
+        if missing:
+            raise ValueError(
+                f'Yahoo returned no ETF observations for {missing}; retry the download.')
+        usd_assets = usd_assets.rename(columns=tickers)
+        print('Yahoo FX/ETF prices; non-USD rates use illustrative differentials.')
+    return fx_spots, domestic_rates, usd_assets
+
+
 class Locals(Enum):
-    # A live CHF-hedged-index demo using bbg_fetch lives in the rosaa example
-    # layer, not here: qis examples stay free of Bloomberg and tickers.
+    # The default examples use public FX spots and ETF prices.
     LOAD_DATA = 2
     CHECK_HEDGED_RETURN = 3
     PLOT_HEDGE_REPORT = 5
@@ -44,7 +75,7 @@ class Locals(Enum):
     LOCAL_RATE_ADJUSTMENT = 8
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, input_dir: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real universe and generate reports.
@@ -54,18 +85,14 @@ def run_local(local: Locals):
     pd.set_option('display.max_columns', 500)
     pd.set_option('display.width', 1000)
 
-    from qis import local_path as lp
+    fx_spots, domestic_rates, usd_assets = load_example_inputs(input_dir)
 
     if local == Locals.LOAD_DATA:
-        fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
-        usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         print(usd_assets)
         print(fx_spots)
         print(domestic_rates)
 
     elif local == Locals.CHECK_HEDGED_RETURN:
-        fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
-        usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         asset_price_local_ccy = usd_assets['Equities']
 
         fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
@@ -113,8 +140,6 @@ def run_local(local: Locals):
 
     elif local == Locals.PLOT_HEDGE_REPORT:
         time_period = qis.TimePeriod('31Dec2004', '31Oct2025')
-        fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
-        usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         asset_price_local_ccy = usd_assets['IG Bonds']
         fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
 
@@ -126,8 +151,6 @@ def run_local(local: Locals):
 
     elif local == Locals.MULTI_ASSET_HEDGE:
         time_period = qis.TimePeriod('31Dec2004', '31Oct2025')
-        fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
-        usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
         out = compute_multi_asset_fx_hedging(asset_prices=usd_assets,
                                              fx_rates_data=fx_rates_data,
@@ -138,8 +161,6 @@ def run_local(local: Locals):
 
     elif local == Locals.MULTI_ASSET_HEDGE_REPORT:
         time_period = qis.TimePeriod('31Dec2004', '31Oct2025')
-        fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
-        usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
         plot_multi_asset_fx_hedging_report(asset_prices=usd_assets,
                                           fx_rates_data=fx_rates_data,
@@ -148,8 +169,6 @@ def run_local(local: Locals):
                                           reference_ccy='CHF')
 
     elif local == Locals.LOCAL_RATE_ADJUSTMENT:
-        fx_spots, domestic_rates = load_fx_rates_data(local_path=lp.get_resource_path())
-        usd_assets = load_usd_assets(local_path=lp.get_resource_path())
         fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
         local_ccys = pd.Series('USD', index=usd_assets.columns)
         usd_assets.loc[:'31Dec2004', 'HY Bonds'] = pd.NA
@@ -167,5 +186,6 @@ def run_local(local: Locals):
 
 
 if __name__ == '__main__':
-
-    run_local(local=Locals.LOCAL_RATE_ADJUSTMENT)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--input-dir', help='Directory of reader-supplied FX and USD-asset CSVs.')
+    run_local(local=Locals.LOCAL_RATE_ADJUSTMENT, input_dir=parser.parse_args().input_dir)

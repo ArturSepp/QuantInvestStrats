@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import yfinance as yf
 import qis as qis
 from enum import Enum
+from examples._helpers.output import get_output_dir, parse_output_dir
 from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_factsheet
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 
@@ -24,12 +25,13 @@ class Locals(Enum):
     HYG_ETFS = 6
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
+    output_path = get_output_dir(output_path)
 
     end_date = '31Dec2025'  # performance repoting
 
@@ -52,16 +54,23 @@ def run_local(local: Locals):
 
     elif local == Locals.BBG:
         benchmark = 'SPTR'
-        tickers = {'SPTR Index': benchmark,
-                   'SGEPMLU Index': 'SG AI long/short', 'SGEPMLUL Index': 'SG AI long', 'SGEPMLUS Index': 'SG AI short',
-                   'SGIXAI Index': 'SG Alpha',
-                   'AIPEX Index': 'HSBC Aipex',
-                   'MQQFUSAI Index': 'MerQube AI',
-                   'CSRPAIS Index': 'CS RavenPack',
-                   'CITIMSTR Index': 'Citi Grand'}
+        tickers = {
+            'SPTR Index': benchmark,
+            'SGEPMLU Index': 'SG AI long/short',
+            'SGEPMLUL Index': 'SG AI long',
+            'SGEPMLUS Index': 'SG AI short',
+            'SGIXAI Index': 'SG Alpha',
+            'AIPEX Index': 'HSBC Aipex',
+            'MQQFUSAI Index': 'MerQube AI',
+            'CSRPAIS Index': 'CS RavenPack',
+            'CITIMSTR Index': 'Citi Grand',
+        }
         time_period = qis.TimePeriod('31Dec2019', end_date)
-        from bbg_fetch import fetch_field_timeseries_per_tickers
-        prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
+        from bbg_fetch import fetch_field_timeseries_per_tickers  # noqa: TID251 - optional vendor branch
+
+        prices = fetch_field_timeseries_per_tickers(
+            tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True
+        ).dropna()
         prices = prices.rename(tickers, axis=1)
 
     elif local == Locals.RATES_FUTURES:
@@ -73,8 +82,11 @@ def run_local(local: Locals):
                    'IR4 Comdty': 'AUD IR',
                    'COR4 Comdty': 'CAD IR'}
         time_period = qis.TimePeriod(start='02Apr1986', end=end_date)
-        from bbg_fetch import fetch_field_timeseries_per_tickers
-        prices = fetch_field_timeseries_per_tickers(tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True).dropna()
+        from bbg_fetch import fetch_field_timeseries_per_tickers  # noqa: TID251 - optional vendor branch
+
+        prices = fetch_field_timeseries_per_tickers(
+            tickers=list(tickers.keys()), field='PX_LAST', CshAdjNormal=True
+        ).dropna()
         prices = prices.rename(tickers, axis=1)
 
     elif local == Locals.HYG_ETFS:
@@ -83,15 +95,20 @@ def run_local(local: Locals):
                    'HYDB US Equity': 'HYDB',
                    'HYG US Equity': 'HYG'
                    }
-        from bbg_fetch import fetch_field_timeseries_per_tickers
-        prices = fetch_field_timeseries_per_tickers(tickers=tickers, field='PX_LAST', CshAdjNormal=True, freq='B').dropna()
+        from bbg_fetch import fetch_field_timeseries_per_tickers  # noqa: TID251 - optional vendor branch
+
+        prices = fetch_field_timeseries_per_tickers(
+            tickers=tickers, field='PX_LAST', CshAdjNormal=True, freq='B'
+        ).dropna()
         time_period = qis.get_time_period(prices)
 
     else:
         raise NotImplementedError
 
     if prices is None:
-        prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
+        prices = yf.download(
+            tickers=tickers, start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True
+        )['Close'][tickers]
 
     prices = prices.asfreq('B', method='ffill').ffill()  # make B frequency
     # prices = prices.dropna()
@@ -103,13 +120,13 @@ def run_local(local: Locals):
                                          time_period=time_period,
                                          **kwargs)
     qis.save_figs_to_pdf(figs=[fig],
-                         file_name=f"multiasset_report",
-                         local_path=qis.local_path.get_output_path())
-    qis.save_fig(fig=fig, file_name=f"multiassets", local_path=qis.local_path.get_output_path())
+                         file_name="multiasset_report",
+                         local_path=output_path)
+    qis.save_fig(fig=fig, file_name="multiassets", local_path=output_path)
 
     plt.show()
 
 
 if __name__ == '__main__':
 
-    run_local(local=Locals.CORE_ETFS)
+    run_local(local=Locals.CORE_ETFS, output_path=parse_output_dir())

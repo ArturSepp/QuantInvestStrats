@@ -25,9 +25,10 @@ An optional dependency is a skip, never a failure - the suite must pass on a cor
 
 What this does not cover, stated so the green tick is not read as more than it is:
 
-  * most examples are never executed, only read. A runtime error past the import and
-    signature layer - a shape mismatch, a bad column name - is not caught.
-  * 88 of the 368 exported callables take ``**kwargs`` and accept any keyword, so check 4 skips
+  * vendor examples are statically checked here. ``example_regressions_test.py`` additionally
+    runs selected public-data workflows against synthetic Yahoo-shaped downloads, including
+    files with optional Bloomberg branches. Live vendor availability remains outside CI.
+  * callables taking ``**kwargs`` accept any keyword, so check 4 skips
     them. ``plot_time_series_2ax`` is one of them, which is why the ``trend_line`` typo was
     silent; only the plot smoke test finds that class.
 """
@@ -53,7 +54,8 @@ pytestmark = pytest.mark.skipif(
     not IS_REPOSITORY_CHECKOUT,
     reason='repository examples are absent from an installed wheel')
 
-# an example that mentions any of these reaches a data vendor and cannot run unattended
+# Conservative filter: a mention may belong to a non-default branch. Targeted offline
+# integration tests exercise those workflows separately with replaced download boundaries.
 NETWORK_MARKERS = ('yfinance', 'yf.', 'bbg_fetch', 'pandas_datareader', 'blpapi')
 
 # aliases an example may bind the top-level package to; only the plain one is checked, since
@@ -83,6 +85,14 @@ OFFLINE_IDS = [str(path.relative_to(EXAMPLES_DIR)) for path in OFFLINE_EXAMPLE_F
 def test_examples_are_found() -> None:
     """the root examples directory is populated, so parametrized checks cannot pass empty."""
     assert EXAMPLE_FILES, f"no Python examples found below {EXAMPLES_DIR}"
+
+
+def test_example_index_covers_modules() -> None:
+    """The index names every example and helper, including offline entry points."""
+    index = EXAMPLES_DIR.joinpath('README.md').read_text(encoding='utf-8')
+    missing = [str(path.relative_to(EXAMPLES_DIR)) for path in EXAMPLE_FILES
+               if path.name not in index]
+    assert not missing, f'Examples missing from the index: {missing}'
 
 
 def _parse(path: Path) -> ast.Module:

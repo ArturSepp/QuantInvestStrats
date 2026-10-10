@@ -14,18 +14,26 @@ import yfinance as yf
 import qis
 
 
-def compute_returns(ticker: str = 'SPY', time_period: qis.TimePeriod = None) -> Tuple[pd.Series, pd.Series, pd.Series]:
-    ohlc_data = yf.download(tickers=ticker, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)
+def compute_returns(
+    ticker: str = 'SPY', time_period: qis.TimePeriod = None
+) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    ohlc_data = yf.download(
+        tickers=ticker, start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True
+    )
     if time_period is not None:
         ohlc_data = time_period.locate(ohlc_data)
-    # need to adjust open price for dividends
-    adjustment_ratio = ohlc_data['Close'] / ohlc_data['Close']
-    adjusted_open = adjustment_ratio.multiply(ohlc_data['Open'])
-    adjusted_close = ohlc_data['Close']
+    # Yahoo already adjusted OHLC; preserve missing close marks when selecting the open.
+    adjustment_ratio = ohlc_data['Close'][ticker] / ohlc_data['Close'][ticker]
+    adjusted_open = adjustment_ratio.multiply(ohlc_data['Open'][ticker])
+    adjusted_close = ohlc_data['Close'][ticker]
     overnight_return = adjusted_open.divide(adjusted_close.shift(1)) - 1.0
     intraday_return = adjusted_close.divide(adjusted_open) - 1.0
     close_to_close_return = adjusted_close.divide(adjusted_close.shift(1)) - 1.0
-    return overnight_return.rename('Overnight'), intraday_return.rename('Intraday'), close_to_close_return.rename('Close-to-Close')
+    return (
+        overnight_return.rename('Overnight'),
+        intraday_return.rename('Intraday'),
+        close_to_close_return.rename('Close-to-Close'),
+    )
 
 
 def plot_split_returns(ticker: str = 'SPY',
@@ -33,7 +41,9 @@ def plot_split_returns(ticker: str = 'SPY',
                        is_check_total: bool = False,
                        ax: plt.Subplot = None
                        ) -> None:
-    overnight_return, intraday_return, close_to_close_return = compute_returns(ticker=ticker, time_period=time_period)
+    overnight_return, intraday_return, close_to_close_return = compute_returns(
+        ticker=ticker, time_period=time_period
+    )
 
     if is_check_total:
         cum_performance = pd.concat([close_to_close_return.rename('Close-to-Close'),

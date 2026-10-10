@@ -11,14 +11,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import yfinance as yf
 import qis as qis
+from examples._helpers.output import get_output_dir, parse_output_dir
+
+output_path = get_output_dir(parse_output_dir())
 
 # select tickers
 benchmark = 'SPY'
 tickers = [benchmark, 'SSO', 'IEF']
 
 # fetch prices
-prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
+prices = yf.download(
+    tickers=tickers, start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True,
+    threads=False,
+)['Close'][tickers]
 prices = prices.asfreq('B', method='ffill').dropna()  # make B frequency
+if prices.empty:
+    raise ValueError('Yahoo returned no overlapping SPY/SSO/IEF history; retry the download.')
 
 rebalancing_freq = 'B'  # each business day
 rebalancing_costs = 0.0010  # 10bp for rebalancing
@@ -31,7 +39,13 @@ unleveraged_portfolio = qis.backtest_model_portfolio(prices=prices[['SSO', 'IEF'
                                                      ticker='50/50 SSO/IEF').get_portfolio_nav()
 
 # leveraged is funded at 100bp + 3m UST
-funding_rate = 0.01 + yf.download('^IRX', start="1999-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
+funding_rate = (
+    0.01
+    + yf.download('^IRX', start='1999-12-31', end=None, ignore_tz=True, auto_adjust=True)['Close'][
+        '^IRX'
+    ].dropna()
+    / 100.0
+)
 leveraged_portfolio = qis.backtest_model_portfolio(prices=prices[['SPY', 'IEF']],
                                                    weights={'SPY': 1.0, 'IEF': 0.5},
                                                    rebalancing_freq=rebalancing_freq,
@@ -49,10 +63,10 @@ fig = qis.generate_multi_asset_factsheet(prices=prices,
                                          time_period=time_period,
                                          **qis.fetch_default_report_kwargs(time_period=time_period))
 
-qis.save_fig(fig=fig, file_name=f"leveraged_fund_analysis", local_path=qis.local_path.get_output_path())
+qis.save_fig(fig=fig, file_name="leveraged_fund_analysis", local_path=output_path)
 
 qis.save_figs_to_pdf(figs=[fig],
-                     file_name=f"leveraged_fund_analysis", orientation='landscape',
-                     local_path=qis.local_path.get_output_path())
+                     file_name="leveraged_fund_analysis", orientation='landscape',
+                     local_path=output_path)
 
 plt.show()

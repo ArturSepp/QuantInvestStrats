@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import List
 from enum import Enum
+from examples._helpers.output import get_output_dir, parse_output_dir
 
 # qis
 import yfinance as yf
@@ -178,36 +179,36 @@ class Locals(Enum):
     PLOT_AUTOCORR_BLOCKSIZES = 2
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
-    # to save pds
-    LOCAL_PATH = "C://Users//artur//OneDrive//analytics//outputs//"
+    # Keep generated PDFs outside the checkout by default.
+    output_path = get_output_dir(output_path)
 
     # download spy prices
     prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True,
-                         auto_adjust=True)['Close'].rename('Realised')
+                         auto_adjust=True)['Close']['SPY'].rename('Realised')
 
     if local == Locals.PLOT_bootstrapPED_PRICES:
         # use small number of num_samples for illustration
         figs = plot_bootstrap_paths(prices=prices,
                                    block_size=30,
                                    num_samples=50)
-        qis.save_figs_to_pdf(figs, file_name='bootstrap_illustrations', local_path=LOCAL_PATH)
+        qis.save_figs_to_pdf(figs, file_name='bootstrap_illustrations', local_path=output_path)
 
     elif local == Locals.PLOT_AUTOCORR_BLOCKSIZES:
         # block_size = 1 corresponds to iid sampling
         figs = plot_autocorr_in_block_size(prices=prices,
                                            block_sizes=[1, 2, 5, 10, 20, 40, 60, 120, 180],
                                            num_samples=1000)
-        qis.save_figs_to_pdf(figs, file_name='bootstrap_block_sizes', local_path=LOCAL_PATH)
+        qis.save_figs_to_pdf(figs, file_name='bootstrap_block_sizes', local_path=output_path)
 
     plt.show()
 
 
 if __name__ == '__main__':
 
-    run_local(local=Locals.PLOT_AUTOCORR_BLOCKSIZES)
+    run_local(local=Locals.PLOT_bootstrapPED_PRICES, output_path=parse_output_dir())

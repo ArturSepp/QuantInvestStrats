@@ -1,5 +1,10 @@
 # Reporting-frequency convention
 
+*Author: [Artur Sepp](https://github.com/ArturSepp)*
+
+Implemented in [qis](https://github.com/ArturSepp/QuantInvestStrats).
+See the [software citation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 `qis` factsheets treat **reporting frequency as a first-class, propagated, guarded and labelled
 axis**. The same book can be reported daily (risk), monthly (clients) or quarterly (investment
 committee / board) and every statistic — rolling windows, regression frequency, regime
@@ -120,16 +125,26 @@ and auto-selects the report archetype from the input:
 
 ```python
 import qis
+from qis.datasets.synthetic import generate_synthetic_universe
 
-# one strategy vs a benchmark, monthly reporting, full history -> PDF path
-path = qis.factsheet(prices,
-                     benchmark_prices=spy,
-                     reporting_frequency='monthly',
-                     file_name='book')
+universe = generate_synthetic_universe(apply_quirks=False)
+prices = universe.prices[['SEQ_US', 'SBD_TSY', 'SBD_IG', 'SCM_GLD']]
+benchmark_prices = universe.benchmark_prices
+time_period = qis.get_time_period(prices)
+
+# A pandas price panel selects the multi-asset report; figures are returned without saving.
+figs = qis.factsheet(prices, benchmark_prices=benchmark_prices,
+                    reporting_frequency='monthly')
 
 # the same universe at quarterly cadence
-figs = qis.factsheet(prices, benchmark_prices=spy, reporting_frequency='quarterly')
+quarterly_figs = qis.factsheet(prices, benchmark_prices=benchmark_prices,
+                              reporting_frequency='quarterly')
 ```
+
+For a strategy report, pass a `PortfolioData`; for strategy-versus-benchmark reporting, pass a
+`MultiPortfolioData` with `kind='strategy_benchmark'`. To export a PDF, supply `file_name` and
+an existing `local_path`. See the [offline factsheet quickstart](https://github.com/ArturSepp/QuantInvestStrats/blob/main/docs/factsheets.md#quick-start)
+for a complete offline example, report selection and export options.
 
 For full control, the convention is exposed through the configuration layer and spread into the
 generators directly. `fetch_default_report_kwargs` builds the frequency- and horizon-calibrated
@@ -141,7 +156,7 @@ from qis.portfolio.reports.config import fetch_default_report_kwargs
 
 report_kwargs = fetch_default_report_kwargs(time_period=time_period,
                                             reporting_frequency=ReportingFrequency.QUARTERLY)
-fig = qis.generate_multi_asset_factsheet(prices=prices, benchmark='SPY',
+fig = qis.generate_multi_asset_factsheet(prices=prices, benchmark='SEQ_US',
                                          time_period=time_period, **report_kwargs)
 ```
 

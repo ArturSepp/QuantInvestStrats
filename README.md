@@ -30,16 +30,21 @@ histories, performance attribution, risk analysis, and reproducible reports.
 **Backtesting of externally computed weights.** `generate_static_weights_schedule()` can create
 live-universe-aware target schedules from desired allocations. `backtest_model_portfolio()` then
 consumes the prices and supplied weights, holds units between rebalancings, and applies explicit
-transaction costs. The backtester does not generate a strategy's target schedule.
+transaction costs. The backtester does not generate a strategy's target schedule. See the
+[worked backtesting example](docs/portfolio_backtesting.md#worked-example) and
+[offline allocation workflow](docs/quickstart.md#complete-checked-workflow).
 
 **Factsheet reporting.** Four report archetypes — multi-asset, strategy, strategy versus
 benchmark, and multi-strategy parameter sweeps — produce reproducible multi-page factsheets, with
-optional PyBloqs HTML/PDF rendering.
+optional PyBloqs HTML/PDF rendering. See the [factsheet gallery](docs/gallery.md) and
+[offline reporting quickstart](docs/factsheets.md#quick-start).
 
 **Consolidated risk and tracking-error layer.** The point-in-time `qis.RiskModel` covers ex-ante
 tracking error, factor exposures, benchmark beta, Euler risk contributions, and fractional,
 overlapping, or signed loading matrices. Ex-post analytics cover realised EWMA tracking error,
-whole-sample TE/IR, and EWMA beta/alpha. The same conventions serve the wider package stack.
+whole-sample TE/IR, and EWMA beta/alpha. The same conventions serve the wider package stack. See
+the [worked tracking-error example](docs/tracking_error_and_risk.md#worked-example) and
+[offline ex-ante and ex-post workflows](docs/tracking_error_and_risk.md#implementation-in-qis).
 
 **Instrument-aware stress reports.** `qis.portfolio.stress` combines funded holdings, signed
 intrinsic calls/puts, futures and custom payoffs under an assigned `RiskModel`. It preserves
@@ -50,7 +55,9 @@ months and exports the standard report with additive Euler risk tables. See the
 **Documentation checked against the code.** The core dependency list is checked against
 `pyproject.toml`; README Python blocks are parsed for unresolved names; repository examples are
 checked for public symbols and introspectable keyword arguments; and examples without a data
-vendor are run. Network-backed examples remain subject to their providers.
+vendor are run. Network-backed examples remain subject to their providers. See the
+[quickstart's checked results](docs/quickstart.md#what-the-result-establishes) and
+[contributor validation commands](CONTRIBUTING.md#development-setup).
 
 ## When to use it — and when not
 

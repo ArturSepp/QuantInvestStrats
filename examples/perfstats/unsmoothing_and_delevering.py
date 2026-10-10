@@ -18,19 +18,20 @@ Demonstrates:
   4. ``qis.unsmooth_returns_glm``   — static AR(q) Getmansky-Lo-Makarov (2004)
                                       unsmoothing with severity diagnostics.
 
-What to look for in the output: the two raw observed series (OCSL levered,
-GCF observed) sit at opposite extremes of the Sharpe range — OCSL inflated
-by leverage-and-discount noise on the listed BDC, GCF deflated (or in this
-sample, mildly deflated) by quarterly NAV smoothing. After de-levering OCSL
-and unsmoothing GCF, the three "underlying credit asset" Sharpe estimates
-land in a much tighter band, demonstrating that both adjustments move the
-estimates towards a common implied risk-adjusted return.
+What to look for in the output: on this bundled sample, the annualised
+zero-rate Sharpe ratios computed from quarterly returns are approximately
+-1.25 for observed OCSL, -0.74 after de-levering, +2.25 for observed GCF,
++2.33 after EWMA AR(1) unsmoothing and +2.84 after static GLM AR(3).
+The adjusted estimates do not converge to a tighter band. These vehicles
+have different holdings, valuation methods and listed-market exposures;
+de-levering and unsmoothing do not establish a common underlying return.
 
 Caveat on the GLM step: with only ~30 quarterly GCF observations, the AR(3)
 fit can produce small or negative ``theta_sum``, in which case the
-methodology's vol-inflation interpretation does not apply and the EWMA AR(1)
-result is the one to trust. The example prints the diagnostics so the
-severity is visible.
+methodology's vol-inflation interpretation does not apply. Here theta_sum
+is about -0.282 and the reported volatility factor is 0.78. Treat both
+unsmoothing estimates as sensitivity analyses, not validated latent returns.
+The example prints the diagnostics and the observed range of Sharpe ratios.
 """
 import os
 import pandas as pd
@@ -98,11 +99,16 @@ def main() -> None:
 
     # Stack levered, de-levered, GCF for visual comparison.
     fig2, ax = plt.subplots(1, 1, figsize=(10, 5))
-    delev_panel = pd.concat([
-        prices['OCSL'].reindex(ocsl_unlev_nav.index, method='ffill').rename('OCSL (levered)'),
-        ocsl_unlev_nav,
-        prices['Oaktree GCF'].reindex(ocsl_unlev_nav.index, method='ffill').rename('GCF (observed)'),
-    ], axis=1)
+    delev_panel = pd.concat(
+        [
+            prices['OCSL'].reindex(ocsl_unlev_nav.index, method='ffill').rename('OCSL (levered)'),
+            ocsl_unlev_nav,
+            prices['Oaktree GCF']
+            .reindex(ocsl_unlev_nav.index, method='ffill')
+            .rename('GCF (observed)'),
+        ],
+        axis=1,
+    )
     qis.plot_prices(prices=delev_panel, ax=ax,
                     title="OCSL de-levered vs GCF (rebased to 100)")
 
@@ -128,7 +134,7 @@ def main() -> None:
     # GCF's NAV is appraised quarterly. We've already resampled above; just
     # reuse the quarterly returns.
 
-    # 4a. Rolling EWMA AR(1) unsmoothing (the qis-recommended default).
+    # 4a. Rolling EWMA AR(1) unsmoothing, one model specification for comparison.
     gcf_q_returns_df = gcf_q_returns.to_frame()
     unsm_returns_ewma, betas, r2 = qis.unsmooth_returns_ar1_ewma(
         returns=gcf_q_returns_df,
@@ -196,6 +202,13 @@ def main() -> None:
         s = perf.loc[name, sharpe_col]
         v = perf.loc[name, vol_col]
         print(f"  {name:30s}  Sharpe = {s:+.2f}   Vol = {v:.1%}")
+
+    raw_sharpes = perf.loc[['OCSL (levered)', 'GCF (observed)'], sharpe_col]
+    adjusted_sharpes = perf.loc[
+        ['OCSL de-levered', 'GCF unsm. EWMA AR(1)', 'GCF unsm. GLM AR(3)'], sharpe_col
+    ]
+    print(f"Raw Sharpe range: {raw_sharpes.max() - raw_sharpes.min():.2f}; "
+          f"adjusted range: {adjusted_sharpes.max() - adjusted_sharpes.min():.2f}")
 
     plt.show()
 
