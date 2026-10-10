@@ -100,6 +100,31 @@ def produce(spec: dict) -> dict:
     assert not any('Interaction' in column for column in totals.columns)
     assert list(active.columns) == ['Allocation Total', 'Selection Total']
 
+    # Complete the displayed weight accounting with independently marked residual cash.
+    cash_weights = {}
+    cash_row = pd.Series(0.0, index=totals.columns, name='Cash')
+    for portfolio in pair.portfolio_datas:
+        _, applied_weights = portfolio.get_brinson_inputs(freq=None, is_net=False)
+        applied_weights = applied_weights.loc[
+            (applied_weights.index > navs.index[0]) & (applied_weights.index <= navs.index[-1])]
+        marked_holdings = (portfolio.units * portfolio.prices).sum(axis=1)
+        residual_cash = ((portfolio.nav - marked_holdings) / portfolio.nav).shift(1)
+        residual_cash = residual_cash.reindex(applied_weights.index)
+        np.testing.assert_allclose(
+            applied_weights.sum(axis=1) + residual_cash, 1.0, atol=1e-12, rtol=0)
+        column = f'{portfolio.ticker}\nWeight Ave'
+        cash_weights[column] = residual_cash
+        cash_row[column] = residual_cash.mean()
+    cash_weights = pd.DataFrame(cash_weights)
+    display_totals = pd.concat([totals.iloc[:-1], cash_row.to_frame().T, totals.iloc[-1:]])
+    for column in cash_weights:
+        display_totals.loc['Total Sum', column] += cash_row[column]
+        np.testing.assert_allclose(display_totals.loc['Total Sum', column], 1.0,
+                                   atol=1e-12, rtol=0)
+    # No cash interest/funding rate is supplied in this example; gross cash effects are zero.
+    np.testing.assert_array_equal(display_totals.loc[totals.index, totals.columns[2:]],
+                                  totals.iloc[:, 2:])
+
     common = dict(time_period=period, reporting_frequency=params['reporting_frequency'],
                   add_rates_data=False,
                   benchmark_prices=prices[['SEQ_US']], fontsize=6)
@@ -156,6 +181,14 @@ def produce(spec: dict) -> dict:
             assert not legend.get_window_extent(renderer).overlaps(
                 figure.texts[-1].get_window_extent(renderer))
     focus_risk(figures['readme_strategy_risk.png'])
+    # Re-render only the summary table with cash; all existing attribution curves stay intact.
+    table_ax = brinson.axes[0]
+    table_ax.clear()
+    qis.plot_brinson_totals_table(display_totals, var_format='{:.2%}', ax=table_ax, fontsize=6)
+    table_ax.text(0, -0.015,
+                  'Cash includes initial balances and cost funding; no interest is earned.\n'
+                  'Weights include cash. Totals use unrounded values.',
+                  transform=table_ax.transAxes, va='top', fontsize=5.5)
     # Wrap current table headings and show small active effects without rounding to zero.
     table = brinson.axes[0].tables[0]
     for (row, column), cell in table.get_celld().items():
@@ -168,7 +201,7 @@ def produce(spec: dict) -> dict:
                 text = text.replace(before, after)
             cell.get_text().set_text(text)
         elif column > 0:
-            cell.get_text().set_text(f'{totals.iloc[row - 1, column - 1]:.2%}')
+            cell.get_text().set_text(f'{display_totals.iloc[row - 1, column - 1]:.2%}')
     for ax in effect_axes:
         ax.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=1))
         for label, line in zip(ax.get_legend().get_texts(), ax.lines):
@@ -203,19 +236,24 @@ def produce(spec: dict) -> dict:
         'tables': {'prices': prices, 'portfolio_navs': navs, 'performance': performance,
                    'strategy_target_weights': schedules[strategy.ticker],
                    'strategy_costs': costs, 'brinson_totals': totals, 'brinson_active': active,
+                   'brinson_display_totals': display_totals, 'brinson_cash_weights': cash_weights,
                    'brinson_allocation': allocation, 'brinson_selection': selection},
         'checks': {'target_weights_sum_to_one': True, 'zero_cost_nav_reconciles_units': True,
                    'linked_attribution_matches_compounded_returns': True,
                    'interaction_folded_into_selection': True,
                    'brinson_regime_shading_present': True,
-                   'brinson_plotted_effects_match_tables': True},
+                   'brinson_plotted_effects_match_tables': True,
+                   'brinson_weights_including_cash_reconcile': True,
+                   'brinson_cash_display_preserves_attribution': True},
         'parameters': params,
         'presentation': 'Selected current report panels; Brinson table wraps headings and uses '
-                        'two-decimal percentages; positions compose PortfolioData plots',
+                        'two-decimal percentages and includes residual cash in weights; '
+                        'positions compose PortfolioData plots',
         'summary': {'sample_start': str(prices.index[0].date()),
                     'sample_end': str(prices.index[-1].date()),
                     'zero_cost_units_valuation_max_error': valuation_error,
                     'gross_linked_active_return': float(reference_active[-1]),
+                    'average_cash_weights': cash_weights.mean().to_dict(),
                     'linked_attribution_max_error': float(
                         np.max(np.abs(linked_active - reference_active))),
                     'brinson_effect_axes_with_regime_shading': len(effect_axes)},

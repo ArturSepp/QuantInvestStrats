@@ -416,6 +416,8 @@ Run [`examples/factsheets/strategy_benchmark.py`](examples/factsheets/strategy_b
 linked with Frongello's method. Interaction is folded entirely into selection, with no separate
 interaction panel. Background colours show benchmark return regimes. This attribution is gross
 of realised trading costs; the comparison NAVs above are net of those costs.
+Average weights include a Cash row for the initial uninvested period and subsequent cost
+funding, so the unrounded weights sum to 100%. Cash earns no interest in this example.
 
 ![Current Brinson allocation and selection effects with benchmark-regime background colours](docs/images/readme_brinson.png)
 

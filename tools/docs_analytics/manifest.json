@@ -4146,7 +4146,8 @@
         "reporting": "Monthly preset; panels label their grid and window; annualisation follows the QIS frequency convention",
         "rate_basis": "Reports: non-excess PA Sharpe with no cash rate. Performance table: constant 3% annual cash rate, ME volatility and QE regression",
         "cost_basis": "Report NAVs net of 10 bp per unit traded; Brinson effects gross of realised trading costs",
-        "attribution": "Native-date BHB allocation, Frongello-linked; interaction assigned 100% to selection; benchmark regime shading"
+        "attribution": "Native-date BHB allocation, Frongello-linked; interaction assigned 100% to selection; benchmark regime shading",
+        "cash": "Displayed average weights include residual cash from NAV less marked holdings, lagged to each return period; initial cash and cost funding included; no cash interest"
       },
       "tables": [
         "prices",
@@ -4155,6 +4156,8 @@
         "strategy_target_weights",
         "strategy_costs",
         "brinson_totals",
+        "brinson_display_totals",
+        "brinson_cash_weights",
         "brinson_active",
         "brinson_allocation",
         "brinson_selection"
@@ -4165,7 +4168,9 @@
         "linked_attribution_matches_compounded_returns",
         "interaction_folded_into_selection",
         "brinson_regime_shading_present",
-        "brinson_plotted_effects_match_tables"
+        "brinson_plotted_effects_match_tables",
+        "brinson_weights_including_cash_reconcile",
+        "brinson_cash_display_preserves_attribution"
       ]
     }
   },

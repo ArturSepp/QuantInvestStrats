@@ -11,7 +11,7 @@
     "seaborn": "0.13.2",
     "statsmodels": "0.14.6"
   },
-  "generated_at_utc": "2026-10-10T01:28:03.441519+00:00",
+  "generated_at_utc": "2026-10-10T03:37:58.376776+00:00",
   "manifest": {
     "assets": [
       {
@@ -2619,10 +2619,13 @@
           "linked_attribution_matches_compounded_returns",
           "interaction_folded_into_selection",
           "brinson_regime_shading_present",
-          "brinson_plotted_effects_match_tables"
+          "brinson_plotted_effects_match_tables",
+          "brinson_weights_including_cash_reconcile",
+          "brinson_cash_display_preserves_attribution"
         ],
         "conventions": {
           "attribution": "Native-date BHB allocation, Frongello-linked; interaction assigned 100% to selection; benchmark regime shading",
+          "cash": "Displayed average weights include residual cash from NAV less marked holdings, lagged to each return period; initial cash and cost funding included; no cash interest",
           "cost_basis": "Report NAVs net of 10 bp per unit traded; Brinson effects gross of realised trading costs",
           "data": "Frozen synthetic sample, not observed investment performance",
           "rate_basis": "Reports: non-excess PA Sharpe with no cash rate. Performance table: constant 3% annual cash rate, ME volatility and QE regression",
@@ -2666,6 +2669,8 @@
           "strategy_target_weights",
           "strategy_costs",
           "brinson_totals",
+          "brinson_display_totals",
+          "brinson_cash_weights",
           "brinson_active",
           "brinson_allocation",
           "brinson_selection"
@@ -5020,9 +5025,9 @@
       "width": 1398
     },
     "images/readme_brinson.png": {
-      "bytes": 502221,
+      "bytes": 511842,
       "height": 1772,
-      "sha256": "440505e9d31820ce7ce152bb553291f744548963cb60027d2b1996430bfb31dd",
+      "sha256": "60dfdb6a86719e325a7e3e292b8bcb97201f05408490ca08506f6337a2b7dc0c",
       "width": 1262
     },
     "images/readme_multi_asset.png": {
@@ -5420,6 +5425,18 @@
       "columns": 5,
       "rows_including_header": 2087,
       "sha256": "9afff6efc2565ee8788e765fb331b86ce9c23b124c4a3712c9a8d707623b8dea"
+    },
+    "tables/readme/brinson_cash_weights.csv": {
+      "bytes": 121672,
+      "columns": 3,
+      "rows_including_header": 2087,
+      "sha256": "84c9b83e6089d22c5429edb8764575874b627dd635dc51ad3d5046442ed1e546"
+    },
+    "tables/readme/brinson_display_totals.csv": {
+      "bytes": 811,
+      "columns": 8,
+      "rows_including_header": 6,
+      "sha256": "d3b7149e589e1a426ea9781338845374b8374f11676f2ded1ca5db24bbc74fa2"
     },
     "tables/readme/brinson_selection.csv": {
       "bytes": 216267,
@@ -7811,8 +7828,10 @@
     },
     "readme": {
       "checks": {
+        "brinson_cash_display_preserves_attribution": true,
         "brinson_plotted_effects_match_tables": true,
         "brinson_regime_shading_present": true,
+        "brinson_weights_including_cash_reconcile": true,
         "interaction_folded_into_selection": true,
         "linked_attribution_matches_compounded_returns": true,
         "target_weights_sum_to_one": true,
@@ -7845,8 +7864,12 @@
         ],
         "weight_implementation_lag": 1
       },
-      "presentation": "Selected current report panels; Brinson table wraps headings and uses two-decimal percentages; positions compose PortfolioData plots",
+      "presentation": "Selected current report panels; Brinson table wraps headings and uses two-decimal percentages and includes residual cash in weights; positions compose PortfolioData plots",
       "summary": {
+        "average_cash_weights": {
+          "EqualWeight\nWeight Ave": 0.010511269762680256,
+          "VolParity 63\nWeight Ave": 0.010470629354112443
+        },
         "brinson_effect_axes_with_regime_shading": 4,
         "gross_linked_active_return": 0.005990821442850569,
         "linked_attribution_max_error": 5.622238785640832e-15,
@@ -10013,10 +10036,10 @@
       "docs/images/unhedged_index_case_study_nddlsz.png",
       "docs/images/unhedged_index_case_study_nddluk.png"
     ],
-    "published_at_utc": "2026-10-10T01:31:14.328068+00:00"
+    "published_at_utc": "2026-10-10T03:43:09.035259+00:00"
   },
   "python": "3.12.10",
-  "qis_import_path": "C:\\Users\\artur\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\AgentWork\\ARTUR_LAPTOP\\QuantInvestStrats\\runs\\readme-figures-20261010\\source\\src\\qis\\__init__.py",
+  "qis_import_path": "C:\\Users\\artur\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\AgentWork\\ARTUR_LAPTOP\\QuantInvestStrats\\runs\\readme-cash-row-20261010\\source\\src\\qis\\__init__.py",
   "qis_source_version": "5.36.0",
   "schema_version": 1,
   "source": {
@@ -10553,17 +10576,17 @@
       "tools/docs_analytics/gallery.py": "7a414759db54f05051539d4fc0c70bfdf1665b6ade748d0239cd353527639c03",
       "tools/docs_analytics/handbook.py": "83561fe88eab4945eb6e654407d8f55d9a8b443d096ddc979c8875b9f3f6e386",
       "tools/docs_analytics/hedged_index_case_study.py": "e423b36025ec2ccf2c0d30184e6209c2f61d8f7d0b30c104d58a6ef0ca962f20",
-      "tools/docs_analytics/manifest.json": "277e334f2f4128109ac18b78cb6206a7ab3fd399d3590d0871f1363baa2f7c7f",
+      "tools/docs_analytics/manifest.json": "dc467421bf7618df78dbc5830181d652f8fbf9342f4f61c209d633c69580b7f2",
       "tools/docs_analytics/model_layer.py": "bb1a6572320cb63135343c4f1d88b2c6777cdf9c353d9fa486d2e9b0e7e9ae47",
       "tools/docs_analytics/publish.py": "8925b7ece371eff423d8eb1a095d04b8da4485b1f15f28c429fe01fe7ff713ec",
-      "tools/docs_analytics/readme.py": "de02e9bfdf1f955682075069bcb8426bf33466d27025f4433d870cdcbe161b9c",
+      "tools/docs_analytics/readme.py": "85bc9e0ac809bad2f32b8e3321695e60e1fbf41ad03c18502651ded5cf48c24d",
       "tools/docs_analytics/run.py": "16bf82930a4268e32aafb79d36c6eed7b23970b17134b01f8de76ca1d405d93e",
       "tools/docs_analytics/style.py": "94813ba0bd1672c112342d735855088f1be339c5543a3c41649fe8ff82747cac",
       "tools/docs_analytics/unhedged_index_case_study.py": "420f35698d842787982fffe9eddd5a6b5447a35b66bb90c11dce7c716bba6e69",
       "uv.lock": "4a2fc57b5f0b910830652a3f4bf1b02805a6089323174f29d1946aadadfcf146"
     },
     "identity": "Effective source content, including dirty export files",
-    "sha256": "49ef0fc2e8ffc4da238e89517b0e7aea42972d56f0e7d7e5300698f3f917f037"
+    "sha256": "c7f0ef5035c29d624d6a1fc034a6617a1fb4e7887f1d405a698663fe12bee9ea"
   },
   "status": "complete",
   "version_note": "dependencies.qis is installed distribution metadata; qis_source_version and the content fingerprint identify the imported source export"

@@ -77,6 +77,10 @@ The standalone performance table uses a constant 3% annual cash rate, monthly ri
 and quarterly regression. Four main reports use the gallery's focused layout; the risk appendix
 shows six existing panels, preserving their data. The positions page composes current
 `PortfolioData` plots. Brinson table headings wrap and percentages use two decimal places.
+The displayed weight totals include residual cash, independently marked as NAV less holdings
+and lagged to each return period. The Cash row includes initial uninvested balances and cost
+funding; no cash interest is supplied. Its gross attribution effects are zero. Native cash weights
+and the displayed totals are saved alongside the unchanged instrument-only attribution tables.
 Brinson uses native-date BHB effects and Frongello linking, gross of realised costs, with
 interaction assigned to selection and benchmark-regime background colours. Independent
 compounded-return and held-unit references check the linked attribution and backtest, and
