@@ -299,15 +299,22 @@ From the repository root, run `python -m examples.portfolios.account_equity_stre
 See the [portfolio stress guide](docs/portfolio_stress.md#run-the-offline-account-example)
 for the input contract and independent accounting checks.
 
+All eight previews below are generated from the current QIS report APIs using fixed synthetic
+data for 2018–2025. Selected panels keep the README readable; the linked scripts generate full
+reports. The volatility-parity portfolios rebalance monthly, implement targets one
+business day later and pay 10 bp per unit traded. See the [offline figure producer](tools/docs_analytics/readme.py)
+and [generation record](docs/images/analytics_manifest.json) for exact inputs and source hashes.
+The linked Yahoo scripts demonstrate the same APIs on observed data; their numbers will differ.
+
 ### 1. Visualisation of price data <a name="price"></a>
 
 This is an optional network-backed plotting example. For the core-install first-success path, use
 the offline quickstart above.
 
 The script is located at [`examples/perfstats/quickstart.py`](examples/perfstats/quickstart.py).
-Run `python -m examples.perfstats.quickstart` from the repository root to produce the figures
-below; `perf1` to `perf3` are excluded from the repository by `.gitignore` on size, so only the
-last is embedded here.
+Run `python -m examples.perfstats.quickstart` from the repository root for the Yahoo-data plots.
+The embedded preview uses the same table API on the fixed synthetic universe, with a constant
+3% annual cash-rate input, monthly risk statistics and quarterly excess-return regression.
 
 ```python
 import matplotlib.pyplot as plt
@@ -365,7 +372,7 @@ fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
                                           title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')} benchmarked with SPY",
                                           perf_params=perf_params)
 ```
-![Performance statistics and benchmark regression for a multi-asset price history](examples/figures/perf4.PNG)
+![Current performance statistics and benchmark regression on the synthetic universe](docs/images/readme_performance_table.png)
 
 
 
@@ -376,7 +383,7 @@ of cross-sectional comparison
 
 Run [`examples/factsheets/multi_assets.py`](examples/factsheets/multi_assets.py).
 
-![Multi-asset factsheet comparing returns, drawdowns, and risk statistics](examples/figures/multiassets.PNG)
+![Current multi-asset factsheet comparing synthetic returns, drawdowns and risk statistics](docs/images/readme_multi_asset.png)
 
 
 ### 3. Strategy factsheet <a name="strategy"></a>
@@ -386,9 +393,15 @@ for either backtested or actual strategy
 
 Run [`examples/factsheets/strategy.py`](examples/factsheets/strategy.py).
 
-![Strategy factsheet with cumulative performance and drawdowns](examples/figures/strategy1.PNG)
-![Volatility-parity strategy: 99% value-at-risk, risk attribution, and rolling beta](examples/figures/strategy2.PNG)
-![Volatility-parity strategy: current positions, rebalancing changes, turnover, and costs](examples/figures/strategy3.PNG)
+The portfolio targets use a 63-observation volatility estimator; the risk appendix labels
+the sampling grid and window of each risk measure.
+The final preview composes current target weights, target changes, turnover and realised costs
+using `PortfolioData` plotting methods. Report statistics use the monthly preset; portfolio
+NAVs include trading costs and Sharpe statistics have no cash-rate adjustment.
+
+![Current strategy factsheet with synthetic cumulative performance and drawdowns](docs/images/readme_strategy.png)
+![Current volatility-parity risk appendix: 99% value-at-risk, attribution and rolling beta](docs/images/readme_strategy_risk.png)
+![Current volatility-parity targets, target changes, turnover and realised trading costs](docs/images/readme_strategy_positions.png)
 
 ### 4. Strategy benchmark factsheet <a name="strategybenchmark"></a>
 This report is adapted for reporting performance and marginal comparison
@@ -397,10 +410,14 @@ This report is adapted for reporting performance and marginal comparison
 
 Run [`examples/factsheets/strategy_benchmark.py`](examples/factsheets/strategy_benchmark.py).
 
-![Volatility-parity portfolio compared with an equal-weight benchmark](examples/figures/strategy_benchmark.PNG)
+![Current volatility-parity portfolio compared with an equal-weight synthetic benchmark](docs/images/readme_strategy_benchmark.png)
 
-Brinson-Fachler performance attribution (https://en.wikipedia.org/wiki/Performance_attribution)
-![Brinson attribution of allocation and selection effects](examples/figures/brinson_attribution.PNG)
+[Brinson–Hood–Beebower attribution](docs/brinson_attribution.md) uses native-period effects
+linked with Frongello's method. Interaction is folded entirely into selection, with no separate
+interaction panel. Background colours show benchmark return regimes. This attribution is gross
+of realised trading costs; the comparison NAVs above are net of those costs.
+
+![Current Brinson allocation and selection effects with benchmark-regime background colours](docs/images/readme_brinson.png)
 
 
 ### 5. Multi strategy factsheet <a name="multistrategy"></a>
@@ -409,7 +426,9 @@ backtested strategy to a parameter or set of parameters:
 
 Run [`examples/factsheets/multi_strategy.py`](examples/factsheets/multi_strategy.py).
 
-![Multi-strategy factsheet comparing performance and risk](examples/figures/multi_strategy.PNG)
+The preview compares 21-, 63- and 126-observation volatility estimators on the same inputs.
+
+![Current multi-strategy factsheet comparing three volatility-estimation spans](docs/images/readme_multi_strategy.png)
 
 
 ### 6. Runnable examples <a name="runnable-examples"></a>

@@ -138,7 +138,10 @@ def check_coverage(manifest: dict, root: Path = ROOT) -> None:
     expected = {(item['document'], item['path']) for item in manifest['assets']}
     expected |= {(item['document'], item['url']) for item in manifest['non_analytics']}
     observed = set()
-    for doc in (root / 'docs').rglob('*.md'):
+    documents = list((root / 'docs').rglob('*.md'))
+    if (root / 'README.md').is_file():
+        documents.append(root / 'README.md')
+    for doc in documents:
         rel_doc = doc.relative_to(root)
         if any(part.startswith(('_', '.')) for part in rel_doc.parts[1:]):
             continue  # build-time mirrors and generated API pages have separate source owners

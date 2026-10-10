@@ -1,7 +1,7 @@
 # Reproducible documentation analytics
 
-This repository-only tool builds all 73 registered documentation previews, supporting aggregate
-CSV tables and provenance. Twenty-two exhibits use offline synthetic inputs. Eight approved empirical
+This repository-only tool builds all 81 registered documentation previews, supporting aggregate
+CSV tables and provenance. Thirty exhibits use offline synthetic inputs. Eight approved empirical
 cash-rate previews preserve reviewed bytes and aggregate fits without distributing raw vendor
 observations. Twenty-one hedged-index previews preserve the corresponding reviewed figures
 and 42 aggregate records. Twenty-two unhedged-index previews compare supplied spots and
@@ -37,13 +37,13 @@ Existing output directories are never overwritten.
 
 [manifest.json](manifest.json) is the coverage ledger. It lists each image's consumer, stable ID,
 producer, fixed inputs, assumptions, expected tables and numerical checks. Adding a Markdown,
-HTML or MyST image without registering its producer fails the inventory check. The external
-Colab badge is explicitly classified as non-analytics. Code examples and generated Sphinx
+HTML or MyST image to the README or site without registering its producer fails the inventory check.
+External status and Colab badges are explicitly classified as non-analytics. Code examples and generated Sphinx
 mirrors are excluded.
 
 A complete bundle contains:
 
-- `images/*.png`: the 73 registered previews; synthetic images and empirical refits use 150 dpi.
+- `images/*.png`: the 81 registered previews; synthetic images and empirical refits use 150 dpi.
 - `tables/gallery/*.csv`, `tables/model_layer/*.csv` and `tables/handbook/*.csv`: inputs and
   supporting computed values.
 - `analytics_manifest.json`: generation timestamp, fixed sample dates, parameters, conventions,
@@ -67,6 +67,21 @@ independently recompute every factsheet statistic. A validator is an integrity c
 signature against deliberate rewriting of both files and their provenance.
 
 ## Producer contracts
+
+[readme.py](readme.py) renders eight README previews from the current report APIs and the frozen
+synthetic universe (seed 20260725, 2018–2025, no quirks). Eight instruments span equities, bonds
+and commodities. Inverse-volatility targets use 21/63/126-observation estimators, monthly
+rebalancing, one-business-day implementation lag and 10 bp costs; the 63-span portfolio is
+compared with equal weights. Reports use the monthly preset and no cash-rate adjustment.
+The standalone performance table uses a constant 3% annual cash rate, monthly risk statistics
+and quarterly regression. Four main reports use the gallery's focused layout; the risk appendix
+shows six existing panels, preserving their data. The positions page composes current
+`PortfolioData` plots. Brinson table headings wrap and percentages use two decimal places.
+Brinson uses native-date BHB effects and Frongello linking, gross of realised costs, with
+interaction assigned to selection and benchmark-regime background colours. Independent
+compounded-return and held-unit references check the linked attribution and backtest, and
+plotted effects are compared with saved tables. These replace unregistered legacy screenshots;
+they are new reproducible teaching exhibits, not a refresh of their historical Yahoo samples.
 
 [gallery.py](gallery.py) uses the frozen `qis.datasets.generate_synthetic_universe` fixture,
 seed 20260725 and the fixed 2018–2025 sample. Four continuously available instruments illustrate
@@ -208,7 +223,7 @@ the figures and supporting CSVs. Publish the reviewed bundle using an explicit t
 
 Set `$targetCheckout` to the intended repository path; use the C-local export first to review the
 rendered site. The publisher validates every bundle output and requires the target's producer
-source and manifest to match. It copies all 73 allowlisted PNGs together and writes
+source and manifest to match. It copies all 81 allowlisted PNGs together and writes
 `docs/images/analytics_manifest.json` last. Supporting CSVs stay in the build bundle.
 
 The publisher saves previous files in a new C-local backup directory beside the bundle and

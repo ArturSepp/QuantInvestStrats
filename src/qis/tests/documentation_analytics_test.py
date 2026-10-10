@@ -22,7 +22,9 @@ MANIFEST = json.loads((RUNNER.parent / 'manifest.json').read_text(encoding='utf-
 
 
 def test_registered_images_cover_documentation():
-    assert len(RUN['load_manifest']()['assets']) == 73
+    assets = RUN['load_manifest']()['assets']
+    assert len(assets) == 81
+    assert len([asset for asset in assets if asset['document'] == 'README.md']) == 8
 
 
 def test_fx_hedging_examples_have_independent_numerical_checks():
@@ -250,9 +252,10 @@ def test_unhedged_empirical_rejects_invalid_records(frozen_unhedged_indices, def
     '![new][]\n\n[new]: images/new.png',
     '![new]\n\n[new]: images/new.png',
 ])
-def test_unregistered_image_syntax_fails_coverage(tmp_path, source):
+@pytest.mark.parametrize('document', ['docs/page.md', 'README.md'])
+def test_unregistered_image_syntax_fails_coverage(tmp_path, source, document):
     (tmp_path / 'docs').mkdir()
-    (tmp_path / 'docs/page.md').write_text(source, encoding='utf-8')
+    (tmp_path / document).write_text(source, encoding='utf-8')
     with pytest.raises(ValueError, match='unregistered'):
         RUN['check_coverage']({'assets': [], 'non_analytics': []}, tmp_path)
 

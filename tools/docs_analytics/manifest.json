@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Twenty-two synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
+  "description": "Thirty synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
   "dependencies": [
     "numpy",
     "pandas",
@@ -4107,6 +4107,66 @@
         "non_circular_cross_family_anchors",
         "currency_diagnostic_integrity"
       ]
+    },
+    "readme": {
+      "module": "tools.docs_analytics.readme",
+      "callable": "produce",
+      "fixture": "qis.datasets.generate_synthetic_universe",
+      "parameters": {
+        "start": "2018-01-02",
+        "end": "2025-12-31",
+        "seed": 20260725,
+        "apply_quirks": false,
+        "assets": [
+          "SEQ_US",
+          "SEQ_EU",
+          "SEQ_EM",
+          "SBD_TSY",
+          "SBD_IG",
+          "SBD_HY",
+          "SCM_GLD",
+          "SCM_BCOM"
+        ],
+        "volatility_spans": [
+          21,
+          63,
+          126
+        ],
+        "strategy_span": 63,
+        "rebalancing_freq": "BME",
+        "weight_implementation_lag": 1,
+        "rebalancing_costs": 0.001,
+        "annual_cash_rate": 0.03,
+        "reporting_frequency": "monthly"
+      },
+      "conventions": {
+        "data": "Frozen synthetic sample, not observed investment performance",
+        "returns": "Business-day log returns for volatility estimates; simple returns for unit backtests",
+        "timing": "Month-end target weights trade one business day later; units drift between trades",
+        "reporting": "Monthly preset; panels label their grid and window; annualisation follows the QIS frequency convention",
+        "rate_basis": "Reports: non-excess PA Sharpe with no cash rate. Performance table: constant 3% annual cash rate, ME volatility and QE regression",
+        "cost_basis": "Report NAVs net of 10 bp per unit traded; Brinson effects gross of realised trading costs",
+        "attribution": "Native-date BHB allocation, Frongello-linked; interaction assigned 100% to selection; benchmark regime shading"
+      },
+      "tables": [
+        "prices",
+        "portfolio_navs",
+        "performance",
+        "strategy_target_weights",
+        "strategy_costs",
+        "brinson_totals",
+        "brinson_active",
+        "brinson_allocation",
+        "brinson_selection"
+      ],
+      "checks": [
+        "target_weights_sum_to_one",
+        "zero_cost_nav_reconciles_units",
+        "linked_attribution_matches_compounded_returns",
+        "interaction_folded_into_selection",
+        "brinson_regime_shading_present",
+        "brinson_plotted_effects_match_tables"
+      ]
     }
   },
   "assets": [
@@ -4547,6 +4607,54 @@
       "document": "docs/unhedged_index_replication.md",
       "path": "docs/images/unhedged_index_case_study_i00038jp.png",
       "producer": "unhedged_index_case_study"
+    },
+    {
+      "id": "readme_performance_table",
+      "document": "README.md",
+      "path": "docs/images/readme_performance_table.png",
+      "producer": "readme"
+    },
+    {
+      "id": "readme_multi_asset",
+      "document": "README.md",
+      "path": "docs/images/readme_multi_asset.png",
+      "producer": "readme"
+    },
+    {
+      "id": "readme_strategy",
+      "document": "README.md",
+      "path": "docs/images/readme_strategy.png",
+      "producer": "readme"
+    },
+    {
+      "id": "readme_strategy_risk",
+      "document": "README.md",
+      "path": "docs/images/readme_strategy_risk.png",
+      "producer": "readme"
+    },
+    {
+      "id": "readme_strategy_positions",
+      "document": "README.md",
+      "path": "docs/images/readme_strategy_positions.png",
+      "producer": "readme"
+    },
+    {
+      "id": "readme_strategy_benchmark",
+      "document": "README.md",
+      "path": "docs/images/readme_strategy_benchmark.png",
+      "producer": "readme"
+    },
+    {
+      "id": "readme_brinson",
+      "document": "README.md",
+      "path": "docs/images/readme_brinson.png",
+      "producer": "readme"
+    },
+    {
+      "id": "readme_multi_strategy",
+      "document": "README.md",
+      "path": "docs/images/readme_multi_strategy.png",
+      "producer": "readme"
     }
   ],
   "non_analytics": [
@@ -4554,6 +4662,46 @@
       "document": "docs/quickstart.md",
       "url": "https://colab.research.google.com/assets/colab-badge.svg",
       "reason": "External Colab launch badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
+      "url": "https://img.shields.io/pypi/v/qis?style=flat-square",
+      "reason": "External status or launch badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
+      "url": "https://img.shields.io/pypi/pyversions/qis?style=flat-square",
+      "reason": "External status or launch badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
+      "url": "https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg?branch=main",
+      "reason": "External status or launch badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
+      "url": "https://readthedocs.org/projects/quantinveststrats/badge/?version=latest",
+      "reason": "External status or launch badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
+      "url": "https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square",
+      "reason": "External status or launch badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
+      "url": "https://static.pepy.tech/badge/qis",
+      "reason": "External status or launch badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
+      "url": "https://static.pepy.tech/badge/qis/month",
+      "reason": "External status or launch badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
+      "url": "https://colab.research.google.com/assets/colab-badge.svg",
+      "reason": "External status or launch badge; not an analytics output."
     }
   ]
 }

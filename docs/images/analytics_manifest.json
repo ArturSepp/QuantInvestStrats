@@ -6,12 +6,12 @@
     "numba": "0.67.0",
     "numpy": "2.5.2",
     "pandas": "3.0.5",
-    "qis": "5.33.1",
+    "qis": "5.36.0",
     "scipy": "1.18.0",
     "seaborn": "0.13.2",
     "statsmodels": "0.14.6"
   },
-  "generated_at_utc": "2026-10-03T09:00:56.408671+00:00",
+  "generated_at_utc": "2026-10-10T01:28:03.441519+00:00",
   "manifest": {
     "assets": [
       {
@@ -451,6 +451,54 @@
         "id": "unhedged_index_case_study_i00038jp",
         "path": "docs/images/unhedged_index_case_study_i00038jp.png",
         "producer": "unhedged_index_case_study"
+      },
+      {
+        "document": "README.md",
+        "id": "readme_performance_table",
+        "path": "docs/images/readme_performance_table.png",
+        "producer": "readme"
+      },
+      {
+        "document": "README.md",
+        "id": "readme_multi_asset",
+        "path": "docs/images/readme_multi_asset.png",
+        "producer": "readme"
+      },
+      {
+        "document": "README.md",
+        "id": "readme_strategy",
+        "path": "docs/images/readme_strategy.png",
+        "producer": "readme"
+      },
+      {
+        "document": "README.md",
+        "id": "readme_strategy_risk",
+        "path": "docs/images/readme_strategy_risk.png",
+        "producer": "readme"
+      },
+      {
+        "document": "README.md",
+        "id": "readme_strategy_positions",
+        "path": "docs/images/readme_strategy_positions.png",
+        "producer": "readme"
+      },
+      {
+        "document": "README.md",
+        "id": "readme_strategy_benchmark",
+        "path": "docs/images/readme_strategy_benchmark.png",
+        "producer": "readme"
+      },
+      {
+        "document": "README.md",
+        "id": "readme_brinson",
+        "path": "docs/images/readme_brinson.png",
+        "producer": "readme"
+      },
+      {
+        "document": "README.md",
+        "id": "readme_multi_strategy",
+        "path": "docs/images/readme_multi_strategy.png",
+        "producer": "readme"
       }
     ],
     "dependencies": [
@@ -464,11 +512,51 @@
       "Pillow",
       "qis"
     ],
-    "description": "Twenty-two synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
+    "description": "Thirty synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
     "non_analytics": [
       {
         "document": "docs/quickstart.md",
         "reason": "External Colab launch badge; not an analytics output.",
+        "url": "https://colab.research.google.com/assets/colab-badge.svg"
+      },
+      {
+        "document": "README.md",
+        "reason": "External status or launch badge; not an analytics output.",
+        "url": "https://img.shields.io/pypi/v/qis?style=flat-square"
+      },
+      {
+        "document": "README.md",
+        "reason": "External status or launch badge; not an analytics output.",
+        "url": "https://img.shields.io/pypi/pyversions/qis?style=flat-square"
+      },
+      {
+        "document": "README.md",
+        "reason": "External status or launch badge; not an analytics output.",
+        "url": "https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg?branch=main"
+      },
+      {
+        "document": "README.md",
+        "reason": "External status or launch badge; not an analytics output.",
+        "url": "https://readthedocs.org/projects/quantinveststrats/badge/?version=latest"
+      },
+      {
+        "document": "README.md",
+        "reason": "External status or launch badge; not an analytics output.",
+        "url": "https://img.shields.io/github/license/ArturSepp/QuantInvestStrats.svg?style=flat-square"
+      },
+      {
+        "document": "README.md",
+        "reason": "External status or launch badge; not an analytics output.",
+        "url": "https://static.pepy.tech/badge/qis"
+      },
+      {
+        "document": "README.md",
+        "reason": "External status or launch badge; not an analytics output.",
+        "url": "https://static.pepy.tech/badge/qis/month"
+      },
+      {
+        "document": "README.md",
+        "reason": "External status or launch badge; not an analytics output.",
         "url": "https://colab.research.google.com/assets/colab-badge.svg"
       }
     ],
@@ -2521,6 +2609,66 @@
           "feature_identity_errors",
           "feature_scenarios",
           "cumulative_alpha_lines"
+        ]
+      },
+      "readme": {
+        "callable": "produce",
+        "checks": [
+          "target_weights_sum_to_one",
+          "zero_cost_nav_reconciles_units",
+          "linked_attribution_matches_compounded_returns",
+          "interaction_folded_into_selection",
+          "brinson_regime_shading_present",
+          "brinson_plotted_effects_match_tables"
+        ],
+        "conventions": {
+          "attribution": "Native-date BHB allocation, Frongello-linked; interaction assigned 100% to selection; benchmark regime shading",
+          "cost_basis": "Report NAVs net of 10 bp per unit traded; Brinson effects gross of realised trading costs",
+          "data": "Frozen synthetic sample, not observed investment performance",
+          "rate_basis": "Reports: non-excess PA Sharpe with no cash rate. Performance table: constant 3% annual cash rate, ME volatility and QE regression",
+          "reporting": "Monthly preset; panels label their grid and window; annualisation follows the QIS frequency convention",
+          "returns": "Business-day log returns for volatility estimates; simple returns for unit backtests",
+          "timing": "Month-end target weights trade one business day later; units drift between trades"
+        },
+        "fixture": "qis.datasets.generate_synthetic_universe",
+        "module": "tools.docs_analytics.readme",
+        "parameters": {
+          "annual_cash_rate": 0.03,
+          "apply_quirks": false,
+          "assets": [
+            "SEQ_US",
+            "SEQ_EU",
+            "SEQ_EM",
+            "SBD_TSY",
+            "SBD_IG",
+            "SBD_HY",
+            "SCM_GLD",
+            "SCM_BCOM"
+          ],
+          "end": "2025-12-31",
+          "rebalancing_costs": 0.001,
+          "rebalancing_freq": "BME",
+          "reporting_frequency": "monthly",
+          "seed": 20260725,
+          "start": "2018-01-02",
+          "strategy_span": 63,
+          "volatility_spans": [
+            21,
+            63,
+            126
+          ],
+          "weight_implementation_lag": 1
+        },
+        "tables": [
+          "prices",
+          "portfolio_navs",
+          "performance",
+          "strategy_target_weights",
+          "strategy_costs",
+          "brinson_totals",
+          "brinson_active",
+          "brinson_allocation",
+          "brinson_selection"
         ]
       },
       "unhedged_index_case_study": {
@@ -4871,6 +5019,54 @@
       "sha256": "4d646e974512142ed8e5d99fdda9d5bc6e16fa8e42fd01a39901150d79b104c7",
       "width": 1398
     },
+    "images/readme_brinson.png": {
+      "bytes": 502221,
+      "height": 1772,
+      "sha256": "440505e9d31820ce7ce152bb553291f744548963cb60027d2b1996430bfb31dd",
+      "width": 1262
+    },
+    "images/readme_multi_asset.png": {
+      "bytes": 578390,
+      "height": 1369,
+      "sha256": "2ddd1711e9cdb7b1bbfaf5cac697ef63d567a6affe02ac0a55f67f2765d56423",
+      "width": 1416
+    },
+    "images/readme_multi_strategy.png": {
+      "bytes": 277305,
+      "height": 1369,
+      "sha256": "b8a1f3af89990a4efcbea17ccce3a0bdc92c85de87bf963adc92732c9bc7b8fa",
+      "width": 1398
+    },
+    "images/readme_performance_table.png": {
+      "bytes": 117817,
+      "height": 708,
+      "sha256": "034922e76455b6a7162dd6c51d95a1ded4d8fbd72aba5d13dab5ea4650783c63",
+      "width": 2122
+    },
+    "images/readme_strategy.png": {
+      "bytes": 206609,
+      "height": 1369,
+      "sha256": "6fbd80915218fbde9abaae193cac098c620c47fba860a1d67afaa4be89a8f851",
+      "width": 1398
+    },
+    "images/readme_strategy_benchmark.png": {
+      "bytes": 266915,
+      "height": 1369,
+      "sha256": "48ce3578f6f3f6fa65fa7e3555151659265ebf9581dc66e8f15960eccf398cc2",
+      "width": 1398
+    },
+    "images/readme_strategy_positions.png": {
+      "bytes": 181963,
+      "height": 1217,
+      "sha256": "f4f11876d254b032850fbdaf04170e868ad71e307172c5698244cf2b43a4ab6e",
+      "width": 1667
+    },
+    "images/readme_strategy_risk.png": {
+      "bytes": 377712,
+      "height": 1549,
+      "sha256": "876a9ece6d37963cb10c6f851d043447754c9f6f6e7c6d768f50f38ccbf74f08",
+      "width": 1546
+    },
     "images/strategy.png": {
       "bytes": 207560,
       "height": 1369,
@@ -5212,6 +5408,60 @@
       "columns": 9,
       "rows_including_header": 7,
       "sha256": "e8188b350f0f250c187e4ae06279e0618d19c75aa8f5b3052b16b774d391f6ab"
+    },
+    "tables/readme/brinson_active.csv": {
+      "bytes": 118424,
+      "columns": 3,
+      "rows_including_header": 2087,
+      "sha256": "e59b2ba7cd3190d52b392e9b7d9a9e47b7c9e5e01c8b37dcfb46f785998b9c08"
+    },
+    "tables/readme/brinson_allocation.csv": {
+      "bytes": 213249,
+      "columns": 5,
+      "rows_including_header": 2087,
+      "sha256": "9afff6efc2565ee8788e765fb331b86ce9c23b124c4a3712c9a8d707623b8dea"
+    },
+    "tables/readme/brinson_selection.csv": {
+      "bytes": 216267,
+      "columns": 5,
+      "rows_including_header": 2087,
+      "sha256": "c437ac53fc3fa26db362477a5032624250d1bcd75f884d98d2807a28fc5f5fb9"
+    },
+    "tables/readme/brinson_totals.csv": {
+      "bytes": 790,
+      "columns": 8,
+      "rows_including_header": 5,
+      "sha256": "3ff21f53f4ee34777a545665f3af5c5f8c716aaf14fb5fd7b879cda69a84498a"
+    },
+    "tables/readme/performance.csv": {
+      "bytes": 490,
+      "columns": 9,
+      "rows_including_header": 9,
+      "sha256": "9f64106f2d4792caa5363350dc9c960c0b1260f303b82dde7304017b62bb75d0"
+    },
+    "tables/readme/portfolio_navs.csv": {
+      "bytes": 179349,
+      "columns": 5,
+      "rows_including_header": 2088,
+      "sha256": "2de2bebd78a8a81747b5a83e8c14a58cf27ee2401aafe89229d4d015f48c4857"
+    },
+    "tables/readme/prices.csv": {
+      "bytes": 338378,
+      "columns": 9,
+      "rows_including_header": 2088,
+      "sha256": "b7e9f80eb459e9632ec14d033844e72cf9c34786c33a67ddc2edd401428f4949"
+    },
+    "tables/readme/strategy_costs.csv": {
+      "bytes": 72274,
+      "columns": 9,
+      "rows_including_header": 2088,
+      "sha256": "7dbd2a8da27ca499fbfbb3c34bd022d01b3e5b8c800ada1bb4f100bdf031a436"
+    },
+    "tables/readme/strategy_target_weights.csv": {
+      "bytes": 16628,
+      "columns": 9,
+      "rows_including_header": 96,
+      "sha256": "37a1ca286d341d658af76d486668b1fc25cc3aa2750135f91d49388ae0f62749"
     },
     "tables/unhedged_index_case_study/currency_diagnostics.csv": {
       "bytes": 350,
@@ -7559,6 +7809,52 @@
         "shapley_max_identity_error": 1.0685896612017132e-15
       }
     },
+    "readme": {
+      "checks": {
+        "brinson_plotted_effects_match_tables": true,
+        "brinson_regime_shading_present": true,
+        "interaction_folded_into_selection": true,
+        "linked_attribution_matches_compounded_returns": true,
+        "target_weights_sum_to_one": true,
+        "zero_cost_nav_reconciles_units": true
+      },
+      "parameters": {
+        "annual_cash_rate": 0.03,
+        "apply_quirks": false,
+        "assets": [
+          "SEQ_US",
+          "SEQ_EU",
+          "SEQ_EM",
+          "SBD_TSY",
+          "SBD_IG",
+          "SBD_HY",
+          "SCM_GLD",
+          "SCM_BCOM"
+        ],
+        "end": "2025-12-31",
+        "rebalancing_costs": 0.001,
+        "rebalancing_freq": "BME",
+        "reporting_frequency": "monthly",
+        "seed": 20260725,
+        "start": "2018-01-02",
+        "strategy_span": 63,
+        "volatility_spans": [
+          21,
+          63,
+          126
+        ],
+        "weight_implementation_lag": 1
+      },
+      "presentation": "Selected current report panels; Brinson table wraps headings and uses two-decimal percentages; positions compose PortfolioData plots",
+      "summary": {
+        "brinson_effect_axes_with_regime_shading": 4,
+        "gross_linked_active_return": 0.005990821442850569,
+        "linked_attribution_max_error": 5.622238785640832e-15,
+        "sample_end": "2025-12-31",
+        "sample_start": "2018-01-02",
+        "zero_cost_units_valuation_max_error": 2.842170943040401e-14
+      }
+    },
     "unhedged_index_case_study": {
       "checks": {
         "currency_diagnostic_integrity": true,
@@ -9684,6 +9980,14 @@
       "docs/images/model_layer_attribution_simulated.png",
       "docs/images/multi_asset.png",
       "docs/images/multi_strategy.png",
+      "docs/images/readme_brinson.png",
+      "docs/images/readme_multi_asset.png",
+      "docs/images/readme_multi_strategy.png",
+      "docs/images/readme_performance_table.png",
+      "docs/images/readme_strategy.png",
+      "docs/images/readme_strategy_benchmark.png",
+      "docs/images/readme_strategy_positions.png",
+      "docs/images/readme_strategy_risk.png",
       "docs/images/strategy.png",
       "docs/images/strategy_vs_benchmark.png",
       "docs/images/unhedged_index_case_study_i00038jp.png",
@@ -9709,19 +10013,19 @@
       "docs/images/unhedged_index_case_study_nddlsz.png",
       "docs/images/unhedged_index_case_study_nddluk.png"
     ],
-    "published_at_utc": "2026-10-03T09:13:25.226157+00:00"
+    "published_at_utc": "2026-10-10T01:31:14.328068+00:00"
   },
-  "python": "3.12.14",
-  "qis_import_path": "C:\\Users\\artur\\AppData\\Local\\AgentWork\\ARTURDESKTOP\\QuantInvestStrats\\analyses\\fx-hedge-doc-examples-20261003\\source\\src\\qis\\__init__.py",
-  "qis_source_version": "5.35.0.dev1",
+  "python": "3.12.10",
+  "qis_import_path": "C:\\Users\\artur\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\AgentWork\\ARTUR_LAPTOP\\QuantInvestStrats\\runs\\readme-figures-20261010\\source\\src\\qis\\__init__.py",
+  "qis_source_version": "5.36.0",
   "schema_version": 1,
   "source": {
     "files": {
       "examples/models/bootstrap_convention.py": "c94e4ac5c5a68299beebe79891b15403ec97230de47d82e8bebfd31a0edc7172",
       "examples/portfolios/model_layer_attribution_simulated.py": "fb3c8fabb316d1cd7d881c4da048b62e1bca299166bf1cf689ae9fbe43cb0d17",
-      "pyproject.toml": "85dbd1c97ebfea0f03b3853605810a8e534ad17028d552f690f1d1b861599e26",
+      "pyproject.toml": "11999c713b3456ba801f3cdbd404f726768be4cb43e17fbdb3819df84c31e00d",
       "src/qis/__init__.py": "cacca3e3207fd1e9046d617e3f9a21fc1dfed060703db5d91a03d07ba6cc7be9",
-      "src/qis/api.py": "59e907e928ed180715605d991c987c3b3364ab86448d889abb69f197570ac671",
+      "src/qis/api.py": "c718a872d34f4cd5ee7ac46368c469b6953cee30a6835565e456f8ef629d4c9f",
       "src/qis/datasets/__init__.py": "02ff1fb80068eab1888c0dd875326c5b24b99177f1f7ac44c91f9ef9246a7d23",
       "src/qis/datasets/run_local/__init__.py": "9086fc3bed4c4e10cc15d73ed2166ec49211ed7c11c556090596a2cb72642b63",
       "src/qis/datasets/run_local/synthetic_run.py": "a8487fd56df5e39d1a8c9fd658b556233bde43215c358ed42a4d20e0865e6596",
@@ -9734,12 +10038,12 @@
       "src/qis/discrete_portfolio/tests/discrete_backtester_test.py": "dc1951c504d56d76ee70e34f6bdab51b4800fd5793989f0de23e0cb27c957406",
       "src/qis/discrete_portfolio/tests/discrete_state_immutability_test.py": "8110cf07445426680a2cf0395fee28a39df7b16b6dca339247fd519554eec917",
       "src/qis/discrete_portfolio/types.py": "e5b8f1c253b88e39b50d05363d2e237c35535dab16b9dca9c7c693afe4b9fcdd",
-      "src/qis/file_utils.py": "77403d555a66de66f0fbc8990f3a255ac057220e1c3644e2783770228800957e",
+      "src/qis/file_utils.py": "9815e104fbd42786c8461ef63e537374b8982ac43bedfa42d5e327f7c371b244",
       "src/qis/local_path.py": "47b3b79b5c4cc3e68552968b6a69b78477eb244ea2a9960e00d761bb0f17bc7d",
       "src/qis/market_data/__init__.py": "6f164d1db9d93e6d05894bcbf58069700005bd38ef316b04f58de7cb8b1a6390",
       "src/qis/market_data/factors_data.py": "3921b59652fb8ba657f8583f786577057d0eaccb9c2fd677716639009cb03657",
       "src/qis/market_data/fx_hedging.py": "2e745c7a0c3b78b7dab6b1887c30678ebf60ee44c259117d5c91fa909b22e329",
-      "src/qis/market_data/fx_rates_data.py": "59a98bef65424471c08dd866fa9f1c031318bef07b98bdf705c6dec54747698d",
+      "src/qis/market_data/fx_rates_data.py": "11d837ecb2e223f4ed81d492962dcfaa9496d1a7dcb060649d666d0e0bfaed56",
       "src/qis/market_data/reports/__init__.py": "b2dc1fc1602d3760d88059f305c6fdf7702a56aacd70e380d2e158a18d8e210b",
       "src/qis/market_data/reports/fx_hedging_report.py": "25fbf4ee82b06d05cbb8fe11ac651e9b79acebd107a818850e3c7ad87060e459",
       "src/qis/market_data/run_local/__init__.py": "9d9c4074b4d29c6468f339946726ffc2e5cc472d60d3c1ea4523f02243491b44",
@@ -9747,7 +10051,7 @@
       "src/qis/market_data/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/qis/market_data/tests/factors_data_test.py": "ffd46eddc8631a5c00ffa164aee804c2e01cbd79f22d361e481ca218b5b73282",
       "src/qis/market_data/tests/futures_fx_arithmetic_domain_test.py": "81c1cda1d87a14ebb9b7a1529f8ce5b5eccc5a12dd5ee170187584b906418c5b",
-      "src/qis/market_data/tests/fx_cip_identity_test.py": "54b8a2e339ce61a1e46885d13dff8f58e1a6cf87efdc254d378f8a0f5270c542",
+      "src/qis/market_data/tests/fx_cip_identity_test.py": "bbbbc6cb85d2b0e3c479f64b875d26ba9d5a9d91c123cb74be35fad0893bf559",
       "src/qis/market_data/tests/fx_nav_period_end_test.py": "6982118dcdfe026394fae3d97f5d735919f9be24bebda7c6b351f650d0f86e4e",
       "src/qis/market_data/tests/fx_rates_data_causality_test.py": "b947d5ed33a5dae6bc1784976c3b56abde37f8b4d2387d78056d270cc0c83221",
       "src/qis/market_data/tests/fx_return_convention_default_test.py": "f71be15182fe9350fdea44c65cf841bc60d1f00448f82dbfb42e0bdbe086366c",
@@ -9768,12 +10072,12 @@
       "src/qis/models/bootstrap/tests/test_bootstrap_numba.py": "f68ed377f8e7d5c80d79e006bdec58983bd70dd82e5e6bbe85e45733c43a18f5",
       "src/qis/models/linear/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/qis/models/linear/auto_corr.py": "06d250091c9a5f3022ad1ae9b71a21008f8addabf36ca5ab527044ec0073cbe2",
-      "src/qis/models/linear/corr_cov_matrix.py": "6664b6c3140816de064ff31c62b3f385a8eb7c6f21c920985ed58deaf8ecb42b",
-      "src/qis/models/linear/ewm.py": "a9d8dd47aa780ecab31802abfe6423bdd464a44c6792351fd4df88c12fbb4a13",
+      "src/qis/models/linear/corr_cov_matrix.py": "529d57a7afb8654affa62210dc55422fbf07a5480a91a97151b9650187de2118",
+      "src/qis/models/linear/ewm.py": "466b4b007ba0077b75a96c297b6efa6d64514ba874e9e150bdb0bd18540d5557",
       "src/qis/models/linear/ewm_convolution.py": "06610c82a25753efb03b6871488e965caa9b8e5a0e38a88520a34fbe4b9d94c8",
       "src/qis/models/linear/ewm_winsor_outliers.py": "c33b65bb96bae976427f2918a4ec608f02f006386c1f420fa76823ffbd2bc0fc",
       "src/qis/models/linear/pca.py": "62f2bac6dccfb207ffb5f8722fba71bd0cbd9ca6d4aafdd6ccd59d7f09d47baa",
-      "src/qis/models/linear/plot_correlations.py": "4215f14733374584e7e5db6348e2029a98bf6f7e38431b0ae9c3b5e147c452c1",
+      "src/qis/models/linear/plot_correlations.py": "3868799e70051831c9e0567e6ba1358ea411eaf1deb27bf24886aeb8cf62658a",
       "src/qis/models/linear/ra_returns.py": "36c25fd35596bca8feea40f83ba1b7e8017205e98c0482838321760f304df997",
       "src/qis/models/linear/run_local/__init__.py": "5bfea403c379102637fc845e254f3db5a589e44447734dd33ccb467993d27695",
       "src/qis/models/linear/run_local/corr_cov_matrix_run.py": "824a66038f4e9338514379d296902fd6c79ecf41d557957f89025f920a09b49d",
@@ -9789,7 +10093,8 @@
       "src/qis/models/linear/tests/ewm_beta_singularity_forecast_test.py": "963588a2e2bcc238358ef60e3e000a4f8ebba0c3cd58900df2bf950b54944f7a",
       "src/qis/models/linear/tests/ewm_container_arguments_test.py": "55105eb313e358c1ab95396454f8836eefe83dec037420ef4f6f274f36934c57",
       "src/qis/models/linear/tests/ewm_convolution_horizon_test.py": "edff6d232f28529c1e53e0872a13b81e1e22f395951b4430b3b6f1c0d8c07af8",
-      "src/qis/models/linear/tests/ewm_corr_pairs_output_test.py": "7d863d7073baf1a2f3e588d8c32ce2db2fb3a788ae26be7f304d0fc4f6fee362",
+      "src/qis/models/linear/tests/ewm_corr_heatmap_last_state_test.py": "24b11c749c2072634d5831c046637df6b9db5df0fd130cf4b5a346bbf8020197",
+      "src/qis/models/linear/tests/ewm_corr_pairs_output_test.py": "9be56c652784a89cfc205cf4b94e6137167995d2cc38a40ec625c45e8b4eb5d5",
       "src/qis/models/linear/tests/ewm_covariance_newey_west_psd_test.py": "cbd09d0913a57ff52e7b1ee5b0be8fd4d23a0bd3aada963481e3df5d85f90ba3",
       "src/qis/models/linear/tests/ewm_cross_xy_seed_warmup_test.py": "cbc289f5a2e3578ead3a494e0f464ccc259d6224279dde2d83dbe0063fe17218",
       "src/qis/models/linear/tests/ewm_first_observation_nan_policy_test.py": "96e7e91a90b0b3d205d66b8b06a433e9ded78531eede4575806aa4c9ca0ef2ed",
@@ -9811,7 +10116,7 @@
       "src/qis/models/stats/run_local/bootstrap_run.py": "c21d14d5f444baeb914023440f674f56eccaff21a77f4999af62106271da085e",
       "src/qis/models/stats/run_local/rolling_stats_run.py": "ae2a9a92bae037c4927abf8daeadcb0f2bce4fb5b732de5a8484e1632a44c9c8",
       "src/qis/models/stats/tests/rolling_raw_window_test.py": "cdba5d4776a48ca39606b3b1655e5df28ba14524cc7cc9f0eba20ba22e048a45",
-      "src/qis/models/unsmoothing/ar_lag.py": "3af4884580af831f2f6d0e671b0f0118d539cc062099613855af55fc4005014c",
+      "src/qis/models/unsmoothing/ar_lag.py": "4228088a4e44d4b7f14e759787e5b620a9f1551331e8649ca3c1f6187abf2f6e",
       "src/qis/models/unsmoothing/dimson_beta.py": "d191438e8f5e0c02dcce8b43a0fa4939bcf6caeae58857b781feefd59c1027a8",
       "src/qis/models/unsmoothing/factor_lag.py": "76b205dfee01b0dcb07f366eb687e724c574b011a5666ed9063886e8c2bf3cce",
       "src/qis/models/unsmoothing/joint_lag.py": "d17656bfcfdae3937284b019b8b3d406f8b6d1087a4222af612b4ced2a1a1c70",
@@ -9821,14 +10126,14 @@
       "src/qis/models/unsmoothing/tests/dimson_beta_inference_test.py": "c73939eb0f93beb7c5f2b617658b20d0d72f4bf33f000f457948ec96f709762a",
       "src/qis/models/unsmoothing/tests/factor_lag_warmup_causality_test.py": "86b9cbb36a5d7b77feef480eb17f6db2614808657580da7faf0f8f2314376aa5",
       "src/qis/models/unsmoothing/tests/joint_lag_warmup_causality_test.py": "dae0f6bfc4019354c5920407beaee8a63c19803a10d924b97a235f27c069d322",
-      "src/qis/models/unsmoothing/tests/test_ar_lag_glm.py": "00018106f590d85999c36ac26c0ca4c7949302c5a80fa58c1484bdf88b7fa28a",
+      "src/qis/models/unsmoothing/tests/test_ar_lag_glm.py": "f1ef04f3a83e42334a186e14fc3cb4d4e90e33d4a966905beb1a30b27e37cd72",
       "src/qis/models/unsmoothing/tests/unsmoothing_warmup_causality_test.py": "f6b93f8d06ed57ac8e2bb222f5254f8d1e189df45178e31b437637d7abe5adfd",
       "src/qis/perfstats/__init__.py": "fffbd0320e8bbf248ceda4023fdea81ee84b887a6c2ba99f06e3e9c74169e94e",
       "src/qis/perfstats/config.py": "937cd1964e4a5f648ea88b609aeca9d9530f88597e550f4c7058f560327d8d49",
       "src/qis/perfstats/desc_table.py": "8e8e8bf3bef83705ab0f25ebdd838c0ea715977e2cc63f3e58cd234a62bccad9",
       "src/qis/perfstats/perf_stats.py": "6d5236359a1234dddb5c1aa05378f34e36fab271bd83e7036b288057d72a2c4b",
       "src/qis/perfstats/regime_classifier.py": "d41c250139eaa00260cdf1ca7fb91ac7286bc0e331987d3a1a799b00a39b456c",
-      "src/qis/perfstats/returns.py": "edd0d5efc17b295ea991bf75fe9064e199b49db4817c492a4a0c7b6b5fafdaf9",
+      "src/qis/perfstats/returns.py": "8ca8f00d790772b3e07948d1cf6b91437b9951f453f375773e1fed2f302adba4",
       "src/qis/perfstats/run_local/__init__.py": "80830516c225596848a7de379c801dd5a48861e18ffa1691428bba1af79d90fe",
       "src/qis/perfstats/run_local/cond_regression_run.py": "e2dad826c6e24c5c9ac0e8acd787041e0eb1d02d92414491aa67e67cb124d4cc",
       "src/qis/perfstats/run_local/desc_table_run.py": "f666965389530c809a7f6654e73fecab7c6736b9e0fbceaaed31b5f3ad46434c",
@@ -9921,6 +10226,7 @@
       "src/qis/perfstats/tests/to_returns_keywords_and_fill_test.py": "11172cfe20e3a0dfdb49c17e1c5f6114a021f94f899fac98db79565ad8793f5d",
       "src/qis/perfstats/tests/total_return_date_order_test.py": "2d9c8abb8bbf46f6db63db8ec445afc46b072b157eed1059be686cd3947992b0",
       "src/qis/perfstats/tests/total_return_nullable_test.py": "87af9556f459ce6b1e5d81ada621503279be1f07ca19e52d9b9e3e453425372b",
+      "src/qis/perfstats/tests/total_return_series_label_test.py": "680ce9174be29c9b888e988fde9fffcd760afe1b8a6139868257efda7abb3c97",
       "src/qis/perfstats/tests/turnover_date_order_test.py": "7a6e6a06673d0c980020e45a67b0530f715b1e50e2d7a59c8a4461d99cc92504",
       "src/qis/perfstats/tests/turnover_test.py": "19fd3c256c9903fbc62f574d0224d6bf5044d63e321f37f1c0b7cb5882898586",
       "src/qis/perfstats/timeseries_bfill.py": "a01de2f1b960e7c3e122e9e6af8a747c83e907be2c40af6f15c38997817a946e",
@@ -9995,9 +10301,9 @@
       "src/qis/plots/run_local/time_series_run.py": "63f771a6db78175d2397661363f6761f52b439d638ca644337c26b4bc11e7a67",
       "src/qis/plots/run_local/utils_checks_run.py": "04a1de18775bb2a82721dcd9ab91d70da5d04feb88e76b4099fa9aa9cc36e6e3",
       "src/qis/plots/run_local/utils_run.py": "41a7c13f2d4611006d76b1e577f7966098b856e32bcd08e52c758038d7937266",
-      "src/qis/plots/scatter.py": "4e528864f807fb108e6fe7c3628be000d6039defdf4c2eb50549fa240e3a91e1",
-      "src/qis/plots/stackplot.py": "908e9233baa37d43573bb8c460242a2cb814993af2b939b475b7229b1c183fbd",
-      "src/qis/plots/table.py": "5cfdae713b6393d659d8ed68d34f65f2ac761115b7e6aeec299b4b41f63456c2",
+      "src/qis/plots/scatter.py": "34a4249849e725579f0a631a26a8961ddcb7affd7e36bb5e8620a90051631be0",
+      "src/qis/plots/stackplot.py": "778809e2bef7fa4607fc6bd14b6be9f8bcb57854222d8aa99887fe1c32ca2f5c",
+      "src/qis/plots/table.py": "7ef40fbbed24aae176f66693613f56d5f3ddc95115eff63df0f371c53e4a8364",
       "src/qis/plots/tests/boxplot_test.py": "feac7bbaad15c3d79194c0f489c8b5ede19262952b1cfdca72268842d5345597",
       "src/qis/plots/tests/desc_table_none_format_test.py": "fd988a96ef72a879e4185c910e6b21dc5c8e7e218dbb757a37a434165689bfa2",
       "src/qis/plots/tests/errorbar_label_alignment_test.py": "5c576899f508dd6f11f3ae60c639401cd0ec383a17a604e2d1bc5dd52d42b654",
@@ -10014,12 +10320,16 @@
       "src/qis/plots/tests/non_finite_desc_plot_test.py": "01141f68700ee860feade51c67778e07ee08a43d6d822966eaf6d628b6ccc59b",
       "src/qis/plots/tests/plot_smoke_test.py": "2f4d91a64d48bc824249ba88847b039187da78d717b113fe6ff156ffe3263efe",
       "src/qis/plots/tests/regime_plot_drop_benchmark_test.py": "e048ccf38b55c5c9d1a988e32e21b005260dbe0eb35354c7bf732c8cf6268f14",
+      "src/qis/plots/tests/scatter_annotations_test.py": "541442cc2d240ad3844243a9e449e5a37a03123309bd8a9d67620d7f3ce2d1b6",
+      "src/qis/plots/tests/scatter_overlays_test.py": "8b8beb89cd7b3d5f799425caea2c502b911c8c563c687f8f11a6cc3d691ab3d9",
       "src/qis/plots/tests/stackplot_annotation_options_test.py": "1a6d3db97811149a8ed2ab2809444c4e397f6e4b39d6151081e397ce67e081b3",
+      "src/qis/plots/tests/stackplot_missing_total_test.py": "486459d5363a1df020ae32a9242db72488f783ac5cdd1167f49c138b6b97ded4",
       "src/qis/plots/tests/stackplot_nullable_input_test.py": "474c38074d7c7c7af7a066cf7f8152b1733db62ad9161d1a833b689837b46a56",
+      "src/qis/plots/tests/table_data_colors_test.py": "4aafa492ac03fca0263ad21dfee4f90af6df60e50e88b66422839c76d7f2c25f",
       "src/qis/plots/tests/utils_test.py": "4c9362b2b9f19676e558ecbf942acdfbf9a6faae6801aec5e59c93b5d3a75994",
       "src/qis/plots/time_series.py": "d3d2d6c088b3660c99fac2807fd86bffa87af7d752d0063af4ceaf427ea96ec7",
       "src/qis/plots/utils.py": "73d595fc91ce24b91c9f4364d4fa057079724f6fc400dc1461980272dfbb146a",
-      "src/qis/portfolio/__init__.py": "676792671b1b77215bb3b73908da7ed9641fcdc96e78efb681f2ea9f026ca10b",
+      "src/qis/portfolio/__init__.py": "202ad0986ed39ad7536c42edc3f6a6d2cfa0665d589237fd8db0175a28aee51a",
       "src/qis/portfolio/attribution/__init__.py": "e589d1e4c768f6ecfacdf745996befdb7675b3e4c89a359a29aa3f9383fbbb51",
       "src/qis/portfolio/attribution/brinson.py": "516db93bff63718d384b90310466cc15d0dcec6ff578a5f2320033166718bf65",
       "src/qis/portfolio/attribution/model_feature.py": "fcb9ec8924f64f198babbc69cf27478a8346dc8e2d70be89fe0a060f1e74ec52",
@@ -10033,29 +10343,31 @@
       "src/qis/portfolio/attribution/tests/portfolio_breadth_test.py": "3845f8b783b45cdc4cc54bff547ae4e62786dbc6b32fd8246dcdcca8beec4be4",
       "src/qis/portfolio/backtester.py": "9617c8680461b59a05693fae857c5f86a42cb90b18a2b28af7442bb7fc9aa4af",
       "src/qis/portfolio/multi_portfolio_data.py": "496eb4bf92601ee0fcf306dde6ca2e1b2e89c60649542de887b2deb2b96b94a9",
-      "src/qis/portfolio/portfolio_data.py": "30495818171630aca01ad06a124f2533d39f9f3bd84c9521d341fd2ded526173",
+      "src/qis/portfolio/portfolio_data.py": "5cd880a42767b1640f72b48a356515b8ba39b08bded27a7bee5730d4576ec3b6",
       "src/qis/portfolio/reports/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "src/qis/portfolio/reports/brinson_attribution.py": "980054b47fd0fefed6710703a71291db0d76f3f9beb97627e8c735068ece5aa6",
+      "src/qis/portfolio/reports/brinson_attribution.py": "fee28ee03d7adcc8cc69b34d05d5ba1bf6e1aa17691ce132ddace29bfa373922",
       "src/qis/portfolio/reports/config.py": "ac5e160b29c29f8588162a2a6c78adefa39f1287844c6bbf1580b79da8559dc4",
-      "src/qis/portfolio/reports/factsheet_facade.py": "cdbbbfb61b462970ae9de799fec52cc38f55e02ecd3ead7fea39fea640438695",
+      "src/qis/portfolio/reports/factsheet_facade.py": "23b91b1bc16a963952462a32c0087cda952797a6203128905ffb9e53a71ddd79",
       "src/qis/portfolio/reports/multi_assets_factsheet.py": "f1905b0acc8438d733dded84c58a4fb6f72411b0342140319b40c35cd1e02e72",
       "src/qis/portfolio/reports/multi_strategy_factsheet.py": "0dea067e70c9819d7a6a02e86a222046fdc6929441c16de9a8284e3948da7aa6",
       "src/qis/portfolio/reports/multi_strategy_factsheet_pybloqs.py": "59b1c0b5a9ef5059e16f241afc8f6ad2eacf1c9ea11341e7a31513ed324a9d53",
       "src/qis/portfolio/reports/overlays_smart_diversification.py": "4675f135bbf4fc1db85458d9870084f92e97e8a6846539674d3212bc76cb32a0",
       "src/qis/portfolio/reports/run_local/__init__.py": "087270db60fe3b09907e85df4c1f216f67aa121f8c680a00d7c5022bf2fc7144",
       "src/qis/portfolio/reports/run_local/brinson_attribution_run.py": "f75dd9de92186361c5e4a833ebba6c4ad99e62d548639be927880d3b67c0fd68",
-      "src/qis/portfolio/reports/strategy_benchmark_factsheet.py": "3ecbf7b3d5579eba9a6f994ba9d3a8ece06ace0e7fff712dc03c377fe5c77249",
+      "src/qis/portfolio/reports/strategy_benchmark_factsheet.py": "061e5ca83fa37c62db9d86a98f986e936fe31230576f9e4d145a8c3210e572f7",
       "src/qis/portfolio/reports/strategy_benchmark_factsheet_pybloqs.py": "b785ee56641f0dbca0f3a83ef0b8f3cf45743899ec06599de80c87f55c872560",
       "src/qis/portfolio/reports/strategy_benchmark_tre_factsheet.py": "6ce5e07882dde8924303c504261d0c1260daed47d686e673067e88b7c5c4cbc7",
       "src/qis/portfolio/reports/strategy_factsheet.py": "35c1230b1d23896005897945dda4a177dd6840c3241a781573ae2f8950ed4bf2",
-      "src/qis/portfolio/reports/strategy_signal_factsheet.py": "1b95ab1102c3e78835edc7bf148f7296c1931225e6ee6784c07f6b6b4e083696",
+      "src/qis/portfolio/reports/strategy_signal_factsheet.py": "f3adee3323c8dbfd989ede66b93746eea118c427e420de31908235d0c62dc4dc",
+      "src/qis/portfolio/reports/tests/brinson_var_format_test.py": "fe853521f5467f1ffab1cbf9d9de7e7c353d38433d28f05747ec69ea980388f2",
+      "src/qis/portfolio/reports/tests/factsheet_facade_returns_test.py": "814c6f185ed0ec76c6116b29215d1e587cc8ff095ba97221e9eb6a7bbe43e9e1",
       "src/qis/portfolio/reports/tests/pybloqs_fallback_delegation_test.py": "546c2735d79f40f4d1226402743fc167f6879d421068e1335b6f8a4ca48f7a2e",
-      "src/qis/portfolio/reports/tests/strategy_factsheet_test.py": "e3ab4bea24a62732d7ca88134bfafc971d45d1e9d6fa0c0b8afaef907d54c3de",
+      "src/qis/portfolio/reports/tests/strategy_factsheet_test.py": "ad646db6e6695dba9f871765a58588c78c10a986cefbea7e72062af2910ea56b",
       "src/qis/portfolio/risk/__init__.py": "f56f240b9bb707911af20db18472683168016d0639a4fbb52f36bce04a2c5416",
       "src/qis/portfolio/risk/contributions.py": "dc81a030b2925667f69d8684a6e79d7dd6b7c9b3b232ef4ba496d9817536c894",
       "src/qis/portfolio/risk/ewm_covar_risk.py": "9a0c797d1aba021f1e591a67098f38cdc50b7e9fcbbe8eb3dc7f3efb6259ae9f",
       "src/qis/portfolio/risk/ewm_factor_model.py": "df83e735e9402e9aef1407afd96fea09f0308dbce2008e6b6a8e09b0d2d46f9c",
-      "src/qis/portfolio/risk/ex_post_tracking_error.py": "a20ea8c150dafd00a8bc9617e2f3d4daf011c277cf0617e49365506c0570dc36",
+      "src/qis/portfolio/risk/ex_post_tracking_error.py": "2a3478e868f786acc35f002590b582fc5ce74b93cccbebee3777092dfe8a4caa",
       "src/qis/portfolio/risk/factor_groups.py": "f40be23fcf491359aefdd1720cc77672ebd0213126bcb4d97dc4bcc16f6121c5",
       "src/qis/portfolio/risk/factor_model.py": "029873bbb510a87c5dbb4f6842091b3cc24921e32f5bc60c93a0b42531bba045",
       "src/qis/portfolio/risk/risk_model.py": "229d61f549924e1b02d79d9140d5123809dc93deb9ad9df0efdd8343e31eaf55",
@@ -10070,7 +10382,7 @@
       "src/qis/portfolio/risk/tests/ewm_covar_risk_point_in_time_test.py": "d7dda4807769f33e22089b882b8576c3bf412aa69a6b94cca80bee1683f8606a",
       "src/qis/portfolio/risk/tests/ewm_factor_model_alignment_test.py": "1282cceeb1db8d5aae2cbc8e0d930b7ed6df1fb9b0ec4122ff38761fda938622",
       "src/qis/portfolio/risk/tests/ewm_linear_model_point_in_time_test.py": "fce89e33ff4004d6da25e630f14abfab440eab9be960ecda9cf245f5621869a3",
-      "src/qis/portfolio/risk/tests/ex_post_tracking_error_test.py": "dd418707e19599f8ca76029320c1d9d94fdb20a164b284497c27ac9872922a4a",
+      "src/qis/portfolio/risk/tests/ex_post_tracking_error_test.py": "326fbe514c717bc7180c61297d054bbe31855df5ba24e3c5cb32270141c0f3d5",
       "src/qis/portfolio/risk/tests/factor_model_test.py": "ab42111e6522a60c37a924c31619dd4d345b9c79e6c4d3f3ba1a4c05f510d0b7",
       "src/qis/portfolio/risk/tests/linear_model_diagnostics_test.py": "04dd48b7b4ad69a3eb553cad611d6a092c780356abccb6722b5fb536082e878f",
       "src/qis/portfolio/risk/tests/risk_model_psd_validation_test.py": "b78ceb8cf2f6ce15ad0d8687fbf791ccda903b684c33ee34bec3b9516aefe2d0",
@@ -10090,19 +10402,24 @@
       "src/qis/portfolio/smart_diversification/tests/allocation_frontier_test.py": "22602bb649ec268527b5cecdc882593372b2663718ab41e4860f700f101773c2",
       "src/qis/portfolio/smart_diversification/tests/overlay_curve_first_date_test.py": "2328d9640af1eefae4b89eda9288cc35fa59b7ee5fb5c40eda44d50f39c96d76",
       "src/qis/portfolio/smart_diversification/tests/smart_diversification_test.py": "62fff0ce22ac3665e65dc69bf6971947462a51723629f174a2193fb204b6ac5a",
-      "src/qis/portfolio/stress/__init__.py": "ae103139bcbfa1fa8a614bd9e32256e32428871b5ed0b11ad91263daad1fe4d4",
+      "src/qis/portfolio/stress/__init__.py": "8bfed28bb9325495ddb34095091ba5fcaecfd19be58903dc1cd898137d5987dc",
       "src/qis/portfolio/stress/_bands.py": "08c2bc3539fd129d2a7666fba365ffa7511f33ae9c4da18978fbd23ad73e29ee",
       "src/qis/portfolio/stress/_clusters.py": "dc9a6ffa693d964d582aa3a44c42e6de69a06dadea0b34c385a61879859214ab",
       "src/qis/portfolio/stress/_diagnostics.py": "03683c5169afd0fa42efb0a975120349d8e9476b296dbb88c506fd23a85f49b2",
-      "src/qis/portfolio/stress/_figures.py": "e2cc26f35637b98f1c25839a59bb21f060c2cd34e6e003a41a801ca16f1a4ae5",
+      "src/qis/portfolio/stress/_figures.py": "5f2a06b39650493a8dca73ac3267fb8cfa0354284ef3c22449fdfbdaccdd6e14",
+      "src/qis/portfolio/stress/_statement.py": "a4c8bcb6ec8bfb0c0d4db3902e72dc4c9a48d30cd05a9fda1b3c327aab4eff48",
       "src/qis/portfolio/stress/_valuation.py": "4c743de1ef1e62225e52d1cc89853999d799b5e871f32894b8cbe2d44ec79e48",
-      "src/qis/portfolio/stress/analytics.py": "1822c7e9b05f18956ca0a20bcfab887e8b8a79dc9dc34f2231b0ab1c6274b355",
+      "src/qis/portfolio/stress/accounting.py": "104a1e974d4994aa68070a100c6a53d1e74c04f274d60a984c6f3bab712379dc",
+      "src/qis/portfolio/stress/analytics.py": "1eb2c2e08dab4539b468c0ecc2f4a12015491db88576d728de67a207e116efde",
+      "src/qis/portfolio/stress/historical.py": "b9bbca8abd9cff5b8b4f66e60186aaf7410cb2c77859abdbc3d866e1f80afd0e",
       "src/qis/portfolio/stress/instruments.py": "8e44fd0ce55ce50b23d43846682b1c210fcd0e0b9bc8800dbb96b2bb4fe7b38d",
-      "src/qis/portfolio/stress/portfolio.py": "41f88832adfaf8e2500dd02550c73278c8a8753e1ca97dd3be8460d52837915e",
-      "src/qis/portfolio/stress/reporting.py": "1bd7d71bc621b037ea3ef2617b479c8311e76c6390e12387331d665f12058a97",
+      "src/qis/portfolio/stress/portfolio.py": "23ebd2d06a5359037fbe9837010a53fe77d44f92f0e1bfefb96b4380b16b94a3",
+      "src/qis/portfolio/stress/reporting.py": "be13c274182fcfae55903feec5f95360a1799b444acffd9dea53d32be42ab9c1",
       "src/qis/portfolio/stress/run_local/portfolio_stress_run.py": "55c88210b8b8763b424968e64a468372d36dd23b03b1c2b62e9d949315861f76",
       "src/qis/portfolio/stress/scenarios.py": "6fd3a0b56b7a2a675f91369b3639ec63cc3345dd15dc49727c6660838978cc8d",
       "src/qis/portfolio/stress/tests/__init__.py": "cb0207aa2870c95f1bed38493e8c3d2913b1bd068546d104306336a556a66bc6",
+      "src/qis/portfolio/stress/tests/accounting_reporting_test.py": "db617b0eeed8356b5f7945535fe726518f09940a53b0a2472ad58c4e94dcd31c",
+      "src/qis/portfolio/stress/tests/accounting_test.py": "efcb05666eaea003e9bcfbe508859c07d79bcbd9d6edebd9124421c785b32d95",
       "src/qis/portfolio/stress/tests/analytics_test.py": "4a0f0a4d2337641b2575a2ce23a8a05fff0c4626dfccabde76c0eaa0c07a08bd",
       "src/qis/portfolio/stress/tests/cluster_contributions_test.py": "54a501988eb4a19df43324bb9e566870fc20d4abd5c783f9db0302409fb80c82",
       "src/qis/portfolio/stress/tests/conditional_bands_test.py": "10c7581213a6788dd6ef0212b3310094542b5ce10205d2a65419f4c97ffe28cb",
@@ -10110,6 +10427,7 @@
       "src/qis/portfolio/stress/tests/conftest.py": "ff4aa64608b203c9405583c7ae566b2eab353bb7d45e45e6b48a17e5af77bed7",
       "src/qis/portfolio/stress/tests/consumer_contract_test.py": "fe40eed080d2682d09fa3982c309a169fb55b7a58dff2fa8b3ba18d211e1f529",
       "src/qis/portfolio/stress/tests/family_cluster_report_test.py": "a71733cedc913184bebfbbc8f1873059baf7b38d9baac1d2c2b367005c02ceb2",
+      "src/qis/portfolio/stress/tests/historical_selection_test.py": "6b6c66f9b9a73305e955edb3fccdee1118ff80cb796171e0769c3f332f4b985f",
       "src/qis/portfolio/stress/tests/instruments_test.py": "5668e5d73f33962b705526ca6ffa56c0488d65e1e429c6c13894e68540ba2df3",
       "src/qis/portfolio/stress/tests/portfolio_test.py": "0f197818f3f2f1520803a111a80e110cffbebdcf7ba0b5018d2cd451d430aa99",
       "src/qis/portfolio/stress/tests/presentation_test.py": "14a942f16d99faa828dd2a2ffa18002d32ef75de3a2efb79864a6e563afd866d",
@@ -10117,6 +10435,7 @@
       "src/qis/portfolio/stress/tests/report_grid_panel_limit_test.py": "7a748c4db44923cb36b6406fb665ad43fba8969ce76ddae8613673a9e50420b3",
       "src/qis/portfolio/stress/tests/reporting_test.py": "e03aa6666f5d61e0ea230c8679e59071020585b09e15565f1cb2f366b21aa867",
       "src/qis/portfolio/stress/tests/scenarios_test.py": "e6b35f19ae9c22ada190371c5da409b014c9adc6c8a7f8731bfc66cf67a960b4",
+      "src/qis/portfolio/stress/tests/statement_allocation_test.py": "7e56a0d674693aafaf35d4666a18a23452e7e17f9c7f659c376a1d115f64eede",
       "src/qis/portfolio/tests/attribution_reduction_test.py": "dd9d8707f62242ef50b777016d2a39d10a08bd0e7ab2e0e24d830a6c8f2f11fc",
       "src/qis/portfolio/tests/backtest_funding_timing_test.py": "dd73885965733f82e7a136879373398b751b291b01f91fd419c54138cb6a0975",
       "src/qis/portfolio/tests/backtester_initial_costs_test.py": "cb349c84fe98ba3219892f48383c2dca68259f8d8414d547a83a8dc061772923",
@@ -10128,6 +10447,7 @@
       "src/qis/portfolio/tests/brinson_inputs_test.py": "63e22b436feae0230b191545c6d41fd1f928f5c75be2a37f527f03e65c04ab53",
       "src/qis/portfolio/tests/brinson_wrapper_test.py": "259432c7513c9b9d2733aef642b0e17b474ef48073e4f18ec5010bd828f7431c",
       "src/qis/portfolio/tests/covar_implied_risk_asof_test.py": "624780842278d9827ae3e951be7b919f803f2ddef239b2a516ceb93cc4a827a5",
+      "src/qis/portfolio/tests/current_var_snapshot_test.py": "bd43ea5a3a95a864c95a0ccaf8f632a77ea0e18ffb49396cd97346c603a38153",
       "src/qis/portfolio/tests/instruments_pnl_net_test.py": "05fa6e287407cc3ec0c7431d87b93cd9da12d31d03f459b95d9d5211637eb294",
       "src/qis/portfolio/tests/legend_capacity_test.py": "53666e00ff9616993b6a792eb83c3e20d8ca85a44a042c21db0ed0c823dcdc7d",
       "src/qis/portfolio/tests/pnl_risk_euler_attribution_test.py": "a5b134d9d85f85f4ab251b37144e793b631a559eb1a50fab836c8b0b1fbdc659",
@@ -10139,12 +10459,12 @@
       "src/qis/portfolio/tests/tracking_error_report_test.py": "cc3e6ca2899f16a30841cc8de13932cba41a1a578b997ffdde923203eb8ffb73",
       "src/qis/regimes/__init__.py": "20aeaacfb87337096fc18e6721ba20e0efb6b1dd11ebe6152fa84608e6670deb",
       "src/qis/regimes/betas.py": "f28a9f643b67e318ad3daafcd54fa602204a9f6e6e39b3c815f4e39538cde6fb",
-      "src/qis/regimes/covariance.py": "7ac5a3e2991a20638236cc91936ee3d1e7ed6b6514cf30600b7a12dbe623c949",
-      "src/qis/regimes/ewma.py": "68d7e3fdfd1afc092e83a17e2a941acc2ffff13dedcf897ab6652279a7c753e8",
+      "src/qis/regimes/covariance.py": "aa0f698c2c8d581fb010cdba26227f5e274f57850947a25a32c9ace98faf759a",
+      "src/qis/regimes/ewma.py": "7f3acd6028d4ed61e5c9f2ff388835c62d47689f4594998c220f068deae74439",
       "src/qis/regimes/nulls.py": "bd6689d27ee542b871e84233795391a9547f3f30fc1fd3f166fea99074373382",
       "src/qis/regimes/partition.py": "5504c73c7dbf91492410d7d951270e9daf52b5e7c97f05759e5cea701d67519e",
       "src/qis/regimes/premium.py": "8af0ed1a9aeb4e0fad026f78806a13e45eac45417d33f1c9762bc173aee75f04",
-      "src/qis/regimes/tests/betas_moments_test.py": "f4bf7ad368eef93ae63926995c6425d03155f367d7f6ae938cb5fae6b62df86d",
+      "src/qis/regimes/tests/betas_moments_test.py": "1f813d514680af945e6be9a42b8fc42abf668d91ef16d287d3834e51488f78a9",
       "src/qis/regimes/tests/nulls_test.py": "2ff705d2e7cb33f890a2934636bf2eb6798d5749f42e5d599de4ec00d871626e",
       "src/qis/regimes/tests/premium_test.py": "b043ecdd1b82b16ddc52af07f86db1cc8fc3b7f3273fe31708e8be78d9776d78",
       "src/qis/regimes/tests/sample_covariance_test.py": "2131110a354312e3fcd82d4a01a747468487a6c655d165ecc679e30c2eeb3e3e",
@@ -10153,15 +10473,16 @@
       "src/qis/run_local/price_data_run.py": "f4d2809042991517aa6fa10998fb24cc4b989e1f1a6c7547bbe9fa615995bf3d",
       "src/qis/sql_engine.py": "3976594d378a5fadfa8680fdc8763b8cd0b12fc2507d03a522b331d08600bc5a",
       "src/qis/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "src/qis/tests/documentation_analytics_test.py": "40437b3fd6287eebfcc96c4a6564a81c2c08700c0104ce2e2a4a50130f940e41",
+      "src/qis/tests/documentation_analytics_test.py": "98447ea91ae93009b7c066756fa3511dee7525807806d0ef9448a32a866966ad",
       "src/qis/tests/documentation_bibliography_test.py": "35baf71a71c4585ecc2f7b375c35b2bcb0c4cf09bf9cb8a266d41b350fc6ef7f",
       "src/qis/tests/documentation_callouts_test.py": "a945845de31b78aef51adf59ac1e6c81207c566b6d78cbd72f018cd4ea8d2409",
       "src/qis/tests/documentation_coverage_test.py": "847af66de8dbb5e22c11df4b770a20804f1aa2b98fd1e1e850fd19333df3a4a8",
-      "src/qis/tests/documentation_examples_test.py": "2914f9e0a417c521f64119e87173479b1d2e40d548a6727d4b05f3094f267d7b",
-      "src/qis/tests/documentation_indexing_test.py": "572eadab5dc7a5486dc47b8fed02807e76202cd67bc90e3adce6d10600f0aa9f",
+      "src/qis/tests/documentation_examples_test.py": "c1502c5b9bf8e4133647d7822d0db2307603d536a4af9717b2cced00cb106c47",
+      "src/qis/tests/documentation_indexing_test.py": "eb279956e35f56a60e340172df8627014b83189e2a3280042dde56e324d10b11",
       "src/qis/tests/documentation_presets_test.py": "961fc2283139c787e87fdb94d575aba39a6db38f8a951126fb2ebb2e3298476a",
-      "src/qis/tests/documentation_standard_test.py": "6dad380740bbc85741c623ea70a27dd0357aacdd1d123b7920a299f0c3605e91",
-      "src/qis/tests/file_utils_test.py": "6acf1644b818d73c605dbae4b633b9b0f0eb7bdd2a1eed346bfb4979cdf3ae9d",
+      "src/qis/tests/documentation_standard_test.py": "0f2ecdba9fba58f5aefb454569d03cff629e1ae766b5134388dce1738378a169",
+      "src/qis/tests/example_regressions_test.py": "052099a13d98693549f96c11dab16e82b99b30855df4b9489128f8883d09a47a",
+      "src/qis/tests/file_utils_test.py": "a8a0bb5ae55fceb02b32e15ce91da67df9dd3f97015b1dbfff3aaa63bd5a6091",
       "src/qis/tests/module_layout_test.py": "63eb859ad528a50530034cd3e17b1afb40fdb8ed684fa5a390ec911a0971c7c9",
       "src/qis/tests/price_data_run_test.py": "78c63545cffac55e924dcd18523351d96475f9ce0469520082e332d318ca674b",
       "src/qis/tests/synthetic_data.py": "d4367f9b4a80d0a94514432baabdce63c5feb210a0239508233ba9bfcf1aef2a",
@@ -10169,7 +10490,7 @@
       "src/qis/tests/test_core_api.py": "82b8026070caba56a83749468606733702fda6b52fd3200282037589f4a132bc",
       "src/qis/tests/test_docstring_convention.py": "c5f6eb82dce7f00ca7a832b96c9c292e2385f8e6e053ca1883d53dcd60fab1cf",
       "src/qis/tests/test_documentation.py": "afa5e4d55883caf5bb6c8e0fec16465194fd408548ed50010d7d020155412035",
-      "src/qis/tests/test_examples.py": "c4792df863c5211192aa385fc7a40e7713b84bc7469df87596e000889b638480",
+      "src/qis/tests/test_examples.py": "7c253e993a9dd3e263541a1f2a486b4cf3f3eb527bc5d5818fb5a7371e2d79a8",
       "src/qis/tests/test_nav_sampling_contract.py": "1aa5a0fe3a99a0d885c4f6b827c0d4a6e8a23362ce0e565579f0430ad20b1798",
       "src/qis/tests/test_paper_audit.py": "58fc15f5203a47ac002133d1dd6b2dbbfa29401efc92578a1c46e05975c1fc54",
       "src/qis/tests/test_quickstart.py": "7226f714ec4877ee89ac92745fc249de65d6bc54ee62b122e8818a56a5ccf51d",
@@ -10232,16 +10553,17 @@
       "tools/docs_analytics/gallery.py": "7a414759db54f05051539d4fc0c70bfdf1665b6ade748d0239cd353527639c03",
       "tools/docs_analytics/handbook.py": "83561fe88eab4945eb6e654407d8f55d9a8b443d096ddc979c8875b9f3f6e386",
       "tools/docs_analytics/hedged_index_case_study.py": "e423b36025ec2ccf2c0d30184e6209c2f61d8f7d0b30c104d58a6ef0ca962f20",
-      "tools/docs_analytics/manifest.json": "c0ca9470c1adf124a168f62772d50c1678ba033dde3b30b8200f211028459771",
+      "tools/docs_analytics/manifest.json": "277e334f2f4128109ac18b78cb6206a7ab3fd399d3590d0871f1363baa2f7c7f",
       "tools/docs_analytics/model_layer.py": "bb1a6572320cb63135343c4f1d88b2c6777cdf9c353d9fa486d2e9b0e7e9ae47",
       "tools/docs_analytics/publish.py": "8925b7ece371eff423d8eb1a095d04b8da4485b1f15f28c429fe01fe7ff713ec",
-      "tools/docs_analytics/run.py": "89b31841ff6faa61ff8cfe503efa0fae10e1e9a39d08ca901fada47374de3197",
+      "tools/docs_analytics/readme.py": "de02e9bfdf1f955682075069bcb8426bf33466d27025f4433d870cdcbe161b9c",
+      "tools/docs_analytics/run.py": "16bf82930a4268e32aafb79d36c6eed7b23970b17134b01f8de76ca1d405d93e",
       "tools/docs_analytics/style.py": "94813ba0bd1672c112342d735855088f1be339c5543a3c41649fe8ff82747cac",
       "tools/docs_analytics/unhedged_index_case_study.py": "420f35698d842787982fffe9eddd5a6b5447a35b66bb90c11dce7c716bba6e69",
-      "uv.lock": "cf72c1b1797ad85ad70c2b47e2cdcee3a1c4183f26930096f0eee7f3aab4a2ae"
+      "uv.lock": "4a2fc57b5f0b910830652a3f4bf1b02805a6089323174f29d1946aadadfcf146"
     },
     "identity": "Effective source content, including dirty export files",
-    "sha256": "f65ef3cf07443b02ad7d53159912177834d35d5a65ab95c358091069e05a287f"
+    "sha256": "49ef0fc2e8ffc4da238e89517b0e7aea42972d56f0e7d7e5300698f3f917f037"
   },
   "status": "complete",
   "version_note": "dependencies.qis is installed distribution metadata; qis_source_version and the content fingerprint identify the imported source export"
