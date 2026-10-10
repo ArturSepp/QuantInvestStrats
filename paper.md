@@ -177,4 +177,9 @@ verified against primary documentation on 29 July 2026. The author reviewed, edi
 assisted output, wrote the economic argument in the statement of need, made the design
 decisions, and is responsible for the content.
 
+# Acknowledgements
+
+The author thanks John D. Reynolds for contributions to numerical correctness, performance,
+reporting, and regression test coverage in QIS.
+
 # References
