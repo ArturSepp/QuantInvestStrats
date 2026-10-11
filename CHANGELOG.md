@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Stabilized descriptive-table sample spread across extreme finite scales without intermediate
+  underflow or overflow, including finite results at binary64's upper boundary.
 - Render optional Plotly data-history charts with the supported timeline API,
   preserving history dates, grouped instrument rows and resource colours on Plotly 7.
 
