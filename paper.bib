@@ -186,59 +186,93 @@
 }
 
 % ---------------------------------------------------------------------------------------------
-% Core dependencies, cited as software (Zenodo concept DOI where the project provides one).
+% Core dependencies, using the publications recommended by the projects.
 
-@software{numpy,
-  author = {{The NumPy developers}},
-  title  = {{NumPy}},
-  year   = {2026},
-  url    = {https://numpy.org/}
+@article{numpy,
+  author = {Harris, Charles R. and Millman, K. Jarrod and van der Walt, Stéfan J.
+            and Gommers, Ralf and Virtanen, Pauli and Cournapeau, David and Wieser, Eric
+            and Taylor, Julian and Berg, Sebastian and Smith, Nathaniel J. and Kern, Robert
+            and Picus, Matti and Hoyer, Stephan and van Kerkwijk, Marten H. and Brett, Matthew
+            and Haldane, Allan and Fernández del Río, Jaime and Wiebe, Mark and Peterson, Pearu
+            and Gérard-Marchant, Pierre and Sheppard, Kevin and Reddy, Tyler and Weckesser, Warren
+            and Abbasi, Hameer and Gohlke, Christoph and Oliphant, Travis E.},
+  title   = {Array programming with {NumPy}},
+  journal = {Nature},
+  year    = {2020},
+  volume  = {585},
+  number  = {7825},
+  pages   = {357--362},
+  doi     = {10.1038/s41586-020-2649-2}
 }
 
-@software{scipy,
-  author = {{The SciPy developers}},
-  title  = {{SciPy}},
-  year   = {2026},
-  url    = {https://scipy.org/},
-  doi    = {10.5281/zenodo.595738}
+@article{scipy,
+  author = {Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and Haberland, Matt
+            and Reddy, Tyler and Cournapeau, David and Burovski, Evgeni and Peterson, Pearu
+            and Weckesser, Warren and Bright, Jonathan and van der Walt, Stéfan J.
+            and Brett, Matthew and Wilson, Joshua and Millman, K. Jarrod and Mayorov, Nikolay
+            and Nelson, Andrew R. J. and Jones, Eric and Kern, Robert and Larson, Eric
+            and Carey, C J and Polat, İlhan and Feng, Yu and Moore, Eric W. and VanderPlas, Jake
+            and Laxalde, Denis and Perktold, Josef and Cimrman, Robert and Henriksen, Ian
+            and Quintero, E. A. and Harris, Charles R. and Archibald, Anne M.
+            and Ribeiro, Antônio H. and Pedregosa, Fabian and van Mulbregt, Paul
+            and {SciPy 1.0 Contributors}},
+  title   = {{SciPy} 1.0: Fundamental algorithms for scientific computing in {Python}},
+  journal = {Nature Methods},
+  year    = {2020},
+  volume  = {17},
+  number  = {3},
+  pages   = {261--272},
+  doi     = {10.1038/s41592-019-0686-2}
 }
 
-@software{pandas,
-  author = {{The pandas development team}},
-  title  = {{pandas}},
-  year   = {2026},
-  url    = {https://pandas.pydata.org/},
-  doi    = {10.5281/zenodo.3509134}
+@inproceedings{pandas,
+  author    = {McKinney, Wes},
+  title     = {Data structures for statistical computing in {Python}},
+  booktitle = {Proceedings of the 9th {Python} in Science Conference},
+  editor    = {van der Walt, Stéfan and Millman, Jarrod},
+  year      = {2010},
+  pages     = {56--61},
+  doi       = {10.25080/Majora-92bf1922-00a}
 }
 
-@software{statsmodels,
-  author = {{The statsmodels developers}},
-  title  = {{statsmodels}},
-  year   = {2024},
-  url    = {https://www.statsmodels.org/},
-  doi    = {10.5281/zenodo.593847}
+@inproceedings{statsmodels,
+  author    = {Seabold, Skipper and Perktold, Josef},
+  title     = {{statsmodels}: Econometric and statistical modeling with {Python}},
+  booktitle = {Proceedings of the 9th {Python} in Science Conference},
+  editor    = {van der Walt, Stéfan and Millman, Jarrod},
+  year      = {2010},
+  pages     = {92--96},
+  doi       = {10.25080/Majora-92bf1922-011}
 }
 
-@software{matplotlib,
-  author = {{The Matplotlib Development Team}},
-  title  = {{Matplotlib}: Visualization with {Python}},
-  year   = {2026},
-  url    = {https://matplotlib.org/},
-  doi    = {10.5281/zenodo.592536}
+@article{matplotlib,
+  author  = {Hunter, John D.},
+  title   = {{Matplotlib}: A {2D} graphics environment},
+  journal = {Computing in Science \& Engineering},
+  year    = {2007},
+  volume  = {9},
+  number  = {3},
+  pages   = {90--95},
+  doi     = {10.1109/MCSE.2007.55}
 }
 
-@software{seaborn,
-  author = {{The seaborn developers}},
-  title  = {{seaborn}},
-  year   = {2023},
-  url    = {https://seaborn.pydata.org/},
-  doi    = {10.5281/zenodo.592845}
+@article{seaborn,
+  author  = {Waskom, Michael L.},
+  title   = {{seaborn}: Statistical data visualization},
+  journal = {Journal of Open Source Software},
+  year    = {2021},
+  volume  = {6},
+  number  = {60},
+  pages   = {3021},
+  doi     = {10.21105/joss.03021}
 }
 
-@software{numba,
-  author = {{The Numba developers}},
-  title  = {{Numba}},
-  year   = {2026},
-  url    = {https://numba.pydata.org/},
-  doi    = {10.5281/zenodo.4343230}
+@inproceedings{numba,
+  author    = {Lam, Siu Kwan and Pitrou, Antoine and Seibert, Stanley},
+  title     = {{Numba}: A {LLVM}-based {Python} {JIT} compiler},
+  booktitle = {Proceedings of the Second Workshop on the {LLVM} Compiler Infrastructure in {HPC}},
+  publisher = {Association for Computing Machinery},
+  year      = {2015},
+  pages     = {1--6},
+  doi       = {10.1145/2833157.2833162}
 }
