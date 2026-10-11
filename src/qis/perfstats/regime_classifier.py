@@ -329,8 +329,9 @@ class RegimeClassifier(ABC):
 
         Examples:
             >>> classifier = BenchmarkReturnsQuantilesRegime(freq='QE', q=4)
-            >>> classifier.to_dict()
-            {'freq': 'QE', 'return_type': <ReturnTypes.RELATIVE: ...>, 'q': 4, ...}
+            >>> params = classifier.to_dict()
+            >>> params['freq'], params['return_type'].value, params['q']
+            ('QE', 'Relative', 4)
         """
         params = {}
         for key, value in self.__dict__.items():

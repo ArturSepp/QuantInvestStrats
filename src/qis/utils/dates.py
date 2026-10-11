@@ -1015,9 +1015,9 @@ def find_upto_date_from_datetime_index(index: Union[pd.DatetimeIndex, List[pd.Ti
     Example:
         >>> index = pd.date_range('2023-01-01', periods=5, freq='D')
         >>> find_upto_date_from_datetime_index(index, pd.Timestamp('2023-01-03'))
-        Timestamp('2023-01-03 00:00:00', freq='D')
+        Timestamp('2023-01-03 00:00:00')
         >>> find_upto_date_from_datetime_index(index, pd.Timestamp('2023-01-02 12:00'))
-        Timestamp('2023-01-02 00:00:00', freq='D')
+        Timestamp('2023-01-02 00:00:00')
     """
     # Search and return from one ordered view so the insertion position addresses the same data.
     ordered_index = cast(

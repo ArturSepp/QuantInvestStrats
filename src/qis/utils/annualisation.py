@@ -56,7 +56,7 @@ def get_annualization_factor(freq: str,
         >>> get_annualization_factor('D', is_calendar=True)
         365.0
         >>> get_annualization_factor('B')
-        252.0
+        252
         >>> get_annualization_factor('W-FRI')
         52.0
         >>> get_annualization_factor('2W')
@@ -253,7 +253,7 @@ def get_annualisation_conversion_factor(from_freq: str, to_freq: str) -> float:
         >>> get_annualisation_conversion_factor('ME', 'QE')  # Monthly to Quarterly
         3.0
         >>> get_annualisation_conversion_factor('B', 'ME')  # Business Daily to Monthly
-        21.666666666666668
+        21.0
     """
     from_periods = get_annualization_factor(from_freq)
     to_periods = get_annualization_factor(to_freq)
