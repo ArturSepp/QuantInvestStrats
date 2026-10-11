@@ -66,7 +66,8 @@ jobs:
   test-extras:
     name: pytest (data + io extras)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Coverage adds overhead to the full suite; a 30-minute run reached 95% before timing out.
+    timeout-minutes: 45
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,7 +83,9 @@ jobs:
     - name: Run tests with coverage
       # [tool.coverage.report] owns the regression floor; the report remains broad because plots
       # and factsheets are core qis functionality rather than disposable presentation wrappers.
-      run: uv run --no-sync pytest --cov=qis --cov-report=term:skip-covered
+      run: >-
+        uv run --no-sync pytest --cov=qis --cov-report=term:skip-covered
+        --durations=20 -o faulthandler_timeout=300
 
   wheel:
     # Editable installs exercise the src tree, not the artifact users receive. Build and install
