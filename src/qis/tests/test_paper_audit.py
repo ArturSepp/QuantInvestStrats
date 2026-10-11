@@ -53,6 +53,7 @@ pytestmark = pytest.mark.skipif(
 # integers of three digits or more that appear in paper.md and are not measurements of this
 # repository. Each needs a reason: the list is what keeps check 3 from becoming a rubber stamp.
 NON_METRIC_NUMBERS: Dict[str, str] = {
+    '007': 'part of the GitHub username luna-007, cited for external reuse',
     '250': 'the sample length in the bootstrap example',
     '400': 'the number of draws in the bootstrap example',
     '260': 'periods per year used to annualise the bootstrap bias',
@@ -60,6 +61,7 @@ NON_METRIC_NUMBERS: Dict[str, str] = {
     '2023': 'a cited publication year',
     '2025': 'a cited publication year',
     '2026': 'the year of writing and of cited publications',
+    '2027': 'the confirmed year of a forthcoming cited publication',
     '1994': 'Politis and Romano, cited for the stationary bootstrap',
     '310': 'the python floor written as 3.10 without its separator',
     '314': 'the python ceiling written as 3.14 without its separator',
@@ -197,6 +199,9 @@ def test_paper_quotes_no_unrecorded_measurement() -> None:
     body = _paper_body(PAPER_PATH.read_text(encoding='utf-8'))
     # a bibliography key such as sepp2026robust is not a number the paper quotes
     body = re.sub(r'@\w+', '', body)
+    # Source URLs contain commit hashes and identifiers, not quoted measurements.
+    # Keep link labels in the body so a measurement in a label is still checked.
+    body = re.sub(r'https?://[^\s)>]+', '', body)
     unrecorded = sorted({found for found in LARGE_NUMBER.findall(body)
                          if found not in recorded_values and found not in NON_METRIC_NUMBERS})
     assert not unrecorded, (
