@@ -33,7 +33,8 @@ conventions. Signal generation and portfolio construction remain with the caller
 
 `qis` is the base layer of a stack of quantitative finance packages — `optimalportfolios`,
 `trendfollowing` and `privateassets`, all three public. Each capability is written once and reused
-across that stack. It requires only the scientific Python stack, runs on Python 3.10 to 3.14, and is
+across that stack. It requires only the scientific Python stack [@numpy; @scipy; @pandas;
+@statsmodels; @matplotlib; @seaborn], runs on Python 3.10 to 3.14, and is
 released under the MIT licence.
 
 # Statement of need
@@ -113,8 +114,8 @@ We organise the package into 14 capability groups, which `src/qis/api.py` names.
 The backtester is 441 lines. It converts target weights to units at each rebalancing, holds those
 units until the next one, applies costs, and returns the result. Holding units preserves natural
 weight drift; multiplying every period's returns by unchanged target weights would instead
-assume repeated rebalancing. This path dependence motivates a date-sequential `numba` kernel,
-while array-based analytics operate on its outputs. The weights-and-prices boundary suits
+assume repeated rebalancing. This path dependence motivates a date-sequential `numba` kernel
+[@numba], while array-based analytics operate on its outputs. The weights-and-prices boundary suits
 portfolio research; order-book events and signal generation remain outside this engine.
 
 The public interface is `qis.__all__`, which holds 474 names; `src/qis/api.py` records that list as a
