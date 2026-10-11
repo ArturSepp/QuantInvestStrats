@@ -1,7 +1,10 @@
 """
-local_path uses setting.yaml to return absolute path for file/folder paths
-use:
-git update-index --skip-worktree src/qis/settings.yaml
+local_path reads file and folder paths from settings.yaml.
+
+The distributed settings.yaml is a placeholder template. Keep private configuration
+outside the release source tree; Git ignore rules and index flags do not prevent
+local files from entering a distribution. Builds reject modified package settings.
+For file_utils readers and writers, pass an explicit local_path for machine data.
 
 example usage:
 import local_path as lp

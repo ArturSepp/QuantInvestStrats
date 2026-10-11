@@ -13,6 +13,10 @@ the index via ``infer_annualisation_factor_from_df``, reporting ``STD_AN`` rathe
 ``is_add_tstat`` reports the signed sample mean divided by its standard error, independently of
 whether the volatility column is annualised. Risk-adjusted statistics are ``perf_stats.py``.
 """
+import sys
+from decimal import Decimal, localcontext
+from fractions import Fraction
+
 # packages
 import numpy as np
 import pandas as pd
@@ -129,6 +133,79 @@ def _translate_finite_columns(data: np.ndarray) -> np.ndarray:
     return data - origins
 
 
+def _compute_upper_range_std(observed: np.ndarray) -> float:
+    """Resolve upper-range sample spread without rounded overflow classification.
+
+    Args:
+        observed: At least two finite observations with extreme sample spread.
+
+    Returns:
+        Sample standard deviation, or infinity if its exact variance exceeds binary64's
+        maximum finite value squared.
+    """
+    # Binary64 observations are exact rationals. Compare variance before taking a square root,
+    # so rounding in the normalized reduction cannot decide whether the result is finite.
+    values = [Fraction.from_float(float(value)) for value in observed]
+    count = len(values)
+    total = sum(values)
+    variance = (sum(value * value for value in values) - total * total / count) / (count - 1)
+    if variance > Fraction.from_float(sys.float_info.max) ** 2:
+        return np.inf
+    with localcontext() as context:
+        # More than binary64's 17 significant decimal digits, independent of ambient precision.
+        context.prec = 80
+        return float((Decimal(variance.numerator) / Decimal(variance.denominator)).sqrt())
+
+
+def _compute_sample_std(data: np.ndarray) -> np.ndarray:
+    """Compute column-wise sample spread without intermediate scale failure.
+
+    Args:
+        data: Two-dimensional finite or missing numerical observations.
+
+    Returns:
+        Sample standard deviation with ``ddof=1`` for each eligible column, or NaN when fewer
+        than two observations are available.
+    """
+    sample_stds = np.full(data.shape[1], np.nan, dtype=float)
+    minimum_safe_scale = np.sqrt(np.finfo(float).tiny)
+    for column_position in range(data.shape[1]):
+        observed = data[:, column_position]
+        observed = observed[np.logical_not(np.isnan(observed))]
+        if observed.size < 2:
+            continue
+
+        # Retain the accepted translated reduction unless its intermediate scale is unsafe.
+        with np.errstate(over="ignore"):
+            translated = observed - np.min(observed)
+        if np.all(np.isfinite(translated)):
+            scale = np.max(translated)
+            if scale == 0.0:
+                sample_stds[column_position] = 0.0
+                continue
+            maximum_safe_scale = np.sqrt(sys.float_info.max / observed.size)
+            if minimum_safe_scale <= scale <= maximum_safe_scale:
+                sample_stds[column_position] = np.std(translated, ddof=1)
+                continue
+            # Tiny normalized components may round to zero without affecting the spread.
+            with np.errstate(under="ignore"):
+                normalized = translated / scale
+        else:
+            # Scale wide signed levels before translating so their finite range cannot overflow.
+            scale = np.max(np.abs(observed))
+            with np.errstate(under="ignore"):
+                normalized = observed / scale
+            normalized = normalized - np.min(normalized)
+
+        with np.errstate(over="ignore", under="ignore"):
+            sample_std = scale * np.std(normalized, ddof=1)
+        # Only extreme spreads need the exact fallback; retain the existing ordinary reduction.
+        if sample_std >= sys.float_info.max / 2.0:
+            sample_std = _compute_upper_range_std(observed)
+        sample_stds[column_position] = sample_std
+    return sample_stds
+
+
 def _reduce_standardized_moment(
         data: np.ndarray,
         reduction: Callable[[np.ndarray], np.ndarray],
@@ -227,8 +304,11 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     the normality p-value requires 20 observations.
     Finite samples are translated before sample standard deviation and standardized moments are
     evaluated, preserving their translation-invariant results when the spread is very small
-    relative to the level. Annualized volatility and the optional t-statistic use that stabilized
-    sample spread without changing the sample mean.
+    relative to the level. Extreme sample spread is additionally scale-normalized so finite
+    periodic results do not become zero, infinity, or missing through intermediate arithmetic.
+    Annualized volatility and the optional t-statistic use that stabilized sample spread without
+    changing the sample mean. A computed spread is infinite only when the periodic or annualized
+    result itself exceeds the finite binary64 range.
     Positive probabilities divide positive returns by non-missing observations in each column;
     zero returns are observed and non-positive.
 
@@ -277,17 +357,16 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
     observation_counts = np.sum(np.logical_not(np.isnan(data_np)), axis=0)
     # Skip all-missing dated columns so undefined base statistics remain NaN without warnings.
     mean = _reduce_observed(data_np, lambda values: np.nanmean(values, axis=0))
-    # Sample spread is translation invariant; zero-base finite columns to avoid cancellation.
-    std = _reduce_observed(
-        data_np,
-        lambda values: np.nanstd(_translate_finite_columns(values), ddof=1, axis=0),
-        minimum_observations=2)
+    # Guard both relative-offset cancellation and extreme-scale intermediate arithmetic.
+    std = _compute_sample_std(data_np)
 
     descriptive_table[PerfStat.AVG.to_str()] = [var_format.format(x) for x in mean]
 
     if annualize_vol:
         an_factor = infer_annualisation_factor_from_df(data=df)
-        vol = std * np.sqrt(an_factor)
+        # A finite periodic spread can have an unrepresentable annualized display value.
+        with np.errstate(over="ignore"):
+            vol = std * np.sqrt(an_factor)
         volatility_column = PerfStat.STD_AN.value.name
     else:
         an_factor = 1.0
@@ -303,7 +382,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             sample_std=std,
             observation_counts=observation_counts,
         )
-        descriptive_table[PerfStat.T_STAT.to_str()] = [norm_variable_display_type.format(x) for x in tstats]
+        descriptive_table[PerfStat.T_STAT.to_str()] = [
+            norm_variable_display_type.format(x) for x in tstats]
 
     nan_policy = 'omit'  # skip nans
     if desc_table_type == DescTableType.NONE:
@@ -319,11 +399,13 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             [PerfStat.AVG.value.name, volatility_column], axis=1)
 
         prob = _compute_positive_probability(data=data_np)
-        descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
+        descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = [
+            '{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_POSITIVE_PROB:
         prob = _compute_positive_probability(data=data_np)
-        descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
+        descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = [
+            '{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_KURTOSIS:
         # Evaluate moments only for eligible varying columns so undefined samples do not warn.

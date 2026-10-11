@@ -19,7 +19,8 @@ prune src/qis/*/*/run_local
 recursive-include src/qis/data *.csv
 recursive-include src/qis/templates *.html
 recursive-include src/qis/static *.css *.js
-recursive-include src/qis *.yml *.yaml *.json *.txt *.md
+recursive-include src/qis *.json *.txt *.md
+include src/qis/settings.yaml
 
 # Explicitly exclude figures, notebooks, and image files
 recursive-exclude examples/figures *
@@ -41,3 +42,7 @@ recursive-exclude * .git*
 recursive-exclude * *.egg-info
 global-exclude *.pyc
 global-exclude *.pyo
+
+# Required when a wheel is built from the sdist: the build and publication paths
+# share one configuration validator. Do not include other repository tooling.
+include .github/scripts/release_guard.py

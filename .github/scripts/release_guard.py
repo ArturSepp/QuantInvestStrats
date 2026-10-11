@@ -16,13 +16,27 @@ import re
 import shutil
 import subprocess
 import tarfile
-import tomllib
 import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
 
 TAG_RE = re.compile(r"v(\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?)")
+# Hash of the reviewed placeholder template, with LF line endings. Changing the
+# distributed configuration requires an explicit review and a new digest here.
+SETTINGS_SHA256 = "3156a129a72c42853f6c0dcaadb44f441d16033a3b905085e108b12a96803aa9"
+
+
+def validate_package_configuration(files: list[tuple[str, bytes]]) -> None:
+    """Allow only the reviewed YAML template; never include values in diagnostics."""
+    if len(files) != 1 or files[0][0] != "settings.yaml":
+        raise ValueError("Package configuration must contain only one settings.yaml template")
+    content = files[0][1].replace(b"\r\n", b"\n")
+    if hashlib.sha256(content).hexdigest() != SETTINGS_SHA256:
+        raise ValueError(
+            "Package configuration differs from the reviewed placeholder template; "
+            "restore src/qis/settings.yaml before building or publishing"
+        )
 
 
 def version_from_tag(tag: str) -> str:
@@ -63,6 +77,10 @@ def cff_scalar(source: str, key: str) -> str:
 
 def validate_metadata(root: Path, tag: str) -> dict:
     """Validate source release identity and the recorded intended release date."""
+    # Publication runs on Python 3.12. The configuration build guard is also
+    # imported on supported Python 3.10, which has no stdlib tomllib.
+    import tomllib
+
     version = version_from_tag(tag)
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     if project["version"] != version:
@@ -126,6 +144,13 @@ def inspect_artifacts(dist: Path, project: dict, import_name: str) -> dict[str, 
         wheel_metadata = wheel.read(metadata_names[0]).decode("utf-8")
         wheel_paths = set(wheel.namelist())
         wheel_metadata_root = metadata_names[0].rsplit("/", 1)[0]
+        if import_name == "qis":
+            validate_package_configuration([
+                (info.filename.removeprefix("qis/"), wheel.read(info))
+                for info in wheel.infolist()
+                if info.filename.startswith("qis/")
+                and PurePosixPath(info.filename).suffix.lower() in {".yaml", ".yml"}
+            ])
     with tarfile.open(sdists[0], "r:gz") as archive:
         candidates = [
             m
@@ -137,6 +162,20 @@ def inspect_artifacts(dist: Path, project: dict, import_name: str) -> dict[str, 
         sdist_metadata = archive.extractfile(candidates[0]).read().decode("utf-8")
         sdist_paths = set(archive.getnames())
         sdist_root = candidates[0].name.split("/", 1)[0]
+        if import_name == "qis":
+            prefix = f"{sdist_root}/src/qis/"
+            settings = []
+            for member in archive.getmembers():
+                if (
+                    member.name.startswith(prefix)
+                    and PurePosixPath(member.name).suffix.lower() in {".yaml", ".yml"}
+                ):
+                    if not member.isfile():
+                        raise ValueError("Package configuration must be a regular file")
+                    settings.append((
+                        member.name.removeprefix(prefix), archive.extractfile(member).read()
+                    ))
+            validate_package_configuration(settings)
     source_paths = {name.removeprefix(sdist_root + "/") for name in sdist_paths}
     if f"src/{import_name}/__init__.py" not in source_paths:
         raise ValueError("Sdist lacks the expected source package")
