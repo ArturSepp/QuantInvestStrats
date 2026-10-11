@@ -30,16 +30,21 @@ histories, performance attribution, risk analysis, and reproducible reports.
 **Backtesting of externally computed weights.** `generate_static_weights_schedule()` can create
 live-universe-aware target schedules from desired allocations. `backtest_model_portfolio()` then
 consumes the prices and supplied weights, holds units between rebalancings, and applies explicit
-transaction costs. The backtester does not generate a strategy's target schedule.
+transaction costs. The backtester does not generate a strategy's target schedule. See the
+[worked backtesting example](docs/portfolio_backtesting.md#worked-example) and
+[offline allocation workflow](docs/quickstart.md#complete-checked-workflow).
 
 **Factsheet reporting.** Four report archetypes — multi-asset, strategy, strategy versus
 benchmark, and multi-strategy parameter sweeps — produce reproducible multi-page factsheets, with
-optional PyBloqs HTML/PDF rendering.
+optional PyBloqs HTML/PDF rendering. See the [factsheet gallery](docs/gallery.md) and
+[offline reporting quickstart](docs/factsheets.md#quick-start).
 
 **Consolidated risk and tracking-error layer.** The point-in-time `qis.RiskModel` covers ex-ante
 tracking error, factor exposures, benchmark beta, Euler risk contributions, and fractional,
 overlapping, or signed loading matrices. Ex-post analytics cover realised EWMA tracking error,
-whole-sample TE/IR, and EWMA beta/alpha. The same conventions serve the wider package stack.
+whole-sample TE/IR, and EWMA beta/alpha. The same conventions serve the wider package stack. See
+the [worked tracking-error example](docs/tracking_error_and_risk.md#worked-example) and
+[offline ex-ante and ex-post workflows](docs/tracking_error_and_risk.md#implementation-in-qis).
 
 **Instrument-aware stress reports.** `qis.portfolio.stress` combines funded holdings, signed
 intrinsic calls/puts, futures and custom payoffs under an assigned `RiskModel`. It preserves
@@ -50,7 +55,9 @@ months and exports the standard report with additive Euler risk tables. See the
 **Documentation checked against the code.** The core dependency list is checked against
 `pyproject.toml`; README Python blocks are parsed for unresolved names; repository examples are
 checked for public symbols and introspectable keyword arguments; and examples without a data
-vendor are run. Network-backed examples remain subject to their providers.
+vendor are run. Network-backed examples remain subject to their providers. See the
+[quickstart's checked results](docs/quickstart.md#what-the-result-establishes) and
+[contributor validation commands](CONTRIBUTING.md#development-setup).
 
 ## When to use it — and when not
 
@@ -218,9 +225,15 @@ Bloomberg access is supplied by the separately installed
 Contributor tests and linting use locked PEP 735 groups rather than a `dev` extra:
 
 ```bash
-uv sync --group test --locked
+uv sync --python 3.12 --group test --locked
 uv run --no-sync pytest
 ```
+
+This core setup is sufficient for the offline quickstart and core tests. `--all-extras` also
+installs the optional PostgreSQL driver, whose source build requires `pg_config` and native
+libraries. See the [installation guide](docs/install.md#postgresql-and-all-extras-installation-on-macos)
+for macOS setup, or select only the extras your workflow needs. The explicit Python version
+avoids accidentally using a different interpreter; other supported versions can be selected.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the CI-equivalent lint, documentation, and wheel
 commands.
@@ -292,16 +305,24 @@ From the repository root, run `python -m examples.portfolios.account_equity_stre
 See the [portfolio stress guide](docs/portfolio_stress.md#run-the-offline-account-example)
 for the input contract and independent accounting checks.
 
+All eight previews below are generated from the current QIS report APIs using fixed synthetic
+data for 2018–2025. Selected panels keep the README readable; the linked scripts generate full
+reports. The volatility-parity portfolios rebalance monthly, implement targets one
+business day later and pay 10 bp per unit traded. See the [offline figure producer](tools/docs_analytics/readme.py)
+and [generation record](docs/images/analytics_manifest.json) for exact inputs and source hashes.
+The linked Yahoo scripts demonstrate the same APIs on observed data; their numbers will differ.
+
 ### 1. Visualisation of price data <a name="price"></a>
 
 This is an optional network-backed plotting example. For the core-install first-success path, use
 the offline quickstart above.
 
 The script is located at [`examples/perfstats/quickstart.py`](examples/perfstats/quickstart.py).
-Run `python -m examples.perfstats.quickstart` from the repository root to produce the figures
-below; `perf1` to `perf3` are excluded from the repository by `.gitignore` on size, so only the
-last is embedded here.
+Run `python -m examples.perfstats.quickstart` from the repository root for the Yahoo-data plots.
+The embedded preview uses the same table API on the fixed synthetic universe, with a constant
+3% annual cash-rate input, monthly risk statistics and quarterly excess-return regression.
 
+<!-- docs-test: skip -->
 ```python
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -318,6 +339,7 @@ with sns.axes_style("darkgrid"):
     fig, ax = plt.subplots(1, 1, figsize=(10, 7))
     qis.plot_prices(prices=prices, x_date_freq='YE', ax=ax)
 ```
+<!-- docs-test: skip -->
 ```python
 # 2-axis plot with drawdowns using sns styles
 with sns.axes_style("darkgrid"):
@@ -325,6 +347,7 @@ with sns.axes_style("darkgrid"):
     qis.plot_prices_with_dd(prices=prices, x_date_freq='YE', axs=axs)
 ```
 
+<!-- docs-test: skip -->
 ```python
 # plot risk-adjusted performance table with excess Sharpe ratio
 ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
@@ -343,6 +366,7 @@ fig = qis.plot_ra_perf_table(prices=prices,
 
 
 
+<!-- docs-test: skip -->
 ```python
 # add benchmark regression using excess returns for linear beta
 # regression frequency is specified using perf_params.freq_reg
@@ -358,7 +382,7 @@ fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
                                           title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')} benchmarked with SPY",
                                           perf_params=perf_params)
 ```
-![Performance statistics and benchmark regression for a multi-asset price history](examples/figures/perf4.PNG)
+![Current performance statistics and benchmark regression on the synthetic universe](docs/images/readme_performance_table.png)
 
 
 
@@ -369,7 +393,7 @@ of cross-sectional comparison
 
 Run [`examples/factsheets/multi_assets.py`](examples/factsheets/multi_assets.py).
 
-![Multi-asset factsheet comparing returns, drawdowns, and risk statistics](examples/figures/multiassets.PNG)
+![Current multi-asset factsheet comparing synthetic returns, drawdowns and risk statistics](docs/images/readme_multi_asset.png)
 
 
 ### 3. Strategy factsheet <a name="strategy"></a>
@@ -379,9 +403,15 @@ for either backtested or actual strategy
 
 Run [`examples/factsheets/strategy.py`](examples/factsheets/strategy.py).
 
-![Strategy factsheet with cumulative performance and drawdowns](examples/figures/strategy1.PNG)
-![Volatility-parity strategy: 99% value-at-risk, risk attribution, and rolling beta](examples/figures/strategy2.PNG)
-![Volatility-parity strategy: current positions, rebalancing changes, turnover, and costs](examples/figures/strategy3.PNG)
+The portfolio targets use a 63-observation volatility estimator; the risk appendix labels
+the sampling grid and window of each risk measure.
+The final preview composes current target weights, target changes, turnover and realised costs
+using `PortfolioData` plotting methods. Report statistics use the monthly preset; portfolio
+NAVs include trading costs and Sharpe statistics have no cash-rate adjustment.
+
+![Current strategy factsheet with synthetic cumulative performance and drawdowns](docs/images/readme_strategy.png)
+![Current volatility-parity risk appendix: 99% value-at-risk, attribution and rolling beta](docs/images/readme_strategy_risk.png)
+![Current volatility-parity targets, target changes, turnover and realised trading costs](docs/images/readme_strategy_positions.png)
 
 ### 4. Strategy benchmark factsheet <a name="strategybenchmark"></a>
 This report is adapted for reporting performance and marginal comparison
@@ -390,10 +420,16 @@ This report is adapted for reporting performance and marginal comparison
 
 Run [`examples/factsheets/strategy_benchmark.py`](examples/factsheets/strategy_benchmark.py).
 
-![Volatility-parity portfolio compared with an equal-weight benchmark](examples/figures/strategy_benchmark.PNG)
+![Current volatility-parity portfolio compared with an equal-weight synthetic benchmark](docs/images/readme_strategy_benchmark.png)
 
-Brinson-Fachler performance attribution (https://en.wikipedia.org/wiki/Performance_attribution)
-![Brinson attribution of allocation and selection effects](examples/figures/brinson_attribution.PNG)
+[Brinson–Hood–Beebower attribution](docs/brinson_attribution.md) uses native-period effects
+linked with Frongello's method. Interaction is folded entirely into selection, with no separate
+interaction panel. Background colours show benchmark return regimes. This attribution is gross
+of realised trading costs; the comparison NAVs above are net of those costs.
+Average weights include a Cash row for the initial uninvested period and subsequent cost
+funding, so the unrounded weights sum to 100%. Cash earns no interest in this example.
+
+![Current Brinson allocation and selection effects with benchmark-regime background colours](docs/images/readme_brinson.png)
 
 
 ### 5. Multi strategy factsheet <a name="multistrategy"></a>
@@ -402,7 +438,9 @@ backtested strategy to a parameter or set of parameters:
 
 Run [`examples/factsheets/multi_strategy.py`](examples/factsheets/multi_strategy.py).
 
-![Multi-strategy factsheet comparing performance and risk](examples/figures/multi_strategy.PNG)
+The preview compares 21-, 63- and 126-observation volatility estimators on the same inputs.
+
+![Current multi-strategy factsheet comparing three volatility-estimation spans](docs/images/readme_multi_strategy.png)
 
 
 ### 6. Runnable examples <a name="runnable-examples"></a>

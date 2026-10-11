@@ -14,7 +14,7 @@ authors:
 affiliations:
   - name: LGT Bank (Schweiz) AG, Zürich, Switzerland
     index: 1
-date: 28 July 2026
+date: 11 October 2026
 bibliography: paper.bib
 ---
 
@@ -27,11 +27,9 @@ addition to the backtesting engine, `qis` provides strategy and reporting buildi
 exponentially weighted covariance, block bootstrap resampling, risk measures,
 regime-conditional statistics, currency hedging, and return unsmoothing.
 
-We designed `qis` around one assumption: a strategy is a rule for producing weights, and, for the
-simulation and reporting workflows `qis` targets, everything downstream of those weights is
-reconstruction rather than research. The researcher develops the signal and the portfolio
-construction — the things that actually matter for a successful investment process;
-the rest belongs to the library.
+We designed `qis` around a separation of responsibilities: the researcher supplies target
+weights, while the library reconstructs holdings and applies explicit accounting and reporting
+conventions. Signal generation and portfolio construction remain with the caller.
 
 `qis` is the base layer of a stack of quantitative finance packages — `optimalportfolios`,
 `trendfollowing` and `privateassets`, all three public. Each capability is written once and reused
@@ -51,16 +49,14 @@ number. The return convention is an argument rather than an assumption, three Sh
 reporting frequency appears on every rendered panel. The simulation holds units between
 rebalancings, so the realised weights drift with prices, which is what a portfolio does.
 
-The cost of leaving a convention unstated is measurable rather than notional. The stationary
-bootstrap resamples a series in blocks, and a block drawn near the end of the sample either wraps
-around to the start or stops there. Both forms run, and neither reports which it used. Under the
-truncating form the first observation of a 250-period sample is drawn at 0.11 times its uniform
-weight and the first decile at 0.53 times, because a block can only run forwards. On a series
-whose drift rises through the sample, that uneven draw reports a mean return 2.15% per year above
-the source, while the wrapping form reports it within 0.32%. Two researchers running a stationary
-bootstrap on the same data would publish annual returns more than two percentage points apart,
-and nothing in either output would explain the gap. The example producing these numbers ships
-with the package, and its values are pinned by the test suite.
+The stationary bootstrap illustrates why conventions need verification. Before version 5.1.0,
+`qis` truncated blocks at the sample boundary. Since 26 July 2026 it uses circular wrapping,
+as in @politis1994. In the package's fixed synthetic example, truncation draws the first
+observation of a 250-period sample at 0.11 times its uniform weight and the first decile at
+0.53 times. With drift rising through the sample, the resampled mean exceeds the source mean
+by 2.15% per year; circular wrapping reproduces the source mean within 0.32%. These are sample-specific
+results, reproduced by the example and pinned by regression tests. Results generated under
+the earlier convention therefore require the earlier software version to reproduce.
 
 A backtest needs two inputs: a strategy generator produces weights, and a price panel aligned to
 those weights supplies everything else. When each consumer of a result rebuilds the reported
@@ -72,69 +68,65 @@ strategy profiling: a bumped strategy against its base, and several building blo
 strategy side by side. All three reports are rendered by one reporting layer rather than a figure
 written per comparison.
 
-The same discipline answers a second need. A research group accumulates analytics faster than it
-consolidates them, and the same method is written again in each project. In our own repositories
-we found four independent block bootstrap implementations and two return unsmoothers, all
-reimplementing code `qis` already exported. They had diverged, so the same nominal method
-produced different numbers in different papers.
-
-The argument extends to agentic AI tools: a researcher who directs one at `qis` for simulation and
-reporting, rather than letting it write those steps, holds the conventions fixed across sessions
-instead of having each session reimplement them and reproduce the divergence above.
-
 # State of the field
 
-Packages in this area are usually described as splitting into reporting libraries and backtesting
-frameworks; their documented interfaces do not, so the comparison below is capability by capability,
-at the versions current on 27 July 2026.
+The following comparison covers selected documented workflows, rather than an exhaustive
+feature or performance benchmark. The references identify the software and its documentation.
 
 | package | its documented interface takes | and returns |
 |---|---|---|
-| `pyfolio-reloaded` 0.9.9 | returns, and optionally positions, transactions, market data, factor returns and loadings | tear sheets, including round-trip analysis rebuilt from positions and transactions |
-| `bt` 1.2.0 | `WeighTarget` takes a target-weight `DataFrame` from the caller, as part of an Algo-stack strategy | a result exposing statistics, weights, positions and turnover |
-| `vectorbt` 1.1.0 | `Portfolio.from_orders`, `from_signals` and `from_order_func` take orders, signals, or an order-generating callback produced elsewhere | order and trade records, statistics and plots |
-| `Riskfolio-Lib` 7.3.0 | returns and optimisation constraints | weights, with documented `Reports` and `PlotFunctions` modules |
-| `skfolio` 0.20.1 | a scikit-learn estimator fitted to returns | weights, walk-forward and combinatorial purged cross-validation, risk measures and plots |
-| `quantstats` 0.0.81 | a return series, not trade data | metrics, plots and an HTML tear sheet |
-| `empyrical-reloaded` 0.5.12 | a return series | return and risk metrics as functions, with no reporting layer |
-| `ffn` 1.1.5 | prices | analytics; its documentation refers simulation to `bt` |
-| `PyPortfolioOpt` 1.6.0 | prices, or expected returns and a risk model | weights and a discrete allocation, `portfolio_performance()`, a `plotting` module |
+| `pyfolio-reloaded` [@pyfolio] | returns, optionally positions and transactions | tear sheets and round-trip analysis |
+| `bt` [@bt] | target weights through `WeighTarget` in an Algo stack | statistics, weights, positions and turnover |
+| `vectorbt` [@vectorbt] | orders, signals or an order-generating callback | order and trade records, statistics and plots |
+| `Riskfolio-Lib` [@riskfolio] | returns and optimisation constraints | weights, reports and plots |
+| `skfolio` [@skfolio] | returns fitted through a scikit-learn interface | weights, cross-validation, risk measures and plots |
+| `quantstats` [@quantstats] | returns | metrics, plots and HTML tear sheets |
+| `empyrical-reloaded` [@empyrical] | returns | return and risk metrics |
+| `ffn` [@ffn] | prices | analytics; its documentation refers simulation to `bt` |
+| `PyPortfolioOpt` [@Martin2021] | prices, or expected returns and a risk model | weights, discrete allocation, performance and plots |
 
-`arch` has no row, being a resampling and econometrics library rather than a portfolio stack, but
-it documents the closest primitive: `StationaryBootstrap` takes several aligned arrays, Series or
-DataFrames in one object, so one index draw propagates across them.
+`arch` provides a related resampling primitive: `StationaryBootstrap` takes several aligned
+arrays, Series or DataFrames in one object, so one index draw propagates across them [@arch].
 
 `qis` differs in where the boundary sits. Only weights and prices cross it, so any generator
 producing weights can be measured. The simulation returns a `PortfolioData` object carrying the net asset value, the realised weights, the held units, the
 instrument-level profit and loss and the realised costs together, so attribution is a property of
 that object rather than a later calculation on a series that has already lost what it needs.
 
-Two capabilities have no counterpart in the documented interfaces above. Return unsmoothing
-corrects the serial correlation induced by appraisal-based valuation, which matters for private
-assets and hedge funds [@getmansky2004]. Regime-conditional reporting partitions every statistic
-by benchmark return quantile [@Sepp2019]. A third, paired block bootstrap resampling — one index
-draw across several aligned panels, so a factor and a residual panel resample together
-[@politis1994] — has the primitive noted above.
+Building a separate library, rather than extending `bt` or `ffn`, served this shared result-object
+boundary across the author's research packages. `bt` already accepts target weights, and `ffn`
+already supplies analytics; `qis` combines holdings, costs, attribution and comparative reports
+without requiring callers to adopt an Algo stack or reconstruct those fields from returns.
+This choice trades the flexibility of a general strategy framework for a common accounting
+contract; it does not imply that the alternatives cannot be extended.
+
+The integrated analytics include return unsmoothing for appraisal-based valuations
+[@getmansky2004], regime-conditional reporting by benchmark return quantile [@Sepp2019], and
+paired bootstrap resampling of aligned factor and residual panels. These methods are not
+claimed as unique: R's `PerformanceAnalytics` implements Geltner unsmoothing
+[@performanceanalytics], and `arch` supplies the paired resampling primitive above.
 
 # Software design
 
 We organise the package into 14 capability groups, which `src/qis/api.py` names.
 
-The backtester is 441 lines, and that follows from the design assumption rather than from
-compression. Because a strategy is a rule for producing weights, the backtester holds no strategy
-logic: it converts target weights to units at each rebalancing, holds those units until the next
-one, applies costs, and returns the result. The recursion over dates is compiled with `numba`,
-one of the few loops here that cannot be vectorised.
+The backtester is 441 lines. It converts target weights to units at each rebalancing, holds those
+units until the next one, applies costs, and returns the result. Holding units preserves natural
+weight drift; multiplying every period's returns by unchanged target weights would instead
+assume repeated rebalancing. This path dependence motivates a date-sequential `numba` kernel,
+while array-based analytics operate on its outputs. The weights-and-prices boundary suits
+portfolio research; order-book events and signal generation remain outside this engine.
 
 The public interface is `qis.__all__`, which holds 474 names; `src/qis/api.py` records that list as a
 literal together with a documented core of 166 symbols grouped by capability, and the suite fails
-when either record disagrees with the namespace.
+when either record disagrees with the namespace. The broad namespace preserves convenient
+imports and compatibility for consumers, at the cost of discoverability; the curated core
+provides a smaller entry point without removing existing exports.
 
-Properties are enforced by tests rather than by convention: every exported plotting function draws a
-figure on a synthetic panel; every example references symbols and keyword arguments that exist;
-every core symbol documents its arguments and documents none it does not take; documentation links
-resolve; and the measurements this paper quotes match a generated record. Every example that needs no data
-vendor runs in the suite; the rest are checked statically.
+Tests check exported plots on synthetic panels, documented core arguments, local documentation
+links and the measurements quoted here. Selected offline examples execute in the suite;
+static checks cover example imports and calls, including network-dependent examples.
+Plot smoke tests establish that figures draw, while layout and readability require visual review.
 
 The suite runs without network access on a core installation, from a frozen seeded simulator
 reproducing the defects of real panels: ragged starts, missing observations, stale prices, appraisal
@@ -142,7 +134,9 @@ smoothing.
 
 # Research impact statement
 
-We state plainly that the stack is the author's. Two public consumers carry this section. `optimalportfolios` declares `qis` a mandatory dependency and references 137 of its symbols
+The public consumers below are maintained by the author, so they demonstrate research reuse
+within this stack rather than independent adoption. `optimalportfolios` declares `qis` a
+mandatory dependency and references 137 of its symbols
 at 1105 sites. `trendfollowing`, which carries the trend-following work cited below, references 87 symbols
 at 428 sites. Both counts are taken at the commits recorded in
 `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
@@ -157,24 +151,20 @@ systems [@sepp2026trend], and the resampling layer work on capital market assump
 multi-asset tradable factors [@sepp2026matf]. The last two are working papers.
 
 Commits run from December 2022 to October 2026, with activity in 40 of the 47 calendar months.
+External contributions include the numerical, performance and reporting work acknowledged below
+and recorded in the repository's public history. We do not infer wider research adoption from
+these contributions.
 
 # AI usage disclosure
 
-The analytical methods, the conventions they implement, and the architecture of the package are
-the author's, and no method in `qis` originated from a language model.
+During July–October 2026, Claude Opus 4.8 and 5.5 and OpenAI Codex assisted with software
+development, tests, documentation, and paper preparation. The author made the methodological
+and architectural decisions, reviewed and validated the assisted outputs, and remains
+responsible for the work.
 
-In July 2026 the author used Anthropic's Claude (2026 models), through an agentic coding
-interface, for a documentation and test infrastructure effort preceding this submission. That work
-produced the test suite described above, the docstrings on the documented core, the documentation
-configuration, the audit scripts under `tools/`, and repairs of defects the new tests exposed. It also implemented two changes the author specified:
-circular block wrapping in the stationary bootstrap, and a fixed-coefficient option in the static
-unsmoothing estimator. The co-authored commits can be listed with
-`git log --grep='Co-authored-by: Claude'`; their number is not quoted here because it moves.
+# Acknowledgements
 
-We drafted this paper with the same assistance, working from measurements the assistant recorded
-under `docs/audit/`. Every row of the comparison above, and every bibliographic claim, was
-verified against primary documentation on 29 July 2026. The author reviewed, edited and validated all
-assisted output, wrote the economic argument in the statement of need, made the design
-decisions, and is responsible for the content.
+The author thanks John D. Reynolds for contributions to numerical correctness, performance,
+reporting, and regression test coverage in QIS.
 
 # References

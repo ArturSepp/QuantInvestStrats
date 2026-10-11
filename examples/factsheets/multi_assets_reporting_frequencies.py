@@ -27,13 +27,14 @@ matplotlib.use('Agg')  # batch PDF generation, no interactive display needed
 import pandas as pd
 from typing import List
 
+from examples._helpers.output import get_output_dir, parse_output_dir
+
 import qis
-from qis import TimePeriod, ReportingFrequency
+from qis import TimePeriod
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_factsheet
 # reuse the exact universe + reporting-frequency grid from the single-strategy runner
-from examples.factsheets.strategy_reporting_frequencies import (UNIVERSE_DATA,
-                                                                REPORTING_FREQUENCIES,
+from examples.factsheets.strategy_reporting_frequencies import (REPORTING_FREQUENCIES,
                                                                 load_universe)
 
 
@@ -42,21 +43,22 @@ def run_global_multi_asset_report(use_synthetic_data: bool = False,
                                   add_rates_data: bool = False,
                                   output_path: str = None
                                   ) -> str:
-    """render the multi-asset factsheet for the full {frequency} x {long, short} grid on one panel."""
+    """Render the multi-asset factsheet across the frequency and time-span grid."""
     prices, benchmark_prices, group_data = load_universe(use_synthetic_data=use_synthetic_data)
     benchmark = benchmark_prices.columns[0]  # SPY as the primary regime / beta / scatter benchmark
 
     end = prices.index[-1]
-    time_period_long = TimePeriod(prices.index[0], end)                                 # full history
-    time_period_short = TimePeriod(end - pd.DateOffset(years=short_period_years), end)   # last N years
+    time_period_long = TimePeriod(prices.index[0], end)  # full history
+    time_period_short = TimePeriod(
+        end - pd.DateOffset(years=short_period_years), end
+    )  # last N years
 
     report_name = 'MultiAsset_universe'   # file-safe base name
     report_title = 'Multi-asset universe'  # human-readable suptitle
 
     report_windows = (('long', time_period_long), ('short', time_period_short))
     all_figs: List = []
-    if output_path is None:
-        output_path = qis.local_path.get_output_path()
+    output_path = get_output_dir(output_path)
 
     for reporting_frequency in REPORTING_FREQUENCIES:
         for span_label, time_period in report_windows:
@@ -86,4 +88,4 @@ def run_global_multi_asset_report(use_synthetic_data: bool = False,
 
 if __name__ == '__main__':
     # real-data run (yfinance). Pass use_synthetic_data=True to run fully offline.
-    run_global_multi_asset_report(use_synthetic_data=False)
+    run_global_multi_asset_report(use_synthetic_data=False, output_path=parse_output_dir())

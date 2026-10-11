@@ -8,12 +8,17 @@ side by side. Useful for illustrating sensitivity to a single parameter.
 """
 # packages
 import pandas as pd
-import matplotlib.pyplot as plt
 from typing import Tuple, List
 from enum import Enum
+from examples._helpers.output import get_output_dir, parse_output_dir
 import yfinance as yf
 import qis
-from qis import TimePeriod, MultiPortfolioData, generate_multi_portfolio_factsheet, fetch_default_report_kwargs
+from qis import (
+    TimePeriod,
+    MultiPortfolioData,
+    generate_multi_portfolio_factsheet,
+    fetch_default_report_kwargs,
+)
 
 
 def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -30,7 +35,9 @@ def fetch_universe_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
                          GLD='Gold')
     tickers = list(universe_data.keys())
     group_data = pd.Series(universe_data)  # for portfolio reporting
-    prices = yf.download(tickers=tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers]
+    prices = yf.download(
+        tickers=tickers, start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True
+    )['Close'][tickers]
     prices = prices.asfreq('B', method='ffill')
     benchmark_prices = prices[['SPY', 'TLT']]
     return prices, benchmark_prices, group_data
@@ -51,7 +58,9 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
 
     portfolio_datas = []
     for span in spans:
-        ra_returns, weights, ewm_vol = qis.compute_ra_returns(returns=returns, span=span, vol_target=vol_target)
+        ra_returns, weights, ewm_vol = qis.compute_ra_returns(
+            returns=returns, span=span, vol_target=vol_target
+        )
         weights = weights.divide(weights.sum(axis=1), axis=0)
         portfolio_data = qis.backtest_model_portfolio(prices=prices,
                                                       weights=time_period.locate(weights),
@@ -68,25 +77,27 @@ class Locals(Enum):
     VOLPARITY_SPAN = 1
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
+    output_path = get_output_dir(output_path)
 
     if local == Locals.VOLPARITY_SPAN:
         # time period for portfolio reporting
         time_period = qis.TimePeriod('31Dec2005', '31Dec2025')
 
         prices, benchmark_prices, group_data = fetch_universe_data()
-        multi_portfolio_data = generate_volparity_multi_strategy(prices=prices,
-                                                                 benchmark_prices=benchmark_prices,
-                                                                 group_data=group_data,
-                                                                 time_period=time_period,
-                                                                 vol_target=0.15,
-                                                                 rebalancing_costs=0.0010  # per traded volume
-                                                                 )
+        multi_portfolio_data = generate_volparity_multi_strategy(
+            prices=prices,
+            benchmark_prices=benchmark_prices,
+            group_data=group_data,
+            time_period=time_period,
+            vol_target=0.15,
+            rebalancing_costs=0.0010,  # per traded volume
+        )
         weights = multi_portfolio_data.get_grouped_weights(group_data=group_data)
         print(weights)
 
@@ -95,11 +106,11 @@ def run_local(local: Locals):
                                                   add_group_exposures_and_pnl=True,
                                                   **fetch_default_report_kwargs(time_period=time_period))
 
-        qis.save_fig(fig=figs[0], file_name=f"multi_strategy", local_path=qis.local_path.get_output_path())
+        qis.save_fig(fig=figs[0], file_name="multi_strategy", local_path=output_path)
 
         qis.save_figs_to_pdf(figs=figs,
-                             file_name=f"volparity_span_factsheet_long",
-                             local_path=qis.local_path.get_output_path())
+                             file_name="volparity_span_factsheet_long",
+                             local_path=output_path)
 
         time_period_short = TimePeriod('31Dec2019', time_period.end)
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
@@ -107,11 +118,11 @@ def run_local(local: Locals):
                                                   add_group_exposures_and_pnl=True,
                                                   **fetch_default_report_kwargs(time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
-                             file_name=f"volparity_span_factsheet_short",
-                             local_path=qis.local_path.get_output_path())
+                             file_name="volparity_span_factsheet_short",
+                             local_path=output_path)
     # plt.show()
 
 
 if __name__ == '__main__':
 
-    run_local(local=Locals.VOLPARITY_SPAN)
+    run_local(local=Locals.VOLPARITY_SPAN, output_path=parse_output_dir())

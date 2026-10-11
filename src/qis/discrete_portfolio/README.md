@@ -246,7 +246,7 @@ avoids silently applying a daily annualisation convention directly to 5-minute r
 
 The repository example downloads adjusted SPY 5-minute closes, runs a moving-average momentum
 strategy, prints the trade ledger and reconciliation error, plots business-day strategy and
-buy-and-hold NAV with end-of-day position size, and opens a QIS multi-asset factsheet:
+buy-and-hold NAV with end-of-day position size, and opens a QIS factsheet:
 
 ```bash
 pip install -e ".[data]"
@@ -255,6 +255,9 @@ python -m examples.discrete_portfolio.discrete_trend_backtest
 
 The default uses one month of 5-minute bars. To use 1-minute bars, set `INTERVAL = "1m"` and a
 short yfinance-supported period such as `PERIOD = "5d"`.
+Below 63 business-day marks, the factsheet shows prices, drawdowns and a compact performance
+table. Longer histories use the full multi-asset report with daily sampling and five-observation
+rolling windows or EWMA spans. This avoids empty long-window panels in the default short sample.
 
 ## Operational boundaries
 

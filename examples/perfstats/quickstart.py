@@ -10,62 +10,97 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import yfinance as yf
 import qis as qis
+from qis import PerfStat
+from examples._helpers.output import get_output_dir, parse_output_dir
+
+output_path = get_output_dir(parse_output_dir())
 
 
 # define tickers and fetch price data
 tickers = ['SPY', 'QQQ', 'EEM', 'TLT', 'IEF', 'SHY', 'LQD', 'HYG', 'GLD']
-prices = yf.download(tickers, start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'][tickers].dropna()
+prices = yf.download(tickers, start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True)[
+    'Close'
+][tickers].dropna()
 
 # minimum usage
 with sns.axes_style("darkgrid"):
     fig, ax = plt.subplots(1, 1, figsize=(10, 7))
     qis.plot_prices(prices=prices, x_date_freq='YE', ax=ax)
 
-# skip
-qis.save_fig(fig, file_name='perf1', local_path="figures/")
+# Save to the explicit or temporary output directory.
+qis.save_fig(fig, file_name='perf1', local_path=output_path)
 
 # with drawdowns using sns styles
 with sns.axes_style("darkgrid"):
     fig, axs = plt.subplots(2, 1, figsize=(10, 7))
     qis.plot_prices_with_dd(prices=prices, x_date_freq='YE', axs=axs)
 
-# skip
-qis.save_fig(fig, file_name='perf2', local_path="figures/")
+# Save to the explicit or temporary output directory.
+qis.save_fig(fig, file_name='perf2', local_path=output_path)
 
 # risk-adjusted performance table with specified data entries
 # add rates for excess Sharpe
-from qis import PerfStat
-ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
+ust_3m_rate = (
+    yf.download('^IRX', start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True)['Close'][
+        '^IRX'
+    ].dropna()
+    / 100.0
+)
 
 # set parameters for computing performance stats including returns vols and regressions
 perf_params = qis.PerfParams(freq='ME', freq_reg='QE', rates_data=ust_3m_rate)
 # perf_columns is list to display different perfomance metrics from enumeration PerfStat
-fig = qis.plot_ra_perf_table(prices=prices,
-                             perf_columns=[PerfStat.TOTAL_RETURN, PerfStat.PA_RETURN, PerfStat.PA_EXCESS_RETURN,
-                                           PerfStat.VOL, PerfStat.SHARPE_RF0,
-                                           PerfStat.SHARPE_EXCESS, PerfStat.SORTINO_RATIO, PerfStat.CALMAR_RATIO,
-                                           PerfStat.MAX_DD, PerfStat.MAX_DD_VOL,
-                                           PerfStat.SKEWNESS, PerfStat.KURTOSIS],
-                             title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')}",
-                             perf_params=perf_params)
+fig = qis.plot_ra_perf_table(
+    prices=prices,
+    perf_columns=[
+        PerfStat.TOTAL_RETURN,
+        PerfStat.PA_RETURN,
+        PerfStat.PA_EXCESS_RETURN,
+        PerfStat.VOL,
+        PerfStat.SHARPE_RF0,
+        PerfStat.SHARPE_EXCESS,
+        PerfStat.SORTINO_RATIO,
+        PerfStat.CALMAR_RATIO,
+        PerfStat.MAX_DD,
+        PerfStat.MAX_DD_VOL,
+        PerfStat.SKEWNESS,
+        PerfStat.KURTOSIS,
+    ],
+    title=f'Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator="-")}',
+    perf_params=perf_params,
+)
 
-# skip
-qis.save_fig(fig, file_name='perf3', local_path="figures/")
+# Save to the explicit or temporary output directory.
+qis.save_fig(fig, file_name='perf3', local_path=output_path)
 
 # add benchmark regression using excess returns for linear beta
 # regression frequency is specified using perf_params.freq_reg
 # regression alpha is multiplied using alpha_an_factor
-fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
-                                          benchmark='SPY',
-                                          perf_columns=[PerfStat.TOTAL_RETURN, PerfStat.PA_RETURN, PerfStat.PA_EXCESS_RETURN,
-                                                        PerfStat.VOL, PerfStat.SHARPE_RF0,
-                                                        PerfStat.SHARPE_EXCESS, PerfStat.SORTINO_RATIO, PerfStat.CALMAR_RATIO,
-                                                        PerfStat.MAX_DD, PerfStat.MAX_DD_VOL,
-                                                        PerfStat.SKEWNESS, PerfStat.KURTOSIS,
-                                                        PerfStat.ALPHA_AN, PerfStat.BETA, PerfStat.R2],
-                                          title=f"Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator='-')} benchmarked with SPY",
-                                          perf_params=perf_params)
-# skip
-qis.save_fig(fig, file_name='perf4', local_path="figures/")
+fig, _ = qis.plot_ra_perf_table_benchmark(
+    prices=prices,
+    benchmark='SPY',
+    perf_columns=[
+        PerfStat.TOTAL_RETURN,
+        PerfStat.PA_RETURN,
+        PerfStat.PA_EXCESS_RETURN,
+        PerfStat.VOL,
+        PerfStat.SHARPE_RF0,
+        PerfStat.SHARPE_EXCESS,
+        PerfStat.SORTINO_RATIO,
+        PerfStat.CALMAR_RATIO,
+        PerfStat.MAX_DD,
+        PerfStat.MAX_DD_VOL,
+        PerfStat.SKEWNESS,
+        PerfStat.KURTOSIS,
+        PerfStat.ALPHA_AN,
+        PerfStat.BETA,
+        PerfStat.R2,
+    ],
+    title=(f'Risk-adjusted performance: {qis.get_time_period_label(prices, date_separator="-")} '
+           'benchmarked with SPY'),
+    perf_params=perf_params,
+)
+# Save to the explicit or temporary output directory.
+qis.save_fig(fig, file_name='perf4', local_path=output_path)
 
 plt.show()

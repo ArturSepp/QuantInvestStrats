@@ -25,13 +25,17 @@ matplotlib.use('Agg')  # batch PDF generation, no interactive display needed
 import numpy as np
 import pandas as pd
 
+from examples._helpers.output import get_output_dir, parse_output_dir
+
 import qis
-from qis import TimePeriod, MultiPortfolioData, ReportingFrequency
+from qis import TimePeriod, MultiPortfolioData
 from qis.portfolio.reports.config import fetch_default_report_kwargs
-from qis.portfolio.reports.strategy_benchmark_factsheet import generate_strategy_benchmark_factsheet_plt
+from qis.portfolio.reports.strategy_benchmark_factsheet import (
+    generate_strategy_benchmark_factsheet_plt,
+)
+
 # reuse the exact universe + reporting-frequency grid from the single-strategy runner
-from examples.factsheets.strategy_reporting_frequencies import (UNIVERSE_DATA,
-                                                                REPORTING_FREQUENCIES,
+from examples.factsheets.strategy_reporting_frequencies import (REPORTING_FREQUENCIES,
                                                                 load_universe)
 
 
@@ -42,10 +46,10 @@ def generate_volparity_multiportfolio(prices: pd.DataFrame,
                                       vol_target: float = 0.15,
                                       rebalancing_costs: float = 0.0010
                                       ) -> MultiPortfolioData:
-    """vol-parity strategy vs equal-weight benchmark, both backtested once on the full daily panel."""
-    ra_returns, weights, ewm_vol = qis.compute_ra_returns(returns=qis.to_returns(prices=prices, is_log_returns=True),
-                                                          span=span,
-                                                          vol_target=vol_target)
+    """Backtest vol-parity and equal-weight portfolios on the full daily panel."""
+    ra_returns, weights, ewm_vol = qis.compute_ra_returns(
+        returns=qis.to_returns(prices=prices, is_log_returns=True), span=span, vol_target=vol_target
+    )
     weights = weights.divide(weights.sum(axis=1), axis=0)
     strategy = qis.backtest_model_portfolio(prices=prices,
                                             weights=weights,
@@ -54,14 +58,18 @@ def generate_volparity_multiportfolio(prices: pd.DataFrame,
                                             ticker='VolParity')
     strategy.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
 
-    benchmark = qis.backtest_model_portfolio(prices=prices,
-                                             weights=np.ones(len(prices.columns)) / len(prices.columns),
-                                             rebalancing_costs=rebalancing_costs,
-                                             weight_implementation_lag=1,
-                                             ticker='EqualWeight')
+    benchmark = qis.backtest_model_portfolio(
+        prices=prices,
+        weights=np.ones(len(prices.columns)) / len(prices.columns),
+        rebalancing_costs=rebalancing_costs,
+        weight_implementation_lag=1,
+        ticker='EqualWeight',
+    )
     benchmark.set_group_data(group_data=group_data, group_order=list(group_data.unique()))
 
-    return MultiPortfolioData(portfolio_datas=[strategy, benchmark], benchmark_prices=benchmark_prices)
+    return MultiPortfolioData(
+        portfolio_datas=[strategy, benchmark], benchmark_prices=benchmark_prices
+    )
 
 
 def run_global_benchmark_report(use_synthetic_data: bool = False,
@@ -70,12 +78,14 @@ def run_global_benchmark_report(use_synthetic_data: bool = False,
                                 add_strategy_factsheet: bool = False,
                                 output_path: str = None
                                 ) -> str:
-    """render the strategy-vs-benchmark factsheet for the full {frequency} x {long, short} grid on one panel."""
+    """Render strategy versus benchmark across the frequency and time-span grid."""
     prices, benchmark_prices, group_data = load_universe(use_synthetic_data=use_synthetic_data)
 
     end = prices.index[-1]
-    time_period_long = TimePeriod(prices.index[0], end)                                 # full history
-    time_period_short = TimePeriod(end - pd.DateOffset(years=short_period_years), end)   # last N years
+    time_period_long = TimePeriod(prices.index[0], end)  # full history
+    time_period_short = TimePeriod(
+        end - pd.DateOffset(years=short_period_years), end
+    )  # last N years
 
     multi_portfolio_data = generate_volparity_multiportfolio(prices=prices,
                                                              benchmark_prices=benchmark_prices,
@@ -85,8 +95,7 @@ def run_global_benchmark_report(use_synthetic_data: bool = False,
 
     spans = (('long', time_period_long), ('short', time_period_short))
     all_figs = []
-    if output_path is None:
-        output_path = qis.local_path.get_output_path()
+    output_path = get_output_dir(output_path)
 
     for reporting_frequency in REPORTING_FREQUENCIES:
         for span_label, time_period in spans:
@@ -95,18 +104,20 @@ def run_global_benchmark_report(use_synthetic_data: bool = False,
                                                         add_rates_data=add_rates_data)
             backtest_name = (f"{strategy_name} vs {benchmark_name} \u2013 "
                              f"{reporting_frequency.name} reporting, {span_label} period")
-            figs = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=multi_portfolio_data,
-                                                             time_period=time_period,
-                                                             backtest_name=backtest_name,
-                                                             add_strategy_factsheet=add_strategy_factsheet,
-                                                             add_brinson_attribution=False,
-                                                             add_exposures_pnl_attribution=False,
-                                                             add_exposures_comp=False,
-                                                             add_grouped_exposures=False,
-                                                             add_grouped_cum_pnl=False,
-                                                             is_grouped=False,
-                                                             add_joint_instrument_history_report=False,
-                                                             **report_kwargs)
+            figs = generate_strategy_benchmark_factsheet_plt(
+                multi_portfolio_data=multi_portfolio_data,
+                time_period=time_period,
+                backtest_name=backtest_name,
+                add_strategy_factsheet=add_strategy_factsheet,
+                add_brinson_attribution=False,
+                add_exposures_pnl_attribution=False,
+                add_exposures_comp=False,
+                add_grouped_exposures=False,
+                add_grouped_cum_pnl=False,
+                is_grouped=False,
+                add_joint_instrument_history_report=False,
+                **report_kwargs,
+            )
             qis.save_figs_to_pdf(figs=figs,
                                  file_name=(f"{strategy_name}_vs_{benchmark_name}_benchmark_factsheet_"
                                             f"{reporting_frequency.name.lower()}_{span_label}"),
@@ -126,4 +137,4 @@ def run_global_benchmark_report(use_synthetic_data: bool = False,
 
 if __name__ == '__main__':
     # real-data run (yfinance). Pass use_synthetic_data=True to run fully offline.
-    run_global_benchmark_report(use_synthetic_data=False)
+    run_global_benchmark_report(use_synthetic_data=False, output_path=parse_output_dir())

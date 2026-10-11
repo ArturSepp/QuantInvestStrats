@@ -15,18 +15,32 @@ from qis import PortfolioData
 from qis.plots.utils import align_x_limits_axs
 
 # load VIX ETH
-vix = yf.download(tickers=['VXX'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].asfreq('B', method='ffill').rename('Long VIX ETF')
+vix = (
+    yf.download(tickers=['VXX'], start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True)[
+        'Close'
+    ]['VXX']
+    .asfreq('B', method='ffill')
+    .rename('Long VIX ETF')
+)
 
 # load becnhmarks benchmarks
-benchmark_prices = yf.download(tickers=['SPY', 'TLT'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].asfreq('B', method='ffill')
+benchmark_prices = yf.download(
+    tickers=['SPY', 'TLT'], start='2003-12-31', end=None, ignore_tz=True, auto_adjust=True
+)['Close'].asfreq('B', method='ffill')
 
 # create long-only portfolio using vix nav
 vix_portfolio = PortfolioData(nav=vix)
 
 # set timeperiod for analysis
 time_period = qis.TimePeriod('31Dec2021', None)
-perf_params = qis.PerfParams(freq='W-WED', freq_reg='W-WED',
-                             rates_data=yf.download('^IRX', start="1959-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0)
+perf_params = qis.PerfParams(
+    freq='W-WED',
+    freq_reg='W-WED',
+    rates_data=yf.download('^IRX', start='1959-12-31', end=None, ignore_tz=True, auto_adjust=True)[
+        'Close'
+    ]['^IRX'].dropna()
+    / 100.0,
+)
 regime_classifier = qis.BenchmarkReturnsQuantilesRegime(freq='ME')
 
 prices = pd.concat([vix, benchmark_prices], axis=1).sort_index().dropna()
@@ -44,24 +58,29 @@ with sns.axes_style("darkgrid"):
                     is_log=True,
                     ax=axs[0],
                     **kwargs)
-    qis.add_bnb_regime_shadows(ax=axs[0], pivot_prices=prices['SPY'], regime_classifier=regime_classifier)
+    qis.add_bnb_regime_shadows(
+        ax=axs[0], pivot_prices=prices['SPY'], regime_classifier=regime_classifier
+    )
 
     # plot vix betas to benchmarks
     span = 63  # use 3m for half-live
-    vix_benchmark_betas = vix_portfolio.compute_portfolio_benchmark_betas(benchmark_prices=benchmark_prices,
-                                                                          factor_beta_span=span)
+    vix_benchmark_betas = vix_portfolio.compute_portfolio_benchmark_betas(
+        benchmark_prices=benchmark_prices, factor_beta_span=span
+    )
     qis.plot_time_series(df=vix_benchmark_betas,
                          var_format='{:,.2f}',
                          legend_stats=qis.LegendStats.AVG_LAST,
                          title='VIX ETF benchmark multi-variate betas',
                          ax=axs[1],
                          **kwargs)
-    qis.add_bnb_regime_shadows(ax=axs[1], pivot_prices=prices['SPY'], regime_classifier=regime_classifier)
+    qis.add_bnb_regime_shadows(
+        ax=axs[1], pivot_prices=prices['SPY'], regime_classifier=regime_classifier
+    )
 
     # plot performance attribution to betas
-    factor_attribution = vix_portfolio.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
-                                                                               factor_beta_span=span,
-                                                                               time_period=time_period)
+    factor_attribution = vix_portfolio.compute_portfolio_benchmark_attribution(
+        benchmark_prices=benchmark_prices, factor_beta_span=span, time_period=time_period
+    )
     qis.plot_time_series(df=factor_attribution.cumsum(axis=0),
                          var_format='{:,.0%}',
                          legend_stats=qis.LegendStats.LAST,
@@ -69,7 +88,9 @@ with sns.axes_style("darkgrid"):
                          ax=axs[2],
                          **kwargs)
     pivot_prices = benchmark_prices['SPY'].reindex(index=factor_attribution.index, method='ffill')
-    qis.add_bnb_regime_shadows(ax=axs[2], pivot_prices=prices['SPY'], regime_classifier=regime_classifier)
+    qis.add_bnb_regime_shadows(
+        ax=axs[2], pivot_prices=prices['SPY'], regime_classifier=regime_classifier
+    )
 
     align_x_limits_axs(axs=axs, is_invisible_xs=True)
 

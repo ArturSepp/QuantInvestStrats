@@ -46,12 +46,18 @@ expectations, release policy, and private route for sensitive reports are docume
 ```bash
 git clone https://github.com/ArturSepp/QuantInvestStrats.git
 cd QuantInvestStrats
-uv sync --group test --locked
+uv sync --python 3.12 --group test --locked
 uv run --no-sync pytest
 ```
 
-The first command installs the core package plus the PEP 735 `test` dependency group exactly as
-recorded in `uv.lock`; it fails instead of re-resolving when the lock and `pyproject.toml` differ.
+The sync command selects Python 3.12 and installs the core package plus the PEP 735 `test`
+dependency group exactly as recorded in `uv.lock`; it fails instead of re-resolving when the
+lock and `pyproject.toml` differ. This is sufficient for the core test suite and offline
+quickstart. `--all-extras` also installs the optional PostgreSQL driver, whose source build needs
+native tools such as `pg_config`. See the [installation guide](docs/install.md#postgresql-and-all-extras-installation-on-macos)
+for macOS prerequisites and an interpreter check. Other supported Python versions can also be
+selected explicitly.
+
 Tests live inside `src/qis/`, and the project configuration supplies that path automatically.
 Files matching `*_test.py` or `test_*.py` contain automated pytest tests only. A diagnostic that
 needs local data, interactive plots, or visual inspection lives beside the component it develops
@@ -61,7 +67,7 @@ runners are excluded from wheels.
 The CI extras and coverage lane is:
 
 ```bash
-uv sync --group test --extra data --extra io --locked
+uv sync --python 3.12 --group test --extra data --extra io --locked
 uv run --no-sync pytest --cov=qis --cov-report=term:skip-covered
 ```
 

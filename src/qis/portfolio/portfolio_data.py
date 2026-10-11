@@ -1992,7 +1992,7 @@ class PortfolioData:
                 else:
                     title = title or f"Avg Independent {freq}-freq 99%-VAR with {vol_span}-span: {period}"
             elif snapshot_period == SnapshotPeriod.MAX:
-                var_1 = portfolio_vars.max(0)
+                var_1 = portfolio_vars.max(axis=0)
                 period = qis.get_time_period(df=portfolio_vars).to_str(date_separator='-')
                 if is_correlated:
                     title = title or f"Max Correlated {freq}-freq 99%-VAR with {vol_span}-span: {period}"
@@ -2013,7 +2013,7 @@ class PortfolioData:
                     period = qis.get_time_period(df=instrument_vars).to_str()
                     title = title or f"Avg Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols: {period}"
                 elif snapshot_period == SnapshotPeriod.MAX:
-                    var_1 = instrument_vars.max(0)
+                    var_1 = instrument_vars.max(axis=0)
                     period = qis.get_time_period(df=instrument_vars).to_str()
                     title = title or f"Max Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols: {period}"
                 else:
