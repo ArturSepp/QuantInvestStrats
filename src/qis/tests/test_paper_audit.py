@@ -65,6 +65,8 @@ NON_METRIC_NUMBERS: Dict[str, str] = {
     '1994': 'Politis and Romano, cited for the stationary bootstrap',
     '310': 'the python floor written as 3.10 without its separator',
     '314': 'the python ceiling written as 3.14 without its separator',
+    '642': 'GitHub stars on 11 October 2026, an external figure quoted with its date',
+    '9342': 'PyPI downloads over the last month reported by pypistats.org on 11 October 2026',
 }
 
 # a [TODO: ...] marker is a note to the author, not manuscript text, so it counts against
