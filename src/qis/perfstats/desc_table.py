@@ -14,7 +14,7 @@ the index via ``infer_annualisation_factor_from_df``, reporting ``STD_AN`` rathe
 whether the volatility column is annualised. Risk-adjusted statistics are ``perf_stats.py``.
 """
 import sys
-from decimal import Decimal, localcontext
+from decimal import Context, Decimal, ROUND_HALF_EVEN, localcontext
 from fractions import Fraction
 
 # packages
@@ -151,9 +151,11 @@ def _compute_upper_range_std(observed: np.ndarray) -> float:
     variance = (sum(value * value for value in values) - total * total / count) / (count - 1)
     if variance > Fraction.from_float(sys.float_info.max) ** 2:
         return np.inf
-    with localcontext() as context:
-        # More than binary64's 17 significant decimal digits, independent of ambient precision.
-        context.prec = 80
+    # Caller Decimal settings may suit financial rounding but can trap this inexact conversion
+    # or overflow its squared binary64 scale. Use fixed local settings without changing caller
+    # flags; retain 80-digit precision and wide exponent bounds until after the square root.
+    with localcontext(
+            Context(prec=80, rounding=ROUND_HALF_EVEN, Emin=-2000, Emax=2000, traps=[])):
         return float((Decimal(variance.numerator) / Decimal(variance.denominator)).sqrt())
 
 
