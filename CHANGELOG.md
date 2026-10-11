@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep `compute_desc_table`'s upper-range sample spread independent of caller Decimal settings,
+  avoiding incidental overflow or inexact exceptions for representable finite results.
+
 ## [5.36.0] - 2026-10-11
 
 ### Fixed

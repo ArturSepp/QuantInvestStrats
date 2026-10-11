@@ -15,7 +15,10 @@ result larger than binary64 can represent.
 """
 
 import sys
-from decimal import Decimal, localcontext
+from decimal import (
+    Context, Decimal, Inexact, InvalidOperation, ROUND_DOWN, ROUND_HALF_EVEN, Rounded,
+    getcontext, localcontext,
+)
 import warnings
 from typing import Protocol, cast
 
@@ -231,12 +234,14 @@ def _compute_without_warnings(
     data: pd.DataFrame | pd.Series,
     *,
     annualize_vol: bool,
+    var_format: str = _VALUE_FORMAT,
 ) -> pd.DataFrame:
     """Call the public function while treating every warning as a regression failure.
 
     Args:
         data: Series or DataFrame supplied to the public function.
         annualize_vol: Whether to display monthly annualized rather than periodic spread.
+        var_format: Display precision, including enough digits to distinguish adjacent floats.
 
     Returns:
         Formatted descriptive-statistics table.
@@ -246,10 +251,10 @@ def _compute_without_warnings(
         return _DESC_TABLE_MODULE.compute_desc_table(
             df=data,
             desc_table_type=DescTableType.SHORT,
-            var_format=_VALUE_FORMAT,
+            var_format=var_format,
             annualize_vol=annualize_vol,
             is_add_tstat=True,
-            norm_variable_display_type=_VALUE_FORMAT,
+            norm_variable_display_type=var_format,
         )
 
 
@@ -344,8 +349,9 @@ def _decimal_sample_std(values: list[float]) -> float:
     Returns:
         Sample spread, or infinity when its exact value exceeds binary64's finite range.
     """
-    with localcontext() as context:
-        context.prec = 1000
+    with localcontext(Context(
+        prec=1000, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999, traps=[],
+    )):
         observed = [Decimal.from_float(value) for value in values]
         mean = sum(observed) / Decimal(len(observed))
         variance = sum((value - mean) ** 2 for value in observed) / (len(observed) - 1)
@@ -403,3 +409,82 @@ def test_compute_desc_table_tolerates_negligible_scaled_observations(values: lis
     assert float(actual.loc["Mixed scale", "Std"]) == pytest.approx(
         _decimal_sample_std(values), rel=5e-12
     )
+
+
+@pytest.mark.parametrize("nullable", (False, True), ids=("float64", "nullable-float64"))
+@pytest.mark.parametrize(
+    ("settings", "annualize_vol"),
+    (("rounding", False), ("bounds", False), ("traps", False),
+     ("combined", False), ("combined", True)),
+)
+def test_compute_desc_table_isolates_upper_range_spread_from_caller_decimal_context(
+    settings: str, annualize_vol: bool, nullable: bool,
+) -> None:
+    """Keep binary64 spread and caller state independent of financial Decimal preferences.
+
+    The adjacent amplitudes distinguish a finite periodic result from genuine overflow. Mixed
+    ordinary, constant and missing neighbors ensure isolation applies per physical column, not
+    by changing the panel's eligibility or inference rules. Named Series exercise the other public
+    construction path; annualization may overflow even when the periodic t-statistic is finite.
+
+    Args:
+        settings: Caller precision/rounding, exponent limits, traps, or their interaction.
+        annualize_vol: Whether to display monthly annualized rather than periodic spread.
+        nullable: Whether inputs use pandas nullable Float64 storage.
+    """
+    amplitude = 1.5568479229996502e308
+    amplitudes = (float(np.nextafter(amplitude, 0.0)), amplitude,
+                  float(np.nextafter(amplitude, np.inf)))
+    samples = pd.DataFrame(
+        {"Below": [-amplitudes[0], amplitudes[0], amplitudes[0], np.nan],
+         "Boundary": [-amplitude, amplitude, amplitude, np.nan],
+         "Above": [-amplitudes[2], amplitudes[2], amplitudes[2], np.nan],
+         "Ordinary": [0.0, 2.0, 4.0, np.nan],
+         "Constant": [2.0, 2.0, 2.0, np.nan], "Missing": [np.nan] * 4},
+        index=_DATES[:4], dtype="Float64" if nullable else "float64",
+    )
+    original = samples.copy(deep=True)
+    value_format = "{:.17g}"
+    expected = _compute_without_warnings(
+        samples, annualize_vol=annualize_vol, var_format=value_format,
+    )
+    # Derive the oracle before changing caller settings, so a trapped/inexact reference cannot
+    # mask a production failure. This centered two-pass calculation is independent of the fallback.
+    periodic_stds = [_decimal_sample_std([-a, a, a]) for a in amplitudes]
+    assert all(np.isfinite(value) for value in periodic_stds[:2])
+    assert np.isinf(periodic_stds[2])
+
+    with localcontext() as caller:
+        if settings in ("rounding", "combined"):
+            caller.prec, caller.rounding = 6, ROUND_DOWN
+        if settings in ("bounds", "combined"):
+            caller.Emin, caller.Emax = -100, 100
+        if settings in ("traps", "combined"):
+            caller.traps[Inexact] = caller.traps[Rounded] = True
+        # Flags are caller-owned sticky state, not just exception controls. A successful square
+        # root must neither clear an existing flag nor leak its own inexact/rounded flags.
+        caller.clear_flags()
+        caller.flags[InvalidOperation] = True
+        before = str(caller)
+        actual = _compute_without_warnings(
+            samples, annualize_vol=annualize_vol, var_format=value_format,
+        )
+        series = samples["Boundary"]
+        series_result = _compute_without_warnings(
+            series, annualize_vol=annualize_vol, var_format=value_format,
+        )
+        # Comparing the old object's fields alone would miss a leaked replacement context.
+        assert getcontext() is caller
+        assert str(caller) == before
+
+    pd.testing.assert_frame_equal(actual, expected)
+    pd.testing.assert_frame_equal(series_result, actual.loc[["Boundary"]])
+    pd.testing.assert_frame_equal(samples, original)
+    spread_column = "Std An" if annualize_vol else "Std"
+    for label, periodic_std in zip(("Below", "Boundary", "Above"), periodic_stds):
+        expected_spread = np.inf if annualize_vol else periodic_std
+        assert actual.loc[label, spread_column] == value_format.format(expected_spread)
+        if np.isfinite(periodic_std):
+            assert float(actual.loc[label, "T-stat"]) == pytest.approx(0.5, abs=2e-16)
+        else:
+            assert actual.loc[label, "T-stat"] == "nan"
