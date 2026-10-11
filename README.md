@@ -3,6 +3,12 @@
 **Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in
 Python.**
 
+`qis` is for quantitative portfolio managers, researchers and investors who analyse portfolio
+performance and backtest investment strategies. Reported results can differ when return
+frequency, risk-free-rate treatment and rebalancing conventions are left unstated. The library
+makes those conventions explicit and uses shared calculations across analytics, backtests and
+reports.
+
 Quantitative Investment Strategies covers time-series and cross-sectional performance,
 drift-aware portfolio histories, ex-ante and ex-post risk, and reproducible reports. Bring your
 own strategy logic and weight targets; `qis` measures, backtests, analyses, and reports them.
