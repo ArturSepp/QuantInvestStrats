@@ -81,7 +81,7 @@ chart, a summary table and a factsheet.
 | `PyPortfolioOpt` [@Martin2021] | prices, or expected returns and a risk model | weights, discrete allocation, performance and plots |
 
 : Documented interfaces of related Python packages, accessed on 11 October 2026. Three of the
-eleven accept supplied weights. []{label="tab:field"}
+eleven accept supplied weights. \label{tab:field}
 
 The table omits event-driven engines such as `zipline-reloaded` [@zipline] and `backtrader`
 [@backtrader]. Their strategies submit orders from a callback on each bar, including orders that
