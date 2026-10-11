@@ -63,13 +63,30 @@ def plot_brinson_attribution_table(
             interaction effects otherwise.
 
     Example:
-        >>> # After running compute_brinson_attribution_table
-        >>> figs = plot_brinson_attribution_table(
-        ...     totals_table, active_total, allocation_return,
-        ...     selection_return, interaction_return
+        Attribute two daily-rebalanced synthetic portfolios. The constant weights
+        are beginning-of-period weights, and P&L inputs are arithmetic return contributions.
+
+        >>> from qis.datasets import generate_synthetic_universe
+        >>> universe = generate_synthetic_universe(
+        ...     start='2024-01-02', end='2024-03-28', apply_quirks=False)
+        >>> prices = universe.prices[['SEQ_US', 'SBD_TSY']]
+        >>> returns = qis.to_returns(prices, is_log_returns=False).dropna()
+        >>> strategy_weights = pd.DataFrame(
+        ...     {'SEQ_US': 0.7, 'SBD_TSY': 0.3}, index=returns.index)
+        >>> benchmark_weights = pd.DataFrame(
+        ...     {'SEQ_US': 0.6, 'SBD_TSY': 0.4}, index=returns.index)
+        >>> results = compute_brinson_attribution_table(
+        ...     benchmark_pnl=returns * benchmark_weights,
+        ...     strategy_pnl=returns * strategy_weights,
+        ...     strategy_weights=strategy_weights, benchmark_weights=benchmark_weights,
+        ...     asset_class_data=universe.group_data, group_order=['Equities', 'Bonds']
         ... )
+        >>> figs = plot_brinson_attribution_table(*results)
         >>> table_fig, active_fig, alloc_fig, select_fig, final_fig = figs
-        >>> plt.show()
+        >>> all(isinstance(fig, plt.Figure) for fig in figs)
+        True
+        >>> for fig in figs:
+        ...     plt.close(fig)
     """
     # Generate formatted summary table
     fig_table = plot_brinson_totals_table(
@@ -168,8 +185,27 @@ def plot_brinson_totals_table(
         matplotlib Figure object containing the formatted table.
 
     Example:
+        Compute a summary from synthetic arithmetic return contributions and
+        beginning-of-period weights for two daily-rebalanced portfolios.
+
+        >>> from qis.datasets import generate_synthetic_universe
+        >>> universe = generate_synthetic_universe(
+        ...     start='2024-01-02', end='2024-03-28', apply_quirks=False)
+        >>> prices = universe.prices[['SEQ_US', 'SBD_TSY']]
+        >>> returns = qis.to_returns(prices, is_log_returns=False).dropna()
+        >>> strategy_weights = pd.DataFrame(
+        ...     {'SEQ_US': 0.7, 'SBD_TSY': 0.3}, index=returns.index)
+        >>> benchmark_weights = pd.DataFrame(
+        ...     {'SEQ_US': 0.6, 'SBD_TSY': 0.4}, index=returns.index)
+        >>> totals_table, *_ = compute_brinson_attribution_table(
+        ...     benchmark_pnl=returns * benchmark_weights,
+        ...     strategy_pnl=returns * strategy_weights,
+        ...     strategy_weights=strategy_weights, benchmark_weights=benchmark_weights,
+        ...     asset_class_data=universe.group_data, group_order=['Equities', 'Bonds'])
         >>> fig = plot_brinson_totals_table(totals_table, var_format='{:.2%}')
-        >>> plt.show()
+        >>> isinstance(fig, plt.Figure)
+        True
+        >>> plt.close(fig)
     """
     # Define visual formatting for the table
     # Highlight the totals row at the bottom

@@ -149,7 +149,8 @@ The capabilities carry named results. The portfolio and optimisation layers supp
 strategic and tactical allocation [@sepp2026robust], the backtester and performance layer work on
 cryptocurrency allocation [@sepp2023crypto], the regime-conditional layer work on trend-following
 systems [@sepp2026trend], and the resampling layer work on capital market assumptions built from
-multi-asset tradable factors [@sepp2026matf]. The last two are working papers.
+multi-asset tradable factors [@sepp2026matf]. The trend-following study is a working paper;
+the capital market assumptions article is forthcoming in The Journal of Portfolio Management.
 
 Commits run from December 2022 to October 2026, with activity in 40 of the 47 calendar months.
 External contributions include the numerical, performance and reporting work acknowledged below

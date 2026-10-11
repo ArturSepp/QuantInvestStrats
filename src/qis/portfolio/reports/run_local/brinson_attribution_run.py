@@ -24,8 +24,15 @@ def run_local(local: Locals) -> None:
         local: Test scenario to execute (currently only ATTRIBUTION available).
 
     Example:
-        >>> run_local(Locals.ATTRIBUTION)
-        # Executes attribution test with mixed asset universe and displays results
+        Execute the mixed-universe attribution diagnostic and capture its printed report.
+
+        >>> import contextlib
+        >>> import io
+        >>> output = io.StringIO()
+        >>> with contextlib.redirect_stdout(output):
+        ...     run_local(Locals.ATTRIBUTION)
+        >>> output.getvalue().splitlines()[0]
+        '=== BRINSON ATTRIBUTION ANALYSIS RESULTS ==='
     """
     if local == Locals.ATTRIBUTION:
         # Test data setup with realistic scenarios

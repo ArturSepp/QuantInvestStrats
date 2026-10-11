@@ -41,32 +41,25 @@ def df_to_cross_sectional_score(df: Union[pd.Series, pd.DataFrame],
         >>> # Series example
         >>> s = pd.Series([1, 2, 3, 4, 5])
         >>> scores = df_to_cross_sectional_score(s)
-        >>> print(scores)
-        0   -1.414
-        1   -0.707
-        2    0.000
-        3    0.707
-        4    1.414
-        dtype: float64
+        >>> scores.round(3).tolist()
+        [-1.414, -0.707, 0.0, 0.707, 1.414]
 
         >>> # DataFrame example (row-wise standardization)
         >>> df = pd.DataFrame({'A': [1, 4, 7], 'B': [2, 5, 8], 'C': [3, 6, 9]})
         >>> scores = df_to_cross_sectional_score(df)
-        >>> print(scores)
-             A    B    C
-        0 -1.0  0.0  1.0
-        1 -1.0  0.0  1.0
-        2 -1.0  0.0  1.0
+        >>> # Default clipping caps raw values at 5 before population-std scaling.
+        >>> scores.iloc[:2].round(3).to_numpy().tolist()
+        [[-1.225, 0.0, 1.225], [-1.414, 0.707, 0.707]]
+        >>> # The last row clips to [5, 5, 5], so its zero dispersion produces NaNs.
+        >>> bool(scores.iloc[2].isna().all())
+        True
 
         >>> # With sorting
         >>> sorted_scores = df_to_cross_sectional_score(s, is_sorted=True)
-        >>> print(sorted_scores)
-        4    1.414
-        3    0.707
-        2    0.000
-        1   -0.707
-        0   -1.414
-        dtype: float64
+        >>> sorted_scores.index.tolist()
+        [4, 3, 2, 1, 0]
+        >>> sorted_scores.round(3).tolist()
+        [1.414, 0.707, 0.0, -0.707, -1.414]
 
     Notes:
         - Uses np.nanmean and np.nanstd to handle NaN values gracefully
@@ -105,19 +98,14 @@ def df_to_max_score(df: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series, pd.D
         >>> # Series example
         >>> s = pd.Series([10, 20, 30])
         >>> max_scores = df_to_max_score(s)
-        >>> print(max_scores)
-        0    0.333
-        1    0.667
-        2    1.000
-        dtype: float64
+        >>> max_scores.round(3).tolist()
+        [0.333, 0.667, 1.0]
 
         >>> # DataFrame example (row-wise max normalization)
         >>> df = pd.DataFrame({'A': [1, 4], 'B': [2, 8], 'C': [3, 12]})
         >>> max_scores = df_to_max_score(df)
-        >>> print(max_scores)
-             A      B    C
-        0  0.333  0.667  1.0
-        1  0.333  0.667  1.0
+        >>> max_scores.round(3).to_numpy().tolist()
+        [[0.333, 0.667, 1.0], [0.333, 0.667, 1.0]]
 
     Notes:
         - Uses np.nanmax to handle NaN values
@@ -167,19 +155,13 @@ def compute_aggregate_scores(scores: List[pd.Series],
         >>>
         >>> # Penalized aggregation (default)
         >>> agg_penalized = compute_aggregate_scores([score1, score2])
-        >>> print(agg_penalized)
-        A    2.828
-        C    2.828
-        B    1.414
-        dtype: float64
+        >>> agg_penalized.round(3).to_dict()
+        {'A': 2.828, 'C': 2.828, 'B': 1.414}
 
         >>> # Mean aggregation (no penalty)
         >>> agg_mean = compute_aggregate_scores([score1, score2], penalise_nan_values=False)
-        >>> print(agg_mean)
-        C    4.000
-        A    2.000
-        B    2.000
-        dtype: float64
+        >>> agg_mean.to_dict()
+        {'C': 4.0, 'A': 2.0, 'B': 2.0}
 
     Notes:
         - When penalise_nan_values=True: uses nansum with normalization
@@ -236,18 +218,16 @@ def select_top_integrated_scores(scores: pd.DataFrame, top_quantile: float = 0.7
         Entity_4      0.9     0.95     0.88
 
         >>> # Select top 75th percentile across all dimensions
-        >>> # 75th percentiles: Score_A=0.825, Score_B=0.762, Score_C=0.857
+        >>> # 75th percentiles: Score_A=0.825, Score_B=0.7625, Score_C=0.8575
         >>> top_performers = select_top_integrated_scores(df, top_quantile=0.75)
         >>> print(top_performers)
                   Score_A  Score_B  Score_C
         Entity_4      0.9     0.95     0.88
 
-        >>> # More selective: top 90th percentile (would return empty DataFrame)
+        >>> # Entity_4 also exceeds all 90th percentiles: 0.87, 0.875, 0.871.
         >>> elite_performers = select_top_integrated_scores(df, top_quantile=0.90)
-        >>> print(elite_performers)
-        Empty DataFrame
-        Columns: [Score_A, Score_B, Score_C]
-        Index: []
+        >>> elite_performers.index.tolist()
+        ['Entity_4']
 
     Notes:
         - Uses logical AND across all columns - entities must excel in ALL dimensions

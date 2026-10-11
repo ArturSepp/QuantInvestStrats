@@ -1580,9 +1580,15 @@ def delever_returns(returns: Union[pd.Series, pd.DataFrame],
         approximation.
 
     Example:
-        >>> # De-lever OCSL using its actual weighted average debt rate of 6.1%
-        >>> ocsl_unlev = delever_returns(ocsl_returns, leverage=1.07,
-        ...                              financing_rate=0.061)
+        Recover asset returns from synthetic observed arithmetic returns, assuming
+        debt/equity of 1 and a 6% annual financing cost on a 252-period basis.
+
+        >>> from qis.datasets import generate_synthetic_prices
+        >>> prices = generate_synthetic_prices(start='2024-01-02', end='2024-03-28')
+        >>> observed = to_returns(prices['SEQ_US'], is_log_returns=False).dropna()
+        >>> unlevered = delever_returns(observed, leverage=1.0,
+        ...                            financing_rate=0.06, periods_per_year=252)
+        >>> np.testing.assert_allclose(unlevered, (observed + 0.06 / 252) / 2)
     """
     # Validate explicit inputs before zero leverage can bypass an invalid annualization factor.
     _validate_leverage_parameters(leverage=leverage, periods_per_year=periods_per_year)
@@ -1650,9 +1656,15 @@ def lever_returns(returns: Union[pd.Series, pd.DataFrame],
             values or date axes violate the contract described above.
 
     Example:
-        >>> # Show what GCF would look like at 1x leverage with BDC-like financing
-        >>> gcf_levered = lever_returns(gcf_returns, leverage=1.0,
-        ...                             financing_rate=0.061)
+        Apply debt/equity of 1 to synthetic arithmetic returns, with a 6% annual
+        financing cost on a 252-period basis.
+
+        >>> from qis.datasets import generate_synthetic_prices
+        >>> prices = generate_synthetic_prices(start='2024-01-02', end='2024-03-28')
+        >>> asset_returns = to_returns(prices['SEQ_US'], is_log_returns=False).dropna()
+        >>> levered = lever_returns(asset_returns, leverage=1.0,
+        ...                         financing_rate=0.06, periods_per_year=252)
+        >>> np.testing.assert_allclose(levered, 2 * asset_returns - 0.06 / 252)
     """
     # Validate explicit inputs before zero leverage can bypass an invalid annualization factor.
     _validate_leverage_parameters(leverage=leverage, periods_per_year=periods_per_year)
@@ -1705,9 +1717,15 @@ def implied_leverage(levered_returns: Union[pd.Series, pd.DataFrame],
         with caution and only when both vehicles target the same underlying exposure.
 
     Example:
-        >>> # Estimate OCSL's implied leverage vs Oaktree GCF
-        >>> L = implied_leverage(ocsl_returns, gcf_returns)
+        Estimate the known debt/equity ratio of a synthetic levered series.
+
+        >>> from qis.datasets import generate_synthetic_prices
+        >>> prices = generate_synthetic_prices(start='2024-01-02', end='2024-03-28')
+        >>> asset_returns = to_returns(prices['SEQ_US'], is_log_returns=False).dropna()
+        >>> levered = 2 * asset_returns - 0.06 / 252
+        >>> L = implied_leverage(levered, asset_returns)
         >>> print(f"Implied leverage: {L:.2f}x")
+        Implied leverage: 1.00x
     """
     if isinstance(levered_returns, pd.Series):
         joint = pd.concat([levered_returns, unlevered_returns], axis=1, sort=True).dropna()
