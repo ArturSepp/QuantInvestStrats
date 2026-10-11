@@ -267,7 +267,7 @@ def _excel_ownership_frame(timezone):
     return frame
 
 
-@pytest.mark.parametrize('timezone', ['UTC', 'US/Eastern', None])
+@pytest.mark.parametrize('timezone', ['UTC', 'America/New_York', None])
 @pytest.mark.parametrize('shape, transpose', [
     ('direct', False), ('list', False), ('dict', False), ('dedicated-dict', False),
     ('direct', True), ('list', True), ('dict', True),
@@ -315,7 +315,7 @@ def test_save_df_to_excel_preserves_inputs_and_wall_clock_output(
 @pytest.mark.parametrize('dedicated', [False, True])
 def test_save_df_to_excel_preserves_input_when_writer_cannot_open(tmp_path, monkeypatch, dedicated):
     """Normalization happens before writer construction, so rejection must preserve the caller."""
-    frame = _excel_ownership_frame('US/Eastern')
+    frame = _excel_ownership_frame('America/New_York')
     before = frame.copy(deep=True)
     caller_index = frame.index
 
@@ -333,7 +333,7 @@ def test_save_df_to_excel_preserves_input_when_writer_cannot_open(tmp_path, monk
     assert frame.attrs == before.attrs
 
 
-@pytest.mark.parametrize('timezone', ['UTC', 'US/Eastern'])
+@pytest.mark.parametrize('timezone', ['UTC', 'America/New_York'])
 def test_save_df_dict_to_excel_keeps_timezone_rejection_without_delocalize(tmp_path, timezone):
     """Owning a normalized frame must not silently enable the dedicated writer's opt-in."""
     frame = _excel_ownership_frame(timezone)
@@ -345,7 +345,7 @@ def test_save_df_dict_to_excel_keeps_timezone_rejection_without_delocalize(tmp_p
 
 def test_save_df_to_excel_preserves_timezone_aware_series_coercion(tmp_path):
     """Series promotion already owns its frame; preserve that accepted warning and index."""
-    series = _excel_ownership_frame('US/Eastern')['value']
+    series = _excel_ownership_frame('America/New_York')['value']
     before = series.copy(deep=True)
     with pytest.warns(UserWarning, match='Series converted'):
         fu.save_df_to_excel([series], 'series', str(tmp_path))
@@ -356,7 +356,7 @@ def test_save_df_to_excel_preserves_timezone_aware_append(tmp_path):
     """An appended sheet needs the same ownership boundary without replacing the first sheet."""
     first = pd.DataFrame({'value': [7.0]}, index=['sentinel'])
     fu.save_df_to_excel({'first': first}, 'append', str(tmp_path))
-    frame = _excel_ownership_frame('US/Eastern')
+    frame = _excel_ownership_frame('America/New_York')
     before = frame.copy(deep=True)
     path = fu.save_df_to_excel({'second': frame}, 'append', str(tmp_path), mode='a')
     pd.testing.assert_frame_equal(frame, before, check_exact=True)
