@@ -58,7 +58,7 @@ first observation of a 250-period sample at 0.11 times its uniform probability a
 decile at 0.53 times. With drift rising through the sample, the truncated resampled mean exceeds
 the sample mean by 2.15% per year, while circular wrapping reproduces it within 0.32% per year.
 Both figures are specific to this sample, and regression tests pin them to the example. Results
-generated before version 5.1.0 therefore require that version to reproduce.
+generated before version 5.1.0 therefore require the original pre-5.1.0 software version to reproduce.
 
 Conventions also diverge inside one research pipeline, because each consumer of a result may
 rebuild the reported quantities. One strategy can then show three Sharpe ratios, one each in a
@@ -137,7 +137,7 @@ discoverability. The curated core gives new users a smaller entry point without 
 export.
 
 Tests check exported plots on synthetic panels, the documented arguments of the core, local
-documentation links and every measurement this paper quotes. Selected offline examples execute in
+documentation links and the recorded software measurements quoted in this paper. Selected offline examples execute in
 the suite, and static checks cover the imports and calls of all examples. Plot smoke tests
 establish that figures draw, while layout and readability require visual review. The suite runs
 without network access on a core installation, using a frozen, seeded simulator that reproduces
@@ -175,7 +175,7 @@ overlays, forthcoming in the Journal of Investment Management [@sepp2026convexit
 [public companion example](https://github.com/ArturSepp/OptimalPortfolios/tree/main/papers/smart_diversification_joim_2026)
 of that paper demonstrates these calculations on synthetic data.
 
-On 11 October 2026, the repository had 642 GitHub stars and 72 forks, and pypistats.org reported
+On 11 October 2026, the repository had 642 GitHub stars and 75 forks, and pypistats.org reported
 9342 PyPI downloads over the last month, excluding known mirrors. The commit history runs from
 December 2022 to October 2026, with commits in 40 of the 47 calendar months.
 
@@ -185,8 +185,8 @@ From July to October 2026, Anthropic's Claude (Opus 5, Opus 5.5, Fable 5 and Fab
 OpenAI Codex (Sol 5.6) assisted with software development, tests, documentation and paper preparation. The
 author made the methodological and architectural decisions, reviewed and validated the assisted
 outputs and remains responsible for the work. Assisted changes pass through the same test suite
-and continuous integration as all other changes, and the suite checks each measurement this paper
-quotes against a recomputed or recorded value.
+and continuous integration as all other changes. The suite checks the recorded software measurements
+quoted in this paper against recomputed values or recorded provenance.
 
 # Acknowledgements
 
