@@ -135,6 +135,16 @@ smoothing.
 
 # Research impact statement
 
+Two public projects demonstrate use outside the author's own package stack.
+[`tradingstrategy-ai/optimalportfolios-defi`](https://github.com/tradingstrategy-ai/optimalportfolios-defi)
+declares `qis` as a dependency and includes an
+[example](https://github.com/tradingstrategy-ai/optimalportfolios-defi/blob/ea8970bcd7aff61a22078b7baa55600bbb0bfd31/scripts/example.py)
+that uses its backtester, strategy factsheets and report export functions. The
+[`luna-007/extra`](https://github.com/luna-007/extra) repository contains a
+[backtesting example](https://github.com/luna-007/extra/blob/c71e30753aa47beb3e622a6123a3d9f949228cca/backtest.py)
+that uses `qis` to compare leveraged ETF allocations, account for funding costs and generate
+a performance factsheet. These repositories provide publicly inspectable examples of external reuse.
+
 The public consumers below are maintained by the author, so they demonstrate research reuse
 within this stack rather than independent adoption. `optimalportfolios` declares `qis` a
 mandatory dependency and references 137 of its symbols
@@ -145,12 +155,15 @@ at 428 sites. Both counts are taken at the commits recorded in
 A third public package, `privateassets`, applies the unsmoothing layer to private-asset
 returns; we cite it for the range of asset classes served, not as adoption evidence.
 
-The capabilities carry named results. The portfolio and optimisation layers support work on robust
-strategic and tactical allocation [@sepp2026robust], the backtester and performance layer work on
-cryptocurrency allocation [@sepp2023crypto], the regime-conditional layer work on trend-following
-systems [@sepp2026trend], and the resampling layer work on capital market assumptions built from
-multi-asset tradable factors [@sepp2026matf]. The trend-following study is a working paper;
-the capital market assumptions article is forthcoming in The Journal of Portfolio Management.
+Within the author's research stack, `qis` supports published work on cryptocurrency allocation
+[@sepp2023crypto] and robust strategic and tactical asset allocation [@sepp2026robust]. Its
+regime-conditional analytics support the working paper on trend-following systems [@sepp2026trend],
+while its resampling functionality supports research on capital market assumptions using multi-asset
+tradable factors, forthcoming in The Journal of Portfolio Management in 2027 [@sepp2026matf]. The
+package also supplies regime-conditional analytics and reporting for *The Convexity Premium of
+Portfolio Overlays*, forthcoming in the Journal of Investment Management [@sepp2026convexity]. The
+paper's [public companion example](https://github.com/ArturSepp/OptimalPortfolios/tree/main/papers/smart_diversification_joim_2026)
+demonstrates these calculations and portfolio-overlay reports using synthetic data.
 
 Commits run from December 2022 to October 2026, with activity in 40 of the 47 calendar months.
 External contributions include the numerical, performance and reporting work acknowledged below
