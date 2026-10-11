@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Render optional Plotly data-history charts with the supported timeline API,
+  preserving history dates, grouped instrument rows and resource colours on Plotly 7.
+
 ## [5.36.0] - 2026-10-09
 
 ### Changed

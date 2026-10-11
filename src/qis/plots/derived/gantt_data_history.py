@@ -7,13 +7,36 @@ Requires the optional ``plotly`` dependency.
 
 import numpy as np
 import pandas as pd
-from plotly import figure_factory as ff, graph_objects as go
+from plotly import express as px, graph_objects as go
 from typing import List, Optional
+
+
+def _history_timeline(records: List[dict], colors: dict) -> go.Figure:
+    """Draw history intervals with the supported Plotly timeline API.
+
+    Args:
+        records: Task, Start, Finish and Resource entries for each history interval.
+        colors: Existing resource colours used in the history legend.
+
+    Returns:
+        A figure with one row per task, in input order from top to bottom.
+    """
+    frame = pd.DataFrame(records, columns=['Task', 'Start', 'Finish', 'Resource'])
+    frame['Start'] = pd.to_datetime(frame['Start'])
+    frame['Finish'] = pd.to_datetime(frame['Finish'])
+    fig = px.timeline(frame, x_start='Start', x_end='Finish', y='Task', color='Resource',
+                      color_discrete_map=colors, title='Gantt Chart')
+    fig.update_traces(width=0.4)
+    fig.update_xaxes(title_text='', showgrid=False)
+    fig.update_yaxes(title_text='', showgrid=False, autorange='reversed',
+                     categoryorder='array', categoryarray=list(dict.fromkeys(frame['Task'])))
+    return fig
 
 
 def plot_price_history(prices: pd.DataFrame,
                        descriptions: Optional[pd.Series] = None,
-                       dates_for_lines: Optional[List[pd.Timestamp]] = (pd.Timestamp('01Jan2005'), pd.Timestamp('01Jan2020'), ),
+                       dates_for_lines: Optional[List[pd.Timestamp]] = (
+                           pd.Timestamp('01Jan2005'), pd.Timestamp('01Jan2020'), ),
                        resource_name: str = 'Price',
                        file_path_to_save: Optional[str] = None
                        ) -> go.Figure:
@@ -42,8 +65,7 @@ def plot_price_history(prices: pd.DataFrame,
     colors = {resource_name: 'rgb(0, 255, 100)',
               'NA': 'rgb(100, 100, 100)'}
 
-    fig = ff.create_gantt(dicts, colors=colors, index_col='Resource', show_colorbar=True,
-                          group_tasks=True)
+    fig = _history_timeline(dicts, colors)
 
     # add date lines
     if dates_for_lines is not None:
@@ -52,9 +74,10 @@ def plot_price_history(prices: pd.DataFrame,
                 {
                     'type': 'line',
                     'x0': current_date,
-                    'y0': -1,
+                    'yref': 'paper',
+                    'y0': 0,
                     'x1': current_date,
-                    'y1': len(dicts) - 1,
+                    'y1': 1,
                     'line': {
                         'color': 'rgb(239, 90, 19)',
                         'width': 3,
@@ -83,9 +106,9 @@ def plot_backfill_history(backfill_data: pd.DataFrame,
                           bbg_data: pd.DataFrame,
                           futures_backfills: pd.DataFrame,
                           instrument_names: pd.Series = None,
-                          dates_for_lines: Optional[List[pd.Timestamp]] = (pd.Timestamp('01Jan1962'),
-                                                                           pd.Timestamp('01Jan1971'),
-                                                                           pd.Timestamp('01Jan1992'),),
+                          dates_for_lines: Optional[List[pd.Timestamp]] = (
+                              pd.Timestamp('01Jan1962'), pd.Timestamp('01Jan1971'),
+                              pd.Timestamp('01Jan1992'),),
                           file_path_to_save: Optional[str] = None
                           ) -> go.Figure:
     """
@@ -98,14 +121,15 @@ def plot_backfill_history(backfill_data: pd.DataFrame,
     else:
         descriptions = [f"{asset}" for asset in backfill_data.columns]
 
-    is_in_bb_data = np.isin(backfill_data.columns.to_list(), bbg_data.columns.to_list(), assume_unique=True)
+    is_in_bb_data = np.isin(backfill_data.columns.to_list(), bbg_data.columns.to_list(),
+                            assume_unique=True)
 
     dicts = []
     is_add_cut_off = True  # to limit bloomberg backfill indicator to universes start
     for asset, description, in_bb in zip(backfill_data.columns, descriptions, is_in_bb_data):
 
         # 1 check backfill data
-        if in_bb and np.all(np.isnan(backfill_data[asset])) == False:
+        if in_bb and not np.all(np.isnan(backfill_data[asset])):
 
             # get bloomberg time series start
             asset_data = bbg_data[asset].dropna()
@@ -116,7 +140,8 @@ def plot_backfill_history(backfill_data: pd.DataFrame,
                 if bbg_start < const_data_start:
                     bbg_start = const_data_start
 
-            bbg_dict = dict(Task=description, Start=bbg_start, Finish=asset_data.index[-1], Resource='Bloomberg')
+            bbg_dict = dict(Task=description, Start=bbg_start, Finish=asset_data.index[-1],
+                            Resource='Bloomberg')
             dicts.append(bbg_dict)
 
             # now check if it is art of universes
@@ -125,23 +150,28 @@ def plot_backfill_history(backfill_data: pd.DataFrame,
                 futures_backfill = futures_backfills[asset].dropna()
                 if not futures_backfill.empty:
                     # first if future backfill
-                    backfill_dict = dict(Task=description, Start=futures_backfill.index[0], Finish=bbg_start, Resource='Futures Backfill')
+                    backfill_dict = dict(Task=description, Start=futures_backfill.index[0],
+                                         Finish=bbg_start, Resource='Futures Backfill')
                     dicts.append(backfill_dict)
                     # then cash backfill
-                    backfill_dict = dict(Task=description, Start=non_nan_backfill_data.index[0], Finish=futures_backfill.index[0], Resource='Cash Backfill')
+                    backfill_dict = dict(Task=description, Start=non_nan_backfill_data.index[0],
+                                         Finish=futures_backfill.index[0], Resource='Cash Backfill')
                     dicts.append(backfill_dict)
                 else:
-                    backfill_dict = dict(Task=description, Start=non_nan_backfill_data.index[0], Finish=bbg_start, Resource='Cash Backfill')
+                    backfill_dict = dict(Task=description, Start=non_nan_backfill_data.index[0],
+                                         Finish=bbg_start, Resource='Cash Backfill')
                     dicts.append(backfill_dict)
 
         elif asset in bbg_data.columns:
             asset_data = bbg_data[asset].dropna()
-            this2 = dict(Task=description, Start=asset_data.index[0], Finish=asset_data.index[-1], Resource='Bloomberg')
+            this2 = dict(Task=description, Start=asset_data.index[0], Finish=asset_data.index[-1],
+                          Resource='Bloomberg')
             dicts.append(this2)
 
         elif (asset in backfill_data.columns and np.all(backfill_data[asset].isnull()) is False):
             asset_data = backfill_data[asset].dropna()
-            this2 = dict(Task=description, Start=asset_data.index[0], Finish=asset_data.index[-1], Resource='Cash Backfill')
+            this2 = dict(Task=description, Start=asset_data.index[0], Finish=asset_data.index[-1],
+                          Resource='Cash Backfill')
             dicts.append(this2)
 
     colors = {'Cash Backfill': 'rgb(220, 0, 0)',
@@ -149,7 +179,7 @@ def plot_backfill_history(backfill_data: pd.DataFrame,
               'Bloomberg': 'rgb(0, 255, 100)',
               'NA': 'rgb(100, 100, 100)'}
 
-    fig = ff.create_gantt(dicts, colors=colors, index_col='Resource', show_colorbar=True, group_tasks=True)
+    fig = _history_timeline(dicts, colors)
 
     # add current line
     if dates_for_lines is not None:
@@ -158,9 +188,10 @@ def plot_backfill_history(backfill_data: pd.DataFrame,
                 {
                     'type': 'line',
                     'x0': current_date,
-                    'y0': -1,
+                    'yref': 'paper',
+                    'y0': 0,
                     'x1': current_date,
-                    'y1': len(dicts)-1,
+                    'y1': 1,
                     'line': {
                         'color': 'rgb(239, 90, 19)',
                         'width': 3,
