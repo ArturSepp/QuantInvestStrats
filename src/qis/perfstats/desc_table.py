@@ -14,6 +14,8 @@ the index via ``infer_annualisation_factor_from_df``, reporting ``STD_AN`` rathe
 whether the volatility column is annualised. Risk-adjusted statistics are ``perf_stats.py``.
 """
 import sys
+from decimal import Decimal, localcontext
+from fractions import Fraction
 
 # packages
 import numpy as np
@@ -131,6 +133,30 @@ def _translate_finite_columns(data: np.ndarray) -> np.ndarray:
     return data - origins
 
 
+def _compute_upper_range_std(observed: np.ndarray) -> float:
+    """Resolve upper-range sample spread without rounded overflow classification.
+
+    Args:
+        observed: At least two finite observations with extreme sample spread.
+
+    Returns:
+        Sample standard deviation, or infinity if its exact variance exceeds binary64's
+        maximum finite value squared.
+    """
+    # Binary64 observations are exact rationals. Compare variance before taking a square root,
+    # so rounding in the normalized reduction cannot decide whether the result is finite.
+    values = [Fraction.from_float(float(value)) for value in observed]
+    count = len(values)
+    total = sum(values)
+    variance = (sum(value * value for value in values) - total * total / count) / (count - 1)
+    if variance > Fraction.from_float(sys.float_info.max) ** 2:
+        return np.inf
+    with localcontext() as context:
+        # More than binary64's 17 significant decimal digits, independent of ambient precision.
+        context.prec = 80
+        return float((Decimal(variance.numerator) / Decimal(variance.denominator)).sqrt())
+
+
 def _compute_sample_std(data: np.ndarray) -> np.ndarray:
     """Compute column-wise sample spread without intermediate scale failure.
 
@@ -161,16 +187,22 @@ def _compute_sample_std(data: np.ndarray) -> np.ndarray:
             if minimum_safe_scale <= scale <= maximum_safe_scale:
                 sample_stds[column_position] = np.std(translated, ddof=1)
                 continue
-            normalized = translated / scale
+            # Tiny normalized components may round to zero without affecting the spread.
+            with np.errstate(under="ignore"):
+                normalized = translated / scale
         else:
             # Scale wide signed levels before translating so their finite range cannot overflow.
             scale = np.max(np.abs(observed))
-            normalized = observed / scale
+            with np.errstate(under="ignore"):
+                normalized = observed / scale
             normalized = normalized - np.min(normalized)
 
-        # Rescale once so only a genuinely unrepresentable result becomes zero or infinity.
         with np.errstate(over="ignore", under="ignore"):
-            sample_stds[column_position] = scale * np.std(normalized, ddof=1)
+            sample_std = scale * np.std(normalized, ddof=1)
+        # Only extreme spreads need the exact fallback; retain the existing ordinary reduction.
+        if sample_std >= sys.float_info.max / 2.0:
+            sample_std = _compute_upper_range_std(observed)
+        sample_stds[column_position] = sample_std
     return sample_stds
 
 
@@ -350,7 +382,8 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             sample_std=std,
             observation_counts=observation_counts,
         )
-        descriptive_table[PerfStat.T_STAT.to_str()] = [norm_variable_display_type.format(x) for x in tstats]
+        descriptive_table[PerfStat.T_STAT.to_str()] = [
+            norm_variable_display_type.format(x) for x in tstats]
 
     nan_policy = 'omit'  # skip nans
     if desc_table_type == DescTableType.NONE:
@@ -366,11 +399,13 @@ def compute_desc_table(df: Union[pd.DataFrame, pd.Series],
             [PerfStat.AVG.value.name, volatility_column], axis=1)
 
         prob = _compute_positive_probability(data=data_np)
-        descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
+        descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = [
+            '{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_POSITIVE_PROB:
         prob = _compute_positive_probability(data=data_np)
-        descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = ['{:.1%}'.format(x) for x in prob]
+        descriptive_table[PerfStat.POSITIVE.to_str(short=True, short_n=True)] = [
+            '{:.1%}'.format(x) for x in prob]
 
     elif desc_table_type == desc_table_type.WITH_KURTOSIS:
         # Evaluate moments only for eligible varying columns so undefined samples do not warn.

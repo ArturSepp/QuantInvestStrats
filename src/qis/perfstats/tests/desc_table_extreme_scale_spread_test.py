@@ -15,6 +15,7 @@ result larger than binary64 can represent.
 """
 
 import sys
+from decimal import Decimal, localcontext
 import warnings
 from typing import Protocol, cast
 
@@ -332,3 +333,73 @@ def test_compute_desc_table_preserves_safe_scale_sample_spread() -> None:
     actual = _compute_without_warnings(samples, annualize_vol=False)
 
     pd.testing.assert_frame_equal(actual, expected)
+
+
+def _decimal_sample_std(values: list[float]) -> float:
+    """Compute an independent two-pass reference on the exact stored observations.
+
+    Args:
+        values: Finite sample observations.
+
+    Returns:
+        Sample spread, or infinity when its exact value exceeds binary64's finite range.
+    """
+    with localcontext() as context:
+        context.prec = 1000
+        observed = [Decimal.from_float(value) for value in values]
+        mean = sum(observed) / Decimal(len(observed))
+        variance = sum((value - mean) ** 2 for value in observed) / (len(observed) - 1)
+        spread = variance.sqrt()
+        if spread > Decimal.from_float(sys.float_info.max):
+            return np.inf
+        return float(spread)
+
+
+@pytest.mark.parametrize("nullable", (False, True), ids=("float64", "nullable-float64"))
+@pytest.mark.parametrize("step", (-1, 0, 1), ids=("below", "boundary", "above"))
+def test_compute_desc_table_rescales_near_maximum_spread(step: int, nullable: bool) -> None:
+    """Distinguish rounded overflow from a truly unrepresentable periodic spread.
+
+    Args:
+        step: Adjacent binary64 amplitude relative to the reported boundary reproducer.
+        nullable: Whether to use pandas nullable Float64 storage.
+    """
+    amplitude = 1.5568479229996502e308
+    if step:
+        amplitude = float(np.nextafter(amplitude, np.inf if step > 0 else 0.0))
+    values = [-amplitude, amplitude, amplitude]
+    expected_std = _decimal_sample_std(values)
+    samples = pd.Series(values, name="Boundary", dtype="Float64" if nullable else "float64")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        actual = _DESC_TABLE_MODULE.compute_desc_table(
+            df=samples, desc_table_type=DescTableType.SHORT,
+            annualize_vol=False, is_add_tstat=True,
+            var_format="{:.17g}", norm_variable_display_type="{:.17g}",
+        )
+    assert float(actual.loc["Boundary", "Std"]) == expected_std
+    if np.isfinite(expected_std):
+        assert float(actual.loc["Boundary", "T-stat"]) == pytest.approx(0.5, abs=2e-16)
+    else:
+        assert actual.loc["Boundary", "T-stat"] == "nan"
+
+
+@pytest.mark.parametrize("values", ([0.0, 1e-200, 1e200], [-1e308, 1e308, 1e-200]))
+def test_compute_desc_table_tolerates_negligible_scaled_observations(values: list[float]) -> None:
+    """Discard negligible normalized components without leaking underflow warnings.
+
+    Args:
+        values: Finite observations spanning more than binary64's normalized dynamic range.
+    """
+    samples = pd.Series(values, name="Mixed scale")
+    # Check spread independently of a t-statistic whose tiny ratio legitimately rounds to zero.
+    with np.errstate(under="warn"), warnings.catch_warnings():
+        warnings.simplefilter("error")
+        actual = _DESC_TABLE_MODULE.compute_desc_table(
+            df=samples, desc_table_type=DescTableType.SHORT,
+            annualize_vol=False, is_add_tstat=False,
+            var_format=_VALUE_FORMAT, norm_variable_display_type=_VALUE_FORMAT,
+        )
+    assert float(actual.loc["Mixed scale", "Std"]) == pytest.approx(
+        _decimal_sample_std(values), rel=5e-12
+    )
