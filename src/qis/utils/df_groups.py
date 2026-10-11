@@ -132,10 +132,18 @@ def agg_df_by_groups_ax1(df: pd.DataFrame,
                          total_column: Union[str, None] = None,
                          group_order: List[str] = None
                          ) -> pd.DataFrame:
-    """
-    take df[index=time series, data = asset data]
-    slit data according to grouping by rows in group_data[asset_group_column] in group_data
-    agg data by groups
+    """Aggregate each row's instruments into their classified groups.
+
+    Args:
+        df: Time-by-instrument panel.
+        group_data: Group labels indexed by instrument identifier.
+        agg_func: Row aggregation callable; custom callables receive a labeled Series.
+            Defaults to NumPy's missing-value-ignoring sum.
+        total_column: Optional extra group containing all classified instruments in df.
+        group_order: Preferred group order; other observed groups are appended.
+
+    Returns:
+        Group aggregates retaining the input row index. Groups absent from df are omitted.
     """
     # group by descriptive data
     group_dict = get_group_dict(group_data=group_data,
@@ -146,7 +154,17 @@ def agg_df_by_groups_ax1(df: pd.DataFrame,
     grouped_data = {}
     for key, columns in group_dict.items():
         if len(columns) > 0:  # get subset of pandas by columns, copy() to break view
-            grouped_data[key] = df[columns].apply(agg_func, axis=1).rename(key)
+            group_frame = df[columns]
+            # Raw rows avoid a Series per observation while keeping NumPy's row-wise sum
+            # order. An axis reduction can round differently. Nullable/object storage
+            # needs pandas scalar semantics; custom callables may depend on row labels.
+            use_raw = (
+                agg_func is np.nansum
+                and not any(isinstance(dtype, pd.api.extensions.ExtensionDtype)
+                            for dtype in group_frame.dtypes)
+                and group_frame.to_numpy().dtype.kind in 'biufc'
+            )
+            grouped_data[key] = group_frame.apply(agg_func, axis=1, raw=use_raw).rename(key)
     grouped_data = pd.DataFrame.from_dict(grouped_data, orient='columns')
     return grouped_data
 
