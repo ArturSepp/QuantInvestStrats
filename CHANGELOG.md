@@ -13,6 +13,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   portfolio-exposure callers, preventing a single group from silently replacing the
   all-instrument total. Distinct total labels and grouping without a total are unchanged.
 
+### Changed
+
+- Reduce peak memory in `estimate_rolling_ewma_covar` by applying availability masks only
+  to returned rebalancing matrices instead of copying the full covariance history. Covariance
+  estimates, per-asset warm-up, dates and labels are unchanged; the estimator still retains its
+  full covariance tensor.
+
 ## [5.36.1] - 2026-10-12
 
 ### Fixed

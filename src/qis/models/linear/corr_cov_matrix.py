@@ -108,8 +108,6 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
     # column rather than the zero that the reset recursion carries, which reads as no risk
     num_returns = np.cumsum(np.isfinite(returns_np), axis=0)
     is_available = num_returns > (0 if warmup_period is None else int(warmup_period))
-    pair_available = is_available[:, :, None] & is_available[:, None, :]
-    covar_tensor_txy = np.where(pair_available, covar_tensor_txy, np.nan)
 
     # create rebalancing schedule
     rebalancing_schedule = da.generate_rebalancing_indicators(df=returns, freq=rebalancing_freq)
@@ -129,7 +127,13 @@ def estimate_rolling_ewma_covar(prices: pd.DataFrame,
             end_date = time_period.end.tz_localize(tz=returns.index.tz)
     for idx, (date, value) in enumerate(rebalancing_schedule.items()):
         if value and start_date <= date <= end_date:
-            covar_t = pd.DataFrame(covar_tensor_txy[idx], index=tickers, columns=tickers)
+            # Only returned dates need masked matrices. This avoids a second t*n*n covariance
+            # tensor and full-history pair mask, while preserving each asset's own warm-up.
+            # np.where copies this slice so the engine tensor and other dates stay untouched.
+            available = is_available[idx]
+            pair_available = available[:, None] & available[None, :]
+            masked_covar = np.where(pair_available, covar_tensor_txy[idx], np.nan)
+            covar_t = pd.DataFrame(masked_covar, index=tickers, columns=tickers)
             covars[date] = an_factor*covar_t
     return covars
 
