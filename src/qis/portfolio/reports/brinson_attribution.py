@@ -18,6 +18,7 @@ from qis.portfolio.attribution.brinson import (
 )
 import qis.plots.time_series as pts
 from qis.plots.table import plot_df_table
+from qis.portfolio._asset_display import plot_asset_time_series, reduce_rows
 
 
 def plot_brinson_attribution_table(
@@ -89,11 +90,15 @@ def plot_brinson_attribution_table(
         ...     plt.close(fig)
     """
     # Generate formatted summary table
+    count = kwargs.get('asset_tail_count')
+    totals_table, table_title = reduce_rows(
+        totals_table, totals_table.iloc[:, -1], count, kwargs.get('title'),
+        additive=True, keep=(total_column,), metric='active contribution')
     fig_table = plot_brinson_totals_table(
         totals_table=totals_table,
         var_format=var_format,
         ax=axs[0],
-        **kwargs
+        **dict(kwargs, title=table_title)
     )
 
     # Linked inputs are already Frongello-adjusted increments; cumsum links only once.
@@ -111,8 +116,9 @@ def plot_brinson_attribution_table(
         grouped_active_return = (
             grouped_allocation_return + grouped_selection_return
         ).drop(columns=total_column, errors='ignore')
-        fig_ts_final = pts.plot_time_series(
+        fig_ts_final = plot_asset_time_series(
             df=grouped_active_return.cumsum(axis=0),
+            asset_additive=True,
             var_format=var_format,
             title='Total Cumulative Active Effects by Groups',
             legend_stats=qis.LegendStats.LAST_NONNAN,
@@ -127,8 +133,9 @@ def plot_brinson_attribution_table(
 
     # Plot cumulative allocation effects by asset class
     cum_allocation_return = grouped_allocation_return.cumsum(axis=0)
-    fig_ts_alloc = pts.plot_time_series(
+    fig_ts_alloc = plot_asset_time_series(
         df=cum_allocation_return,
+        asset_additive=True, asset_totals=(total_column,),
         var_format=var_format,
         title='Cumulative Asset Class Allocation Effects',
         legend_stats=qis.LegendStats.LAST_NONNAN,
@@ -138,8 +145,9 @@ def plot_brinson_attribution_table(
 
     # Plot cumulative selection effects by asset class
     cum_selection_return = grouped_selection_return.cumsum(axis=0)
-    fig_ts_sel = pts.plot_time_series(
+    fig_ts_sel = plot_asset_time_series(
         df=cum_selection_return,
+        asset_additive=True, asset_totals=(total_column,),
         var_format=var_format,
         title='Cumulative Instrument Selection Effects',
         legend_stats=qis.LegendStats.LAST_NONNAN,
@@ -149,8 +157,9 @@ def plot_brinson_attribution_table(
 
     if not is_exclude_interaction_term:
         cum_interaction_return = grouped_interaction_return.cumsum(axis=0)
-        fig_ts_final = pts.plot_time_series(
+        fig_ts_final = plot_asset_time_series(
             df=cum_interaction_return,
+            asset_additive=True, asset_totals=(total_column,),
             trend_line=pts.TrendLine.TREND_LINE,
             var_format=var_format,
             title='Cumulative Asset Class Interaction Effects',

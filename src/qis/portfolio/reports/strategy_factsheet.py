@@ -37,6 +37,10 @@ from typing import Tuple, Optional, List, Union
 import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
+from qis.portfolio._asset_display import (
+    compact_groups, factsheet_kwargs, plot_asset_bars, plot_asset_stack,
+    plot_asset_time_series, price_tails,
+)
 from qis.portfolio.reports.config import (
     DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
     PERF_PARAMS,
@@ -212,11 +216,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             it still controls whether costs are normalized by NAV
         df_to_add: extra frame appended as a table
         factsheet_name: report title
-        **kwargs: forwarded to the underlying plot functions
+        **kwargs: forwarded to the underlying plot functions. ``asset_tail_count`` is 10
+            (default) or 20 per side. Large asset panels show both tails by the displayed
+            metric; additive panels retain an Other remainder and full portfolio totals
 
     Returns:
         one figure per page, in page order
     """
+    kwargs = factsheet_kwargs(kwargs)
     if 'heatmap_fontsize' in kwargs:
         raise TypeError("heatmap_fontsize was removed; use fontsize")
     if monthly_returns_heatmap_max_years is not None and monthly_returns_heatmap_max_years <= 0:
@@ -233,7 +240,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     if not is_grouped:
         if len(portfolio_data.get_weights().columns) >= 10:  # otherwise tables look too bad
-            warnings.warn(f"report for more than 10 assets is not supported for is_grouped=False, switching to is_grouped=True ")
+            warnings.warn(
+                "Using portfolio groups for a report with at least 10 assets; "
+                "oversized asset panels show bottom/top selections.")
             is_grouped = True
     is_grouped_for_summary_tables = _use_grouped_summary_tables(
         portfolio_data=portfolio_data,
@@ -350,7 +359,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[8:10, :2])
     if weights_freq is not None:
         exposures = exposures.resample(weights_freq).last()
-    qis.plot_stack(df=exposures,
+    plot_asset_stack(df=exposures,
                    use_bar_plot=True,
                    title=f'Exposures ({weights_freq}-freq)' if weights_freq is not None else 'Exposures',
                    legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
@@ -385,7 +394,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     turnover_title = (
         f"{turnover_rolling_period}-period rolling {freq}-freq {turnover_label}"
     )
-    qis.plot_time_series(df=turnover,
+    plot_asset_time_series(df=turnover, asset_additive=True,
+                         asset_totals=(portfolio_data.nav.name,),
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
                          legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
@@ -406,7 +416,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      is_unit_based_traded_volume=is_unit_based_costs)
     freq = freq_cost or pd.infer_freq(costs.index)
     costs_title = f"{cost_rolling_period}-period rolling {freq}-freq Costs"
-    qis.plot_time_series(df=costs,
+    plot_asset_time_series(df=costs, asset_additive=True,
+                         asset_totals=(portfolio_data.nav.name,),
                          var_format='{:,.2%}',
                          # y_limits=(0.0, None),
                          legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
@@ -580,24 +591,27 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         # best worst returns
         with sns.axes_style("whitegrid"):
             portfolio_data.plot_best_worst_returns(ax=fig.add_subplot(gs[2, 0:2]),
-                                                   num_returns=20,
+                                                   num_returns=kwargs['asset_tail_count'],
                                                    time_period=time_period,
-                                                   title=f"Portfolio Worst/Best 20 returns for {time_period.to_str()}",
+                                                   title=(f"Portfolio Worst/Best returns for "
+                                                          f"{time_period.to_str()}"),
                                                    **qis.update_kwargs(kwargs, dict(date_format='%d%b%Y')))
-            num_assets = 10
-            num_investable_assets = len(num_investable_instruments.columns)
+            num_assets = kwargs['asset_tail_count']
+            num_investable_assets = len(portfolio_data.prices.columns)
             if num_investable_assets > 2 * num_assets:
                 pre_title = f"-{num_assets}"
             else:
                 pre_title = ''
             portfolio_data.plot_contributors(ax=fig.add_subplot(gs[2, 2]),
                                              time_period=time_period,
-                                             title=f"Bottom/Top{pre_title} performance contributors {time_period.to_str()}",
+                                             title=(f"Bottom/Top{pre_title} contributors\n"
+                                                    f"{time_period.to_str()}"),
                                              **kwargs)
             time_period_1y = qis.get_time_period_shifted_by_years(time_period=time_period)
             portfolio_data.plot_contributors(ax=fig.add_subplot(gs[2, 3]),
                                              time_period=time_period_1y,
-                                             title=f"Bottom/Top-{num_assets} performance contributors {time_period_1y.to_str()}",
+                                             title=(f"Bottom/Top-{num_assets} contributors\n"
+                                                    f"{time_period_1y.to_str()}"),
                                              **kwargs)
 
         # var attribution
@@ -721,7 +735,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                                                                                      total_column=total_column,
                                                                                                      weights_freq=None)
 
-        lead_index = grouped_weights_agg[total_column].index
+        grouped_weights_agg, grouped_weights_by_inst = compact_groups(
+            grouped_weights_agg, grouped_weights_by_inst)
+        lead_index = next(iter(grouped_weights_agg.values())).index
         current_date = lead_index[-1]
         past_date = qis.find_upto_date_from_datetime_index(index=lead_index,
                                                            date=current_date - pd.Timedelta(days=weights_change_lag))
@@ -740,33 +756,32 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             fig1.suptitle(f"{portfolio_data.nav.name} Weights by groups for past date {past_date.strftime('%d%b%Y')} "
                           f" and current date {current_date.strftime('%d%b%Y')}",
                          fontweight="bold", fontsize=8, color='blue')
-            nrows = len(grouped_weights_agg.keys()) + 2
-            gs = fig1.add_gridspec(nrows=nrows // 2 , ncols=2, wspace=0.0, hspace=0.0)
+            instrument_groups = {key: value for key, value in grouped_weights_by_inst.items()
+                                 if key != total_column}
+            nrows = 1 + (len(instrument_groups) + 1) // 2
+            gs = fig1.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
             local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
 
             local_kwargs_ = qis.update_kwargs(local_kwargs, new_kwargs=dict(yvar_format='{:,.1%}', stacked=False, ncols=3,
                                                                             add_bar_values=True, total_rotation=90, alpha=0.75))
             ax = fig1.add_subplot(gs[0, 0])
-            qis.plot_bars(df=grouped_weights_agg_last.T,
+            plot_asset_bars(df=grouped_weights_agg_last.T,
                           title=f"Aggregated by groups on past date {past_date.strftime('%d%b%Y')}",
                           ax=ax,
                           **local_kwargs_)
 
             ax = fig1.add_subplot(gs[0, 1])
-            qis.plot_bars(df=grouped_weights_agg_current.T,
+            plot_asset_bars(df=grouped_weights_agg_current.T,
                           title=f"Weights by groups on current date {current_date.strftime('%d%b%Y')}",
                           ax=ax,
                           **local_kwargs_)
 
-            for idx, (key, weights) in enumerate(grouped_weights_by_inst.items()):
-                if key == total_column:  # skip total
-                    continue
-                idx -= 1  # account for dropping total_column
+            for idx, (key, weights) in enumerate(instrument_groups.items()):
                 df = pd.concat([weights.loc[past_date, :].rename(past_date.strftime('%d%b%Y')),
                                                                  weights.loc[current_date, :].rename(current_date.strftime('%d%b%Y')),
                                 ], axis=1, sort=True)
                 ax = fig1.add_subplot(gs[1+idx//2, idx%2])  # shift row by one
-                qis.plot_bars(df=df,
+                plot_asset_bars(df=df, asset_additive=True,
                               title=f"{key} by instrument",
                               ax=ax,
                               **local_kwargs_)
@@ -910,6 +925,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     if add_grouped_exposures:
         grouped_weights_agg, grouped_weights_by_inst = portfolio_data.get_grouped_long_short_weights(time_period=time_period1)
+        grouped_weights_agg, grouped_weights_by_inst = compact_groups(
+            grouped_weights_agg, grouped_weights_by_inst)
         nrows = len(grouped_weights_agg.keys())
         fig1 = plt.figure(figsize=figsize, constrained_layout=True)
         figs.append(fig1)
@@ -922,7 +939,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                      f"{group} by instrument": grouped_weights_by_inst[group]}
             for idx_, (key, df) in enumerate(datas.items()):
                 ax = fig1.add_subplot(gs[idx, idx_])
-                qis.plot_time_series(df=df,
+                plot_asset_time_series(df=df,
                                      var_format='{:,.0%}',
                                      legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
                                      title=f"{key}",
@@ -935,6 +952,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     if add_grouped_cum_pnl:
         grouped_pnls_agg, grouped_pnls_by_inst = portfolio_data.get_grouped_cum_pnls(time_period=time_period1)
+        grouped_pnls_agg, grouped_pnls_by_inst = compact_groups(
+            grouped_pnls_agg, grouped_pnls_by_inst)
         nrows = len(grouped_pnls_agg.keys())
         fig1 = plt.figure(figsize=figsize, constrained_layout=True)
         figs.append(fig1)
@@ -947,7 +966,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                      f"{group} by instrument": grouped_pnls_by_inst[group]}
             for idx_, (key, df) in enumerate(datas.items()):
                 ax = fig1.add_subplot(gs[idx, idx_])
-                qis.plot_time_series(df=df,
+                plot_asset_time_series(df=df,
                                      var_format='{:,.0%}',
                                      legend_stats=qis.LegendStats.LAST_NONNAN,
                                      title=f"{key}",
@@ -971,10 +990,13 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                         qis.PerfStat.VOL, qis.PerfStat.SHARPE_RF0,
                         qis.PerfStat.MAX_DD, qis.PerfStat.MAX_DD_VOL, qis.PerfStat.SKEWNESS)
 
-        fig = qis.generate_price_history_report(prices=portfolio_data.prices,
+        history_prices, history_title = price_tails(
+            time_period.locate(portfolio_data.prices), kwargs['asset_tail_count'],
+            'Program Instrument Universe')
+        fig = qis.generate_price_history_report(prices=history_prices,
                                                 **qis.update_kwargs(kwargs, dict(fontsize=4, figsize=figsize,
                                                                                  perf_columns=perf_columns)))
-        fig.suptitle('Program Instrument Universe', fontweight="bold", fontsize=8, color='blue')
+        fig.suptitle(history_title, fontweight="bold", fontsize=8, color='blue')
         figs.append(fig)
 
     return figs

@@ -168,7 +168,9 @@ def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfo
         local_path: directory for the PDF; ignored when ``file_name`` is None
         factsheet_name: report title, mapped to ``backtest_name`` for the multi-portfolio
             reports
-        **kwargs: forwarded to the underlying generator; caller values override the preset
+        **kwargs: forwarded to the underlying generator; caller values override the preset.
+            ``asset_tail_count=10`` (default) or ``20`` selects the bottom/top assets per
+            detailed panel. Ranking is labelled; full portfolio calculations are preserved
 
     Returns:
         the PDF path when ``file_name`` is given, otherwise the list of figures

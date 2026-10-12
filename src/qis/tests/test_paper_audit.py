@@ -61,7 +61,6 @@ NON_METRIC_NUMBERS: Dict[str, str] = {
     '2023': 'a cited publication year',
     '2025': 'a cited publication year',
     '2026': 'the year of writing and of cited publications',
-    '2027': 'the confirmed year of a forthcoming cited publication',
     '1994': 'Politis and Romano, cited for the stationary bootstrap',
     '310': 'the python floor written as 3.10 without its separator',
     '314': 'the python ceiling written as 3.14 without its separator',

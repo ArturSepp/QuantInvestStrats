@@ -52,6 +52,7 @@ import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.drawdowns as cdr
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
+from qis.portfolio._asset_display import plot_asset_time_series, selection_title, tail_index
 from qis.portfolio.risk.risk_model import RiskModel
 from qis.utils.struct_ops import merge_lists_unique
 from qis.perfstats.turnover import TurnoverComputationType
@@ -869,7 +870,7 @@ class MultiPortfolioData:
         exposures1 = self.portfolio_datas[portfolio_idx1].get_weights(is_grouped=True, time_period=time_period, add_total=False)
         exposures2 = self.portfolio_datas[portfolio_idx2].get_weights(is_grouped=True, time_period=time_period, add_total=False)
         diff = exposures1.subtract(exposures2)
-        pts.plot_time_series(df=diff,
+        plot_asset_time_series(df=diff, asset_additive=True,
                              var_format=var_format,
                              legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
                              title=f"Net exposure diff {self.portfolio_datas[portfolio_idx1].nav.name}-{self.portfolio_datas[portfolio_idx2].nav.name}",
@@ -1339,7 +1340,6 @@ class MultiPortfolioData:
         report total exposures by portfolio
         """
         # aling to the first
-        group_data = self.portfolio_datas[0].group_data
         group_order = self.portfolio_datas[0].group_order
         grouped_exposures_aggs = {}  # dict[portfolio, Dict[group, pd.Dataframe]]
         grouped_pnls_aggs = {}
@@ -1353,13 +1353,21 @@ class MultiPortfolioData:
             grouped_exposures_aggs[portfolio_data.ticker] = grouped_weights_agg
             grouped_pnls_aggs[portfolio_data.ticker] = grouped_pnls_agg
 
+        group_scores = pd.Series({
+            group: grouped_pnls_aggs[self.portfolio_datas[0].ticker][group][total_name].iloc[-1]
+            for group in group_order})
+        selected_groups = tail_index(group_scores, kwargs.get('asset_tail_count'))
+        page_title = selection_title(
+            'Total Exposures and P&L', len(group_order), len(selected_groups),
+            kwargs.get('asset_tail_count'), 'first portfolio cumulative P&L')
+        group_order = selected_groups.tolist()
         group_exposures_by_portfolio = {group: {} for group in group_order}
-        for group in group_data:
+        for group in group_order:
             for ticker, df in grouped_exposures_aggs.items():
                 group_exposures_by_portfolio[group].update({ticker: df[group][total_name]})
 
         group_pnl_by_portfolio = {group: {} for group in group_order}
-        for group in group_data:
+        for group in group_order:
             for ticker, df in grouped_pnls_aggs.items():
                 group_pnl_by_portfolio[group].update({ticker: df[group][total_name]})
 
@@ -1368,18 +1376,19 @@ class MultiPortfolioData:
             group_pnl_by_portfolio[group] = pd.DataFrame.from_dict(group_pnl_by_portfolio[group], orient='columns')
 
         figs = []
+        var_format = '{:,.2%}' if kwargs.get('asset_tail_count') else '{:,.0%}'
         for group, exposures_agg in group_exposures_by_portfolio.items():
             fig, axs = plt.subplots(2, 1, figsize=figsize, tight_layout=True)
-            qis.set_suptitle(fig, f"Total Exposures and P&L by {group}")
+            qis.set_suptitle(fig, f"{page_title}\n{group}")
             figs.append(fig)
             qis.plot_time_series(df=exposures_agg,
-                                 var_format='{:,.0%}',
+                                 var_format=var_format,
                                  legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
                                  title=f"Exposure by {group}",
                                  ax=axs[0],
                                  **kwargs)
             qis.plot_time_series(df=group_pnl_by_portfolio[group],
-                                 var_format='{:,.0%}',
+                                 var_format=var_format,
                                  legend_stats=qis.LegendStats.LAST,
                                  title=f"Cumulative P&L by {group}",
                                  ax=axs[1],

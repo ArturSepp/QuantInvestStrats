@@ -22,6 +22,7 @@ from typing import List, Optional, Tuple
 import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
+from qis.portfolio._asset_display import factsheet_kwargs
 from qis.portfolio.reports.config import (
     DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
     PERF_PARAMS,
@@ -80,10 +81,13 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
         add_group_exposures_and_pnl: add the per-group exposure and P&L pages
         add_strategy_factsheets: append a full single-strategy factsheet for each portfolio
         fontsize: base font size, small by default because a factsheet page is dense
+        **kwargs: plotting options, including ``asset_tail_count``: 10 (default) or 20
+            assets per tail in detailed pages, with all holdings retained in calculations
 
     Returns:
         the pages, in order, ready for :func:`save_figs_to_pdf`
     """
+    kwargs = factsheet_kwargs(kwargs)
     if group_data is not None:
         is_grouped = True
     else:

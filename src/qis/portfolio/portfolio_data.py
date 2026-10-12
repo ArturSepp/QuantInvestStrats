@@ -65,6 +65,9 @@ import qis.plots.derived.returns_heatmap as rhe
 from qis.models.linear.ewm import compute_ewm_vol
 import qis.portfolio.risk.ewm_factor_model as ef
 from qis.portfolio.signal_data import StrategySignalData
+from qis.portfolio._asset_display import (
+    plot_asset_bars, plot_asset_stack, plot_asset_time_series, reduce_rows, wrap_title,
+)
 from qis.portfolio.risk.ewm_covar_risk import compute_portfolio_vol
 from qis.portfolio.risk.contributions import (
     compute_portfolio_risk_contributions,
@@ -291,7 +294,7 @@ class PortfolioData:
     def set_group_data(self, group_data: pd.Series, group_order: List[str] = None) -> None:
         self.group_data = group_data
         if group_order is None:
-            group_order = group_data.to_list()
+            group_order = group_data.unique().tolist()
         self.group_order = group_order
 
     def save(self, ticker: str, local_path: str = './') -> None:
@@ -1631,6 +1634,16 @@ class PortfolioData:
         prices = pd.concat([benchmark_price.reindex(index=prices.index, method='ffill'), prices],
                            axis=1, sort=True)
 
+        count = kwargs.get('asset_tail_count')
+        if count is not None:
+            scores = prices.ffill().iloc[-1].divide(prices.bfill().iloc[0]).subtract(1.0)
+            selected, title = reduce_rows(
+                prices.T, scores, count, title, metric='total return',
+                keep=(benchmark_price.name, self.nav.name))
+            prices = selected.T
+            if prices.shape[1] > 10:
+                kwargs = dict(kwargs, ncols=5 if count == 20 else 3)
+                title = wrap_title(title, ax, kwargs.get('fontsize', 10))
         fig = qis.plot_regime_boxplot(prices=prices,
                                       benchmark=str(benchmark_price.name),
                                       title=title,
@@ -1645,6 +1658,7 @@ class PortfolioData:
                           **kwargs
                           ) -> None:
         prices = self.get_instruments_navs(time_period=time_period)
+        num_assets = kwargs.get('asset_tail_count', num_assets)
         ppt.plot_top_bottom_performers(prices=prices, num_assets=num_assets, ax=ax, **kwargs)
 
     def plot_best_worst_returns(self,
@@ -1756,7 +1770,7 @@ class PortfolioData:
                                                      ),
                                                      vols=vols,
                                                      **kwargs)
-        if remove_zero_data:
+        if remove_zero_data and kwargs.get('asset_tail_count') is None:
             # data = data.replace({0.0: np.nan}).dropna()
             data[np.isclose(data, 0.0)] = np.nan
             data = data.dropna()
@@ -1774,6 +1788,9 @@ class PortfolioData:
         title = f"{attribution_metric.value}"
         if time_period is not None:
             title += f", for period={time_period.to_str()}"
+        if kwargs.get('asset_tail_count') is not None:
+            # Factsheets use the same signed bottom/top rule even for one-sided data.
+            max_bars = 0
         if max_bars is None and ax is not None and isinstance(data, pd.Series):
             axis_width = put.estimate_axis_width(ax=ax)
             if axis_width is not None:
@@ -1805,7 +1822,7 @@ class PortfolioData:
                                                    add_top_bar_values=add_top_bar_values,
                                                    fontsize=fontsize,
                                                    x_rotation=90))
-        qis.plot_bars(df=data,
+        plot_asset_bars(df=data, asset_additive=True,
                       skip_y_axis=True,
                       title=title,
                       stacked=False,
@@ -1865,7 +1882,7 @@ class PortfolioData:
         else:
             title = title or f"Independent {freq}-freq 99%-VAR with {vol_span}-span ewma vols"
 
-        qis.plot_time_series(df=portfolio_vars,
+        plot_asset_time_series(df=portfolio_vars, asset_totals=(total_column,),
                              var_format='{:,.2%}',
                              legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
                              title=title,
@@ -1910,7 +1927,7 @@ class PortfolioData:
                 title = f"Weights by groups on {date_to_str(weights_1.name)}"
             else:
                 title = f"Weights by instruments on {date_to_str(weights_1.name)}"
-        qis.plot_bars(df=weights_1,
+        plot_asset_bars(df=weights_1, asset_additive=True,
                       skip_y_axis=True,
                       title=title,
                       stacked=False,
@@ -1951,7 +1968,7 @@ class PortfolioData:
                 title = f"Change in weights by groups with {post_title}"
             else:
                 title = f"Change in weights by instruments with {post_title}"
-        qis.plot_bars(df=delta,
+        plot_asset_bars(df=delta, asset_additive=True,
                       skip_y_axis=True,
                       title=title,
                       stacked=False,
@@ -2027,7 +2044,7 @@ class PortfolioData:
         kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None,
                                                                   add_bar_values=add_top_bar_values,
                                                                   x_rotation=90))
-        qis.plot_bars(df=var_1,
+        plot_asset_bars(df=var_1, asset_totals=(total_column,),
                       skip_y_axis=True,
                       title=title,
                       stacked=False,
@@ -2070,7 +2087,7 @@ class PortfolioData:
         if stack_freq is not None:
             var_1 = var_1.asfreq(stack_freq, method='ffill')
         df = var_1.divide(np.nansum(var_1, axis=1, keepdims=True))
-        qis.plot_stack(df=df,
+        plot_asset_stack(df=df,
                        is_yaxis_limit_01=True,
                        use_bar_plot=True,
                        title=title,

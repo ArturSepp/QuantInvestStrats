@@ -23,6 +23,7 @@ import qis as qis
 from qis import TimePeriod, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
 from qis.portfolio.signal_data import StrategySignalData
+from qis.portfolio._asset_display import factsheet_kwargs, plot_asset_bars
 from qis.plots.utils import TrendLine, set_y_limits
 from qis.utils.df_str import date_to_str
 
@@ -37,6 +38,7 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
                                   group_deflator: Optional[Dict[str, float]] = dict(STIR=0.1),
                                   **kwargs
                                   ) -> plt.Figure:
+    kwargs = factsheet_kwargs(kwargs)
     strategy_signal_data = portfolio_data.strategy_signal_data
     if strategy_signal_data is None:
         raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
@@ -76,7 +78,10 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
                 this += f"{key}={deflator:0.2f}"
             post_agg = f" (using deflator for {this})"
         preds_dict = {f"Total by groups {post_agg}": agg_preds}
-        preds_dict.update(group_preds)
+        if len(group_preds) > 6:
+            preds_dict['All instruments'] = pd.concat(group_preds.values())
+        else:
+            preds_dict.update(group_preds)
 
         with sns.axes_style('darkgrid'):
             fig, axs = plt.subplots(len(preds_dict.keys())//2+len(preds_dict.keys())%2, 2, figsize=figsize, tight_layout=True)
@@ -93,7 +98,7 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
                 print(f"{group}")
                 print(df_ac)
                 print(f"{fitted_models_g[group].summary()}")
-            qis.plot_bars(df=df_ac,
+            plot_asset_bars(df=df_ac, asset_scores=df_ac.sum(axis=1), asset_additive=True,
                           stacked=True,
                           totals=df_ac.sum(axis=1).to_list(),
                           annotate_totals=False,
@@ -112,12 +117,20 @@ def generate_current_signal_report(portfolio_data: PortfolioData,
                                    figsize: Tuple[float, float] = (8.3, 11.7),
                                    **kwargs
                                    ) -> plt.Figure:
+    kwargs = factsheet_kwargs(kwargs)
     strategy_signal_data = portfolio_data.strategy_signal_data
     if strategy_signal_data is None:
         raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
 
     agg_by_group_dict = strategy_signal_data.get_current_signal_by_groups(group_data=portfolio_data.group_data,
                                                                           group_order=portfolio_data.group_order)
+
+    if len(agg_by_group_dict) > 6:
+        agg_by_group_dict = {
+            'Total by groups': agg_by_group_dict['Total by groups'],
+            'All instruments': pd.concat([value for key, value in agg_by_group_dict.items()
+                                          if key != 'Total by groups']),
+        }
 
     with sns.axes_style('darkgrid'):
         fig, axs = plt.subplots(len(agg_by_group_dict.keys())//2+len(agg_by_group_dict.keys())%2, 2,
@@ -132,7 +145,7 @@ def generate_current_signal_report(portfolio_data: PortfolioData,
     for idx, (group, df_ac) in enumerate(agg_by_group_dict.items()):
         if y_limits is not None:
             set_y_limits(ax=axs[idx], y_limits=y_limits)
-        qis.plot_bars(df=df_ac,
+        plot_asset_bars(df=df_ac,
                       stacked=False,
                       title=f"{group}",
                       ncols=2,

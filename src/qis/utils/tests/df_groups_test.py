@@ -31,7 +31,8 @@ def test_agg_df_by_groups_ax1_avoids_series_rows_for_numeric_sums(dtype, monkeyp
     )
     pd.testing.assert_frame_equal(actual, expected, check_exact=True)
     pd.testing.assert_frame_equal(frame, before, check_exact=True)
-    assert calls == [True, True, True]
+    # The single-instrument Other group uses the direct NumPy path.
+    assert calls == [True, True]
 
 
 @pytest.mark.parametrize("dtype", ["float32", "float64"])
@@ -103,7 +104,8 @@ def test_agg_df_by_groups_ax1_dispatches_each_group_in_a_mixed_nullable_panel(mo
     )
     pd.testing.assert_frame_equal(actual, expected, check_exact=True)
     pd.testing.assert_frame_equal(frame, before, check_exact=True)
-    assert calls == [False, True, False, False]
+    # Ordinary is a native singleton; the total and nullable groups use Series.
+    assert calls == [False, False, False]
 
 
 def test_agg_df_by_groups_ax1_custom_callable_retains_labels_and_input_isolation():

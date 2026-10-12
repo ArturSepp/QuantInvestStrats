@@ -9,6 +9,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Bound large-universe strategy, benchmark-comparison and multi-strategy factsheet panels
+  to the bottom 10 and top 10 assets by the displayed metric. Pass `asset_tail_count=20`
+  through existing report keyword arguments for 20 per side. Additive displays retain an
+  explicitly labelled remainder; portfolio analytics and totals still use every holding.
+- Deduplicate the default group order in `PortfolioData.set_group_data`, preventing repeated
+  group pages and duplicate-column failures in benchmark exposure comparisons.
 - Keep `compute_desc_table`'s upper-range sample spread independent of caller Decimal settings,
   avoiding incidental overflow or inexact exceptions for representable finite results.
 

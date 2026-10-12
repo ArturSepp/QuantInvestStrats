@@ -1,0 +1,20 @@
+{
+  "title": "qis: reproducible performance analytics and portfolio backtesting in Python",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Sepp, Artur",
+      "affiliation": "LGT Bank (Schweiz) AG, Zürich, Switzerland",
+      "orcid": "0000-0002-7038-1748"
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "quantitative-finance",
+    "performance-attribution",
+    "portfolio-analytics",
+    "portfolio-backtesting",
+    "risk-analysis",
+    "factsheet-reporting"
+  ]
+}

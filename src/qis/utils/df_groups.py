@@ -155,16 +155,23 @@ def agg_df_by_groups_ax1(df: pd.DataFrame,
     for key, columns in group_dict.items():
         if len(columns) > 0:  # get subset of pandas by columns, copy() to break view
             group_frame = df[columns]
-            # Raw rows avoid a Series per observation while keeping NumPy's row-wise sum
-            # order. An axis reduction can round differently. Nullable/object storage
-            # needs pandas scalar semantics; custom callables may depend on row labels.
-            use_raw = (
-                agg_func is np.nansum
-                and not any(isinstance(dtype, pd.api.extensions.ExtensionDtype)
-                            for dtype in group_frame.dtypes)
-                and group_frame.to_numpy().dtype.kind in 'biufc'
-            )
-            grouped_data[key] = group_frame.apply(agg_func, axis=1, raw=use_raw).rename(key)
+            if (not group_frame.empty and group_frame.shape[1] == 1 and agg_func is np.nansum
+                    and isinstance(group_frame.dtypes.iloc[0], np.dtype)
+                    and group_frame.dtypes.iloc[0].kind in 'biufc'):
+                # A single instrument needs no per-row Python call; there is no multi-value
+                # reduction whose order can change.
+                grouped_data[key] = pd.Series(
+                    np.nansum(group_frame.to_numpy(), axis=1), index=df.index, name=key)
+            else:
+                # Raw rows preserve row-wise NumPy summation order for larger numeric groups.
+                # Nullable/object storage and custom callables retain labeled Series rows.
+                use_raw = (
+                    agg_func is np.nansum
+                    and not any(isinstance(dtype, pd.api.extensions.ExtensionDtype)
+                                for dtype in group_frame.dtypes)
+                    and group_frame.to_numpy().dtype.kind in 'biufc'
+                )
+                grouped_data[key] = group_frame.apply(agg_func, axis=1, raw=use_raw).rename(key)
     grouped_data = pd.DataFrame.from_dict(grouped_data, orient='columns')
     return grouped_data
 

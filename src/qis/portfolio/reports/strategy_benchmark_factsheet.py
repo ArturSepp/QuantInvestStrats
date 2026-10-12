@@ -28,6 +28,9 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 # portfolio
 from qis.portfolio.portfolio_data import AttributionMetric
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
+from qis.portfolio._asset_display import (
+    factsheet_kwargs, price_tails, reduce_rows, selection_title, tail_index,
+)
 from qis.portfolio.reports.strategy_factsheet import (
     _use_grouped_summary_tables,
     generate_strategy_factsheet,
@@ -40,7 +43,7 @@ from qis.portfolio.reports.config import (
     validate_legend_capacity,
     validate_reporting_frequency,
 )
-from qis.plots.utils import get_df_table_size, set_spines, set_y_limits
+from qis.plots.utils import set_spines, set_y_limits
 
 _RecentStart = Optional[pd.Timestamp]
 
@@ -108,12 +111,15 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         figsize: page size in inches; the default is A4 portrait
         fontsize: base font size
         add_joint_instrument_history_report: add the per-instrument history page
+        **kwargs: plotting options, including ``asset_tail_count``: 10 (default) or 20
+            assets per tail. Selection affects display only; totals retain every holding
 
     Returns:
         Pages in order, ready for :func:`save_figs_to_pdf`. Completed per-instrument exposure
         comparison pages are closed in pyplot but remain drawable and saveable. Other pages
         remain open for the caller to close after use; unrelated figures are left open.
     """
+    kwargs = factsheet_kwargs(kwargs)
     if 'heatmap_fontsize' in kwargs:
         raise TypeError("heatmap_fontsize was removed; use fontsize")
     if len(multi_portfolio_data.portfolio_datas) == 1:
@@ -351,8 +357,11 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         tre_table = multi_portfolio_data.compute_tracking_error_table(strategy_idx=strategy_idx,
                                                                       benchmark_idx=benchmark_idx,
                                                                       **kwargs)
-        fig1, ax = plt.subplots(1, 1, figsize=get_df_table_size(df=tre_table), constrained_layout=True)
-        fig1.suptitle(f'{backtest_name} Per-instrument attribution and IR',
+        tre_table, tre_title = reduce_rows(
+            tre_table, tre_table.iloc[:, 0], kwargs['asset_tail_count'],
+            f'{backtest_name} Per-instrument attribution and IR', metric='active contribution')
+        fig1, ax = plt.subplots(1, 1, figsize=figsize, constrained_layout=True)
+        fig1.suptitle(tre_title,
                       fontweight="bold", fontsize=8, color='blue')
         figs.append(fig1)
         qis.plot_df_table(df=tre_table,
@@ -376,7 +385,12 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                                                           benchmark_idx=benchmark_idx,
                                                                                           is_grouped=is_grouped,
                                                                                           **kwargs)
-        for inst in strategy_weights.columns:
+        exposure_scores = strategy_weights.subtract(benchmark_weights).ffill().iloc[-1]
+        exposure_names = tail_index(exposure_scores, kwargs['asset_tail_count'])
+        exposure_title = selection_title(
+            'Exposures and Two-sided Turnover', len(exposure_scores), len(exposure_names),
+            kwargs['asset_tail_count'], 'last active exposure')
+        for inst in exposure_names:
             df1 = pd.concat([strategy_weights[inst].rename(strategy_name),
                             benchmark_weights[inst].rename(benchmark_name)], axis=1, sort=True)
             df2 = pd.concat([strategy_turnover[inst].rename(strategy_name),
@@ -384,7 +398,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
             with sns.axes_style("darkgrid"):
                 fig1, axs = plt.subplots(2, 1, figsize=figsize, constrained_layout=True)
                 fig1.suptitle(
-                    f'{inst} Exposures and Two-sided Turnover',
+                    f'{inst} {exposure_title}',
                     fontweight="bold",
                     fontsize=8,
                     color='blue')
@@ -413,17 +427,26 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         strategy_grouped_pnls_agg, strategy_grouped_pnls_by_inst \
             = multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_cum_pnls(time_period=time_period)
 
-        benchmark_grouped_pnls_agg, strategy_grouped_pnls_by_inst \
+        benchmark_grouped_pnls_agg, benchmark_grouped_pnls_by_inst \
             = multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_cum_pnls(time_period=time_period)
 
-        nrows = len(strategy_grouped_exposures_agg.keys())
-        fig2 = plt.figure(figsize=figsize, constrained_layout=True)
-        figs.append(fig2)
-        fig2.suptitle(f"{backtest_name}: Strategy vs Benchmark exposures by groups for period {time_period.to_str()}",
-                     fontweight="bold", fontsize=8, color='blue')
-        gs = fig2.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
+        scores = pd.Series({
+            group: pnl['Total'].iloc[-1] - benchmark_grouped_pnls_agg[group]['Total'].iloc[-1]
+            for group, pnl in strategy_grouped_pnls_agg.items()})
+        selected_groups = tail_index(scores, kwargs['asset_tail_count'])
+        page_title = selection_title(
+            f'{backtest_name}: Strategy vs Benchmark exposures and P&L {time_period.to_str()}',
+            len(scores), len(selected_groups), kwargs['asset_tail_count'],
+            'active cumulative P&L')
         local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
-        for idx, (group, exposures_agg) in enumerate(strategy_grouped_exposures_agg.items()):
+        for position, group in enumerate(selected_groups):
+            idx = position % 4
+            if idx == 0:
+                fig2 = plt.figure(figsize=figsize, constrained_layout=True)
+                figs.append(fig2)
+                fig2.suptitle(page_title, fontweight='bold', fontsize=8, color='blue')
+                nrows = min(4, len(selected_groups) - position)
+                gs = fig2.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
             df1 = pd.concat([strategy_grouped_exposures_agg[group]['Total'].rename(strategy_name),
                              benchmark_grouped_exposures_agg[group]['Total'].rename(benchmark_name)],
                             axis=1, sort=True)
@@ -436,7 +459,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
             for idx_, (key, df) in enumerate(datas.items()):
                 ax = fig2.add_subplot(gs[idx, idx_])
                 qis.plot_time_series(df=df,
-                                     var_format='{:,.0%}',
+                                     var_format='{:,.2%}',
                                      legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
                                      title=f"{key}",
                                      ax=ax,
@@ -453,10 +476,13 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                   multi_portfolio_data.portfolio_datas[benchmark_idx].prices],
                                  axis=1, sort=True)
         joint_prices = joint_prices.loc[:, ~joint_prices.columns.duplicated(keep='first')]
+        joint_prices, history_title = price_tails(
+            time_period.locate(joint_prices), kwargs['asset_tail_count'],
+            'Instruments in Joint Universe')
         fig = qis.generate_price_history_report(prices=joint_prices,
                                                 **qis.update_kwargs(kwargs, dict(fontsize=4, figsize=figsize,
                                                                                  perf_columns=perf_columns)))
-        fig.suptitle('Instruments in Joint Universe', fontweight="bold", fontsize=8, color='blue')
+        fig.suptitle(history_title, fontweight="bold", fontsize=8, color='blue')
         figs.append(fig)
 
     if add_strategy_factsheet:
