@@ -186,6 +186,6 @@ def compact_groups(aggregates, instruments, max_groups=6):
         assets = instruments['Total']
     else:
         aggregate = pd.concat(aggregates.values()).groupby(level=0).sum(min_count=1)
-        assets = pd.concat(instruments.values(), axis=1)
+        assets = pd.concat(instruments.values(), axis=1, sort=True)
     label = f'All instruments ({len(aggregates)} groups)'
     return {label: aggregate}, {label: assets}
