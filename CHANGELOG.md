@@ -9,6 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Reject mismatched observation indexes in `fit_multivariate_ols` before converting inputs
+  to positional arrays, preventing fits that silently pair different dates. Aligned fits,
+  finite-row filtering and prediction labels are unchanged.
 - Reject conflicting total-group labels in `get_group_dict` and its grouped-panel and
   portfolio-exposure callers, preventing a single group from silently replacing the
   all-instrument total. Distinct total labels and grouping without a total are unchanged.
