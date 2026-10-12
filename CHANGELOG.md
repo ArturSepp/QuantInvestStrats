@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.36.1] - 2026-10-12
+
 ### Fixed
 
 - Bound large-universe strategy, benchmark-comparison and multi-strategy factsheet panels
@@ -17,12 +19,22 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   group pages and duplicate-column failures in benchmark exposure comparisons.
 - Keep `compute_desc_table`'s upper-range sample spread independent of caller Decimal settings,
   avoiding incidental overflow or inexact exceptions for representable finite results.
+- Use the canonical `America/New_York` timezone in file utility tests so they run on systems
+  without the legacy `US/Eastern` timezone alias (PR #182).
 
 ### Changed
 
 - Speed up grouped row sums used by Brinson attribution and portfolio reports for ordinary
   NumPy numeric panels. Row-sum results are unchanged; nullable/object panels and custom
   aggregation callables retain their existing Series-row path.
+
+### Documentation
+
+- State the intended users and motivation in the README and documentation homepage (#176).
+- Document public external-use examples and research applications in the JOSS paper (#175).
+- Correct bibliography entries, cite core scientific Python dependencies, and execute
+  docstring examples in the test suite (PRs #174 and #178).
+- Refresh the public-consumer and paper audit records for the release.
 
 ## [5.36.0] - 2026-10-11
 

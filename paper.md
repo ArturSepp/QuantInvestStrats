@@ -80,7 +80,7 @@ chart, a summary table and a factsheet.
 | `PyPortfolioOpt` [@Martin2021] | prices, or expected returns and a risk model | weights, discrete allocation, performance and plots |
 
 Table: Documented interfaces of related Python packages, accessed on 11 October 2026. Three of the
-eleven accept supplied weights. []{label="tab:field"}
+eleven accept supplied weights. \label{tab:field}
 
 The table omits event-driven engines such as `zipline-reloaded` [@zipline] and `backtrader`
 [@backtrader]. Their strategies submit orders from a callback on each bar, including orders that
@@ -137,8 +137,8 @@ discoverability. The curated core gives new users a smaller entry point without 
 export.
 
 Tests check exported plots on synthetic panels, the documented arguments of the core, local
-documentation links and every measurement this paper quotes. Selected offline examples execute in
-the suite, and static checks cover the imports and calls of all examples. Plot smoke tests
+documentation links and the recorded software measurements this paper quotes. Selected offline
+examples execute in the suite, and static checks cover the imports and calls of all examples. Plot smoke tests
 establish that figures draw, while layout and readability require visual review. The suite runs
 without network access on a core installation, using a frozen, seeded simulator that reproduces
 the defects of real panels: ragged starts, missing observations, stale prices and appraisal
@@ -175,7 +175,7 @@ overlays, forthcoming in the Journal of Investment Management [@sepp2026convexit
 [public companion example](https://github.com/ArturSepp/OptimalPortfolios/tree/main/papers/smart_diversification_joim_2026)
 of that paper demonstrates these calculations on synthetic data.
 
-On 11 October 2026, the repository had 642 GitHub stars and 72 forks, and pypistats.org reported
+On 11 October 2026, the repository had 642 GitHub stars and 75 forks, and pypistats.org reported
 9342 PyPI downloads over the last month, excluding known mirrors. The commit history runs from
 December 2022 to October 2026, with commits in 40 of the 47 calendar months.
 
@@ -185,8 +185,8 @@ From July to October 2026, Anthropic's Claude (Opus 5, Opus 5.5, Fable 5 and Fab
 OpenAI Codex (Sol 5.6) assisted with software development, tests, documentation and paper preparation. The
 author made the methodological and architectural decisions, reviewed and validated the assisted
 outputs and remains responsible for the work. Assisted changes pass through the same test suite
-and continuous integration as all other changes, and the suite checks each measurement this paper
-quotes against a recomputed or recorded value.
+and continuous integration as all other changes. The suite checks recorded software measurements
+against recomputed values or recorded provenance.
 
 # Acknowledgements
 

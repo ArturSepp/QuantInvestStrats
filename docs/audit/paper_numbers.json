@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "d6577b5e424dbf0be0087316cc59a189baeadd7d",
+  "measured_at_commit": "f56433dce1ab5ea6634579ac574e0649ef4b9b86",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,13 +46,13 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 6495,
+      "value": 6619,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 924,
+      "value": 948,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -124,7 +124,7 @@
       "paper_phrase": null
     },
     "paper_body_words": {
-      "value": 1421,
+      "value": 1745,
       "how": "whitespace-separated tokens in paper.md after the YAML front matter",
       "live": true,
       "paper_phrase": null
