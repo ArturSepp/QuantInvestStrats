@@ -67,8 +67,8 @@ jobs:
   test-extras:
     name: pytest (data + io extras)
     runs-on: ubuntu-latest
-    # Coverage adds overhead; allow the same full-suite budget as the core matrix.
-    timeout-minutes: 60
+    # Coverage took 51 minutes on a slower runner; leave room for runner variation and cleanup.
+    timeout-minutes: 90
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
