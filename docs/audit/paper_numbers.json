@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "1ac583d1e2059343bbad2a5c01b706151381066a",
+  "measured_at_commit": "69cef6cde78dd911fb25e42cadba18e5e33c7400",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,13 +46,13 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 6665,
+      "value": 6718,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 958,
+      "value": 964,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -100,16 +100,16 @@
       "paper_phrase": "documented core of 166 symbols"
     },
     "exported_module_bindings": {
-      "value": 9,
+      "value": 10,
       "how": "the subpackage names the wildcard re-exports leave in the namespace",
       "live": true,
       "paper_phrase": null
     },
     "exported_symbols": {
-      "value": 474,
+      "value": 475,
       "how": "len(qis.__all__)",
       "live": true,
-      "paper_phrase": "holds 474 names"
+      "paper_phrase": "holds 475 names"
     },
     "first_commit_month": {
       "value": "2022-12",
@@ -124,7 +124,7 @@
       "paper_phrase": null
     },
     "paper_body_words": {
-      "value": 1745,
+      "value": 1747,
       "how": "whitespace-separated tokens in paper.md after the YAML front matter",
       "live": true,
       "paper_phrase": null

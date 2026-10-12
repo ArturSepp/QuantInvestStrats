@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Export the `qis.discrete_portfolio` subpackage in `qis.__all__`, so `import qis` binds it and
+  `from qis import *` includes it. Its names stay qualified as `qis.discrete_portfolio.<name>`
+  rather than wildcarded into the top-level namespace. Existing imports are unchanged.
+
 ### Fixed
 
 - Reject mismatched observation indexes in `fit_multivariate_ols` before converting inputs

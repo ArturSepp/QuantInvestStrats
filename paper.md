@@ -83,8 +83,7 @@ Table: Documented interfaces of related Python packages, accessed on 11 October 
 eleven accept supplied weights. \label{tab:field}
 
 The table omits event-driven engines such as `zipline-reloaded` [@zipline] and `backtrader`
-[@backtrader]. Their strategies submit orders from a callback on each bar, including orders that
-target a percentage of portfolio value.
+[@backtrader], whose strategies submit orders from a callback on each bar.
 
 The `qis` package differs in where the weights-and-prices boundary sits. Only weights and prices
 cross it, so any generator that produces weights can be measured. Among the packages in
@@ -123,16 +122,20 @@ every period. The path dependence of held units motivates a date-sequential `num
 portfolio research, while order-book events and signal generation remain outside the engine.
 Market frictions enter instead as proportional rebalancing costs, set per instrument and per date.
 
+The subpackage `qis.discrete_portfolio` covers strategies that emit orders from a callback on each
+observation. The replay supports full fills at the next observation and converts the ledgers
+into the same `PortfolioData` object, reconciled against net asset value. Partial fills,
+cancellations and market impact remain outside this version.
+
 We build the chart, the summary table and the factsheet of a strategy from one `PortfolioData`
 object, constructed from weights and prices. The same object feeds the three comparisons of a
 research pipeline: a strategy against its benchmark, a parameter perturbation against its base
 case and the sub-strategies of one strategy side by side. One reporting layer renders all three
 comparisons, so no comparison needs plotting code of its own.
 
-The public interface is `qis.__all__`, which holds 474 names. The module `src/qis/api.py` records
+The public interface is `qis.__all__`, which holds 475 names. The module `src/qis/api.py` records
 that list as a literal, together with a documented core of 166 symbols in 14 capability groups.
-The test suite fails when either record disagrees with the namespace. The broad namespace
-preserves convenient imports and compatibility for existing consumers, at the cost of
+The broad namespace preserves convenient imports and compatibility for existing consumers, at the cost of
 discoverability. The curated core gives new users a smaller entry point without removing any
 export.
 
@@ -141,8 +144,7 @@ documentation links and the recorded software measurements this paper quotes. Se
 examples execute in the suite, and static checks cover the imports and calls of all examples. Plot smoke tests
 establish that figures draw, while layout and readability require visual review. The suite runs
 without network access on a core installation, using a frozen, seeded simulator that reproduces
-the defects of real panels: ragged starts, missing observations, stale prices and appraisal
-smoothing.
+the defects of real price panels.
 
 # Research impact statement
 
@@ -161,19 +163,18 @@ We maintain the public consumers below, so they show reuse within this stack and
 adoption. The `optimalportfolios` package declares `qis` a mandatory dependency and
 references 137 of its symbols at 1105 sites. The `trendfollowing` package, the companion code of
 @sepp2026trend, references 87 symbols at 428 sites. Both counts are taken at the commits recorded
-in `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`. We also list
-`privateassets`, which applies the unsmoothing layer to private-asset returns, for the range of
-asset classes served and not as evidence of adoption.
+in `docs/audit/consumers.json` and reproduced by `tools/audit_consumers.py --pinned`.
 
-Within our research stack, `qis` supports published work on cryptocurrency allocation
+Within our research stack, `qis` carries the analytics behind our papers, so others can reproduce
+their calculations with public code. The package supports papers on cryptocurrency allocation
 [@sepp2023crypto] and robust strategic and tactical asset allocation [@sepp2026robust]. Its
+bootstrap resampling supports research on capital market assumptions using multi-asset tradable
+factors, forthcoming in The Journal of Portfolio Management [@sepp2027matf]. Its
 regime-conditional analytics support the working paper on trend-following systems
-[@sepp2026trend]. Its bootstrap resampling supports research on capital market assumptions using
-multi-asset tradable factors, forthcoming in The Journal of Portfolio Management [@sepp2026matf].
-The package also supplies regime-conditional analytics and reports for research on portfolio
-overlays, forthcoming in the Journal of Investment Management [@sepp2026convexity]. The
+[@sepp2026trend] and research on portfolio overlays, forthcoming in the Journal of Investment
+Management [@sepp2026convexity]. The
 [public companion example](https://github.com/ArturSepp/OptimalPortfolios/tree/main/papers/smart_diversification_joim_2026)
-of that paper demonstrates these calculations on synthetic data.
+of the overlay paper demonstrates these calculations on synthetic data.
 
 On 11 October 2026, the repository had 642 GitHub stars and 75 forks, and pypistats.org reported
 9342 PyPI downloads over the last month, excluding known mirrors. The commit history runs from
@@ -181,7 +182,7 @@ December 2022 to October 2026, with commits in 40 of the 47 calendar months.
 
 # AI usage disclosure
 
-From July to October 2026, Anthropic's Claude (Opus 5, Opus 5.5, Fable 5 and Fable 5.1) and
+From July to October 2026, Anthropic's Claude (Opus 5 and 5.5, Fable 5 and 5.1) and
 OpenAI Codex (Sol 5.6) assisted with software development, tests, documentation and paper preparation. The
 author made the methodological and architectural decisions, reviewed and validated the assisted
 outputs and remains responsible for the work. Assisted changes pass through the same test suite

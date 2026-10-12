@@ -46,6 +46,11 @@ from qis.portfolio.__init__ import *
 
 from qis.market_data.__init__ import *
 
+# the event-driven replay is exported as a subpackage rather than wildcarded: its names (Order,
+# Trade, ExecutionModel, ...) are generic enough to collide with a caller's own, so they stay
+# qualified as ``qis.discrete_portfolio.<name>``
+from qis import discrete_portfolio
+
 
 # the public surface, computed once here rather than inferred from ``dir(qis)`` later.
 #
@@ -53,8 +58,9 @@ from qis.market_data.__init__ import *
 # ``import qis.api`` makes ``dir(qis)`` one name longer than it was. Anything that counts or
 # checks the public surface has to be counting the same set every time, so the set is fixed at
 # the end of this module, where the wildcard re-exports above have finished and nothing else has
-# been imported yet. The nine subpackage names bound by those imports are included, because
-# ``from qis import *`` has always bound them and removing them would be a silent break.
+# been imported yet. The subpackage names bound by those imports are included, because
+# ``from qis import *`` has always bound them and removing them would be a silent break, and so is
+# ``discrete_portfolio``, which is bound explicitly above.
 #
 # ``qis.api.PUBLIC_API`` records the same names in a diffable literal, and
 # ``src/qis/tests/test_core_api.py`` fails when the two disagree.
