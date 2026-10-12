@@ -12,9 +12,20 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Reject mismatched observation indexes in `fit_multivariate_ols` before converting inputs
   to positional arrays, preventing fits that silently pair different dates. Aligned fits,
   finite-row filtering and prediction labels are unchanged.
+- Align complete, uniquely named `instruments_carry` panels to price-column order in
+  `backtest_model_portfolio`, preventing one instrument's carry rate from being credited to
+  another. Carry timing and existing nonmatching-schema behavior are unchanged.
+
 - Reject conflicting total-group labels in `get_group_dict` and its grouped-panel and
   portfolio-exposure callers, preventing a single group from silently replacing the
   all-instrument total. Distinct total labels and grouping without a total are unchanged.
+
+### Changed
+
+- Reduce peak memory in `estimate_rolling_ewma_covar` by applying availability masks only
+  to returned rebalancing matrices instead of copying the full covariance history. Covariance
+  estimates, per-asset warm-up, dates and labels are unchanged; the estimator still retains its
+  full covariance tensor.
 
 ## [5.36.1] - 2026-10-12
 

@@ -101,7 +101,8 @@ def backtest_model_portfolio(prices: pd.DataFrame,
             times the ACT/365 fraction of the period, as ``qis.compute_excess_returns`` charges;
             a period with no quote known at its start leaves the nav missing, with a warning
         management_fee: annualised fee accrued on nav
-        instruments_carry: per-instrument carry, expressed on nav. Dated rows are ordered
+        instruments_carry: per-instrument carry, expressed on nav. Complete panels with unique
+            ticker columns are aligned to ``prices.columns`` by name. Dated rows are ordered
             chronologically on a local copy before alignment to ``prices``
         rebalancing_costs: proportional cost on traded notional, fractional units (0.0010 is
             10 bp). A float applies to every instrument and date; a Series indexed by ticker
@@ -268,6 +269,13 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         management_fee_dt = pd.Series(0.0, index=prices.index)
 
     if instruments_carry is not None:
+        # The kernel pairs rates with prices positionally after ticker labels are stripped.
+        # Only complete, unique panels define a name mapping; keep legacy schemas untouched.
+        if (isinstance(instruments_carry, pd.DataFrame)
+                and prices.columns.is_unique and instruments_carry.columns.is_unique
+                and len(instruments_carry.columns) == len(prices.columns)
+                and prices.columns.isin(instruments_carry.columns).all()):
+            instruments_carry = instruments_carry.loc[:, prices.columns]
         instruments_carry_dt = multiply_df_by_dt(
             df=instruments_carry.sort_index(kind="stable"), dates=prices.index, lag=0
         )
