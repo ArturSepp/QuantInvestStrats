@@ -22,6 +22,7 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Use the canonical `America/New_York` timezone in file utility tests so they run on systems
   without the legacy `US/Eastern` timezone alias (PR #182).
 - State chronological sorting explicitly when compacting dated instrument groups for a factsheet.
+- Avoid pandas 2 empty-index concatenation warnings when selecting factsheet asset tails.
 
 ### Changed
 

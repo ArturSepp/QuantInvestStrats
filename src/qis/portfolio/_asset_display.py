@@ -38,6 +38,10 @@ def tail_index(scores, count, keep=()):
     ranked = candidates.replace([np.inf, -np.inf], np.nan).dropna().sort_values(
         kind='stable')
     selected = ranked.iloc[:count].index.union(ranked.iloc[-count:].index, sort=False)
+    if protected.empty:
+        return selected
+    if selected.empty:
+        return protected
     return selected.append(protected)
 
 
