@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Reject conflicting total-group labels in `get_group_dict` and its grouped-panel and
+  portfolio-exposure callers, preventing a single group from silently replacing the
+  all-instrument total. Distinct total labels and grouping without a total are unchanged.
+
 ## [5.36.1] - 2026-10-12
 
 ### Fixed
