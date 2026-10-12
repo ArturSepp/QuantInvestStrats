@@ -41,13 +41,15 @@ def get_group_dict(group_data: pd.Series,
             every ticker in ``group_data``
         group_order: order of the groups in the result. None orders by first appearance
         total_column: name of an extra group holding every ticker, for a total row alongside the
-            groups. None adds none
+            groups. Must differ from every label in ``group_data``, even when ``index_data``
+            excludes that group's tickers. None adds none
 
     Returns:
         group label to the tickers in it, in ``group_order``
 
     Raises:
-        ValueError: if ``group_data`` is not a Series, or if it or ``index_data`` contains nulls
+        ValueError: if ``group_data`` is not a Series, if it or ``index_data`` contains nulls,
+            or if ``total_column`` matches an observed group label
         TypeError: if ``index_data`` is not an Index, list or array
     """
     if not isinstance(group_data, pd.Series):
@@ -67,6 +69,10 @@ def get_group_dict(group_data: pd.Series,
 
     group_data_ls = group_data.to_list()
     data_groups = list(np.unique(group_data_ls))
+    # A restricted subgroup can be empty but still overwrite the all-ticker total key.
+    # Check observed labels, not group_order placeholders or only surviving tickers.
+    if total_column is not None and total_column in data_groups:
+        raise ValueError(f"total_column {total_column!r} duplicates a group_data label")
     if group_order is not None:
         groups = sop.merge_lists_unique(list1=group_order, list2=data_groups)
     else:
@@ -106,11 +112,15 @@ def split_df_by_groups(df: pd.DataFrame,
     Args:
         df: panel indexed by date with one column per asset
         group_data: group label per asset, indexed by asset
-        total_column: name of an extra group holding every column. None adds none
+        total_column: name of an extra group holding every classified column. Must differ from
+            the labels in ``group_data``. None adds none
         group_order: order of the groups. None orders by first appearance
 
     Returns:
         group label to the sub-panel of ``df``, each a copy rather than a view
+
+    Raises:
+        ValueError: if ``total_column`` matches a label in ``group_data``
     """
     # group by descriptive data
     group_dict = get_group_dict(group_data=group_data,
@@ -140,10 +150,14 @@ def agg_df_by_groups_ax1(df: pd.DataFrame,
         agg_func: Row aggregation callable; custom callables receive a labeled Series.
             Defaults to NumPy's missing-value-ignoring sum.
         total_column: Optional extra group containing all classified instruments in df.
+            Must differ from the labels in group_data.
         group_order: Preferred group order; other observed groups are appended.
 
     Returns:
         Group aggregates retaining the input row index. Groups absent from df are omitted.
+
+    Raises:
+        ValueError: If total_column matches a label in group_data.
     """
     # group by descriptive data
     group_dict = get_group_dict(group_data=group_data,
