@@ -20,12 +20,13 @@ env:
 jobs:
   # The Linux cells cover every supported interpreter.  Windows and macOS run the authoritative
   # 3.12 version to exercise platform paths and plotting backends without multiplying the
-  # eight-to-sixteen-minute suite across a 15-cell Cartesian product. All change-validation cells use
+  # full suite across a 15-cell Cartesian product. All change-validation cells use
   # uv.lock; the scheduled compatibility run resolves current compatible dependencies.
   test:
     name: pytest (core, ${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # Plot/report tests vary with runner speed; 30 minutes cancelled healthy runs at 94-100%.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -60,14 +61,14 @@ jobs:
       run: uv sync --group test ${{ github.event_name == 'schedule' && '--upgrade' || '--locked' }}
 
     - name: Run tests
-      run: uv run --no-sync pytest
+      run: uv run --no-sync pytest --durations=20
 
   # the same suite with the optional extras present, so the tests skipped above actually run
   test-extras:
     name: pytest (data + io extras)
     runs-on: ubuntu-latest
-    # Coverage adds overhead to the full suite; a 30-minute run reached 95% before timing out.
-    timeout-minutes: 45
+    # Coverage took 51 minutes on a slower runner; leave room for runner variation and cleanup.
+    timeout-minutes: 90
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -92,7 +93,8 @@ jobs:
     # the wheel in a clean environment so missing packages, tests or package data cannot pass CI.
     name: built wheel (core install)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The shipped suite took 28 minutes on a slower runner; leave room for setup and cleanup.
+    timeout-minutes: 45
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -38,6 +38,10 @@ def tail_index(scores, count, keep=()):
     ranked = candidates.replace([np.inf, -np.inf], np.nan).dropna().sort_values(
         kind='stable')
     selected = ranked.iloc[:count].index.union(ranked.iloc[-count:].index, sort=False)
+    if protected.empty:
+        return selected
+    if selected.empty:
+        return protected
     return selected.append(protected)
 
 
@@ -186,6 +190,6 @@ def compact_groups(aggregates, instruments, max_groups=6):
         assets = instruments['Total']
     else:
         aggregate = pd.concat(aggregates.values()).groupby(level=0).sum(min_count=1)
-        assets = pd.concat(instruments.values(), axis=1)
+        assets = pd.concat(instruments.values(), axis=1, sort=True)
     label = f'All instruments ({len(aggregates)} groups)'
     return {label: aggregate}, {label: assets}
