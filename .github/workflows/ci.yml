@@ -61,7 +61,7 @@ jobs:
       run: uv sync --group test ${{ github.event_name == 'schedule' && '--upgrade' || '--locked' }}
 
     - name: Run tests
-      run: uv run --no-sync pytest --durations=20 -o faulthandler_timeout=300
+      run: uv run --no-sync pytest --durations=20
 
   # the same suite with the optional extras present, so the tests skipped above actually run
   test-extras:
