@@ -140,7 +140,7 @@ def fit_multivariate_ols(x: pd.DataFrame,
 
     Args:
         x: explanatory variables, one column per regressor
-        y: dependent variable, aligned with ``x``
+        y: dependent variable, with the same index labels and order as ``x``
         fit_intercept: include an intercept, reported under the name ``'intercept'``
         verbose: print the statsmodels summary
         beta_format: format for the slope coefficients in the returned label
@@ -150,7 +150,15 @@ def fit_multivariate_ols(x: pd.DataFrame,
         A tuple ``(prediction, params, reg_label)``: the prediction indexed by the retained
         dates, the fitted parameters indexed by regressor name (``'intercept'`` first when
         ``fit_intercept``), and a formatted label of the fitted equation for a chart legend.
+
+    Raises:
+        ValueError: If ``x`` and ``y`` do not have matching index labels in the same order.
     """
+
+    # A positional fit can look perfect even when x and y refer to different dated observations.
+    # Check the original labels before conversion or finite-row filtering can hide that mismatch.
+    if not x.index.equals(y.index):
+        raise ValueError("x and y indices must be aligned")
 
     x_, y_, cond = filter_x_y(x=x.to_numpy(), y=y.to_numpy())
 

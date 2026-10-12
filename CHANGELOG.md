@@ -9,6 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Reject mismatched observation indexes in `fit_multivariate_ols` before converting inputs
+  to positional arrays, preventing fits that silently pair different dates. Aligned fits,
+  finite-row filtering and prediction labels are unchanged.
 - Align complete, uniquely named `instruments_carry` panels to price-column order in
   `backtest_model_portfolio`, preventing one instrument's carry rate from being credited to
   another. Carry timing and existing nonmatching-schema behavior are unchanged.
