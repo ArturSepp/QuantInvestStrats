@@ -15,6 +15,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Retain long and short holdings at their last observed valuation mark when execution prices
+  are missing in the backtester (#189). Unquoted positions cannot trade, even to a zero target;
+  available targets use full marked NAV. NAV, effective weights, carry and instrument P&L now
+  follow the same marks, and skipped trades have zero costs. Warn on held stale marks, including
+  trailing gaps, and document explicit settlement/exit inputs for terminal events.
 - Reject mismatched observation indexes in `fit_multivariate_ols` before converting inputs
   to positional arrays, preventing fits that silently pair different dates. Aligned fits,
   finite-row filtering and prediction labels are unchanged.

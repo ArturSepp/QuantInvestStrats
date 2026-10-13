@@ -3,8 +3,8 @@ what the backtester says when the weights and the prices do not fit each other.
 
 The backtester takes weights as given and never modifies them, so every mismatch between a
 weight and the price panel it meets has to be reported rather than absorbed. Three of them are
-pinned here: a weighted instrument with no price on its traded date, a nan inside an
-instrument's own reported history, and two weight dates resolving onto one traded date.
+pinned here: a weighted instrument with no price on its traded date, a held instrument with a
+missing quote, and two weight dates resolving onto one traded date.
 
 The third is the one that produced wrong numbers silently. Weights are consumed one row per
 rebalancing flag, so a collision does not skip a row - it shifts every later row, and the
@@ -80,35 +80,36 @@ def test_rescaled_weights_do_not_warn(ragged_prices: pd.DataFrame) -> None:
         qis.backtest_model_portfolio(prices=ragged_prices, weights=weights, ticker='rescaled')
 
 
-def test_an_interior_nan_warns_and_suggests_ffill(clean_prices: pd.DataFrame) -> None:
-    """a hole inside an instrument's own history removes the leg from the nav on those dates."""
+def test_an_interior_nan_warns_about_stale_valuation(clean_prices: pd.DataFrame) -> None:
+    """A held instrument keeps its last observed mark, with an explicit valuation warning."""
     holed = clean_prices.copy()
     holed.loc['2012-03-05':'2012-03-09', 'SBD_TSY'] = np.nan
-    with pytest.warns(UserWarning, match='prices.ffill'):
+    with pytest.warns(UserWarning, match='last observed price for valuation only'):
         qis.backtest_model_portfolio(prices=holed, weights={'SEQ_US': 0.6, 'SBD_TSY': 0.4},
                                      rebalancing_freq='QE')
 
 
-def test_leading_and_trailing_nans_do_not_warn_as_interior(clean_prices: pd.DataFrame) -> None:
-    """
-    an instrument that starts late or stops reporting is a universe change, not a hole.
-
-    Warning on those would fire on every ragged panel and so on every real one.
-    """
+def test_trailing_held_nan_warns_but_leading_nan_is_only_unfunded(clean_prices: pd.DataFrame):
+    """A trailing gap needs a valuation warning even when no future price resumes."""
     ragged = clean_prices.copy()
     ragged.loc[:'2010-06-30', 'SBD_TSY'] = np.nan   # not trading yet
     ragged.loc['2014-06-30':, 'SBD_TSY'] = np.nan   # no longer reporting
-    with warnings_are_errors(allowed='stays in the cash balance'):
+    with pytest.warns(UserWarning) as caught:
         qis.backtest_model_portfolio(prices=ragged, weights={'SEQ_US': 0.6, 'SBD_TSY': 0.4},
                                      rebalancing_freq='QE')
+    messages = [str(w.message) for w in caught]
+    assert len(messages) == 2
+    assert 'stays in the cash balance' in messages[0]
+    assert 'first at 30Jun2014' in messages[1]
+    assert 'last observed price for valuation only' in messages[1]
 
 
-def test_ffill_clears_the_interior_warning(clean_prices: pd.DataFrame) -> None:
-    """the remedy the message names actually removes the condition it warns about."""
+def test_unheld_interior_gap_is_silent(clean_prices: pd.DataFrame) -> None:
+    """Missing prices on a never-held, zero-target asset need no valuation warning."""
     holed = clean_prices.copy()
     holed.loc['2012-03-05':'2012-03-09', 'SBD_TSY'] = np.nan
     with warnings_are_errors():
-        qis.backtest_model_portfolio(prices=holed.ffill(), weights={'SEQ_US': 0.6, 'SBD_TSY': 0.4},
+        qis.backtest_model_portfolio(prices=holed, weights={'SEQ_US': 1.0, 'SBD_TSY': 0.0},
                                      rebalancing_freq='QE')
 
 

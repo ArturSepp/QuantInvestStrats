@@ -134,14 +134,25 @@ target construction or execution assumption.
 
 ### Unpriced assets and cash
 
-A target for an unpriced asset cannot be executed and leaves that allocation in cash. A static
-vector does not redistribute it across available assets. Use an explicit availability-aware
-schedule if redistribution is part of the investment rule.
+A missing execution quote never permits a trade. An unheld asset stays unheld, leaving its
+allocation in cash; an existing holding keeps its units even when the new target is zero.
+Available assets still trade to their targets using the full marked NAV. Targets are not
+redistributed or reduced to fit available cash, so a frozen holding can leave negative cash.
+For example, with NAV 100 and two holdings worth 50 each, a target of 100% in the quoted asset
+leaves that asset worth 100, the unquoted holding worth 50, and cash of -50 before costs.
 
-An internal price NaN is not repaired. Units remain held, but the unmarked leg drops out of the
-NAV sum on that date and the backtester warns. This is not an estimate of its economic value.
-Leading or trailing missing data also require an explicit entry/exit and valuation policy.
-Forward-fill only when carrying the last mark is the intended policy.
+For valuation, missing quotes carry the last observed price forward, without looking ahead.
+NAV, effective weights and carry use that mark. Instrument P&L uses mark changes on the units
+held over the interval, so a resumed price recognises the full move since the last observation.
+Leading or wholly missing histories never create positions, and a resumed quote alone does not
+trigger a trade: a new scheduled rebalance is needed. The returned `PortfolioData.prices` retains
+the original gaps. Forward-filling the input yourself would instead make those dates executable.
+
+The backtester warns when held positions use stale marks, including trailing gaps. This is a
+valuation convention, not an estimate of liquidation proceeds. For a delisting, recovery or
+default, supply an explicit settlement price and an exit target on that date; a missing quote
+alone neither writes off the holding nor converts it to cash. A zero settlement with a zero
+target realises a complete loss; carrying the previous mark indefinitely would conceal it.
 
 <a id="minimal-offline-example"></a>
 

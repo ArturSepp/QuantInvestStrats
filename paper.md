@@ -113,7 +113,7 @@ bootstrap resamples returns and recompounds them into price panels.
 
 # Software design
 
-The backtester is 449 lines, so its accounting can be audited line by line. The backtester
+The backtester is 460 lines, so its accounting can be audited line by line. The backtester
 converts target weights to units at each rebalancing, holds those units until the next one,
 applies costs and returns the result. Holding units lets the realised weights drift with prices,
 whereas multiplying each period's returns by fixed target weights would assume rebalancing in

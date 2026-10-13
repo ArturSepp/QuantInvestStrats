@@ -34,9 +34,11 @@ instrument returns are the same under any lag.
 
 Caller-owned dated inputs are never modified. Prices and dated schedules are ordered
 chronologically on local copies, and the price index must contain unique, non-missing timestamps.
-An instrument with no price on a rebalancing date is not traded and its weight stays in the cash
-balance; allocating that weight over the priced instruments instead is
-``qis.generate_static_weights_schedule``, before the backtest.
+Missing quotes retain held units at the last observed valuation mark, with a warning. They
+never enable trades: even a zero target cannot liquidate an unquoted holding. An unheld asset
+without a quote stays unheld, leaving its allocation in cash. Available targets still use full
+marked nav, without redistribution or a cash constraint. Supply explicit settlement prices and
+exit targets for terminal events; a missing quote alone is neither a loss nor a liquidation.
 
 ``backtest_rebalanced_portfolio`` is the numba kernel underneath: a genuine recursion in nav and
 cash balance, which is why it is not vectorized. Rolling an optimisation through time is
@@ -85,7 +87,9 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         prices: instrument prices, columns are tickers. Costs, carry and fees are applied on
             this grid. A nonempty input must use a ``DatetimeIndex`` with unique, non-missing
             timestamps. Rows are ordered chronologically on a local copy before any portfolio
-            state is constructed; the caller-owned object is not modified
+            state is constructed; the caller-owned object is not modified. Missing quotes use
+            the last observed price for valuation and carry only; existing units cannot trade
+            until a quoted rebalance. Leading missing prices never create positions
         weights: target weights. A Dict or pd.DataFrame is safest, since both are aligned to
             ``prices.columns`` by name; a list or array is positional and must match the
             column count. A fixed weight vector is applied at every date in
@@ -163,22 +167,6 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                              f"got {weight_implementation_lag!r}")
         lag = int(weight_implementation_lag)
 
-    # a nan inside an instrument's own reported history is a data defect rather than a universe
-    # change: units are held through it and np.nansum drops the leg from the nav on those dates.
-    # Leading nans (not yet trading) and trailing nans (no longer reporting) are legitimate
-    is_reported = prices.notna()
-    is_inside_history = np.logical_and(is_reported.cumsum().to_numpy() > 0,
-                                       is_reported.iloc[::-1].cumsum().iloc[::-1].to_numpy() > 0)
-    is_interior_nan = np.logical_and(is_inside_history, is_reported.to_numpy() == False)
-    if np.any(is_interior_nan):
-        holed = prices.columns[np.any(is_interior_nan, axis=0)].to_list()
-        first_hole = prices.index[np.any(is_interior_nan, axis=1)][0]
-        warnings.warn(f"prices carry missing values inside the reported history of {holed}, first "
-                      f"at {first_hole:%d%b%Y}: units are held through a nan price and the leg "
-                      f"drops out of the nav on those dates. Carry the last price with "
-                      f"prices.asfreq('B', method='ffill') or prices.ffill()",
-                      UserWarning, stacklevel=2)
-
     if isinstance(weights, pd.DataFrame):
         assert_list_subset(large_list=prices.columns.to_list(),
                               list_sample=weights.columns.to_list(),
@@ -231,9 +219,7 @@ def backtest_model_portfolio(prices: pd.DataFrame,
                                          index=portfolio_rebalance_dates,
                                          columns=prices.columns)
 
-    # a weighted instrument with no price on its traded date is not traded and its weight stays in
-    # the cash balance. Checked at the traded date rather than the weight date, so a lag that
-    # carries a weight past an instrument's last price is caught too
+    # Check execution availability at the traded date, including any implementation lag.
     traded_dates = is_rebalancing[is_rebalancing == True].index
     is_weighted = np.isclose(np.nan_to_num(portfolio_weights.to_numpy()), 0.0) == False
     is_unfunded = np.logical_and(prices.loc[traded_dates, :].isna().to_numpy(), is_weighted)
@@ -241,9 +227,8 @@ def backtest_model_portfolio(prices: pd.DataFrame,
         unfunded = prices.columns[np.any(is_unfunded, axis=0)].to_list()
         first_unfunded = traded_dates[np.any(is_unfunded, axis=1)][0]
         warnings.warn(f"weighted instruments {unfunded} have no price on their traded date, first "
-                      f"at {first_unfunded:%d%b%Y}: these legs are not traded and their weight "
-                      f"stays in the cash balance. Allocate over the priced instruments with "
-                      f"qis.generate_static_weights_schedule()",
+                      f"at {first_unfunded:%d%b%Y}: these legs are not traded. Existing units "
+                      f"are retained; an allocation to an unheld asset stays in the cash balance",
                       UserWarning, stacklevel=2)
 
     # Sort dated funding and carry before multiply_df_by_dt forward-fills them onto the price grid.
@@ -316,12 +301,28 @@ def backtest_model_portfolio(prices: pd.DataFrame,
     if ticker is not None:
         portfolio_nav = portfolio_nav.rename(ticker)
 
+    stale_holdings = prices.isna().to_numpy() & (units != 0.0)
+    if np.any(stale_holdings):
+        stale = prices.columns[np.any(stale_holdings, axis=0)].to_list()
+        first_stale = prices.index[np.any(stale_holdings, axis=1)][0]
+        warnings.warn(f"held instruments {stale} have missing quotes, first at "
+                      f"{first_stale:%d%b%Y}: using the last observed price for valuation only; "
+                      f"units are retained without trading. Supply explicit settlement prices "
+                      f"and exit targets for terminal events",
+                      UserWarning, stacklevel=2)
+
+    # Attribute the whole resumed price move to the units held through the gap. Keep the raw
+    # execution panel in PortfolioData so missing quotes remain visible to callers.
+    portfolio_units = pd.DataFrame(units, index=prices.index, columns=prices.columns)
+    instrument_pnl = (prices.ffill().diff().multiply(portfolio_units.shift(1))
+                      .divide(portfolio_nav.shift(1), axis=0).fillna(0.0))
     output_portfolio_data = PortfolioData(nav=portfolio_nav,
-                                          units=pd.DataFrame(units, index=prices.index, columns=prices.columns),
+                                          units=portfolio_units,
                                           weights=pd.DataFrame(effective_weights, index=prices.index, columns=prices.columns),
                                           input_weights=weights,
                                           is_rebalancing=is_rebalancing,
                                           prices=prices,
+                                          instrument_pnl=instrument_pnl,
                                           realized_costs=pd.DataFrame(realized_costs, index=prices.index, columns=prices.columns),
                                           ticker=ticker)
 
@@ -348,7 +349,8 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
     step depends on the previous nav and cash balance — which is why it is not vectorized.
 
     Args:
-        prices: price panel, shape (t, n), time along the first axis
+        prices: execution price panel, shape (t, n), time along the first axis. NaNs retain
+            existing units and use the last observed mark for nav, carry and effective weights
         weights: target weights, shape (num_rebalancings, n), one row consumed per True in
             ``is_rebalancing``
         is_rebalancing: boolean flag per date, shape (t,)
@@ -387,9 +389,12 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
     realized_costs = np.zeros_like(prices)
     nav = np.zeros(prices.shape[0])
     cash_balances = np.zeros(prices.shape[0])
+    valuation_prices = np.zeros_like(prices)
 
     # build initial portfolio
     current_prices = prices[0, :]
+    # Before the first quote units are zero; the zero mark never permits execution.
+    valuation_prices[0, :] = np.where(np.isnan(current_prices), 0.0, current_prices)
     if is_rebalancing[0]:
         if constant_trade_level is not None:
             current_units = (constant_trade_level * weights[current_rebalancing_idx]) / current_prices
@@ -409,31 +414,36 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
         current_units = np.zeros(prices.shape[1])
         current_cash_balance = initial_nav
     units[0, :] = current_units
-    nav[0] = np.nansum(current_units * current_prices) + current_cash_balance
+    nav[0] = np.nansum(current_units * valuation_prices[0]) + current_cash_balance
     cash_balances[0] = current_cash_balance
 
     # loop over t
     for t in np.arange(1, prices.shape[0]):
         current_units = units[t - 1]
         current_prices = prices[t, :]
+        missing_quote = np.isnan(current_prices)
+        valuation_prices[t, :] = np.where(missing_quote, valuation_prices[t - 1], current_prices)
+        current_marks = valuation_prices[t]
         management_fee = management_fee_dt[t]*nav[t-1]
         current_cash_balance = cash_balances[t-1] * (1.0 + funding_rate_dt[t]) - management_fee
 
         if instruments_carry_dt is not None:
-            carry = np.nansum(current_units * current_prices * instruments_carry_dt[t])
+            carry = np.nansum(current_units * current_marks * instruments_carry_dt[t])
             current_cash_balance += carry
 
         if is_rebalancing[t]:
             if constant_trade_level:
                 current_nav0 = constant_trade_level
             else:
-                current_nav0 = np.nansum(current_units * current_prices) + current_cash_balance
+                current_nav0 = np.nansum(current_units * current_marks) + current_cash_balance
             current_units = (current_nav0 * weights[current_rebalancing_idx]) / current_prices
             current_units[np.isnan(current_units)] = 0
+            current_units[missing_quote] = units[t - 1][missing_quote]
             units_change = current_units - units[t-1]
             change_in_cash = -np.nansum(units_change*current_prices)
             if rebalancing_costs is not None:
                 realized_costs_t = rebalancing_costs[t, :]*current_prices*np.abs(units_change)
+                realized_costs_t[missing_quote] = 0.0
                 realized_costs[t, :] = realized_costs_t
                 change_in_cash -= np.nansum(realized_costs_t)
             current_cash_balance = current_cash_balance + change_in_cash
@@ -441,9 +451,10 @@ def backtest_rebalanced_portfolio(prices: np.ndarray,
 
         # store
         units[t, :] = current_units
-        nav[t] = np.nansum(current_units * current_prices) + current_cash_balance
+        nav[t] = np.nansum(current_units * current_marks) + current_cash_balance
         cash_balances[t] = current_cash_balance
 
-    effective_weights = np.divide(units * prices, repeat_by_columns(a=nav, n=prices.shape[1]))
+    effective_weights = np.divide(units * valuation_prices,
+                                  repeat_by_columns(a=nav, n=prices.shape[1]))
 
     return nav, units, effective_weights, realized_costs
