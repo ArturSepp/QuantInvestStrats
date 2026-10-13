@@ -1,13 +1,13 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "344351443f7f60dd02fb8f90d23d79c2772ed0b6",
+  "measured_at_commit": "a5ced226f4707068821dc6bc6c332bdae0b56531",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
       "value": 40,
       "how": "distinct YYYY-MM with at least one commit",
       "live": false,
-      "paper_phrase": "in 40 of the 47 calendar months"
+      "paper_phrase": null
     },
     "ai_coauthored_commits": {
       "value": 110,
@@ -46,13 +46,13 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 6741,
+      "value": 6736,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 965,
+      "value": 966,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -61,13 +61,13 @@
       "value": 1105,
       "how": "tools/audit_consumers.py at 6a396cc190de",
       "live": false,
-      "paper_phrase": "at 1105 sites"
+      "paper_phrase": null
     },
     "consumer_optimalportfolios_symbols": {
       "value": 137,
       "how": "tools/audit_consumers.py at 6a396cc190de",
       "live": false,
-      "paper_phrase": "references 137 of its symbols"
+      "paper_phrase": null
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
@@ -85,13 +85,13 @@
       "value": 428,
       "how": "tools/audit_consumers.py at b1d75d974dc1",
       "live": false,
-      "paper_phrase": "at 428 sites"
+      "paper_phrase": null
     },
     "consumer_trendfollowing_symbols": {
       "value": 87,
       "how": "tools/audit_consumers.py at b1d75d974dc1",
       "live": false,
-      "paper_phrase": "references 87 symbols"
+      "paper_phrase": null
     },
     "core_symbols": {
       "value": 166,
@@ -124,7 +124,7 @@
       "paper_phrase": null
     },
     "paper_body_words": {
-      "value": 1747,
+      "value": 1606,
       "how": "whitespace-separated tokens in paper.md after the YAML front matter",
       "live": true,
       "paper_phrase": null

@@ -54,17 +54,12 @@ TODO_BLOCK = re.compile(r'\[TODO:.*?\]', flags=re.S)
 
 AI_COAUTHOR: str = 'Claude'  # the trailer identity disclosed in the paper's AI usage section
 
-# the sentence each consumer count is quoted inside, as a template over the measured value. A
-# bare number cannot be used: '94' is satisfied by the citation key politis1994, so that check
-# would have stayed green on a manuscript that had stopped quoting the count altogether.
-# privateassets is None in both positions because the paper cites it for the range of asset
-# classes it serves and quotes no figure for it - a phrase that binds nothing is a check that
-# cannot fail. A consumer absent from this table gets no phrase, which is the right default: it
-# means the manuscript does not quote it yet.
+# Consumer counts remain measured for provenance, but the paper describes their uses without
+# quoting these counts. None leaves a metric unbound to manuscript text. If a count is quoted
+# again, supply its full sentence fragment with a value placeholder rather than a bare number.
 CONSUMER_PHRASES: Dict[str, Dict[str, Optional[str]]] = {
-    'optimalportfolios': dict(symbols='references {value} of its symbols',
-                              call_sites='at {value} sites'),
-    'trendfollowing': dict(symbols='references {value} symbols', call_sites='at {value} sites'),
+    'optimalportfolios': dict(symbols=None, call_sites=None),
+    'trendfollowing': dict(symbols=None, call_sites=None),
     'privateassets': dict(symbols=None, call_sites=None),
 }
 
@@ -266,12 +261,11 @@ def measure() -> AuditResult:
     last_year, last_month = (int(part) for part in last_date.split('-'))
     span_months = (last_year - first_year) * 12 + (last_month - first_month) + 1
     active_months = len(set(dates))
-    # the phrase carries both numbers, so span_months is bound to the manuscript through it
+    # Development-history measurements remain recorded but are no longer quoted in the paper.
     result.metrics['active_months'] = Metric(
         value=active_months,
         how='distinct YYYY-MM with at least one commit',
-        live=False,
-        paper_phrase=f'in {active_months} of the {span_months} calendar months')
+        live=False)
     result.metrics['span_months'] = Metric(
         value=span_months,
         how='calendar months from the first commit to the last, inclusive',
