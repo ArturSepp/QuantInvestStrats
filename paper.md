@@ -132,6 +132,14 @@ research pipeline: a strategy against its benchmark, a parameter perturbation ag
 case and the sub-strategies of one strategy side by side. One reporting layer renders all three
 comparisons under the same conventions for performance evaluation.
 
+Beyond backtesting, `qis` supports analysis of currency exposure and factor risk. `FxRatesData`
+aligns spot exchange rates and short interest rates to express asset returns in a reference
+currency and evaluate partial currency hedges, including carry implied by covered interest
+parity. Exponentially weighted factor models estimate time-varying loadings, while risk analytics
+report portfolio factor exposures and systematic and residual risk contributions. Stress-testing
+functions apply specified or conditionally derived factor shocks to current holdings and report
+scenario profit and loss with reconciled factor attribution.
+
 The public interface is `qis.__all__`, which holds 475 names. The module `src/qis/api.py` records
 that list as a literal, together with a documented core of 166 symbols in 14 capability groups.
 The broad namespace preserves convenient imports and compatibility for existing consumers, at the
