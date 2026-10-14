@@ -95,6 +95,7 @@ jobs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ci-coverage-numerical
+        overwrite: true
         path: ${{ runner.temp }}/coverage-data/.coverage.*
         include-hidden-files: true
         if-no-files-found: error
@@ -136,6 +137,7 @@ jobs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ci-coverage-${{ matrix.suite }}-${{ matrix.shard }}
+        overwrite: true
         path: ${{ runner.temp }}/coverage-data/.coverage.*
         include-hidden-files: true
         if-no-files-found: error
@@ -231,6 +233,7 @@ jobs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ci-tested-wheel
+        overwrite: true
         path: dist/*.whl
         if-no-files-found: error
         retention-days: 7
