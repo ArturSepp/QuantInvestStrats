@@ -15,6 +15,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Apply prior-close weights in date order in `to_portfolio_returns` on a shared, unique
+  `DatetimeIndex` without `NaT`, preventing descending or shuffled rows from using a future
+  decision for an earlier return. Output row order, caller inputs and missing-term accounting
+  are unchanged.
 - Reconstruct `PortfolioData.instrument_pnl` on last observed marks
   (`prices.ffill().pct_change()`), matching the backtester's convention from #189, so a
   resumed quote books its full move to units held through the gap and instrument

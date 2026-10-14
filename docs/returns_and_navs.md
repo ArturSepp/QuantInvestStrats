@@ -58,7 +58,7 @@ questions:
 | Sampling grid | The input index, or the `freq` grid when given: prices are sampled at `freq` boundaries before differencing |
 | Annualisation | Per-annum returns use $Y$ = days/365.25; cash and fees accrue ACT/365; leverage financing uses the annual rate divided by $\mathrm{af}$; `compute_sampled_vols` scales by $\sqrt{\mathrm{af}}$ |
 | Mean adjustment | None in return, NAV, fee and leverage transforms; `estimate_vol` removes the sample mean at 20 or more observations and none below 20 |
-| Timing | A return dated $t$ covers $(t-1,t]$; cash accrued over it, in the excess helpers and in the backtest cash leg alike, uses the rate known on the return date $t-1$, as does leverage financing; backtest carry uses the latest quote at or before $t$; `to_portfolio_returns` lags weights by one row; interpolated returns up to a report date use data up to that date |
+| Timing | A return dated $t$ covers $(t-1,t]$; cash accrued over it, in the excess helpers and in the backtest cash leg alike, uses the rate known on the return date $t-1$, as does leverage financing; backtest carry uses the latest quote at or before $t$; `to_portfolio_returns` lags weights by one observation in date order on a shared, unique date grid without `NaT`; interpolated returns up to a report date use data up to that date |
 | Output units | Decimal returns; NAVs start at 1 unless `init_value` or `terminal_value` rescales them |
 | qis default | `to_returns(is_log_returns=False, return_type=ReturnTypes.RELATIVE, freq=None, ffill_nans=True, drop_first=False, is_first_zero=False)`, `returns_to_nav(init_period=0)`, fees `man_fee=0.01, perf_fee=0.2, perf_fee_frequency='YE'`, `interpolate_infrequent_returns(span=12, is_to_log_returns=False, vol_adjustment=1.0)` |
 
@@ -217,8 +217,9 @@ returns the total return, or $\mathrm{TR}/Y$ when `annualize_less_1y=True`.
 
 ### Portfolio returns from lagged weights
 
-**Definition (portfolio return).** `qis.to_portfolio_returns(weights, returns)` shifts the weights
-frame down by one row and computes
+**Definition (portfolio return).** On a shared, unique `DatetimeIndex` without `NaT`,
+`qis.to_portfolio_returns(weights, returns)` orders both frames chronologically, lags the weights
+by one observation, and computes
 
 $$
 r_{p,t}=\sum_{i\in O_t} w_{i,t-1}\,r_{i,t},
@@ -229,7 +230,10 @@ $$
 with $r_{p,t}$ missing when $O_t$ is empty. The weights are multiplied with the returns by date
 label, so the two frames must share one index; weights on rebalancing dates only must be
 reindexed and forward-filled to the return dates first, otherwise every unmatched date is
-missing. The first row is missing because it has no lagged weight.
+missing. The earliest date is missing because it has no lagged weight. Calculation uses date order
+even when the input rows are descending or shuffled; the returned Series retains the return
+frame's original index order, and neither caller-owned frame is modified. Other index forms retain
+their existing row-based behaviour; no calendar or duplicate-date policy is introduced for them.
 
 The missing-value rule is exact: a missing term contributes zero and **the remaining weights are
 not renormalised**. With weights $(0.5,0.5)$ and returns $(2\%,\text{missing})$ the portfolio
