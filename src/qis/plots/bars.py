@@ -156,8 +156,22 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
         df1 = df.melt(ignore_index=False, var_name=var_name, value_name=value_name)
         df1 = df1.dropna(subset=[value_name])  # dropna in value_name
         if is_sns and not stacked:
+            palette = colors[:len(df1[var_name].unique())]
+            # A dropped series must not shift its neighbours' colours. Key a complete palette
+            # by original columns, without adding empty hue slots to Seaborn's layout.
+            # Short palettes and duplicate labels retain the established positional fallback.
+            if df.columns.is_unique and len(colors) >= len(df.columns):
+                series_colors = dict(zip(df.columns, colors))
+                if isinstance(df1[var_name].dtype, pd.CategoricalDtype) and not df1.empty:
+                    # Seaborn retains unused categorical levels. Supply their native cycled
+                    # colours without changing real series identities or the category layout.
+                    categories = df1[var_name].cat.categories
+                    for category, color in zip(
+                            categories, sns.color_palette(palette, n_colors=len(categories))):
+                        series_colors.setdefault(category, color)
+                palette = series_colors
             sns.barplot(x=df1.index, y=value_name, data=df1, hue=var_name,
-                        palette=colors[:len(df1[var_name].unique())],
+                        palette=palette,
                         edgecolor='none',
                         orient='h' if is_horizontal else 'v',
                         alpha=alpha,
