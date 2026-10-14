@@ -48,7 +48,9 @@ FACTSHEET_TESTS = {
 
 def canonical_nodeid(nodeid):
     """Remove checkout/site-packages prefixes, including Windows path separators."""
-    return nodeid.replace('\\', '/').rsplit('qis/', 1)[-1]
+    path, separator, test = nodeid.partition('::')
+    path = path.replace('\\', '/').rsplit('qis/', 1)[-1]
+    return path + separator + test
 
 
 def suite_for(nodeid):

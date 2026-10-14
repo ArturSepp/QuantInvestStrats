@@ -52,6 +52,8 @@ def test_explicit_rendering_selectors_name_existing_tests():
 
 @pytest.mark.parametrize(('nodeid', 'suite'), [
     ('plots/tests/plot_smoke_test.py::test_exported_plot_function_draws[plot_df_table]', 'plots'),
+    ('plots/tests/plot_smoke_test.py::'
+     'test_exported_plot_function_draws[qis/docs/table.md]', 'plots'),
     ('portfolio/reports/tests/large_universe_factsheet_test.py::'
      'test_large_universe_appendices[no-groups-risk]', 'factsheets'),
     ('tests/test_reporting_conventions.py::test_panel_frequency_labels[DAILY]', 'factsheets'),
