@@ -1,8 +1,9 @@
-"""Opt-in CI partitioning; ordinary pytest and installed-wheel runs still run everything.
+"""Opt-in CI partitioning shared by source and installed-wheel test jobs.
 
-Only named rendering workloads leave the full Python/OS matrix. Mixed modules default to
-the numerical suite so new accounting, estimation and reporting-contract tests keep matrix
-coverage. Each collected item belongs to exactly one suite and one stable shard.
+Ordinary pytest remains unpartitioned. Only named rendering workloads leave the full
+Python/OS matrix. Mixed modules default to the numerical suite, keeping new accounting,
+estimation and reporting contracts on every matrix cell. Each collected item belongs to
+exactly one suite and one stable shard.
 """
 
 import hashlib

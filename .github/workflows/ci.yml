@@ -164,12 +164,10 @@ jobs:
         uv run --no-sync coverage report --skip-covered
 
   wheel:
-    # Editable installs exercise the src tree, not the artifact users receive. Build and install
-    # the wheel in a clean environment so missing packages, tests or package data cannot pass CI.
-    name: built wheel (core install)
+    # Build once: every installed-wheel partition must exercise the same artifact.
+    name: build wheel from sdist
     runs-on: ubuntu-latest
-    # The shipped suite took 28 minutes on a slower runner; leave room for setup and cleanup.
-    timeout-minutes: 45
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -229,6 +227,44 @@ jobs:
         print(f"{wheels[0]}: {len(tests)} test modules and required package data present")
         PY
 
+    - name: Retain the exact wheel for every installed-artifact test
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ci-tested-wheel
+        path: dist/*.whl
+        if-no-files-found: error
+        retention-days: 7
+
+  wheel-tests:
+    name: installed wheel (${{ matrix.suite }}, shard ${{ matrix.shard }})
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: numerical
+            shard: 0
+            shards: 1
+          - suite: plots
+            shard: 0
+            shards: 1
+          - suite: factsheets
+            shard: 0
+            shards: 2
+          - suite: factsheets
+            shard: 1
+            shards: 2
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        python-version: "3.12"
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: ci-tested-wheel
+        path: dist
     - name: Install the wheel into a clean environment
       run: |
         uv venv --python 3.12 "$RUNNER_TEMP/qis-wheel-venv"
@@ -236,6 +272,7 @@ jobs:
           "$(ls dist/*.whl)" pytest
 
     - name: Run the offline quickstart against the installed wheel
+      if: matrix.suite == 'numerical'
       # Execute from outside the checkout.  The script path is repository-owned documentation,
       # but its qis import and synthetic data resolve entirely through the clean wheel environment.
       run: |
@@ -246,12 +283,13 @@ jobs:
         grep -F "Final NAV: 119.9866" quickstart.txt
         grep -F "TE=0.0299, IR=-0.2899" quickstart.txt
 
-    - name: Run the shipped suite against the installed wheel
+    - name: Run the shipped partition against the installed wheel
       run: |
         mkdir -p "$RUNNER_TEMP/qis-wheel-check"
         cd "$RUNNER_TEMP/qis-wheel-check"
         "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pytest --pyargs qis -q \
-          --import-mode=importlib
+          --import-mode=importlib -p ci_test_suites --ci-suite ${{ matrix.suite }} \
+          --ci-shard ${{ matrix.shard }} --ci-shards ${{ matrix.shards }} --durations=20
 
   stack-policy:
     name: stack import boundaries
