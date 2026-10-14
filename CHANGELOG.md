@@ -15,6 +15,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Apply prior-close weights in date order in `to_portfolio_returns` on a shared, unique
+  `DatetimeIndex` without `NaT`, preventing descending or shuffled rows from using a future
+  decision for an earlier return. Output row order, caller inputs and missing-term accounting
+  are unchanged.
 - Retain long and short holdings at their last observed valuation mark when execution prices
   are missing in the backtester (#189). Unquoted positions cannot trade, even to a zero target;
   available targets use full marked NAV. NAV, effective weights, carry and instrument P&L now

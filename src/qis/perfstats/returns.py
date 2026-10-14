@@ -1214,7 +1214,9 @@ def to_portfolio_returns(weights: pd.DataFrame,
                          ) -> pd.Series:
     """Compute portfolio returns from asset weights and returns.
 
-    Uses lagged weights (rebalanced at prior period close).
+    Uses lagged weights (rebalanced at prior period close). On a shared, unique ``DatetimeIndex``
+    without ``NaT``, the lag follows date order, not the physical row order of either input.
+    The result retains the return frame's original index order; neither input is modified.
 
     NaN handling — IMPORTANT:
         This function aggregates ``returns * lagged_weights`` via ``nansum``
@@ -1235,13 +1237,28 @@ def to_portfolio_returns(weights: pd.DataFrame,
         return (rather than 0), so fully-NaN periods propagate correctly.
 
     Args:
-        weights: Portfolio weight DataFrame (columns = assets)
-        returns: Asset return DataFrame (columns = assets)
+        weights: Portfolio weight DataFrame (columns = assets), on the return dates. Sparse
+            rebalancing schedules must be reindexed and forward-filled by the caller first
+        returns: Asset return DataFrame (columns = assets), sharing the weight frame's date grid
         portfolio_name: Name for output series
 
     Returns:
         Portfolio return time series
     """
+    output_index = returns.index
+    if (
+        isinstance(weights.index, pd.DatetimeIndex)
+        and isinstance(returns.index, pd.DatetimeIndex)
+        and weights.index.is_unique
+        and returns.index.is_unique
+        and not weights.index.hasnans
+        and not returns.index.hasnans
+        and weights.index.sort_values().equals(returns.index.sort_values())
+    ):
+        # A physical neighbor can be a future decision. Prepare both companions on the same
+        # chronological grid before lagging, but do not invent a policy for ambiguous axes.
+        weights = _chronological_prices(weights)
+        returns = _chronological_prices(returns)
     weights_1 = weights.shift(1)
     portfolio_pnl = returns.multiply(weights_1).to_numpy()
     pnl = np.nansum(portfolio_pnl, axis=1)
@@ -1250,7 +1267,8 @@ def to_portfolio_returns(weights: pd.DataFrame,
     portfolio_returns = pd.Series(data=portfolio_pnl,
                                   index=returns.index,
                                   name=portfolio_name)
-    return portfolio_returns
+    # Date ordering is calculation-only; callers retain their original return labels and layout.
+    return portfolio_returns.reindex(output_index)
 
 
 def portfolio_returns_to_nav(returns: pd.DataFrame,
