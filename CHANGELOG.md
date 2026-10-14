@@ -33,6 +33,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Reduce peak memory in `bootstrap_price_data` for float64 list-output draws by replacing
+  sampled-return arrays with reconstructed price paths instead of retaining both collections.
+  Sampling, price reconstruction, output types and caller-owned inputs are unchanged.
 - Reduce peak memory in `estimate_rolling_ewma_covar` by applying availability masks only
   to returned rebalancing matrices instead of copying the full covariance history. Covariance
   estimates, per-asset warm-up, dates and labels are unchanged; the estimator still retains its
