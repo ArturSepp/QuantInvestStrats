@@ -19,6 +19,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `DatetimeIndex` without `NaT`, preventing descending or shuffled rows from using a future
   decision for an earlier return. Output row order, caller inputs and missing-term accounting
   are unchanged.
+- Reconstruct `PortfolioData.instrument_pnl` on last observed marks
+  (`prices.ffill().pct_change()`), matching the backtester's convention from #189, so a
+  resumed quote books its full move to units held through the gap and instrument
+  contributions sum to the nav return. Complete price panels are unchanged.
 - Retain long and short holdings at their last observed valuation mark when execution prices
   are missing in the backtester (#189). Unquoted positions cannot trade, even to a zero target;
   available targets use full marked NAV. NAV, effective weights, carry and instrument P&L now

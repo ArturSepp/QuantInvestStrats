@@ -16,16 +16,17 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   MPLBACKEND: Agg  # no display on the runner
+  PYTHONPATH: ${{ github.workspace }}/.github  # opt-in pytest CI routing plugin
 
 jobs:
   # The Linux cells cover every supported interpreter.  Windows and macOS run the authoritative
   # 3.12 version to exercise platform paths and plotting backends without multiplying the
-  # full suite across a 15-cell Cartesian product. All change-validation cells use
+  # rendering workloads across a 15-cell Cartesian product. All change-validation cells use
   # uv.lock; the scheduled compatibility run resolves current compatible dependencies.
   test:
     name: pytest (core, ${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
-    # Plot/report tests vary with runner speed; 30 minutes cancelled healthy runs at 94-100%.
+    # Numerical and mixed numerical/reporting contracts remain on every interpreter/platform.
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -60,10 +61,10 @@ jobs:
       # resolution so compatibility with what a new installer receives remains covered.
       run: uv sync --group test ${{ github.event_name == 'schedule' && '--upgrade' || '--locked' }}
 
-    - name: Run tests
-      run: uv run --no-sync pytest --durations=20
+    - name: Run numerical and mixed-contract tests
+      run: uv run --no-sync pytest -p ci_test_suites --ci-suite numerical --durations=20
 
-  # the same suite with the optional extras present, so the tests skipped above actually run
+  # Optional numeric/IO tests plus coverage; rendering coverage is combined below.
   test-extras:
     name: pytest (data + io extras)
     runs-on: ubuntu-latest
@@ -81,20 +82,94 @@ jobs:
     - name: Sync the locked data and io environment
       run: uv sync --group test --extra data --extra io --locked
 
-    - name: Run tests with coverage
-      # [tool.coverage.report] owns the regression floor; the report remains broad because plots
-      # and factsheets are core qis functionality rather than disposable presentation wrappers.
+    - name: Run numerical tests with coverage
+      env:
+        COVERAGE_FILE: ${{ runner.temp }}/coverage-data/.coverage.numerical
+      # A shard cannot enforce the package-wide floor. The combined report below does.
       run: >-
-        uv run --no-sync pytest --cov=qis --cov-report=term:skip-covered
+        uv run --no-sync pytest -p ci_test_suites --ci-suite numerical
+        --cov=qis --cov-report= --cov-fail-under=0
         --durations=20 -o faulthandler_timeout=300
 
-  wheel:
-    # Editable installs exercise the src tree, not the artifact users receive. Build and install
-    # the wheel in a clean environment so missing packages, tests or package data cannot pass CI.
-    name: built wheel (core install)
+    - name: Retain numerical coverage
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ci-coverage-numerical
+        overwrite: true
+        path: ${{ runner.temp }}/coverage-data/.coverage.*
+        include-hidden-files: true
+        if-no-files-found: error
+        retention-days: 7
+
+  rendering:
+    name: pytest (${{ matrix.suite }}, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    # The shipped suite took 28 minutes on a slower runner; leave room for setup and cleanup.
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: plots
+            shard: 0
+            shards: 1
+          - suite: factsheets
+            shard: 0
+            shards: 2
+          - suite: factsheets
+            shard: 1
+            shards: 2
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        python-version: "3.12"
+    - name: Sync the core rendering environment
+      run: uv sync --group test ${{ github.event_name == 'schedule' && '--upgrade' || '--locked' }}
+    - name: Run rendering shard with coverage
+      env:
+        COVERAGE_FILE: ${{ runner.temp }}/coverage-data/.coverage.${{ matrix.suite }}-${{ matrix.shard }}
+      run: >-
+        uv run --no-sync pytest -p ci_test_suites --ci-suite ${{ matrix.suite }}
+        --ci-shard ${{ matrix.shard }} --ci-shards ${{ matrix.shards }}
+        --cov=qis --cov-report= --cov-fail-under=0
+        --durations=20 -o faulthandler_timeout=300
+    - name: Retain rendering coverage
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ci-coverage-${{ matrix.suite }}-${{ matrix.shard }}
+        overwrite: true
+        path: ${{ runner.temp }}/coverage-data/.coverage.*
+        include-hidden-files: true
+        if-no-files-found: error
+        retention-days: 7
+
+  coverage:
+    name: combined numerical and rendering coverage
+    needs: [test-extras, rendering]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        python-version: "3.12"
+    - name: Sync the locked coverage tools
+      run: uv sync --locked --group test
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        pattern: ci-coverage-*
+        merge-multiple: true
+        path: ${{ runner.temp }}/coverage-data
+    - name: Combine every shard and enforce the existing package-wide floor
+      run: |
+        uv run --no-sync coverage combine "${{ runner.temp }}/coverage-data"
+        uv run --no-sync coverage report --skip-covered
+
+  wheel:
+    # Build once: every installed-wheel partition must exercise the same artifact.
+    name: build wheel from sdist
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -154,6 +229,45 @@ jobs:
         print(f"{wheels[0]}: {len(tests)} test modules and required package data present")
         PY
 
+    - name: Retain the exact wheel for every installed-artifact test
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ci-tested-wheel
+        overwrite: true
+        path: dist/*.whl
+        if-no-files-found: error
+        retention-days: 7
+
+  wheel-tests:
+    name: installed wheel (${{ matrix.suite }}, shard ${{ matrix.shard }})
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: numerical
+            shard: 0
+            shards: 1
+          - suite: plots
+            shard: 0
+            shards: 1
+          - suite: factsheets
+            shard: 0
+            shards: 2
+          - suite: factsheets
+            shard: 1
+            shards: 2
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        python-version: "3.12"
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: ci-tested-wheel
+        path: dist
     - name: Install the wheel into a clean environment
       run: |
         uv venv --python 3.12 "$RUNNER_TEMP/qis-wheel-venv"
@@ -161,6 +275,7 @@ jobs:
           "$(ls dist/*.whl)" pytest
 
     - name: Run the offline quickstart against the installed wheel
+      if: matrix.suite == 'numerical'
       # Execute from outside the checkout.  The script path is repository-owned documentation,
       # but its qis import and synthetic data resolve entirely through the clean wheel environment.
       run: |
@@ -171,12 +286,13 @@ jobs:
         grep -F "Final NAV: 119.9866" quickstart.txt
         grep -F "TE=0.0299, IR=-0.2899" quickstart.txt
 
-    - name: Run the shipped suite against the installed wheel
+    - name: Run the shipped partition against the installed wheel
       run: |
         mkdir -p "$RUNNER_TEMP/qis-wheel-check"
         cd "$RUNNER_TEMP/qis-wheel-check"
         "$RUNNER_TEMP/qis-wheel-venv/bin/python" -m pytest --pyargs qis -q \
-          --import-mode=importlib
+          --import-mode=importlib -p ci_test_suites --ci-suite ${{ matrix.suite }} \
+          --ci-shard ${{ matrix.shard }} --ci-shards ${{ matrix.shards }} --durations=20
 
   stack-policy:
     name: stack import boundaries

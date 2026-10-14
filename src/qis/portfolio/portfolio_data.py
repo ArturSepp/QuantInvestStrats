@@ -22,8 +22,10 @@ Conventions that hold module-wide:
         Turnover is summed over a rolling ``roll_period``, 260 observations by default.
 
     ``instrument_pnl`` is arithmetic and additive across instruments. When not supplied it is
-        reconstructed as prices.pct_change() * weights.shift(1) with missing values filled to
-        zero, so a backtester computing pnl on another convention should pass it explicitly.
+        reconstructed as prices.ffill().pct_change() * weights.shift(1) with missing values
+        filled to zero, so missing quotes are valued at the last observed price and a resumed
+        quote books its full move; a backtester computing pnl on another convention should
+        pass it explicitly.
 
     ``covar_dict``, annualised covariance by date, is read by
         ``compute_ex_anti_portfolio_vol_implied_by_covar`` and
@@ -174,7 +176,8 @@ class PortfolioData:
     correctly but has nothing to attribute, so pass the panels if attribution is wanted.
 
     ``instrument_pnl``, when not given, is reconstructed as
-    ``prices.pct_change() * weights.shift(1)`` — arithmetic returns on lagged weights. Pass it
+    ``prices.ffill().pct_change() * weights.shift(1)`` — arithmetic returns on lagged weights,
+    valued on last observed marks so a resumed quote books its full move. Pass it
     explicitly if the backtester computed pnl on a different convention.
 
     Attributes:
@@ -240,7 +243,10 @@ class PortfolioData:
         if self.realized_costs is None:
             self.realized_costs = pd.DataFrame(0.0, index=self.prices.index, columns=self.prices.columns)
         if self.instrument_pnl is None:
-            self.instrument_pnl = self.prices.pct_change(fill_method=None).multiply(self.weights.shift(1)).fillna(0.0)
+            # Value on last observed marks, matching backtest_model_portfolio, so a resumed
+            # quote books its full move to units held through the gap.
+            self.instrument_pnl = (self.prices.ffill().pct_change(fill_method=None)
+                                   .multiply(self.weights.shift(1)).fillna(0.0))
         if self.group_data is None:  # use instruments as groups
             self.group_data = pd.Series(self.prices.columns, index=self.prices.columns)
         if self.group_order is None:
