@@ -177,6 +177,8 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
                              z=np.outer(np.linspace(0.0, 1.0, 8), np.linspace(0.0, 1.0, 8))),
         'plot_corr_matrix_from_covar': dict(covar=fx.covar),
         'plot_data_timeseries': dict(data=fx.prices),
+        # A smoke test needs a few cells, not the entire multi-year return history.
+        'plot_df_table': dict(df=fx.small_table),
         'plot_df_table_with_ci': dict(df=fx.small_table, df_ci=fx.small_table.abs()),
         'plot_histplot2d': dict(df=fx.two_columns),
         # each value is an x/y frame: first column is x, second is y
@@ -284,6 +286,15 @@ def test_exported_plot_function_draws(name: str, fx: Fixtures) -> None:
         output = getattr(qis, name)(**_call_kwargs(name=name, fx=fx))
         assert isinstance(output, (plt.Figure, plt.Axes, tuple, pd.DataFrame)) or output is None
         assert len(plt.get_fignums()) > 0, f"{name} drew no figure"
+        if name == 'plot_df_table':
+            figure = plt.gcf()
+            cells = figure.axes[0].tables[0].get_celld()
+            assert len(cells) == (len(fx.small_table) + 1) * (len(fx.small_table.columns) + 1)
+            for row in range(len(fx.small_table)):
+                for column in range(len(fx.small_table.columns)):
+                    assert cells[row + 1, column + 1].get_text().get_text() == str(
+                        fx.small_table.iloc[row, column])
+            figure.canvas.draw()
     finally:
         plt.close('all')
 
