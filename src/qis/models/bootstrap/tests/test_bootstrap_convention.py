@@ -1,36 +1,21 @@
 """
-the numbers in the convention example are pinned, not just executed.
+Pin the convention example's numerical results and the handbook tables that publish them.
 
-``src/qis/tests/test_examples.py`` runs the example at
-``examples/models/bootstrap_convention.py`` and fails on a nonzero exit code. That is a
-check that the script runs, not a check that it is right: the
-first observation could be drawn at 0.20 instead of 0.110, the annualised bias could move from
-+2.15% to +5%, and the example would still exit zero. Those numbers are quoted in
-``docs/reproducibility.md`` and in the paper, so "the example runs in the test suite" was
-carrying more weight than it could hold.
+``test_examples.py`` checks that the script runs, but execution alone would not catch a changed
+draw frequency or annualised bias. The fixed seeds make every quantity deterministic, so the
+tolerances below are half a unit in the last published digit, not a statistical allowance.
 
-This file pins them. Every value below is deterministic given the seeds in the example, so the
-tolerances are half a unit in the last published digit rather than a statistical allowance: a
-change large enough to alter the printed table fails here.
-
-It also checks that ``docs/reproducibility.md`` and ``paper.md`` still state the values the code
-produces, so neither document can drift away from the script behind it. The paper was the gap:
-the failure messages below have always claimed it quotes these numbers, and until now nothing
-read it. It rounds to two decimals where this file pins three, so the check formats the
-measurement the way the manuscript prints it and requires that fragment. A recomputation that
-moves a value therefore changes the fragment the paper must carry, rather than passing on a
-sentence that has quietly become wrong.
-
-To confirm the check can fail, replace ``qis.generate_bootstrapped_indices`` in the example with
-``draw_truncating_indices``: the circular rows move to the truncating values and four assertions
-below fail. That was run before this file was committed.
+``docs/reproducibility.md`` retains this case study; the revised software paper no longer quotes
+its measurements. Keep the numerical and handbook checks here rather than requiring removed
+manuscript wording. ``src/qis/tests/test_paper_audit.py`` separately checks the measurements the
+paper still quotes.
 """
 # packages
 import importlib.util
 import re
 from pathlib import Path
 from types import ModuleType
-from typing import Dict, Tuple
+from typing import Tuple
 import numpy as np
 import pytest
 # qis / project
@@ -39,7 +24,6 @@ import qis
 REPO_ROOT: Path = Path(qis.__file__).resolve().parents[2]
 EXAMPLE_PATH: Path = REPO_ROOT.joinpath('examples', 'models', 'bootstrap_convention.py')
 REPRODUCIBILITY_PATH: Path = REPO_ROOT.joinpath('docs', 'reproducibility.md')
-PAPER_PATH: Path = REPO_ROOT.joinpath('paper.md')
 IS_REPOSITORY_CHECKOUT: bool = REPO_ROOT.joinpath('pyproject.toml').is_file()
 
 pytestmark = pytest.mark.skipif(
@@ -145,7 +129,7 @@ def test_relative_draw_frequency(example: ModuleType,
                                                       'last decile')):
         assert abs(measured_value - expected_value) < FREQUENCY_TOLERANCE, (
             f"{convention} {label}: {measured_value:.4f}, published {expected_value:.3f}. "
-            f"The example, docs/reproducibility.md and paper.md all quote the published value")
+            f"The example and docs/reproducibility.md quote the published value")
 
 
 def test_source_series_mean(example: ModuleType) -> None:
@@ -169,8 +153,8 @@ def test_resampled_mean_bias(example: ModuleType,
     """
     the mean each convention reports, and the annualised bias that follows.
 
-    The 2.47 percentage-point spread between the two annualised biases is the measurement the
-    statement of need rests on, so it is pinned here rather than recomputed by a reader.
+    The handbook uses the 2.47 percentage-point spread to illustrate this fixed sample's
+    sensitivity to the convention; it is not a universal bootstrap adjustment.
     """
     draw = indices[0] if convention == 'truncating' else indices[1]
     returns = example.make_trending_returns()
@@ -193,11 +177,11 @@ def test_conventions_differ_by_more_than_two_points(example: ModuleType,
                                                     indices: Tuple[np.ndarray, np.ndarray],
                                                     ) -> None:
     """
-    the claim the paper makes in words, asserted as a number.
+    the handbook's case-study consequence, asserted as a number.
 
     Two researchers running "a stationary bootstrap" on this series report annualised means more
-    than two percentage points apart. If that ever stops being true the sentence in the paper
-    stops being true with it.
+    than two percentage points apart. Keep this check alongside the individually rounded biases
+    so the handbook's stated difference remains supported by the full-precision calculation.
     """
     returns = example.make_trending_returns()
     source_mean = float(returns.mean())
@@ -205,7 +189,7 @@ def test_conventions_differ_by_more_than_two_points(example: ModuleType,
     spread_percent = abs(biases[0] - biases[1]) * example.PERIODS_PER_YEAR * 100.0
     assert spread_percent > 2.0, (
         f"the two conventions now differ by {spread_percent:.2f} percentage points a year, "
-        f"and the paper says more than two")
+        f"but the handbook's case study reports more than two")
 
 
 @pytest.mark.parametrize('published', ['0.110', '0.526', '1.073', '0.978', '1.007', '1.020',
@@ -226,62 +210,3 @@ def test_reproducibility_page_states_the_measured_values(published: str) -> None
     assert published in normalised, (
         f"docs/reproducibility.md no longer states {published!r}. Regenerate the page from "
         f"python -m examples.models.bootstrap_convention")
-
-
-@pytest.fixture(scope='module')
-def paper_fragments(example: ModuleType,
-                    indices: Tuple[np.ndarray, np.ndarray],
-                    ) -> Dict[str, str]:
-    """
-    the four quantities the statement of need quotes, formatted as the manuscript prints them.
-
-    The manuscript rounds to two decimals where this file pins three - 0.110 is printed 0.11,
-    0.526 is printed 0.53 - so the fragment is built from the measurement rather than written
-    out. A value that moves changes the fragment the paper is required to carry, which fails
-    here instead of leaving a sentence that has quietly stopped being true.
-
-    Args:
-        example: the imported example module
-        indices: the truncating and circular draws
-
-    Returns:
-        the fragment paper.md must contain, by quantity
-    """
-    truncating, circular = indices
-    first_observation, first_decile, _ = _frequency_triple(example=example, draw=truncating)
-    returns = example.make_trending_returns()
-    source_mean = float(returns.mean())
-    annual = {name: (float(returns[draw].mean(axis=0).mean()) - source_mean)
-                    * example.PERIODS_PER_YEAR * 100.0
-              for name, draw in (('truncating', truncating), ('circular', circular))}
-    return {'first_observation': f'{first_observation:.2f} times',
-            'first_decile': f'{first_decile:.2f} times',
-            'truncating_annual_bias': f'{annual["truncating"]:.2f}% per year',
-            'circular_annual_bias': f'within {abs(annual["circular"]):.2f}%'}
-
-
-@pytest.mark.parametrize('quantity, published',
-                         [('first_observation', '0.11 times'),
-                          ('first_decile', '0.53 times'),
-                          ('truncating_annual_bias', '2.15% per year'),
-                          ('circular_annual_bias', 'within 0.32%')])
-def test_paper_states_the_measured_values(paper_fragments: Dict[str, str],
-                                          quantity: str,
-                                          published: str,
-                                          ) -> None:
-    """
-    paper.md quotes what the example computes, at the manuscript's own precision.
-
-    Two assertions, and they fail for different reasons. The first says the measurement still
-    rounds to the figure the manuscript and this row agree on; the second says the manuscript
-    still carries it. The paper is the document a reviewer reads, and it was the one document
-    nothing held to these numbers.
-    """
-    if not PAPER_PATH.is_file():
-        pytest.skip(f"{PAPER_PATH} is not in this checkout")
-    measured = paper_fragments[quantity]
-    assert measured == published, (
-        f"{quantity} now prints as {measured!r} where this row and paper.md say {published!r}; "
-        f"correct the manuscript and this row together")
-    assert published in PAPER_PATH.read_text(encoding='utf-8'), (
-        f"paper.md no longer states {published!r}, which the example computes")
