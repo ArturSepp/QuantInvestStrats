@@ -26,6 +26,7 @@ of one portfolio offline.
 | How much risk is the portfolio running? | `PortfolioData.compute_portfolio_vol`, `qis.compute_portfolio_vol`, `qis.compute_ewm_vol` | [Exponentially weighted estimators](ewm_estimators.md) |
 | Where does the risk come from? | `qis.compute_portfolio_risk_contribution_ratios`, `PortfolioData.compute_risk_contributions_implied_by_covar`, `qis.RiskModel` | [Portfolio risk and Euler contributions](risk_contributions.md), [factor risk models](factor_risk_models.md) |
 | How large is a bad day? | `PortfolioData.compute_portfolio_vars`, `qis.compute_portfolio_correlated_var_by_groups` | [Parametric value at risk](risk_contributions.md#parametric-value-at-risk) |
+| What is the proposed allocation's one-year VaR relative to its benchmark? | `qis.GaussianVarSpec`, `qis.GaussianMonteCarlo`, `qis.compute_gaussian_portfolio_risk` | [Gaussian Monte Carlo VaR and benchmark risk](gaussian_var.md) |
 | How far can it drift from the benchmark? | `qis.RiskModel` for ex-ante tracking error, `qis.compute_ewma_realised_tracking_error`, `PortfolioData.compute_portfolio_benchmark_betas` | [Tracking error](tracking_error_and_risk.md), [alpha and beta](benchmark_relative_performance.md) |
 | How deep and how long are the losses? | `qis.compute_max_current_drawdown`, `qis.compute_rolling_drawdown_time_under_water`, `qis.compute_drawdowns_stats_table` | [Drawdowns and time under water](drawdowns.md) |
 | Is diversification holding up? | `qis.compute_ewm_corr_df`, `qis.compute_pca_r2`, `qis.compute_portfolio_breadth` | [Covariance, correlation and principal components](covariance_correlation_pca.md), [portfolio breadth](portfolio_breadth.md) |
@@ -115,8 +116,10 @@ the bond sleeve means that adding to it would reduce portfolio risk at the margi
 - **Timing.** Pair the weights of date $t$ with a covariance estimated from returns up to $t$.
   `compute_portfolio_vol` lags the weights by one row by default (`weight_lag=1`); the VaR
   functions do not lag them. Inside a backtest, any full-sample estimate is a look-ahead.
-- **Return basis and grid.** The VaR functions use log returns on `freq`; the volatility columns
-  above use simple returns. Daily, weekly and monthly estimates of the same portfolio differ, and
+- **Return basis and grid.** The price-based VaR functions above use log returns on `freq`;
+  the supplied-covariance Gaussian API inherits the caller's return convention and applies a
+  linear P&L approximation. The volatility columns above use simple returns. Daily, weekly and
+  monthly estimates of the same portfolio differ, and
   autocorrelation changes how they scale; see the
   [reporting-frequency chapter](frequency_convention_note.md).
 - **Span.** An EWM span of $N$ periods has a mean lag of $(N-1)/2$ periods, an effective sample
@@ -128,6 +131,22 @@ the bond sleeve means that adding to it would reduce portfolio risk at the margi
   Monitor both: a persistent gap between forecast and realised risk is itself a signal.
 - **Normality.** The normal VaR is a fixed multiple of volatility. Fat tails make it too small;
   compare it with the realised worst days and with stress scenarios.
+
+## Monitoring proposed allocations from supplied covariance
+
+When a production risk model already supplies dated covariance matrices, use
+`qis.compute_gaussian_portfolio_risk` to evaluate strategic and tactical proposals
+against the same benchmark. It returns one-year 99% Monte Carlo VaR by default,
+plus the VaR ratio, ex-ante beta, tracking error and a closed-form VaR check.
+Pass annualised fractional covariance for a horizon in years and reuse one
+`qis.GaussianMonteCarlo` instance across portfolios and reporting dates.
+
+The [Gaussian VaR chapter](gaussian_var.md) defines the input contract and output
+keys, explains horizon scaling and zero-risk benchmarks, and includes executed
+examples for an allocation comparison and historical monitoring. Its
+[offline example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/gaussian_var_monitoring.py)
+uses the frozen synthetic universe. For an actual historical report, pair each
+date's known weights with that date's point-in-time covariance.
 
 ## Reporting
 
@@ -146,6 +165,7 @@ lists the report options and the [gallery](gallery.md) shows each report type.
 
 ## See also
 
+- [Gaussian Monte Carlo VaR and benchmark risk](gaussian_var.md)
 - [Portfolio risk and Euler contributions](risk_contributions.md)
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)
 - [Factor stress testing](stress_testing.md)

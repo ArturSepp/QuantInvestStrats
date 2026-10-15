@@ -108,6 +108,8 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
 
 - [Portfolio risk and Euler contributions](risk_contributions.md): marginal, total and relative
   risk contributions and their grouping.
+- [Gaussian Monte Carlo VaR and benchmark risk](gaussian_var.md): supplied-covariance
+  loss quantiles, VaR ratios, beta and tracking error, with offline monitoring examples.
 - [Factor risk models](factor_risk_models.md): EWMA factor models, betas, residual risk and the
   model covariance.
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md):
@@ -240,6 +242,7 @@ signal_diagnostics
 
 Risk monitoring guide <risk_monitoring>
 risk_contributions
+Gaussian Monte Carlo VaR <gaussian_var>
 factor_risk_models
 Tracking error and risk <tracking_error_and_risk>
 Portfolio breadth <portfolio_breadth>
