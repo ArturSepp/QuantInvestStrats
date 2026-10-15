@@ -680,18 +680,26 @@ def bootstrap_price_data(prices: Union[pd.Series, pd.DataFrame],
     if bootstrap_output == BootstrapOutput.DF_TO_LIST_ARRAYS:
         init_value = _get_price_anchor(prices=prices, init_to_end=init_to_end)
 
-        bootstrap_sample = List()
-        for sampled_returns in bootstrap_returns:
+        # Gathered draws are private: replacing each consumed slot avoids retaining complete
+        # return and price collections together. Numba lists have a fixed element dtype, so
+        # float32 draws still need a separate list for the float64 reconstructed prices.
+        reuse_draws = len(bootstrap_returns) > 0 and bootstrap_returns[0].dtype == np.float64
+        bootstrap_sample = bootstrap_returns if reuse_draws else List()
+        for idx, sampled_returns in enumerate(bootstrap_returns):
             assert isinstance(sampled_returns, np.ndarray)
             sampled_returns_float: FloatArray = sampled_returns.astype(np.float64, copy=False)
             # Unlike log_returns_to_nav(), this path supports NumPy arrays and pandas objects.
             if is_log_returns:
-                bootstrap_sample.append(ret.returns_to_nav(returns=sampled_returns_float,
-                                                           init_value=init_value,
-                                                           is_log_returns=True))
+                price_path = ret.returns_to_nav(returns=sampled_returns_float,
+                                                init_value=init_value,
+                                                is_log_returns=True)
             else:
-                bootstrap_sample.append(ret.returns_to_nav(returns=sampled_returns_float,
-                                                           init_value=init_value))
+                price_path = ret.returns_to_nav(returns=sampled_returns_float,
+                                                init_value=init_value)
+            if reuse_draws:
+                bootstrap_sample[idx] = price_path
+            else:
+                bootstrap_sample.append(price_path)
 
     elif bootstrap_output == BootstrapOutput.SERIES_TO_DF:
         assert isinstance(prices, pd.Series)
