@@ -126,7 +126,7 @@ jobs:
         --durations=20 -o faulthandler_timeout=300
 
     - name: Retain numerical coverage
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ci-coverage-numerical-${{ matrix.shard }}
         overwrite: true
@@ -168,7 +168,7 @@ jobs:
         --cov=qis --cov-report= --cov-fail-under=0
         --durations=20 -o faulthandler_timeout=300
     - name: Retain rendering coverage
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ci-coverage-${{ matrix.suite }}-${{ matrix.shard }}
         overwrite: true
@@ -264,7 +264,7 @@ jobs:
         PY
 
     - name: Retain the exact wheel for every installed-artifact test
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ci-tested-wheel
         overwrite: true
