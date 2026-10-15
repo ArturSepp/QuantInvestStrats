@@ -159,8 +159,10 @@ def plot_bars(df: Union[pd.DataFrame, pd.Series],
             palette = colors[:len(df1[var_name].unique())]
             # A dropped series must not shift its neighbours' colours. Key a complete palette
             # by original columns, without adding empty hue slots to Seaborn's layout.
-            # Short palettes and duplicate labels retain the established positional fallback.
-            if df.columns.is_unique and len(colors) >= len(df.columns):
+            # MultiIndex melt exposes outer labels rather than full column tuples. Keep its
+            # positional fallback, as for short palettes and duplicate labels.
+            if (not isinstance(df.columns, pd.MultiIndex)
+                    and df.columns.is_unique and len(colors) >= len(df.columns)):
                 series_colors = dict(zip(df.columns, colors))
                 if isinstance(df1[var_name].dtype, pd.CategoricalDtype) and not df1.empty:
                     # Seaborn retains unused categorical levels. Supply their native cycled

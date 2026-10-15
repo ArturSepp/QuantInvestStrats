@@ -204,3 +204,40 @@ def test_plot_bars_preserves_duplicate_hue_behavior_with_explicit_legend():
             np.testing.assert_allclose(bar.get_facecolor(), _bar_rgba(expected[bar.get_height()]))
     finally:
         plt.close(fig)
+
+
+@pytest.mark.parametrize("levels", [2, 3])
+@pytest.mark.parametrize("missing_first", [False, True])
+@pytest.mark.parametrize("default_colors", [False, True])
+def test_plot_bars_preserves_multiindex_positional_fallback(
+    levels, missing_first, default_colors
+):
+    """Melted outer-level hues retain the established MultiIndex rendering policy."""
+    tuples = [("Portfolio", "A"), ("Benchmark", "B")]
+    if levels == 3:
+        tuples = [(*column, "Return") for column in tuples]
+    columns = pd.MultiIndex.from_tuples(tuples)
+    frame = pd.DataFrame([[1.0, 3.0], [2.0, 4.0]], columns=columns)
+    if missing_first:
+        frame.iloc[:, 0] = np.nan
+    original = frame.copy(deep=True)
+    colors = get_n_colors(2) if default_colors else ["red", "blue"]
+    original_colors = list(colors)
+    # MultiIndex melt exposes outer labels, not full tuples. Preserve its positional
+    # palette, including the first colour for the sole surviving outer-level series.
+    expected = {3.0: colors[0 if missing_first else 1], 4.0: colors[0 if missing_first else 1]}
+    if not missing_first:
+        expected.update({1.0: colors[0], 2.0: colors[0]})
+    fig, ax = plt.subplots()
+    try:
+        qis.plot_bars(frame, stacked=False, colors=None if default_colors else colors, ax=ax)
+        fig.canvas.draw()
+        bars = [patch for patch in ax.patches if patch.get_height() in expected]
+        assert len(bars) == len(expected)
+        for bar in bars:
+            np.testing.assert_allclose(bar.get_facecolor(), _bar_rgba(expected[bar.get_height()]))
+            np.testing.assert_allclose(bar.get_width(), 0.8 if missing_first else 0.4)
+        pd.testing.assert_frame_equal(frame, original)
+        assert colors == original_colors
+    finally:
+        plt.close(fig)
