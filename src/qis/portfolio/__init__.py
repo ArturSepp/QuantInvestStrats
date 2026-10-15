@@ -1,5 +1,8 @@
 
 from qis.portfolio.risk.risk_model import RiskModel, WEIGHT_TOL
+from qis.portfolio.risk.gaussian_var import (
+    GaussianVarSpec, GaussianMonteCarlo, compute_gaussian_portfolio_risk,
+)
 
 from qis.portfolio.risk.ex_post_tracking_error import (
     compute_ewma_realised_tracking_error,

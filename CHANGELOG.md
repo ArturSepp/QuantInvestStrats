@@ -9,6 +9,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Add supplied-covariance Gaussian Monte Carlo VaR through `GaussianVarSpec`,
+  `GaussianMonteCarlo` and `compute_gaussian_portfolio_risk`. The benchmark-relative
+  snapshot reuses `RiskModel` for volatility, beta and tracking error, with an independent
+  closed-form VaR control and explicit horizon units. Existing price-based VaR APIs are unchanged.
+
 - Export the `qis.discrete_portfolio` subpackage in `qis.__all__`, so `import qis` binds it and
   `from qis import *` includes it. Its names stay qualified as `qis.discrete_portfolio.<name>`
   rather than wildcarded into the top-level namespace. Existing imports are unchanged.
