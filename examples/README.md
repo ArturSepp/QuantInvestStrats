@@ -92,6 +92,7 @@ examples/
 | `long_short.py` | Long IEF / short LQD pair (Treasury duration vs IG credit). |
 | `ex_anti_tracking_error_and_risk.py` | Offline ex-ante TE, benchmark beta, and Euler marginal TE through `RiskModel`. |
 | `ex_post_tracking_error_and_risk.py` | Offline realised EWMA TE, whole-sample TE/IR, and EWMA beta/annualised alpha. |
+| [gaussian_var_monitoring.py](portfolios/gaussian_var_monitoring.py) | Offline supplied-covariance Gaussian VaR monitoring for two allocations, with a benchmark and closed-form control. See the [Gaussian VaR guide](../docs/gaussian_var.md). |
 | `model_layer_attribution_simulated.py` | Offline, seeded layer and two-feature simulation for `compute_model_layer_alpha_beta_attribution` and `compute_model_feature_alpha_beta_attribution`: HAC(3) intervals, exact identities, return bridge, additive cumulative alpha and grouped Shapley sensitivity. Source of the figures in `docs/model_layer_attribution.md`. |
 | `vol_target_and_trend.py` | Vol-target + trend-following sweep via `examples.portfolios.strats.qis_delta1`. |
 | `seasonality_backtest.py` | Point-in-time calendar-month seasonality with annual trailing-window refits. |

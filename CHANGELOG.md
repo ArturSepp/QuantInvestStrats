@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.37.0] - 2026-10-15
+
 ### Added
 
 - Add supplied-covariance Gaussian Monte Carlo VaR through `GaussianVarSpec`,
@@ -57,6 +59,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   to returned rebalancing matrices instead of copying the full covariance history. Covariance
   estimates, per-asset warm-up, dates and labels are unchanged; the estimator still retains its
   full covariance tensor.
+
+### Documentation
+
+- Clarify the JOSS paper's motivation, software comparisons and research impact, and describe
+  currency hedging, factor risk and stress testing in response to reviewer feedback.
+- Add a Gaussian VaR monitoring guide and an offline portfolio example.
+- Refresh the public API, consumer-usage and paper audit records for the release.
 
 ## [5.36.1] - 2026-10-12
 

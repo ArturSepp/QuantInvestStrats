@@ -4,11 +4,11 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "6a396cc190de340f20da6f837c5bf7cda913e0a6",
+      "commit": "2cc99aa76a2997b045526d204b592bf5e2361849",
       "distinct_symbols": 137,
-      "call_sites": 1105,
-      "files_scanned": 354,
-      "files_using_qis": 132,
+      "call_sites": 1108,
+      "files_scanned": 371,
+      "files_using_qis": 134,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
         "CorrMatrixOutput",
@@ -248,10 +248,10 @@
     },
     "privateassets": {
       "url": "https://github.com/ArturSepp/privateassets.git",
-      "commit": "720369603d749e0a805106616debf6a7028faf1c",
+      "commit": "871c7f330fbbf86d496a8f716db57b4c17cd0fa6",
       "distinct_symbols": 5,
       "call_sites": 9,
-      "files_scanned": 33,
+      "files_scanned": 37,
       "files_using_qis": 5,
       "symbols": [
         "BootstrapType",

@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "b88441981f0090df477fef62130d84c994852bf7",
+  "measured_at_commit": "394c08b54f2f0d594e7d7b1372768d833e48b5de",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,38 +46,38 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 6852,
+      "value": 6883,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 988,
+      "value": 999,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
-      "value": 1105,
-      "how": "tools/audit_consumers.py at 6a396cc190de",
+      "value": 1108,
+      "how": "tools/audit_consumers.py at 2cc99aa76a29",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_symbols": {
       "value": 137,
-      "how": "tools/audit_consumers.py at 6a396cc190de",
+      "how": "tools/audit_consumers.py at 2cc99aa76a29",
       "live": false,
       "paper_phrase": null
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
-      "how": "tools/audit_consumers.py at 720369603d74",
+      "how": "tools/audit_consumers.py at 871c7f330fbb",
       "live": false,
       "paper_phrase": null
     },
     "consumer_privateassets_symbols": {
       "value": 5,
-      "how": "tools/audit_consumers.py at 720369603d74",
+      "how": "tools/audit_consumers.py at 871c7f330fbb",
       "live": false,
       "paper_phrase": null
     },
