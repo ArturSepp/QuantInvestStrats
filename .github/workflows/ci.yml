@@ -24,9 +24,9 @@ jobs:
   # rendering workloads across a 15-cell Cartesian product. All change-validation cells use
   # uv.lock; the scheduled compatibility run resolves current compatible dependencies.
   test:
-    name: pytest (core, ${{ matrix.os }}, py${{ matrix.python-version }})
+    name: pytest (core, ${{ matrix.os }}, py${{ matrix.python-version }}, shard ${{ matrix.shard }})
     runs-on: ${{ matrix.os }}
-    # Numerical and mixed numerical/reporting contracts remain on every interpreter/platform.
+    # Every interpreter/platform runs both shards, whose union is the entire numerical suite.
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -34,19 +34,46 @@ jobs:
         include:
           - os: ubuntu-latest
             python-version: "3.10"
+            shard: 0
+          - os: ubuntu-latest
+            python-version: "3.10"
+            shard: 1
           - os: ubuntu-latest
             python-version: "3.11"
+            shard: 0
+          - os: ubuntu-latest
+            python-version: "3.11"
+            shard: 1
           - os: ubuntu-latest
             python-version: "3.12"
-            locked: true
+            shard: 0
+          - os: ubuntu-latest
+            python-version: "3.12"
+            shard: 1
           - os: ubuntu-latest
             python-version: "3.13"
+            shard: 0
+          - os: ubuntu-latest
+            python-version: "3.13"
+            shard: 1
           - os: ubuntu-latest
             python-version: "3.14"
+            shard: 0
+          - os: ubuntu-latest
+            python-version: "3.14"
+            shard: 1
           - os: windows-latest
             python-version: "3.12"
+            shard: 0
+          - os: windows-latest
+            python-version: "3.12"
+            shard: 1
           - os: macos-latest
             python-version: "3.12"
+            shard: 0
+          - os: macos-latest
+            python-version: "3.12"
+            shard: 1
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,14 +89,20 @@ jobs:
       run: uv sync --group test ${{ github.event_name == 'schedule' && '--upgrade' || '--locked' }}
 
     - name: Run numerical and mixed-contract tests
-      run: uv run --no-sync pytest -p ci_test_suites --ci-suite numerical --durations=20
+      run: >-
+        uv run --no-sync pytest -p ci_test_suites --ci-suite numerical
+        --ci-shard ${{ matrix.shard }} --ci-shards 2 --durations=20
 
   # Optional numeric/IO tests plus coverage; rendering coverage is combined below.
   test-extras:
-    name: pytest (data + io extras)
+    name: pytest (data + io extras, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     # Coverage took 51 minutes on a slower runner; leave room for runner variation and cleanup.
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -84,17 +117,18 @@ jobs:
 
     - name: Run numerical tests with coverage
       env:
-        COVERAGE_FILE: ${{ runner.temp }}/coverage-data/.coverage.numerical
+        COVERAGE_FILE: ${{ runner.temp }}/coverage-data/.coverage.numerical-${{ matrix.shard }}
       # A shard cannot enforce the package-wide floor. The combined report below does.
       run: >-
         uv run --no-sync pytest -p ci_test_suites --ci-suite numerical
+        --ci-shard ${{ matrix.shard }} --ci-shards 2
         --cov=qis --cov-report= --cov-fail-under=0
         --durations=20 -o faulthandler_timeout=300
 
     - name: Retain numerical coverage
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
-        name: ci-coverage-numerical
+        name: ci-coverage-numerical-${{ matrix.shard }}
         overwrite: true
         path: ${{ runner.temp }}/coverage-data/.coverage.*
         include-hidden-files: true
@@ -249,7 +283,10 @@ jobs:
         include:
           - suite: numerical
             shard: 0
-            shards: 1
+            shards: 2
+          - suite: numerical
+            shard: 1
+            shards: 2
           - suite: plots
             shard: 0
             shards: 1
@@ -275,7 +312,7 @@ jobs:
           "$(ls dist/*.whl)" pytest
 
     - name: Run the offline quickstart against the installed wheel
-      if: matrix.suite == 'numerical'
+      if: matrix.suite == 'numerical' && matrix.shard == 0
       # Execute from outside the checkout.  The script path is repository-owned documentation,
       # but its qis import and synthetic data resolve entirely through the clean wheel environment.
       run: |

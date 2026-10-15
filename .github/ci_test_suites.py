@@ -78,8 +78,8 @@ def pytest_addoption(parser):
     group = parser.getgroup('qis CI suites')
     group.addoption('--ci-suite', choices=('all', 'numerical', 'plots', 'factsheets'),
                     default='all', help='Opt-in CI suite; normal pytest remains unpartitioned.')
-    group.addoption('--ci-shard', type=int, default=0, help='Zero-based rendering shard.')
-    group.addoption('--ci-shards', type=int, default=1, help='Number of rendering shards.')
+    group.addoption('--ci-shard', type=int, default=0, help='Zero-based suite shard.')
+    group.addoption('--ci-shards', type=int, default=1, help='Number of suite shards.')
 
 
 def pytest_collection_modifyitems(config, items):
@@ -88,8 +88,8 @@ def pytest_collection_modifyitems(config, items):
     count = config.getoption('--ci-shards')
     if count < 1 or not 0 <= shard < count:
         raise pytest.UsageError('CI shard must satisfy 0 <= --ci-shard < --ci-shards')
-    if suite in ('all', 'numerical') and (shard != 0 or count != 1):
-        raise pytest.UsageError('Only rendering suites may be sharded')
+    if suite == 'all' and (shard != 0 or count != 1):
+        raise pytest.UsageError('Select a CI suite before sharding; ordinary pytest stays whole')
     if suite == 'all':
         return
     selected, deselected = [], []
