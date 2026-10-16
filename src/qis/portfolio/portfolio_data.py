@@ -847,8 +847,51 @@ class PortfolioData:
                                                 time_period: TimePeriod = None,
                                                 constant_trade_level: bool = False
                                                 ) -> pd.Series:
-        navs = self.get_instruments_navs(time_period=time_period, constant_trade_level=constant_trade_level)
-        perf = ret.to_total_returns(prices=navs).rename(self.nav.name)
+        """Return instrument contributions to compounded portfolio P&L.
+
+        On unique, increasing dates, contributions accrue on preceding portfolio wealth, not
+        on independently compounded instrument NAVs. Their sum is the compounded return of the
+        supplied instrument P&L; it matches NAV performance only when both include the same costs,
+        fees and cash flows. Missing contributions retain the existing zero-fill convention.
+        Other date axes retain native instrument-NAV results, warnings and errors.
+
+        Args:
+            time_period: Optional report interval; its first observation is the NAV baseline,
+                so only subsequent contributions enter the result.
+            constant_trade_level: Retain the legacy arithmetic instrument-NAV return instead
+                of scaling contributions by compounded portfolio wealth.
+
+        Returns:
+            Float64 contributions indexed by instrument or configured display name, named
+            after the portfolio. A single baseline observation has undefined (NaN) returns.
+        """
+        pnl = self.get_instruments_pnl(time_period=time_period).fillna(0.0)
+        has_chronology = (
+            isinstance(pnl.index, pd.DatetimeIndex)
+            and pnl.index.is_unique
+            and pnl.index.is_monotonic_increasing
+        )
+        if constant_trade_level or len(pnl.index) < 2 or not has_chronology:
+            # Native conversion sorts NAVs only after compounding physical rows. Delegate
+            # irregular axes rather than inventing a chronology or losing NaT warnings.
+            # This also retains arithmetic normalization and empty/single-row behavior.
+            navs = self.get_instruments_navs(
+                time_period=time_period, constant_trade_level=constant_trade_level)
+            perf = ret.to_total_returns(prices=navs)
+        else:
+            pnl = pnl.iloc[1:].astype(float)
+            # A later 10% contribution earns 11 on capital 110: scale every instrument by
+            # the same prior portfolio wealth, rebased after the selected NAV baseline.
+            prior_wealth = (1.0 + pnl.sum(axis=1)).cumprod().shift(1, fill_value=1.0)
+            perf = pnl.mul(prior_wealth, axis=0).sum(axis=0)
+            # Match the native NAV conversion's named-Series construction: it normalizes
+            # categorical and dated instrument axes as well as clearing their names.
+            perf = pd.concat(
+                [pd.Series([value], name=instrument) for instrument, value in perf.items()],
+                axis=1,
+                sort=False,
+            ).iloc[0]
+        perf = perf.rename(self.nav.name)
         if self.tickers_to_names_map is not None:
             perf = perf.rename(index=self.tickers_to_names_map)
         return perf

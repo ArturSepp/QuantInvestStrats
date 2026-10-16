@@ -7,6 +7,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Correct default `PortfolioData.get_instruments_performance_attribution` and
+  `AttributionMetric.PNL` bars on unique, increasing dates to accumulate instrument contributions
+  on preceding portfolio wealth, so they sum to the compounded return of the supplied P&L rather
+  than independently compounded instrument returns. Irregular date axes retain native results,
+  warnings and errors. Report baselines, explicit `constant_trade_level=True` and standalone
+  instrument NAVs are unchanged; costs or fees absent from supplied P&L remain excluded.
+
 ## [5.37.0] - 2026-10-15
 
 ### Added
