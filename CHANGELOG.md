@@ -20,6 +20,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   than independently compounded instrument returns. Irregular date axes retain native results,
   warnings and errors. Report baselines, explicit `constant_trade_level=True` and standalone
   instrument NAVs are unchanged; costs or fees absent from supplied P&L remain excluded.
+- Preserve the caller's row labels and index metadata in `plot_vbars` when
+  `add_total_to_index=True` and totals are supplied. Totals still appear in the chart labels,
+  while the original data remains reusable for lookup and repeated plotting.
 
 ## [5.37.0] - 2026-10-15
 
