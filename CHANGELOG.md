@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Speed up `plot_df_table` column alignment by inspecting table properties once per aligned
+  column rather than once per row, preserving pre-draw geometry and rendered output.
+
 ## [5.37.0] - 2026-10-15
 
 ### Added
