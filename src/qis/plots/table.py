@@ -404,5 +404,9 @@ def set_align_for_column(table: Table,
                          align: str = 'left'
                          ) -> None:
     cells = [key for key in table._cells if key[1] == col]
-    for cell in cells:
-        table.properties()["celld"][cell]._loc = align
+    if cells:
+        # The first inspection also initializes geometry used by performance-table headers
+        # before drawing. Retain that side effect, but avoid repeating all getters per row.
+        cell_map = table.properties()["celld"]
+        for cell in cells:
+            cell_map[cell]._loc = align
