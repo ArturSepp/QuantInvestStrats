@@ -325,7 +325,16 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
                **kwargs
                ) -> plt.Figure:
     """
-    adopted for vertical bars
+    Plot signed, stacked horizontal bars without relabeling caller data.
+
+    Args:
+        df: Row-indexed observations with one bar segment per column, or a Series.
+        totals: Supplied row totals; computed from the plotted values when omitted.
+        add_total_to_index: Append supplied totals to displayed row labels only.
+        ax: Axes to draw on; create a figure when omitted.
+
+    Returns:
+        The new figure when ax is omitted, otherwise None.
     """
     if ax is None:
         height = put.calc_table_height(num_rows=len(df.index), scale=0.30)
@@ -342,6 +351,9 @@ def plot_vbars(df: Union[pd.DataFrame, pd.Series],
     category_names = df.columns.to_list()
 
     if add_total_to_index and totals is not None:
+        # Totals are display labels, not analytical row IDs. A shallow copy owns the
+        # label assignment while retaining pandas metadata handling and shared data buffers.
+        df = df.copy(deep=False)
         df.index = [f"{x} {var_format.format(total)}" for x, total in zip(df.index, totals)]
 
     # plot results = {index, column data as list}
