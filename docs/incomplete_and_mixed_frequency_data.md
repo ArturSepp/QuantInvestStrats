@@ -123,10 +123,12 @@ its gaps whatever `ffill_nans` says: on its own grid a missing value is a missin
 Specify `is_log_returns` explicitly. Filling should stop at the economically justified boundary,
 especially after a terminal event.
 
-The backtester warns about internal NaNs. Units can remain held while `np.nansum` omits the
-unpriced leg from that day's valuation, creating artificial NAV movements. A warning is not a
-repair. An unpriced target cannot be acquired; supplying a fixed 25% target in that leg leaves
-the opening allocation in cash rather than redistributing it automatically.
+The backtester retains held units and uses the last observed price for valuation and carry
+when a quote is missing. It warns on held stale marks, including trailing gaps. Using a stale
+mark does not make the asset tradable: an unquoted holding cannot be sold even when its target
+is zero. An unpriced target in an unheld asset remains in cash rather than being redistributed.
+A stale mark is not a liquidation value; supply explicit settlement prices and exit targets
+for terminal events. See [Unpriced assets and cash](portfolio_backtesting.md#unpriced-assets-and-cash).
 
 The mixed-frequency FX helper `FxRatesData.compute_fx_adjusted_returns` replaces exact zero
 returns with NaN for estimation. This removes structural zeros and also any genuine exact zero.
