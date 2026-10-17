@@ -95,7 +95,9 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
             :func:`plot_ra_perf_table_benchmark` or :func:`compute_bnb_regimes_pa_perf_table`
             for those
         column_header: header of the leading column, which holds the asset names
-        df_to_add: extra columns inserted before the statistics, for group labels or weights
+        df_to_add: extra columns inserted before the statistics, for group labels or weights.
+            Complete, uniquely labeled asset rows are aligned by label; other schemas retain
+            their existing positional handling and length checks
         is_to_str: format the values as strings. False returns the numbers, for further computation
 
     Returns:
@@ -116,6 +118,28 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                 data[perf_column.to_str()] = ra_perf_table[perf_column.to_str()]
 
     if df_to_add is not None:
+        # Dropping labels too early can silently attach metadata to the wrong asset.
+        # Only complete, unique asset sets define a mapping; keep legacy schemas positional.
+        if (len(df_to_add.columns) > 0 and data.index.is_unique and df_to_add.index.is_unique
+                and len(data.index) == len(df_to_add.index)):
+            # Full tuple keys avoid MultiIndex coercion of unrelated positional labels.
+            # Keep native lookup rules, including distinct boolean and numeric labels.
+            asset_keys = data.index.to_flat_index()
+            extra_keys = df_to_add.index.to_flat_index()
+            # Use lossless comparison keys and one missing marker for both checks below.
+            # The original indexes still decide whether native lookup accepts that match.
+            asset_labels = asset_keys.astype(object).fillna(pd.NA)
+            extra_labels = extra_keys.astype(object).fillna(pd.NA)
+            # A full-key screen avoids IntervalIndex point lookup on unrelated labels.
+            if asset_labels.isin(extra_labels).all():
+                positions, _ = extra_keys.get_indexer_non_unique(asset_keys)
+                # Native lookup can round numeric keys. Require each row once and verify
+                # the selected labels with the same comparison keys used for screening.
+                if (len(positions) == len(asset_keys) and (positions >= 0).all()
+                        and len(np.unique(positions)) == len(positions)
+                        and extra_labels.take(positions).equals(asset_labels)):
+                    # Use the validated positions directly, rather than repeating label lookup.
+                    df_to_add = df_to_add.iloc[positions]
         for idx, column in enumerate(df_to_add.columns):
             data.insert(idx, column=column, value=df_to_add[column].to_numpy())
     data.index.name = column_header
