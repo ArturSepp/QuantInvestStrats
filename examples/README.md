@@ -97,6 +97,7 @@ examples/
 | `vol_target_and_trend.py` | Vol-target + trend-following sweep via `examples.portfolios.strats.qis_delta1`. |
 | `seasonality_backtest.py` | Point-in-time calendar-month seasonality with annual trailing-window refits. |
 | `instrument_portfolio_stress.py` | Offline funded and mixed books through the public portfolio/report interface: call/put decompositions, futures, local FX, Credit/Carry family splits, historical replay and optional PDF/Excel/CSV output. See the [instrument guide](../docs/portfolio_stress.md). |
+| [observed_index_stress.py](portfolios/observed_index_stress.py) | Offline USD/EUR observed-index stress comparison using VIX point and log changes, with portfolio prediction R-squared and optional report output. |
 | `composite_payoff_stress.py` | Offline consumer-owned terminal-knockout payoff through `HoldingPayoff`, preserving vanilla valuation and shared-response sensitivities; optional standard report. |
 | `factor_stress_testing.py` | Offline assigned-model stress workflow: direct versus correlated targets, joint credit anchors, nonlinear P&L attribution and one-month conditional prediction bands; optional CSV/PNG/PDF export. See [analytics and formulas](../docs/stress_testing.md). |
 | [account_equity_stress.py](portfolios/account_equity_stress.py) | Offline account equity, signed borrowing and equity after stress; optional report export. |

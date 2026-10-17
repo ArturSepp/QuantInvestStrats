@@ -7,6 +7,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.38.1] - 2026-10-17
+
+Version 5.38.0 failed release validation before building or uploading distributions to PyPI.
+Its tag is retained for the release audit.
+
+### Fixed
+
+- Declare chronological index sorting explicitly in the new `to_factor_returns` concatenation.
+- Add the offline observed-index stress example to the examples catalogue.
+
 ## [5.38.0] - 2026-10-17
 
 ### Changed

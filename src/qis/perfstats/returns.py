@@ -256,7 +256,7 @@ def to_factor_returns(prices: pd.DataFrame,
         raise ValueError('Factor changes support ReturnTypes.LOG and DIFFERENCE')
     return pd.concat([
         to_returns(prices[name], return_type=types[name], is_log_returns=False, **kwargs)
-        for name in prices], axis=1).reindex(columns=prices.columns)
+        for name in prices], axis=1, sort=True).reindex(columns=prices.columns)
 
 
 def compute_asset_returns_dict(prices: pd.DataFrame,
