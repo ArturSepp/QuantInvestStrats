@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.38.0] - 2026-10-17
+
 ### Changed
 
 - Speed up `plot_df_table` column alignment by inspecting table properties once per aligned
@@ -23,6 +25,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Preserve the caller's row labels and index metadata in `plot_vbars` when
   `add_total_to_index=True` and totals are supplied. Totals still appear in the chart labels,
   while the original data remains reusable for lookup and repeated plotting.
+
+### Added
+
+- Add per-factor `ReturnTypes` and `to_factor_returns` for mixed log-return and native-point
+  factor coordinates, with matching stress-scenario units and descending historical selection.
+- Add single-factor stress report layouts and caller-supplied portfolio prediction R-squared,
+  retaining negative out-of-sample scores. Existing LOG defaults remain unchanged.
 
 ## [5.37.0] - 2026-10-15
 

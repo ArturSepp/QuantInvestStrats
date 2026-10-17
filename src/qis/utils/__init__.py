@@ -93,6 +93,7 @@ from qis.utils.np_ops import (
 from qis.utils.regression import (
     EwmaAlphaBetaHacResult,
     estimate_ewma_alpha_beta_hac,
+    prediction_r_squared,
     fit_multivariate_ols,
 )
 

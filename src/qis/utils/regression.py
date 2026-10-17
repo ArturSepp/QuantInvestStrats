@@ -30,7 +30,7 @@ import pandas as pd
 from scipy.stats import norm
 from statsmodels import api as sm
 from statsmodels.regression.linear_model import RegressionResults as RegModel
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 
 @dataclass(frozen=True)
@@ -533,6 +533,42 @@ def estimate_ewma_alpha_beta_hac(
         hac_lags=effective_hac_lags,
         confidence_level=confidence_level,
     )
+
+
+def prediction_r_squared(actual: pd.Series, prediction: pd.Series,
+                         benchmark: Union[float, pd.Series, None] = None,
+                         weights: Optional[pd.Series] = None) -> float:
+    """Score aligned predictions without clipping negative out-of-sample R-squared.
+
+    Args:
+        actual: Finite observations with a unique index.
+        prediction: Finite fitted or held-out predictions on exactly the same index.
+        benchmark: Constant or aligned benchmark predictions. None uses the weighted
+            observed mean and is appropriate only for an in-sample diagnostic.
+        weights: Optional finite nonnegative objective weights, aligned to actual.
+
+    Returns:
+        One minus weighted prediction SSE divided by benchmark SSE; NaN for a
+        zero denominator. For out-of-sample use a benchmark known before each test date.
+    """
+    if not actual.index.is_unique or not actual.index.equals(prediction.index) or actual.empty:
+        raise ValueError('Actual and prediction must have the same nonempty unique index')
+    w = pd.Series(1., index=actual.index) if weights is None else weights
+    if (not w.index.equals(actual.index) or not np.isfinite(w).all()
+            or (w < 0).any() or w.sum() <= 0):
+        raise ValueError('Weights must be aligned, finite, nonnegative with positive mass')
+    if not np.isfinite(actual).all() or not np.isfinite(prediction).all():
+        raise ValueError('Actual and prediction must be finite')
+    if benchmark is None:
+        benchmark = float(np.average(actual, weights=w))
+    if isinstance(benchmark, pd.Series) and not benchmark.index.equals(actual.index):
+        raise ValueError('Benchmark must be aligned')
+    if not np.isfinite(benchmark).all():
+        raise ValueError('Benchmark must be finite')
+    denominator = float(np.sum(w * (actual - benchmark)**2))
+    if denominator <= 0:
+        return np.nan
+    return float(1. - np.sum(w * (actual - prediction)**2) / denominator)
 
 
 def estimate_hac_mean(

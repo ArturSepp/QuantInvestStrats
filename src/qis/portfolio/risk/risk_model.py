@@ -30,6 +30,7 @@ import pandas as pd
 
 from qis.portfolio.risk.contributions import fill_unavailable_unheld
 from qis.portfolio.risk.factor_groups import FactorGroupSpec
+from qis.perfstats.config import ReturnTypes
 
 
 WEIGHT_TOL: float = 1e-10
@@ -71,6 +72,9 @@ class RiskModel:
         residual_vars: Optional asset residual variances (not volatilities) by date, one
             Series indexed by asset per date.
         factor_groups: Optional provider-neutral family membership and bump weights.
+        factor_return_types: Optional exact factor-to-ReturnTypes mapping. Omitted means
+            legacy LOG. DIFFERENCE loadings are response log return per native point;
+            factor covariance must use those same coordinates.
 
     Raises:
         ValueError: If the covariance or factor data are incomplete, non-finite (outside the
@@ -84,9 +88,19 @@ class RiskModel:
     factor_covar: Optional[Dict[pd.Timestamp, pd.DataFrame]] = None
     residual_vars: Optional[Dict[pd.Timestamp, pd.Series]] = None
     factor_groups: Optional[Dict[str, FactorGroupSpec]] = None
+    factor_return_types: Optional[Dict[str, ReturnTypes]] = None
 
     def __post_init__(self) -> None:
         """Validate and normalise the dated model inputs."""
+        if self.factor_return_types is not None:
+            if self.factor_loadings is None or any(
+                    set(frame.columns) != set(self.factor_return_types)
+                    for frame in self.factor_loadings.values()):
+                raise ValueError('factor_return_types must match exactly the fitted factors')
+            if any(t not in (ReturnTypes.LOG, ReturnTypes.DIFFERENCE)
+                   for t in self.factor_return_types.values()):
+                raise ValueError('Unsupported factor return type')
+            self.factor_return_types = dict(self.factor_return_types)
         self.covar = self._normalise_date_mapping(self.covar, field_name='covar')
         if not self.covar:
             raise ValueError("covar must not be empty")

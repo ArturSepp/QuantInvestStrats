@@ -24,6 +24,8 @@ class StressReportConfig:
         model_label: Optional plain model/version label.
         factor_labels: Display aliases, keyed by actual factor ID.
         response_diagnostics: Optional response-indexed diagnostics, including r2.
+        portfolio_r2: Optional caller-computed portfolio prediction R-squared, replacing
+            the legacy weighted instrument diagnostic. Negative values are valid.
         cluster_memberships: Optional fitted group-to-response membership Series.
         cluster_linkages: Matching fitted linkage arrays in membership index order.
         cluster_cutoffs: Matching fitted cutoffs; never estimated by the report.
@@ -61,9 +63,13 @@ class StressReportConfig:
     appendix_notes: tuple[str, ...] = ()
     report_name: str | None = None
     cluster_labels: Mapping[str, str] = field(default_factory=dict)
+    portfolio_r2: float | None = None
 
     def __post_init__(self):
         """Snapshot caller diagnostics and validate presentation choices."""
+        if self.portfolio_r2 is not None and (
+                not np.isfinite(self.portfolio_r2) or self.portfolio_r2 > 1.):
+            raise ValueError('portfolio_r2 must be finite and at most one, or None')
         if self.report_name is not None:
             if not isinstance(self.report_name, str) or not self.report_name.strip():
                 raise ValueError("report_name must be a nonempty string or None")
@@ -171,6 +177,8 @@ def _loading_table(result, config):
         aggregates.loc[label, "R-squared"] = (
             available @ weights / weights.sum() if weights.sum() else np.nan
         )
+        if config.portfolio_r2 is not None and label == 'Portfolio':
+            aggregates.loc[label, 'R-squared'] = config.portfolio_r2
     table["response_exposure"] = result.response_exposures
     table = pd.concat([table, aggregates])
     return table.loc[
@@ -491,9 +499,9 @@ def generate_portfolio_stress_report(
             "contributors": 10,
             "response_rows": 20,
             "response_factor_columns": len(result.factor_loadings.columns),
-            "factor_panels": 6,
-            # the sensitivity page lays out two rows of three panels, one per selected grid
-            "grid_panels": 6,
+            "factor_panels": 1 if len(result.factor_exposures) == 1 else 6,
+            # Single-factor reports use one full-size panel; multifactor reports retain six.
+            "grid_panels": 1 if len(result.factor_exposures) == 1 else 6,
             "allocation_currency_groups": 5,
         },
         "hashes": {

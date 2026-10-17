@@ -68,6 +68,7 @@ from qis.perfstats.returns import (
     to_portfolio_returns,
     long_short_to_relative_nav,
     to_returns,
+    to_factor_returns,
     compute_asset_returns_dict,
     prices_to_scaled_nav,
     to_total_returns,

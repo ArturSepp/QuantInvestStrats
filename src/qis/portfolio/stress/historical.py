@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from qis.perfstats.config import ReturnTypes
 
 
 @dataclass(frozen=True)
@@ -15,19 +16,26 @@ class HistoricalScenarioSelection:
     owned by the caller and does not determine this scenario window.
 
     Attributes:
-        factor: Factor whose log return determines selection, not portfolio P&L.
+        factor: Factor whose declared change determines selection, not portfolio P&L.
         start_date: Inclusive first scenario month; no prior opening return is used.
         count: Requested number of months, ordered by factor loss.
         end_date: Optional upper date, capped by the portfolio risk date.
+        ascending: Select smallest changes first; False selects largest increases.
+        return_type: Declared LOG or DIFFERENCE units used for audit labels.
     """
 
     factor: str = "Equity"
     start_date: str = "2006-01-01"
     count: int = 10
     end_date: str | None = None
+    ascending: bool = True
+    return_type: ReturnTypes = ReturnTypes.LOG
 
     def __post_init__(self):
         """Validate named-factor selection, finite dates and a positive count."""
+        if not isinstance(self.ascending, bool) or self.return_type not in (
+                ReturnTypes.LOG, ReturnTypes.DIFFERENCE):
+            raise ValueError('Invalid historical ordering or return type')
         if not isinstance(self.factor, str) or not self.factor.strip():
             raise ValueError("historical ranking factor must be a nonempty name")
         if not isinstance(self.count, int) or isinstance(self.count, bool) or self.count < 1:
@@ -81,7 +89,8 @@ class HistoricalScenarioSelection:
             Selected vectors ordered by the ranking factor's ascending return.
         """
         window = self.window(history, cutoff)
-        dates = window[self.factor].sort_values(kind="stable").head(self.count).index
+        dates = window[self.factor].sort_values(
+            kind="stable", ascending=self.ascending).head(self.count).index
         selected = window.loc[dates]
         if not np.isfinite(selected.to_numpy()).all():
             missing = selected.columns[(~np.isfinite(selected)).any()].tolist()
@@ -101,13 +110,17 @@ class HistoricalScenarioSelection:
                     requested_start=self.start_date, requested_end=self.end_date,
                     history_start=str(window.index.min().date()),
                     history_end=str(window.index.max().date()), available_months=len(window),
-                    order="ascending factor log return; chronological ties")
+                    ascending=self.ascending, return_type=self.return_type.name,
+                    order=(('ascending' if self.ascending else 'descending') +
+                           f' factor {self.return_type.name.lower()} return; chronological ties'))
 
 
 def historical_captions(policy):
     """Describe factor selection consistently in historical pages and the guide."""
     year = policy["requested_start"][:4]
     title = f"{policy['count']} worst {policy['factor']} months since {year}"
+    if not policy.get('ascending', True):
+        title = f"{policy['count']} largest {policy['factor']} increases since {year}"
     subtitle = (f"Ranked by {policy['factor']} factor return; complete monthly vectors applied "
                 f"to current holdings. History: {policy['history_start']} to "
                 f"{policy['history_end']}. Historical replay, not realised portfolio performance.")

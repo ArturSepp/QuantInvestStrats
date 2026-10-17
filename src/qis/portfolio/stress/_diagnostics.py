@@ -92,12 +92,12 @@ def report_diagnostics(model, date, jacobian, denominator, risk, grids, all_fund
         "Loading aggregates": pd.DataFrame.from_dict(aggregates, orient="index"),
         "Grid polynomial regressions": regressions,
         "Grid regression confidence bands": confidence_bands,
-        **_conditional_shock_tables(model.factor_covar[date]),
+        **_conditional_shock_tables(model.factor_covar[date], model.factor_return_types),
     }
 
 
 
-def _conditional_shock_tables(covariance):
+def _conditional_shock_tables(covariance, return_types=None):
     """Complete fixed-percentage and annual-volatility-magnitude simple-return anchors.
 
     Rows respond to anchored columns. Sigma magnitudes are sqrt(diag(annual
@@ -105,6 +105,14 @@ def _conditional_shock_tables(covariance):
     diagonal. Zero variance or a simple downside at/below -100% is unavailable.
     """
     tables = {}
+    if return_types and any(value.name != 'LOG' for value in return_types.values()):
+        # Mixed native coordinates cannot be labelled as percentage shocks.
+        for sign in (-1, 1):
+            columns = {factor: conditional_factor_shock(
+                covariance, {factor: sign * np.sqrt(covariance.loc[factor, factor])})
+                for factor in covariance if covariance.loc[factor, factor] > 0}
+            tables[f'Conditional model shocks {sign:+d}sigma'] = pd.DataFrame(columns)
+        return tables
     volatility = pd.Series(np.sqrt(np.diag(covariance)), index=covariance.index)
     anchors = [(f"{bump:+.0%}", volatility * 0 + bump) for bump in (-.10, .10)]
     anchors += [(f"{sign:+d}sigma", sign * volatility) for sign in (-1, 1)]

@@ -270,21 +270,27 @@ def _risk_page(result, config):
     )
     labels = config.factor_labels
     currency = result.metadata["reference_currency"]
+    native = any(t == 'DIFFERENCE' for t in result.metadata.get('factor_return_types', {}).values())
     _bars(
         fig.add_axes([0.16, 0.535, 0.32, 0.325]),
         result.factor_betas.rename(index=labels),
-        "Weighted factor exposure (ratio)",
+        "Portfolio return per native factor unit" if native else "Weighted factor exposure (ratio)",
+        percent=native,
     )
     _bars(
         fig.add_axes([0.65, 0.535, 0.29, 0.325]),
         result.factor_exposures.rename(index=labels) / 1e6,
-        f"Dollar factor exposure ({currency} m)",
+        f"P&L per native factor unit ({currency} m)" if native
+        else f"Dollar factor exposure ({currency} m)",
     )
     _panel_note(
         fig,
         0.055,
         0.478,
-        "e_f = sum_i w_i beta_if, where w_i = MTM_i / NAV. This is the portfolio sensitivity "
+        "Native DIFFERENCE beta is portfolio return per one point; LOG beta is return per "
+        "unit log change. Multiply beta by the matching factor change."
+        if native else "e_f = sum_i w_i beta_if, where w_i = MTM_i / NAV. "
+        "This is the portfolio sensitivity "
         "to factor f: a small +1% factor move contributes approximately e_f% of NAV."
         if result.metadata["all_funded"]
         else "e_f = factor dollar sensitivity / reporting denominator. Sensitivities use the "
@@ -294,7 +300,9 @@ def _risk_page(result, config):
         fig,
         0.565,
         0.478,
-        ("Dollar exposure = NAV x e_f. " if result.metadata["all_funded"]
+        "Dollar sensitivity = NAV x beta per model unit. A +1 point DIFFERENCE shock "
+        "contributes approximately this amount to P&L. This is a derivative, not option sizing."
+        if native else ("Dollar exposure = NAV x e_f. " if result.metadata["all_funded"]
          else "Dollar exposure = reporting denominator x e_f. ")
         + "A small +1% factor move contributes approximately "
         "1% of this amount to portfolio P&L; it is not invested cash.",
@@ -377,9 +385,10 @@ def _contributor_page(result, config):
     groups = result.report_diagnostics["Reported factor groups"]
     rc = groups.euler_vol
     factors = _contributor_factors(result)
-    grid = fig.add_gridspec(
-        2, 3, left=0.11, right=0.96, top=0.86, bottom=0.20, hspace=0.48, wspace=0.68
-    )
+    single = len(factors) == 1
+    grid = fig.add_gridspec(1 if single else 2, 1 if single else 3,
+        left=.27 if single else .11, right=.88 if single else .96,
+        top=.83 if single else .86, bottom=.30 if single else .20, hspace=.48, wspace=.68)
     for i, factor in enumerate(factors):
         values = result.report_diagnostics["Holding reported factor Euler volatility"][factor]
         selected = values.abs().sort_values(ascending=False, kind="stable").head(10).index
@@ -387,10 +396,10 @@ def _contributor_page(result, config):
         name_col = "metadata:short_name" if "metadata:short_name" in result.positions else "name"
         values.index = result.positions.loc[selected, name_col]
         _bars(
-            fig.add_subplot(grid[i // 3, i % 3]),
+            fig.add_subplot(grid[0, 0] if single else grid[i // 3, i % 3]),
             values,
             f"{config.factor_labels.get(factor, groups.loc[factor, 'label'])}\n"
-            f"Exposure {groups.loc[factor, 'factor_beta']:+.2f}; factor Euler {rc[factor]:+.2%}",
+            f"Exposure {groups.loc[factor, 'factor_beta']:+.5f}; factor Euler {rc[factor]:+.2%}",
             percent=True,
         )
     _footnotes(
@@ -442,11 +451,12 @@ def _grid_page(result, config):
     else:
         subtitle += " Deterministic payoff curves; local-risk bands disabled or unavailable."
     fig = _page(result, config, 6, "Sensitivity to largest factor exposures", subtitle)
-    grid = fig.add_gridspec(
-        2, 3, left=0.07, right=0.97, top=0.83, bottom=0.275, hspace=0.58, wspace=0.38
-    )
-    for i in range(6):
-        ax = fig.add_subplot(grid[i // 3, i % 3])
+    single = len(result.factor_exposures) == 1 and len(keys) == 1
+    grid = fig.add_gridspec(1 if single else 2, 1 if single else 3,
+        left=.14 if single else .07, right=.87 if single else .97,
+        top=.83, bottom=.30 if single else .275, hspace=.58, wspace=.38)
+    for i in range(1 if single else 6):
+        ax = fig.add_subplot(grid[0, 0] if single else grid[i // 3, i % 3])
         if i >= len(keys):
             ax.set_axis_off()
             continue
@@ -462,6 +472,9 @@ def _grid_page(result, config):
         group = result.metadata.get("factor_groups", {}).get(requested)
         title = config.factor_labels.get(requested, requested)
         xlabel = title + " factor return"
+        axis_label = result.grid_metadata.loc[key].get('axis_label', '')
+        if axis_label:
+            xlabel = axis_label
         if group is not None:
             title = group["label"] or requested
             equal = np.allclose(group["weights"], 1.0/len(group["members"]))
@@ -484,7 +497,7 @@ def _grid_page(result, config):
             ci=None,
             legend_loc=None,
             full_sample_color=BLUE,
-            xvar_format="{:+.0%}" if numeric else "{:.0f}",
+            xvar_format=("{:+.0f}" if axis_label else "{:+.0%}") if numeric else "{:.0f}",
             yvar_format="{:+.0%}",
             markersize=13,
             fontsize=8,
@@ -511,8 +524,11 @@ def _grid_page(result, config):
         if key in coefficients.index:
             row = coefficients.loc[key]
             b1, b2 = row[["linear", "quadratic"]]
-            equation = rf"$R_p(x)={b1:.2f}x{b2:+.2f}x^2"
+            equation = (rf"$R_p(x)={b1:.5f}x{b2:+.5f}x^2" if axis_label
+                        else rf"$R_p(x)={b1:.2f}x{b2:+.2f}x^2")
             fit = rf"$R^2$={row.r_squared:.1%}" if np.isfinite(row.r_squared) else "$R^2$: n/a"
+            if axis_label:
+                fit = 'Curve ' + fit
             label = equation + "$\n" + fit
             curve, = ax.plot(x, b1 * x + b2 * x * x,
                              color="#C46B27", ls="--", lw=1.5, label=label)
@@ -534,7 +550,10 @@ def _grid_page(result, config):
         ax.axvline(0, color="#7B8D9B", lw=0.6)
         if numeric and len(x):
             ax.set_xlim(x.min() - 0.015, x.max() + 0.015)
-            ax.set_xticks(np.arange(np.ceil(x.min() * 10), np.floor(x.max() * 10) + 1) / 10)
+            if axis_label:
+                ax.xaxis.set_major_locator(MaxNLocator(nbins=8, integer=True))
+            else:
+                ax.set_xticks(np.arange(np.ceil(x.min() * 10), np.floor(x.max() * 10) + 1) / 10)
         elif len(x):
             ax.set_xticks(x, [str(item) for item in summary.index], rotation=30)
     notes = [
@@ -569,6 +588,11 @@ def _grid_page(result, config):
         notes[0] = ("Each panel uses the supplied grid index and exported Grid conventions. "
                     "Simple family bumps split before log1p; log family bumps split in log units. "
                     "Only conditional grids complete free factors by a joint covariance solve.")
+    if any(result.grid_metadata.loc[key].get('axis_label', '') for key in keys):
+        notes[0] = ('Point axes describe changes in observed index levels. Exported anchors use '
+                    'the declared DIFFERENCE or LOG transform of those same endpoints.')
+        notes[-1] = ('Dashed: quadratic approximation through zero in the displayed axis units. '
+                     'Its curve-fit R-squared is not the portfolio regression R-squared.')
     _footnotes(fig, notes, y=0.185)
     return fig
 
@@ -607,6 +631,9 @@ def _beta_page(result, config):
     table.index = labels
     factors = result.factor_loadings.columns
     formatted = table.map(lambda x: "n/a" if pd.isna(x) else f"{x:+.2f}")
+    for factor, return_type in result.metadata.get('factor_return_types', {}).items():
+        if return_type == 'DIFFERENCE':
+            formatted[factor] = table[factor].map(lambda x: f'{x:+.5f}/pt')
     formatted["R-squared"] = table["R-squared"].map(lambda x: "n/a" if pd.isna(x) else f"{x:.1%}")
     for column in ["Model total vol", "Systematic vol", "Idio vol"]:
         formatted[column] = table[column].map(lambda x: "n/a" if pd.isna(x) else f"{x:.2%}")
@@ -652,6 +679,9 @@ def _beta_page(result, config):
         "PiYG palette, capped at +/-1.5; printed values are uncapped. "
         "Missing estimates remain n/a.",
     ]
+    if config.portfolio_r2 is not None:
+        notes[2] = ('Portfolio R-squared uses the supplied portfolio prediction series and '
+                    'common response observations; it is not an average of instrument R-squared.')
     if "Rest of assets" in result.report_diagnostics["Loading aggregates"].index:
         notes.append(
             "Rest of assets: omitted modelled holdings aggregated with full-NAV weights; "
@@ -794,7 +824,10 @@ def _cluster_contribution_page(result, config):
         if labels is not None:
             table.index = [labels.get(key, key) for key in table.index]
         limit = max(float(table.abs().max().max()), 1e-12)
-        plot_heatmap(table, ax=ax, cmap="PiYG", var_format="{:+.2%}" if percent else "{:.2f}",
+        native = any(t == 'DIFFERENCE' for t in
+                     result.metadata.get('factor_return_types', {}).values())
+        plot_heatmap(table, ax=ax, cmap="PiYG",
+                     var_format="{:+.2%}" if percent else "{:.5f}" if native else "{:.2f}",
                      fontsize=fontsize, top_x_label=True, vmin=-limit, vmax=limit,
                      date_format=None, hline_rows=[len(table)-1], x_rotation=0)
         ax.set_ylabel("")
@@ -923,6 +956,9 @@ def _cluster_contribution_page(result, config):
 
 def _methodology_page(result, config):
     """Show the fitted covariance and map declared economic targets to factor returns."""
+    if len(result.factor_covariance) == 1 or any(
+            t != 'LOG' for t in result.metadata.get('factor_return_types', {}).values()):
+        return _native_methodology_page(result, config)
     fig = _page(
         result, config, 10, f"{config.model_name} correlation and scenario construction",
         f"Fitted covariance at {pd.Timestamp(result.metadata['risk_date']):%d %b %Y}; "
@@ -1307,19 +1343,21 @@ def _report_pages(result, config):
                         f" Using notional of {currency} {denominator:,.0f}.") + qualifier,
         ),
     )
-    title = f"Requested scenarios with latest {model} co-moves"
-    yield (
-        title,
-        _scenario_page(
-            result,
-            config,
-            2,
+    if len(result.factor_covariance) > 1:
+        title = f"Requested scenarios with latest {model} co-moves"
+        yield (
             title,
-            result.valuations.get("conditional"),
-            f"Conditional shocks using the fitted covariance at {date:%d %b %Y}; explicit anchors "
-            "are preserved." + qualifier,
-        ),
-    )
+            _scenario_page(
+                result,
+                config,
+                2,
+                title,
+                result.valuations.get("conditional"),
+                f"Conditional shocks using the fitted covariance at {date:%d %b %Y}; "
+                "explicit anchors "
+                "are preserved." + qualifier,
+            ),
+        )
     count = meta["historical_count"]
     title = f"{'Ten' if count == 10 else count} worst {model} historical scenario months"
     historical_subtitle = ("Complete historical monthly factor vectors ranked by loss on today's "
@@ -1348,17 +1386,33 @@ def _report_pages(result, config):
         (f"{model} conditional shocks and covariance at 10% shocks", _conditional_page),
         (f"{model} conditional shocks and covariance at 1-sigma shocks", _conditional_sigma_page),
     ]:
+        if builder is _methodology_page and (len(result.factor_covariance) == 1 or any(
+                t != 'LOG' for t in meta.get('factor_return_types', {}).values())):
+            title = f'{model}: factor units and methodology'
+        if builder in (_conditional_page, _conditional_sigma_page) and (
+                len(result.factor_covariance) == 1 or any(
+                    t != 'LOG' for t in meta.get('factor_return_types', {}).values())):
+            continue
         yield title, builder(result, config)
     if config.appendix_table is not None:
         yield config.appendix_title, _coverage_page(result, config)
 
-    yield "Notation and guide to the analysis", _analysis_guide_page(result, config)
+    if len(result.factor_covariance) > 1 and not any(
+            t != 'LOG' for t in meta.get('factor_return_types', {}).values()):
+        yield "Notation and guide to the analysis", _analysis_guide_page(result, config)
 
 
 def report_pages(result, config):
     """Yield standard figures with physical page references after the account cover."""
-    for title, figure in _report_pages(result, config):
-        if "accounting" in result.metadata:
+    native_layout = len(result.factor_covariance) == 1 or any(
+        t != 'LOG' for t in result.metadata.get('factor_return_types', {}).values())
+    for page_number, (title, figure) in enumerate(_report_pages(result, config), 1):
+        if native_layout:
+            for text in figure.texts:
+                text.set_text(re.sub(r"\bappendix,\s+page\s+\d+\b",
+                                    "factor-units methodology exhibit", text.get_text(),
+                                    flags=re.IGNORECASE))
+        elif "accounting" in result.metadata:
             for text in figure.texts:
                 value = text.get_text()
                 value = re.sub(r"\b(pages?\s+)(\d+)(?:-(\d+))?", _shift_page_reference,
@@ -1367,6 +1421,10 @@ def report_pages(result, config):
                     value = re.sub(r"^(\d+)\. ",
                                    lambda m: f"{int(m[1]) + 1}. ", value)
                 text.set_text(value)
+        for text in figure.texts:
+            if (text.get_position()[0] > .9 and text.get_position()[1] < .05
+                    and text.get_text().isdigit()):
+                text.set_text(str(page_number))
         yield title, figure
 
 
@@ -1375,3 +1433,33 @@ def _shift_page_reference(match):
     start = int(match[2]) + 1
     end = f"-{int(match[3]) + 1}" if match[3] else ""
     return f"{match[1]}{start}{end}"
+
+
+def _native_methodology_page(result, config):
+    """Describe single/mixed-coordinate models without percentage-only assumptions."""
+    fig = _page(result, config, 10, f"{config.model_name}: factor units and methodology",
+                "Factor changes and asset log-return responses use distinct units.")
+    types = result.metadata.get('factor_return_types', {})
+    covariance = result.factor_covariance
+    table = pd.DataFrame(index=covariance.index)
+    table['Transform'] = [types.get(f, 'LOG') for f in table.index]
+    table['Annualised factor std. dev.'] = [
+        f"{np.sqrt(covariance.loc[f, f]):.2f} points" if types.get(f) == 'DIFFERENCE'
+        else f"{np.sqrt(covariance.loc[f, f]):.1%} log-change units" for f in table.index]
+    table['Beta units'] = ['return / index point' if types.get(f) == 'DIFFERENCE'
+                           else 'return / log change' for f in table.index]
+    _table(fig.add_axes([.07, .60, .86, .20]), table, fontsize=11)
+    fig.text(.08, .52, 'DIFFERENCE: x = level after - level before.\n'
+             'LOG: x = log(level after / level before).\n'
+             'Predicted asset log return = beta multiplied by x.\n'
+             'Funded-position P&L = market value multiplied by expm1(predicted log return).',
+             fontsize=12, va='top', linespacing=1.7)
+    fig.text(.08, .31, 'Observed indices retain their source units: '
+             'no FX conversion or cash-rate subtraction.\n'
+             'Asset returns and portfolio P&L use the stated reference currency.\n'
+             'With one factor fixed, independent and conditional stresses agree; '
+             'residual risk remains.\n'
+             'Annualisation describes covariance units, not a one-year index-level forecast.\n'
+             'Portfolio fit quality is assessed separately on common observed return dates.',
+             fontsize=11, va='top', linespacing=1.6)
+    return fig

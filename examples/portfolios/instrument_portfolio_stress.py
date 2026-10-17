@@ -216,6 +216,9 @@ def run_example(output_dir=None, case="all"):
         output_dir = Path(output_dir)
         if output_dir.exists():
             raise FileExistsError("Use a fresh example output directory")
+    if case == "vix":
+        from examples.portfolios.observed_index_stress import run_example as run_vix
+        return run_vix(output_dir)
     model, date, history = build_model_and_history()
     requests, grids = scenario_inputs(model, date)
     results = {}
@@ -242,7 +245,8 @@ def run_example(output_dir=None, case="all"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", choices=("funded", "mixed", "account", "all"), default="all")
+    parser.add_argument("--case", choices=("funded", "mixed", "account", "vix", "all"),
+                        default="all")
     parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
     run_example(args.output_dir, args.case)

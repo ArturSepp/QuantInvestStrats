@@ -10,6 +10,7 @@ import pandas as pd
 
 from qis.portfolio.risk.risk_model import RiskModel
 from qis.portfolio.risk.stress_testing import conditional_factor_shock
+from qis.perfstats.config import ReturnTypes
 
 
 class ScenarioMode(Enum):
@@ -30,10 +31,12 @@ class ShockConvention(Enum):
     Attributes:
         LOG: Log-return bumps, with family weights applied in log units.
         SIMPLE: Simple-return bumps, split before applying log1p.
+        MODEL: Bumps in each factor's declared LOG or DIFFERENCE coordinates.
     """
 
     LOG = "log"
     SIMPLE = "simple"
+    MODEL = "model"
 
 
 @dataclass(frozen=True)
@@ -51,6 +54,7 @@ class StressScenarios:
         descriptions: Optional plain descriptions keyed by scenario ID.
         scenario_modes: Optional row-specific completion policies which remain
             fixed even when resolve supplies a comparison-mode override.
+        axis_label: Optional explicit grid-axis caption, including native units.
     """
 
     anchors: pd.DataFrame
@@ -58,6 +62,7 @@ class StressScenarios:
     convention: ShockConvention = ShockConvention.LOG
     descriptions: Mapping[str, str] = field(default_factory=dict)
     scenario_modes: Mapping[str, ScenarioMode] = field(default_factory=dict)
+    axis_label: str = ""
 
     def __post_init__(self):
         """Validate the request shape while preserving explicit zero anchors."""
@@ -118,6 +123,10 @@ class StressScenarios:
                     raise ValueError(f"conflicting family/member anchors: {sorted(overlap)}")
                 supplied.update(bumps)
             values = pd.Series(supplied)
+            types = risk_model.factor_return_types or {}
+            if self.convention is not ShockConvention.MODEL and any(
+                    types.get(f, ReturnTypes.LOG) is not ReturnTypes.LOG for f in values.index):
+                raise ValueError('Non-log factors require MODEL shocks in their declared units')
             if self.convention is ShockConvention.SIMPLE:
                 if (values <= -1.0).any():
                     raise ValueError("each expanded simple-return bump must exceed -1")

@@ -227,6 +227,38 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
     return returns
 
 
+def to_factor_returns(prices: pd.DataFrame,
+                      return_types: Optional[Dict[str, ReturnTypes]] = None,
+                      **kwargs) -> pd.DataFrame:
+    """Transform each factor in its declared units using the standard return kernel.
+
+    Args:
+        prices: Ordered date-by-factor levels, including raw observed indices.
+        return_types: Exact factor mapping to LOG or DIFFERENCE. None means all LOG.
+        **kwargs: Sampling and missing-data options forwarded to to_returns. A true
+            is_log_returns override is rejected; the per-factor mapping is authoritative.
+
+    Returns:
+        Date-by-factor changes in original column order. No FX or funding adjustment.
+
+    Raises:
+        ValueError: If labels/types disagree or a legacy Boolean overrides the mapping.
+    """
+    if kwargs.pop('is_log_returns', False):
+        raise ValueError('is_log_returns cannot override per-factor return types')
+    if prices.columns.has_duplicates or prices.empty:
+        raise ValueError('Factor levels require nonempty unique columns')
+    types = ({name: ReturnTypes.LOG for name in prices} if return_types is None
+             else dict(return_types))
+    if set(types) != set(prices):
+        raise ValueError('return_types must contain exactly the factor columns')
+    if any(value not in (ReturnTypes.LOG, ReturnTypes.DIFFERENCE) for value in types.values()):
+        raise ValueError('Factor changes support ReturnTypes.LOG and DIFFERENCE')
+    return pd.concat([
+        to_returns(prices[name], return_type=types[name], is_log_returns=False, **kwargs)
+        for name in prices], axis=1).reindex(columns=prices.columns)
+
+
 def compute_asset_returns_dict(prices: pd.DataFrame,
                                returns_freqs: Union[str, pd.Series],
                                drop_first: bool = False,

@@ -1,5 +1,13 @@
 # Instrument portfolio valuation and stress reports
 
+Observed-index models can use `RiskModel.factor_return_types` with
+`ReturnTypes.DIFFERENCE` and `ShockConvention.MODEL` for native point shocks.
+Omission retains LOG behaviour. VIX remains in native index points in every
+portfolio reference currency; only the asset response receives FX/funding treatment.
+`StressReportConfig.portfolio_r2` accepts a portfolio prediction score rather than
+an average instrument R². Run the offline USD/EUR point/log example with
+`python -m examples.portfolios.instrument_portfolio_stress --case vix`.
+
 The public interface is `qis.portfolio.stress`. The same objects are exported
 from `qis.portfolio` and `qis`. `InstrumentPortfolio` represents a dated
 absolute-position snapshot; the existing `PortfolioData` continues to represent

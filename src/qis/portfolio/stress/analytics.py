@@ -204,8 +204,10 @@ def _history(portfolio: InstrumentPortfolio, history: pd.DataFrame | None, count
     ranking = (summary.sort_values("portfolio_pnl", kind="stable").head(count)
                if selected is None else summary.loc[selected.index].copy())
     if selected is not None:
-        ranking["selection_factor_log_return"] = selected[selection.factor]
-        ranking["selection_factor_simple_return"] = np.expm1(selected[selection.factor])
+        ranking["selection_factor_change"] = selected[selection.factor]
+        if selection.return_type.name == 'LOG':
+            ranking["selection_factor_log_return"] = selected[selection.factor]
+            ranking["selection_factor_simple_return"] = np.expm1(selected[selection.factor])
     ranking.insert(0, "rank", np.arange(1, len(ranking) + 1))
     return valuation, ranking, coverage
 
@@ -214,6 +216,7 @@ def _grid_metadata(request, expanded, key, band_status):
     """Describe the displayed grid units independently from expanded member shocks."""
     return {
         "grid": key,
+        "axis_label": request.axis_label,
         "bump_convention": request.convention.value,
         "completion": "row-specific" if request.scenario_modes else request.mode.value,
         "requested_keys": ", ".join(map(str, request.anchors.columns)),
@@ -338,6 +341,7 @@ def run_portfolio_stress_test(
                 }
             )
     metadata = {
+        "factor_return_types": {k: v.name for k, v in (model.factor_return_types or {}).items()},
         "all_funded": all_funded,
         "volatility_bands": "conditional scenario-local Euler risk; exactly +/-1sigma, +/-2sigma",
         "band_limitations": ("Local delta approximation; no curvature, boundary jumps "

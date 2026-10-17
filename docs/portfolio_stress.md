@@ -872,6 +872,35 @@ numbers, not a fitted model.
 
 ## Implementation in qis
 
+### Native factor coordinates
+
+Factors need not be tradable NAVs. Use `qis.to_factor_returns(levels,
+return_types={'VIX': qis.ReturnTypes.DIFFERENCE})` for raw VIX point changes,
+and carry the same mapping in `RiskModel.factor_return_types`. Omission preserves
+the LOG default. Covariance and fitted loadings must use those same coordinates.
+Asset responses remain log returns in the portfolio reference currency; an
+observed index is not FX converted or cash adjusted by this transform helper.
+
+Declare point shocks with `ShockConvention.MODEL` (for example VIX `+5.0`),
+and give a point grid `axis_label='VIX change (index points)'`. LOG/SIMPLE
+scenario conventions reject native-difference anchors to prevent unit confusion.
+`HistoricalScenarioSelection('VIX', '2006-01-01', 10, ascending=False,
+return_type=ReturnTypes.DIFFERENCE)` selects the largest point increases.
+The single-factor report renders native covariance units and suppresses duplicate
+conditional pages. Existing multifactor percentage reports retain their defaults.
+
+Supply `StressReportConfig(portfolio_r2=...)` when a true portfolio prediction
+score is available. `qis.prediction_r_squared` scores aligned observations and
+predictions, accepts observation weights and training-only benchmark predictions,
+and preserves negative out-of-sample scores. Instrument R-squared averages are
+not portfolio R-squared.
+
+Run the offline comparison with
+`python -m examples.portfolios.instrument_portfolio_stress --case vix`.
+Add `--output-dir <fresh-directory>` to write point/log report packs. The example
+fits synthetic USD and EUR responses with the same observed-index regressor,
+verifies scalar P&L and portfolio R², and includes the account snapshot.
+
 ### Entry points and formulas
 
 | Quantity | Formula | qis entry point |

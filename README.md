@@ -57,6 +57,10 @@ intrinsic calls/puts, futures and custom payoffs under an assigned `RiskModel`. 
 source marks and shared underlying risk, splits factor-family scenarios, ranks historical
 months and exports the standard report with additive Euler risk tables. See the
 [instrument portfolio guide and offline examples](docs/portfolio_stress.md).
+Single-factor observed-index models support native point changes (such as VIX),
+currency-independent regressors and portfolio prediction R². Run the offline
+[point/log comparison](examples/portfolios/observed_index_stress.py) with
+`python -m examples.portfolios.instrument_portfolio_stress --case vix`.
 
 **Documentation checked against the code.** The core dependency list is checked against
 `pyproject.toml`; README Python blocks are parsed for unresolved names; repository examples are
@@ -541,7 +545,7 @@ If you use QIS in your research, please cite it as:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.37.0},
+  version={5.38.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```
