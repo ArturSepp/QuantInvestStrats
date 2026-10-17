@@ -26,17 +26,17 @@ prices of its assets, `qis` simulates the portfolio's net asset value. It then m
 portfolio against a benchmark and renders the result as a factsheet. In addition to the
 backtesting engine, the package provides building blocks for systematic strategies and reports,
 including exponentially weighted covariance, bootstrap resampling, risk measures, stress testing,
-regime-conditional statistics, currency hedging and return unsmoothing.
+regime-conditional statistics, currency hedging, and return unsmoothing.
 
 Signal generation and portfolio construction remain with the researcher. The `qis` library
 reconstructs holdings from the target weights and applies explicit accounting and reporting
 conventions.
 
 The `qis` package is the base layer of a public stack of quantitative finance packages, whose
-other members are `optimalportfolios`, `trendfollowing` and `privateassets`. The package depends
-on NumPy, SciPy, pandas, statsmodels, Matplotlib, seaborn, Numba, openpyxl and PyYAML [@numpy;
-@scipy; @pandas; @statsmodels; @matplotlib; @seaborn; @numba], runs on Python 3.10 to 3.14 and is
-released under the MIT licence.
+other members are `optimalportfolios`, `trendfollowing`, and `privateassets`. The package depends
+on NumPy [@numpy], SciPy [@scipy], pandas [@pandas], statsmodels [@statsmodels],
+Matplotlib [@matplotlib], seaborn [@seaborn], Numba [@numba], openpyxl, and PyYAML, runs on
+Python 3.10 to 3.14 and is released under the MIT licence.
 
 # Statement of need
 
@@ -49,7 +49,7 @@ therefore report different performance statistics without either containing an e
 The target users of `qis` are researchers and portfolio managers who generate weights with their
 own models. The `qis` package settles each convention once and applies it to every factsheet it
 generates. The caller states the return convention as an argument, and the reporting frequency
-appears on every rendered output. Three Sharpe conventions, with compounded, log and arithmetic
+appears on every rendered output. Three Sharpe conventions, with compounded, log, and arithmetic
 numerators, are named and selected explicitly.
 
 # State of the field
@@ -57,18 +57,18 @@ numerators, are named and selected explicitly.
 | Package | Documented input | Documented output |
 |---|---|---|
 | `pyfolio-reloaded` [@pyfolio] | returns, optionally positions and transactions | tear sheets and round-trip analysis |
-| `bt` [@bt] | target weights through `WeighTarget` in an Algo stack | statistics, weights, positions and turnover |
-| `cvxportfolio` [@cvxportfolio] | a trading policy, such as `FixedWeights` for supplied target weights, and market data | value, weights, holdings, turnover and statistics |
-| `cvxsimulator` [@cvxsimulator] | prices, with units, weights or cash positions set in a loop over time | a portfolio object tracking units, cash and profit, with a snapshot plot |
-| `vectorbt` [@vectorbt] | orders, including target portfolio percentages, signals or an order-generating callback | order and trade records, statistics and plots |
+| `bt` [@bt] | target weights through `WeighTarget` in an Algo stack | statistics, weights, positions, and turnover |
+| `cvxportfolio` [@cvxportfolio] | a trading policy, such as `FixedWeights` for supplied target weights, and market data | value, weights, holdings, turnover, and statistics |
+| `cvxsimulator` [@cvxsimulator] | prices, with units, weights, or cash positions set in a loop over time | a portfolio object tracking units, cash and profit, with a snapshot plot |
+| `vectorbt` [@vectorbt] | orders, including target portfolio percentages, signals, or an order-generating callback | order and trade records, statistics, and plots |
 | `zipline-reloaded` [@zipline] | orders placed from a callback on each bar, including target portfolio percentages | a daily performance frame |
-| `backtrader` [@backtrader] | orders placed from a `Strategy` callback on each bar, including target portfolio percentages | strategy instances with analysers, observers and plots |
-| `Riskfolio-Lib` [@riskfolio] | returns and optimisation constraints | weights, reports and plots |
-| `skfolio` [@skfolio] | returns fitted through a scikit-learn interface | weights, cross-validation, risk measures and plots |
-| `quantstats` [@quantstats] | returns | metrics, plots and HTML tear sheets |
+| `backtrader` [@backtrader] | orders placed from a `Strategy` callback on each bar, including target portfolio percentages | strategy instances with analysers, observers, and plots |
+| `Riskfolio-Lib` [@riskfolio] | returns and optimisation constraints | weights, reports, and plots |
+| `skfolio` [@skfolio] | returns fitted through a scikit-learn interface | weights, cross-validation, risk measures, and plots |
+| `quantstats` [@quantstats] | returns | metrics, plots, and HTML tear sheets |
 | `empyrical-reloaded` [@empyrical] | returns | return and risk metrics |
 | `ffn` [@ffn] | prices | analytics, with simulation referred to `bt` |
-| `PyPortfolioOpt` [@Martin2021] | prices, or expected returns and a risk model | weights, discrete allocation, performance and plots |
+| `PyPortfolioOpt` [@Martin2021] | prices, or expected returns and a risk model | weights, discrete allocation, performance, and plots |
 
 Table: Documented interfaces of related Python packages, consulted on 11–14 October 2026.
 \label{tab:field}
@@ -80,29 +80,29 @@ object. Target-weight support is shared with other packages in \autoref{tab:fiel
 supports percentage targets, and `zipline-reloaded` and `backtrader` provide target-percent order
 methods.
 
-The contribution of `qis` is the integration of held-unit accounting, instrument attribution and
+The contribution of `qis` is the integration of held-unit accounting, instrument attribution, and
 comparative reporting under explicit conventions. The simulation returns a `PortfolioData`
-object carrying net asset value, held units, realised weights, realised costs and instrument
+object carrying net asset value, held units, realised weights, realised costs, and instrument
 profit and loss. Factsheets and comparative reports are rendered from it. The chart, the summary
-table and the factsheet of one strategy therefore show one Sharpe ratio under one stated
+table, and the factsheet of one strategy therefore show one Sharpe ratio under one stated
 convention. The analytics packages
-`pyfolio-reloaded`, `quantstats`, `empyrical-reloaded` and `ffn` measure a portfolio from its
+`pyfolio-reloaded`, `quantstats`, `empyrical-reloaded`, and `ffn` measure a portfolio from its
 history of returns. That history does not record the holdings or the trading costs incurred, so
 these packages cannot show which holding earned or lost the money unless holdings are supplied
 separately. The closest package is `cvxportfolio`, whose `FixedWeights` policy trades to supplied
 target weights and holds the positions between them. Its documented backtest result reports
-value, weights, holdings, turnover and total profit, within a framework built around optimisation
+value, weights, holdings, turnover, and total profit, within a framework built around optimisation
 policies and cost models.
 
-We built a separate library, instead of extending `bt`, `ffn` or `cvxportfolio`, because our
+We built a separate library, instead of extending `bt`, `ffn`, or `cvxportfolio`, because our
 research packages exchange one result object. The `bt` package already accepts target weights,
-and `ffn` already supplies analytics. The `qis` package combines holdings, costs, attribution and
+and `ffn` already supplies analytics. The `qis` package combines holdings, costs, attribution, and
 comparative reports, and its callers adopt neither an Algo stack nor a policy framework. The user
 keeps the freedom to generate allocation weights in their own strategy code. The trade-off is that
 `qis` ships no optimiser and no signal library of its own.
 
 The integrated analytics include return unsmoothing for appraisal-based valuations [@geltner1993;
-@getmansky2004], regime-conditional reporting by benchmark return quantile [@Sepp2019] and paired
+@getmansky2004], regime-conditional reporting by benchmark return quantile [@Sepp2019], and paired
 resampling of aligned factor and residual panels with the stationary bootstrap of @politis1994. We
 do not claim these methods as unique. R's `PerformanceAnalytics` implements the first-order
 unsmoothing of @geltner1993 [@performanceanalytics], and the `StationaryBootstrap` class of `arch`
@@ -124,12 +124,12 @@ Market frictions enter instead as proportional rebalancing costs, set per instru
 The subpackage `qis.discrete_portfolio` covers strategies that emit orders from a callback on each
 observation. The replay supports full fills at the next observation and converts the ledgers
 into the same `PortfolioData` object, reconciled against net asset value. Partial fills,
-cancellations and market impact remain outside this version.
+cancellations, and market impact remain outside this version.
 
-We build the chart, the summary table and the factsheet of a strategy from one `PortfolioData`
+We build the chart, the summary table, and the factsheet of a strategy from one `PortfolioData`
 object, constructed from weights and prices. The same object feeds the three comparisons of a
 research pipeline: a strategy against its benchmark, a parameter perturbation against its base
-case and the sub-strategies of one strategy side by side. One reporting layer renders all three
+case, and the sub-strategies of one strategy side by side. One reporting layer renders all three
 comparisons under the same conventions for performance evaluation.
 
 Beyond backtesting, `qis` supports analysis of currency exposure and factor risk. `FxRatesData`
@@ -147,7 +147,7 @@ cost of discoverability. The curated core gives new users a smaller entry point 
 export.
 
 Tests check exported plots on synthetic panels, the documented arguments of the core, local
-documentation links and the recorded software measurements this paper quotes. Selected offline
+documentation links, and the recorded software measurements this paper quotes. Selected offline
 examples execute in the suite, and static checks cover the imports and calls of all examples. Plot
 smoke tests establish that figures draw, while layout and readability require visual review. The
 suite runs without network access on a core installation, using a frozen, seeded simulator that
@@ -177,15 +177,15 @@ allocations with funding costs and to generate a performance factsheet.
 # AI usage disclosure
 
 From July to October 2026, Anthropic's Claude (Opus 5 and 5.5, Fable 5 and 5.1) and OpenAI Codex
-(Sol 5.6) assisted with software development, tests, documentation and paper preparation. The
+(Sol 5.6) assisted with software development, tests, documentation, and paper preparation. The
 author made the methodological and architectural decisions, reviewed and validated the assisted
-outputs and remains responsible for the work. Assisted changes pass through the same test suite
+outputs, and remains responsible for the work. Assisted changes pass through the same test suite
 and continuous integration as all other changes. The suite checks recorded software measurements
 against recomputed values or recorded provenance.
 
 # Acknowledgements
 
-We thank John D. Reynolds for contributions to numerical correctness, performance, reporting and
+We thank John D. Reynolds for contributions to numerical correctness, performance, reporting, and
 regression test coverage in `qis`. This work received no specific funding.
 
 # References
