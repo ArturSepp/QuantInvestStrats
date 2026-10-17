@@ -65,7 +65,7 @@ numerators, are named and selected explicitly.
 | `backtrader` [@backtrader] | orders placed from a `Strategy` callback on each bar, including target portfolio percentages | strategy instances with analysers, observers, and plots |
 | `Riskfolio-Lib` [@riskfolio] | returns and optimisation constraints | weights, reports, and plots |
 | `skfolio` [@skfolio] | returns fitted through a scikit-learn interface | weights, cross-validation, risk measures, and plots |
-| `quantstats` [@quantstats] | returns | metrics, plots ,and HTML tear sheets |
+| `quantstats` [@quantstats] | returns | metrics, plots, and HTML tear sheets |
 | `empyrical-reloaded` [@empyrical] | returns | return and risk metrics |
 | `ffn` [@ffn] | prices | analytics, with simulation referred to `bt` |
 | `PyPortfolioOpt` [@Martin2021] | prices, or expected returns and a risk model | weights, discrete allocation, performance, and plots |
@@ -119,7 +119,7 @@ prices, whereas multiplying each period's returns by fixed target weights would 
 every period. The path dependence of held units motivates a date-sequential `numba` kernel
 [@numba], and array-based analytics operate on its outputs. The backtester suits portfolio
 research, while order-book events and signal generation remain outside it.
-Market frictions enter instead as proportional rebalancing costs, set per instrument, and per date.
+Market frictions enter instead as proportional rebalancing costs, set per instrument and per date.
 
 The subpackage `qis.discrete_portfolio` covers strategies that emit orders from a callback on each
 observation. The replay supports full fills at the next observation and converts the ledgers
