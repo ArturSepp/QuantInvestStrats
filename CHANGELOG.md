@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Speed up `bootstrap_data` with `SERIES_TO_DF` for ordinary numeric Series by constructing
+  all sampled paths as one DataFrame, preserving sampling, path labels and native fallback behavior.
+
 ## [5.38.1] - 2026-10-17
 
 Version 5.38.0 failed release validation before building or uploading distributions to PyPI.
