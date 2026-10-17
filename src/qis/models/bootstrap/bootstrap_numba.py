@@ -464,6 +464,19 @@ def bootstrap_data(data: Union[pd.Series, pd.DataFrame],
             raise ValueError("data must be series")
 
         data_np = npo.np_array_to_matrix(a=data.to_numpy(), ncols=1)
+        # Gather ordinary numeric paths as one matrix instead of constructing and concatenating
+        # one frame per draw. Keep Numba's domain outside this fast path: NumPy would accept
+        # some rejected dtypes or reinterpret Boolean indices, and zero draws must still fail.
+        if (data_np.dtype.isnative
+                and (data_np.dtype.kind in "biu" or data_np.dtype in (np.float32, np.float64))
+                and bootstrapped_indices.ndim == 2
+                and bootstrapped_indices.shape[1] > 0
+                and bootstrapped_indices.dtype in (np.int32, np.int64)):
+            bootstrap_sample = pd.DataFrame(
+                data_np[bootstrapped_indices, 0],
+                columns=[f"path_{idx+1}" for idx in range(bootstrapped_indices.shape[1])])
+            return bootstrap_sample
+
         bootstrap_sample = get_bootstrap_data_list(data_np=data_np,
                                                    bootstrapped_indices=bootstrapped_indices)
         data = []
