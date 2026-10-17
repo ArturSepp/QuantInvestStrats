@@ -10,8 +10,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 
 - Align complete, uniquely asset-indexed extra columns in `get_ra_perf_columns` and
-  `plot_ra_perf_table` by asset label before insertion, preventing classifications and weights
-  from appearing beside the wrong asset. Statistics, formatting and other metadata schemas
+  `plot_ra_perf_table` by asset label before insertion, including tuple labels with missing
+  components, preventing classifications and weights from appearing beside the wrong asset.
+  Statistics, formatting and other metadata schemas
   retain their existing behavior.
 
 ## [5.38.1] - 2026-10-17

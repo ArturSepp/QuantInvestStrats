@@ -65,6 +65,28 @@ def _resize_ra_table_header(number_of_columns: int,
             cell.set_height(RA_TABLE_HEADER_HEIGHT_MULTIPLIER * data_height)
 
 
+
+def _get_ra_table_full_keys(index: pd.Index, missing_key: object) -> pd.Index:
+    """Preserve full tuple identity when an asset's MultiIndex level is missing.
+
+    Args:
+        index: asset labels or metadata labels, including flat full-tuple keys.
+        missing_key: shared comparison marker for missing tuple components.
+
+    Returns:
+        Object keys without coercing exact numeric labels or unrelated positional labels.
+    """
+    keys = []
+    for key in index.to_flat_index():
+        if isinstance(key, tuple):
+            key = tuple(
+                missing_key if pd.api.types.is_scalar(value) and pd.isna(value) else value
+                for value in key
+            )
+        keys.append(key)
+    return pd.Index(keys, dtype=object, tupleize_cols=False)
+
+
 def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                         perf_params: PerfParams = None,
                         perf_columns: List[PerfStat] = rpt.STANDARD_TABLE_COLUMNS,
@@ -126,8 +148,14 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
             # Keep native lookup rules, including distinct boolean and numeric labels.
             asset_keys = data.index.to_flat_index()
             extra_keys = df_to_add.index.to_flat_index()
+            if isinstance(data.index, pd.MultiIndex):
+                # Flat tuple lookup loses MultiIndex's missing-level equality. Share a
+                # marker inside full keys, including metadata supplied as a flat tuple Index.
+                missing_key = object()
+                asset_keys = _get_ra_table_full_keys(data.index, missing_key)
+                extra_keys = _get_ra_table_full_keys(df_to_add.index, missing_key)
             # Use lossless comparison keys and one missing marker for both checks below.
-            # The original indexes still decide whether native lookup accepts that match.
+            # Scalar labels retain their native lookup rules and missing-label aliases.
             asset_labels = asset_keys.astype(object).fillna(pd.NA)
             extra_labels = extra_keys.astype(object).fillna(pd.NA)
             # A full-key screen avoids IntervalIndex point lookup on unrelated labels.

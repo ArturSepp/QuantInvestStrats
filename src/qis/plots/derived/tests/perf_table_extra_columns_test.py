@@ -469,3 +469,126 @@ def test_plot_ra_perf_table_draws_native_missing_asset_keys(prices):
         pd.testing.assert_frame_equal(extra, original)
     finally:
         plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        [("A", "USD"), ("B", None)],
+        [(None, "USD"), ("B", "EUR")],
+        [("A", np.nan), ("B", "EUR")],
+        [("A", pd.NA), ("B", "EUR")],
+        [(None, "USD"), ("B", None)],
+        [("A", "USD", None), ("B", None, "spot")],
+    ],
+)
+@pytest.mark.parametrize("flat_metadata_index", [False, True])
+@pytest.mark.parametrize("is_to_str", [False, True])
+def test_get_ra_perf_columns_aligns_missing_tuple_components(
+    prices, labels, flat_metadata_index, is_to_str
+):
+    """A missing tuple component retains native MultiIndex asset identity."""
+    prices.columns = pd.MultiIndex.from_tuples(labels)
+    metadata_index = (
+        pd.Index(labels, tupleize_cols=False)
+        if flat_metadata_index
+        else pd.MultiIndex.from_tuples(labels)
+    )
+    extra = pd.DataFrame(
+        {"Class": ["Equity", "Bond"], "Weight": [0.75, 0.25]}, index=metadata_index
+    ).iloc[::-1]
+    original_prices, original_extra = prices.copy(deep=True), extra.copy(deep=True)
+    expected = _table(prices, is_to_str=is_to_str)
+    expected.insert(0, "Class", np.array(["Equity", "Bond"], dtype=object))
+    expected.insert(1, "Weight", [0.75, 0.25])
+
+    pd.testing.assert_frame_equal(_table(prices, extra, is_to_str), expected)
+    pd.testing.assert_frame_equal(prices, original_prices)
+    pd.testing.assert_frame_equal(extra, original_extra)
+
+
+@pytest.mark.parametrize("flat_metadata_index", [False, True])
+def test_plot_ra_perf_table_draws_missing_tuple_components(prices, flat_metadata_index):
+    """Drawn classifications and weights follow full asset keys, including missing levels."""
+    labels = [("A", "USD"), ("B", None)]
+    prices.columns = pd.MultiIndex.from_tuples(labels)
+    metadata_index = (
+        pd.Index(labels, tupleize_cols=False)
+        if flat_metadata_index
+        else prices.columns
+    )
+    extra = pd.DataFrame(
+        {"Class": ["Equity", "Bond"], "Weight": [0.75, 0.25]}, index=metadata_index
+    ).iloc[::-1]
+    fig = qis.plot_ra_perf_table(
+        prices,
+        perf_params=qis.PerfParams(freq="B"),
+        perf_columns=[qis.PerfStat.TOTAL_RETURN],
+        df_to_add=extra,
+    )
+    try:
+        fig.canvas.draw()
+        table = fig.axes[0].tables[0]
+        assert [table[1, col].get_text().get_text() for col in [1, 2]] == ["Equity", "0.75"]
+        assert [table[2, col].get_text().get_text() for col in [1, 2]] == ["Bond", "0.25"]
+    finally:
+        plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "asset_labels, metadata_labels",
+    [
+        (
+            [(None, 2**53 + 1), ("B", 2**53 + 3)],
+            [("B", float(2**53 + 4)), (None, float(2**53))],
+        ),
+        (
+            [(None, float(2**53 + 4)), ("B", float(2**53))],
+            [("B", 2**53 + 1), (None, 2**53 + 3)],
+        ),
+        (
+            [("A", None), ("B", "EUR")],
+            [("C", "EUR"), ("A", None)],
+        ),
+    ],
+)
+@pytest.mark.parametrize("flat_metadata_index", [False, True])
+@pytest.mark.parametrize("is_to_str", [False, True])
+def test_get_ra_perf_columns_keeps_unmatched_missing_tuples_positional(
+    prices, asset_labels, metadata_labels, flat_metadata_index, is_to_str
+):
+    """Missing-level normalization must not invent numeric matches or partial joins."""
+    prices.columns = pd.MultiIndex.from_tuples(asset_labels)
+    metadata_index = (
+        pd.Index(metadata_labels, tupleize_cols=False)
+        if flat_metadata_index
+        else pd.MultiIndex.from_tuples(metadata_labels)
+    )
+    extra = pd.DataFrame({"Class": ["first", "second"]}, index=metadata_index)
+    expected = _table(prices, is_to_str=is_to_str)
+    expected.insert(0, "Class", extra["Class"].to_numpy())
+    pd.testing.assert_frame_equal(_table(prices, extra, is_to_str), expected)
+
+
+@pytest.mark.parametrize("flat_metadata_index", [False, True])
+@pytest.mark.parametrize("is_to_str", [False, True])
+def test_get_ra_perf_columns_aligns_three_asset_missing_tuples(
+    prices, flat_metadata_index, is_to_str
+):
+    """A cyclic metadata permutation cannot depend on NaN identity in flattened keys."""
+    labels = [("A", 1), ("B", None), ("C", 3)]
+    prices = pd.concat([prices, prices["A"].rename("C")], axis=1, sort=False)
+    prices.columns = pd.MultiIndex.from_tuples(labels)
+    metadata_index = (
+        pd.Index(labels, tupleize_cols=False)
+        if flat_metadata_index
+        else prices.columns
+    )
+    extra = pd.DataFrame(
+        {"Class": ["Equity", "Bond", "Cash"], "Weight": [0.6, 0.3, 0.1]},
+        index=metadata_index,
+    ).iloc[[2, 0, 1]]
+    expected = _table(prices, is_to_str=is_to_str)
+    expected.insert(0, "Class", np.array(["Equity", "Bond", "Cash"], dtype=object))
+    expected.insert(1, "Weight", [0.6, 0.3, 0.1])
+    pd.testing.assert_frame_equal(_table(prices, extra, is_to_str), expected)
