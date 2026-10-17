@@ -284,7 +284,7 @@ def _write_api_index() -> None:
     from qis.api import CORE_API, core_api_names
 
     documentable = []
-    for name in sorted(dir(qis)):
+    for name in sorted(qis.__all__):
         if name.startswith('_'):
             continue
         obj = getattr(qis, name)

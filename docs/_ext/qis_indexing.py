@@ -131,6 +131,120 @@ def write_sitemap(app: Any, exception: Exception | None) -> None:
     )
 
 
+PACKAGE = 'qis'
+
+
+def public_api_names() -> list[str]:
+    """Return verified exports from the same contract used by the API producer."""
+    from importlib import import_module
+    import json
+
+    package = import_module(PACKAGE)
+    if PACKAGE == 'optimalportfolios':
+        inventory = json.loads(
+            (Path(__file__).resolve().parents[2] / 'tools' / 'docs_inventory.json')
+            .read_text(encoding='utf-8')
+        )
+        names = {name for group in inventory['symbols'].values() for name in group}
+        names.update(inventory['external_symbols'])
+    else:
+        names = set(package.__all__)
+    for name in names:
+        if name.startswith('_') or not hasattr(package, name):
+            raise ValueError(f'Invalid public API inventory entry: {PACKAGE}.{name}')
+    return sorted(names)
+
+
+def release_channel(baseurl: str) -> str:
+    """Describe the configured build channel without inferring a PyPI version.
+
+    Args:
+        baseurl: The build's own configured URL.
+    """
+    channel = urlsplit(baseurl).path.rstrip('/').rsplit('/', 1)[-1]
+    if channel == 'latest':
+        return 'Development documentation; main may be ahead of PyPI'
+    if channel == 'stable':
+        return 'Released documentation; compare its build version with your installation'
+    return 'Version-specific documentation; compare its build version with your installation'
+
+
+def set_release_navigation(app, pagename, templatename, context, doctree) -> None:
+    """Show the build channel and link to channel roots and generated navigation.
+
+    Args:
+        app: Running Sphinx application.
+        pagename: Current document name.
+        templatename: Current template; unchanged.
+        context: HTML template variables, including the rendered body.
+        doctree: Parsed document; unused.
+    """
+    from html import escape
+
+    base = app.config.html_baseurl
+    if app.builder.name != 'html' or not base or 'body' not in context:
+        return
+    root = urljoin(base.rstrip('/') + '/', '../')
+    links = ''
+    if urlsplit(base).netloc.endswith('.readthedocs.io'):
+        links = (f'<a href="{escape(urljoin(root, "stable/"), quote=True)}">Stable</a> · '
+                 f'<a href="{escape(urljoin(root, "latest/"), quote=True)}">Latest</a> · ')
+    index = escape(urljoin(base.rstrip('/') + '/', 'llms.txt'), quote=True)
+    version = escape(str(getattr(app.config, 'release', 'unspecified')))
+    notice = ('<aside class="admonition note oss-release-navigation" '
+              'aria-label="Documentation version">'
+              f'<p>{escape(release_channel(base))}. Build version: {version}.</p>'
+              f'<p>{links}<a href="{index}">Markdown / LLM index</a></p></aside>')
+    context['body'] = notice + context['body']
+
+
+def write_llms(app, exception) -> None:
+    """Generate deterministic Markdown from discovered pages and verified API exports.
+
+    Args:
+        app: Successful HTML application with the merged Sphinx environment.
+        exception: Build failure, if any; failed builds publish no index.
+    """
+    base = app.config.html_baseurl
+    if (exception is not None or getattr(app, 'statuscode', 0)
+            or app.builder.name != 'html' or not base):
+        return
+    base = base.rstrip('/') + '/'
+    def page_url(name):
+        uri = app.builder.get_target_uri(name)
+        return urljoin(base, quote('' if uri == 'index.html' else uri, safe='/%'))
+
+    pages = sorted(name for name in app.env.found_docs
+                   if name not in {'search', 'genindex', 'py-modindex'}
+                   and not name.startswith(('_', 'generated/', 'api/generated/')))
+    titles = getattr(app.env, 'titles', {})
+    lines = [f'# {PACKAGE} documentation', '', '> ' + release_channel(base) + '.', '',
+             'Build version: ' + str(getattr(app.config, 'release', 'unspecified')) + '.', '',
+             '## Canonical documentation', '']
+    for name in pages:
+        title = titles[name].astext() if name in titles else name
+        title = title.replace('[', '').replace(']', '').replace('\n', ' ')
+        lines.append(f'- [{title}]({page_url(name)})')
+    lines += ['', f'- [Public API exports]({urljoin(base, "llms-api.txt")})', '']
+    names = public_api_names()
+    objects = {entry[0]: entry for entry in app.env.get_domain('py').get_objects()}
+    api = [f'# {PACKAGE} public API exports', '', '> ' + release_channel(base) + '.', '',
+           'Generated from the API producer contract; links use actual Sphinx targets.', '']
+    for name in names:
+        full = f'{PACKAGE}.{name}'
+        entry = objects.get(full)
+        if entry is not None:
+            _, _, _, docname, anchor, _ = entry
+            url = page_url(docname) + ('#' + quote(anchor, safe='.-_') if anchor else '')
+            api.append(f'- [{full}]({url})')
+        else:
+            # Some exported constants have no object directive. Do not invent an anchor.
+            api.append(f'- `{full}` (exported; no individual Sphinx target)')
+    out = Path(app.outdir)
+    (out / 'llms.txt').write_text('\n'.join(lines), encoding='utf-8')
+    (out / 'llms-api.txt').write_text('\n'.join(api) + '\n', encoding='utf-8')
+
+
 def setup(app: Any) -> dict:
     """Register independent page metadata and end-of-build sitemap callbacks.
 
@@ -143,4 +257,6 @@ def setup(app: Any) -> dict:
     app.connect('html-page-context', set_canonical_url)
     app.connect('html-page-context', set_robots_meta)
     app.connect('build-finished', write_sitemap)
+    app.connect('html-page-context', set_release_navigation)
+    app.connect('build-finished', write_llms)
     return {'version': '1', 'parallel_read_safe': True, 'parallel_write_safe': True}

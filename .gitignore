@@ -161,3 +161,4 @@ output/
 # Claude Code: permission settings are per-machine, never committed
 .claude/
 .codex/
+UsersarturAppDataLocalAgentWorkARTUR_LAPTOPQuantInvestStratstmpvix_verify/test_csv_round_trip0/futures_risk_factors.csv

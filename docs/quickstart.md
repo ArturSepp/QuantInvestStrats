@@ -17,6 +17,11 @@ Start with an [installed core package](install.md). The examples below use the f
 fixture with default seed 20260725 and a fixed 2 January 2018–31 December 2025 sample.
 Their outputs demonstrate software behaviour under those inputs, not historical market returns.
 
+Minimum supported released version for this example: **`qis>=5.37.0`**.
+This conservative support floor was checked against the released API. See
+[versions and compatibility](index.md#versions-and-compatibility) for channel selection,
+capability boundaries and dependency licences.
+
 ## First chart
 
 The first example draws a quarterly rebalanced 60/40 portfolio of synthetic US equities and

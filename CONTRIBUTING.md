@@ -1,4 +1,16 @@
+---
+myst:
+  html_meta:
+    description: >-
+      Contribution scope, reproducible starter tasks, development checks and review for QuantInvestStrats.
+---
+
 # Contributing to QuantInvestStrats
+
+*Author: [Artur Sepp](https://github.com/ArturSepp)*
+
+Project: [QuantInvestStrats](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 Thanks for your interest in `qis`. `qis` is the analytics and reporting engine of a wider stack, so contributions here can affect downstream packages.
 
@@ -24,6 +36,74 @@ writing code:
   [`bbg-fetch`](https://github.com/ArturSepp/BloombergFetch)
 - Examples that require a paid data subscription to run
 
+## Starter tasks
+
+These are proposed, unassigned tasks, not reports of confirmed numerical defects. Check for
+existing or completed work and agree a bounded scope before starting. The
+[shared contributor guide](https://github.com/ArturSepp/ArturSepp/blob/main/docs/contributing_to_stack.md)
+explains setup, review, attribution and validation of automation-assisted work. Reuse this
+repository's [feature request form](.github/ISSUE_TEMPLATE/feature_request.yml), or its
+[bug report form](.github/ISSUE_TEMPLATE/bug_report.yml) for an observed defect.
+No starter label implies that numerical redesign is included.
+
+Commands below use PowerShell's `& $py`, where `$py` is the selected development interpreter.
+Run them from the repository source root (a C-local source export on the maintainer host).
+Follow [development setup](#development-setup) first; for this Windows/OneDrive checkout,
+use the external environment and generated-state helper described in `AGENTS.md` before
+running Python or uv. The shared guide gives the exact interpreter table. Each command is
+a focused check, not a substitute for the package's documentation and PR gates.
+
+### QIS-1: Map the quickstart output to its Python objects
+
+**Owner and code home:** QuantInvestStrats; [docs/quickstart.md](docs/quickstart.md).
+**Read first:** [examples/getting_started/offline_quickstart.py](examples/getting_started/offline_quickstart.py), [src/qis/tests/test_quickstart.py](src/qis/tests/test_quickstart.py).
+
+**Current gap:** The script prints targets, realised weights, performance and benchmark-relative results; the page has no compact output-to-object lookup table.
+
+**Reproduce:** Read the printed labels in the canonical script, then run the existing quickstart tests below.
+
+**Acceptance and scope:** Add one small table mapping those four output groups to weight_schedule, portfolio_data.weights, performance_table and the TE/IR objects. State that targets and drifted holdings can differ; link existing timing and Sharpe guidance. Keep every computed value, seed and executable snippet unchanged.
+
+**Useful verification:**
+
+```powershell
+& $py -m pytest src/qis/tests/test_quickstart.py -q
+```
+
+### QIS-2: Make the quickstart test enforce its offline promise
+
+**Owner and code home:** QuantInvestStrats; [src/qis/tests/test_quickstart.py](src/qis/tests/test_quickstart.py).
+**Read first:** [examples/getting_started/offline_quickstart.py](examples/getting_started/offline_quickstart.py).
+
+**Current gap:** test_quickstart_executes_and_reports_sane_results runs the example but does not block socket connections.
+
+**Reproduce:** Inspect that test: it changes the working directory and checks results, without patching socket.socket.connect or socket.create_connection. Run it unchanged to establish the baseline.
+
+**Acceptance and scope:** Use monkeypatch to reject both connection entry points during the existing run, with a useful error. Check that a deliberate connection attempt is rejected by the guard in an isolated test before trusting the green example run. Preserve current NAV assertions and the canonical script. Do not add a network service, dependency or new analytics implementation.
+
+**Useful verification:**
+
+```powershell
+& $py -m pytest src/qis/tests/test_quickstart.py -q
+```
+
+### QIS-3: Explain how to diagnose a source quickstart mismatch
+
+**Owner and code home:** QuantInvestStrats; [docs/quickstart.md](docs/quickstart.md).
+**Read first:** [src/qis/tests/test_quickstart.py](src/qis/tests/test_quickstart.py), [tools/check_docs.py](tools/check_docs.py).
+
+**Current gap:** The page links its checks but has no contributor decision table separating source-copy drift, a wrong interpreter and a numerical assertion failure.
+
+**Reproduce:** Follow the quickstart source link and inspect the test assertions and the minimum supported version on the page.
+
+**Acceptance and scope:** Add a concise table: check the loaded qis file/version for interpreter mismatch; compare the canonical script and clean notebook for copy drift; report the exact failing assertion and environment for a numerical discrepancy. Link existing installation and contribution guidance. Do not recommend updating expected numbers or changing the frozen fixture to make a check pass.
+
+**Useful verification:**
+
+```powershell
+& $py tools/check_docs.py --files docs/quickstart.md
+```
+
 ## Reporting a bug
 
 Open an issue using the bug report template. A report needs the `qis` version, your
@@ -42,6 +122,13 @@ expectations, release policy, and private route for sensitive reports are docume
 [GOVERNANCE.md](GOVERNANCE.md).
 
 ## Development setup
+
+For the maintainer's Windows/OneDrive checkout, first run the setup helper named in
+`AGENTS.md` and select the registered C:\Python interpreter. Set
+`UV_PROJECT_ENVIRONMENT` to that external environment before any uv project operation;
+never use the unqualified uv examples below against a OneDrive-local environment.
+Keep generated output and pure verification source exports on C: as described in the
+[shared contributor guide](https://github.com/ArturSepp/ArturSepp/blob/main/docs/contributing_to_stack.md#setup-and-a-first-check).
 
 ```bash
 git clone https://github.com/ArturSepp/QuantInvestStrats.git
