@@ -65,6 +65,28 @@ def _resize_ra_table_header(number_of_columns: int,
             cell.set_height(RA_TABLE_HEADER_HEIGHT_MULTIPLIER * data_height)
 
 
+
+def _get_ra_table_full_keys(index: pd.Index, missing_key: object) -> pd.Index:
+    """Preserve full tuple identity when an asset's MultiIndex level is missing.
+
+    Args:
+        index: asset labels or metadata labels, including flat full-tuple keys.
+        missing_key: shared comparison marker for missing tuple components.
+
+    Returns:
+        Object keys without coercing exact numeric labels or unrelated positional labels.
+    """
+    keys = []
+    for key in index.to_flat_index():
+        if isinstance(key, tuple):
+            key = tuple(
+                missing_key if pd.api.types.is_scalar(value) and pd.isna(value) else value
+                for value in key
+            )
+        keys.append(key)
+    return pd.Index(keys, dtype=object, tupleize_cols=False)
+
+
 def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                         perf_params: PerfParams = None,
                         perf_columns: List[PerfStat] = rpt.STANDARD_TABLE_COLUMNS,
@@ -95,7 +117,9 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
             :func:`plot_ra_perf_table_benchmark` or :func:`compute_bnb_regimes_pa_perf_table`
             for those
         column_header: header of the leading column, which holds the asset names
-        df_to_add: extra columns inserted before the statistics, for group labels or weights
+        df_to_add: extra columns inserted before the statistics, for group labels or weights.
+            Complete, uniquely labeled asset rows are aligned by label; other schemas retain
+            their existing positional handling and length checks
         is_to_str: format the values as strings. False returns the numbers, for further computation
 
     Returns:
@@ -116,6 +140,34 @@ def get_ra_perf_columns(prices: Union[pd.DataFrame, pd.Series],
                 data[perf_column.to_str()] = ra_perf_table[perf_column.to_str()]
 
     if df_to_add is not None:
+        # Dropping labels too early can silently attach metadata to the wrong asset.
+        # Only complete, unique asset sets define a mapping; keep legacy schemas positional.
+        if (len(df_to_add.columns) > 0 and data.index.is_unique and df_to_add.index.is_unique
+                and len(data.index) == len(df_to_add.index)):
+            # Full tuple keys avoid MultiIndex coercion of unrelated positional labels.
+            # Keep native lookup rules, including distinct boolean and numeric labels.
+            asset_keys = data.index.to_flat_index()
+            extra_keys = df_to_add.index.to_flat_index()
+            if isinstance(data.index, pd.MultiIndex):
+                # Flat tuple lookup loses MultiIndex's missing-level equality. Share a
+                # marker inside full keys, including metadata supplied as a flat tuple Index.
+                missing_key = object()
+                asset_keys = _get_ra_table_full_keys(data.index, missing_key)
+                extra_keys = _get_ra_table_full_keys(df_to_add.index, missing_key)
+            # Use lossless comparison keys and one missing marker for both checks below.
+            # Scalar labels retain their native lookup rules and missing-label aliases.
+            asset_labels = asset_keys.astype(object).fillna(pd.NA)
+            extra_labels = extra_keys.astype(object).fillna(pd.NA)
+            # A full-key screen avoids IntervalIndex point lookup on unrelated labels.
+            if asset_labels.isin(extra_labels).all():
+                positions, _ = extra_keys.get_indexer_non_unique(asset_keys)
+                # Native lookup can round numeric keys. Require each row once and verify
+                # the selected labels with the same comparison keys used for screening.
+                if (len(positions) == len(asset_keys) and (positions >= 0).all()
+                        and len(np.unique(positions)) == len(positions)
+                        and extra_labels.take(positions).equals(asset_labels)):
+                    # Use the validated positions directly, rather than repeating label lookup.
+                    df_to_add = df_to_add.iloc[positions]
         for idx, column in enumerate(df_to_add.columns):
             data.insert(idx, column=column, value=df_to_add[column].to_numpy())
     data.index.name = column_header
