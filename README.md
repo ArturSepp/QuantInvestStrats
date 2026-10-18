@@ -16,6 +16,7 @@ own strategy logic and weight targets; `qis` measures, backtests, analyses, and 
 **Install:** `pip install qis` · **Import:** `qis` · **Status:** Beta
 
 [![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square)](https://pypi.org/project/qis/)
+[![JOSS DOI](https://joss.theoj.org/papers/10.21105/joss.11400/status.svg)](https://doi.org/10.21105/joss.11400)
 [![Python](https://img.shields.io/pypi/pyversions/qis?style=flat-square)](https://pypi.org/project/qis/)
 [![CI](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ArturSepp/QuantInvestStrats/actions/workflows/ci.yml)
 [![Docs](https://readthedocs.org/projects/quantinveststrats/badge/?version=latest)](https://quantinveststrats.readthedocs.io/en/stable/)
@@ -536,9 +537,37 @@ There are a number of requirements:
 
 ## Citation
 
-A machine-readable citation is available in [`CITATION.cff`](CITATION.cff).
+A machine-readable citation is available in [`CITATION.cff`](CITATION.cff), with the JOSS paper
+as the preferred citation.
 
-If you use QIS in your research, please cite it as:
+If you use QIS in your research, please cite the paper:
+
+Sepp, A. (2026). qis: reproducible performance analytics and portfolio backtesting in Python.
+*Journal of Open Source Software, 11*(126), 11400.
+[https://doi.org/10.21105/joss.11400](https://doi.org/10.21105/joss.11400)
+
+[Read the paper](https://joss.theoj.org/papers/10.21105/joss.11400) ·
+[Download the PDF](https://joss.theoj.org/papers/10.21105/joss.11400.pdf)
+
+```bibtex
+@article{sepp2026qisjoss,
+  title={qis: reproducible performance analytics and portfolio backtesting in {Python}},
+  author={Sepp, Artur},
+  journal={Journal of Open Source Software},
+  year={2026},
+  volume={11},
+  number={126},
+  pages={11400},
+  doi={10.21105/joss.11400},
+  url={https://joss.theoj.org/papers/10.21105/joss.11400}
+}
+```
+
+The reviewed software release,
+[v5.37.0](https://github.com/ArturSepp/QuantInvestStrats/releases/tag/v5.37.0), is archived on
+Zenodo at [10.5281/zenodo.23452520](https://doi.org/10.5281/zenodo.23452520).
+
+To identify the current software version alongside the paper, use:
 
 ```bibtex
 @software{sepp2026qis,

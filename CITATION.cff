@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it using the metadata from this file."
+message: "If you use this software, please cite the article in the Journal of Open Source Software."
 type: software
 title: "qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python"
 authors:
@@ -11,6 +11,35 @@ url: "https://pypi.org/project/qis/"
 license: MIT
 version: 5.38.1
 date-released: "2026-10-17"
+preferred-citation:
+  type: article
+  title: "qis: reproducible performance analytics and portfolio backtesting in Python"
+  authors:
+    - family-names: Sepp
+      given-names: Artur
+      orcid: "https://orcid.org/0000-0002-7038-1748"
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  year: 2026
+  date-published: "2026-10-18"
+  volume: 11
+  issue: 126
+  start: 11400
+  issn: 2475-9066
+  doi: 10.21105/joss.11400
+  url: "https://joss.theoj.org/papers/10.21105/joss.11400"
+references:
+  - type: software
+    title: "qis: reproducible performance analytics and portfolio backtesting in Python"
+    authors:
+      - family-names: Sepp
+        given-names: Artur
+        orcid: "https://orcid.org/0000-0002-7038-1748"
+    version: 5.37.0
+    year: 2026
+    doi: 10.5281/zenodo.23452520
+    url: "https://zenodo.org/records/23452520"
 keywords:
   - quantitative-finance
   - performance-attribution
