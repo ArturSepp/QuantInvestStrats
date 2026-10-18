@@ -4675,6 +4675,11 @@
     },
     {
       "document": "README.md",
+      "url": "https://joss.theoj.org/papers/10.21105/joss.11400/status.svg",
+      "reason": "External JOSS publication badge; not an analytics output."
+    },
+    {
+      "document": "README.md",
       "url": "https://img.shields.io/pypi/pyversions/qis?style=flat-square",
       "reason": "External status or launch badge; not an analytics output."
     },
