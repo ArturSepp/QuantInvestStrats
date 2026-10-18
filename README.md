@@ -7,7 +7,8 @@ Python.**
 performance and backtest investment strategies. Reported results can differ when return
 frequency, risk-free-rate treatment and rebalancing conventions are left unstated. The library
 makes those conventions explicit and uses shared calculations across analytics, backtests and
-reports.
+reports. `qis` is published in the
+[Journal of Open Source Software (JOSS)](https://doi.org/10.21105/joss.11400).
 
 Quantitative Investment Strategies covers time-series and cross-sectional performance,
 drift-aware portfolio histories, ex-ante and ex-post risk, and reproducible reports. Bring your
