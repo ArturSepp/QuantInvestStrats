@@ -544,7 +544,7 @@ If you use QIS in your research, please cite the paper:
 
 Sepp, A. (2026). qis: reproducible performance analytics and portfolio backtesting in Python.
 *Journal of Open Source Software, 11*(126), 11400.
-[https://doi.org/10.21105/joss.11400](https://doi.org/10.21105/joss.11400)
+[DOI: 10.21105/joss.11400](https://doi.org/10.21105/joss.11400)
 
 [Read the paper](https://joss.theoj.org/papers/10.21105/joss.11400) ·
 [Download the PDF](https://joss.theoj.org/papers/10.21105/joss.11400.pdf)
