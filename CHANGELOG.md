@@ -14,6 +14,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Preserve the first metric and original row labels in `plot_df_table(transpose=True)`
+  with index-column display, including transposed `plot_ra_perf_table` output. Single-metric
+  tables and Series no longer become empty during rendering. Captions may match asset labels;
+  transposed `plot_df_table_with_ci` output keeps every estimate paired with its scaled colour.
 - Align complete, uniquely asset-indexed extra columns in `get_ra_perf_columns` and
   `plot_ra_perf_table` by asset label before insertion, including tuple labels with missing
   components, preventing classifications and weights from appearing beside the wrong asset.

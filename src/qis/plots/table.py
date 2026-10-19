@@ -94,7 +94,8 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
         col_widths: explicit width per column, overriding ``column_width``
         rotation_for_columns_headers: rotation in degrees of the header text
         rotation_for_text: rotation in degrees of the cell text
-        transpose: swap rows and columns before rendering
+        transpose: swap rows and columns before rendering, retaining all data and using
+            the original index as column labels
         index_column_name: header of the index column. The default is a space, which leaves
             the corner cell visually empty without collapsing it
         header_color: fill colour of the header row
@@ -133,16 +134,18 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
     if isinstance(df, pd.Series):
         df = df.to_frame()
     if transpose:
-        t_data = df.T
-        if add_index_as_column:
-            t_data.columns = t_data.iloc[0, :]  # rename columns by original index
-            df = t_data.drop(labels=t_data.index[0], axis=0)
-        else:
-            t_data.columns = df.index  # rename columns using original index
-            df = t_data
+        # The first metric is data, not a header row. Add display labels only after
+        # transposing, so even a one-metric table retains its values and asset names.
+        df = df.T
 
     if add_index_as_column:
-        df.insert(0, column=index_column_name, value=df.index)
+        index_column_key = index_column_name
+        if transpose:
+            # The caption is display text, not a reserved asset label. A distinct key
+            # also keeps native formatting and heatmap lookups on the data columns.
+            index_column_key = (tuple(object() for _ in range(df.columns.nlevels))
+                                if isinstance(df.columns, pd.MultiIndex) else object())
+        df.insert(0, column=index_column_key, value=df.index)
 
     if col_widths is None:
         col_widths = [column_width for _ in df]
@@ -171,6 +174,8 @@ def plot_df_table(df: Union[pd.DataFrame, pd.Series],
         col_labels = df.columns.to_list()
     else:
         col_labels = [df.columns[0]] + [''] * (len(df.columns) - 1)
+    if transpose and add_index_as_column:
+        col_labels[0] = index_column_name
 
     mpl_table = ax.table(cellText=df.to_numpy(),
                          bbox=bbox,
@@ -313,6 +318,9 @@ def plot_df_table_with_ci(df: pd.DataFrame,
                                       var_format=var_format)
     if is_add_heatmap:
         data_colors = put.compute_heatmap_colors(a=df.to_numpy(), axis=axis)
+        if kwargs.get('transpose', False):
+            # Preserve the original normalization; move RGBA cells with their estimates.
+            data_colors = np.swapaxes(data_colors, 0, 1)
     else:
         data_colors = None
 
