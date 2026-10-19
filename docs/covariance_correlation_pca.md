@@ -220,10 +220,15 @@ $1/0.8=1.25$.
 its missing-data policies are derived in [exponentially weighted estimators](ewm_estimators.md);
 this section states how the function uses them.
 
-1. **Returns.** Prices are sampled at `returns_freq` (the last price on or before each grid date,
-   forward-filled) and converted to log returns $\ell_{i,t}$, so $x_t$ is the vector of weekly log
-   returns by default. Forward filling turns a gap inside a history into a zero return; a missing
-   return appears only before an asset's first price.
+1. **Returns.** Prices are converted to log returns $\ell_{i,t}$ at `returns_freq` through
+   `qis.to_returns`, so $x_t$ is the vector of weekly log returns by default. If the input's
+   inferred frequency already equals `returns_freq`, its missing price reports are preserved:
+   an interior missing price leaves both adjacent returns missing, even with the default
+   `ffill_nans=True`. For example, a month-end price column `[100, 110, NaN, 121]` already on
+   the requested `'ME'` grid has two missing returns around the absent report, not a zero return
+   followed by a catch-up return. When prices are actually resampled, the sampler forward-fills
+   prices before selecting the last price on or before each grid date and fills sampled gaps.
+   Repeated filled prices then give a zero return; no price is filled before the first observed price.
 2. **Demeaning.** With `demean=True`, the residual is the one-step forecast error
    $e_t=x_t-m_{t-1}$ against the EWM mean of the previous date,
    $m_t=\lambda m_{t-1}+(1-\lambda)x_t$, with $\lambda=1-2/(N+1)$ and $N$ = `span` in units of
@@ -925,7 +930,8 @@ API reference:
   with gaps towards zero, and those of a delisted asset decay to zero. Under `NanBackfill.FFILL`,
   the default until the handbook follow-up, they held stale entries and could produce
   correlations outside $[-1,1]$. Align the panel first when a gap means a missing price rather
-  than a zero return; `qis.to_returns` forward-fills prices by default.
+  than a zero return; `qis.to_returns` forward-fills prices when resampling, but preserves missing
+  reports when the input's inferred frequency already equals the requested grid.
 - `estimate_rolling_ewma_covar` estimates on log returns. Portfolio variance $w^{\top}\Sigma w$
   with capital weights is exact for a covariance of simple returns; with log returns it is an
   approximation whose error is of higher order in the per-period volatility.
