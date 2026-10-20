@@ -23,7 +23,10 @@ from enum import Enum
 
 # qis
 import qis.perfstats.returns as ret
-from qis.utils.annualisation import infer_annualisation_factor_from_df
+from qis.utils.annualisation import (
+    CALENDAR_DAYS_PER_YEAR_SHARPE,
+    infer_annualisation_factor_from_df,
+)
 import qis.models.linear.ewm as ewm
 
 
@@ -93,9 +96,67 @@ def compute_rolling_returns(prices: Union[pd.DataFrame, pd.Series],
 def compute_rolling_pa_returns(prices: Union[pd.DataFrame, pd.Series],
                                roll_periods: int = 260
                                ) -> Union[pd.DataFrame, pd.Series]:
+    """Compute per-annum returns on trailing windows of native price rows.
+
+    Args:
+        prices: Price Series or DataFrame. Complete positive float64 histories with ordered,
+            unique dates share endpoint/calendar preparation; other inputs retain the scalar path.
+        roll_periods: Number of price observations per window, without implicit resampling.
+
+    Returns:
+        Rolling returns with the native input labels and initial unavailable windows. As in
+        ``compute_pa_return``, spans of at most one year are not annualised; longer spans use
+        geometric compounding on elapsed calendar days divided by 365.25.
     """
-    compute rolling pa returns
-    """
+    # Unsigned windows stay native: 1 - window can wrap before calendar slicing.
+    ordinary = (
+        type(prices) in (pd.DataFrame, pd.Series)
+        and isinstance(roll_periods, (int, np.integer))
+        and not isinstance(roll_periods, (bool, np.bool_, np.unsignedinteger))
+        and 2 <= roll_periods <= len(prices)
+        and type(prices.index) is pd.DatetimeIndex
+        and not prices.index.hasnans
+        and prices.index.is_unique
+        and prices.index.is_monotonic_increasing
+        and prices.size > 0
+    )
+    if ordinary:
+        dtypes = prices.dtypes if isinstance(prices, pd.DataFrame) else [prices.dtype]
+        if all(dtype == np.dtype('float64') for dtype in dtypes):
+            values = prices.to_numpy()
+            if np.isfinite(values).all() and (values > 0.0).all():
+                panel = values[:, None] if isinstance(prices, pd.Series) else values
+                try:
+                    # Every complete column uses the same window dates. Keep native whole-day
+                    # truncation and its one-day floor, including subday and DST-spanning input.
+                    days = (prices.index[roll_periods - 1:] - prices.index[:1 - roll_periods]).days
+                    years = (
+                        np.maximum(days, 1).to_numpy(dtype=float) / CALENDAR_DAYS_PER_YEAR_SHARPE
+                    )
+                    with np.errstate(all='raise'):
+                        # Do not simplify to an endpoint ratio: subtract/add rounding is part
+                        # of the scalar helper's result, including ratios rounded down to zero.
+                        total = panel[roll_periods - 1:] / panel[:1 - roll_periods] - 1.0
+                        ratio = total + 1.0
+                        ratio = np.where(ratio > 0.0, ratio, np.nan)
+                        result = ratio - 1.0
+                        annualised = years > 1.0
+                        result[annualised] = np.power(
+                            ratio[annualised], 1.0 / years[annualised, None]
+                        ) - 1.0
+                except (FloatingPointError, OverflowError, ValueError):
+                    # Let the untouched scalar path emit its own diagnostics under the
+                    # caller's NumPy policy; a batch must not introduce or suppress warnings.
+                    pass
+                else:
+                    out = np.full(panel.shape, np.nan)
+                    out[roll_periods - 1:] = result
+                    if isinstance(prices, pd.Series):
+                        return pd.Series(out[:, 0], index=prices.index, name=prices.name)
+                    # Rolling isolates column-name metadata, but does not deep-copy labels
+                    # or the row index. Preserve that ownership boundary with a shallow copy.
+                    columns = prices.columns.copy(deep=False)
+                    return pd.DataFrame(out, index=prices.index, columns=columns)
     pa_returns = prices.rolling(roll_periods).apply(lambda x: ret.compute_pa_return(x))
     return pa_returns
 

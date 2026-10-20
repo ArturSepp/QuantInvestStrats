@@ -9,6 +9,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Speed up `compute_rolling_perf_stat` with `PA_RETURNS` by batching window endpoints and calendar
+  spans for complete positive float64 price histories, preserving rolling results and native
+  fallback behaviour for other inputs.
+
 - Speed up `bootstrap_data` with `SERIES_TO_DF` for ordinary numeric Series by constructing
   all sampled paths as one DataFrame, preserving sampling, path labels and native fallback behavior.
 
