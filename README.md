@@ -314,6 +314,9 @@ The offline [financed-account stress example](examples/portfolios/account_equity
 demonstrates borrowing, gross-asset allocations, stress P&L on net equity and equity after stress.
 From the repository root, run `python -m examples.portfolios.account_equity_stress` with QIS
 5.36.0 or newer. Add `--output-dir <fresh local directory>` to generate the standard report pack.
+QIS accepts caller-supplied 95% beta intervals, with production or benchmark whiskers,
+a detail page and net-equity-scaled dollar bounds. Add `--with-beta-intervals` to the
+example to inspect this optional layout using clearly illustrative bounds.
 See the [portfolio stress guide](docs/portfolio_stress.md#run-the-offline-account-example)
 for the input contract and independent accounting checks.
 
@@ -575,7 +578,7 @@ To identify the current software version alongside the paper, use:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.38.1},
+  version={5.41.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

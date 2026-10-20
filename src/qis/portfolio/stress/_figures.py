@@ -271,18 +271,34 @@ def _risk_page(result, config):
     labels = config.factor_labels
     currency = result.metadata["reference_currency"]
     native = any(t == 'DIFFERENCE' for t in result.metadata.get('factor_return_types', {}).values())
+    beta_ax = fig.add_axes([0.16, 0.535, 0.32, 0.325])
+    dollar_ax = fig.add_axes([0.65, 0.535, 0.29, 0.325])
     _bars(
-        fig.add_axes([0.16, 0.535, 0.32, 0.325]),
+        beta_ax,
         result.factor_betas.rename(index=labels),
         "Portfolio return per native factor unit" if native else "Weighted factor exposure (ratio)",
         percent=native,
     )
     _bars(
-        fig.add_axes([0.65, 0.535, 0.29, 0.325]),
+        dollar_ax,
         result.factor_exposures.rename(index=labels) / 1e6,
         f"P&L per native factor unit ({currency} m)" if native
         else f"Dollar factor exposure ({currency} m)",
     )
+    if config.factor_beta_intervals is not None and config.beta_interval_display == "overlay":
+        from qis.portfolio.stress._inference import overlay_beta_intervals
+
+        intervals = config.factor_beta_intervals.reindex(result.factor_betas.index)
+        overlay_beta_intervals(beta_ax, intervals, config.beta_interval_confidence,
+                               label=config.beta_interval_label, target=config.beta_interval_target,
+                               kind=config.beta_interval_kind)
+        overlay_beta_intervals(dollar_ax, intervals, config.beta_interval_confidence,
+                               scale=result.metadata["reporting_denominator"]/1e6,
+                               label=config.beta_interval_label, target=config.beta_interval_target,
+                               kind=config.beta_interval_kind)
+    elif config.factor_beta_intervals is not None:
+        fig.text(.055, .895, "Exposure estimates only; uncertainty intervals are shown in "
+                 "the following diagnostic table.", fontsize=9, color=INK)
     _panel_note(
         fig,
         0.055,
@@ -1394,6 +1410,10 @@ def _report_pages(result, config):
                     t != 'LOG' for t in meta.get('factor_return_types', {}).values())):
             continue
         yield title, builder(result, config)
+        if builder is _risk_page and config.factor_beta_intervals is not None:
+            from qis.portfolio.stress._inference import beta_interval_pages
+
+            yield from beta_interval_pages(result, config)
     if config.appendix_table is not None:
         yield config.appendix_title, _coverage_page(result, config)
 
@@ -1406,20 +1426,27 @@ def report_pages(result, config):
     """Yield standard figures with physical page references after the account cover."""
     native_layout = len(result.factor_covariance) == 1 or any(
         t != 'LOG' for t in result.metadata.get('factor_return_types', {}).values())
+    extra = ((len(result.factor_betas)+15)//16
+             if config.factor_beta_intervals is not None else 0)
+    account = int("accounting" in result.metadata)
     for page_number, (title, figure) in enumerate(_report_pages(result, config), 1):
         if native_layout:
             for text in figure.texts:
                 text.set_text(re.sub(r"\bappendix,\s+page\s+\d+\b",
                                     "factor-units methodology exhibit", text.get_text(),
                                     flags=re.IGNORECASE))
-        elif "accounting" in result.metadata:
+        elif account or extra:
             for text in figure.texts:
                 value = text.get_text()
-                value = re.sub(r"\b(pages?\s+)(\d+)(?:-(\d+))?", _shift_page_reference,
+                value = re.sub(r"\b(pages?\s+)(\d+)(?:-(\d+))?",
+                               lambda m: _shift_page_reference(m, extra, account),
                                value, flags=re.IGNORECASE)
                 if title == "Notation and guide to the analysis":
+                    def guide_number(match):
+                        number = int(match[1])
+                        return f"{number + account + (extra if number >= 5 else 0)}. "
                     value = re.sub(r"^(\d+)\. ",
-                                   lambda m: f"{int(m[1]) + 1}. ", value)
+                                   guide_number, value)
                 text.set_text(value)
         for text in figure.texts:
             if (text.get_position()[0] > .9 and text.get_position()[1] < .05
@@ -1428,10 +1455,12 @@ def report_pages(result, config):
         yield title, figure
 
 
-def _shift_page_reference(match):
-    """Translate analysis references once when the statement occupies page one."""
-    start = int(match[2]) + 1
-    end = f"-{int(match[3]) + 1}" if match[3] else ""
+def _shift_page_reference(match, extra=0, account=1):
+    """Translate references after the optional statement and beta-inference pages."""
+    def shift(value):
+        return int(value) + account + (extra if int(value) >= 5 else 0)
+    start = shift(match[2])
+    end = f"-{shift(match[3])}" if match[3] else ""
     return f"{match[1]}{start}{end}"
 
 

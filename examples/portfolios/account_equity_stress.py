@@ -1,7 +1,7 @@
 """Offline account statement, signed borrowing and equity-after-stress example.
 
 Run: python -m examples.portfolios.account_equity_stress
-Optional: --output-dir <fresh directory>
+Optional: --output-dir <fresh directory> --with-beta-intervals
 No files are written by default. Uses the existing seeded synthetic factor example;
 prescribed loadings are teaching inputs. No client data, Bloomberg or network access.
 """
@@ -45,7 +45,7 @@ def build_account(model, date):
             limitations=("Illustrative loadings; not an estimated client product",))})
 
 
-def run_example(output_dir=None):
+def run_example(output_dir=None, with_beta_intervals=False):
     """Check the accounting example and optionally create the standard PDF/workbook."""
     model, date, history = build_model_and_history()
     portfolio = build_account(model, date)
@@ -72,10 +72,22 @@ def run_example(output_dir=None):
     print("Fixed Income 100.00%; Borrowing -33.33%; assets/equity 1.50x")
     print("Scenario checks passed; chart order: % P&L, Total P&L, Equity after")
     if output_dir is not None:
+        # These supplied bounds demonstrate presentation only. In production the
+        # caller supplies estimates and intervals from its inference implementation.
+        intervals = None
+        if with_beta_intervals:
+            center = result.factor_betas
+            intervals = pd.DataFrame({'estimate': center, 'lower': center-.15,
+                                      'upper': center+.15, 'status': 'Illustrative'})
         artifacts = qis.generate_portfolio_stress_report(result, Path(output_dir),
             qis.StressReportConfig(title="Synthetic financed account",
                 report_name="Account accounting example", model_name="Illustrative factors",
                 model_label="Synthetic seven-factor model", write_previews=True,
+                factor_beta_intervals=intervals,
+                beta_interval_label="Illustrative production ranges (not fitted)",
+                beta_interval_target="production", beta_interval_kind="stability",
+                beta_interval_notes=("Prescribed 95% bounds demonstrate the interface; "
+                                     "they are not estimated statistical intervals.",),
                 notes=("All data and loadings are synthetic teaching inputs.",)))
         print(artifacts.pdf_path)
     return result
@@ -84,5 +96,6 @@ def run_example(output_dir=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--with-beta-intervals", action="store_true")
     args = parser.parse_args()
-    run_example(args.output_dir)
+    run_example(args.output_dir, args.with_beta_intervals)

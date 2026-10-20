@@ -43,6 +43,22 @@ class StressReportConfig:
         appendix_notes: Parser-owned variable definitions and source explanations.
         report_name: Optional account/portfolio name on the first page; defaults to title.
             The header appends the actual notional, currency and assigned model label.
+        factor_beta_intervals: Optional factor-indexed estimates and pointwise
+            bounds in portfolio-return/native-factor units. Required columns are estimate,
+            lower and upper; optional status describes weak or unavailable estimates.
+            Estimates must be finite; lower/upper bounds may be negative/positive
+            infinity. Unavailable rows have all three numerical entries missing.
+            The caller owns estimation; target selects production or benchmark inference.
+        beta_interval_confidence: Confidence level of the supplied intervals; default 95%.
+        beta_interval_label: Name of the independent inference benchmark.
+        beta_interval_notes: Caller-supplied inference conventions and limitations.
+        beta_interval_target: 'benchmark' (default) or 'production'. Production estimates
+            must equal the reported betas; their dots sit at the bar endpoints.
+        beta_interval_kind: 'confidence' (default) or 'stability'. Stability ranges are
+            explicitly labelled and make no nominal confidence-coverage claim.
+        beta_interval_display: 'overlay' (default) adds chart whiskers and a diagnostic
+            table; 'table' keeps clean exposure charts and the full diagnostic table.
+            Neither setting changes supplied bounds or numerical exports.
     """
 
     title: str = "Portfolio stress report"
@@ -64,9 +80,24 @@ class StressReportConfig:
     report_name: str | None = None
     cluster_labels: Mapping[str, str] = field(default_factory=dict)
     portfolio_r2: float | None = None
+    factor_beta_intervals: pd.DataFrame | None = None
+    beta_interval_confidence: float = .95
+    beta_interval_label: str = "WLS-HAC benchmark"
+    beta_interval_notes: tuple[str, ...] = ()
+    beta_interval_target: str = "benchmark"
+    beta_interval_kind: str = "confidence"
+    beta_interval_display: str = "overlay"
 
     def __post_init__(self):
         """Snapshot caller diagnostics and validate presentation choices."""
+        from qis.portfolio.stress._inference import validate_beta_intervals
+
+        object.__setattr__(self, "factor_beta_intervals", validate_beta_intervals(
+            self.factor_beta_intervals, self.beta_interval_confidence, self.beta_interval_label,
+            self.beta_interval_target, self.beta_interval_kind))
+        object.__setattr__(self, "beta_interval_notes", tuple(self.beta_interval_notes))
+        if self.beta_interval_display not in ("overlay", "table"):
+            raise ValueError("beta_interval_display must be overlay or table")
         if self.portfolio_r2 is not None and (
                 not np.isfinite(self.portfolio_r2) or self.portfolio_r2 > 1.):
             raise ValueError('portfolio_r2 must be finite and at most one, or None')
@@ -197,6 +228,11 @@ def _loading_table(result, config):
 def _report_tables(result, config):
     """Collect all numerical observations without the PDF's display row limits."""
     tables = dict(result.report_diagnostics)
+    if config.factor_beta_intervals is not None:
+        from qis.portfolio.stress._inference import portfolio_beta_interval_table
+
+        interval_title = f"Portfolio beta {config.beta_interval_kind} intervals"
+        tables[interval_title] = portfolio_beta_interval_table(result, config)
     tables["Displayed loadings and fit"] = _loading_table(result, config)
     for key, summary in result.summaries.items():
         tables[f"{key} summary"] = summary
@@ -406,6 +442,13 @@ def generate_portfolio_stress_report(
         Paths to the PDF, CSV tables, optional workbook and audit manifest.
     """
     config = config or StressReportConfig()
+    if config.factor_beta_intervals is not None:
+        if set(config.factor_beta_intervals.index) - set(result.factor_betas.index):
+            raise ValueError("factor_beta_intervals includes an unknown fitted factor")
+        if config.beta_interval_target == "production":
+            from qis.portfolio.stress._inference import validate_production_estimates
+
+            validate_production_estimates(result, config)
     if set(config.selected_grids) - set(result.grids):
         raise ValueError("selected_grids includes a grid absent from the result")
     if set(config.factor_labels) - set(result.factor_loadings.columns):
@@ -510,6 +553,17 @@ def generate_portfolio_stress_report(
         },
     }
     manifest_path = output_dir / "manifest.json"
+    if config.factor_beta_intervals is not None:
+        manifest["beta_inference"] = {
+            "label": config.beta_interval_label,
+            "confidence": config.beta_interval_confidence,
+            "notes": list(config.beta_interval_notes),
+            "target": config.beta_interval_target,
+            "kind": config.beta_interval_kind,
+            "display": config.beta_interval_display,
+            "scope": "Caller-supplied estimation uncertainty; production unchanged",
+            "reporting_denominator": result.metadata["reporting_denominator"],
+        }
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     return StressReportArtifacts(
         pdf_path, MappingProxyType(table_paths), workbook_path, manifest_path, tuple(previews)

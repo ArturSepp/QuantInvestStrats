@@ -1097,6 +1097,68 @@ Display names should be unique aliases of at most 20 characters, supplied as
 `PortfolioHolding.metadata["short_name"]` and `StressReportConfig.response_diagnostics["name"]`;
 full names and IDs remain in the exports.
 
+### Optional factor beta confidence intervals (5.39.0)
+
+`StressReportConfig.factor_beta_intervals` accepts a factor-indexed DataFrame with
+`estimate`, `lower`, `upper` and an optional `status`. Estimates and bounds use the
+same native factor coordinates as the production beta: return per unit log change,
+or return per index point for a difference factor. Factor IDs, not display aliases,
+align rows. A missing row or three missing numerical entries means unavailable;
+partial missing bounds, duplicate IDs and unknown factors are rejected.
+Open bounds are supported with a finite estimate: a lower bound may be `-inf` and
+an upper bound may be `+inf`. They remain explicit in the detail table and exports.
+Charts retain finite axes, draw only finite whiskers and identify open bounds in
+the legend. An open confidence set is distinct from missing inference.
+
+The default `beta_interval_confidence` is 0.95. The caller must supply bounds at
+that level; changing the label does not recompute them. `beta_interval_label` names
+the estimator and `beta_interval_notes` records its assumptions. QIS renders this
+inference without importing an estimation package or changing the production fit.
+
+The exposure page retains production bars and overlays separate benchmark diamonds
+with interval whiskers. A detail page follows it, showing production and benchmark
+betas, lower and upper bounds, dollar bounds and status; more than 16 factors paginate.
+Dollar intervals multiply the beta bounds by the report's denominator, so borrowing
+is reflected through net equity. The workbook and CSV contain all unrounded rows.
+The manifest records the interval level, estimator, notes and denominator.
+
+For a WLS-HAC benchmark, intervals describe an unpenalised weighted-least-squares
+estimate with heteroskedasticity and autocorrelation robust covariance. They are
+pointwise benchmark intervals, not intervals centred on penalised production betas
+or future-P&L prediction bands. Asset aggregation must retain cross-asset covariance;
+the caller owns sample, weighting, missing-history and covariance choices. Synthetic
+product histories give inference conditional on their construction assumptions.
+Existing conditional market/residual bands on scenario sensitivities remain separate.
+
+From 5.40.0, set `beta_interval_target='production'` for intervals from the actual
+production estimator. QIS checks that every supplied point equals the corresponding
+reported beta and draws its dot at the bar endpoint. The interval segment is drawn
+independently: asymmetric bootstrap percentiles may exclude the original estimate.
+The detail page has one production-beta column, with no independent benchmark.
+The default target remains `benchmark` for compatibility.
+
+From 5.41.0, set `beta_interval_display='table'` to keep exposure bars on their
+original scale and show uncertainty only in the following diagnostic table.
+The chart directs readers to that table. All supplied bounds, including infinity,
+remain unchanged in the table, CSV and workbook; the manifest records the display
+choice. This is useful when wide intervals would obscure the production exposures.
+The default `overlay` retains existing chart whiskers and the diagnostic table.
+Changing presentation does not improve identification or establish coverage.
+
+Set `beta_interval_kind='stability'` for bootstrap probability ranges whose nominal
+confidence coverage has not been established. Charts, detail pages and exports say
+“95% stability range”, not “95% CI”. The default kind remains `confidence`; QIS does
+not validate statistical coverage. The caller must refit all relevant selection
+steps, retain joint asset dependence, test coverage and describe limitations. In
+particular, an ordinary FCGL bootstrap does not inherit a coverage theorem merely
+because the full production pipeline is refitted. Fixed-by-specification and policy
+exclusions should have unavailable bounds and an explicit status.
+
+Omitting `factor_beta_intervals` preserves the existing report layout and numerical
+outputs. Run the offline account example with `--output-dir <fresh directory>` and
+`--with-beta-intervals` to inspect the additional exhibits. Its prescribed bounds are
+explicitly illustrative production ranges; it does not estimate statistical intervals.
+
 ### Exports and audit
 
 Every table is exported to CSV and, with `write_workbook=True`, to a formatted workbook with a

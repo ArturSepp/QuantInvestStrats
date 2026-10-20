@@ -7,6 +7,30 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Table-only beta inference display (5.41.0): `beta_interval_display='table'`
+  keeps exposure charts on their original scale and retains the full uncertainty
+  table and unrounded exports. Existing callers default to `overlay`; statistical
+  bounds, production betas and stress P&L are unchanged.
+
+- Production-beta inference display (5.40.0): `beta_interval_target='production'`
+  verifies supplied points against reported loadings and places dots at bar endpoints.
+  `beta_interval_kind='stability'` labels bootstrap ranges without claiming confidence
+  coverage. Asymmetric bounds may exclude the original production point. Existing
+  benchmark and no-inference reports keep their behavior; QIS adds no estimator.
+  Open confidence bounds remain explicit in tables and exports; plots retain finite
+  axes and direct readers to the interval table instead of treating infinity as missing.
+
+- Optional caller-supplied portfolio factor beta confidence intervals in the shared
+  stress report (5.39.0): separate benchmark markers and 95% whiskers on exposure
+  charts, a detailed interval page, and CSV/workbook/manifest exports. Dollar
+  bounds use the reporting denominator, including net equity for financed accounts.
+  Production betas, stress results and reports without inference remain unchanged.
+- The offline account example accepts `--with-beta-intervals` to demonstrate the
+  presentation contract using explicitly illustrative bounds; QIS adds no estimator
+  dependency.
+
 ### Changed
 
 - Speed up `compute_rolling_perf_stat` with `PA_RETURNS` by batching window endpoints and calendar

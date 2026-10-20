@@ -1,5 +1,31 @@
 # Instrument portfolio valuation and stress reports
 
+Optional beta inference (5.39.0): supply `StressReportConfig.factor_beta_intervals`
+as a factor-indexed DataFrame with `estimate`, `lower`, `upper` and optional `status`.
+Bounds are in native portfolio-return/factor units, with 95% confidence by default.
+QIS adds separate benchmark markers and whiskers to the two exposure charts, a
+detail page immediately afterwards, and unrounded workbook/CSV/manifest exports.
+Dollar bounds use the reporting denominator (net equity for financed accounts).
+Production betas and stress P&L remain unchanged; absent inference keeps the old layout.
+From 5.40.0, `beta_interval_target='production'` requires matching production estimates
+and puts dots at the bar endpoints. Bounds may be asymmetric and exclude that point.
+`beta_interval_kind='stability'` labels bootstrap ranges without claiming nominal
+confidence coverage. The caller owns full-estimator refits and coverage validation.
+Defaults remain benchmark/confidence for existing callers.
+From 5.41.0, `beta_interval_display='table'` keeps clean exposure bars and retains
+the full interval table and exports, including open bounds. The default `overlay`
+preserves existing whiskers. The manifest records this presentation choice; no
+interval is clipped or rescaled.
+Open confidence bounds may be `-inf` or `+inf` with a finite point estimate. Tables
+and exports retain them; charts draw finite whiskers and identify open bounds in the legend.
+The caller owns estimation, joint cross-asset covariance and synthetic-NAV assumptions.
+These intervals differ from the conditional market/residual bands on sensitivity pages.
+Use `beta_interval_label` and `beta_interval_notes` to identify the benchmark and its
+limitations. Missing bounds must be all missing; duplicate or unknown factor IDs fail.
+The account example's `--with-beta-intervals` flag demonstrates the interface with
+explicitly illustrative supplied bounds. See the full
+[confidence-interval contract](https://github.com/ArturSepp/QuantInvestStrats/blob/main/docs/portfolio_stress.md#optional-factor-beta-confidence-intervals-5390).
+
 Observed-index models can use `RiskModel.factor_return_types` with
 `ReturnTypes.DIFFERENCE` and `ShockConvention.MODEL` for native point shocks.
 Omission retains LOG behaviour. VIX remains in native index points in every
