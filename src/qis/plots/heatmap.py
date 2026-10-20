@@ -61,7 +61,7 @@ def plot_heatmap(df: pd.DataFrame,
     Args:
         df: values to colour, drawn in the orientation of the frame
         transpose: swap rows and columns before drawing
-        inverse: reverse the colour map, for a quantity where low is good
+        inverse: reindex by reversed display-row labels; ignored when transpose is True
         date_format: strftime format for a DatetimeIndex on either axis
         cmap: matplotlib colour map name, or an explicit map. The default is diverging, which
             suits a signed quantity centred near zero
@@ -74,8 +74,10 @@ def plot_heatmap(df: pd.DataFrame,
             so panels drawn separately are not comparable unless this is set
         vmax: value mapped to the high end of the colour scale
         labelpad: padding in points between the axis and its label
-        annot: write the value in each cell. An array of the same shape writes those strings
-            instead, which is how a table of formatted values is drawn over unformatted colours
+        annot: write the value in each cell. An array matching the input df shape supplies
+            positional cell labels, which follow the data through transpose or row reversal.
+            Rectangular transposed plots also accept arrays already matching the display shape.
+            Use var_format=None for strings drawn over unformatted colours
 
     Returns:
         the figure drawn on, or None when ``ax`` was supplied
@@ -93,6 +95,21 @@ def plot_heatmap(df: pd.DataFrame,
 
     if date_format is not None:  # index may include 'Total'
         df.index = [date.strftime(date_format) if isinstance(date, pd.Timestamp) else date for date in df.index]
+
+    if (transpose or inverse) and annot is not None and not isinstance(annot, bool):
+        # Seaborn pairs annotations positionally, regardless of any annotation-frame labels.
+        # Only move input-shaped labels: rectangular callers may already supply display-shaped
+        # arrays. Leave those and invalid shapes to seaborn's existing positional validation.
+        annotations = np.asarray(annot)
+        if annotations.shape == df.shape:
+            if transpose:
+                annot = annotations.T
+            else:
+                # Match the data's native reindex, not a positional reversal: repeated labels
+                # (including formatted dates) can make reindex leave the row order unchanged.
+                # Reindex positions only so pandas cannot coerce the annotation values or units.
+                rows = pd.Series(np.arange(len(df)), index=df.index)
+                annot = annotations[rows.reindex(index=df.index[::-1]).to_numpy()]
 
     if transpose:
         df = df.T
