@@ -41,7 +41,7 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           python-version: "3.12"
-          version: "0.12.23"
+          version: "0.13.4"
       - name: Use the pinned consumer environment
         env:
           EXTRA: ${{ matrix.extra }}
