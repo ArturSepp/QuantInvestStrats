@@ -106,7 +106,7 @@ The suite must pass on a **core** install. Anything needing an optional extra is
 failed — see `requires_pyarrow` in `src/qis/tests/file_utils_test.py` for the pattern.
 
 Optional extras: `data`, `reports`, `visualization`, `io`, `database`, `jupyter`.
-Supported Python is >= 3.10; CI runs the matrix 3.10 – 3.14.
+Supported Python is >= 3.11; CI runs the matrix 3.11 – 3.14.
 
 ## Conventions
 

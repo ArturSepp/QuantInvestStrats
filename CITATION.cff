@@ -9,8 +9,8 @@ authors:
 repository-code: "https://github.com/ArturSepp/QuantInvestStrats"
 url: "https://pypi.org/project/qis/"
 license: MIT
-version: 5.41.0
-date-released: 2026-10-19
+version: 5.42.0
+date-released: 2026-10-21
 preferred-citation:
   type: article
   title: "qis: reproducible performance analytics and portfolio backtesting in Python"

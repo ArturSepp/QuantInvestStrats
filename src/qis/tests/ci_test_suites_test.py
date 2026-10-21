@@ -115,7 +115,7 @@ def _ci_jobs():
 def test_every_supported_matrix_cell_runs_both_numerical_shards():
     job = _ci_jobs()['test']
     cells = job['strategy']['matrix']['include']
-    expected = {('ubuntu-latest', version) for version in ('3.10', '3.11', '3.12', '3.13', '3.14')}
+    expected = {('ubuntu-latest', version) for version in ('3.11', '3.12', '3.13', '3.14')}
     expected |= {('windows-latest', '3.12'), ('macos-latest', '3.12')}
     assert Counter((cell['os'], cell['python-version'], cell['shard']) for cell in cells) == {
         (os, version, shard): 1 for os, version in expected for shard in range(2)

@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Require Python 3.11 or later for the upcoming 5.42.0 minor version. Python 3.10 reached
+  [end of life on 1 October 2026](https://devguide.python.org/versions/); remove its classifier
+  and CI cells and run the lowest-direct dependency lane on Python 3.11. This version remains
+  unreleased.
+- Speed up `compute_rolling_perf_stat` with `PA_RETURNS` by batching window endpoints and calendar
+  spans for complete positive float64 price histories, preserving rolling results and native
+  fallback behaviour for other inputs.
+
+- Speed up `bootstrap_data` with `SERIES_TO_DF` for ordinary numeric Series by constructing
+  all sampled paths as one DataFrame, preserving sampling, path labels and native fallback behavior.
+
 ### Added
 
 - Table-only beta inference display (5.41.0): `beta_interval_display='table'`
@@ -31,14 +44,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   presentation contract using explicitly illustrative bounds; QIS adds no estimator
   dependency.
 
-### Changed
+### Security
 
-- Speed up `compute_rolling_perf_stat` with `PA_RETURNS` by batching window endpoints and calendar
-  spans for complete positive float64 price histories, preserving rolling results and native
-  fallback behaviour for other inputs.
-
-- Speed up `bootstrap_data` with `SERIES_TO_DF` for ordinary numeric Series by constructing
-  all sampled paths as one DataFrame, preserving sampling, path labels and native fallback behavior.
+- Update the locked Pillow dependency to 13.0.0. The certifi 2026.10.19 update is retained in
+  its separate security commit.
 
 ### Fixed
 

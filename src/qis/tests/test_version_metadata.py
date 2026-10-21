@@ -39,9 +39,8 @@ def _pyproject_version() -> str:
     """
     the ``[project] version`` string.
 
-    Parsed with a regular expression rather than ``tomllib``, which arrived in 3.11 while the
-    supported floor is 3.10 - the same reason ``test_documentation.py`` reads the dependency
-    table that way.
+    Parsed with the same lightweight regular-expression convention as the dependency table in
+    ``test_documentation.py``.
 
     Returns:
         the version

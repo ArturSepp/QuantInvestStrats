@@ -148,7 +148,7 @@ to maintain.
 ## Verification and packaging
 
 The [CI workflow](https://github.com/ArturSepp/QuantInvestStrats/blob/main/.github/workflows/ci.yml)
-defines the tested environments. Its core matrix covers Python 3.10–3.14 on Linux, plus Windows
+defines the tested environments. Its core matrix covers Python 3.11–3.14 on Linux, plus Windows
 and macOS on Python 3.12. A separate locked lane covers the `data` and `io` extras. The wheel
 lane builds from a source distribution, checks the archive contents, installs the core wheel
 into a clean environment, and runs the shipped tests and offline quickstart outside the checkout.

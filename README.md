@@ -203,7 +203,7 @@ git clone https://github.com/ArturSepp/QuantInvestStrats.git
 ```
 
 Core dependencies:
-    python = ">=3.10",
+    python = ">=3.11",
     numba = ">=0.64.0",
     numpy = ">=2.0",
     scipy = ">=1.12.0",
@@ -578,7 +578,7 @@ To identify the current software version alongside the paper, use:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.41.0},
+  version={5.42.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

@@ -293,8 +293,7 @@ def _pyproject_dependencies() -> List[str]:
     """
     the distribution names in the project's ``dependencies`` table, lower-cased.
 
-    Parsed with a regular expression rather than ``tomllib``, which arrived in 3.11 while the
-    supported floor is 3.10.
+    Parsed with the same lightweight regular-expression convention as the version metadata checks.
 
     Returns:
         the names, sorted

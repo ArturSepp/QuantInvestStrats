@@ -16,7 +16,7 @@ Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats
 
 ## Core installation
 
-Use Python 3.10 or later and install into your chosen Python environment:
+Use Python 3.11 or later and install into your chosen Python environment:
 
 ~~~console
 python -m pip install qis
