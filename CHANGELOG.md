@@ -42,6 +42,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Keep caller-supplied `plot_heatmap` annotations paired with their cells when transposing or
+  reversing rows, preventing misleading square-grid labels and rectangular transpose failures.
 - Preserve the first metric and original row labels in `plot_df_table(transpose=True)`
   with index-column display, including transposed `plot_ra_perf_table` output. Single-metric
   tables and Series no longer become empty during rendering. Captions may match asset labels;
