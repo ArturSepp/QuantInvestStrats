@@ -3,8 +3,12 @@
 The methodology starts from benchmark, risk-layer, signal-layer and fully integrated model NAVs.
 An optional net full-model NAV may be supplied to measure realised trading
 cost drag. All NAVs are trimmed to the range between the latest first valid observation and the
-earliest last valid observation, forward-filled inside that range, and converted at ``freq`` to
-log returns, ``r[t] = log(NAV[t] / NAV[t-1])``. Log returns are required because their additive
+earliest last valid observation, then converted at ``freq`` to log returns,
+``r[t] = log(NAV[t] / NAV[t-1])``. Filling follows the native sampler: an input whose inferred
+frequency exactly matches ``freq`` keeps missing NAV levels, while actual resampling forward-fills
+missing levels before and after reindexing. An isolated interior gap on a matching grid leaves
+both adjacent returns undefined; any date with a non-finite return in any layer is removed from
+every layer. Log returns are required because their additive
 identity lets the component bridge reconstruct the full model in every observation and over time.
 
 For each observed or derived layer L, the module estimates the descriptive full-sample regression

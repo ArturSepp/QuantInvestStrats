@@ -114,12 +114,17 @@ return of an arbitrary portfolio a weighted sum of its sleeves' log returns. Rep
 means are not compounded annual growth rates; exponentiating each component separately destroys
 additivity.
 
-The common sample is set before any resampling. The NAVs are trimmed to the range between the
-latest first valid observation and the earliest last valid observation, forward-filled inside
-that range, and then converted to returns at `freq`. A layer that starts later or ends earlier
-than the others therefore shortens the sample for every layer, and no layer contributes flat
-forward-filled returns outside its own history. Any date on which a periodic return is still not
-finite is dropped for all layers.
+The common valid NAV range is set before any resampling: the NAVs are trimmed between the latest
+first valid observation and the earliest last valid observation, then converted to returns at
+`freq`. A layer that starts later or ends earlier therefore shortens the range for every layer;
+no layer contributes flat forward-filled returns outside its own history.
+
+Filling follows the [native price-sampling policy](returns_and_navs.md#return-types-and-the-sampling-grid),
+not an unconditional preprocessing step. If the input index's inferred frequency exactly matches
+`freq`, missing NAV levels are preserved. For example, with month-end input and `freq='ME'`, an
+isolated interior missing NAV leaves both adjacent monthly returns undefined rather than creating
+a zero return and a catch-up return. Actual resampling forward-fills missing levels before and
+after reindexing. Any date with a non-finite periodic return in any layer is dropped for all layers.
 
 **Definition (integration return and cost drag).** The integration return is the log-return
 residual of the full model against the sum of the risk and signal layers run on their own, and
