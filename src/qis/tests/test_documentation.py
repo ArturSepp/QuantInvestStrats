@@ -53,6 +53,7 @@ the static checks in ``test_examples.py``.
 import ast
 import builtins
 import re
+from importlib import import_module
 from pathlib import Path
 from typing import List, NamedTuple, Set
 import pytest
@@ -153,6 +154,21 @@ def test_documents_are_found() -> None:
     documents = _documents()
     assert len(documents) >= 5, f"only {len(documents)} documents matched {DOCUMENT_GLOBS}"
     assert len(ALL_LINKS) >= 20, f"only {len(ALL_LINKS)} internal links found; the patterns broke"
+
+
+@pytest.mark.parametrize('helper', ['get_n_colors', 'get_legend_lines'])
+def test_plotting_guide_helper_references_resolve(helper: str) -> None:
+    """Inline helper references must resolve, even though they are not executable examples.
+
+    Args:
+        helper: internal plotting helper named in the shared argument guide
+    """
+    text = REPO_ROOT.joinpath('src/qis/docs/plotting_kwargs.md').read_text(encoding='utf-8')
+    references = re.findall(rf'\b(qis(?:\.\w+)*\.{helper})\b', text)
+    assert references, f'the plotting guide no longer identifies {helper}'
+    for reference in references:
+        module, _, name = reference.rpartition('.')
+        assert callable(getattr(import_module(module), name)), reference
 
 
 @pytest.mark.parametrize('prefix', GENERATED_PREFIXES)
