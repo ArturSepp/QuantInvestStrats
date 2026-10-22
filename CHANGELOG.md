@@ -51,6 +51,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Correct the shared plotting guide's colour and legend helper references to their internal
+  `qis.plots.utils` owners, without adding public exports.
 - Preserve frequency-string inference and CSV/Excel readers with pandas 3.1; retain
   caller pandas options, optional date-order defaults, and independent expected-index
   metadata in risk and Feather regressions.

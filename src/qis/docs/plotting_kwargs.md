@@ -77,8 +77,9 @@ Tick *labels* follow the frequency: an annual frequency prints years, a monthly 
 ## Colour
 
 `colors: List[str] = None` — one colour per series, in column order. `None` takes the default
-palette, `qis.get_n_colors(n)`, which is stable for a given `n` so that the same universe gets
-the same colours across every panel of a factsheet.
+palette from the internal helper `qis.plots.utils.get_n_colors(n)`, which is stable for a given
+`n` so that the same universe gets the same colours across every panel of a factsheet. This
+helper is an implementation detail, not a public export from `qis`.
 
 ## Limits
 
@@ -109,8 +110,8 @@ most alphas; pass `'{0:+0.2%}'` to show `+1.30%`.
 ## `**kwargs`
 
 Most plot functions end in `**kwargs` and forward it to the helpers they call —
-`qis.get_legend_lines`, the table renderers, and matplotlib itself. Two consequences worth
-knowing:
+the internal helper `qis.plots.utils.get_legend_lines`, the table renderers, and matplotlib
+itself. The helper is not a public export from `qis`. Two consequences worth knowing:
 
 - A keyword these functions do not recognise **may be silently ignored**. A
   misspelled argument name therefore produces a figure that looks nearly right, which is how
