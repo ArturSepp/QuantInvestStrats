@@ -342,9 +342,11 @@ def load_df_from_excel(file_name: str,
         raise FileNotFoundError(f"file data {file_path} nor found")
 
     index_col = 0 if is_index else None
-    df = excel_reader.parse(sheet_name=sheet_name, index_col=index_col, header=header)
+    df = pd.read_excel(excel_reader, sheet_name=sheet_name, index_col=index_col, header=header)
     if preserve_header0_columns and header != 0:
-        header_names = excel_reader.parse(sheet_name=sheet_name, index_col=index_col, nrows=0).columns.tolist()
+        header_names = pd.read_excel(
+            excel_reader, sheet_name=sheet_name, index_col=index_col, nrows=0
+        ).columns.tolist()
         df.columns = header_names
 
     if is_index and delocalize:
@@ -429,7 +431,7 @@ def load_df_dict_from_excel(file_name: str,
     pandas_dict = {}
     for key in dataset_keys:
         try:
-            df = excel_reader.parse(sheet_name=key, index_col=index_col)
+            df = pd.read_excel(excel_reader, sheet_name=key, index_col=index_col)
         except Exception:
             raise TypeError(f"sheet_name data {key} nor found")
         if delocalize:
