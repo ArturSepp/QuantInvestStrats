@@ -51,6 +51,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Preserve frequency-string inference and optional CSV date-order defaults with pandas 3.1;
+  retain caller pandas options and isolate expected-index metadata in risk regressions.
 - Preserve unknown covariance-implied risk in grouped contributions and normalized
   portfolio risk histories instead of reporting zero; genuinely zero and unheld risk stay zero.
 - Keep caller-supplied `plot_heatmap` annotations paired with their cells when transposing or

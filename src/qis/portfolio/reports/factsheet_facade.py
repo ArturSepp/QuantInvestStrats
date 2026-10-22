@@ -20,6 +20,7 @@ qis being fully initialised (keeps the top-level `qis.factsheet` export circular
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 from typing import TYPE_CHECKING, List, Optional, Union
 
 if TYPE_CHECKING:  # resolved by typing.get_type_hints and by sphinx autodoc, never at runtime
@@ -102,7 +103,7 @@ def _returns_to_navs(returns: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series
     # the exact pandas frequency keeps its anchor ('W-FRI', 'QE-NOV'); an irregular index, such as
     # exchange trading days, falls back to its median-spacing tier
     try:
-        freq = pd.infer_freq(returns.index) if len(returns.index) >= 3 else None
+        freq = _infer_freq(returns.index) if len(returns.index) >= 3 else None
     except (TypeError, ValueError):
         freq = None
     freq = freq or infer_data_frequency_label(returns.index) or 'B'

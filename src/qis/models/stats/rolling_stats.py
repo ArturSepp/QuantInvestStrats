@@ -17,6 +17,7 @@ subtracts no financing rate; the excess-return conventions live in ``qis.perfsta
 # packages
 import numpy as np
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 from scipy.stats import skew
 from typing import Union, Optional, Tuple
 from enum import Enum
@@ -53,7 +54,7 @@ def compute_rolling_perf_stat(prices: Union[pd.DataFrame, pd.Series],
     for monthly returns anf 5y rolling use roll_freq='ME' and roll_periods=5*12
     """
     if roll_freq is None:
-        roll_freq1 = pd.infer_freq(index=prices.index)
+        roll_freq1 = _infer_freq(index=prices.index)
     else:
         roll_freq1 = roll_freq
 

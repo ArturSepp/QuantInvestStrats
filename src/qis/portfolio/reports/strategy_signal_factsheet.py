@@ -16,6 +16,7 @@ Performance, exposures and costs of the same portfolio are ``strategy_factsheet.
 import numpy as np
 # packages
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Tuple, List, Dict, Optional
@@ -86,7 +87,7 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
         with sns.axes_style('darkgrid'):
             fig, axs = plt.subplots(len(preds_dict.keys())//2+len(preds_dict.keys())%2, 2, figsize=figsize, tight_layout=True)
             axs = qis.to_flat_list(axs)
-            weight_freq = pd.infer_freq(strategy_signal_data.weights.index)
+            weight_freq = _infer_freq(strategy_signal_data.weights.index)
 
             qis.set_suptitle(fig, title=f"{portfolio_data.ticker} Attribution of changes in weights for period "
                                         f"{prediction_period.to_str()}"

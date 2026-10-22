@@ -552,7 +552,7 @@ def load_df_from_csv(file_name: Optional[str] = None,
             df = pd.read_csv(filepath_or_buffer=file_path,
                              index_col=index_col,
                              parse_dates=parse_dates,
-                             dayfirst=dayfirst,
+                             dayfirst=False if dayfirst is None else dayfirst,
                              float_precision=float_precision)
 
         except UnicodeDecodeError:  # try without index
@@ -712,7 +712,7 @@ def load_df_dict_from_csv(dataset_keys: List[Union[str, Enum, NamedTuple]],
             data = pd.read_csv(filepath_or_buffer=file_path,
                                index_col=index_col,
                                parse_dates=True,
-                               dayfirst=dayfirst,
+                               dayfirst=False if dayfirst is None else dayfirst,
                                float_precision=float_precision)
             pandas_dict[key] = data
         else:

@@ -22,6 +22,7 @@ from __future__ import annotations
 import warnings
 import re
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 from typing import Union
 
 BUS_DAYS_PER_YEAR = 252  # applied for volatility normalization
@@ -223,7 +224,7 @@ def infer_annualisation_factor_from_df(data: Union[pd.DataFrame, pd.Series]) -> 
         if semi_month_offset is not None and semi_month_offset.n > 0:
             freq = index_freq
         else:
-            freq = pd.infer_freq(data.index)
+            freq = _infer_freq(data.index)
 
     if freq is None:
         warnings.warn(
@@ -298,7 +299,7 @@ def infer_data_frequency_label(data: Union[pd.DataFrame, pd.Series, pd.DatetimeI
     falls back to the median-spacing tier label so a label is always shown.
     """
     index = pd.DatetimeIndex(data.index if hasattr(data, 'index') else data)
-    freq = pd.infer_freq(index) if len(index) >= 3 else None
+    freq = _infer_freq(index) if len(index) >= 3 else None
     if freq is not None:
         # drop the December/anchor suffix for quarterly/annual ('QE-DEC' -> 'QE') so the label
         # matches the un-anchored convention used elsewhere; keep weekly anchors ('W-WED').

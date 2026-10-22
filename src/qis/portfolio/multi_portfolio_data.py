@@ -33,6 +33,7 @@ and tracking-error reports - live in ``qis/portfolio/reports/``, not here.
 # packages
 import numpy as np
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union, Dict
@@ -924,7 +925,7 @@ class MultiPortfolioData:
                                      is_unit_based_traded_volume=is_unit_based_traded_volume,
                                      vols=vols,
                                      time_period=time_period)
-        freq = freq_turnover or pd.infer_freq(turnover.index)
+        freq = freq_turnover or _infer_freq(turnover.index)
         is_volatility_normalized = (
             turnover_computation_type
             == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
@@ -973,7 +974,7 @@ class MultiPortfolioData:
         costs = pd.concat(costs, axis=1, sort=True)
         if time_period is not None:
             costs = time_period.locate(costs)
-        freq = freq_cost or pd.infer_freq(costs.index)
+        freq = freq_cost or _infer_freq(costs.index)
         cost_title = cost_title or f"{cost_rolling_period}-period rolling {freq}-freq Costs %"
         pts.plot_time_series(df=costs,
                              var_format=var_format,

@@ -256,6 +256,7 @@ def test_compute_risk_contributions_implied_by_covar_preserves_unknown_rows(
         expected = expected.astype(object)
         if not normalise:
             expected.loc[dates[1], :] = pd.NA
+    expected.index = expected.index.copy(deep=True)
     expected.index.freq = None
     pd.testing.assert_frame_equal(actual, expected, atol=1e-14, rtol=1e-14)
     pd.testing.assert_frame_equal(portfolio.weights, before)

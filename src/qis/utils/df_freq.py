@@ -13,6 +13,7 @@ A panel is a mapping from date to value, so the row order it arrives in carries 
 import warnings
 import numpy as np
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 from typing import Optional, Union, Callable, Literal
 
 import qis.utils.dates as da
@@ -128,7 +129,7 @@ def df_asfreq(df: Union[pd.DataFrame, pd.Series],
     # pd.infer_freq requires >= 3 points and can raise on irregular indices
     if len(df.index) >= 3:
         try:
-            inferred = pd.infer_freq(df.index)
+            inferred = _infer_freq(df.index)
         except (TypeError, ValueError):
             inferred = None
         if inferred is not None and inferred == freq:
@@ -213,7 +214,7 @@ def df_resample_at_other_index(df: Union[pd.DataFrame, pd.Series],
     if not isinstance(other_index, pd.DatetimeIndex):
         raise TypeError(f"other_index type = {type(other_index)} must be pd.DatetimeIndex")
 
-    freq = pd.infer_freq(other_index)
+    freq = _infer_freq(other_index)
     if freq is None:
         raise ValueError(f"could not infer frequency for index = {other_index}")
 

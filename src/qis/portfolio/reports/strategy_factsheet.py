@@ -31,6 +31,7 @@ that picks between them by input shape is ``factsheet_facade.py``.
 # packages
 import warnings
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Tuple, Optional, List, Union
@@ -376,7 +377,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                            turnover_computation_type=turnover_computation_type,
                                            is_unit_based_traded_volume=is_unit_based_traded_volume,
                                            vols=turnover_vols)
-    freq = freq_turnover or pd.infer_freq(turnover.index)
+    freq = freq_turnover or _infer_freq(turnover.index)
     is_volatility_normalized = (
         turnover_computation_type
         == qis.TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
@@ -414,7 +415,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                                      freq=freq_cost,
                                      is_grouped=is_grouped,
                                      is_unit_based_traded_volume=is_unit_based_costs)
-    freq = freq_cost or pd.infer_freq(costs.index)
+    freq = freq_cost or _infer_freq(costs.index)
     costs_title = f"{cost_rolling_period}-period rolling {freq}-freq Costs"
     plot_asset_time_series(df=costs, asset_additive=True,
                          asset_totals=(portfolio_data.nav.name,),
@@ -454,7 +455,7 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             time_period=time_period,
             recent_ra_perf_table_start_date=recent_ra_perf_table_start_date,
         )
-        if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
+        if _infer_freq(benchmark_prices.index) in ['B', 'D']:
             local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
         else:
             local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
