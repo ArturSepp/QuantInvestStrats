@@ -34,6 +34,12 @@ def test_table_matches_a_direct_computation(sampled):
     data = sampled.dropna(subset=['regime'])
     labels = data['regime'].astype(str).to_numpy()
     kappa = compute_regime_kappa(af=4.0)
+    benchmark_returns = data['SBM_6040'].to_numpy()
+    benchmark_sigma = np.std(benchmark_returns, ddof=1)
+    benchmark_sharpe = 2.0 * np.mean(benchmark_returns) / benchmark_sigma
+    benchmark_bear = (2.0 * np.mean(labels == 'Bear')
+                      * np.mean(benchmark_returns[labels == 'Bear']) / benchmark_sigma)
+    direct_benchmark_premium = benchmark_bear - (0.16 * benchmark_sharpe - kappa)
     for asset in ASSETS:
         r, b = data[asset].to_numpy(), data['SBM_6040'].to_numpy()
         sigma = np.std(r, ddof=1)
@@ -46,7 +52,16 @@ def test_table_matches_a_direct_computation(sampled):
         assert np.isclose(row['bear_sharpe'], bear, rtol=1e-12)
         assert np.isclose(row['convexity_premium'], bear - (0.16 * sharpe - kappa * rho),
                           atol=1e-12)
-    assert table.loc['SBM_6040', 'cp_star'] == 0.0
+        direct_premium = bear - (0.16 * sharpe - kappa * rho)
+        np.testing.assert_allclose(row['cp_star'],
+                                   direct_premium - rho * direct_benchmark_premium,
+                                   rtol=1e-12, atol=1e-12)
+    # Self-correlation can differ from one by a few ulps across NumPy/BLAS builds.
+    # Keep a machine-scale bound rather than requiring an exactly representable zero.
+    benchmark_premium = table.loc['SBM_6040', 'convexity_premium']
+    zero_atol = 8.0 * np.finfo(float).eps * max(1.0, abs(benchmark_premium))
+    np.testing.assert_allclose(table.loc['SBM_6040', 'cp_star'], 0.0,
+                               rtol=0.0, atol=zero_atol)
 
 
 def test_contributions_equal_the_qis_decomposition_and_add_up(sampled):
