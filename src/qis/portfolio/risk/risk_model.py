@@ -1000,6 +1000,7 @@ class RiskModel:
             Per-asset DataFrame, or a DataFrame with ``Total`` and group rows.
             Column ``mcte`` is always present; a complete factor block adds
             ``mcte_systematic`` and ``mcte_residual``.
+            Unknown tracking error stays missing in every group and ``Total``.
 
         Raises:
             KeyError: If ``date`` is not an exact covariance-grid date.
@@ -1047,9 +1048,10 @@ class RiskModel:
         if group_data is None:
             return contributions
         groups = self._align_groups(group_data=group_data, date=date)
-        grouped = {'Total': contributions.sum(axis=0)}
+        # Unknown tracking error makes every Euler column unknown, including Total.
+        grouped = {'Total': contributions.sum(axis=0, skipna=False)}
         for group in pd.unique(groups):
-            grouped[group] = contributions.loc[groups == group].sum(axis=0)
+            grouped[group] = contributions.loc[groups == group].sum(axis=0, skipna=False)
         return pd.DataFrame.from_dict(grouped, orient='index')
 
     def _require_factor_loadings(self) -> None:

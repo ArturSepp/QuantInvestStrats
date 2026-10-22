@@ -1314,7 +1314,8 @@ class PortfolioData:
 
         Returns:
             Contributions per date and instrument or group, in volatility units, or shares when
-            ``normalise`` is True.
+            ``normalise`` is True. Unknown risk remains missing through grouping and
+            normalization; genuinely zero risk stays zero.
 
         Raises:
             ValueError: If no covariance is supplied or stored.
@@ -1342,10 +1343,19 @@ class PortfolioData:
                                                                              covar=covar_dict[last_covar_update_date])
 
         strategy_rc = pd.DataFrame.from_dict(strategy_rc, orient='index')
+        unknown_risk = strategy_rc.isna().all(axis=1)
+        restore_unknown = unknown_risk.any() and (group_data is not None or normalise)
+        if restore_unknown:
+            # The generic helpers treat missing scores as zero; object-backed pd.NA
+            # rows can also fail inside them. Both operate row-locally, so temporary
+            # zero rows cannot affect known risk. Restore the unknown rows afterwards.
+            strategy_rc = strategy_rc.mask(unknown_risk, 0.0, axis=0)
         if group_data is not None:
             strategy_rc = dfg.agg_df_by_groups_ax1(strategy_rc, group_data=group_data, group_order=group_order)
         if normalise:
             strategy_rc = qis.df_to_weight_allocation_sum1(strategy_rc)
+        if restore_unknown:
+            strategy_rc = strategy_rc.mask(unknown_risk, axis=0)
         return strategy_rc
 
     # """
