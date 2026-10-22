@@ -167,14 +167,16 @@ def test_compute_ewm_corr_df_top_row_retains_integer_fallback(monkeypatch) -> No
                                   expected, check_exact=True)
 
 
-def test_compute_ewm_corr_df_top_row_preserves_global_scale_after_overflow() -> None:
+@pytest.mark.parametrize('mode', [CorrMatrixOutput.TOP_ROW, CorrMatrixOutput.FULL])
+def test_compute_ewm_corr_df_preserves_global_scale_after_overflow(mode) -> None:
     """An unrequested covariance can mask a finite pair after a diagonal update overflows."""
     df = pd.DataFrame([[1e135, 1e135, 0.0, 0.0], [0.0, 0.0, 1e160, 1e140]],
                       columns=['a', 'b', 'c', 'd'])
     with warnings.catch_warnings():
         warnings.simplefilter('error', RuntimeWarning)
-        actual = compute_ewm_corr_df(df, CorrMatrixOutput.TOP_ROW, ewm_lambda=0.5)
-        expected = _tensor_top_row(df, ewm_lambda=0.5)
+        actual = compute_ewm_corr_df(df, mode, ewm_lambda=0.5)
+        reference = _tensor_top_row if mode == CorrMatrixOutput.TOP_ROW else _tensor_pairs
+        expected = reference(df, ewm_lambda=0.5)
     pd.testing.assert_frame_equal(actual, expected, check_exact=True)
     assert actual.iloc[0, 0] == pytest.approx(1.0)
     assert np.isnan(actual.iloc[1, 0])
@@ -235,18 +237,145 @@ def test_compute_ewm_corr_df_top_row_retains_native_fallback(monkeypatch, parame
 
 
 @pytest.mark.parametrize('rows', [0, 1])
-def test_compute_ewm_corr_df_top_row_preserves_short_sample(rows) -> None:
+@pytest.mark.parametrize('mode', [CorrMatrixOutput.TOP_ROW, CorrMatrixOutput.FULL])
+def test_compute_ewm_corr_df_preserves_short_sample(rows, mode) -> None:
     """Empty history and first-observation normalization retain exact frames."""
     df = _returns(3).iloc[:rows]
-    pd.testing.assert_frame_equal(compute_ewm_corr_df(df, CorrMatrixOutput.TOP_ROW),
-                                  _tensor_top_row(df), check_exact=True)
+    reference = _tensor_top_row if mode == CorrMatrixOutput.TOP_ROW else _tensor_pairs
+    pd.testing.assert_frame_equal(compute_ewm_corr_df(df, mode),
+                                  reference(df), check_exact=True)
 
 
 @pytest.mark.parametrize('width', [0, 1])
-def test_compute_ewm_corr_df_top_row_preserves_no_pair_error(width) -> None:
+@pytest.mark.parametrize('mode', list(CorrMatrixOutput))
+def test_compute_ewm_corr_df_preserves_no_pair_error(width, mode) -> None:
     """A panel without any pair keeps the accepted concat error, not an empty result."""
     with pytest.raises(ValueError, match='No objects to concatenate'):
-        compute_ewm_corr_df(_returns(width), CorrMatrixOutput.TOP_ROW)
+        compute_ewm_corr_df(_returns(width), mode)
+
+
+def _tensor_pairs(df: pd.DataFrame, **parameters) -> pd.DataFrame:
+    """Native full-history construction remains the compatibility reference, not the oracle."""
+    seed = parameters.get('init_value')
+    if seed is None:
+        seed = ewm.set_init_dim2(df.to_numpy(), parameters.get('init_type', ewm.InitType.ZERO))
+    tensor = ewm.compute_ewm_covar_tensor(
+        df.to_numpy(), span=parameters.get('span'), ewm_lambda=parameters.get('ewm_lambda', 0.94),
+        covar0=seed, is_corr=True)
+    return pd.concat([
+        pd.Series(tensor[:, i, j], name=f'{column_i} - {column_j}')
+        for i, column_i in enumerate(df.columns) for j, column_j in enumerate(df.columns) if j < i
+    ], axis=1, sort=False).set_index(df.index)
+
+
+@pytest.mark.parametrize('mode', [CorrMatrixOutput.FULL, CorrMatrixOutput.SUB_TOP])
+@pytest.mark.parametrize('width', [2, 3])
+def test_compute_ewm_corr_df_pairs_avoids_full_tensor(monkeypatch, mode, width) -> None:
+    """Retain only returned history, without replacing the independently weighted result."""
+    df = pd.DataFrame([[1., 2., np.nan], [2., -1., 1.], [-1., 3., -2.], [4., 0., 2.]],
+                      columns=['a', 'b', 'c']).iloc[:, :width]
+    before = df.copy(deep=True)
+    expected = pd.concat([
+        _weighted_top_row(df.iloc[:, [i, j]], 0.5)
+        for i in range(width) for j in range(i)
+    ], axis=1)
+
+    def unexpected_tensor(*args, **kwargs):
+        pytest.fail('all-pairs output must not allocate unrequested full tensor history')
+
+    monkeypatch.setattr(ewm, 'compute_ewm_covar_tensor', unexpected_tensor)
+    actual = compute_ewm_corr_df(df, mode, ewm_lambda=0.5)
+    pd.testing.assert_frame_equal(actual, expected, rtol=1e-14, atol=1e-14)
+    actual.iloc[-1, 0] = -99.
+    pd.testing.assert_frame_equal(actual.iloc[:, 1:], expected.iloc[:, 1:], check_exact=True)
+    pd.testing.assert_frame_equal(df, before, check_exact=True)
+
+
+@pytest.mark.parametrize('dtype', [np.float32, np.float64])
+@pytest.mark.parametrize('index', [
+    pd.RangeIndex(60, name='rows'),
+    pd.date_range('2020-01-01', periods=60, freq='B', tz='Europe/London', name='dates'),
+    pd.period_range('2020-01-01', periods=60, freq='D', name='period'),
+    pd.MultiIndex.from_arrays([np.arange(60) // 2, np.arange(60) % 2], names=['day', 'part']),
+])
+@pytest.mark.parametrize('parameters', [
+    {}, {'init_type': ewm.InitType.X0}, {'span': 7, 'ewm_lambda': np.inf},
+    {'ewm_lambda': np.float32(0.5)},
+])
+def test_compute_ewm_corr_df_pairs_preserves_mixed_panel_and_axes(dtype, index, parameters) -> None:
+    """One ragged panel crosses the new storage and pandas-construction boundaries."""
+    df = _returns(8).astype(dtype).set_axis(index)
+    df.iloc[:3, 0] = np.nan
+    df.iloc[:7, 1] = np.nan
+    df.iloc[10:12, 2] = np.nan
+    df.iloc[30:, 3] = np.nan
+    df.iloc[:, 4] = np.nan
+    df.iloc[:, 5] = 0.
+    df.iloc[:, 6] *= 1e-9
+    df.iloc[15, 7] = np.inf
+    df.columns = pd.Index(['pivot', 'same', 'same', 3, np.nan, ('a', 'b'), 'tiny', 'inf'],
+                          name='assets')
+    before = df.copy(deep=True)
+    # Separate axis snapshots keep shared pandas metadata from masking a caller mutation.
+    before.index = before.index.copy(deep=True)
+    before.columns = before.columns.copy(deep=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        expected = _tensor_pairs(df, **parameters)
+        actual = compute_ewm_corr_df(df, **parameters)
+    pd.testing.assert_frame_equal(actual, expected, check_exact=True)
+    pd.testing.assert_frame_equal(df, before, check_exact=True)
+
+
+@pytest.mark.parametrize('dtype, parameters', [
+    ('int64', {}), ('Float64', {}), ('float64', {'init_value': np.eye(3),
+                                              'init_type': ewm.InitType.VAR}),
+    ('float64', {'span': np.array([3., 4., 5.])}),
+    ('float64', {'ewm_lambda': np.array([.5, .6, .7])}),
+    ('float64', {'ewm_lambda': np.float16(.5)}),
+    ('float64', {'ewm_lambda': np.longdouble(.5)}),
+    ('float64', {'init_type': ewm.InitType.MEAN}),
+])
+def test_compute_ewm_corr_df_pairs_retains_native_fallback(monkeypatch, dtype, parameters) -> None:
+    """Do not broaden Numba admission or bypass explicit-seed and initialization policy."""
+    df = _returns(3).astype(dtype)
+    expected_error = None
+    try:
+        expected = _tensor_pairs(df, **parameters)
+    except Exception as error:
+        expected_error = error
+
+    def unexpected_specialization(*args, **kwargs):
+        pytest.fail('exceptional inputs must retain native tensor dispatch')
+
+    monkeypatch.setattr(ewm, '_compute_ewm_corr_pairs', unexpected_specialization)
+    if expected_error is not None:
+        with pytest.raises(type(expected_error)) as actual:
+            compute_ewm_corr_df(df, **parameters)
+        assert str(actual.value) == str(expected_error)
+    else:
+        pd.testing.assert_frame_equal(compute_ewm_corr_df(df, **parameters), expected,
+                                      check_exact=True)
+
+
+@pytest.mark.parametrize('parameters', [
+    {'span': 0}, {'span': np.nan}, {'span': True},
+    {'ewm_lambda': -.1}, {'ewm_lambda': 1.}, {'ewm_lambda': np.inf},
+])
+def test_compute_ewm_corr_df_pairs_preserves_parameter_errors(parameters) -> None:
+    """The selected smoothing parameter keeps native validation and error wording."""
+    with pytest.raises(ValueError) as expected:
+        _tensor_pairs(_returns(3), **parameters)
+    with pytest.raises(ValueError) as actual:
+        compute_ewm_corr_df(_returns(3), **parameters)
+    assert str(actual.value) == str(expected.value)
+
+
+def test_compute_ewm_corr_df_pairs_preserves_series_rejection() -> None:
+    """A malformed container still reaches the native dimensionality diagnostic."""
+    data = _returns(1).iloc[:, 0]
+    with pytest.raises(ValueError, match='only 2-d arrays are supported'):
+        compute_ewm_corr_df(data)
 
 
 @pytest.mark.parametrize('fill_value', [0.0, np.nan])

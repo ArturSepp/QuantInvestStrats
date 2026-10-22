@@ -305,6 +305,7 @@ def compute_ewm_corr_df(df: pd.DataFrame,
     default zero seed the first row is the sign of ``x_i x_j``, so the path needs a warm-up.
     For float32/float64 data, scalar smoothing and no explicit seed, ``TOP_ROW`` stores only the
     requested row's history, while retaining the full current covariance for normalization.
+    Eligible ``FULL``/``SUB_TOP`` calls likewise retain only the returned lower-triangle history.
 
     Args:
         df: returns, rows are dates and columns are assets
@@ -324,6 +325,20 @@ def compute_ewm_corr_df(df: pd.DataFrame,
         init_value = ewm.set_init_dim2(data=df.to_numpy(), init_type=init_type)
 
     values = df.to_numpy()
+    pair_scalar_types = (int, float, np.integer, np.float32, np.float64)
+    # Keep exceptional scalar representations with native Numba admission/diagnostics.
+    # Seed validation above and set_index below retain the existing public boundaries.
+    if (corr_matrix_output in (CorrMatrixOutput.FULL, CorrMatrixOutput.SUB_TOP) and default_seed
+            and values.ndim == 2 and values.shape[1] > 1
+            and values.dtype in (np.dtype('float32'), np.dtype('float64'))
+            and isinstance(ewm_lambda, pair_scalar_types)
+            and (span is None or isinstance(span, pair_scalar_types))):
+        pairs = ewm._compute_ewm_corr_pairs(a=values, span=span, ewm_lambda=ewm_lambda)
+        columns = [f'{column_i} - {column_j}'
+                   for i, column_i in enumerate(df.columns)
+                   for j, column_j in enumerate(df.columns) if j < i]
+        return pd.DataFrame(pairs, columns=columns, copy=False).set_index(df.index)
+
     scalar_types = (int, float, np.integer, np.floating)
     # Unrequested pairs can determine the global normalization tolerance, so omit
     # their history, not the full current covariance state.

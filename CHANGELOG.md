@@ -9,6 +9,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Reduce retained history and peak memory for eligible `compute_ewm_corr_df` FULL/SUB_TOP
+  calls by storing only returned pairs; covariance updates and correlation results are unchanged.
 - Require Python 3.11 or later for the upcoming 5.42.0 minor version. Python 3.10 reached
   [end of life on 1 October 2026](https://devguide.python.org/versions/); remove its classifier
   and CI cells and run the lowest-direct dependency lane on Python 3.11. This version remains
