@@ -481,7 +481,7 @@ def test_forward_and_hedge_history_fill_before_weekend_valuation() -> None:
         prices, data.fx_spots['CHF'], known_premium,
         pd.Series(0.0, index=prices.index), known_hedge)
     np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14)
-    assert prices.index[2].dayofweek == 6
+    assert prices.index[2].day_of_week == 6
     assert known_premium.iloc[2] == premium.loc['2024-03-28']
 
 
@@ -507,5 +507,5 @@ def test_optimal_hedge_uses_latest_business_day_forward_quote(
     expected_carry = 1.0 - (1.0 - forward_over_spot) * 12.0 / (2.0 * 2.0 * 0.2 ** 2)
     np.testing.assert_allclose(carry, expected_carry, rtol=1e-13, atol=1e-14)
     np.testing.assert_allclose(optimal, expected_carry + 0.3, rtol=1e-13, atol=1e-14)
-    assert prices.index[2].dayofweek == 6
+    assert prices.index[2].day_of_week == 6
     assert known_premium.iloc[2] == premium.loc['2024-03-29']

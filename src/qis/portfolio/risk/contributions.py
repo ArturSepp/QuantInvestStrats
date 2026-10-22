@@ -154,6 +154,7 @@ def compute_group_portfolio_risk_contribution_ratios(
 
     Returns:
         Normalized group risk contributions in first-seen group order.
+        Groups remain missing when portfolio risk is unknown.
 
     Raises:
         TypeError: If ``groups`` is not a Series.
@@ -175,7 +176,11 @@ def compute_group_portfolio_risk_contribution_ratios(
             f"groups must classify every covariance asset; missing {missing[:5]}"
         )
     contributions = compute_portfolio_risk_contribution_ratios(weights=weights, covar=covar)
-    grouped = contributions.groupby(aligned_groups, sort=False).sum()
+    # Unknown observations are not zero risk. An unused categorical group, however,
+    # still has the native empty sum of zero on pandas versions that include it.
+    by_group = contributions.groupby(aligned_groups, sort=False)
+    grouped = by_group.sum(min_count=1)
+    grouped.loc[by_group.size().eq(0)] = 0.0
     grouped.name = "risk_contribution"
     return grouped
 

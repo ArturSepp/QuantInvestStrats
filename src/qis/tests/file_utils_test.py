@@ -433,7 +433,9 @@ class TestFeather:
     def test_roundtrip_preserves_index(self, tmp_path, df):
         fu.save_df_to_feather(df=df, file_name='t', local_path=str(tmp_path))
         loaded = fu.load_df_from_feather(file_name='t', local_path=str(tmp_path))
-        pd.testing.assert_index_equal(loaded.index, df.index, check_names=False)
+        expected_index = df.index.copy(deep=True)
+        expected_index.freq = None  # Feather does not persist sampling metadata.
+        pd.testing.assert_index_equal(loaded.index, expected_index, check_names=False)
 
     def test_roundtrip_no_index_col(self, tmp_path, df):
         fu.save_df_to_feather(df=df, file_name='t', local_path=str(tmp_path), index_col=None)

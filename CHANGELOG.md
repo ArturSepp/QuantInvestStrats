@@ -51,6 +51,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Preserve frequency-string inference and CSV/Excel readers with pandas 3.1; retain
+  caller pandas options, optional date-order defaults, and independent expected-index
+  metadata in risk and Feather regressions.
+- Preserve unknown covariance-implied risk in grouped contributions and normalized
+  portfolio risk histories instead of reporting zero; genuinely zero and unheld risk stay zero.
 - Keep caller-supplied `plot_heatmap` annotations paired with their cells when transposing or
   reversing rows, preventing misleading square-grid labels and rectangular transpose failures.
 - Preserve the first metric and original row labels in `plot_df_table(transpose=True)`

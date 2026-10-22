@@ -15,6 +15,7 @@ over a shared overlap and requires the older columns to be a subset of the newer
 # packages
 import numpy as np
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 from typing import Optional, Union, List, Tuple, cast
 # qis
 import qis.utils.df_ops as dfo
@@ -374,7 +375,7 @@ def bfill_timeseries(df_newer: Union[pd.DataFrame, pd.Series],  # more recent da
             bfill_datas[column] = bfill_datas[column].ffill()
 
     # Short splices have no inferable frequency but can still be expanded safely.
-    inferred_freq = pd.infer_freq(bfill_datas.index) if len(bfill_datas.index) >= 3 else None
+    inferred_freq = _infer_freq(bfill_datas.index) if len(bfill_datas.index) >= 3 else None
     if inferred_freq != freq:
         if is_prices:
             # Carry the latest source price even when its date is outside the target grid.

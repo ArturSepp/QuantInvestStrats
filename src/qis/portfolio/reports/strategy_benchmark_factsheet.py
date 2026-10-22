@@ -19,6 +19,7 @@ risk contributions on the same pair is ``strategy_benchmark_tre_factsheet.py``.
 import numpy as np
 # packages
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 import seaborn as sns
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Optional
@@ -247,7 +248,7 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         recent_ra_perf_table_start_date=recent_ra_perf_table_start_date,
     )
     # change regression to weekly
-    if pd.infer_freq(benchmark_price.index) in ['B', 'D']:
+    if _infer_freq(benchmark_price.index) in ['B', 'D']:
         local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
     else:
         local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))

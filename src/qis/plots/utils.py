@@ -34,6 +34,7 @@ variants behind it - so that series colours are stable across the panels of one 
 import colorsys
 import numpy as np
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import seaborn as sns
@@ -556,7 +557,7 @@ def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
 
         if x_date_freq == 'YE':
             re_indexed_data.index = [t.strftime(date_format) for t in dates_index]
-            if pd.infer_freq(data.index) is not None:
+            if _infer_freq(data.index) is not None:
                 datalables = [t.strftime(date_format) if t.month == 12 else '' for t in dates_index]
             else:  # uneven dates so get 1y apart
                 datalables = [t0.strftime(date_format) if t.year - t0.year == 1 and t.year % 2 == 0 else '' for
@@ -567,7 +568,7 @@ def map_dates_index_to_str(data: Union[pd.DataFrame, pd.Series],
 
         elif x_date_freq == 'QE':
             re_indexed_data.index = [t.strftime(date_format) for t in dates_index]
-            if pd.infer_freq(data.index) is not None:
+            if _infer_freq(data.index) is not None:
                 datalables = [t.strftime(date_format) if t.month % 3 == 0 else '' for t in dates_index]
             else:  # uneven dates so get 1y apart
                 datalables = [t0.strftime(date_format) if t.month - t0.month == 1 and t0.month % 3 == 0 else '' for

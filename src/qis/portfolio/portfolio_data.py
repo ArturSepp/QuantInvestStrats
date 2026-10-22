@@ -43,6 +43,7 @@ from __future__ import annotations
 # packages
 import numpy as np
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 import seaborn as sns
 import matplotlib.pyplot as plt
 from numba import njit
@@ -1314,7 +1315,8 @@ class PortfolioData:
 
         Returns:
             Contributions per date and instrument or group, in volatility units, or shares when
-            ``normalise`` is True.
+            ``normalise`` is True. Unknown risk remains missing through grouping and
+            normalization; genuinely zero risk stays zero.
 
         Raises:
             ValueError: If no covariance is supplied or stored.
@@ -1342,10 +1344,19 @@ class PortfolioData:
                                                                              covar=covar_dict[last_covar_update_date])
 
         strategy_rc = pd.DataFrame.from_dict(strategy_rc, orient='index')
+        unknown_risk = strategy_rc.isna().all(axis=1)
+        restore_unknown = unknown_risk.any() and (group_data is not None or normalise)
+        if restore_unknown:
+            # The generic helpers treat missing scores as zero; object-backed pd.NA
+            # rows can also fail inside them. Both operate row-locally, so temporary
+            # zero rows cannot affect known risk. Restore the unknown rows afterwards.
+            strategy_rc = strategy_rc.mask(unknown_risk, 0.0, axis=0)
         if group_data is not None:
             strategy_rc = dfg.agg_df_by_groups_ax1(strategy_rc, group_data=group_data, group_order=group_order)
         if normalise:
             strategy_rc = qis.df_to_weight_allocation_sum1(strategy_rc)
+        if restore_unknown:
+            strategy_rc = strategy_rc.mask(unknown_risk, axis=0)
         return strategy_rc
 
     # """
@@ -1516,7 +1527,7 @@ class PortfolioData:
                                    axis=1, sort=True)
             prices = prices.loc[:, ~prices.columns.duplicated(keep='first')]
             if perf_params is None:  # the default the benchmark table itself would apply
-                perf_params = PerfParams(freq=pd.infer_freq(prices.index))
+                perf_params = PerfParams(freq=_infer_freq(prices.index))
             title = title or f"RA performance table {for_title} for {perf_params.freq_vol}-freq returns with beta to {benchmark}:" \
                              f" {qis.get_time_period(prices).to_str()}"
             ppt.plot_ra_perf_table_benchmark(prices=prices,
@@ -2204,7 +2215,7 @@ class PortfolioData:
                                      vols=vols,
                                      **kwargs)
         if not turnover.empty:
-            freq = pd.infer_freq(turnover.index)
+            freq = _infer_freq(turnover.index)
             is_volatility_normalized = (
                 turnover_computation_type
                 == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS

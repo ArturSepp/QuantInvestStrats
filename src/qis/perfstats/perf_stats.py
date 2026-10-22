@@ -38,6 +38,7 @@ statistics belong in ``qis/perfstats/regime_classifier.py``.
 # packages
 import numpy as np
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 from scipy.stats import kurtosis, skew
 from typing import Callable, List, Union, Tuple, Optional, Literal, cast
 
@@ -623,7 +624,7 @@ def compute_ra_perf_table(prices: Union[pd.DataFrame, pd.Series],
         under water.
     """
     if perf_params is None:
-        perf_params = PerfParams(freq=pd.infer_freq(prices.index))
+        perf_params = PerfParams(freq=_infer_freq(prices.index))
 
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
@@ -732,7 +733,7 @@ def compute_ra_perf_table_with_benchmark(prices: pd.DataFrame,
                                                  benchmark_price=benchmark_price)
 
     if perf_params is None:
-        perf_params = PerfParams(freq=pd.infer_freq(prices.index))
+        perf_params = PerfParams(freq=_infer_freq(prices.index))
 
     ra_perf_table = compute_ra_perf_table(prices=prices, perf_params=perf_params)
 

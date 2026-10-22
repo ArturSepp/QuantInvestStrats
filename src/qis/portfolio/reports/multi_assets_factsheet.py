@@ -15,6 +15,7 @@ portfolios are ``multi_strategy_factsheet.py``.
 # packages
 import math
 import pandas as pd
+from qis.utils._pandas_compat import infer_freq as _infer_freq
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Union, List, Optional, Tuple
@@ -692,7 +693,7 @@ def generate_multi_asset_factsheet(prices: pd.DataFrame,
                                   **kwargs)
 
         # change regression to weekly
-        if pd.infer_freq(benchmark_prices.index) in ['B', 'D']:
+        if _infer_freq(benchmark_prices.index) in ['B', 'D']:
             local_kwargs = qis.update_kwargs(
                 kwargs, dict(time_period=recent_ra_time_period, freq_reg='W-WED'))
         else:
