@@ -872,6 +872,36 @@ def _compute_ewm_corr_top_row(a: np.ndarray,
 
 
 @njit
+def _compute_ewm_corr_pairs(a: np.ndarray,
+                          span: Optional[int] = None,
+                          ewm_lambda: float = 0.94) -> np.ndarray:
+    """Zero-seeded lower-triangle history, ordered by row then column.
+
+    Keep the full current covariance: unreturned entries can set the normalizer's tolerance.
+    Only stored history is packed, so the native update and missing-value policy stay intact.
+    """
+    if span is not None:
+        _validate_ewm_parameter(value=span, is_span=True)
+        ewm_lambda = 1.0 - 2.0 / (span + 1.0)
+    else:
+        _validate_ewm_parameter(value=ewm_lambda, is_span=False)
+
+    t, n = a.shape
+    last_covar = np.zeros((n, n))
+    output = np.empty((t, n * (n - 1) // 2))
+    for idx in range(t):
+        last_covar, _ = _covar_update(last_covar, np.outer(a[idx], a[idx]), ewm_lambda,
+                                     NanBackfill.DEFLATED_FFILL)
+        correlation, _, _ = npo._covar_to_corr_array(last_covar)
+        pair = 0
+        for i in range(n):
+            for j in range(i):
+                output[idx, pair] = correlation[i, j]
+                pair += 1
+    return output
+
+
+@njit
 def compute_ewm_covar_tensor_vol_norm_returns(a: np.ndarray,
                                               span: Union[int, np.ndarray] = None,
                                               ewm_lambda: float = 0.94,
