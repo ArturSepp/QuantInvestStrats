@@ -96,7 +96,7 @@ def sharpe_difference_test(
             or not np.isfinite(af) or af <= 0):
         raise ValueError('af must be positive and finite')
     joint = pd.concat([returns1.rename('r1'), returns2.rename('r2')],
-                      axis=1, join='inner').sort_index().dropna()
+                      axis=1, join='inner', sort=False).sort_index().dropna()
     n_obs = len(joint)
     if n_obs < 24:
         raise ValueError(f'joint sample must have at least 24 observations, got {n_obs}')
