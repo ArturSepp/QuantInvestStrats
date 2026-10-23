@@ -12,7 +12,7 @@ authors:
     orcid: 0000-0002-7038-1748
     affiliation: 1
 affiliations:
-  - name: LGT Bank (Schweiz) AG, Zürich, Switzerland
+  - name: LGT Bank (Schweiz) AG, ZÃ¼rich, Switzerland
     index: 1
 date: 11 October 2026
 bibliography: paper.bib
@@ -70,7 +70,7 @@ numerators, are named and selected explicitly.
 | `ffn` [@ffn] | prices | analytics, with simulation referred to `bt` |
 | `PyPortfolioOpt` [@Martin2021] | prices, or expected returns and a risk model | weights, discrete allocation, performance, and plots |
 
-Table: Documented interfaces of related Python packages, consulted on 11–14 October 2026.
+Table: Documented interfaces of related Python packages, consulted on 11â€“14 October 2026.
 \label{tab:field}
 
 The `qis` backtester accepts dated target weights and asset prices directly, with optional
@@ -140,8 +140,8 @@ report portfolio factor exposures and systematic and residual risk contributions
 functions apply specified or conditionally derived factor shocks to current holdings and report
 scenario profit and loss with reconciled factor attribution.
 
-The public interface is `qis.__all__`, which holds 480 names. The module `src/qis/api.py` records
-that list as a literal, together with a documented core of 166 symbols in 14 capability groups.
+The public interface is `qis.__all__`, which holds 465 names. The module `src/qis/api.py` records
+that list as a literal, together with a documented core of 158 symbols in 14 capability groups.
 The broad namespace preserves convenient imports and compatibility for existing consumers, at the
 cost of discoverability. The curated core gives new users a smaller entry point without removing any
 export.

@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "7b53d6eff281d853eb362d21a69cc67b639e69a0",
+  "measured_at_commit": "719a9484dd87b2afd1ec67545374845df2e12d20",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -45,14 +45,8 @@
       "live": true,
       "paper_phrase": "14 capability groups"
     },
-    "collected_tests": {
-      "value": 6972,
-      "how": "pytest --collect-only -q, summed over files, core install",
-      "live": false,
-      "paper_phrase": null
-    },
     "commits": {
-      "value": 1009,
+      "value": 1056,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -94,22 +88,22 @@
       "paper_phrase": null
     },
     "core_symbols": {
-      "value": 166,
+      "value": 158,
       "how": "len(qis.api.core_api_names())",
       "live": true,
-      "paper_phrase": "documented core of 166 symbols"
+      "paper_phrase": "documented core of 158 symbols"
     },
     "exported_module_bindings": {
-      "value": 10,
+      "value": 9,
       "how": "the subpackage names the wildcard re-exports leave in the namespace",
       "live": true,
       "paper_phrase": null
     },
     "exported_symbols": {
-      "value": 480,
+      "value": 465,
       "how": "len(qis.__all__)",
       "live": true,
-      "paper_phrase": "holds 480 names"
+      "paper_phrase": "holds 465 names"
     },
     "first_commit_month": {
       "value": "2022-12",
