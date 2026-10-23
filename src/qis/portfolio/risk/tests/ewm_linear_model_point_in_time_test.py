@@ -108,8 +108,8 @@ def test_portfolio_benchmark_beta_is_zero_when_the_portfolio_is_in_cash() -> Non
         instrument_prices=instrument_prices, weights=weights, benchmark_prices=benchmark_prices,
         factor_beta_span=63)
 
-    assert betas['Bench'].iloc[:21].isna().all()  # positions 0 to 20 are the warm-up
-    assert betas['Bench'].iloc[21:].notna().all()
+    assert betas['Bench'].iloc[:64].isna().all()  # first missing return plus 63 warm-up returns
+    assert betas['Bench'].iloc[64:].notna().all()
     assert (betas['Bench'].iloc[300:] == 0.0).all()
     assert betas['Bench'].iloc[100:300].between(1.0, 1.4).all()
 
@@ -136,7 +136,8 @@ def test_portfolio_benchmark_betas_use_weights_as_of_calendar_month_ends() -> No
     model = qis.EwmLinearModel(
         x=qis.to_returns(benchmark_prices, freq='ME', is_log_returns=True),
         y=qis.to_returns(instrument_prices, freq='ME', is_log_returns=True))
-    model.fit(span=12, mean_adj_type=qis.MeanAdjType.EWMA, init_type=qis.InitType.X0)
+    model.fit(span=12, mean_adj_type=qis.MeanAdjType.EWMA, init_type=qis.InitType.X0,
+              warmup_period=12)
     month_end_weights = weights.reindex(index=betas.index, method='ffill')
     expected = (model.loadings['Bench'] * month_end_weights).sum(axis=1, min_count=2)
     assert (~betas.index.isin(index)).any()  # some month-ends fall on a weekend

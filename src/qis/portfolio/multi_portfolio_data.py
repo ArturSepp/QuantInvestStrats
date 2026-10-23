@@ -55,6 +55,7 @@ import qis.plots.derived.drawdowns as cdr
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
 from qis.portfolio._asset_display import plot_asset_time_series, selection_title, tail_index
 from qis.portfolio.risk.risk_model import RiskModel
+from qis.portfolio.risk.ewm_factor_model import _get_instrument_beta_estimation_start
 from qis.utils.struct_ops import merge_lists_unique
 from qis.perfstats.turnover import TurnoverComputationType
 
@@ -762,14 +763,14 @@ class MultiPortfolioData:
             post_start_alpha = realised_alpha.loc[realised_alpha.index > performance_start]
             first_alpha_date = post_start_alpha.first_valid_index()
             if first_alpha_date is None:
-                raise ValueError(
-                    f'no finite lagged-beta alpha returns after {performance_start:%d%b%Y} '
-                    f'for {portfolio.nav.name}'
+                rolling_alpha = pd.Series(np.nan, index=post_start_alpha.index)
+            else:
+                rolling_alpha = qis.compute_ewm(
+                    data=post_start_alpha.loc[first_alpha_date:],
+                    span=factor_beta_span,
                 )
-            rolling_alpha = qis.compute_ewm(
-                data=post_start_alpha.loc[first_alpha_date:],
-                span=factor_beta_span,
-            )
+                rolling_alpha = rolling_alpha.where(
+                    post_start_alpha.loc[first_alpha_date:].notna())
             zero_index = realised_alpha.index[realised_alpha.index <= performance_start].union(
                 pd.DatetimeIndex([performance_start])
             )
@@ -1003,8 +1004,9 @@ class MultiPortfolioData:
         factor_exposures = {factor: [] for factor in benchmark_prices.columns}
         estimation_starts = {factor: [] for factor in benchmark_prices.columns}
         for portfolio in self.portfolio_datas:
-            estimation_start = _get_first_active_return_date(
-                portfolio_nav=portfolio.get_portfolio_nav(),
+            estimation_start = _get_instrument_beta_estimation_start(
+                instrument_prices=portfolio.prices,
+                benchmark_prices=benchmark_prices,
                 freq=freq_beta,
             )
             factor_exposure = portfolio.compute_portfolio_benchmark_betas(
@@ -1015,10 +1017,6 @@ class MultiPortfolioData:
             )
             for factor in factor_exposure.columns:
                 factor_exposures[factor].append(factor_exposure[factor].rename(portfolio.nav.name))
-                if factor_exposure[factor].first_valid_index() is None:
-                    raise ValueError(
-                        f'no finite {factor} beta estimates for {portfolio.nav.name}'
-                    )
                 estimation_starts[factor].append(estimation_start)
 
         if axs is None:
@@ -1030,8 +1028,9 @@ class MultiPortfolioData:
             if time_period is not None:
                 factor_exposure = time_period.locate(factor_exposure)
             factor_beta_title = (
-                f'{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {factor},\n'
-                f'estimation starting from {_to_compact_date(estimation_start)}'
+                f'{factor_beta_span}-span rolling holdings-weighted Beta to {factor} '
+                f'({freq_beta}-freq),\n'
+                f'instrument beta estimation starting from {_to_compact_date(estimation_start)}'
             )
             pts.plot_time_series(df=factor_exposure,
                                  var_format=var_format,
@@ -1039,6 +1038,12 @@ class MultiPortfolioData:
                                  title=f"{factor_beta_title}",
                                  ax=axs[idx],
                                  **kwargs)
+            if factor_exposure.isna().all().all():
+                axs[idx].text(
+                    0.5, 0.5, f'Insufficient history: {factor_beta_span}-return warm-up',
+                    transform=axs[idx].transAxes, ha='center', va='center',
+                    fontsize=kwargs.get('fontsize', 10),
+                )
             if regime_benchmark is not None:
                 self.add_regime_shadows(ax=axs[idx],
                                         regime_benchmark=regime_benchmark,

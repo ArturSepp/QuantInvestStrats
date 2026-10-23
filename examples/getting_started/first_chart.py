@@ -19,7 +19,6 @@ portfolio = qis.backtest_model_portfolio(
 )
 figure = qis.plot_prices(
     prices=portfolio.get_portfolio_nav(),
-    perf_stats_labels=None,
     title='Quarterly rebalanced 60/40 portfolio',
 )
 plt.show()

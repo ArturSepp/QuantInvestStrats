@@ -21,6 +21,10 @@ plain difference of the two returns, has its own volatility, the tracking error,
 Sharpe ratio, the information ratio. This chapter defines the three objects, shows where they
 disagree, and states exactly what qis computes for each.
 
+For dynamic portfolios, the factsheets use **holdings-weighted instrument betas**: current
+portfolio exposures times instrument betas estimated from their return histories. This is an
+ex-ante exposure estimate, distinct from the regression of historical portfolio NAV returns.
+
 ## Overview
 
 qis answers the benchmark question with five families of entry points. They answer different
@@ -47,6 +51,10 @@ The chapter's main messages:
    volatilities, and when $\beta\neq1$ it contains a beta-mismatch term as well as residual risk.
 5. The attribution applies the beta estimated at $t-1$ to the benchmark return over $(t-1,t]$,
    so it is point in time. Its residual is booked as `Alpha`.
+6. A rebalance changes holdings-weighted beta immediately. This accounts for the current long,
+   short and leveraged positions of dynamic allocation and CTA strategies; a NAV regression
+   averages the exposures carried during its estimation history. Instrument betas warm up for
+   one span of returns, with no assumed initial portfolio beta of one.
 
 Ex-ante and EWMA realised tracking error are covered in
 [Tracking error and benchmark-relative risk](tracking_error_and_risk.md); this chapter only uses
@@ -56,9 +64,9 @@ the whole-sample estimators and links to that chapter for the rest.
 
 | Convention | This article |
 |---|---|
-| Return basis | Table regression: simple returns (`is_log_returns=False`), in excess of cash on both sides when `PerfParams.rates_data` is set. EWMA betas: log returns. Attribution: simple returns |
+| Return basis | Table regression: simple returns (`is_log_returns=False`), in excess of cash on both sides when `PerfParams.rates_data` is set. EWMA betas: log returns. Contribution-table attribution: simple returns. Factsheet rolling alpha: log-return residuals, no cash subtraction |
 | Sampling grid | `PerfParams.freq_reg`, default `QE`; with `perf_params=None` the grid is inferred from the price index. EWMA betas and attribution: `freq_beta`, default the input grid for the `qis.*` functions and `'B'` for the `PortfolioData` methods |
-| Annualisation | `ALPHA_AN` is $\mathrm{af}\,\hat\alpha$ with $\mathrm{af}$ of `freq_reg`; TE is $\sqrt{\mathrm{af}}\,s(x)$ and IR is $\sqrt{\mathrm{af}}\,\bar x/s(x)$ with $\mathrm{af}$ inferred from the return index; beta and $R^2$ are not annualised |
+| Annualisation | `ALPHA_AN` is $\mathrm{af}\,\hat\alpha$ with $\mathrm{af}$ of `freq_reg`; factsheet alpha is $\mathrm{af}$ times an EWMA residual on `freq_beta`; TE is $\sqrt{\mathrm{af}}\,s(x)$ and IR is $\sqrt{\mathrm{af}}\,\bar x/s(x)$ with $\mathrm{af}$ inferred from the return index; beta and $R^2$ are not annualised |
 | Mean adjustment | OLS with an intercept and a centred $R^2$; TE demeaned with `ddof=1`; EWMA betas demeaned by an EWMA mean (`MeanAdjType.EWMA`) |
 | Timing | Table statistics and TE/IR are full-sample and descriptive. Attribution applies the beta known at $t-1$ to the return over $(t-1,t]$ |
 | Output units | Alpha as a decimal return per `freq_reg` period (`ALPHA`) and per year (`ALPHA_AN`); beta, IR dimensionless; $R^2$ in $[0,1]$; TE annualised decimal |
@@ -81,7 +89,9 @@ the whole-sample estimators and links to that chapter for the rest.
 | $\beta_{i,q,t}$, $\beta_{p,q,t}$ | EWMA beta of instrument $i$ and of the portfolio to benchmark $q$ at $t$ | Uses returns up to and including $t$ |
 | $m_t$, $C_{i,t}$, $\Gamma_t$ | EWMA mean, cross-moment vector and benchmark second-moment matrix | Local to the EWMA recursion |
 | $A_{q,t}$ | Return attributed to benchmark $q$ over $(t-1,t]$ | Decimal per period |
-| $\eta_t$ | Attribution residual, the column `Alpha` | Decimal per period |
+| $\eta_t$ | Simple-return attribution residual, the column `Alpha` | Decimal per period |
+| $\ell_{p,t}$, $\ell_{b,t}$, $a_t$, $\bar a_t$ | Portfolio and benchmark log returns, lagged-beta log residual and its EWMA | Decimal per period; factsheet alpha is $\mathrm{af}\,\bar a_t$ |
+| $w_{i,t}$, $t_0$ | Instrument exposure as a fraction of NAV; performance base date | Signed exposures, not gross-normalised; zero alpha through $t_0$ |
 | $\lambda$, $N$ | EWM decay and span, $\lambda=1-2/(N+1)$ | `factor_beta_span` or `span` is $N$ |
 | $\mathrm{af}$, $Y$ | Periods per year; elapsed years $T/\mathrm{af}$ | 12 for `ME`, 4 for `QE` |
 
@@ -384,8 +394,11 @@ Implementation details of `qis.compute_portfolio_ewm_benchmark_betas`:
   to $C$ and $\Gamma$ and cancels in the ratio.
 - Because $m_t$ includes $\ell_t$, $\check\ell_t=\lambda(\ell_t-m_{t-1})$. The factor $\lambda^2$
   cancels between $C$ and $V$, so the beta equals the one demeaned by the previous EWMA mean.
-- Betas are missing on the first 21 dates of the grid, the start date and the first 20 returns
-  (warm-up, `warmup_period=20`). A benchmark with no centred variance gets a missing beta and the
+- Instrument betas are missing for the first $N$ jointly finite instrument/benchmark returns
+  (`warmup_period=factor_beta_span`). With complete prices this means the baseline and first
+  $N$ return rows are missing; the first published estimate uses return $N+1$. A later-starting
+  instrument must complete its own warm-up. No missing beta is replaced by one or zero.
+  A benchmark with no centred variance gets a missing beta and the
   others come from the reduced system; a numerically singular $\Gamma_t$, whose unit-diagonal
   rescaling has an eigenvalue ratio below $10^{-12}$, gives missing betas. There is no diagonal
   fall-back. A missing return carries both moments forward.
@@ -408,6 +421,23 @@ Both conditions are approximations. Weighted log returns are not the portfolio l
 [Notation and conventions](notation_and_conventions.md)), and after a rebalance the holdings-based
 beta moves at once while a beta estimated from the NAV would adjust over the EWMA memory.
 
+> **Insight.** Holdings-weighted beta answers: "What benchmark exposure do the positions held
+> now imply?" A dynamic strategy can cut risk, increase leverage or reverse a futures position
+> today. Its instrument betas may hardly change, but its portfolio beta should change with
+> those positions. A regression of historical portfolio NAV returns cannot observe today's
+> rebalance until subsequent returns enter its estimation window. We therefore retain
+> holdings-weighted beta for the factsheet's ex-ante exposure and lag it when attributing
+> realised returns. Benchmark returns earned through those exposures are assigned to the beta
+> contribution, reducing the risk of labelling a change in exposure as alpha.
+
+This is not a claim that the estimate is the true future beta: instrument relationships can
+change, nonlinear payoffs need more than a linear beta, and within-period rebalances require a
+fine enough attribution grid. Weekly CTA reporting uses weekly instrument returns and weights;
+the warm-up is $N$ weekly returns, not $N$ months. The span sets an exponential memory, not a
+hard rolling window. The separate
+[model-layer NAV regressions](model_layer_attribution.md#holdings-exposure-versus-model-layer-nav-regression)
+answer what the realised layer return histories explain.
+
 The weights entering the sum are those in force on each beta date, selected as of that date (the
 last weight row at or before it), so a calendar month-end that falls on a weekend uses the
 Friday weights. The portfolio beta is missing during the warm-up, before the first weight row,
@@ -415,9 +445,10 @@ and wherever an instrument with a non-zero weight has no beta; a missing weight 
 instrument is not held. A genuinely zero exposure, for example a portfolio fully in cash, is
 reported as zero. Until the handbook follow-up, weights were matched to beta dates exactly, zero
 betas were treated as holidays and replaced by the previous value, and the warm-up showed zero.
-`PortfolioData.compute_portfolio_benchmark_betas`
-passes `PortfolioData.get_weights()`, which by default samples weights weekly (`W-WED`) and
-forward-fills them onto the price grid.
+`PortfolioData.compute_portfolio_benchmark_betas` passes native-date realised weights through
+`PortfolioData.get_weights(freq=None)` before selecting weights as of each beta date. It does
+not first sample them on Wednesdays: that would delay an off-Wednesday opening allocation or
+rebalance and could turn an invested portfolio's opening beta into a spurious zero.
 
 `qis.compute_ewm_beta_alpha_forecast` is the one-factor estimator for return series. With the
 default `mean_adj_type=MeanAdjType.NONE` it uses second moments about zero, so for a benchmark
@@ -490,6 +521,36 @@ return as a column, which is filled in the warm-up as well. Both functions keep 
 including the first row after `time_period` clipping; the returns variant no longer overwrites
 its first row with zeros. The row dated $t$ attributes the return over $(t-1,t]$, so cumulate
 from the row after a base date to measure performance from that date.
+
+### Factsheet rolling alpha and the performance start
+
+The paired factsheet panels use the same `factor_beta_span` and `freq_beta`. For one benchmark,
+the realised log-return residual and the displayed rolling annualised alpha are
+
+$$
+a_t=\ell_{p,t}-\beta_{p,t-1}\ell_{b,t},
+\qquad
+\bar a_t=\lambda\bar a_{t-1}+(1-\lambda)a_t,
+\qquad
+\alpha_{\mathrm{rolling},t}=\mathrm{af}\,\bar a_t.
+$$
+
+Instrument beta estimation uses all available paired history, including history before the
+portfolio's performance base date $t_0$. The beta title states the first paired instrument-return
+date; it does not assert that the portfolio was live then. The alpha title states $t_0$.
+Alpha is zero through $t_0$. Its EWMA starts from the first valid residual strictly after $t_0$
+(`InitType.X0`), without carrying pre-start alpha into the measured performance. The zero
+baseline is not an extra zero observation in that EWMA.
+
+If the lagged beta is still warming up after $t_0$, alpha is missing for those periods. There is
+no unity-beta fallback and the entire portfolio return is not booked as alpha. Missing later
+held-instrument betas also leave gaps. An all-cash portfolio can have a genuine beta of zero.
+
+The upper panel is a **rolling annualised alpha estimate**, not cumulative alpha. A cumulative
+log-alpha path instead sums $a_t$ strictly after $t_0$ with a zero baseline there; it is not
+annualised. A missing attribution period is unavailable, not evidence of zero alpha. Neither
+measure is a compounded investable return or proof of manager skill. Unlike the simple-return
+contribution table above, both sides of the factsheet residual use log returns.
 
 ## Worked example
 
@@ -612,11 +673,11 @@ assert abs(12.0 * (coef[1] - 1.0) * r_b.mean() + 0.0024) < 5e-5
 Finally, a fund holds 60% in the portfolio and 40% in the benchmark, rebalanced monthly. Its
 EWMA benchmark beta with span 24 is computed by qis and, independently, by the recursion of the
 Methodology section on log returns. The benchmark's beta to itself is 1, so the fund beta is 0.6
-times the portfolio sleeve's beta plus 0.4. The first beta is dated 2021-09-30, after the 21-row
+times the portfolio sleeve's beta plus 0.4. The first beta is dated 2022-01-31, after the 25-row
 warm-up; the last is about 0.87, against $0.6\times0.805+0.4\approx0.88$ from the full-sample
 regression. The attribution uses the previous month's beta times the simple benchmark return and
-reconciles exactly to the fund return in every attributed month. During the warm-up the first 22
-rows (the start date and 21 returns without a lagged beta) are missing in both columns rather
+reconciles exactly to the fund return in every attributed month. During the warm-up the first 26
+rows (the start date and 25 returns without a lagged beta) are missing in both columns rather
 than booked as `Alpha`. Moving the fund fully into cash for its last six months gives a beta of
 exactly zero on those dates.
 
@@ -635,7 +696,7 @@ attribution = qis.compute_portfolio_benchmark_ewm_beta_alpha_attribution(
 lam = 1.0 - 2.0 / (span + 1.0)
 
 
-def ewm_beta(y, x, warmup=20):
+def ewm_beta(y, x, warmup=span):
     """EWMA-demeaned beta of y on x: X0 means, moments from zero."""
     beta = np.full(len(x), np.nan)
     m_x, m_y, c, v = x[1], y[1], 0.0, 0.0  # the means start at the first return
@@ -652,7 +713,8 @@ def ewm_beta(y, x, warmup=20):
 l_b, l_p = np.r_[np.nan, np.log1p(r_b)], np.r_[np.nan, np.log1p(r_p)]
 beta_fund = 0.6 * ewm_beta(l_p, l_b) + 0.4 * ewm_beta(l_b, l_b)
 np.testing.assert_allclose(betas['Benchmark'].to_numpy(), beta_fund, rtol=1e-10)
-assert betas['Benchmark'].first_valid_index() == pd.Timestamp('2021-09-30')
+assert betas['Benchmark'].iloc[:span + 1].isna().all()
+assert betas['Benchmark'].first_valid_index() == pd.Timestamp('2022-01-31')
 assert abs(beta_fund[-1] - 0.87) < 5e-3
 
 # log-return betas against simple-return betas: a second-order difference
@@ -665,7 +727,7 @@ np.testing.assert_allclose(attribution['Benchmark'].to_numpy(),
 
 # warm-up: while the lagged beta is missing, neither contribution nor residual is defined
 warm = attribution['Benchmark'].isna().to_numpy()[1:]
-assert warm.sum() == 21 and attribution.iloc[:22].isna().all().all()
+assert warm.sum() == span + 1 and attribution.iloc[:span + 2].isna().all().all()
 np.testing.assert_allclose(attribution.sum(axis=1).iloc[1:][~warm], fund_r[~warm], atol=1e-14)
 
 # a fund fully in cash has beta zero, not the beta of its last invested month
@@ -686,9 +748,66 @@ assert np.isclose(x_f.mean(), eta.mean() + (b_lag.mean() - 1.0) * r_bt.mean() + 
                   rtol=1e-10)
 ```
 
-After the warm-up, the residual averages 0.068% per month against a true fund alpha of
-$0.6\times0.1\%=0.06\%$. The beta-timing term is $-0.023\%$ per month, noise around zero,
-because the synthetic fund does not time its exposure.
+The printed residual mean and beta-timing term below use only months with a valid lagged beta.
+The true fund alpha is $0.6\times0.1\%=0.06\%$ per month; sample residuals and timing need not
+equal their population values because the synthetic fund has finite, noisy returns.
+
+```python
+print(f'Residual mean: {eta.mean():.3%} per month; beta timing: {timing:.3%} per month')
+```
+
+### Dynamic holdings: the two-panel factsheet example
+
+![Rolling annualised alpha above holdings-weighted beta for dynamic and fixed allocations; the dynamic NAV-regression beta adjusts gradually after weight changes](images/handbook_holdings_alpha_beta.png)
+
+[Open full-resolution preview](images/handbook_holdings_alpha_beta.png).
+
+This synthetic example asks whether the beta reflects a portfolio's changed exposures at the
+rebalance. It uses the frozen US equity and Treasury indices from January 2005 to December
+2025, monthly rebalancing, a 12-return warm-up and span, and performance from 31 December 2010.
+The fixed allocation holds 80% equity / 20% bonds. The dynamic targets change to 20% / 80% on
+31 December 2013, -40% / 80% on 31 December 2017, and 120% / 20% on 31 December 2021. These
+predetermined changes illustrate defensive, short-equity and leveraged exposures; they are not
+a fitted trading rule. The balance is cash or funding, with zero rates, fees and costs.
+Units are held between monthly rebalances; new targets apply to the following month's return.
+
+The first instrument beta is available on 28 February 2006, well before the performance start.
+The blue holdings beta reacts on each dotted rebalance date: at the first switch it is 0.17,
+while the dashed NAV-regression beta is still 0.80. The latter continues to reflect past
+positions and adapts as new returns arrive. Both regressions use
+EWMA mean adjustment and the same span, so the distinction is their input, not a faster
+smoothing parameter. The upper panel is `MultiPortfolioData.compute_rolling_benchmark_alpha`:
+12 times the 12-span EWMA of realised log-return residuals using the previous month's holdings
+beta. It starts at zero on the performance base date. Residual alpha includes the bond return
+not explained by US equity exposure; it is not evidence that this predetermined rule has skill.
+
+The canonical producer is
+[`holdings_alpha_beta` in handbook.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/tools/docs_analytics/handbook.py).
+It calls `qis.backtest_model_portfolio`, `PortfolioData.compute_portfolio_benchmark_betas` and
+the same rolling-alpha calculation as the factsheet. Independent pandas moment recursions
+check both beta curves and alpha, and a lagged-weight simple-return calculation checks NAVs.
+The registered table saves weights, NAVs, instrument returns, instrument betas and both panels.
+
+From a source checkout, the following executes that single example without private inputs or
+network access; the [complete bundle command](https://github.com/ArturSepp/QuantInvestStrats/blob/main/tools/docs_analytics/README.md)
+records source fingerprints and produces the published preview. The span-linked holdings
+warm-up and native-date weight alignment described here are changes in the current source.
+
+```python
+import matplotlib.pyplot as plt
+from tools.docs_analytics.handbook import holdings_alpha_beta
+from tools.docs_analytics.run import load_manifest
+
+params = load_manifest()['producers']['handbook']['parameters']
+figure, table, verified, summary = holdings_alpha_beta(params)
+assert verified
+assert summary['first_beta_date'] == '2006-02-28'
+assert round(summary['first_switch_holdings_beta'], 2) == 0.17
+assert round(summary['first_switch_nav_beta'], 2) == 0.80
+assert table.loc['2010-12-31', 'annual_alpha_Dynamic holdings'] == 0.0
+assert table['holdings_beta_Dynamic holdings'].iloc[:13].isna().all()
+plt.close(figure)
+```
 
 ## Implementation in qis
 
@@ -704,6 +823,7 @@ because the synthetic fund does not time its exposure.
 | Portfolio EWMA benchmark betas | $\sum_iw_{i,t}\beta_{i,q,t}$ on log returns | `qis.compute_portfolio_ewm_benchmark_betas`, `PortfolioData.compute_portfolio_benchmark_betas` |
 | Beta attribution | $A_{q,t}=\beta_{p,q,t-1}r_{q,t}$, $\eta_t=r_{p,t}-\sum_qA_{q,t}$ | `qis.compute_benchmarks_beta_attribution_from_prices`, `qis.compute_benchmarks_beta_attribution_from_returns` |
 | Betas and attribution in one call | both of the above | `qis.compute_portfolio_benchmark_ewm_beta_alpha_attribution`, `PortfolioData.compute_portfolio_benchmark_attribution` |
+| Factsheet rolling annualised alpha | $\mathrm{af}\,\mathrm{EWM}(\ell_p-\beta_{p,t-1}\ell_b)$, reset after the performance start | `MultiPortfolioData.compute_rolling_benchmark_alpha`, `MultiPortfolioData.plot_rolling_benchmark_alpha` |
 | Rendered table | selected `PerfStat` columns | `qis.plot_ra_perf_table_benchmark`, `PortfolioData.plot_ra_perf_table` with `BENCHMARK_TABLE_COLUMNS` |
 
 Defaults verified with `inspect.signature`:

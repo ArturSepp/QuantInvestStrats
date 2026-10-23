@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple
 from enum import Enum
-from examples._helpers.output import get_output_dir, parse_output_dir
+from qis import local_path
 import yfinance as yf
 import qis as qis
 from qis import TimePeriod, MultiPortfolioData, weights_tracking_error_report_by_ac_subac
@@ -105,7 +105,7 @@ def run_local(local: Locals, output_path: str = None):
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
-    output_path = get_output_dir(output_path)
+    output_path = local_path.get_output_path(output_path)
 
     # time period for portfolio reporting
     time_period = qis.TimePeriod('31Dec2006', '31Dec2025')
@@ -189,4 +189,4 @@ def run_local(local: Locals, output_path: str = None):
 
 if __name__ == '__main__':
 
-    run_local(local=Locals.STRATEGY_BENCHMARK_PLT, output_path=parse_output_dir())
+    run_local(local=Locals.STRATEGY_BENCHMARK_PLT)

@@ -14,7 +14,7 @@ from enum import Enum
 from bbg_fetch import fetch_field_timeseries_per_tickers
 
 
-def run_report():
+def run_report(output_path: str = None):
     # tickers = {'TY1 Comdty': '10y', 'UXY1 Comdty': '10y Ultra'}
     tickers = {
         'SPTR Index': 'SPTR Index',
@@ -171,7 +171,8 @@ def run_report():
 
     prices = fetch_field_timeseries_per_tickers(tickers=tickers, freq='B', field='PX_LAST').ffill()
     print(prices)
-    # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices', local_path=qis.get_output_path())
+    # qis.save_df_to_csv(df=prices, file_name='qis_vol_indices',
+    #                    local_path=qis.get_output_path(output_path))
 
     # time_period = qis.TimePeriod('07Aug2014', '08Jul2026')
     # time_period = qis.TimePeriod('18Apr2024', '08Jul2026')
@@ -186,8 +187,7 @@ def run_report():
                                              **kwargs)
     qis.save_figs_to_pdf(figs=[fig],
                          file_name=f"bbg_multiasset_report", orientation='landscape',
-                         # local_path='C://Users//uarts//outputs//',
-                         local_path=qis.get_output_path()
+                         local_path=qis.get_output_path(output_path)
                          )
 
 
@@ -208,7 +208,7 @@ class Locals(Enum):
     PRICE = 2
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -220,7 +220,7 @@ def run_local(local: Locals):
 
 
     if local == Locals.REPORT:
-        run_report()
+        run_report(output_path=output_path)
 
     elif local == Locals.PRICE:
         run_price()

@@ -230,7 +230,7 @@ class Locals(Enum):
     SPY_SIMULATION = 2
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -245,14 +245,14 @@ def run_local(local: Locals):
         time_period = qis.TimePeriod('31Dec2015', '21Jun2023')
         figs = create_time_series_report(prices=prices, time_period=time_period, vol_target=0.5, vol_af=360)
         fu.save_figs_to_pdf(figs=figs, file_name='btc_analysis', orientation='landscape',
-                            add_current_date=True, local_path=None)
+                            add_current_date=True, local_path=qis.get_output_path(output_path))
 
     elif local == Locals.SPY_SIMULATION:
         prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True, auto_adjust=True)['Close'].dropna()
         time_period = qis.TimePeriod('31Dec2019', '15Aug2024')
         figs = create_time_series_report(prices=prices, time_period=time_period, vol_target=0.15, vol_af=260)
         fu.save_figs_to_pdf(figs=figs, file_name='spy_analysis', orientation='landscape',
-                            add_current_date=True, local_path=None)
+                            add_current_date=True, local_path=qis.get_output_path(output_path))
 
     plt.show()
 

@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from typing import Tuple, List
 from enum import Enum
-from examples._helpers.output import get_output_dir, parse_output_dir
+from qis import local_path
 import yfinance as yf
 import qis
 from qis import TimePeriod, PortfolioData
@@ -103,7 +103,7 @@ def run_local(local: Locals, output_path: str = None):
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
-    output_path = get_output_dir(output_path)
+    output_path = local_path.get_output_path(output_path)
 
     time_period = qis.TimePeriod('31Dec2005', '31Dec2025')  # time period for portfolio reporting
     time_period_short = TimePeriod('31Dec2022', time_period.end)
@@ -192,4 +192,4 @@ def run_local(local: Locals, output_path: str = None):
 
 if __name__ == '__main__':
 
-    run_local(local=Locals.VOLPARITY_PORTFOLIO, output_path=parse_output_dir())
+    run_local(local=Locals.VOLPARITY_PORTFOLIO)

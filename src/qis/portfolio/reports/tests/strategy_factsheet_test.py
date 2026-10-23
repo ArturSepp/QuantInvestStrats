@@ -586,7 +586,7 @@ def test_rolling_benchmark_alpha_uses_lagged_displayed_betas_and_matching_span()
     expected = pd.DataFrame(expected)
     expected = time_period.locate(expected)
 
-    pd.testing.assert_frame_equal(actual, expected)
+    pd.testing.assert_frame_equal(actual, expected, check_freq=False)
     assert (actual.loc[performance_start] == 0.0).all()
 
 
@@ -608,6 +608,7 @@ def test_portfolio_betas_use_point_in_time_ewma_mean_adjustment(monkeypatch) -> 
 
     assert fit_arguments[-1]['mean_adj_type'] is qis.MeanAdjType.EWMA
     assert fit_arguments[-1]['init_type'] is qis.InitType.X0
+    assert fit_arguments[-1]['warmup_period'] == 12
 
 
 def test_beta_estimation_start_ignores_flat_strategy_history() -> None:
@@ -707,10 +708,10 @@ def test_quarterly_strategy_benchmark_report_uses_monthly_exposures_and_linked_a
     time_period = qis.TimePeriod(start=performance_start, end=pd.Timestamp('2025-12-31'))
     beta_estimation_start = min(
         qis.to_returns(
-            prices=portfolio.get_portfolio_nav(),
+            prices=portfolio.prices,
             freq='QE',
             is_log_returns=True,
-        ).loc[lambda x: x.notna() & x.ne(0.0)].index[0]
+        ).dropna(how='all').index[0]
         for portfolio in multi_portfolio.portfolio_datas
     )
     assert beta_estimation_start < performance_start
@@ -732,8 +733,8 @@ def test_quarterly_strategy_benchmark_report_uses_monthly_exposures_and_linked_a
             'starting from 31Dec2020'
         ) in titles
         assert (
-            '12-span rolling Beta of QE-freq returns to Benchmark,\n'
-            f'estimation starting from {beta_estimation_start:%d%b%Y}'
+            '12-span rolling holdings-weighted Beta to Benchmark (QE-freq),\n'
+            f'instrument beta estimation starting from {beta_estimation_start:%d%b%Y}'
         ) in titles
         assert not any(title.startswith('Cumulative p&l diff') for title in titles)
     finally:

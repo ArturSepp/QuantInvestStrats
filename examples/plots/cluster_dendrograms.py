@@ -1,11 +1,12 @@
 """Offline examples of single-axis and composite fitted-tree plots.
 
-Run: python -m examples.plots.cluster_dendrograms --output-dir <local-output-directory>
+Run: python -m examples.plots.cluster_dendrograms
+Select Locals.EXPORT to save under YAML OUTPUT_PATH or pass output_path to run_local.
 The frozen QIS synthetic universe supplies all observations; no vendor data is needed.
 This example fits illustrative trees with SciPy. Production callers pass their saved
 estimator linkages and memberships instead.
 """
-import argparse
+from enum import Enum
 from pathlib import Path
 
 import pandas as pd
@@ -57,8 +58,7 @@ def main(output_dir=None):
     if output_dir is None:
         plt.show()
     else:
-        folder = Path(output_dir)
-        folder.mkdir(parents=True, exist_ok=True)
+        folder = Path(qis.get_output_path(output_dir))
         standalone.savefig(folder / "standalone_dendrogram.png", dpi=120)
         fig.savefig(folder / "cluster_dendrograms.png", dpi=120)
         membership.to_csv(folder / "cluster_membership.csv")
@@ -66,7 +66,20 @@ def main(output_dir=None):
         plt.close(fig)
 
 
+class Locals(Enum):
+    PLOT = 1
+    EXPORT = 2
+
+
+def run_local(local: Locals, output_path: str = None):
+    """Display the example or export using YAML defaults/an explicit override."""
+    if local not in (Locals.PLOT, Locals.EXPORT):
+        raise ValueError(local)
+    output = qis.get_output_path(output_path) if local == Locals.EXPORT else None
+    if output_path is not None:
+        output = qis.get_output_path(output_path)
+    return main(output_dir=output)
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path)
-    main(parser.parse_args().output_dir)
+    run_local(local=Locals.PLOT)

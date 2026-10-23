@@ -515,13 +515,70 @@ record length. The deflated Sharpe ratio of
 to the expected maximum Sharpe ratio among the independent trials of a strategy search, which
 corrects for selection among many backtests.
 
-**What qis computes.** No function in qis returns a Sharpe-ratio standard error, a probabilistic
-or a deflated Sharpe ratio. The nearest output is `qis.compute_desc_table(...,
-is_add_tstat=True)`, which reports $\sqrt{T}\,\bar x/s(x)$ for each column; on periodic returns
+**What qis computes.** `qis.sharpe_difference_test` returns a paired Sharpe-difference standard
+error and test, described below. It does not estimate a probabilistic or deflated Sharpe ratio.
+The separate `qis.compute_desc_table(...,
+is_add_tstat=True)` reports $\sqrt{T}\,\bar x/s(x)$ for each column; on periodic returns
 this is $\sqrt{T}\,\hat\theta$, the Sharpe ratio divided by its standard error under the null
 $\theta=0$. The worked example computes the standard errors above with numpy, and the bootstrap
 of [reproducibility](reproducibility.md) can resample returns for a distribution-free
 alternative.
+
+### Paired HAC test of a Sharpe difference
+
+`qis.sharpe_difference_test(r1, r2, n_lags=None, af=12.0)` tests equal arithmetic Sharpes
+using the delta-method framework of [Ledoit and Wolf (2008)](https://doi.org/10.1016/j.jempfin.2008.03.002),
+section 3.1. Supply periodic simple excess returns on the same grid; the function does no
+cash adjustment or fee deduction. It sorts the index intersection, drops pairs with NaN,
+rejects infinities and requires at least 24 observations. HAC lags count retained observations;
+resolve material calendar gaps before calling it.
+
+Write $\hat\theta_i=\bar r_i/\hat\sigma_i$ with population variance (`ddof=0`), and
+$z_{it}=(r_{it}-\bar r_i)/\hat\sigma_i$. The difference's influence series is
+
+$$
+h_t=z_{1t}-\frac{\hat\theta_1}{2}(z_{1t}^2-1)
+    -z_{2t}+\frac{\hat\theta_2}{2}(z_{2t}^2-1).
+$$
+
+This is the paper's four-moment gradient applied to the demeaned moment vector. QIS applies
+the unprewhitened Bartlett kernel to $h_t$, with weights $1-k/(L+1)$ through lag $L$:
+
+$$
+\widehat{\operatorname{se}}(\hat\theta_1-\hat\theta_2)^2
+=\frac{1}{T^2}\left[\sum_{t=1}^T h_t^2+
+2\sum_{k=1}^{L}\left(1-\frac{k}{L+1}\right)\sum_{t=k+1}^{T}h_t h_{t-k}\right].
+$$
+
+The default is $L=\lfloor4(T/100)^{2/9}\rfloor$, with no finite-sample correction.
+Both the difference and its standard error are multiplied by $\sqrt{\mathrm{af}}$;
+their ratio (`t_stat`, a normal-reference z statistic) and two-sided p-value are unchanged.
+The population variance convention differs slightly from tables using `ddof=1`.
+The result preserves paired dependence; testing the mean of `r1-r2` answers a different question.
+Identical or positively proportional return series return zero difference and standard error,
+with the explicit neutral convention `t_stat=0`, `p_value=1`.
+
+This implements an asymptotic HAC variant, not the paper's prewhitened quadratic-spectral
+estimator or its recommended studentized time-series bootstrap. It requires stationarity,
+sufficient finite moments and weak dependence, and does not correct for selecting a strategy
+from many backtests. Square-root annualisation here labels the periodic arithmetic Sharpe;
+it does not estimate the Sharpe of compounded annual returns under serial dependence.
+
+For NAVs, convert first and explicitly choose the annualisation factor:
+
+```python
+import qis
+from qis.datasets.synthetic import generate_synthetic_prices
+
+navs = generate_synthetic_prices(end='2006-06-30', apply_quirks=False)
+paired = qis.to_returns(navs[['SEQ_US', 'SBD_TSY']], is_log_returns=False, drop_first=True)
+test = qis.sharpe_difference_test(paired['SEQ_US'], paired['SBD_TSY'], af=260.0)
+print(f"Difference: {test.diff_an:0.2f}; HAC SE: {test.se_an:0.2f}; p: {test.p_value:0.2f}")
+```
+
+These synthetic NAV returns use a zero cash hurdle. For funded NAVs, subtract the appropriate
+cash accrual before testing excess Sharpes; do not subtract cash again from futures excess P&L.
+Implementation: [sharpe_inference.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/sharpe_inference.py).
 
 ### Short histories
 
@@ -831,6 +888,7 @@ assert np.isclose(information_ratio.iloc[0], 0.301, atol=5e-4)
 | Log Sharpe ratio | $\log(1+R_{\mathrm{pa}})/\sigma_v$ | `PerfStat.SHARPE_LOG_AN`; excess: `PerfStat.SHARPE_LOG_EXCESS` |
 | Arithmetic Sharpe ratio | $\sqrt{\mathrm{af}}\,\bar r/s(r)$ | `PerfStat.SHARPE_ARITH`, computed in `qis.compute_risk_table` |
 | Arithmetic excess Sharpe ratio | $\sqrt{\mathrm{af}}\,\overline{\tilde r}/s(\tilde r)$ | `PerfStat.SHARPE_ARITH_EXCESS` |
+| Paired Sharpe-difference inference | Bartlett HAC delta-method standard error and normal p-value | `qis.sharpe_difference_test`, `qis.SharpeDiffTest` |
 | Table volatility | $\sigma_v=\sqrt{\mathrm{af}}\,s(v)$ | `PerfStat.VOL`; `PerfParams.freq_vol`, `PerfParams.return_type` |
 | P.a. return | $R_{\mathrm{pa}}$ | `PerfStat.PA_RETURN` (native endpoints), `qis.compute_pa_return` |
 | Cash accrual and excess returns | $r^{f}_t$, $\tilde r_t$ | `qis.compute_excess_returns`, `qis.compute_pa_excess_compounded_returns` |
@@ -963,3 +1021,4 @@ and [ex-post tracking error](https://github.com/ArturSepp/QuantInvestStrats/blob
 7. Bailey, D. H., and López de Prado, M. (2014). The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting, and Non-Normality. *The Journal of Portfolio Management*, 40(5), 94–107. [DOI: 10.3905/jpm.2014.40.5.094](https://doi.org/10.3905/jpm.2014.40.5.094). The correction for selection among many trials.
 8. Bacon, C. R. (2008). *Practical Portfolio Performance Measurement and Attribution*, 2nd edition. Wiley. The performance-measurement practice of compound annualised returns in risk-adjusted ratios.
 9. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+10. Ledoit, O., and Wolf, M. (2008). Robust performance hypothesis testing with the Sharpe ratio. *Journal of Empirical Finance*, 15(5), 850–859. [DOI: 10.1016/j.jempfin.2008.03.002](https://doi.org/10.1016/j.jempfin.2008.03.002).

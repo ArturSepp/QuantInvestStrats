@@ -69,7 +69,7 @@ class Locals(Enum):
     EM = 4
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -109,7 +109,7 @@ def run_local(local: Locals):
                                              **kwargs)
     qis.save_figs_to_pdf(figs=[fig],
                          file_name=f"bbg_multiasset_report", orientation='landscape',
-                         local_path=qis.get_output_path())
+                         local_path=qis.get_output_path(output_path))
 
     plt.close('all')
 

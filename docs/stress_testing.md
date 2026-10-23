@@ -423,17 +423,18 @@ at quarter ends, and uses the last returned covariance date. The risk date is pr
 It is an EWMA span, **not a hard 52-observation rolling window**. The zero-mean scenario
 conditioning is separate from the estimator's demeaning convention.
 
-From the repository root, with qis 5.24.0 or later installed:
+From the current repository root, using [default or private YAML paths](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/README.md):
 
 ~~~console
 python -m examples.portfolios.factor_stress_testing
-python -m examples.portfolios.factor_stress_testing --output-dir /path/to/output
+python -c "from examples.portfolios.factor_stress_testing import Locals, run_local; run_local(Locals.REPORT)"
 ~~~
 
 On Windows, use the external repository interpreter
 `C:\Python\QuantInvestStrats312\Scripts\python.exe` and an explicit C-local output directory.
 The example creates figures in memory and prints the scenario comparison by default.
-With `--output-dir` it saves two figures in PNG/PDF and 22 CSV tables; reuse of an output directory
+With `Locals.REPORT` it saves two figures in PNG/PDF and 22 CSV tables under YAML `OUTPUT_PATH`
+(override with the `output_path` argument); reuse of an output directory
 overwrites matching filenames. The example is repository-only, not installed in the wheel.
 
 The workflow demonstrates:

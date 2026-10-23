@@ -12,6 +12,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402
@@ -64,8 +65,17 @@ def yahoo_panel(monkeypatch, tmp_path):
 def test_yahoo_workflow(module, yahoo_panel, monkeypatch, tmp_path):
     """Real calculation/rendering code accepts a one-column Yahoo Close DataFrame."""
     output = tmp_path / 'new' / 'reports'
-    monkeypatch.setattr(sys, 'argv', [module, '--output-dir', str(output)])
-    namespace = runpy.run_module(f'examples.{module}', run_name='__main__')
+    config = tmp_path / 'private.yaml'
+    config.write_text(yaml.safe_dump({'OUTPUT_PATH': str(output)}), encoding='utf-8')
+    monkeypatch.setenv('QIS_SETTINGS_PATH', str(config))
+    monkeypatch.setattr(sys, 'argv', [module])
+    if module == 'portfolios.leveraged_etf_strategies':
+        namespace = runpy.run_module(f'examples.{module}')
+        funding_rate = namespace['run_local'](namespace['Locals'].FACTSHEET)
+        assert isinstance(funding_rate, pd.Series)
+        np.testing.assert_allclose(funding_rate, 0.05)
+    else:
+        namespace = runpy.run_module(f'examples.{module}', run_name='__main__')
     assert plt.get_fignums(), f'{module} did not produce a figure'
     for number in plt.get_fignums():
         plt.figure(number).canvas.draw()
@@ -73,11 +83,8 @@ def test_yahoo_workflow(module, yahoo_panel, monkeypatch, tmp_path):
         overnight, intraday, daily = namespace['compute_returns']()
         np.testing.assert_allclose((1 + overnight) * (1 + intraday), 1 + daily,
                                    equal_nan=True, rtol=1e-12)
-    if module == 'portfolios.leveraged_etf_strategies':
-        assert isinstance(namespace['funding_rate'], pd.Series)
-        np.testing.assert_allclose(namespace['funding_rate'], 0.05)
     if module in ('perfstats.quickstart', 'models.bootstrap_analysis'):
-        assert list(output.glob('*')), 'the explicit output directory was not used'
+        assert list(output.glob('*')), 'the YAML output directory was not used'
 
 
 def test_unsmoothing_narrative(yahoo_panel, capsys):
@@ -169,7 +176,8 @@ def test_fx_example_rejects_missing_inputs(missing_ticker, yahoo_panel, monkeypa
     'multi_assets_reporting_frequencies', 'strategy_reporting_frequencies',
     'strategy_benchmark_reporting_frequencies', 'multi_strategy_reporting_frequencies',
 ])
-def test_factsheet_output_directory(module, yahoo_panel, monkeypatch, tmp_path):
+@pytest.mark.parametrize('explicit', [False, True])
+def test_factsheet_output_directory(module, explicit, yahoo_panel, monkeypatch, tmp_path):
     """Exercise entry-point/save plumbing; full report layouts have separate rendering tests."""
     import qis
 
@@ -192,7 +200,17 @@ def test_factsheet_output_directory(module, yahoo_panel, monkeypatch, tmp_path):
         monkeypatch.setattr(module_object, name, replacement)
         monkeypatch.setattr(qis, name, replacement)
     output = tmp_path / 'new' / 'reports'
-    monkeypatch.setattr(sys, 'argv', [module, '--output-dir', str(output)])
-    runpy.run_module(f'examples.factsheets.{module}', run_name='__main__')
+    configured = tmp_path / 'configured' if explicit else output
+    config = tmp_path / 'private.yaml'
+    config.write_text(yaml.safe_dump({'OUTPUT_PATH': str(configured)}), encoding='utf-8')
+    monkeypatch.setenv('QIS_SETTINGS_PATH', str(config))
+    monkeypatch.setattr(sys, 'argv', [module])
+    if explicit:
+        namespace = runpy.run_module(f'examples.factsheets.{module}')
+        local = next(iter(namespace['Locals']))
+        namespace['run_local'](local=local, output_path=str(output))
+        assert not configured.exists()
+    else:
+        runpy.run_module(f'examples.factsheets.{module}', run_name='__main__')
     pdfs = list(output.glob('*.pdf'))
     assert pdfs and all(path.stat().st_size > 100 for path in pdfs)

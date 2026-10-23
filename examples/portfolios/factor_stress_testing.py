@@ -1,11 +1,11 @@
 """Offline factor stresses, joint conditioning and analytical one-month prediction bands.
 
 Run from the checkout: python -m examples.portfolios.factor_stress_testing
-Pass --output-dir <directory> to retain CSV tables and PNG/PDF figures.
+Select Locals.REPORT to export through YAML OUTPUT_PATH, or override output_path.
 Synthetic factor histories come from qis.datasets.synthetic; loadings and positions are
 explicit teaching inputs, not fitted or vendor data. No files are written by default.
 """
-import argparse
+from enum import Enum
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -128,8 +128,7 @@ def run_example(output_dir=None):
     print((100 * comparison).round(2).to_string())
     print("All attribution reconciles; prediction horizon: one month; confidence: 95%.")
     if output_dir is not None:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = Path(qis.get_output_path(output_dir))
         tables = {
             "factor_covariance": covariance, "asset_betas": betas,
             "amounts": amounts, "annual_residual_variances": residual_variances,
@@ -155,7 +154,22 @@ def run_example(output_dir=None):
     return comparison, grids
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=None)
-    run_example(parser.parse_args().output_dir)
+class Locals(Enum):
+    CHECK = 1
+    REPORT = 2
+
+
+def run_local(local: Locals, output_path: str = None):
+    """Check offline or write reports using YAML defaults/an explicit destination."""
+    if local not in (Locals.CHECK, Locals.REPORT):
+        raise ValueError(local)
+    output = None
+    if local == Locals.REPORT or output_path is not None:
+        output = Path(qis.get_output_path(output_path))
+        if output_path is None:
+            output /= 'factor_stress_testing'
+    return run_example(output_dir=output)
+
+
+if __name__ == '__main__':
+    run_local(local=Locals.CHECK)

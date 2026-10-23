@@ -23,7 +23,7 @@ MANIFEST = json.loads((RUNNER.parent / 'manifest.json').read_text(encoding='utf-
 
 def test_registered_images_cover_documentation():
     assets = RUN['load_manifest']()['assets']
-    assert len(assets) == 81
+    assert len(assets) == 82
     assert len([asset for asset in assets if asset['document'] == 'README.md']) == 8
 
 

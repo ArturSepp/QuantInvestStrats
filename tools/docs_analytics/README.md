@@ -1,7 +1,7 @@
 # Reproducible documentation analytics
 
-This repository-only tool builds all 81 registered documentation previews, supporting aggregate
-CSV tables and provenance. Thirty exhibits use offline synthetic inputs. Eight approved empirical
+This repository-only tool builds all 82 registered documentation previews, supporting aggregate
+CSV tables and provenance. Thirty-one exhibits use offline synthetic inputs. Eight approved empirical
 cash-rate previews preserve reviewed bytes and aggregate fits without distributing raw vendor
 observations. Twenty-one hedged-index previews preserve the corresponding reviewed figures
 and 42 aggregate records. Twenty-two unhedged-index previews compare supplied spots and
@@ -43,7 +43,7 @@ mirrors are excluded.
 
 A complete bundle contains:
 
-- `images/*.png`: the 81 registered previews; synthetic images and empirical refits use 150 dpi.
+- `images/*.png`: the 82 registered previews; synthetic images and empirical refits use 150 dpi.
 - `tables/gallery/*.csv`, `tables/model_layer/*.csv` and `tables/handbook/*.csv`: inputs and
   supporting computed values.
 - `analytics_manifest.json`: generation timestamp, fixed sample dates, parameters, conventions,
@@ -75,7 +75,9 @@ rebalancing, one-business-day implementation lag and 10 bp costs; the 63-span po
 compared with equal weights. Reports use the monthly preset and no cash-rate adjustment.
 The standalone performance table uses a constant 3% annual cash rate, monthly risk statistics
 and quarterly regression. Four main reports use the gallery's focused layout; the risk appendix
-shows six existing panels, preserving their data. The positions page composes current
+shows six existing panels, preserving their data. Its beta line retains missing warm-up rows
+as gaps instead of joining the opening cash beta to the first warmed-up estimate. The
+positions page composes current
 `PortfolioData` plots. Brinson table headings wrap and percentages use two decimal places.
 The displayed weight totals include residual cash, independently marked as NAV less holdings
 and lagged to each return period. The Cash row includes initial uninvested balances and cost
@@ -103,19 +105,30 @@ intervals. It preserves that simulation's known layer and feature effects and ca
 independent identity/design checks. Tables and figures share the same computed attribution
 objects. This named fixture is an exception to the market-panel fixture rule.
 
-[handbook.py](handbook.py) draws fifteen teaching exhibits for thirteen methodology chapters from the
+[handbook.py](handbook.py) draws sixteen teaching exhibits for thirteen methodology chapters from the
 frozen synthetic universe (seed 20260725, 2005–2025, no quirks); the convexity-premium chapter has
-two, both on quarterly returns from 2005-03-31 against the universe's `SBM_6040` benchmark. Three
+two, both on quarterly returns from 2005-03-31 against the universe's `SBM_6040` benchmark. Four
 explicit teaching constructions are applied on top of it: the volatility-targeting
 figure scales the US equity returns by recorded volatility regimes, and the bootstrap figure
 compares the qis draw with the truncating draw of `examples/models/bootstrap_convention.py`; the
 two FX-hedging exhibits define a synthetic CHF-per-USD cross as normalised `SBD_TSY` raised to
-1.5, with constant 3.5% USD and 3.0% CHF annual quotes. FX estimation uses the 2005–2025 monthly
+1.5, with constant 3.5% USD and 3.0% CHF annual quotes; and the holdings exhibit uses the
+predetermined allocation schedule described below. FX estimation uses the 2005–2025 monthly
 history and a 36-month EWMA span; performance starts on 31 December 2010. Their public-QIS hedge
 rules, lagged forward wealth, geometric returns and monthly-log-volatility Sharpe are checked
 against independent formula/NumPy references. Each
 exhibit has an independent check against a closed form or a direct numpy calculation, named after
 its table.
+
+The holdings-alpha/beta exhibit adds a predetermined monthly allocation to synthetic US equity
+and Treasuries: 80/20%, then 20/80%, -40/80% and 120/20% at the registered switch dates.
+It holds units between rebalances and sets cash/funding rates, fees and trading costs to zero.
+Instrument beta and realised alpha use monthly log returns, EWMA mean adjustment and span 12;
+instrument betas withhold the first 12 paired returns without a unity prior. Performance starts
+on 31 December 2010 after prehistory has warmed up the estimator. The upper panel is annualised
+rolling alpha using lagged holdings beta; the lower compares current holdings beta with a
+same-span NAV regression. Independent pandas moments, lagged weights and residual recursions
+check the beta, NAV and alpha series. The table retains their inputs and full-precision values.
 
 A producer returns figures keyed by preview filename, tables keyed by the manifest table name,
 Boolean checks, actual parameters and result summaries. Unexpected output sets or unsuccessful
@@ -227,7 +240,7 @@ the figures and supporting CSVs. Publish the reviewed bundle using an explicit t
 
 Set `$targetCheckout` to the intended repository path; use the C-local export first to review the
 rendered site. The publisher validates every bundle output and requires the target's producer
-source and manifest to match. It copies all 81 allowlisted PNGs together and writes
+source and manifest to match. It copies all 82 allowlisted PNGs together and writes
 `docs/images/analytics_manifest.json` last. Supporting CSVs stay in the build bundle.
 
 The publisher saves previous files in a new C-local backup directory beside the bundle and

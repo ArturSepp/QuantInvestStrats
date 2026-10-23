@@ -23,6 +23,16 @@
         "bbg_fetch"
       ],
       "reason": "Existing source-only Bloomberg development runner; not a runtime dependency."
+    },
+    {
+      "path": "examples/factsheets/using_bbg_fetch/europe_futures.py",
+      "modules": ["bbg_fetch"],
+      "reason": "Relocated existing Bloomberg-only maintainer example; excluded from package runtime."
+    },
+    {
+      "path": "examples/factsheets/using_bbg_fetch/momentum_indices.py",
+      "modules": ["bbg_fetch"],
+      "reason": "Relocated existing Bloomberg-only maintainer example; excluded from package runtime."
     }
   ]
 }

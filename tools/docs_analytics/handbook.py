@@ -361,6 +361,114 @@ def benchmark_regression(params: dict):
     return fig, table, check, {'beta': beta, 'alpha_annualised': 12 * alpha, 'r2': r2}
 
 
+def holdings_alpha_beta(params: dict):
+    """Factsheet alpha/beta with changing holdings and a NAV-regression comparator."""
+    from matplotlib import dates as mdates
+
+    cfg = params['holdings_alpha_beta']
+    span, freq = cfg['span'], cfg['freq']
+    prices = _universe(params)[cfg['assets']].resample(freq).last()
+    benchmark = prices[params['benchmark']]
+    targets = pd.DataFrame(np.tile(cfg['initial_weights'], (len(prices), 1)),
+                           index=prices.index, columns=prices.columns)
+    dynamic = targets.copy()
+    for date, weights in cfg['switches']:
+        dynamic.loc[pd.Timestamp(date):] = weights
+    portfolios = [qis.backtest_model_portfolio(
+        prices=prices, weights=weights, rebalancing_freq=None, weight_implementation_lag=0,
+        rebalancing_costs=0.0, ticker=label)
+        for weights, label in [(dynamic, 'Dynamic holdings'), (targets, 'Fixed allocation')]]
+    pair = qis.MultiPortfolioData(portfolio_datas=portfolios, benchmark_prices=benchmark.to_frame())
+    period = qis.TimePeriod(start=cfg['report_start'], end=params['end'])
+    betas = pd.DataFrame({p.nav.name: p.compute_portfolio_benchmark_betas(
+        benchmark_prices=benchmark.to_frame(), freq_beta=freq, factor_beta_span=span
+    )[benchmark.name] for p in portfolios})
+    alpha = pair.compute_rolling_benchmark_alpha(
+        benchmark_price=benchmark, freq_beta=freq, factor_beta_span=span, time_period=period)
+    navs = pd.concat([p.nav for p in portfolios], axis=1)
+    nav_returns = qis.to_returns(navs, freq=freq, is_log_returns=True)
+    instrument_returns = qis.to_returns(prices, freq=freq, is_log_returns=True)
+    benchmark_returns = instrument_returns[benchmark.name]
+    nav_beta = qis.compute_ewm_beta_alpha_forecast(
+        x_data=benchmark_returns, y_data=nav_returns, span=span,
+        mean_adj_type=qis.MeanAdjType.EWMA, init_type=qis.InitType.X0,
+        beta_init_value=None)[0]
+    nav_beta.iloc[:span + 1] = np.nan
+
+    # Independent pandas recursions: centred moments, holdings aggregation and lagged alpha.
+    centred = instrument_returns - instrument_returns.ewm(span=span, adjust=False).mean()
+    x = centred[benchmark.name]
+    variance = x.pow(2).ewm(span=span, adjust=False).mean()
+    reference_instrument_beta = centred.mul(x, axis=0).ewm(span=span, adjust=False).mean()
+    reference_instrument_beta = reference_instrument_beta.div(variance, axis=0)
+    reference_instrument_beta.iloc[:span + 1] = np.nan
+    checks = []
+    for p, weights in zip(portfolios, [dynamic, targets]):
+        checks.append(np.allclose(p.get_weights(freq=None), weights, atol=1e-12))
+        expected_return = weights.shift(1).mul(prices.pct_change()).sum(axis=1).iloc[1:]
+        checks.append(np.allclose(p.nav.pct_change().iloc[1:], expected_return, atol=1e-12))
+        expected_beta = reference_instrument_beta.mul(weights).sum(axis=1, min_count=2)
+        checks.append(np.allclose(betas[p.nav.name], expected_beta, equal_nan=True, atol=1e-12))
+        residual = nav_returns[p.nav.name] - expected_beta.shift(1) * benchmark_returns
+        post_start = residual.loc[residual.index > pd.Timestamp(cfg['report_start'])]
+        expected_alpha = 12.0 * post_start.ewm(span=span, adjust=False).mean()
+        checks.append(np.allclose(alpha[p.nav.name].loc[post_start.index], expected_alpha,
+                                  atol=1e-12))
+        checks.append(alpha.loc[cfg['report_start'], p.nav.name] == 0.0)
+    nav_centred = nav_returns - nav_returns.ewm(span=span, adjust=False).mean()
+    nav_reference = nav_centred.mul(x, axis=0).ewm(span=span, adjust=False).mean()
+    nav_reference = nav_reference.div(variance, axis=0)
+    nav_reference.iloc[:span + 1] = np.nan
+    checks.append(np.allclose(nav_beta, nav_reference, equal_nan=True, atol=1e-12))
+    checks.append(betas.first_valid_index() == prices.index[span + 1])
+
+    fig, axes = _new_figure(nrows=2, sharex=True)
+    for label, color in zip(betas.columns, SERIES):
+        axes[0].plot(alpha.index, alpha[label], color=color, linewidth=1.8, label=label)
+        shown = period.locate(betas[label])
+        axes[1].plot(shown.index, shown, color=color, linewidth=1.8, label=label)
+    shown_nav = period.locate(nav_beta['Dynamic holdings'])
+    axes[1].plot(shown_nav.index, shown_nav, color=MUTED, linestyle='--', linewidth=1.7,
+                 label='Dynamic NAV regression')
+    for date, _ in cfg['switches']:
+        for ax in axes:
+            ax.axvline(pd.Timestamp(date), color=MUTED, linestyle=':', linewidth=1.0)
+    start = pd.Timestamp(cfg['report_start']).strftime('%d %b %Y')
+    estimation_start = instrument_returns.dropna().index[0].strftime('%d %b %Y')
+    axes[0].set_title(f'{span}-span rolling annualised alpha | from {start}', loc='left')
+    axes[1].set_title(f'Holdings-weighted beta | instrument estimation from {estimation_start}',
+                      loc='left')
+    axes[0].yaxis.set_major_formatter(_percent())
+    axes[0].set_ylabel('Alpha p.a.')
+    axes[1].set_ylabel('Beta to US equity')
+    for ax in axes:
+        ax.axhline(0.0, color=MUTED, linewidth=0.7)
+        ax.legend(loc='upper left', ncol=2)
+    axes[1].xaxis.set_major_locator(mdates.YearLocator(2))
+    axes[1].xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    handbook_exhibit(
+        fig, title='Dynamic exposures: holdings beta and realised alpha',
+        subtitle='Synthetic US equity / Treasury portfolio | monthly log returns | span = 12',
+        footer='Dotted dates change equity / bond targets: 80/20 to 20/80 to -40/80 to 120/20%.\n'
+               'Alpha uses the previous month\'s holdings beta. Cash/funding rates and costs '
+               'are zero.', size=(10.0, 8.8))
+    table = pd.concat([
+        navs.add_prefix('nav_'), betas.add_prefix('holdings_beta_'),
+        nav_beta.add_prefix('nav_beta_'), alpha.add_prefix('annual_alpha_'),
+        dynamic.add_prefix('dynamic_weight_'), targets.add_prefix('fixed_weight_'),
+        instrument_returns.add_prefix('log_return_'),
+        reference_instrument_beta.add_prefix('instrument_beta_')], axis=1)
+    switch = cfg['switches'][0][0]
+    summary = {
+        'first_beta_date': str(betas.first_valid_index().date()),
+        'first_alpha_date': str(alpha.index[1].date()),
+        'first_switch_holdings_beta': float(betas.loc[switch, 'Dynamic holdings']),
+        'first_switch_nav_beta': float(nav_beta.loc[switch, 'Dynamic holdings']),
+        'last_annual_alpha': alpha.iloc[-1].to_dict(),
+    }
+    return fig, table, all(checks), summary
+
+
 def risk_contributions(params: dict):
     """Capital weights against Euler risk-contribution shares for a balanced allocation."""
     prices = _universe(params)[list(params['allocation'])]
@@ -772,6 +880,7 @@ FIGURES = {
     'handbook_bootstrap_frequencies.png': ('bootstrap_frequencies', bootstrap_frequencies),
     'handbook_fee_navs.png': ('fee_navs', fee_navs),
     'handbook_benchmark_regression.png': ('benchmark_regression', benchmark_regression),
+    'handbook_holdings_alpha_beta.png': ('holdings_alpha_beta', holdings_alpha_beta),
     'handbook_risk_contributions.png': ('risk_contributions', risk_contributions),
     'handbook_vol_targeting.png': ('vol_targeting', vol_targeting),
     'handbook_convexity_premium.png': ('convexity_premium', convexity_premium),

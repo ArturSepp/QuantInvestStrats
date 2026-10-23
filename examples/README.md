@@ -43,7 +43,7 @@ examples/
 
 | File | What it shows |
 |---|---|
-| `quickstart.py` | Yahoo-data plotting walkthrough: prices, drawdowns and risk-adjusted tables. Supports `--output-dir`; the package README starts with offline data. |
+| `quickstart.py` | Yahoo-data plotting walkthrough: prices, drawdowns and risk-adjusted tables. Uses YAML `OUTPUT_PATH`; the package README starts with offline data. |
 | `full_performance_report.py` | Five-figure summary on a yfinance universe (ETFs, crypto, vol ETFs…). Uses `_helpers.reporting_helpers`. |
 | `sharpe_vs_sortino.py` | Sharpe vs Sortino across return frequencies. |
 | `risk_return_frontier.py` | Bond-ETF risk/return scatter using `compute_ra_perf_table`. |
@@ -66,7 +66,7 @@ examples/
 | `rolling_correlations.py` | Rolling 3m/6m/12m correlations between BTC and QQQ. |
 | `crypto_intraday_vol.py` | BTC hourly EWMA vol — handles 24/7 markets without weekend gaps. |
 | `overnight_intraday_returns.py` | Decomposes close-to-close returns into overnight + intraday components. |
-| `bootstrap_analysis.py` | Fifty illustrative block-bootstrap price paths by default; the larger autocorrelation sweep is a separate `Locals` branch. Supports `--output-dir`. |
+| `bootstrap_analysis.py` | Fifty illustrative block-bootstrap price paths by default; the larger autocorrelation sweep is a separate `Locals` branch. Uses YAML `OUTPUT_PATH`. |
 | [bootstrap_convention.py](models/bootstrap_convention.py) | Offline comparison of circular versus truncated stationary-bootstrap blocks. |
 | [ar_bootstrap_gaps.py](models/ar_bootstrap_gaps.py) | Offline illustration of preserving lag spacing when fitting an AR process across missing observations. |
 | `pca_variance_explained.py` | Rolling EWMA-covariance PCA variance shares on the seeded synthetic universe. |
@@ -88,7 +88,7 @@ examples/
 | `balanced_60_40.py` | 60/40 SPY/IEF with management fee — `backtest_model_portfolio`. |
 | `balanced_60_40_with_btc.py` | Impact of adding a 2% BTC sleeve to a 60/40 portfolio. |
 | `constant_notional_short.py` | Constant-notional vs constant-weight short SPY simulation. |
-| `leveraged_etf_strategies.py` | SSO/IEF and funded SPY/IEF backtests with rebalancing costs; supports `--output-dir`. |
+| `leveraged_etf_strategies.py` | SSO/IEF and funded SPY/IEF backtests with rebalancing costs; uses YAML `OUTPUT_PATH`. |
 | `long_short.py` | Long IEF / short LQD pair (Treasury duration vs IG credit). |
 | `ex_anti_tracking_error_and_risk.py` | Offline ex-ante TE, benchmark beta, and Euler marginal TE through `RiskModel`. |
 | `ex_post_tracking_error_and_risk.py` | Offline realised EWMA TE, whole-sample TE/IR, and EWMA beta/annualised alpha. |
@@ -162,7 +162,7 @@ examples/
 | `fx_rates_data_bloomberg_example.py` | The same, built from Bloomberg via `bbg_fetch` — real 3M rates, full currency set. **Bloomberg.** |
 | `fx_cip_identity_yahoo_example.py` | Covered-interest-parity check: USD excess vs CHF-hedged excess agree to within bp. |
 | `fx_hedging_yahoo_example.py` | Single/multi-asset FX hedging: optimal/carry/beta ratios, hedged NAVs, EWM FX vol/beta, hedge reports. |
-| `fx_hedging_example.py` | Yahoo FX/ETF demo by default, with illustrative non-USD rate spreads. `--input-dir` selects reader-supplied `fx_hedging_data_fx_spots.csv`, `fx_hedging_data_domestic_rates.csv` and `fx_hedging_data_usd_assets.csv`; these files are not bundled. |
+| `fx_hedging_example.py` | Yahoo FX/ETF demo by default, with illustrative non-USD rate spreads. `use_local_data=True` selects YAML `RESOURCE_PATH`; `input_dir` overrides it for reader-supplied `fx_hedging_data_fx_spots.csv`, `fx_hedging_data_domestic_rates.csv` and `fx_hedging_data_usd_assets.csv`; these files are not bundled. |
 
 ## data_fetching — optional vendor input
 
@@ -176,32 +176,119 @@ These support the workflows above; they are not standalone demonstrations.
 
 | File | Purpose |
 |---|---|
-| [_helpers/output.py](_helpers/output.py) | Create and print an explicit or temporary report destination. |
 | [_helpers/reporting_helpers.py](_helpers/reporting_helpers.py) | Reusable five-figure performance report layout. |
 | [portfolios/strats/qis_delta1.py](portfolios/strats/qis_delta1.py) | Vol-target and trend strategy helpers. |
 | [portfolios/strats/seasonality_strat.py](portfolios/strats/seasonality_strat.py) | Point-in-time seasonality strategy helpers. |
 
 ---
 
-### Output files
+### Input and output directories
 
-The four main factsheet examples, their reporting-frequency sweeps, the Yahoo quickstart and
-the bootstrap walkthrough and leveraged-ETF example accept `--output-dir`. They create missing directories and print
-the destination. Without that argument, they use a fresh system temporary directory.
+Examples use [`qis.local_path`](../src/qis/local_path.py) as the single directory resolver.
+No configuration is required: packaged defaults are `~/.qis/resources` for resource files
+and caches, and `~/.qis/outputs` for reports. Keep `src/qis/settings.yaml` unchanged: it
+contains release-checked portable defaults, not private paths or credentials. See the
+[configuration guide](../src/qis/README.md) for permanent Windows setup and all settings.
 
-```bash
-python -m examples.factsheets.multi_assets --output-dir /path/to/local/reports
+Optionally create private YAML outside the checkout/package, for example
+`C:/Data/qis/private-settings.yaml`:
+
+```yaml
+RESOURCE_PATH: 'C:/Data/qis/resources'
+OUTPUT_PATH: 'C:/Data/qis/outputs'
 ```
 
-On Windows, use a local destination such as `C:\Temp\qis-reports`. Other examples document
-their own export options; vendor research templates may require configured local paths.
-The tracked previews in `examples/figures/` are documentation assets, not the default output
-destination for these scripts.
+Set its location before importing qis or starting an example:
 
+```powershell
+$env:QIS_SETTINGS_PATH = 'C:/Data/qis/private-settings.yaml'
+& 'C:/Python/QuantInvestStrats312/Scripts/python.exe' -m examples.factsheets.multi_assets
+```
+
+On Linux/macOS, use `export QIS_SETTINGS_PATH=/absolute/path/private-settings.yaml`,
+with paths appropriate to that machine. No private configuration file is generated or
+modified by an example.
+
+The precedence is **explicit directory argument > explicit YAML file >
+`QIS_SETTINGS_PATH` YAML > packaged defaults**. Private YAML can contain just the keys
+needed by a workflow; other keys retain the packaged defaults. A missing selected YAML,
+malformed YAML, or invalid directory value produces an actionable error, not a
+silent temporary-directory fallback.
+
+```python
+from qis import local_path
+
+# Read defaults or the private configuration selected by QIS_SETTINGS_PATH.
+resources = local_path.get_resource_path(create=True)  # Deliberate download/cache directory.
+outputs = local_path.get_output_path()
+
+# Explicit one-run overrides, without changing configuration.
+outputs = local_path.get_output_path('C:/Data/qis/another-run')
+resources = local_path.get_resource_path('C:/Data/qis/other-resources')  # Must exist.
+
+# Alternatively, select a configuration file for this call only.
+outputs = local_path.get_output_path(settings_path='C:/Data/qis/private-settings.yaml')
+```
+
+Output directories are created, including missing parents. Resource directories must already
+exist; use `get_resource_path(..., create=True)` only for deliberate download/cache
+locations. Paths expand `~` and environment variables. Relative YAML paths are relative
+to the YAML file; explicit relative directory arguments are relative to the working
+directory. Returned paths are absolute strings, without requiring a trailing separator.
+Use `Path(directory) / filename`, not string concatenation.
+
+Settings are cached by YAML file. After editing a file in a running session, call
+`local_path.get_paths.cache_clear()`. Selecting a different file is recognised on the next
+getter call. Legacy `file_utils` module constants are import-time snapshots, so examples
+pass the resolved directory explicitly to file readers/writers.
+
+### Local runners and explicit overrides
+
+Use `class Locals(Enum)`, `run_local(local=...)`, and a main guard calling only the
+selected local branch. Directory CLI flags and the duplicate example output helpers have
+been removed. For an override, call the runner from Python or edit the local main call:
+
+```python
+from examples.factsheets.multi_assets import Locals, run_local
+
+run_local(local=Locals.CORE_ETFS)  # YAML OUTPUT_PATH
+run_local(local=Locals.CORE_ETFS, output_path='C:/Data/qis/reports/one-run')
+```
+
+Display-only and offline check branches remain write-free and do not require path
+configuration. Select `Locals.REPORT` or `Locals.EXPORT` to save their output. Their
+lower-level `run_example(output_dir=None)`/plot functions retain the no-export convention;
+the local dispatcher selects YAML defaults when export is requested. A supplied
+`output_path` also requests export. Stress reports require a fresh destination and
+reject existing targets; YAML defaults use a named subfolder such as
+`OUTPUT_PATH/account_equity_stress`. Pass a new `output_path` for each later report.
+
+The FX hedging example still downloads public Yahoo data by default. Select
+`run_local(..., use_local_data=True)` for CSV inputs under YAML `RESOURCE_PATH`, or
+supply `input_dir` explicitly. Missing local files raise an error; they do not trigger
+an undisclosed download. The options-stress example uses
+`RESOURCE_PATH/options_stress` for its reusable Yahoo cache, with `input_path` as an
+override. Its CHECK branch uses the default or configured cache and may download/write resource
+data, but does not export a report. Frozen synthetic and bundled dataset loaders do not
+require private directories.
+
+Tests and disposable runs should pass their temporary directory explicitly. On the
+maintainer's Windows host, use the repository's external Python and C-local execution
+helpers described in [AGENTS.md](../AGENTS.md). Never put environments or generated
+run output under the OneDrive checkout. The tracked previews in `examples/figures/`
+are documentation assets, not default output destinations.
 
 ### Cluster dendrograms (offline)
 
-Run python -m examples.plots.cluster_dendrograms --output-dir <local-output-directory>
-to generate a single-axis dendrogram and a composite cluster-membership page from
-the frozen synthetic universe. The example demonstrates supplied axes and titles;
-no FactorLasso, OptimalPortfolios or vendor data is required.
+`python -m examples.plots.cluster_dendrograms` displays the frozen synthetic example.
+To export its two PNGs and membership CSV through YAML:
+
+```python
+from examples.plots.cluster_dendrograms import Locals, run_local
+
+run_local(local=Locals.EXPORT)
+# Or: run_local(local=Locals.EXPORT, output_path='C:/Data/qis/reports/clusters')
+```
+
+The example demonstrates supplied axes and titles; no FactorLasso, OptimalPortfolios
+or vendor data is required.

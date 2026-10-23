@@ -214,7 +214,7 @@ class Locals(Enum):
     CONDITIONAL_PERFORMANCES = 4
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -241,7 +241,8 @@ def run_local(local: Locals):
         for asset in prices.columns:
             fig = plot_unconditional_performances(price=prices[asset].dropna(), title=f"{asset} performance")
             figs.append(fig)
-        qis.save_figs_to_pdf(figs, file_name='election_perf_unconditional', local_path=qis.get_output_path())
+        qis.save_figs_to_pdf(figs, file_name='election_perf_unconditional',
+                             local_path=qis.get_output_path(output_path))
 
     elif local == Locals.CONDITIONAL_PERFORMANCES:
         tickers = {'SPX Index': 'S&P 500',
@@ -266,8 +267,10 @@ def run_local(local: Locals):
             for key, df in dfs.items():
                 dfss[f"{asset}-{key}"] = df - 1.0
             figs.append(fig)
-        qis.save_figs_to_pdf(figs, file_name='perf_conditional_on_government', local_path=qis.get_output_path())
-        qis.save_df_to_excel(data=dfss, file_name='perf_conditional_on_government', local_path=qis.get_output_path())
+        qis.save_figs_to_pdf(figs, file_name='perf_conditional_on_government',
+                             local_path=qis.get_output_path(output_path))
+        qis.save_df_to_excel(data=dfss, file_name='perf_conditional_on_government',
+                             local_path=qis.get_output_path(output_path))
     plt.show()
 
 

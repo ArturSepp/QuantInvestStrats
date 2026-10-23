@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qis"
-version = "5.42.0"
+version = "5.43.0"
 description = "Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python"
 readme = "README.md"
 license = "MIT"
@@ -139,7 +139,7 @@ exclude = [
 ]
 
 [tool.setuptools.package-data]
-qis = ["*.yaml", "docs/*.md"]
+qis = ["*.yaml", "README.md", "docs/*.md"]
 
 [tool.pytest.ini_options]
 # tests live inside the package, in src/qis/<subpackage>/tests/, not in a top-level tests/
@@ -205,6 +205,9 @@ numpy = "np"
 pandas = "pd"
 
 [tool.ruff.lint.per-file-ignores]
+# Relocated legacy vendor examples, explicitly recorded in .github/stack-policy.json.
+"examples/factsheets/using_bbg_fetch/europe_futures.py" = ["TID251"]
+"examples/factsheets/using_bbg_fetch/momentum_indices.py" = ["TID251"]
 # Named source-only provider runner; the AST policy limits this waiver to bbg_fetch.
 "src/qis/market_data/run_local/fx_rates_data_run.py" = ["E501", "TID253", "TID251"]
 

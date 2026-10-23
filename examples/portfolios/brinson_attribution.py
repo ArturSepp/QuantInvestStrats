@@ -1,5 +1,5 @@
 """Offline BHB attribution, native-date linking and net-trading-cost reconciliation."""
-import argparse
+from enum import Enum
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -63,8 +63,7 @@ def run_example(output_dir: Path = None):
     print('Every native/monthly endpoint reconciles; monthly and quarterly totals agree.')
 
     if output_dir is not None:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = Path(qis.get_output_path(output_dir))
         figure, axes = plt.subplots(5, 1, figsize=(12, 18))
         figure.subplots_adjust(top=.94, bottom=.04, hspace=.55)
         figure.suptitle('Brinson attribution | native daily effects, monthly display', fontsize=15)
@@ -83,7 +82,22 @@ def run_example(output_dir: Path = None):
     return multi, monthly
 
 
+class Locals(Enum):
+    CHECK = 1
+    REPORT = 2
+
+
+def run_local(local: Locals, output_path: str = None):
+    """Check offline or write reports using YAML defaults/an explicit destination."""
+    if local not in (Locals.CHECK, Locals.REPORT):
+        raise ValueError(local)
+    output = None
+    if local == Locals.REPORT or output_path is not None:
+        output = Path(qis.get_output_path(output_path))
+        if output_path is None:
+            output /= 'brinson_attribution'
+    return run_example(output_dir=output)
+
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output-dir', type=Path, help='Optional figure/table output directory')
-    run_example(parser.parse_args().output_dir)
+    run_local(local=Locals.CHECK)

@@ -43,6 +43,12 @@ def write_artifacts(dist, template, target=None, change=None):
                 )
             elif change == "path":
                 files[1] = (files[1][0], template + b"\nPRIVATE_PATH: C:/Users/private/data\n")
+            elif change in ("resources", "outputs"):
+                files[1] = (
+                    files[1][0],
+                    template.replace(
+                        f"~/.qis/{change}".encode(), b"C:/Users/private/data"),
+                )
             elif change == "missing":
                 files.pop()
             elif change == "duplicate":
@@ -64,7 +70,7 @@ def write_artifacts(dist, template, target=None, change=None):
 
 
 @pytest.mark.parametrize("newline", [b"\n", b"\r\n"])
-def test_placeholder_settings_pass(tmp_path, newline):
+def test_portable_settings_pass(tmp_path, newline):
     """The reviewed template is portable between Linux and Windows builds."""
     template = (ROOT / "src/qis/settings.yaml").read_bytes().replace(b"\r\n", b"\n")
     write_artifacts(tmp_path, template.replace(b"\n", newline))
@@ -73,7 +79,8 @@ def test_placeholder_settings_pass(tmp_path, newline):
 
 @pytest.mark.parametrize("target", ["wheel", "sdist"])
 @pytest.mark.parametrize(
-    "change", ["database", "path", "missing", "duplicate", "private.yaml", "nested/private.yml"]
+    "change", ["database", "path", "resources", "outputs", "missing", "duplicate",
+               "private.yaml", "nested/private.yml"]
 )
 @pytest.mark.filterwarnings("ignore:Duplicate name:UserWarning")
 def test_private_or_ambiguous_configuration_is_rejected(tmp_path, target, change):

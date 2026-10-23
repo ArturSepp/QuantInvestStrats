@@ -53,6 +53,39 @@ For a single strategy's ex-post TE or IR, use [tracking-error analytics](trackin
 For ex-ante active risk from a covariance model, use `qis.RiskModel`. Neither replaces the
 counterfactual layer NAVs required here.
 
+### Holdings exposure versus model-layer NAV regression
+
+The estimators in this chapter regress **observed layer NAV returns** on benchmark returns.
+They answer how the risk layer, signal layer and integrated model performed, given those
+counterfactual NAV histories. They do not receive current instrument holdings and cannot
+directly recognise a new allocation before it affects subsequent NAV returns.
+
+The standard strategy factsheet instead uses
+[holdings-weighted instrument beta and rolling alpha](benchmark_relative_performance.md#factsheet-rolling-alpha-and-the-performance-start).
+It estimates each instrument's benchmark beta and aggregates with current signed exposures as
+fractions of portfolio NAV. A CTA can reverse a futures position, or a dynamic allocation can
+cut risk or change leverage, while the instrument relationships remain similar. Holdings beta
+then changes at the rebalance; NAV-regression beta still averages the previous exposures.
+**This is why the factsheet retains holdings-weighted beta for ex-ante portfolio exposure.**
+Applying its one-period lag to realised benchmark returns accounts for the positions in force
+before the return, with the remaining return reported as realised alpha. The
+[two-panel example](benchmark_relative_performance.md#dynamic-holdings-the-two-panel-factsheet-example)
+shows both beta estimates on the same sampling grid and EWMA span.
+
+| Convention | Holdings-based factsheet | Model-layer lagged NAV regression |
+|---|---|---|
+| Inputs | Instrument prices, current portfolio exposures and portfolio NAV | Benchmark and counterfactual layer NAVs |
+| Beta | Current weights times EWMA-demeaned instrument betas | EWMA-demeaned regression of each layer's NAV returns |
+| Warm-up / prior | One span of paired returns per instrument; missing betas stay missing; no unity prior | `beta_init_value=1.0` is an explicit existing prior; the example also chooses a separate post-warm-up accumulation date |
+| Realised alpha | Portfolio log return less lagged holdings beta times benchmark log return | Each layer's log return less its own lagged NAV-regression beta times benchmark log return |
+| Display | Same-span rolling annualised alpha and current holdings beta | Layer bridges, cumulative realised alpha and separately labelled descriptive regressions |
+
+The model-layer prior below belongs to that distinct NAV-only API. It is not an instruction to
+initialise holdings-weighted beta to one. A prior of one is not generally suitable for cash,
+short or leveraged dynamic portfolios. The two methods can legitimately assign different
+amounts to systematic return and residual alpha because they condition on different exposure
+information. Neither residual alone establishes skill or captures every nonlinear risk.
+
 ## Inputs, notation, and assumptions
 
 | Convention | This article |
@@ -285,6 +318,11 @@ their betas are full-sample estimates; they are not point-in-time alpha forecast
 
 Use the rolling estimator when the question is how alpha accumulated under betas that were
 available before each realised return.
+
+Here those betas are estimated from each **layer NAV**, not from current instrument holdings.
+The following prior and example warm-up are specific to this model-layer API; for the
+factsheet's span-length warm-up without a beta prior, see the
+[holdings comparison](#holdings-exposure-versus-model-layer-nav-regression).
 
 **Definition (lagged realised components).** For $L\in\{R,S,F\}$, let $\hat\beta_{L,t}$ be the
 EWM beta of $\ell_L$ on $\ell_B$ after observing return $t$, with span $N$ (`beta_span`, default

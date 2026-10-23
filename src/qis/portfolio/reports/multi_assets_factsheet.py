@@ -315,9 +315,8 @@ class MultiAssetsReport:
             is_x_correlated=True,
             mean_adj_type=qis.MeanAdjType.EWMA,
             init_type=qis.InitType.X0,
+            warmup_period=factor_beta_span,
         )
-        if ewm_linear_model.get_factor_loadings(benchmark).first_valid_index() is None:
-            raise ValueError(f'no finite {benchmark} beta estimates')
         estimation_start = returns.index.min()
         factor_beta_title = (
             f'{factor_beta_span}-span rolling Beta of {freq_beta}-freq returns to {benchmark},\n'
@@ -357,6 +356,7 @@ class MultiAssetsReport:
             is_x_correlated=True,
             mean_adj_type=qis.MeanAdjType.EWMA,
             init_type=qis.InitType.X0,
+            warmup_period=factor_beta_span,
         )
         displayed_beta = ewm_linear_model.get_factor_loadings(benchmark)
         factor_alpha = returns.drop(benchmark, axis=1).subtract(

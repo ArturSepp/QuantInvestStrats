@@ -314,20 +314,24 @@ and the separate VOP package. From a QIS checkout:
 
 ~~~console
 python -m pip install -e ".[data]" "vanilla-option-pricers==2.2.0"
-python -m examples.portfolios.stress_testing_with_options --cache-dir /absolute/cache/options_stress --output-dir /absolute/output/options_stress
+python -c "from examples.portfolios.stress_testing_with_options import Locals, run_local; run_local(Locals.REPORT, input_path='/absolute/cache/options_stress', output_path='/absolute/output/options_stress')"
 ~~~
 
 On the maintainer's Windows host, use the existing external environment and C-local paths:
 
 ~~~powershell
 . '..\ArturSepp\scripts\repo_governance\Enter-AgentRepo.ps1'
-& 'C:\Python\QuantInvestStrats312\Scripts\python.exe' -m examples.portfolios.stress_testing_with_options --cache-dir "$env:AGENT_LOCAL_ROOT\data\options_stress_20251231" --output-dir "$env:AGENT_LOCAL_ROOT\runs\options_stress_new"
+& 'C:\Python\QuantInvestStrats312\Scripts\python.exe' -c "from examples.portfolios.stress_testing_with_options import Locals, run_local; run_local(Locals.REPORT)"
 ~~~
 
-Run the same command with a **fresh output directory** to replay the cached input. Omit
-`--output-dir` to calculate and print the key results without saving a report. The default
-cache is under the user's local application/cache directory, never relative to the checkout.
-`--as-of YYYY-MM-DD` selects another frozen date; `--refresh` requests another Yahoo download.
+The [directory defaults](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/README.md)
+are `~/.qis/resources` and `~/.qis/outputs`. Optionally set `QIS_SETTINGS_PATH` to private
+YAML with C-local `RESOURCE_PATH` and `OUTPUT_PATH` before running the Windows command.
+The default cache is `RESOURCE_PATH/options_stress`; the default report destination is
+`OUTPUT_PATH/options_stress`. Supply a **fresh `output_path`** to replay the cached input
+on subsequent runs. Select `Locals.CHECK` without an output override to calculate and print
+the key results without saving a report. The Python arguments `as_of='YYYY-MM-DD'` and
+`refresh=True` select another frozen date and request another Yahoo download, respectively.
 The example raises an error if data acquisition fails; it does not silently substitute
 synthetic prices.
 

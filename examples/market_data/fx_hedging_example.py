@@ -3,10 +3,9 @@ Examples for the FX hedging research pipeline (run_local dispatcher).
 
 By default, downloads free Yahoo FX spots and USD ETFs. Non-USD interest
 rates use the explicitly illustrative spreads in fx_rates_data_yahoo_example.
-Pass --input-dir to use your own fx_hedging_data_{fx_spots,domestic_rates,usd_assets}.csv
-files instead; those production inputs are not distributed with qis.
+Set use_local_data=True to load fx_hedging_data_{fx_spots,domestic_rates,usd_assets}.csv
+from YAML RESOURCE_PATH, or pass input_dir explicitly. Those inputs are not distributed.
 """
-import argparse
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -38,13 +37,14 @@ def load_usd_assets(local_path: str,
     return data['usd_assets']
 
 
-def load_example_inputs(input_dir: str = None):
-    """Load explicit reader CSVs, or the public-data teaching universe by default."""
-    if input_dir is not None:
+def load_example_inputs(input_dir: str = None, use_local_data: bool = False):
+    """Use Yahoo by default; opt into local CSVs via YAML or an explicit directory."""
+    if input_dir is not None or use_local_data:
+        input_dir = qis.get_resource_path(input_dir)
         for key in ('fx_spots', 'domestic_rates', 'usd_assets'):
             path = Path(input_dir) / f'fx_hedging_data_{key}.csv'
             if not path.is_file():
-                raise FileNotFoundError(f'Missing {path}; omit --input-dir for the Yahoo demo.')
+                raise FileNotFoundError(f'Missing input CSV: {path}')
         fx_spots, domestic_rates = load_fx_rates_data(local_path=input_dir)
         usd_assets = load_usd_assets(local_path=input_dir)
     else:
@@ -75,7 +75,7 @@ class Locals(Enum):
     LOCAL_RATE_ADJUSTMENT = 8
 
 
-def run_local(local: Locals, input_dir: str = None):
+def run_local(local: Locals, input_dir: str = None, use_local_data: bool = False):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real universe and generate reports.
@@ -85,7 +85,7 @@ def run_local(local: Locals, input_dir: str = None):
     pd.set_option('display.max_columns', 500)
     pd.set_option('display.width', 1000)
 
-    fx_spots, domestic_rates, usd_assets = load_example_inputs(input_dir)
+    fx_spots, domestic_rates, usd_assets = load_example_inputs(input_dir, use_local_data)
 
     if local == Locals.LOAD_DATA:
         print(usd_assets)
@@ -186,6 +186,4 @@ def run_local(local: Locals, input_dir: str = None):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--input-dir', help='Directory of reader-supplied FX and USD-asset CSVs.')
-    run_local(local=Locals.LOCAL_RATE_ADJUSTMENT, input_dir=parser.parse_args().input_dir)
+    run_local(local=Locals.LOCAL_RATE_ADJUSTMENT)

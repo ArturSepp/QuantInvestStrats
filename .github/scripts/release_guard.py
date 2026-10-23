@@ -22,9 +22,9 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 TAG_RE = re.compile(r"v(\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?)")
-# Hash of the reviewed placeholder template, with LF line endings. Changing the
+# Hash of the reviewed portable defaults, with LF line endings. Changing the
 # distributed configuration requires an explicit review and a new digest here.
-SETTINGS_SHA256 = "3156a129a72c42853f6c0dcaadb44f441d16033a3b905085e108b12a96803aa9"
+SETTINGS_SHA256 = "4e618880cbed19ad2f59d6d5a77680db4dccfdcf8a9fc3433074ac48ac054a27"
 
 
 def validate_package_configuration(files: list[tuple[str, bytes]]) -> None:
@@ -34,7 +34,7 @@ def validate_package_configuration(files: list[tuple[str, bytes]]) -> None:
     content = files[0][1].replace(b"\r\n", b"\n")
     if hashlib.sha256(content).hexdigest() != SETTINGS_SHA256:
         raise ValueError(
-            "Package configuration differs from the reviewed placeholder template; "
+            "Package configuration differs from the reviewed portable defaults; "
             "restore src/qis/settings.yaml before building or publishing"
         )
 

@@ -82,7 +82,7 @@ class Locals(Enum):
     ONE_FACTOR_PLOTS = 5
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -181,7 +181,7 @@ def run_local(local: Locals):
         qis.save_fig(
             fig=fig,
             file_name=f"beta_target_{beta_target:.2f}",
-            local_path=None,
+            local_path=qis.get_output_path(output_path),
         )
 
     plt.show()

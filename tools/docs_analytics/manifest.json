@@ -147,6 +147,18 @@
         "perf_fee": 0.2,
         "benchmark": "SEQ_US",
         "regression_asset": "SBD_HY",
+        "holdings_alpha_beta": {
+          "assets": ["SEQ_US", "SBD_TSY"],
+          "freq": "ME",
+          "span": 12,
+          "report_start": "2010-12-31",
+          "initial_weights": [0.8, 0.2],
+          "switches": [
+            ["2013-12-31", [0.2, 0.8]],
+            ["2017-12-31", [-0.4, 0.8]],
+            ["2021-12-31", [1.2, 0.2]]
+          ]
+        },
         "allocation": {
           "SEQ_US": 0.5,
           "SBD_TSY": 0.3,
@@ -206,6 +218,7 @@
         "cost_basis": "Gross returns except the fee exhibit: 2% management, 20% performance fee",
         "teaching_constructions": "Volatility regimes scale SEQ_US returns in the targeting exhibit; the truncating bootstrap draw comes from the example; FX exhibits define CHF per USD as normalised SBD_TSY raised to 1.5",
         "fx_hedging": "36-month EWMA log-return FX volatility/beta from 2005; performance from 31Dec2010 to 31Dec2025; monthly hedge and CIP quote lagged one month; [0,1] clip; simple total NAVs; geometric p.a./monthly-log-vol Sharpe with rf=0; no additional trading costs",
+        "holdings_alpha_beta": "Monthly unit-held backtests with predetermined target switches, zero cash/funding rates and costs; EWMA-demeaned instrument log-return beta with 12-return warm-up and no beta prior; native-date weights; alpha = 12 times 12-span EWMA of NAV log return minus one-month-lagged holdings beta times benchmark log return, reset from 31Dec2010; NAV regression shown only for comparison",
         "checks": "Each exhibit has an independent closed-form or numpy check of its plotted values"
       },
       "tables": [
@@ -218,6 +231,7 @@
         "bootstrap_frequencies",
         "fee_navs",
         "benchmark_regression",
+        "holdings_alpha_beta",
         "risk_contributions",
         "vol_targeting",
         "convexity_premium",
@@ -235,6 +249,7 @@
         "bootstrap_frequencies",
         "fee_navs",
         "benchmark_regression",
+        "holdings_alpha_beta",
         "risk_contributions",
         "vol_targeting",
         "convexity_premium",
@@ -4395,6 +4410,12 @@
       "id": "handbook_benchmark_regression",
       "document": "docs/benchmark_relative_performance.md",
       "path": "docs/images/handbook_benchmark_regression.png",
+      "producer": "handbook"
+    },
+    {
+      "id": "handbook_holdings_alpha_beta",
+      "document": "docs/benchmark_relative_performance.md",
+      "path": "docs/images/handbook_holdings_alpha_beta.png",
       "producer": "handbook"
     },
     {

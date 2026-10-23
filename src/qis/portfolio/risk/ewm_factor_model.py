@@ -112,6 +112,19 @@ class EwmLinearModel(LinearModel):
         self.loadings = loadings
 
 
+def _get_instrument_beta_estimation_start(instrument_prices: pd.DataFrame,
+                                          benchmark_prices: pd.DataFrame,
+                                          freq: str) -> pd.Timestamp:
+    """Return the first paired instrument/factor return date used for estimation."""
+    benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
+    instrument_returns = ret.to_returns(instrument_prices, freq=freq, is_log_returns=True)
+    benchmark_returns = ret.to_returns(benchmark_prices, freq=freq, is_log_returns=True)
+    paired = instrument_returns.notna().any(axis=1) & benchmark_returns.notna().all(axis=1)
+    if not paired.any():
+        raise ValueError('no paired instrument and benchmark returns for beta estimation')
+    return pd.Timestamp(paired.index[paired][0])
+
+
 def compute_portfolio_ewm_benchmark_betas(instrument_prices: pd.DataFrame,
                                           weights: pd.DataFrame,
                                           benchmark_prices: pd.DataFrame,
@@ -133,23 +146,35 @@ def compute_portfolio_ewm_benchmark_betas(instrument_prices: pd.DataFrame,
         benchmark_prices: Benchmark price data, one column per benchmark.
         time_period: Optional time period filter.
         freq_beta: Frequency for return calculation; the price index when None.
-        factor_beta_span: Span for EWM beta estimation.
+        factor_beta_span: EWM span and number of jointly finite return observations withheld
+            for each instrument's warm-up. The next observation can publish a beta.
         mean_adj_type: Mean adjustment method.
 
     Returns:
         Portfolio benchmark betas, beta dates by benchmarks. Rows are NaN during the estimator
         warm-up and before the first weight row; a portfolio with zero weights (all cash) has
-        beta zero.
+        beta zero. Missing estimates are never replaced by a beta prior.
     """
     benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-    ewm_linear_model = EwmLinearModel(x=ret.to_returns(prices=benchmark_prices, freq=freq_beta, is_log_returns=True),
-                                      y=ret.to_returns(prices=instrument_prices, freq=freq_beta, is_log_returns=True))
+    ewm_linear_model = EwmLinearModel(
+        x=ret.to_returns(prices=benchmark_prices, freq=freq_beta, is_log_returns=True),
+        y=ret.to_returns(prices=instrument_prices, freq=freq_beta, is_log_returns=True),
+    )
     ewm_linear_model.fit(
         span=factor_beta_span,
         is_x_correlated=True,
         mean_adj_type=mean_adj_type,
         init_type=InitType.X0,
+        warmup_period=factor_beta_span,
     )
+    # Global panel age cannot warm up an instrument whose own return history starts later.
+    paired_returns = ewm_linear_model.y.notna().mul(
+        ewm_linear_model.x.notna().all(axis=1), axis=0)
+    warmed_up = paired_returns.cumsum().gt(factor_beta_span)
+    ewm_linear_model.loadings = {
+        factor: loadings.where(warmed_up)
+        for factor, loadings in ewm_linear_model.loadings.items()
+    }
     weights = weights.reindex(index=instrument_prices.index, method='ffill')
     # weights are aligned as of each beta date, so no off-grid date needs filling; a genuine zero
     # beta (for example a portfolio fully in cash) is kept rather than replaced by the last one

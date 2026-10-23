@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import List
 from enum import Enum
-from examples._helpers.output import get_output_dir, parse_output_dir
+from qis import local_path
 
 # qis
 import yfinance as yf
@@ -186,7 +186,7 @@ def run_local(local: Locals, output_path: str = None):
     Use for quick verification during development.
     """
     # Keep generated PDFs outside the checkout by default.
-    output_path = get_output_dir(output_path)
+    output_path = local_path.get_output_path(output_path)
 
     # download spy prices
     prices = yf.download(tickers=['SPY'], start="2003-12-31", end=None, ignore_tz=True,
@@ -211,4 +211,4 @@ def run_local(local: Locals, output_path: str = None):
 
 if __name__ == '__main__':
 
-    run_local(local=Locals.PLOT_bootstrapPED_PRICES, output_path=parse_output_dir())
+    run_local(local=Locals.PLOT_bootstrapPED_PRICES)

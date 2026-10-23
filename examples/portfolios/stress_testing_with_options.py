@@ -1,16 +1,15 @@
 """Five yfinance stocks and ten short VOP-priced options under a four-factor EWMA model.
 
-Run python -m examples.portfolios.stress_testing_with_options --output-dir <fresh directory>.
+Run python -m examples.portfolios.stress_testing_with_options; select Locals.REPORT to export.
 The first run downloads Yahoo data; subsequent runs replay a hashed local cache.
---refresh explicitly replaces the cache. No Bloomberg access or client data is used.
+Set refresh=True to replace the cache. No Bloomberg access or client data is used.
 """
-import argparse
+from enum import Enum
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 from importlib.metadata import version
 import json
-import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -30,12 +29,13 @@ SPAN = 52
 ANNUALISATION = 52.0
 
 
-def load_prices(cache_dir, as_of=AS_OF, refresh=False):
+def load_prices(cache_dir=None, as_of=AS_OF, refresh=False):
     """Download explicit raw/adjusted closes once, then replay their checked CSV bytes."""
     import yfinance as yf
 
-    cache = Path(cache_dir)
-    cache.mkdir(parents=True, exist_ok=True)
+    if cache_dir is None:
+        cache_dir = Path(qis.get_resource_path(create=True)) / 'options_stress'
+    cache = Path(qis.get_resource_path(cache_dir, create=True))
     cut = pd.Timestamp(as_of).normalize()
     path = cache / f"yahoo_{START}_{cut.date()}.csv"
     record = path.with_suffix(".json")
@@ -43,7 +43,7 @@ def load_prices(cache_dir, as_of=AS_OF, refresh=False):
                 "as_of": str(cut.date()), "auto_adjust": False, "repair": False}
     if refresh or not path.exists():
         if path.exists() != record.exists() and not refresh:
-            raise ValueError("Incomplete cache; use --refresh to rebuild it")
+            raise ValueError("Incomplete cache; use refresh=True to rebuild it")
         yf.set_tz_cache_location(str(cache / "yfinance"))
         frame = yf.download(
             list(STOCKS + FACTORS), start=START, end=str((cut + pd.Timedelta(days=1)).date()),
@@ -62,9 +62,9 @@ def load_prices(cache_dir, as_of=AS_OF, refresh=False):
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}, indent=2), encoding="utf-8")
     metadata = json.loads(record.read_text(encoding="utf-8"))
     if any(metadata.get(key) != value for key, value in expected.items()):
-        raise ValueError("Cache request metadata differs; use the matching cache or --refresh")
+        raise ValueError("Cache request metadata differs; use the matching cache or refresh=True")
     if hashlib.sha256(path.read_bytes()).hexdigest() != metadata["sha256"]:
-        raise ValueError("Cached prices changed; use --refresh for an intentional new download")
+        raise ValueError("Cached prices changed; use refresh=True for an intentional new download")
     frame = pd.read_csv(path, header=[0, 1], index_col=0, parse_dates=True,
                         float_precision="round_trip")
     frame.index = pd.DatetimeIndex(frame.index).tz_localize(None)
@@ -355,9 +355,10 @@ def convexity_exhibit(portfolio, result, inventory):
     return fig, curves.join(sleeves), stock_options
 
 
-def run_example(cache_dir, output_dir=None, as_of=AS_OF, refresh=False):
+def run_example(cache_dir=None, output_dir=None, as_of=AS_OF, refresh=False):
     """Compute the reproducible book; optionally save a standard report and convexity exhibit."""
-    output = Path(output_dir).expanduser().resolve() if output_dir is not None else None
+    output = (Path(qis.get_output_path(output_dir, create=False))
+              if output_dir is not None else None)
     if output is not None and output.exists():
         raise FileExistsError("Use a fresh example output directory")
     prices, source = load_prices(cache_dir, as_of, refresh)
@@ -421,13 +422,23 @@ def run_example(cache_dir, output_dir=None, as_of=AS_OF, refresh=False):
     return portfolio, result, inventory
 
 
+class Locals(Enum):
+    CHECK = 1
+    REPORT = 2
+
+
+def run_local(local: Locals, input_path: str = None, output_path: str = None,
+              as_of: str = AS_OF, refresh: bool = False):
+    """Use YAML RESOURCE_PATH/OUTPUT_PATH, with explicit cache and report overrides."""
+    if local not in (Locals.CHECK, Locals.REPORT):
+        raise ValueError(local)
+    output = None
+    if local == Locals.REPORT or output_path is not None:
+        output = Path(qis.get_output_path(output_path, create=False))
+        if output_path is None:
+            output /= 'options_stress'
+    return run_example(cache_dir=input_path, output_dir=output, as_of=as_of, refresh=refresh)
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    cache_root = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".cache"))
-    default_cache = cache_root / "qis/options_stress"
-    parser.add_argument("--cache-dir", type=Path, default=default_cache)
-    parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--as-of", default=AS_OF)
-    parser.add_argument("--refresh", action="store_true")
-    args = parser.parse_args()
-    run_example(args.cache_dir, args.output_dir, args.as_of, args.refresh)
+    run_local(local=Locals.CHECK)

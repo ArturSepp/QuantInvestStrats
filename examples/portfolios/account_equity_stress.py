@@ -1,11 +1,11 @@
 """Offline account statement, signed borrowing and equity-after-stress example.
 
 Run: python -m examples.portfolios.account_equity_stress
-Optional: --output-dir <fresh directory> --with-beta-intervals
+Select Locals.REPORT; run_local accepts output_path and with_beta_intervals overrides.
 No files are written by default. Uses the existing seeded synthetic factor example;
 prescribed loadings are teaching inputs. No client data, Bloomberg or network access.
 """
-import argparse
+from enum import Enum
 from pathlib import Path
 
 import numpy as np
@@ -47,6 +47,8 @@ def build_account(model, date):
 
 def run_example(output_dir=None, with_beta_intervals=False):
     """Check the accounting example and optionally create the standard PDF/workbook."""
+    if output_dir is not None:
+        output_dir = Path(qis.get_output_path(output_dir, create=False))
     model, date, history = build_model_and_history()
     portfolio = build_account(model, date)
     scenarios, grids = scenario_inputs(model, date)
@@ -93,9 +95,22 @@ def run_example(output_dir=None, with_beta_intervals=False):
     return result
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--with-beta-intervals", action="store_true")
-    args = parser.parse_args()
-    run_example(args.output_dir, args.with_beta_intervals)
+class Locals(Enum):
+    CHECK = 1
+    REPORT = 2
+
+
+def run_local(local: Locals, output_path: str = None, with_beta_intervals: bool = False):
+    """Check offline or write reports using YAML defaults/an explicit destination."""
+    if local not in (Locals.CHECK, Locals.REPORT):
+        raise ValueError(local)
+    output = None
+    if local == Locals.REPORT or output_path is not None:
+        output = Path(qis.get_output_path(output_path, create=False))
+        if output_path is None:
+            output /= 'account_equity_stress'
+    return run_example(output_dir=output, with_beta_intervals=with_beta_intervals)
+
+
+if __name__ == '__main__':
+    run_local(local=Locals.CHECK)

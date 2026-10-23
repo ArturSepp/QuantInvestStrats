@@ -1,10 +1,10 @@
 """Consumer-owned terminal knockout using the public HoldingPayoff extension.
 
 Run: python -m examples.portfolios.composite_payoff_stress
-Pass --output-dir <fresh directory> to export a standard report.
+Select Locals.REPORT to export through YAML OUTPUT_PATH, or override output_path.
 This synthetic terminal proxy ignores fixing paths, accrued units and settlement mechanics.
 """
-import argparse
+from enum import Enum
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -65,8 +65,10 @@ class TerminalKnockoutAccumulator:
 
 def run_example(output_dir=None):
     """Replace one vanilla holding with a composite and verify its factor derivative."""
-    if output_dir is not None and Path(output_dir).exists():
-        raise FileExistsError("Use a fresh example output directory")
+    if output_dir is not None:
+        output_dir = Path(qis.get_output_path(output_dir, create=False))
+        if output_dir.exists():
+            raise FileExistsError("Use a fresh example output directory")
     model, date, history = build_model_and_history()
     portfolio = build_portfolio(model, date, derivatives=True)
     original = next(h for h in portfolio.holdings if h.holding_id == "accumulator")
@@ -112,7 +114,22 @@ def run_example(output_dir=None):
     return result
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path)
-    run_example(parser.parse_args().output_dir)
+class Locals(Enum):
+    CHECK = 1
+    REPORT = 2
+
+
+def run_local(local: Locals, output_path: str = None):
+    """Check offline or write reports using YAML defaults/an explicit destination."""
+    if local not in (Locals.CHECK, Locals.REPORT):
+        raise ValueError(local)
+    output = None
+    if local == Locals.REPORT or output_path is not None:
+        output = Path(qis.get_output_path(output_path, create=False))
+        if output_path is None:
+            output /= 'composite_payoff_stress'
+    return run_example(output_dir=output)
+
+
+if __name__ == '__main__':
+    run_local(local=Locals.CHECK)

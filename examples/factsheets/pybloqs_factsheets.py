@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Tuple, List
 from enum import Enum
+from pathlib import Path
 
 import yfinance as yf
 import qis
@@ -71,6 +72,7 @@ def generate_ra_performance_pybloqs(prices: pd.DataFrame,
                                     regime_benchmark: str,
                                     perf_params: qis.PerfParams = None,
                                     heatmap_freq: str = 'YE',
+                                    output_path: str = None,
                                     **kwargs
                                     ) -> None:
     """Build the same 5-figure layout as
@@ -144,8 +146,9 @@ def generate_ra_performance_pybloqs(prices: pd.DataFrame,
         p.Block(fig5),
     ])
 
-    out = f"{local_path.get_output_path()}PyBloqs_Factsheet_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.pdf"
-    r.save(out)
+    timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M')
+    out = Path(local_path.get_output_path(output_path)) / f'PyBloqs_Factsheet_{timestamp}.pdf'
+    r.save(str(out))
     print(f"saved to {out}")
 
 
@@ -205,7 +208,7 @@ class Mode(Enum):
     MULTI_PORTFOLIO = 2
 
 
-def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
+def run(mode: Mode = Mode.RA_PERFORMANCE, output_path: str = None) -> None:
     if mode == Mode.RA_PERFORMANCE:
         ust_3m_rate = yf.download('^IRX', start="2003-12-31", end=None,
                                   ignore_tz=True, auto_adjust=True)['Close'].dropna() / 100.0
@@ -222,6 +225,7 @@ def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
         prices = time_period.locate(prices)
         generate_ra_performance_pybloqs(prices=prices,
                                         regime_benchmark=regime_benchmark,
+                                        output_path=output_path,
                                         **kwargs)
         plt.show()
         return
@@ -242,10 +246,18 @@ def run(mode: Mode = Mode.RA_PERFORMANCE) -> None:
         time_period=time_period,
         **fetch_default_report_kwargs(time_period=time_period))
     timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M')
-    out = f"{qis.local_path.get_output_path()}_volparity_span_report_{timestamp}.pdf"
-    report.save(out)
+    out = Path(local_path.get_output_path(output_path)) / f'_volparity_span_report_{timestamp}.pdf'
+    report.save(str(out))
     print(f"saved multi-portfolio report to {out}")
 
 
+Locals = Mode
+
+
+def run_local(local: Locals, output_path: str = None) -> None:
+    """Keep the local dispatcher while resolving outputs through YAML or an override."""
+    run(mode=local, output_path=output_path)
+
+
 if __name__ == '__main__':
-    run(mode=Mode.RA_PERFORMANCE)
+    run_local(local=Locals.RA_PERFORMANCE)

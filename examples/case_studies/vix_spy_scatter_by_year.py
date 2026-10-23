@@ -80,7 +80,7 @@ class Locals(Enum):
     USDJPY = 2
 
 
-def run_local(local: Locals):
+def run_local(local: Locals, output_path: str = None):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
@@ -94,7 +94,7 @@ def run_local(local: Locals):
         fig = plot_vol_vs_underlying(spot=prices['SPY'].rename('S&P500'),
                                      vol=prices['^VIX'].rename('VIX'),
                                      time_period=time_period)
-        qis.save_fig(fig, file_name='spx_vix')
+        qis.save_fig(fig, file_name='spx_vix', local_path=qis.get_output_path(output_path))
 
     elif local == Locals.USDJPY:
         # need to use bloomberg data
@@ -102,7 +102,7 @@ def run_local(local: Locals):
         spot = fetch_fields_timeseries_per_ticker(ticker='USDJPY Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY')
         vol = fetch_fields_timeseries_per_ticker(ticker='USDJPYV1M BGN Curncy', fields=['PX_LAST']).iloc[:, 0].rename('USDJPY 1M ATM')
         fig = plot_vol_vs_underlying(spot=spot, vol=vol, time_period=time_period)
-        qis.save_fig(fig, file_name='usdjpy')
+        qis.save_fig(fig, file_name='usdjpy', local_path=qis.get_output_path(output_path))
     plt.show()
 
 

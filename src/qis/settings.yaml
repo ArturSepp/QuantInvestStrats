@@ -1,18 +1,15 @@
-# set pc/developer local paths
-# add to gitignore afterwards
+# Portable defaults; no private configuration is needed for public examples.
+# Keep this release-checked file unchanged. Override keys in an external YAML
+# selected by QIS_SETTINGS_PATH; see README.md beside this file.
 
-RESOURCE_PATH:
-  "C:\\Users\\...\\"
+RESOURCE_PATH: '~/.qis/resources'
 
-LOCAL_RESOURCE_PATH:
-  "C:\\Users\\...\\"
+LOCAL_RESOURCE_PATH: '~/.qis/resources'
 
-UNIVERSE_PATH:
-  "C:\\Users\\...\\"
+UNIVERSE_PATH: '~/.qis/resources/universes'
 
-OUTPUT_PATH:
-  "C:\\Users\\...\\"
+OUTPUT_PATH: '~/.qis/outputs'
 
+# Inert placeholder for optional database users; no database is configured.
 AWS_POSTGRES:
   "postgresql://user:password@database:port"
-  

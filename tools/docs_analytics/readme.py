@@ -11,13 +11,24 @@ from qis.datasets import generate_synthetic_universe
 from tools.docs_analytics.style import gallery_preview
 
 
-def focus_risk(figure):
+def focus_risk(figure, benchmark_betas):
     """Reflow six existing risk panels; retain every selected line's values and shading."""
     fragments = ['Independent ME-freq', 'Correlated ME-freq',
                  'Risk Attribution with Correlated', 'Correlated B-freq',
-                 'Rolling 36-span beta', 'Portfolio EWM']
+                 'Rolling 36-span holdings-weighted beta', 'Portfolio EWM']
     selected = [next(ax for ax in figure.axes if ax.get_title().startswith(fragment))
                 for fragment in fragments]
+    # Seaborn omits missing rows and joins an opening cash beta to the first warmed-up beta.
+    # Restore the native gaps while checking that every finite plotted value is unchanged.
+    beta_lines = [line for line in selected[4].lines if len(line.get_ydata())]
+    assert len(beta_lines) == len(benchmark_betas.columns)
+    for line, column in zip(beta_lines, benchmark_betas):
+        values = benchmark_betas[column]
+        np.testing.assert_allclose(line.get_ydata(), values.dropna().to_numpy(), atol=1e-12)
+        line.set_data(values.index, values.to_numpy())
+        np.testing.assert_array_equal(np.isnan(line.get_ydata()), values.isna().to_numpy())
+    selected[4].text(0.08, 0.45, '36-return warm-up', transform=selected[4].transAxes,
+                     fontsize=8, color='dimgray')
     snapshots = [(line, line.get_ydata().copy()) for ax in selected for line in ax.lines]
     figure.set_layout_engine(None)
     figure.set_size_inches(11, 11)
@@ -180,7 +191,10 @@ def produce(spec: dict) -> dict:
             renderer = figure.canvas.get_renderer()
             assert not legend.get_window_extent(renderer).overlaps(
                 figure.texts[-1].get_window_extent(renderer))
-    focus_risk(figures['readme_strategy_risk.png'])
+    benchmark_betas = strategy.compute_portfolio_benchmark_betas(
+        benchmark_prices=prices[['SEQ_US']], freq_beta='ME', factor_beta_span=36,
+        time_period=period)
+    focus_risk(figures['readme_strategy_risk.png'], benchmark_betas)
     # Re-render only the summary table with cash; all existing attribution curves stay intact.
     table_ax = brinson.axes[0]
     table_ax.clear()

@@ -28,7 +28,8 @@ matplotlib.use('Agg')  # batch PDF generation, no interactive display needed
 import pandas as pd
 from typing import List, Tuple
 
-from examples._helpers.output import get_output_dir, parse_output_dir
+from qis import local_path
+from enum import Enum
 
 import qis
 from qis import TimePeriod, MultiPortfolioData
@@ -93,7 +94,7 @@ def run_global_multi_strategy_report(use_synthetic_data: bool = False,
 
     report_windows = (('long', time_period_long), ('short', time_period_short))
     all_figs: List = []
-    output_path = get_output_dir(output_path)
+    output_path = local_path.get_output_path(output_path)
 
     for reporting_frequency in REPORTING_FREQUENCIES:
         for span_label, time_period in report_windows:
@@ -121,6 +122,18 @@ def run_global_multi_strategy_report(use_synthetic_data: bool = False,
     return combined
 
 
+class Locals(Enum):
+    YAHOO = 1
+    SYNTHETIC = 2
+
+
+def run_local(local: Locals, output_path: str = None):
+    """Generate the frequency sweep using YAML defaults or an explicit directory."""
+    if local not in (Locals.YAHOO, Locals.SYNTHETIC):
+        raise ValueError(local)
+    return run_global_multi_strategy_report(
+        use_synthetic_data=local == Locals.SYNTHETIC, output_path=output_path)
+
+
 if __name__ == '__main__':
-    # real-data run (yfinance). Pass use_synthetic_data=True to run fully offline.
-    run_global_multi_strategy_report(use_synthetic_data=False, output_path=parse_output_dir())
+    run_local(local=Locals.YAHOO)

@@ -9,9 +9,25 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Unify example input/output directories through `qis.local_path` for development 5.43.0.
+  `get_paths(settings_path=None)` supports a private `QIS_SETTINGS_PATH` YAML file;
+  `get_output_path` and `get_resource_path` accept explicit directory and YAML overrides.
+  Directory getters return absolute paths, reject placeholders, create output parents by
+  default, and never silently select temporary directories. Input directories must exist
+  unless `create=True` is requested for downloads. Relative YAML paths use the YAML folder;
+  explicit relative directories use the working directory. Packaged defaults are
+  `~/.qis/resources` and `~/.qis/outputs`, so private YAML is optional. Add the packaged
+  `qis/README.md` configuration guide, including persistent Windows setup.
+- Remove the duplicate example `get_output_dir`/`parse_output_dir` helpers and directory CLI
+  parsers. Examples use `Locals`/`run_local`; pass overrides as Python function arguments.
+  Display-only and offline check branches remain write-free; downloads use configured caches.
+  Stress-report exports retain their fresh-path
+  protection. The packaged YAML remains release-checked portable defaults, not private
+  configuration.
+
 - Reduce retained history and peak memory for eligible `compute_ewm_corr_df` FULL/SUB_TOP
   calls by storing only returned pairs; covariance updates and correlation results are unchanged.
-- Require Python 3.11 or later for the upcoming 5.42.0 minor version. Python 3.10 reached
+- Require Python 3.11 or later for the upcoming minor version. Python 3.10 reached
   [end of life on 1 October 2026](https://devguide.python.org/versions/); remove its classifier
   and CI cells and run the lowest-direct dependency lane on Python 3.11. This version remains
   unreleased.
@@ -23,6 +39,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   all sampled paths as one DataFrame, preserving sampling, path labels and native fallback behavior.
 
 ### Added
+
+- Add `qis.sharpe_difference_test` and `SharpeDiffTest` for paired arithmetic Sharpe
+  inference using the Ledoit-Wolf (2008) delta method and unprewhitened Bartlett HAC.
+  Report annualised Sharpes, difference, HAC standard error, normal-reference statistic,
+  p-value and lag/sample counts, with input validation and independent numerical tests.
+
+- Document the factsheet's holdings-weighted beta and rolling alpha with a reproducible
+  two-panel dynamic-allocation exhibit, span-length warm-up and independent numerical checks;
+  distinguish current portfolio exposure from model-layer NAV regression.
 
 - Table-only beta inference display (5.41.0): `beta_interval_display='table'`
   keeps exposure charts on their original scale and retains the full uncertainty
@@ -53,6 +78,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Keep native allocation dates in holdings-weighted benchmark betas, including the opening
+  month-end allocation. Match instrument-beta warm-up to the configured span, counting each
+  instrument's jointly finite returns, without a unity prior. Beta panels label the instrument
+  estimation history rather than pre-investment NAV fee accruals; multi-asset beta/alpha panels
+  also use span-length warm-up. Report return frequencies and lagged-alpha methodology are retained.
 - Correct the shared plotting guide's colour and legend helper references to their internal
   `qis.plots.utils` owners, without adding public exports.
 - Preserve frequency-string inference and CSV/Excel readers with pandas 3.1; retain

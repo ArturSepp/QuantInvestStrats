@@ -1,11 +1,11 @@
 """Offline funded and derivative portfolios using the same public stress/report interface.
 
 Run: python -m examples.portfolios.instrument_portfolio_stress
-Optional: --case funded|mixed|account|all --output-dir <fresh directory>
+Select Locals.REPORT; run_local accepts case and output_path overrides.
 No files are written by default. Prices come from qis.datasets.synthetic; factor names,
 loadings, residual variances and contract terms are teaching inputs, not a fitted MATF model.
 """
-import argparse
+from enum import Enum
 from dataclasses import replace
 from pathlib import Path
 
@@ -213,7 +213,7 @@ def verify_result(portfolio, result, derivatives):
 def run_example(output_dir=None, case="all"):
     """Compare funded, mixed and financed-account books; optionally write report packs."""
     if output_dir is not None:
-        output_dir = Path(output_dir)
+        output_dir = Path(qis.get_output_path(output_dir, create=False))
         if output_dir.exists():
             raise FileExistsError("Use a fresh example output directory")
     if case == "vix":
@@ -243,10 +243,24 @@ def run_example(output_dir=None, case="all"):
     return results
 
 
+class Locals(Enum):
+    CHECK = 1
+    REPORT = 2
+
+
+def run_local(local: Locals, output_path: str = None, case: str = 'all'):
+    """Check a selected book or export it under YAML OUTPUT_PATH/an explicit override."""
+    if local not in (Locals.CHECK, Locals.REPORT):
+        raise ValueError(local)
+    if case not in ('funded', 'mixed', 'account', 'vix', 'all'):
+        raise ValueError(case)
+    output = None
+    if local == Locals.REPORT or output_path is not None:
+        output = Path(qis.get_output_path(output_path, create=False))
+        if output_path is None:
+            output /= 'instrument_portfolio_stress'
+    return run_example(output_dir=output, case=case)
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", choices=("funded", "mixed", "account", "vix", "all"),
-                        default="all")
-    parser.add_argument("--output-dir", type=Path)
-    args = parser.parse_args()
-    run_example(args.output_dir, args.case)
+    run_local(local=Locals.CHECK)

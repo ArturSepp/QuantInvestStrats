@@ -10,6 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Tuple, List
+from enum import Enum
 import qis as qis
 
 
@@ -42,7 +43,18 @@ def generate_figure_2x(num_assets: int = 5, n_days: int = 1000) -> List[plt.Figu
     return figs
 
 
-figs = generate_figure_2x(num_assets=5, n_days=1000)
-# local_path=None writes to the working directory; qis.get_output_path() reads settings.yaml,
-# which ships with a placeholder path that does not exist on any machine
-qis.save_figs_to_pdf(figs=figs, file_name='test_price_report', local_path=None)
+class Locals(Enum):
+    PLOT = 1
+
+
+def run_local(local: Locals, output_path: str = None):
+    """Run the example using YAML defaults or an explicit output directory."""
+    if local != Locals.PLOT:
+        raise ValueError(local)
+    figs = generate_figure_2x(num_assets=5, n_days=1000)
+    qis.save_figs_to_pdf(figs=figs, file_name='test_price_report',
+                         local_path=qis.get_output_path(output_path))
+
+
+if __name__ == '__main__':
+    run_local(local=Locals.PLOT)

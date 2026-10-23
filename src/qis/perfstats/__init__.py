@@ -97,3 +97,5 @@ from qis.perfstats.signal_diagnostics import (
 from qis.perfstats.turnover import TurnoverComputationType, compute_turnover
 
 from qis.perfstats.tail_risk import compute_cvar
+
+from qis.perfstats.sharpe_inference import SharpeDiffTest, sharpe_difference_test

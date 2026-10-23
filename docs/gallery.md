@@ -56,7 +56,9 @@ around their targets. The strategy NAV includes trading costs; the reference ser
 
 ## Strategy vs. benchmark
 
-Compare a strategy portfolio with another portfolio, including their cumulative P&L difference.
+Compare a strategy portfolio with another portfolio. The full report includes paired
+[rolling alpha and holdings-weighted beta panels](benchmark_relative_performance.md#dynamic-holdings-the-two-panel-factsheet-example);
+the focused preview below selects performance, statistics, drawdown and turnover.
 The comparison portfolio is distinct from a reference market series used for regimes and beta.
 
 ![Balanced and Defensive synthetic allocations compared by cumulative performance, monthly statistics, daily drawdown and rolling turnover](images/strategy_vs_benchmark.png)

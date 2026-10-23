@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import yfinance as yf
 import qis as qis
 from enum import Enum
-from examples._helpers.output import get_output_dir, parse_output_dir
+from qis import local_path
 from qis.portfolio.reports.multi_assets_factsheet import generate_multi_asset_factsheet
 from qis.portfolio.reports.config import fetch_default_report_kwargs
 
@@ -31,7 +31,7 @@ def run_local(local: Locals, output_path: str = None):
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
     """
-    output_path = get_output_dir(output_path)
+    output_path = local_path.get_output_path(output_path)
 
     end_date = '31Dec2025'  # performance repoting
 
@@ -129,4 +129,4 @@ def run_local(local: Locals, output_path: str = None):
 
 if __name__ == '__main__':
 
-    run_local(local=Locals.CORE_ETFS, output_path=parse_output_dir())
+    run_local(local=Locals.CORE_ETFS)

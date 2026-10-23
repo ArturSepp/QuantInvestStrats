@@ -38,6 +38,7 @@ from typing import Tuple, Optional, List, Union
 import qis as qis
 from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
+from qis.portfolio.risk.ewm_factor_model import _get_instrument_beta_estimation_start
 from qis.portfolio._asset_display import (
     compact_groups, factsheet_kwargs, plot_asset_bars, plot_asset_stack,
     plot_asset_time_series, price_tails,
@@ -662,13 +663,15 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             freq_beta=freq_beta,
             factor_beta_span=factor_beta_span,
         )
-        if factor_exposures.first_valid_index() is None:
-            raise ValueError('no finite portfolio benchmark beta estimates')
-        estimation_start = factor_exposures.index.min()
+        estimation_start = _get_instrument_beta_estimation_start(
+            instrument_prices=portfolio_data.prices,
+            benchmark_prices=benchmark_prices,
+            freq=freq_beta,
+        )
         factor_exposures = time_period.locate(factor_exposures)
         factor_beta_title = (
-            f'Rolling {factor_beta_span}-span beta of {freq_beta}-freq returns,\n'
-            f'estimation starting from {estimation_start:%d%b%Y}'
+            f'Rolling {factor_beta_span}-span holdings-weighted beta ({freq_beta}-freq),\n'
+            f'instrument beta estimation starting from {estimation_start:%d%b%Y}'
         )
         qis.plot_time_series(df=factor_exposures,
                              var_format='{:,.2f}',
@@ -676,6 +679,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                              title=factor_beta_title,
                              ax=ax,
                              **kwargs)
+        if factor_exposures.isna().all().all():
+            ax.text(0.5, 0.5, f'Insufficient history: {factor_beta_span}-return warm-up',
+                    transform=ax.transAxes, ha='center', va='center', fontsize=fontsize)
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
         set_spines(ax=ax, bottom_spine=False, left_spine=False)
 

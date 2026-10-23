@@ -1,7 +1,7 @@
 """Offline observed-index example: point/log fits, USD/EUR responses and account report.
 
-Run: python -m examples.portfolios.instrument_portfolio_stress --case vix
-Optional: --output-dir <fresh directory> writes two USD report packs and a comparison CSV.
+Select case='vix' in instrument_portfolio_stress.run_local.
+Locals.REPORT writes two USD report packs and a comparison CSV under YAML OUTPUT_PATH.
 All observations are synthetic, derived from the standard seeded QIS dataset. This is
 an unpenalised EWLS teaching example, not a MAC estimate or an options sizing model.
 """
@@ -19,7 +19,7 @@ from qis.utils.regression import estimate_ewma_alpha_beta_hac
 def run_example(output_dir=None):
     """Fit both index transforms and verify invariant regressors in USD and EUR."""
     if output_dir is not None:
-        output_dir = Path(output_dir)
+        output_dir = Path(qis.get_output_path(output_dir, create=False))
         output_dir.mkdir(parents=True, exist_ok=False)
     prices = generate_synthetic_prices(start="2015-12-01", end="2025-12-31",
                                       apply_quirks=False).resample("ME").last()

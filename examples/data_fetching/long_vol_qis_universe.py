@@ -390,8 +390,7 @@ def save_long_vol_prices(prices: pd.DataFrame,
         raise ValueError(f"prices must be pd.DataFrame, got {type(prices)}")
     if prices.empty:
         raise ValueError("refusing to save an empty price frame")
-    if local_path is None:
-        local_path = qis.local_path.get_resource_path()
+    local_path = qis.local_path.get_resource_path(local_path, create=True)
     qis.save_df_to_csv(df=prices, file_name=file_name, local_path=local_path)
 
 
@@ -401,8 +400,7 @@ def load_long_vol_prices(file_name: str = LOCAL_FILE_NAME,
     """
     load previously saved prices from the local resource folder
     """
-    if local_path is None:
-        local_path = qis.local_path.get_resource_path()
+    local_path = qis.local_path.get_resource_path(local_path)
     return qis.load_df_from_csv(file_name=file_name, local_path=local_path)
 
 

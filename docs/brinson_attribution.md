@@ -251,7 +251,9 @@ returned increments; they must not run linking a second time.
 For a complete executable example, run
 `python -m examples.portfolios.brinson_attribution` from a source checkout.
 It uses `qis.datasets.synthetic`, has no data/network dependency, prints and
-checks the reconciliation, and accepts `--output-dir` for optional PDF/PNG/CSV files.
+checks the reconciliation, and exports PDF/PNG/CSV files with
+`run_local(local=Locals.REPORT)`. Output uses YAML `OUTPUT_PATH` or an explicit
+`output_path` argument; see the [example path configuration](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/README.md#input-and-output-directories).
 
 ### Complete offline example
 

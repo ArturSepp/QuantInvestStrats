@@ -31,7 +31,8 @@ See [Citation](#citation) for the BibTeX entries.
 
 **Documentation:** [quantinveststrats.readthedocs.io](https://quantinveststrats.readthedocs.io/en/stable/) ·
 [offline quickstart](examples/getting_started/offline_quickstart.py) ·
-[factsheet gallery](docs/gallery.md)
+[factsheet gallery](docs/gallery.md) ·
+[resource/output configuration](src/qis/README.md)
 
 ---
 
@@ -402,8 +403,8 @@ are flagged inline.
 | Drift-aware backtest of a supplied weight schedule (JOSS paper) | `generate_static_weights_schedule`, `backtest_model_portfolio` | [`offline_quickstart.py`](examples/getting_started/offline_quickstart.py) |
 | Ex-ante tracking error and its decomposition | `qis.RiskModel` | [`ex_anti_tracking_error_and_risk.py`](examples/portfolios/ex_anti_tracking_error_and_risk.py) |
 | Realised EWMA tracking error, whole-sample TE/IR, EWMA beta/alpha | `compute_ewma_realised_tracking_error`, `compute_te_ir_errors` | [`ex_post_tracking_error_and_risk.py`](examples/portfolios/ex_post_tracking_error_and_risk.py) |
-| Financed-account stress: borrowing, gross-asset allocations, P&L on net equity | `qis.portfolio.stress` | [`account_equity_stress.py`](examples/portfolios/account_equity_stress.py) (`--output-dir` for the report pack, `--with-beta-intervals` for caller-supplied 95% beta intervals); see the [portfolio stress guide](docs/portfolio_stress.md#run-the-offline-account-example) |
-| Observed-index single-factor stress with native point changes (VIX) | `qis.portfolio.stress` | [`observed_index_stress.py`](examples/portfolios/observed_index_stress.py), `python -m examples.portfolios.instrument_portfolio_stress --case vix` |
+| Financed-account stress: borrowing, gross-asset allocations, P&L on net equity | `qis.portfolio.stress` | [`account_equity_stress.py`](examples/portfolios/account_equity_stress.py): `run_local(Locals.REPORT, with_beta_intervals=True)` uses YAML output and caller-supplied 95% beta intervals; see the [portfolio stress guide](docs/portfolio_stress.md#run-the-offline-account-example) |
+| Observed-index single-factor stress with native point changes (VIX) | `qis.portfolio.stress` | [`observed_index_stress.py`](examples/portfolios/observed_index_stress.py), `instrument_portfolio_stress.run_local(Locals.CHECK, case='vix')` |
 | Convexity premium and smart diversification (Sepp and Kastenholz 2026) | `qis.regimes`, `qis.SmartDiversificationReport` | [convexity premium chapter](docs/convexity_premium.md) |
 | Brinson–Hood–Beebower attribution with Frongello linking | strategy benchmark factsheet | [`brinson_attribution.py`](examples/portfolios/brinson_attribution.py) |
 
@@ -454,7 +455,7 @@ To identify the current software version alongside the paper, use:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.42.0},
+  version={5.43.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

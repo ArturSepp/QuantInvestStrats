@@ -21,6 +21,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from pathlib import Path
+from enum import Enum
 from typing import Optional
 # qis
 import qis
@@ -695,7 +696,7 @@ def run_example(
     if save_figure_path is not None:
         bridge_figure.savefig(save_figure_path, dpi=150, bbox_inches='tight')
     if output_dir is not None:
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = Path(qis.get_output_path(output_dir))
         documentation_figures = {
             'model_layer_attribution_simulated.png': bridge_figure,
             'model_layer_attribution_cumulative_alpha_simulated.png': cumulative_figure,
@@ -711,5 +712,20 @@ def run_example(
     return attribution
 
 
+class Locals(Enum):
+    PLOT = 1
+    EXPORT = 2
+
+
+def run_local(local: Locals, output_path: str = None):
+    """Display the simulation or export figures through the shared YAML path resolver."""
+    if local not in (Locals.PLOT, Locals.EXPORT):
+        raise ValueError(local)
+    output = None
+    if local == Locals.EXPORT or output_path is not None:
+        output = Path(qis.get_output_path(output_path))
+    return run_example(output_dir=output)
+
+
 if __name__ == '__main__':
-    run_example()
+    run_local(local=Locals.PLOT)

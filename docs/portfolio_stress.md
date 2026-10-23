@@ -138,11 +138,11 @@ invested in bonds, 50m borrowing and 100m equity. It checks Fixed Income 100%,
 Borrowing -33.33%, zero instantaneous USD loan P&L, percentage P&L on net equity
 and equity remaining after every scenario. No client data or provider access is used.
 
-From a QIS checkout with qis 5.36.0 or later installed:
+From the current QIS checkout, using [default or private YAML paths](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/README.md):
 
 ```bash
 python -m examples.portfolios.account_equity_stress
-python -m examples.portfolios.account_equity_stress --output-dir /path/to/fresh/account-demo
+python -c "from examples.portfolios.account_equity_stress import Locals, run_local; run_local(Locals.REPORT)"
 ```
 
 The first command validates and prints results without writing files. The second
@@ -151,10 +151,10 @@ panels, numerical workbook, CSV audits and report manifest. Use a fresh output
 directory on local storage. The existing general example exposes the same case:
 
 ```bash
-python -m examples.portfolios.instrument_portfolio_stress --case account
+python -c "from examples.portfolios.instrument_portfolio_stress import Locals, run_local; run_local(Locals.CHECK, case='account')"
 ```
 
-Its default `--case all` includes funded, mixed and account demonstrations.
+Its default `case='all'` includes funded, mixed and account demonstrations.
 The scenario history starts at the first complete synthetic month; it does not
 claim observed historical market events or estimated client product exposures.
 
@@ -895,9 +895,9 @@ predictions, accepts observation weights and training-only benchmark predictions
 and preserves negative out-of-sample scores. Instrument R-squared averages are
 not portfolio R-squared.
 
-Run the offline comparison with
-`python -m examples.portfolios.instrument_portfolio_stress --case vix`.
-Add `--output-dir <fresh-directory>` to write point/log report packs. The example
+Run the offline comparison with `instrument_portfolio_stress.run_local(Locals.CHECK, case='vix')`.
+Select `Locals.REPORT` for YAML-backed output, or pass `output_path` for a fresh explicit
+directory, to write point/log report packs. The example
 fits synthetic USD and EUR responses with the same observed-index regressor,
 verifies scalar P&L and portfolio R², and includes the account snapshot.
 
@@ -1010,13 +1010,13 @@ By default the examples compute and verify results and write no files. To genera
 supply fresh output directories outside the source checkout:
 
 ~~~console
-python -m examples.portfolios.instrument_portfolio_stress --case all --output-dir /path/to/new/instrument_reports
-python -m examples.portfolios.composite_payoff_stress --output-dir /path/to/new/composite_report
-python -m examples.portfolios.account_equity_stress --output-dir /path/to/new/account_report
+python -c "from examples.portfolios.instrument_portfolio_stress import Locals, run_local; run_local(Locals.REPORT, output_path='/path/to/new/instrument_reports', case='all')"
+python -c "from examples.portfolios.composite_payoff_stress import Locals, run_local; run_local(Locals.REPORT, output_path='/path/to/new/composite_report')"
+python -c "from examples.portfolios.account_equity_stress import Locals, run_local; run_local(Locals.REPORT, output_path='/path/to/new/account_report')"
 ~~~
 
-`--case all` creates `funded/`, `mixed/` and `account/`; `--case funded`, `--case mixed`
-and `--case account` select one. The standalone account and custom-payoff examples write
+`case='all'` creates `funded/`, `mixed/` and `account/`; `case='funded'`, `case='mixed'`
+and `case='account'` select one. The standalone account and custom-payoff examples write
 directly to their supplied directories. On Windows, replace the
 example paths with quoted absolute paths on the local C drive and use the repository's external
 interpreter. An existing target is rejected before report output is written.
@@ -1155,8 +1155,8 @@ because the full production pipeline is refitted. Fixed-by-specification and pol
 exclusions should have unavailable bounds and an explicit status.
 
 Omitting `factor_beta_intervals` preserves the existing report layout and numerical
-outputs. Run the offline account example with `--output-dir <fresh directory>` and
-`--with-beta-intervals` to inspect the additional exhibits. Its prescribed bounds are
+outputs. Call the offline account example's `run_local(Locals.REPORT, with_beta_intervals=True)`
+to inspect the additional exhibits; `output_path` overrides its YAML destination. Its bounds are
 explicitly illustrative production ranges; it does not estimate statistical intervals.
 
 ### Exports and audit
