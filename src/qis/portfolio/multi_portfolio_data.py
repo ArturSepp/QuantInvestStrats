@@ -58,6 +58,9 @@ from qis.portfolio.risk.risk_model import RiskModel
 from qis.portfolio.risk.ewm_factor_model import _get_instrument_beta_estimation_start
 from qis.utils.struct_ops import merge_lists_unique
 from qis.perfstats.turnover import TurnoverComputationType
+from qis.portfolio.reports.sharpe_difference import (
+    compute_sharpe_difference_table, plot_sharpe_difference_table,
+)
 
 
 # default perf params
@@ -206,6 +209,50 @@ class MultiPortfolioData:
                                                           perf_columns=perf_columns,
                                                           **kwargs)
         return ra_perf_table
+
+    def get_sharpe_difference_table(
+            self, base_portfolio_id: int = 0, time_period: Optional[TimePeriod] = None,
+            freq: Optional[str] = 'ME', af: Optional[float] = None,
+            n_lags: Optional[int] = None, is_convert_to_str: bool = False,
+    ) -> pd.DataFrame:
+        """Return paired HAC comparisons of all other portfolios with one base.
+
+        Args:
+            base_portfolio_id: Zero-based position of the base portfolio, omitted from rows.
+            time_period: NAV window; its first sampled NAV is the return baseline.
+            freq: Return frequency; ME by default, None for the native NAV grid.
+            af: Periods per year; required with freq=None, otherwise inferred from freq.
+            n_lags: Bartlett HAC truncation; None uses the automatic lag rule.
+            is_convert_to_str: Display floats to two decimals; False keeps numeric precision.
+
+        Returns:
+            The compute_sharpe_difference_table DataFrame, on common complete return dates.
+            Differences are portfolio minus base; no fees or cash adjustment are added.
+        """
+        return compute_sharpe_difference_table(
+            self, base_portfolio_id, time_period, freq, af, n_lags, is_convert_to_str)
+
+    def plot_sharpe_difference_table(
+            self, base_portfolio_id: int = 0, time_period: Optional[TimePeriod] = None,
+            freq: Optional[str] = 'ME', af: Optional[float] = None,
+            n_lags: Optional[int] = None, ax: Optional[plt.Axes] = None, **kwargs,
+    ) -> Tuple[Optional[plt.Figure], pd.DataFrame]:
+        """Draw the HAC comparison table and return its figure and numeric DataFrame.
+
+        Args:
+            base_portfolio_id: Zero-based base portfolio position, omitted from rows.
+            time_period: NAV window; its first sampled NAV is the return baseline.
+            freq: Return frequency; ME by default, None for the native NAV grid.
+            af: Periods per year; required with freq=None, otherwise inferred from freq.
+            n_lags: Bartlett HAC truncation; None uses the automatic lag rule.
+            ax: Optional existing axes; then the returned figure is None.
+            **kwargs: Display settings for plot_df_table, including title.
+
+        Returns:
+            (figure, numeric table), with floats displayed to two decimals.
+        """
+        return plot_sharpe_difference_table(
+            self, base_portfolio_id, time_period, freq, af, n_lags, ax=ax, **kwargs)
 
     def get_aligned_weights(self,
                             strategy_idx: int = 0,

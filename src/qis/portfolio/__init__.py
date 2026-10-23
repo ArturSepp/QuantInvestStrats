@@ -28,6 +28,10 @@ from qis.portfolio.signal_data import StrategySignalData
 
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 
+from qis.portfolio.reports.sharpe_difference import (
+    compute_sharpe_difference_table, plot_sharpe_difference_table,
+)
+
 from qis.portfolio.attribution import (
     ModelLayerAlphaBetaAttribution,
     ModelLayerCumulativeAlphaAttribution,

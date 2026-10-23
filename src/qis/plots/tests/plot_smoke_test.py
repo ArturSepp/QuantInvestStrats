@@ -179,6 +179,9 @@ def _call_kwargs(name: str, fx: Fixtures) -> dict:
         'plot_data_timeseries': dict(data=fx.prices),
         # A smoke test needs a few cells, not the entire multi-year return history.
         'plot_df_table': dict(df=fx.small_table),
+        'plot_sharpe_difference_table': dict(multi_portfolio_data=qis.MultiPortfolioData([
+            qis.PortfolioData(nav=fx.prices[column]) for column in fx.prices.columns[:2]
+        ])),
         'plot_df_table_with_ci': dict(df=fx.small_table, df_ci=fx.small_table.abs()),
         'plot_histplot2d': dict(df=fx.two_columns),
         # each value is an x/y frame: first column is x, second is y

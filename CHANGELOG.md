@@ -45,6 +45,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Report annualised Sharpes, difference, HAC standard error, normal-reference statistic,
   p-value and lag/sample counts, with input validation and independent numerical tests.
 
+- Add `compute_sharpe_difference_table` and `plot_sharpe_difference_table` for
+  `MultiPortfolioData`, with matching instance methods. Compare all portfolios with a
+  selected base on common complete returns in a chosen NAV window, retaining embedded
+  costs/fees, reporting the sampling conventions and formatting floats to two decimals.
+
 - Document the factsheet's holdings-weighted beta and rolling alpha with a reproducible
   two-panel dynamic-allocation exhibit, span-length warm-up and independent numerical checks;
   distinguish current portfolio exposure from model-layer NAV regression.

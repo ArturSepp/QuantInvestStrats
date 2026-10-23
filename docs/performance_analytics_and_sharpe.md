@@ -580,6 +580,42 @@ These synthetic NAV returns use a zero cash hurdle. For funded NAVs, subtract th
 cash accrual before testing excess Sharpes; do not subtract cash again from futures excess P&L.
 Implementation: [sharpe_inference.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/sharpe_inference.py).
 
+For a `MultiPortfolioData`, generate all comparisons against a base portfolio by its
+zero-based position. Each row is **portfolio minus base**; the base itself is omitted.
+`compute_sharpe_difference_table` returns full-precision numeric columns for the two Sharpes,
+their difference, HAC standard error, z statistic, p-value, observation count and lag count.
+`plot_sharpe_difference_table` returns `(figure, numeric_table)` and displays floats to two
+decimal places. Both are also available as `multi.get_sharpe_difference_table` and
+`multi.plot_sharpe_difference_table`.
+
+```python
+multi = qis.MultiPortfolioData([
+    qis.PortfolioData(nav=navs[column]) for column in ['SEQ_US', 'SBD_TSY']
+])
+period = qis.TimePeriod('2005-01-03', '2006-06-30')
+table = qis.compute_sharpe_difference_table(
+    multi, base_portfolio_id=0, time_period=period, freq=None, af=260.0,
+)
+fig, table = multi.plot_sharpe_difference_table(
+    base_portfolio_id=0, time_period=period, freq=None, af=260.0,
+)
+```
+
+The period bounds select NAVs **before** return conversion: its first sampled NAV is the
+baseline. To include returns from January 2005, pass the closing NAV from December 2004 when
+available. The default `freq='ME'` uses complete month ends with annualisation 12; `freq=None`
+uses the native observations and requires `af`. Explicit business-day sampling (`freq='B'`)
+defaults to the QIS convention of 252 unless overridden.
+
+All portfolios use the same complete return rows, so the base Sharpe is identical in every
+row. Missing NAVs are not filled, and returns are computed before incomplete rows are dropped
+to avoid bridging a missing observation. A short-history portfolio therefore shortens the
+sample for the entire table; the returned `attrs` and plot title record the actual return
+dates and sampling settings. HAC lags count retained rows. NAVs retain their existing costs,
+fees and cash convention; the table applies no additional deductions and excludes external
+`benchmark_prices`. Individual p-values have no multiple-testing correction.
+Implementation: [sharpe_difference.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/sharpe_difference.py).
+
 ### Short histories
 
 With $Y\leq 1$ the p.a. helper returns the total return unannualised, so `SHARPE_RF0` divides a
