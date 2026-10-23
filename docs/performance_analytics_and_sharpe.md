@@ -60,7 +60,7 @@ conventions are defined in [notation and conventions](notation_and_conventions.m
 | Return basis | P.a. and log columns: compound growth over the sampled boundaries, volatility on `PerfParams.return_type` returns (log by default); arithmetic columns: simple returns in numerator and denominator; total, or in excess of `rates_data` |
 | Sampling grid | `PerfParams.freq_vol` (default `ME`) for every table Sharpe column, on each asset's complete boundaries; the regime classifier's grid (default `QE`); `roll_freq` for rolling ratios; the caller's grid for EWM ratios and the information ratio |
 | Annualisation | $\sqrt{\mathrm{af}}$ of the sampled grid for volatilities and arithmetic ratios; compound numerators use $Y$ years of 365.25 days; $\mathrm{af}$ is inferred from the sampled index |
-| Mean adjustment | Standard deviations are demeaned, `ddof=1`; numerators are raw means or compound returns; the EWM ratio with `norm_type=1` uses a second moment about zero |
+| Mean adjustment | Standard deviations are demeaned, `ddof=1`, except paired Sharpe inference uses population moments, `ddof=0`; numerators are raw means or compound returns; the EWM ratio with `norm_type=1` uses a second moment about zero |
 | Timing | Table and regime ratios are full-sample and descriptive; rolling and EWM ratios at $t$ use data up to $t$; cash accrued over $(t-1,t]$ uses the rate known at $t-1$ on the return grid |
 | Output units | Dimensionless annualised ratios; the EWM ratio with `norm_type=0` is an annualised return; standard errors are in Sharpe-ratio units |
 | qis default | `compute_ra_perf_table(prices, perf_params=None)` builds `PerfParams(freq=pd.infer_freq(prices.index))`; `PerfParams()` has `freq_vol='ME'`, `return_type=ReturnTypes.LOG`, `sharpe_convention=SharpeConvention.PA`, `rates_data=None` |
@@ -526,12 +526,16 @@ alternative.
 
 ### Paired HAC test of a Sharpe difference
 
-`qis.sharpe_difference_test(r1, r2, n_lags=None, af=12.0)` tests equal arithmetic Sharpes
+`qis.sharpe_difference_test(r1, r2, n_lags=3, af=12.00)` tests equal arithmetic Sharpes
 using the delta-method framework of [Ledoit and Wolf (2008)](https://doi.org/10.1016/j.jempfin.2008.03.002),
 section 3.1. Supply periodic simple excess returns on the same grid; the function does no
 cash adjustment or fee deduction. It sorts the index intersection, drops pairs with NaN,
 rejects infinities and requires at least 24 observations. HAC lags count retained observations;
 resolve material calendar gaps before calling it.
+
+The three-lag default described here is in development version **5.44.0 (unreleased)**.
+Earlier development snapshots selected lags automatically when the argument was omitted.
+Pass `n_lags=None` explicitly to retain that behaviour.
 
 Write $\hat\theta_i=\bar r_i/\hat\sigma_i$ with population variance (`ddof=0`), and
 $z_{it}=(r_{it}-\bar r_i)/\hat\sigma_i$. The difference's influence series is
@@ -550,7 +554,26 @@ $$
 2\sum_{k=1}^{L}\left(1-\frac{k}{L+1}\right)\sum_{t=k+1}^{T}h_t h_{t-k}\right].
 $$
 
-The default is $L=\lfloor4(T/100)^{2/9}\rfloor$, with no finite-sample correction.
+The default is **three lags**, matching QIS's regression HAC helpers. Lag selection is a
+QIS implementation choice, not a prescription of Ledoit and Wolf's paper:
+
+| Argument | Bartlett lag count | Meaning on monthly returns |
+|---|---|---|
+| Omitted, or `n_lags=3` | 3 | Three retained monthly observations |
+| `n_lags=None` | $\lfloor4(T/100)^{2/9}\rfloor$ | Automatic sample-size rule; 4 for 252 observations |
+| `n_lags=0` | 0 | Allows nonnormality but ignores serial dependence |
+| `n_lags=L` | The supplied integer, from 0 through $T-1$ | Explicit truncation for sensitivity analysis |
+
+Three lags always means three **observations**, not three months at every frequency.
+Changing the lag count changes the standard error and inference, not the estimated Sharpes.
+The automatic rule uses the number of complete pairs retained after alignment and filtering.
+
+The covariance calculation reuses the internal
+[`qis.utils.regression.estimate_hac_mean`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/regression.py)
+on the paired influence series. That helper applies a $T/(T-1)$ variance correction;
+the Sharpe test removes it to retain the uncorrected delta-method covariance above.
+This is the same Bartlett HAC estimator documented in
+[regression and HAC inference](regression_and_hac.md), with the correction stated explicitly.
 Both the difference and its standard error are multiplied by $\sqrt{\mathrm{af}}$;
 their ratio (`t_stat`, a normal-reference z statistic) and two-sided p-value are unchanged.
 The population variance convention differs slightly from tables using `ddof=1`.
@@ -567,14 +590,30 @@ it does not estimate the Sharpe of compounded annual returns under serial depend
 For NAVs, convert first and explicitly choose the annualisation factor:
 
 ```python
+import numpy as np
 import qis
 from qis.datasets.synthetic import generate_synthetic_prices
 
-navs = generate_synthetic_prices(end='2006-06-30', apply_quirks=False)
-paired = qis.to_returns(navs[['SEQ_US', 'SBD_TSY']], is_log_returns=False, drop_first=True)
-test = qis.sharpe_difference_test(paired['SEQ_US'], paired['SBD_TSY'], af=260.0)
+navs = generate_synthetic_prices(
+    start='2004-12-31', end='2025-12-31', apply_quirks=False,
+)
+paired = qis.to_returns(
+    navs[['SEQ_US', 'SBD_TSY']], freq='ME', is_log_returns=False, drop_first=True,
+)
+test = qis.sharpe_difference_test(paired['SEQ_US'], paired['SBD_TSY'], af=12.00)
+automatic = qis.sharpe_difference_test(
+    paired['SEQ_US'], paired['SBD_TSY'], n_lags=None, af=12.00,
+)
+assert test.n_obs == automatic.n_obs == 252
+assert test.n_lags == 3 and automatic.n_lags == 4
+assert test.diff_an == automatic.diff_an
 print(f"Difference: {test.diff_an:0.2f}; HAC SE: {test.se_an:0.2f}; p: {test.p_value:0.2f}")
 ```
+
+`SharpeDiffTest` contains `sr1_an` and `sr2_an` (annualised arithmetic Sharpes),
+`diff_an` (first minus second), `se_an`, `t_stat` (normal-reference z), `p_value`,
+`n_obs` and `n_lags`. Unlike the NAV table wrapper, this return-series function performs
+no frequency inference: its `af` default is 12.00, so pass a suitable factor for other grids.
 
 These synthetic NAV returns use a zero cash hurdle. For funded NAVs, subtract the appropriate
 cash accrual before testing excess Sharpes; do not subtract cash again from futures excess P&L.
@@ -586,24 +625,33 @@ zero-based position. Each row is **portfolio minus base**; the base itself is om
 their difference, HAC standard error, z statistic, p-value, observation count and lag count.
 `plot_sharpe_difference_table` returns `(figure, numeric_table)` and displays floats to two
 decimal places. Both are also available as `multi.get_sharpe_difference_table` and
-`multi.plot_sharpe_difference_table`.
+`multi.plot_sharpe_difference_table`. All four entry points default to `n_lags=3` and accept
+explicit `n_lags=None` for automatic selection on their common return sample.
 
 ```python
 multi = qis.MultiPortfolioData([
-    qis.PortfolioData(nav=navs[column]) for column in ['SEQ_US', 'SBD_TSY']
+    qis.PortfolioData(nav=navs[column]) for column in ['SEQ_US', 'SBD_TSY', 'SCM_GLD']
 ])
-period = qis.TimePeriod('2005-01-03', '2006-06-30')
+period = qis.TimePeriod('2004-12-31', '2025-12-31')
 table = qis.compute_sharpe_difference_table(
-    multi, base_portfolio_id=0, time_period=period, freq=None, af=260.0,
+    multi, base_portfolio_id=0, time_period=period, freq='ME',
 )
-fig, table = multi.plot_sharpe_difference_table(
-    base_portfolio_id=0, time_period=period, freq=None, af=260.0,
+automatic_table = multi.get_sharpe_difference_table(
+    base_portfolio_id=0, time_period=period, freq='ME', n_lags=None,
 )
+fig, plotted_table = multi.plot_sharpe_difference_table(
+    base_portfolio_id=0, time_period=period, freq='ME',
+)
+assert table['HAC lags'].eq(3).all() and automatic_table['HAC lags'].eq(4).all()
+assert table.attrs['af'] == 12.00 and table.equals(plotted_table)
+assert np.isclose(table.loc['SBD_TSY', 'Sharpe difference'], -test.diff_an)
+print(table.to_string(float_format=lambda value: f'{value:0.2f}'))
 ```
 
 The period bounds select NAVs **before** return conversion: its first sampled NAV is the
 baseline. To include returns from January 2005, pass the closing NAV from December 2004 when
-available. The default `freq='ME'` uses complete month ends with annualisation 12; `freq=None`
+available. The default `freq='ME'` uses complete month ends with inferred annualisation 12.00;
+leave `af` omitted or set it to `None` for this inference. `freq=None`
 uses the native observations and requires `af`. Explicit business-day sampling (`freq='B'`)
 defaults to the QIS convention of 252 unless overridden.
 
@@ -615,6 +663,11 @@ dates and sampling settings. HAC lags count retained rows. NAVs retain their exi
 fees and cash convention; the table applies no additional deductions and excludes external
 `benchmark_prices`. Individual p-values have no multiple-testing correction.
 Implementation: [sharpe_difference.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/reports/sharpe_difference.py).
+The runnable [factsheet example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/sharpe_difference_table.py)
+builds portfolios from the frozen synthetic data with transaction costs, displays the monthly
+HAC(3) table, and exports PNG/CSV through `run_local(Locals.EXPORT)`. Output paths use the
+configured QIS `OUTPUT_PATH` or an explicit `output_path` argument; numeric results retain
+full precision while display and CSV floats use two decimals.
 
 ### Short histories
 

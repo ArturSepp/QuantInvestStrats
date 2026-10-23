@@ -120,6 +120,7 @@ examples/
 | `strategy_benchmark.py` | `generate_strategy_benchmark_factsheet_plt` — strategy vs benchmark. |
 | `multi_assets.py` | `generate_multi_asset_factsheet` on an asset-class universe. |
 | `multi_strategy.py` | `generate_multi_portfolio_factsheet` over a span sweep. |
+| [sharpe_difference_table.py](factsheets/sharpe_difference_table.py) | Offline paired HAC Sharpe comparisons from `MultiPortfolioData`, with a selected base and NAV window. Uses month-end returns with inferred annualisation, synthetic backtests with transaction costs or existing portfolio NAVs, and display or PNG/CSV export via `Locals.EXPORT`. |
 | `strategy_reporting_frequencies.py` | `generate_strategy_factsheet` reproduced across the DAILY/WEEKLY/MONTHLY/QUARTERLY × {long, short} reporting-frequency grid via `fetch_default_report_kwargs`, on one volparity portfolio. |
 | `strategy_benchmark_reporting_frequencies.py` | `generate_strategy_benchmark_factsheet_plt` across the same reporting-frequency grid — volparity vs equal-weight. |
 | `multi_strategy_reporting_frequencies.py` | `generate_multi_portfolio_factsheet` across the same grid, on a vol-parity span sweep. |

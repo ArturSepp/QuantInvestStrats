@@ -9,7 +9,7 @@ authors:
 repository-code: "https://github.com/ArturSepp/QuantInvestStrats"
 url: "https://pypi.org/project/qis/"
 license: MIT
-version: 5.43.0
+version: 5.44.0
 date-released: 2026-10-23
 preferred-citation:
   type: article

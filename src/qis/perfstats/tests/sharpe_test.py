@@ -1,6 +1,6 @@
 """Independent four-moment and input-contract checks for paired Sharpe HAC inference."""
 
-from dataclasses import astuple
+from dataclasses import astuple, replace
 
 import numpy as np
 import pandas as pd
@@ -10,6 +10,7 @@ from scipy.stats import norm
 
 import qis
 from qis.datasets.synthetic import generate_synthetic_prices
+from qis.utils import regression
 
 
 @pytest.fixture(scope='module')
@@ -36,13 +37,34 @@ def _moment_reference(values, lags, af):
                      diff / se, 2 * norm.sf(abs(diff / se))])
 
 
-@pytest.mark.parametrize('lags', [0, 1, 6, 50])
+@pytest.mark.parametrize('lags', [0, 1, 3, 6, 50])
 def test_matches_independent_moment_reference(returns, lags):
     out = qis.sharpe_difference_test(returns.iloc[:, 0], returns.iloc[:, 1], lags, af=260)
     np.testing.assert_allclose(astuple(out)[:6], _moment_reference(returns.values, lags, 260),
                                rtol=2e-12, atol=1e-13)
     assert out.n_obs == len(returns)
     assert out.n_lags == lags
+
+
+def test_sharpe_inference_consumes_qis_hac_estimator(returns, monkeypatch):
+    """Shared QIS HAC changes must flow through to the Sharpe standard error."""
+    r1, r2 = returns.iloc[:, 0], returns.iloc[:, 1]
+    baseline = qis.sharpe_difference_test(r1, r2, n_lags=3)
+    estimate_hac_mean = regression.estimate_hac_mean
+    calls = []
+
+    def doubled_standard_error(y, hac_lags=3, confidence_level=0.95):
+        calls.append((len(y), hac_lags))
+        result = estimate_hac_mean(y, hac_lags=hac_lags, confidence_level=confidence_level)
+        return replace(result, hac_se=2 * result.hac_se)
+
+    monkeypatch.setattr(regression, 'estimate_hac_mean', doubled_standard_error)
+    actual = qis.sharpe_difference_test(r1, r2, n_lags=3)
+    assert calls == [(len(returns), 3)]
+    assert actual.diff_an == baseline.diff_an
+    assert actual.se_an == pytest.approx(2 * baseline.se_an)
+    assert actual.t_stat == pytest.approx(baseline.t_stat / 2)
+    assert actual.p_value == pytest.approx(2 * norm.sf(abs(baseline.t_stat / 2)))
 
 
 def test_hac_accounts_for_serial_dependence(returns):
@@ -73,14 +95,28 @@ def test_swapping_series_changes_only_sign_and_order(returns):
                                [a.sr2_an, a.sr1_an, -a.diff_an, a.se_an, -a.t_stat, a.p_value])
 
 
-def test_alignment_nan_handling_and_default_lags(returns):
+def test_default_three_lags_and_explicit_automatic_option(returns):
+    """Omitting the lag argument uses three; explicit None still selects the sample rule."""
+    r1, r2 = returns.iloc[:, 0], returns.iloc[:, 1]
+    default = qis.sharpe_difference_test(r1, r2)
+    assert default.n_lags == 3
+    assert default == qis.sharpe_difference_test(r1, r2, n_lags=3)
+    automatic = qis.sharpe_difference_test(r1, r2, n_lags=None)
+    expected_lags = int(np.floor(4 * (len(returns) / 100) ** (2 / 9)))
+    assert expected_lags != 3
+    assert automatic.n_lags == expected_lags
+    np.testing.assert_allclose(astuple(automatic)[:6],
+                               _moment_reference(returns.values, expected_lags, 12), rtol=2e-12)
+
+
+def test_alignment_nan_handling_and_automatic_lags(returns):
     r1 = returns.iloc[:-10, 0].astype('Float64')
     r2 = returns.iloc[7:, 1].copy()
     r1.iloc[20] = pd.NA
     r2.iloc[30] = np.nan
     complete = pd.concat([r1, r2], axis=1).dropna()
-    out = qis.sharpe_difference_test(r1.iloc[::-1], r2.iloc[::-1])
-    expected = qis.sharpe_difference_test(complete.iloc[:, 0], complete.iloc[:, 1])
+    out = qis.sharpe_difference_test(r1.iloc[::-1], r2.iloc[::-1], n_lags=None)
+    expected = qis.sharpe_difference_test(complete.iloc[:, 0], complete.iloc[:, 1], n_lags=None)
     assert out == expected
     assert out.n_obs == len(complete)
     assert out.n_lags == int(np.floor(4 * (len(complete) / 100) ** (2 / 9)))

@@ -9,6 +9,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Route paired Sharpe inference through `qis.utils.regression.estimate_hac_mean`, removing
+  its one-parameter small-sample correction to preserve the existing uncorrected Sharpe
+  inference results at a fixed lag count. For development 5.44.0, make `n_lags=3` the default
+  in `sharpe_difference_test`, both table functions and both `MultiPortfolioData` methods.
+  Explicit `n_lags=None` retains automatic selection; callers wanting the previous omitted-
+  argument behaviour must now pass None. Update the monthly example, methodology and
+  regression tests for both choices. Sharpe point estimates and annualisation are unchanged.
+
 - Unify example input/output directories through `qis.local_path` for development 5.43.0.
   `get_paths(settings_path=None)` supports a private `QIS_SETTINGS_PATH` YAML file;
   `get_output_path` and `get_resource_path` accept explicit directory and YAML overrides.

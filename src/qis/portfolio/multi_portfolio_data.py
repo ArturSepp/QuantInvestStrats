@@ -213,7 +213,7 @@ class MultiPortfolioData:
     def get_sharpe_difference_table(
             self, base_portfolio_id: int = 0, time_period: Optional[TimePeriod] = None,
             freq: Optional[str] = 'ME', af: Optional[float] = None,
-            n_lags: Optional[int] = None, is_convert_to_str: bool = False,
+            n_lags: Optional[int] = 3, is_convert_to_str: bool = False,
     ) -> pd.DataFrame:
         """Return paired HAC comparisons of all other portfolios with one base.
 
@@ -222,7 +222,8 @@ class MultiPortfolioData:
             time_period: NAV window; its first sampled NAV is the return baseline.
             freq: Return frequency; ME by default, None for the native NAV grid.
             af: Periods per year; required with freq=None, otherwise inferred from freq.
-            n_lags: Bartlett HAC truncation; None uses the automatic lag rule.
+            n_lags: Bartlett HAC truncation; defaults to 3 retained return observations.
+                Explicit None uses the automatic lag rule.
             is_convert_to_str: Display floats to two decimals; False keeps numeric precision.
 
         Returns:
@@ -235,7 +236,7 @@ class MultiPortfolioData:
     def plot_sharpe_difference_table(
             self, base_portfolio_id: int = 0, time_period: Optional[TimePeriod] = None,
             freq: Optional[str] = 'ME', af: Optional[float] = None,
-            n_lags: Optional[int] = None, ax: Optional[plt.Axes] = None, **kwargs,
+            n_lags: Optional[int] = 3, ax: Optional[plt.Axes] = None, **kwargs,
     ) -> Tuple[Optional[plt.Figure], pd.DataFrame]:
         """Draw the HAC comparison table and return its figure and numeric DataFrame.
 
@@ -244,7 +245,8 @@ class MultiPortfolioData:
             time_period: NAV window; its first sampled NAV is the return baseline.
             freq: Return frequency; ME by default, None for the native NAV grid.
             af: Periods per year; required with freq=None, otherwise inferred from freq.
-            n_lags: Bartlett HAC truncation; None uses the automatic lag rule.
+            n_lags: Bartlett HAC truncation; defaults to 3 retained return observations.
+                Explicit None uses the automatic lag rule.
             ax: Optional existing axes; then the returned figure is None.
             **kwargs: Display settings for plot_df_table, including title.
 

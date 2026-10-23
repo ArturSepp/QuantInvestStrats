@@ -41,7 +41,7 @@ def compute_sharpe_difference_table(
         time_period: Optional[TimePeriod] = None,
         freq: Optional[str] = 'ME',
         af: Optional[float] = None,
-        n_lags: Optional[int] = None,
+        n_lags: Optional[int] = 3,
         is_convert_to_str: bool = False,
 ) -> pd.DataFrame:
     """Compare every non-base portfolio with one base on a common return sample.
@@ -63,7 +63,8 @@ def compute_sharpe_difference_table(
             None retains the native NAV grid and requires an explicit af.
         af: Periods per year. None uses QIS get_annualization_factor(freq), including 252
             for B and 12 for ME. Pass 260 explicitly for the TF daily reporting convention.
-        n_lags: Bartlett HAC truncation passed to sharpe_difference_test; None uses its rule.
+        n_lags: Bartlett HAC truncation; defaults to 3 retained return observations.
+            Explicit None uses sharpe_difference_test's automatic lag rule.
         is_convert_to_str: Format floats to two decimals and counts as integers for display.
             False preserves full numerical precision.
 
@@ -140,7 +141,7 @@ def plot_sharpe_difference_table(
         time_period: Optional[TimePeriod] = None,
         freq: Optional[str] = 'ME',
         af: Optional[float] = None,
-        n_lags: Optional[int] = None,
+        n_lags: Optional[int] = 3,
         ax: Optional[plt.Axes] = None,
         **kwargs,
 ) -> Tuple[Optional[plt.Figure], pd.DataFrame]:
@@ -152,7 +153,8 @@ def plot_sharpe_difference_table(
         time_period: Inclusive NAV window, with its first sampled NAV used as the baseline.
         freq: Sampling frequency; ME by default, None for native observations.
         af: Periods per year; required with freq=None, otherwise inferred from freq.
-        n_lags: Bartlett truncation; None uses the Sharpe test's automatic lag rule.
+        n_lags: Bartlett truncation; defaults to 3 retained return observations.
+            Explicit None uses the Sharpe test's automatic lag rule.
         ax: Optional axes for composing the table into an existing report.
         **kwargs: Display options forwarded to plot_df_table, including a custom title.
 

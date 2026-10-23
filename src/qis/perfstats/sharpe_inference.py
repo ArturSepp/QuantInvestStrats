@@ -11,9 +11,8 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-from statsmodels.stats.sandwich_covariance import S_hac_simple
 
-from qis.utils.regression import newey_west_lag_rule
+from qis.utils import regression
 
 
 @dataclass(frozen=True)
@@ -44,7 +43,7 @@ class SharpeDiffTest:
 def sharpe_difference_test(
         returns1: pd.Series,
         returns2: pd.Series,
-        n_lags: Optional[int] = None,
+        n_lags: Optional[int] = 3,
         af: float = 12.0,
 ) -> SharpeDiffTest:
     """Test equal arithmetic Sharpe ratios on paired periodic returns with HAC.
@@ -62,7 +61,8 @@ def sharpe_difference_test(
         returns2: Second return Series on the same sampling grid and return basis.
             Index intersection is sorted and pairs containing NaN are dropped. Lags count
             retained observations, so the caller must resolve material calendar gaps first.
-        n_lags: Bartlett truncation, an integer from zero through T-1. None uses
+        n_lags: Bartlett truncation, an integer from zero through T-1; defaults to 3,
+            matching QIS's regression HAC helpers. Explicit None selects
             floor(4*(T/100)**(2/9)); zero allows nonnormality but ignores serial dependence.
         af: Positive finite periods per year, used only for reporting (default 12 for monthly).
             Both the difference and its standard error scale by sqrt(af); p-values do not.
@@ -77,6 +77,8 @@ def sharpe_difference_test(
             a return variance is numerically degenerate, or inference is undefined.
 
     Notes:
+        Covariance uses QIS's estimate_hac_mean on the paired influence series. Its
+        T/(T-1) correction is removed to retain this test's uncorrected delta-method convention.
         Asymptotic validity requires stationary paired returns, sufficient finite moments
         and weak dependence. A significant result does not correct for strategy selection.
         The field t_stat is retained for familiarity; it does not use Student's t distribution.
@@ -101,7 +103,7 @@ def sharpe_difference_test(
     if n_obs < 24:
         raise ValueError(f'joint sample must have at least 24 observations, got {n_obs}')
     if n_lags is None:
-        n_lags = newey_west_lag_rule(n_obs)
+        n_lags = regression.newey_west_lag_rule(n_obs)
     if (isinstance(n_lags, (bool, np.bool_)) or not isinstance(n_lags, Integral)
             or not 0 <= n_lags < n_obs):
         raise ValueError('n_lags must be an integer between zero and T-1')
@@ -132,12 +134,12 @@ def sharpe_difference_test(
             and abs(diff) <= tolerance * max(1.0, np.max(np.abs(sr)))):
         diff, se, statistic, p_value = 0.0, 0.0, 0.0, 1.0
     else:
-        # S_hac_simple returns the unnormalised Bartlett sum; divide by T^2
-        # for the variance of the sample mean influence (no degrees correction).
-        variance = float(S_hac_simple(paired, nlags=int(n_lags))[0, 0]) / n_obs ** 2
-        if not np.isfinite(variance) or variance <= 0:
+        # Reuse QIS's Bartlett HAC mean estimator. Remove its one-parameter
+        # T/(T-1) variance correction for the uncorrected Sharpe delta method.
+        hac_mean = regression.estimate_hac_mean(paired, hac_lags=int(n_lags))
+        se = float(hac_mean.hac_se * np.sqrt((n_obs - 1) / n_obs))
+        if not np.isfinite(se) or se <= 0:
             raise ValueError('Sharpe difference has no positive finite HAC variance')
-        se = float(np.sqrt(variance))
         statistic = diff / se
         p_value = float(2 * norm.sf(abs(statistic)))
     sqrt_af = np.sqrt(af)

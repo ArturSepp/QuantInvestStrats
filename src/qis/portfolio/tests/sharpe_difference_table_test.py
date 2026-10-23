@@ -19,6 +19,37 @@ def make_multi(prices):
     return qis.MultiPortfolioData([qis.PortfolioData(prices[name].copy()) for name in prices])
 
 
+@pytest.mark.parametrize('entry', ['compute', 'plot', 'method_get', 'method_plot'])
+def test_table_default_three_lags_and_explicit_automatic_option(entry):
+    """Every public table entry point distinguishes omitted lags from explicit None."""
+    navs = generate_synthetic_prices(start='2004-12-31', end='2025-12-31',
+                                     apply_quirks=False)[['SEQ_US', 'SBD_TSY']]
+    multi = make_multi(navs)
+
+    def call(**kwargs):
+        if entry == 'compute':
+            return qis.compute_sharpe_difference_table(multi, **kwargs)
+        if entry == 'method_get':
+            return multi.get_sharpe_difference_table(**kwargs)
+        if entry == 'plot':
+            fig, table = qis.plot_sharpe_difference_table(multi, **kwargs)
+        else:
+            fig, table = multi.plot_sharpe_difference_table(**kwargs)
+        plt.close(fig)
+        return table
+
+    default = call()
+    assert default['HAC lags'].eq(3).all()
+    pd.testing.assert_frame_equal(default, call(n_lags=3))
+    automatic = call(n_lags=None)
+    assert automatic['Observations'].eq(252).all()
+    assert automatic['HAC lags'].eq(4).all()
+    pd.testing.assert_frame_equal(automatic, call(n_lags=4))
+    assert default.attrs['af'] == 12.0
+    for column in ['Base Sharpe', 'Portfolio Sharpe', 'Sharpe difference', 'Observations']:
+        pd.testing.assert_series_equal(default[column], automatic[column])
+
+
 @pytest.mark.parametrize('base_id', [0, 1, 2])
 @pytest.mark.parametrize('freq,af', [(None, 260.0), ('ME', None)])
 def test_table_matches_direct_tests_on_independent_nav_returns(prices, base_id, freq, af):
