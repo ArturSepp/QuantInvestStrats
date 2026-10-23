@@ -53,6 +53,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Preserve object and nullable storage when filling normalized weights, avoiding pandas 2.2
+  implicit-downcasting warnings in covariance-implied portfolio risk histories. Missing scores
+  still receive zero weight; unknown portfolio risk remains missing.
 - Correct the shared plotting guide's colour and legend helper references to their internal
   `qis.plots.utils` owners, without adding public exports.
 - Preserve frequency-string inference and CSV/Excel readers with pandas 3.1; retain

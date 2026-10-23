@@ -163,3 +163,34 @@ def test_df_to_weight_allocation_sum1_preserves_defined_rows() -> None:
         == scores.loc["near-cancelling", "second"] / scores.loc["near-cancelling", "first"]
     )
     pd.testing.assert_frame_equal(scores, original, check_exact=True)
+
+
+@pytest.mark.parametrize("dtype", ["float64", "Float64", "object"])
+@pytest.mark.parametrize("as_frame", [False, True], ids=["series", "frame"])
+@pytest.mark.parametrize("case", ["defined", "zero", "missing"])
+def test_df_to_weight_allocation_sum1_fills_without_implicit_downcasting(
+    dtype: str, as_frame: bool, case: str,
+) -> None:
+    """Fill missing scores without pandas-version-dependent object downcasting."""
+    values = {"defined": [2.0, np.nan, 1.0],
+              "zero": [0.0, np.nan, 0.0], "missing": [np.nan, np.nan, np.nan]}
+    expected_values = {"defined": [2.0 / 3.0, 0.0, 1.0 / 3.0],
+                       "zero": [0.0, 0.0, 0.0], "missing": [0.0, 0.0, 0.0]}
+    scores = pd.Series(values[case], index=["a", "b", "c"], name="scores", dtype=dtype)
+    expected = pd.Series(expected_values[case], index=scores.index, name=scores.name,
+                         dtype=dtype)
+    if as_frame:
+        scores = scores.to_frame().T
+        expected = expected.to_frame().T
+    original = scores.copy(deep=True)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        actual = qis.df_to_weight_allocation_sum1(scores)
+
+    if as_frame:
+        pd.testing.assert_frame_equal(actual, expected, check_exact=True)
+        pd.testing.assert_frame_equal(scores, original, check_exact=True)
+    else:
+        pd.testing.assert_series_equal(actual, expected, check_exact=True)
+        pd.testing.assert_series_equal(scores, original, check_exact=True)
