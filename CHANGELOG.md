@@ -7,16 +7,24 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-- Use daily realised holdings for benchmark attribution, matching the displayed portfolio
-  betas. Estimate multi-portfolio regime shading from native benchmark prices within the
-  displayed window, preserving monthly returns on quarterly report panels. Public signatures
-  are unchanged.
+- Estimate multi-portfolio regime shading from native benchmark prices within the displayed
+  window, preserving monthly returns on quarterly report panels. Public signatures are unchanged.
 
-- 2026-10-24: fit joint unsmoothing coefficients subject to their bounds, re-estimating
+## [5.44.2] - 2026-10-24
+
+- Supersede the unpublished 5.44.0/5.44.1 candidates with the approved production
+  joint-unsmoothing policy. Benchmark attribution also uses unsampled holdings.
+- Fit joint unsmoothing coefficients subject to their bounds, re-estimating
   the free coefficient on an active boundary instead of clipping a correlated pair
   independently. Reuse existing EWMA moments and rank safeguards; preserve warm-up,
   missing-data timing and the one-period application lag. Public signatures and general
   EWMA defaults are unchanged. CMA's no-coefficient-smoothing choice remains explicit.
+
+## [5.44.1] - 2026-10-24
+
+- Use unsampled holdings for benchmark attribution, matching the displayed benchmark
+  betas. This repairs the existing daily-holdings regression without changing portfolio
+  execution or unsmoothing. The 5.44.0 validation run was stopped before publication.
 
 ## [5.44.0] - 2026-10-24
 
