@@ -812,7 +812,7 @@ class PortfolioData:
         """
         instrument_prices = self.prices
         benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-        weights = self.get_weights().reindex(index=instrument_prices.index, method='ffill')
+        weights = self.get_weights(freq=None).reindex(index=instrument_prices.index, method='ffill')
         portfolio_nav = self.get_portfolio_nav().reindex(index=instrument_prices.index, method='ffill')
         joint_attrib = ef.compute_portfolio_benchmark_ewm_beta_alpha_attribution(instrument_prices=instrument_prices,
                                                                                  weights=weights,
