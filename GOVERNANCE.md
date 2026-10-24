@@ -1,5 +1,10 @@
 # Governance, maintenance, and support
 
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-08-21](https://github.com/ArturSepp/QuantInvestStrats/commit/10cc0ab622d064908a782dddfce7205e44dea7fc)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 `qis` is an open-source research-software project for performance analytics, portfolio
 backtesting, risk analysis, and factsheet reporting. This document states how decisions are made,
 how the project is maintained, and what contributors and users can expect.

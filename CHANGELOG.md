@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Use daily realised holdings for benchmark attribution, matching the displayed portfolio
+  betas. Estimate multi-portfolio regime shading from native benchmark prices within the
+  displayed window, preserving monthly returns on quarterly report panels. Public signatures
+  are unchanged.
+
 - 2026-10-24: fit joint unsmoothing coefficients subject to their bounds, re-estimating
   the free coefficient on an active boundary instead of clipping a correlated pair
   independently. Reuse existing EWMA moments and rank safeguards; preserve warm-up,

@@ -1,5 +1,10 @@
 # `qis.market_data`
 
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-06-19](https://github.com/ArturSepp/QuantInvestStrats/commit/a39da9f97a11a25848e1d6ff8bc644f7501d53a8)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 Generic market-data containers and FX-hedging analytics, lifted out of `rosaa.market_data` into
 the open `qis` package. The module holds two dataclass containers (`FxRatesData`, `FactorsData`),
 a leaf of pure FX math (`fx_hedging`), and a small FX-hedging reporting pipeline (`reports`). It is

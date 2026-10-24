@@ -1,5 +1,10 @@
 # qis
 
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2022-12-30](https://github.com/ArturSepp/QuantInvestStrats/commit/b5a876000b63b15a3c95ff06e5add4f60beceadc)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 **Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in
 Python.**
 

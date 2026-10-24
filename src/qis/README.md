@@ -1,6 +1,9 @@
 # Configuring qis resource and output directories
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-10-23](https://github.com/ArturSepp/QuantInvestStrats/commit/77fd15cc8acd19e527b6617730edc50f998f73d3)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 [qis](https://github.com/ArturSepp/QuantInvestStrats) uses [local_path.py](local_path.py)
 and [settings.yaml](settings.yaml) for directory configuration. Software citation:

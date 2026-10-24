@@ -8,7 +8,7 @@ myst:
 
 # Reference-currency conversion and excess returns
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-10-24](https://github.com/ArturSepp/QuantInvestStrats/commit/21d304e32dcb1514fa738c16b6aceabe8038ba28)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

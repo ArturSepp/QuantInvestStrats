@@ -1,8 +1,8 @@
 # Committing with GitHub Desktop
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-21](https://github.com/ArturSepp/QuantInvestStrats/commit/a9870cb9ad92addea114a2f55a1778d35372f75c)*
 
-Project: [qis](https://github.com/ArturSepp/QuantInvestStrats).
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 Create a working branch, select the intended changes, and commit normally. The installed
