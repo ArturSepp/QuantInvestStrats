@@ -7,7 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-- 2026-10-24: fit joint unsmoothing coefficients subject to their bounds, re-estimating
+## [5.44.2] - 2026-10-24
+
+- Supersede the unpublished 5.44.0/5.44.1 candidates with the approved production
+  joint-unsmoothing policy. Benchmark attribution also uses unsampled holdings.
+- Fit joint unsmoothing coefficients subject to their bounds, re-estimating
   the free coefficient on an active boundary instead of clipping a correlated pair
   independently. Reuse existing EWMA moments and rank safeguards; preserve warm-up,
   missing-data timing and the one-period application lag. Public signatures and general

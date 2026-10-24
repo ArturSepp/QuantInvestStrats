@@ -455,7 +455,7 @@ To identify the current software version alongside the paper, use:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.44.1},
+  version={5.44.2},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```
