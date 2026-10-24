@@ -13,6 +13,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   missing-data timing and the one-period application lag. Public signatures and general
   EWMA defaults are unchanged. CMA's no-coefficient-smoothing choice remains explicit.
 
+## [5.44.1] - 2026-10-24
+
+- Use unsampled holdings for benchmark attribution, matching the displayed benchmark
+  betas. This repairs the existing daily-holdings regression without changing portfolio
+  execution or unsmoothing. The 5.44.0 validation run was stopped before publication.
+
 ## [5.44.0] - 2026-10-24
 
 - Zero-seed unsmoothing means and coefficient filters; exclude warmup estimates
