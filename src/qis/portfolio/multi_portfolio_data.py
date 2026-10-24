@@ -475,9 +475,9 @@ class MultiPortfolioData:
         """
         pivot_prices = self.benchmark_prices[regime_benchmark]
         if index is not None:
-            pivot_prices = pivot_prices.loc[
-                (pivot_prices.index >= index.min()) & (pivot_prices.index <= index.max())
-            ]
+            # Clip the window without reducing prices to the panel's display frequency.
+            # A quarterly exposure grid cannot supply monthly regime returns.
+            pivot_prices = pivot_prices.loc[index.min():index.max()]
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
 
     def plot_nav(self,

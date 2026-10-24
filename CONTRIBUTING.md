@@ -7,9 +7,9 @@ myst:
 
 # Contributing to QuantInvestStrats
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-07-21](https://github.com/ArturSepp/QuantInvestStrats/commit/a5e30ad58fac37bab018f03885ce5548c6308acd)*
 
-Project: [QuantInvestStrats](https://github.com/ArturSepp/QuantInvestStrats).
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 Thanks for your interest in `qis`. `qis` is the analytics and reporting engine of a wider stack, so contributions here can affect downstream packages.

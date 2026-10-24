@@ -1,5 +1,10 @@
 # Discrete portfolio replay
 
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-08-15](https://github.com/ArturSepp/QuantInvestStrats/commit/547d3f5270bed336c3af1a87c2a1001be9b19090)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 `qis.discrete_portfolio` is the event-driven trading pipeline in QIS. It is intended for
 strategies that decide whether to submit an order after each observed market event and need an
 explicit order/fill history. The same deterministic replay logic can sit behind research and a

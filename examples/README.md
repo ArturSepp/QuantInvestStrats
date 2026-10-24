@@ -1,6 +1,9 @@
 # qis examples
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-05-05](https://github.com/ArturSepp/QuantInvestStrats/commit/8f36d19bc6580e06cf9def5772d21837fd6d427a)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 Examples for [qis](https://github.com/ArturSepp/QuantInvestStrats).
 See the [software citation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
