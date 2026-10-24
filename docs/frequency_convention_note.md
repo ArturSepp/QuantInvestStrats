@@ -12,10 +12,12 @@ myst:
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-06-19](https://github.com/ArturSepp/QuantInvestStrats/commit/a39da9f97a11a25848e1d6ff8bc644f7501d53a8)*
 
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 Reporting frequency is the sampling grid used to estimate and label performance
 statistics. This article explains its statistical consequences and the factsheet
 convention implemented in [qis](https://github.com/ArturSepp/QuantInvestStrats).
-Software reference: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 ## Overview
 

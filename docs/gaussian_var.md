@@ -8,13 +8,15 @@ myst:
 
 # Gaussian Monte Carlo VaR and benchmark risk
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-10-15](https://github.com/ArturSepp/QuantInvestStrats/commit/7e93cf4bf85ddb7bc20ce1f3db0dec64ca711de5)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 Value at risk (VaR) is a quantile of a portfolio's loss over a specified horizon.
 This chapter describes the supplied-covariance Gaussian calculation in
 [qis](https://github.com/ArturSepp/QuantInvestStrats), including comparison with a
-benchmark and a closed-form check. Software citation:
-[CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+benchmark and a closed-form check.
 
 ## Overview
 

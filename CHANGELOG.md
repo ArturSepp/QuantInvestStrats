@@ -7,6 +7,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- 2026-10-24: fit joint unsmoothing coefficients subject to their bounds, re-estimating
+  the free coefficient on an active boundary instead of clipping a correlated pair
+  independently. Reuse existing EWMA moments and rank safeguards; preserve warm-up,
+  missing-data timing and the one-period application lag. Public signatures and general
+  EWMA defaults are unchanged. CMA's no-coefficient-smoothing choice remains explicit.
+
+- 2026-10-24: zero-seed unsmoothing means and coefficient filters; exclude warm-up
+  estimates before smoothing. AR(1) counts usable coefficients once, independently
+  of leading empty dates. General EWMA defaults and public signatures are unchanged.
+
 ### Changed
 
 - Route paired Sharpe inference through `qis.utils.regression.estimate_hac_mean`, removing

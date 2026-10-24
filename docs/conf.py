@@ -129,6 +129,15 @@ API_HEADER = """..
 API reference
 =============
 
+Author: `Artur Sepp <https://github.com/ArturSepp>`_ /
+First recorded: `2026-07-25
+<https://github.com/ArturSepp/QuantInvestStrats/commit/33fb329654dd1ab6064a009c785f11f08910953e>`_.
+
+Implemented in `qis — Quantitative Investment Strategies
+<https://github.com/ArturSepp/QuantInvestStrats>`_.
+Software citation: `CITATION.cff
+<https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff>`_.
+
 Public means exported from ``src/qis/__init__.py``. This page is regenerated on every build, so it
 cannot drift from the exports.
 

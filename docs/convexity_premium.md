@@ -10,7 +10,7 @@ myst:
 
 # The convexity premium and smart diversification
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-27](https://github.com/ArturSepp/QuantInvestStrats/commit/01a16b60ea4d12ea9d6b5c701dac4ae816dffab1)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

@@ -10,9 +10,11 @@ myst:
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-07-25](https://github.com/ArturSepp/QuantInvestStrats/commit/33fb329654dd1ab6064a009c785f11f08910953e)*
 
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats)
 provides portfolio analytics and reporting in Python.
-Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 ## Core installation
 

@@ -4,6 +4,11 @@ orphan: true
 
 # Brinson attribution
 
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-13](https://github.com/ArturSepp/QuantInvestStrats/commit/29fb6ce856e4480d9643508842a7ef5beff56cf9)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 The full methodology and calculation contract is maintained in
 [`docs/brinson_attribution.md`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/docs/brinson_attribution.md)
 in the QuantInvestStrats repository.

@@ -5,7 +5,6 @@ For SPY/TLT/GLD, computes monthly returns and renders a hue-coloured
 boxplot by calendar month via ``df_boxplot_by_hue_var``, plus a
 mean/std/min/max table per month.
 """
-import pandas as pd
 import matplotlib.pyplot as plt
 import yfinance as yf
 import qis

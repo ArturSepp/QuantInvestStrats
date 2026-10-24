@@ -10,7 +10,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from enum import Enum
-from typing import Union
 import yfinance as yf
 import qis
 

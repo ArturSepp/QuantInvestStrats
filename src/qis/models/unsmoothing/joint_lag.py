@@ -8,8 +8,9 @@ process is fitted as ONE regression,
     r_t = phi_1 r_{t-1} + beta_1 F_{t-1} + e_t,
 
 estimating the own-lag coefficient phi_1 and the lagged-factor beta beta_1
-JOINTLY with the rolling EWMA cross-moment estimator (``compute_ewm_xy_beta_tensor``,
-``is_x_correlated=True``), because r_{t-1} and F_{t-1} are correlated in
+JOINTLY by minimizing the rolling EWMA squared error subject to the supplied bounds,
+using the cross-moments of ``compute_ewm_xy_beta_tensor``. The regressors r_{t-1} and
+F_{t-1} are correlated in
 proportion to the contemporaneous beta. The two-stage pipeline fits phi_1 from
 r_t on r_{t-1} alone, so the omitted F_{t-1} biases it
 (phi_1^seq - phi_1^joint = beta_1 Cov(r_{t-1}, F_{t-1}) / Var(r_{t-1})), and then
@@ -26,8 +27,8 @@ beta_1 F_t:
             + beta_1 (F_t - F_{t-1}) / (1 - phi_1).
 
 The first term is Geltner own-lag unsmoothing, the second the Dimson re-timing of
-the lagged factor. The correction is mean-preserving (E[F_t - F_{t-1}] = 0 and the
-denominator restores the level), so the cumulative return is unchanged. The
+the lagged factor. For fixed coefficients in a stationary process, the correction preserves the
+population mean. Time-varying estimated coefficients do not preserve cumulative return exactly. The
 implied unsmoothed contemporaneous loading is (beta_0 + beta_1) / (1 - phi_1), an
 OUTPUT of the fit.
 
@@ -51,6 +52,56 @@ from qis.models.linear.ewm import (compute_ewm, compute_ewm_xy_beta_tensor, Mean
                                     compute_rolling_mean_adj, InitType, NanBackfill)
 
 
+UNSMOOTHING_INITIALIZATION_VERSION = 2
+UNSMOOTHING_JOINT_BOUNDS_VERSION = 1
+
+
+def _fit_bounded_joint_betas(x: np.ndarray, y: np.ndarray, span: int,
+                             lower: np.ndarray, upper: np.ndarray) -> np.ndarray:
+    """Minimize each two-variable EWMA objective over its coefficient box.
+
+    Reuse the linear engine's unconstrained fit and rank safeguard. If a bound
+    binds, enumerate the boundary optima, including corners via conditional
+    clipping. Scalar moment filters use the same zero seed and gap decay as the
+    joint tensor; unit-diagonal scaling keeps the objective independent of units.
+    """
+    betas = compute_ewm_xy_beta_tensor(
+        x=x, y=y, span=span, warmup_period=-1, is_x_correlated=True,
+        nan_backfill=NanBackfill.DEFLATED_FFILL)[:, :, 0]
+    bounded = np.clip(betas, lower, upper)
+    active = np.isfinite(betas).all(axis=1) & np.any(
+        (betas < lower) | (betas > upper), axis=1)
+    if not active.any():
+        return bounded
+
+    products = np.column_stack((x[:, 0] ** 2, x[:, 0] * x[:, 1], x[:, 1] ** 2,
+                                x[:, 0] * y, x[:, 1] * y))
+    moments = compute_ewm(data=products, span=span, init_type=InitType.ZERO,
+                          nan_backfill=NanBackfill.DEFLATED_FFILL)
+    for pos in np.flatnonzero(active):
+        a, b, c, d, e = moments[pos]
+        scale = np.sqrt(np.array([a, c]))
+        hessian = np.array([[1.0, b / (scale[0] * scale[1])],
+                            [b / (scale[0] * scale[1]), 1.0]])
+        cross = np.array([d, e]) / scale
+        lo, hi = lower * scale, upper * scale
+        candidates = []
+        for fixed in (0, 1):
+            free = 1 - fixed
+            for boundary in (lo[fixed], hi[fixed]):
+                if not np.isfinite(boundary):
+                    continue
+                candidate = np.empty(2)
+                candidate[fixed] = boundary
+                candidate[free] = np.clip(
+                    cross[free] - hessian[free, fixed] * boundary, lo[free], hi[free])
+                candidates.append(candidate)
+        losses = [z @ hessian @ z - 2.0 * cross @ z for z in candidates]
+        best = candidates[int(np.argmin(losses))]
+        bounded[pos] = np.clip(best / scale, lower, upper)
+    return bounded
+
+
 def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
                                           factor_returns: pd.Series,
                                           span: int = 40,
@@ -72,8 +123,8 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
     ``r_u[t] = (r[t] - phi1 * r[t-1] + beta1 * (F[t] - F[t-1])) / (1 - phi1)``.
 
     Fits phi_1 and beta_1 in one regression of r_t on [r_{t-1}, F_{t-1}] with a
-    time-varying EWMA beta pair (``compute_ewm_xy_beta_tensor``,
-    ``is_x_correlated=True``, the two regressors are correlated), lags the pair
+    time-varying bounded EWMA beta pair. When a bound binds, the other coefficient
+    is re-estimated conditional on it, rather than clipped independently. Lags the pair
     one period to avoid look-ahead, and applies the mean-preserving inversion on
     the raw levels. Single-stage counterpart to running ``adjust_returns_with_ar``
     then ``adjust_returns_with_factor_lag``, without the omitted-variable bias in
@@ -87,7 +138,7 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
             same index and frequency as ``returns``.
         span: EWMA span for the rolling coefficients, in periods of ``returns``.
         mean_adj_type: How to demean r_t, r_{t-1}, F_{t-1} for the beta fit. The
-            default EWMA mode uses a point-in-time ``InitType.X0`` seed. The inversion
+            default EWMA mode uses a point-in-time ``InitType.ZERO`` seed. The inversion
             uses raw levels and stays mean-preserving regardless.
         warmup_period: Number of jointly observable coefficient dates masked once
             per asset. The application lag then makes the next return the first
@@ -98,10 +149,10 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         max_factor_beta: Upper cap on beta_1. None disables.
         min_factor_beta: Lower cap on beta_1. Pass 0.0 to floor the lagged-factor
             beta at non-negative (the forward-only re-timing the factor-lag engine
-            enforces via its sign tie), at the cost of boundary bias. None
-            disables.
+            enforces via its sign tie). Bounds are imposed jointly in the weighted
+            fit; None disables this bound.
         apply_ewma_mean_smoother: If True, apply an extra EWMA smoother to each
-            coefficient series after the caps.
+            coefficient series after the bounded fit.
         return_diagnostics: If True, return ``(corrected, phi_1, beta_1)``, the
             unsmoothed returns and the two rolling coefficient panels.
 
@@ -111,7 +162,7 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
 
     Raises:
         ValueError: if ``span <= 0``, ``warmup_period < 0``, ``factor_returns``
-            is not an aligned Series, or ``max_ar_coeff >= 1``.
+            is not an aligned Series, ``max_ar_coeff >= 1``, or bounds are invalid.
     """
     if span <= 0:
         raise ValueError(f"span must be positive, got {span!r}")
@@ -121,6 +172,16 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         raise ValueError(f"factor_returns must be a pd.Series, got {type(factor_returns)}")
     if max_ar_coeff >= 1.0:
         raise ValueError(f"max_ar_coeff must be < 1 to keep 1 - phi_1 > 0, got {max_ar_coeff!r}")
+
+    lo_phi = -np.inf if min_ar_coeff is None else min_ar_coeff
+    lo_beta = -np.inf if min_factor_beta is None else min_factor_beta
+    hi_beta = np.inf if max_factor_beta is None else max_factor_beta
+    lower = np.array([lo_phi, lo_beta], dtype=float)
+    upper = np.array([max_ar_coeff, hi_beta], dtype=float)
+    if (np.isnan(lower).any() or np.isnan(upper).any()
+            or np.isposinf(lower).any() or np.isneginf(upper).any()
+            or np.any(lower > upper)):
+        raise ValueError("coefficient bounds must be ordered and cannot contain NaN")
 
     cols = returns.columns
     factor = factor_returns.reindex(returns.index)
@@ -132,11 +193,11 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
     # Demean the target and the two regressors for the beta fit only.
     if mean_adj_type != MeanAdjType.NONE:
         y_adj = compute_rolling_mean_adj(data=returns, mean_adj_type=mean_adj_type,
-                                         span=span, init_type=InitType.X0)
+                                         span=span, init_type=InitType.ZERO)
         r_lag_adj = compute_rolling_mean_adj(data=r_lag_raw, mean_adj_type=mean_adj_type,
-                                             span=span, init_type=InitType.X0)
+                                             span=span, init_type=InitType.ZERO)
         f_lag_adj = compute_rolling_mean_adj(data=f_lag_raw, mean_adj_type=mean_adj_type,
-                                             span=span, init_type=InitType.X0)
+                                             span=span, init_type=InitType.ZERO)
     else:
         y_adj, r_lag_adj, f_lag_adj = returns, r_lag_raw, f_lag_raw
 
@@ -156,30 +217,12 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         # accumulate factor variance before a ragged asset itself is observable.
         x_for_fit = np.where(joint_valid[:, None], x, np.nan)
         y_for_fit = np.where(joint_valid, y, np.nan)
-        bt = compute_ewm_xy_beta_tensor(
-            x=x_for_fit, y=y_for_fit, span=span,
-            warmup_period=-1,                          # publish masking is applied once below
-            is_x_correlated=True,                        # joint 2x2 cross-moment inverse
-            # Decay XX and XY equally across excluded rows, preserving their ratio.
-            nan_backfill=NanBackfill.DEFLATED_FFILL,
-        )                                                # shape [t, 2, 1]
+        bt = _fit_bounded_joint_betas(
+            x=x_for_fit, y=y_for_fit, span=span, lower=lower, upper=upper)
         has_joint_observation = np.logical_or.accumulate(joint_valid)
         publish = returns[col].notna().to_numpy() & has_joint_observation
-        phi1[col] = np.where(publish, bt[:, 0, 0], np.nan)
-        beta1[col] = np.where(publish, bt[:, 1, 0], np.nan)
-
-    # Caps. phi_1 capped below 1 for inversion stability; beta_1 optional.
-    lo_phi = -np.inf if min_ar_coeff is None else min_ar_coeff
-    phi1 = phi1.clip(lower=lo_phi, upper=max_ar_coeff)
-    if max_factor_beta is not None or min_factor_beta is not None:
-        lo_b = -np.inf if min_factor_beta is None else min_factor_beta
-        hi_b = np.inf if max_factor_beta is None else max_factor_beta
-        beta1 = beta1.clip(lower=lo_b, upper=hi_b)
-
-    if apply_ewma_mean_smoother:
-        phi1 = compute_ewm(data=phi1, span=span)
-        beta1 = compute_ewm(data=beta1, span=span)
-        phi1 = phi1.clip(lower=lo_phi, upper=max_ar_coeff)   # smoother can overshoot the cap
+        phi1[col] = np.where(publish, bt[:, 0], np.nan)
+        beta1[col] = np.where(publish, bt[:, 1], np.nan)
 
     if warmup_period is not None:
         # Mask exactly the requested number of usable regression dates per asset.
@@ -187,6 +230,13 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         coefficient_ready = jointly_observable.cumsum().gt(warmup_period)
         phi1 = phi1.where(coefficient_ready)
         beta1 = beta1.where(coefficient_ready)
+
+    # Excluded estimates must never seed or update the coefficient smoother.
+    if apply_ewma_mean_smoother:
+        phi1 = compute_ewm(data=phi1, span=span, init_type=InitType.ZERO)
+        beta1 = compute_ewm(data=beta1, span=span, init_type=InitType.ZERO)
+        phi1 = phi1.clip(lower=lo_phi, upper=max_ar_coeff)
+        beta1 = beta1.clip(lower=lo_beta, upper=hi_beta)
 
     # Lag the coefficients one period (no look-ahead), invert with raw levels.
     phi1_l = phi1.shift(1)
@@ -201,3 +251,4 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
     if return_diagnostics:
         return corrected, phi1, beta1
     return corrected
+

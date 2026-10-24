@@ -1,5 +1,10 @@
 # Instrument portfolio valuation and stress reports
 
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-12](https://github.com/ArturSepp/QuantInvestStrats/commit/d6d991b34aacbadf6a723b5e44c0e07076e6b706)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 Optional beta inference (5.39.0): supply `StressReportConfig.factor_beta_intervals`
 as a factor-indexed DataFrame with `estimate`, `lower`, `upper` and optional `status`.
 Bounds are in native portfolio-return/factor units, with 95% confidence by default.

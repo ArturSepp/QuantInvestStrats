@@ -8,9 +8,9 @@ myst:
 
 # Portfolio risk monitoring with qis
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-10-07](https://github.com/ArturSepp/QuantInvestStrats/commit/183666edfddff6f5f1c389ad4dc37d6733d31bb0)*
 
-This guide is part of [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 Risk monitoring asks the same questions of a portfolio every day: how much risk it runs, where

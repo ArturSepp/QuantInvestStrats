@@ -10,10 +10,11 @@ myst:
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-13](https://github.com/ArturSepp/QuantInvestStrats/commit/29fb6ce856e4480d9643508842a7ef5beff56cf9)*
 
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 This standard applies to human-authored documentation for
 [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
-Use the project's [citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff)
-when citing the software.
 
 This is the QIS supplement to the
 [shared OSS documentation standard](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md).
@@ -26,6 +27,10 @@ guide. Existing section headings remain available for incoming links.
 Use the shared [article structure](https://github.com/ArturSepp/ArturSepp/blob/main/docs/documentation_standard.md#user-content-article-structure),
 with the H2 `Implementation in qis`. Utility pages use the shared shorter form.
 The QIS checker enforces the eight methodology headings and their order.
+
+Use the linked Artur Sepp byline and the exact software attribution block shown at the top
+of this page in both `docs/` and `src/qis/docs/`. Add each article's own evidenced First recorded
+date and commit; an uncommitted page retains its author-only byline.
 
 Explain simple versus log returns, annualisation, estimation versus reporting grids, gross
 versus net results, risk-free-rate assumptions, and prior versus current weights where relevant.

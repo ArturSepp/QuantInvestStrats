@@ -1,5 +1,10 @@
 # Sharpe ratio conventions
 
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-07-12](https://github.com/ArturSepp/QuantInvestStrats/commit/17b8a55d42540a48919886a5c95b0636335c1f9d)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 This packaged note summarises the Sharpe conventions of qis. The definitions, proofs, standard
 errors, regime decomposition and a worked example are in the handbook chapter
 [Sharpe ratios: conventions and inference](https://quantinveststrats.readthedocs.io/en/latest/performance_analytics_and_sharpe.html).

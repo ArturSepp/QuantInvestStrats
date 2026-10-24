@@ -15,7 +15,6 @@ AWS_POSTGRES:
 """
 import os
 import functools
-import platform
 import time
 import warnings
 import numpy as np
@@ -27,7 +26,9 @@ from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple, Union, Lit
 from matplotlib.backends.backend_pdf import PdfPages
 from enum import Enum
 
-from qis.local_path import get_paths, get_resource_path, get_output_path
+from qis.local_path import (
+    get_paths, get_output_path as get_output_path, get_resource_path as get_resource_path,
+)
 
 
 """"

@@ -1,5 +1,10 @@
 # Factor stress testing
 
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-12](https://github.com/ArturSepp/QuantInvestStrats/commit/334d942db051de44b5abecedc1f5a2f1fa167c51)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 The public APIs in qis.portfolio.risk.stress_testing work with labelled pandas inputs
 and have no dependency on a particular factor model, provider or optimisation package.
 

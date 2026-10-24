@@ -10,7 +10,7 @@ myst:
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-08-15](https://github.com/ArturSepp/QuantInvestStrats/commit/378db166e53ca50c0e5adcdaf5b7c5749ca0e9f5)*
 
-This comparison is part of [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 These libraries overlap, but they start from different analytical objects. The useful comparison

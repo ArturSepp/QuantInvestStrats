@@ -35,7 +35,7 @@ portfolio_data = qis.backtest_model_portfolio(
     weights=weight_schedule,
     rebalancing_freq=None,
     rebalancing_costs=TRANSACTION_COST,
-    weight_implementation_lag=0,
+    weight_implementation_lag=1,
     ticker='Live-universe portfolio',
 )
 portfolio_nav = portfolio_data.get_portfolio_nav()

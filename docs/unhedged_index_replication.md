@@ -8,7 +8,7 @@ myst:
 
 # Unhedged index replication
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-10-03](https://github.com/ArturSepp/QuantInvestStrats/commit/dff7d64db3c4ad90573ecfe28d5f4efbb56f6d8b)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

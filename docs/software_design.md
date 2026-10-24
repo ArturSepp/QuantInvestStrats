@@ -10,9 +10,11 @@ myst:
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-08-21](https://github.com/ArturSepp/QuantInvestStrats/commit/10cc0ab622d064908a782dddfce7205e44dea7fc)*
 
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats)
 is an analytics and reporting library built around labelled data and explicit conventions.
-Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 This page explains how inputs become portfolio histories and reports, where functionality
 belongs, and which contracts an extension must preserve. The [offline quickstart](quickstart.md)

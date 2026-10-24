@@ -1,9 +1,10 @@
 # Shared plotting arguments
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-07-26](https://github.com/ArturSepp/QuantInvestStrats/commit/9946300b64ca8b6a75f7e0ccab4925fee2144192)*
 
-Implemented in [qis](https://github.com/ArturSepp/QuantInvestStrats).
-See the [software citation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 
 This page describes shared arguments used by qis Matplotlib plots: where to draw, what to title
 the plot, and how to format numbers. Check the individual function's signature and docstring

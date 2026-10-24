@@ -1,9 +1,10 @@
 # Reporting-frequency convention
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-06-19](https://github.com/ArturSepp/QuantInvestStrats/commit/a39da9f97a11a25848e1d6ff8bc644f7501d53a8)*
 
-Implemented in [qis](https://github.com/ArturSepp/QuantInvestStrats).
-See the [software citation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 
 `qis` factsheets treat **reporting frequency as a first-class, propagated, guarded and labelled
 axis**. The same book can be reported daily (risk), monthly (clients) or quarterly (investment

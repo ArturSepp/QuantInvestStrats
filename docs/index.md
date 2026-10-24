@@ -10,6 +10,9 @@ myst:
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-07-25](https://github.com/ArturSepp/QuantInvestStrats/commit/33fb329654dd1ab6064a009c785f11f08910953e)*
 
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+
 <a id="qis"></a>
 <a id="qis-performance-analytics-portfolio-backtesting-risk-analysis-and-factsheet-reporting"></a>
 
@@ -24,7 +27,6 @@ is a Python library for performance analytics, portfolio backtesting, risk analy
 reporting. It works with price and NAV time series and externally constructed portfolio weights.
 These guides explain the methods, calculation conventions and runnable examples behind its reports.
 
-Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 ## Versions and compatibility
 

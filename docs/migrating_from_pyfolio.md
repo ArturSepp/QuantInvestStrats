@@ -8,9 +8,9 @@ myst:
 
 # Migrating from pyfolio-reloaded to qis
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-10-07](https://github.com/ArturSepp/QuantInvestStrats/commit/94e9d3fb08b1f622908d4658320092a98cc6c235)*
 
-This guide is part of [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 This guide maps a [pyfolio-reloaded](https://github.com/stefan-jansen/pyfolio-reloaded) workflow

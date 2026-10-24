@@ -10,7 +10,7 @@ myst:
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-07-12](https://github.com/ArturSepp/QuantInvestStrats/commit/356c392e41df9a85cabaae66348afcdbc04ed7b0)*
 
-This guide accompanies [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 The version sections record historical changes; the module reference below lists imports that

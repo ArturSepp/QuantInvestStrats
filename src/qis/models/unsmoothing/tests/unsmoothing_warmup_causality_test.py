@@ -74,9 +74,9 @@ def _assert_prefix_equal(shorter: Sequence[pd.DataFrame], longer: Sequence[pd.Da
 
 def test_adjust_returns_with_ar_does_not_retroactively_fill_warmup_prefix() -> None:
     """A newly identified beta must not be copied into an earlier unidentified prefix."""
-    returns = _seeded_ar_returns(num_periods=6)
+    returns = _seeded_ar_returns(num_periods=5)
     shorter = _adjust_with_diagnostics(
-        returns.head(5),
+        returns.head(4),
         mean_adj_type=MeanAdjType.NONE,
         warmup_period=2,
         apply_ewma_mean_smoother=False,
@@ -90,7 +90,7 @@ def test_adjust_returns_with_ar_does_not_retroactively_fill_warmup_prefix() -> N
 
     _assert_prefix_equal(shorter=shorter, longer=longer)
     assert bool(shorter[0].isna().all().all())
-    assert bool(shorter[1].isna().all().all())
+    assert shorter[1]["asset"].first_valid_index() == returns.index[3]
 
 
 @pytest.mark.parametrize("warmup_period", [10, None])
@@ -126,11 +126,11 @@ def test_adjust_returns_with_ar_ewma_mean_is_prefix_invariant(
         (2, 0, False, 4),
         (3, 0, False, 5),
         (5, 1, False, 8),
-        (1, 1, False, 5),
+        (1, 1, False, 4),
         (2, 1, False, 5),
-        (1, 3, False, 9),
+        (1, 3, False, 6),
         (2, 3, False, 9),
-        (1, None, False, 23),
+        (1, None, False, 3),
         (2, None, False, 23),
         (12, 0, False, 14),
         (1, 0, True, 3),
@@ -230,9 +230,9 @@ def test_non_negative_no_warmup_is_not_rejected_by_tensor_floor() -> None:
 
 def test_adjust_returns_with_ar_insufficient_data_uses_causal_floor() -> None:
     """Raise and passthrough policies must use the same causal availability boundary."""
-    returns = _seeded_ar_returns(num_periods=4)
+    returns = _seeded_ar_returns(num_periods=3)
 
-    with pytest.raises(ValueError, match=r"needs 5 rows.*got 4"):
+    with pytest.raises(ValueError, match=r"needs 4 rows.*got 3"):
         _adjust_with_diagnostics(
             returns,
             mean_adj_type=MeanAdjType.NONE,
@@ -262,7 +262,7 @@ def test_adjust_returns_with_ar_first_output_uses_prior_beta() -> None:
         warmup_period=3,
         apply_ewma_mean_smoother=False,
     )
-    position = 8
+    position = 5
     return_values = returns["asset"].to_numpy(dtype=float)
     beta_values = betas["asset"].to_numpy(dtype=float)
     expected = (

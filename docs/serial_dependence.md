@@ -9,7 +9,7 @@ myst:
 
 # Serial dependence and autocorrelation
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-25](https://github.com/ArturSepp/QuantInvestStrats/commit/ddee40a0f97780a6bfe3a8623dbd65e113805e90)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

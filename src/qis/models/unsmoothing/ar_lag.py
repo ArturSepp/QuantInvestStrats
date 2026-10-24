@@ -37,7 +37,8 @@ arguments, while ``insufficient_data`` is the opt-in one):
     ``insufficient_data``  Controls what happens when a column comes out entirely
         NaN. ``set_nans_for_warmup_period`` discards the first ``warmup_period``
         FINITE beta values and blanks the whole column when fewer remain, and the
-        rolling tensor already masks its own first ``warmup_period`` rows. The
+        AR(1) tensor applies no additional calendar warmup; higher orders retain
+        their tensor warmup. The
         retained beta must then be applied one period later, after every requested
         raw lag exists; see ``min_obs_for_ar_unsmoothing`` for the resulting floor.
         Individual columns can also degenerate when they are entirely NaN. The default
@@ -72,6 +73,9 @@ from qis.models.linear.ewm import (compute_ewm, compute_ewm_xy_beta_tensor, Mean
                                     compute_rolling_mean_adj, InitType, NanBackfill)
 
 
+UNSMOOTHING_INITIALIZATION_VERSION = 2
+
+
 # compute_ewm_xy_beta_tensor's own default when warmup_period is None
 TENSOR_DEFAULT_WARMUP: int = 20
 # With warmup_period=None the outer warmup masking is skipped, so only the tensor warmup binds,
@@ -102,7 +106,12 @@ def min_obs_for_ar_unsmoothing(ar_order: int,
                                ) -> int:
     """Minimum number of ROWS in the returns frame for which AR(q) unsmoothing yields output.
 
-    Lag ``k`` is first observed on row ``k``, and a lag with no observation has no beta, so
+    AR(1) counts eligible coefficients once: one lagged observation, the requested
+    finite-coefficient warmup, and a one-period application lag give ``3 + warmup``
+    rows (``None`` means zero warmup).
+
+    For higher orders, lag ``k`` is first observed on row ``k``. A lag with no observation
+    has no beta, so
     both estimators produce their first beta vector on row ``max(q, m)``, where the q x q
     system is exactly identified and ``m`` is the first row the estimator does not mask:
     ``warmup_period + 1``, or ``TENSOR_DEFAULT_WARMUP + 1`` for the unconstrained tensor and 0
@@ -122,9 +131,9 @@ def min_obs_for_ar_unsmoothing(ar_order: int,
 
     Args:
         ar_order: Lag order q, must be >= 1.
-        warmup_period: Periods masked before the first valid beta. None defers to the
-            tensor default of ``TENSOR_DEFAULT_WARMUP`` for the unconstrained estimator and
-            leaves the non-negative estimator without an explicit warmup.
+        warmup_period: Finite coefficients excluded before smoothing. For AR(1),
+            None disables this warmup. Higher orders also retain their tensor warmup;
+            None selects the tensor default for the unconstrained estimator.
         non_negative: Whether availability follows the non-negative estimator.
 
     Returns:
@@ -143,6 +152,10 @@ def min_obs_for_ar_unsmoothing(ar_order: int,
     # (on the seeded AR(1) test sample it costs one row from q = 15 on, and up to three rows at
     # q = 24 on other samples), and a larger floor would make InsufficientData.RAISE reject
     # frames that do yield output. The non-negative solve has no singularity test.
+    if ar_order == 1:
+        if warmup_period is not None and warmup_period < 0:
+            raise ValueError(f"warmup_period must be >= 0 or None, got {warmup_period!r}")
+        return 3 + (warmup_period or 0)
     if warmup_period is None:
         if non_negative:
             return ar_order + 2
@@ -349,7 +362,7 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
     identical to clipping the single beta, so the bounds carry the same meaning
     as in the legacy AR(1) path.
 
-    Rolling mean adjustments use the point-in-time ``InitType.X0`` seed. Warmup coefficients
+    Rolling mean adjustments use the point-in-time ``InitType.ZERO`` seed. Warmup coefficients
     remain missing until they are identified and are applied only after the one-period lag.
 
     Args:
@@ -359,11 +372,11 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
             more effective observations than AR(1) — for quarterly data use
             ~40 (10y); for monthly ~24-36.
         mean_adj_type: How to demean returns/lags before beta estimation. EWMA uses the
-            point-in-time ``InitType.X0`` seed; INSAMPLE intentionally uses the full sample.
+            point-in-time ``InitType.ZERO`` seed; INSAMPLE intentionally uses the full sample.
         warmup_period: Initial periods masked before the first valid beta. Masked coefficients
             remain missing rather than being filled from the first later estimate.
             Default 10; raise to ~16 for q >= 2 (the q x q estimate is noisier
-            early). The underlying tensor also self-guards via its own warmup.
+            early). AR(1) counts this warmup once; higher orders retain the tensor warmup.
         max_value_for_beta: Upper bound on theta_sum (sum of betas). Bounds the
             inversion denominator away from zero. Pass None to disable. For
             q = 1 this is the upper beta cap (legacy semantics).
@@ -438,12 +451,12 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
     cols = core.columns
     lags_raw = [core.shift(i + 1) for i in range(ar_order)]   # raw lags for the inversion
 
-    # Use the point-in-time X0 seed so extending the sample cannot revise rolling means.
+    # Use the point-in-time zero seed so extending the sample cannot revise rolling means.
     if mean_adj_type != MeanAdjType.NONE:
         y_adj = compute_rolling_mean_adj(data=core, mean_adj_type=mean_adj_type,
-                                         span=span, init_type=InitType.X0)
+                                         span=span, init_type=InitType.ZERO)
         x_lags = [compute_rolling_mean_adj(data=lag, mean_adj_type=mean_adj_type,
-                                           span=span, init_type=InitType.X0)
+                                           span=span, init_type=InitType.ZERO)
                   for lag in lags_raw]
     else:
         y_adj, x_lags = core, lags_raw
@@ -454,7 +467,7 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
         # negative higher lag collapses the fit to the lower-order solution.
         betas = _rolling_nonneg_betas(x_lags=x_lags, y_adj=y_adj, cols=cols,
                                       ar_order=ar_order, span=span,
-                                      warmup_period=warmup_period,
+                                      warmup_period=None if ar_order == 1 else warmup_period,
                                       tol=non_negative_tol)
     else:
         betas = [pd.DataFrame(index=core.index, columns=cols, dtype=float)
@@ -464,7 +477,10 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
             y = y_adj[col].to_numpy(float)
             betas_ts = compute_ewm_xy_beta_tensor(
                 x=x, y=y, span=span,
-                warmup_period=warmup_period if warmup_period is not None else TENSOR_DEFAULT_WARMUP,
+                warmup_period=(
+                    -1 if ar_order == 1 else
+                    warmup_period if warmup_period is not None else TENSOR_DEFAULT_WARMUP
+                ),
                 is_x_correlated=(ar_order > 1),     # q x q inverse for q >= 2; scalar for q = 1
                 nan_backfill=NanBackfill.FFILL,
             )                                       # shape [t, q, 1]
@@ -481,13 +497,14 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
             scale = (ts_clipped / ts).where(ts.abs() > 1e-12, other=1.0)
         betas = [b.multiply(scale) for b in betas]
 
-    if apply_ewma_mean_smoother:
-        betas = [compute_ewm(data=b, span=span) for b in betas]
-
     if warmup_period is not None:
         # Preserve unidentified dates; backward fill would import the first future estimate.
         betas = [set_nans_for_warmup_period(a=b, warmup_period=warmup_period)
                  .reindex(index=core.index) for b in betas]
+
+    # Excluded estimates must never seed or update the coefficient smoother.
+    if apply_ewma_mean_smoother:
+        betas = [compute_ewm(data=b, span=span, init_type=InitType.ZERO) for b in betas]
 
     # Invert the AR(q) smoothing using lagged betas (align with lagged returns).
     betas_l = [b.shift(1) for b in betas]
@@ -551,7 +568,7 @@ def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
         returns: observed returns of the appraisal-based series, one column per fund
         span: EWM span of the rolling AR(1) beta estimate
         mean_adj_type: Mean subtracted before estimating the beta. EWMA uses the point-in-time
-            ``InitType.X0`` seed; see :class:`MeanAdjType`.
+            ``InitType.ZERO`` seed; see :class:`MeanAdjType`.
         warmup_period: Leading periods blanked while the EWM state converges. Blank coefficients
             remain missing rather than being filled from the first later estimate.
         max_value_for_beta: cap on the estimated beta. The inversion divides by ``1 - beta``, so
@@ -607,7 +624,7 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
             mixed-frequency panels (e.g. monthly HFs alongside quarterly PE).
         span: EWMA span for the rolling beta.
         mean_adj_type: Mean adjustment type for beta regression. EWMA uses the point-in-time
-            ``InitType.X0`` seed.
+            ``InitType.ZERO`` seed.
         warmup_period: Initial warmup periods to mask. Masked coefficients remain missing rather
             than being filled from the first later estimate.
         max_value_for_beta: Upper bound on theta_sum (default 0.75).

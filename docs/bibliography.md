@@ -8,10 +8,12 @@ myst:
 
 # Bibliography
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-25](https://github.com/ArturSepp/QuantInvestStrats/commit/f3bc96c08ae41030b36de67e5cfa67af3b87c43e)*
+
+Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 This is the reference list of the [qis documentation](https://github.com/ArturSepp/QuantInvestStrats).
-Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 Every entry below is written once, in one style: authors, year, title, venue with volume,
 issue and pages, then a DOI or a stable source link. A chapter's References section copies the
