@@ -53,11 +53,16 @@ entirely, which is what you want when several panels share one.
 
 ## Number formatting
 
-`var_format: Optional[str] = '{:,.2f}'` — a Python format string applied to the values in the
-legend, the tick labels and any data labels. This is where percent, ratio and price displays are
-chosen: `'{:.0%}'` for a percentage, `'{:,.2f}'` for a ratio, `'{:,.0f}'` for a level. `None`
-leaves axis ticks to Matplotlib and uses native scalar text for statistic legends, including
-descriptive tables where supported.
+`var_format: Optional[str] = '{:,.2f}'` — a Python format string applied to data-valued legend
+statistics (such as the mean and standard deviation), tick labels and data labels. This is where
+percent, ratio and price displays are chosen: `'{:.0%}'` for a percentage, `'{:,.2f}'` for a ratio,
+`'{:,.0f}'` for a level. `None` leaves axis ticks to Matplotlib and uses native scalar text for
+these statistics, including descriptive tables where supported.
+
+Legend diagnostics retain their separate formats, including when `var_format=None`: t-statistics,
+skewness and kurtosis use two decimals, while percentile scores and missing/zero ratios use
+percentages. For example, a return mean displayed as `2.50%` can appear beside `t-stat=3.87`;
+the t-statistic is dimensionless, not `387.30%`.
 
 `xvar_format`, `yvar_format` — the same, per axis, on plots where the two axes carry different
 units. A scatter of return against volatility wants `xvar_format='{:.0%}'` and

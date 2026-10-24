@@ -762,11 +762,14 @@ class LegendStats(Enum):
     undefined zero percentage. ``SCORE`` appends the percentile rank of the last value within its
     own selected history.
 
-    ``NONE`` prints the column name alone. Formatting of every value follows the ``var_format``
-    argument of the plotting function; when it is ``None``, values use their native scalar text.
+    ``NONE`` prints the column name alone. Data-valued summaries such as the mean and standard
+    deviation follow the plotting function's ``var_format``; when it is ``None``, these summaries
+    use their native scalar text. T-statistics, skewness and kurtosis keep separate two-decimal
+    formats, while scores and missing/zero ratios keep percentage formats. A percentage-formatted
+    mean therefore does not turn its dimensionless t-statistic into a percentage.
     A missing indexed endpoint uses the configured numeric missing display regardless of whether
     the input stores it as ``np.nan`` or ``pd.NA``.
-    The enum therefore chooses the statistics and not their display.
+    The enum selects the statistics together with their mode-specific display conventions.
 
     A member documented here is computed in ``get_legend_lines``, which is the single place the
     legend text is built for every plot in the package.
