@@ -13,9 +13,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   missing-data timing and the one-period application lag. Public signatures and general
   EWMA defaults are unchanged. CMA's no-coefficient-smoothing choice remains explicit.
 
-- 2026-10-24: zero-seed unsmoothing means and coefficient filters; exclude warm-up
-  estimates before smoothing. AR(1) counts usable coefficients once, independently
+## [5.44.0] - 2026-10-24
+
+- Zero-seed unsmoothing means and coefficient filters; exclude warmup estimates
+  before coefficient smoothing. AR(1) counts usable coefficients once, independently
   of leading empty dates. General EWMA defaults and public signatures are unchanged.
+  This release uses the implementation qualified in the ROSAA execution migration.
 
 ### Changed
 
