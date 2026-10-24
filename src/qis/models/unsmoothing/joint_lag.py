@@ -51,6 +51,9 @@ from qis.models.linear.ewm import (compute_ewm, compute_ewm_xy_beta_tensor, Mean
                                     compute_rolling_mean_adj, InitType, NanBackfill)
 
 
+UNSMOOTHING_INITIALIZATION_VERSION = 2
+
+
 def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
                                           factor_returns: pd.Series,
                                           span: int = 40,
@@ -87,7 +90,7 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
             same index and frequency as ``returns``.
         span: EWMA span for the rolling coefficients, in periods of ``returns``.
         mean_adj_type: How to demean r_t, r_{t-1}, F_{t-1} for the beta fit. The
-            default EWMA mode uses a point-in-time ``InitType.X0`` seed. The inversion
+            default EWMA mode uses a point-in-time ``InitType.ZERO`` seed. The inversion
             uses raw levels and stays mean-preserving regardless.
         warmup_period: Number of jointly observable coefficient dates masked once
             per asset. The application lag then makes the next return the first
@@ -132,11 +135,11 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
     # Demean the target and the two regressors for the beta fit only.
     if mean_adj_type != MeanAdjType.NONE:
         y_adj = compute_rolling_mean_adj(data=returns, mean_adj_type=mean_adj_type,
-                                         span=span, init_type=InitType.X0)
+                                         span=span, init_type=InitType.ZERO)
         r_lag_adj = compute_rolling_mean_adj(data=r_lag_raw, mean_adj_type=mean_adj_type,
-                                             span=span, init_type=InitType.X0)
+                                             span=span, init_type=InitType.ZERO)
         f_lag_adj = compute_rolling_mean_adj(data=f_lag_raw, mean_adj_type=mean_adj_type,
-                                             span=span, init_type=InitType.X0)
+                                             span=span, init_type=InitType.ZERO)
     else:
         y_adj, r_lag_adj, f_lag_adj = returns, r_lag_raw, f_lag_raw
 
@@ -176,17 +179,18 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
         hi_b = np.inf if max_factor_beta is None else max_factor_beta
         beta1 = beta1.clip(lower=lo_b, upper=hi_b)
 
-    if apply_ewma_mean_smoother:
-        phi1 = compute_ewm(data=phi1, span=span)
-        beta1 = compute_ewm(data=beta1, span=span)
-        phi1 = phi1.clip(lower=lo_phi, upper=max_ar_coeff)   # smoother can overshoot the cap
-
     if warmup_period is not None:
         # Mask exactly the requested number of usable regression dates per asset.
         # The tensor itself is deliberately unmasked, so this is not applied twice.
         coefficient_ready = jointly_observable.cumsum().gt(warmup_period)
         phi1 = phi1.where(coefficient_ready)
         beta1 = beta1.where(coefficient_ready)
+
+    # Excluded estimates must never seed or update the coefficient smoother.
+    if apply_ewma_mean_smoother:
+        phi1 = compute_ewm(data=phi1, span=span, init_type=InitType.ZERO)
+        beta1 = compute_ewm(data=beta1, span=span, init_type=InitType.ZERO)
+        phi1 = phi1.clip(lower=lo_phi, upper=max_ar_coeff)   # smoother can overshoot the cap
 
     # Lag the coefficients one period (no look-ahead), invert with raw levels.
     phi1_l = phi1.shift(1)

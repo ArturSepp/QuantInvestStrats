@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.44.0] - 2026-10-24
+
+- Zero-seed unsmoothing means and coefficient filters; exclude warmup estimates
+  before coefficient smoothing. AR(1) counts usable coefficients once, independently
+  of leading empty dates. General EWMA defaults and public signatures are unchanged.
+  This release uses the implementation qualified in the ROSAA execution migration.
+
 ### Changed
 
 - Route paired Sharpe inference through `qis.utils.regression.estimate_hac_mean`, removing
