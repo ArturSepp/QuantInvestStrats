@@ -7,6 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.44.3] - 2026-10-24
+
+- Preserve native benchmark observations when shading sampled exposure charts; the
+  display index restricts dates without manufacturing zero-return regime periods.
+  Both reporting regressions found in the full release suite are repaired.
+- Include the approved bounded joint-unsmoothing implementation. Versions 5.44.0
+  through 5.44.2 were validation candidates and were not published to PyPI.
+
 ## [5.44.2] - 2026-10-24
 
 - Supersede the unpublished 5.44.0/5.44.1 candidates with the approved production

@@ -471,11 +471,13 @@ class MultiPortfolioData:
                            regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime()
                            ) -> None:
         """
-        add regime shadows using regime_benchmark
+        Shade the displayed date window using the benchmark at its native frequency.
         """
         pivot_prices = self.benchmark_prices[regime_benchmark]
         if index is not None:
-            pivot_prices = pivot_prices.reindex(index=index, method='ffill')
+            pivot_prices = pivot_prices.loc[
+                (pivot_prices.index >= index.min()) & (pivot_prices.index <= index.max())
+            ]
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
 
     def plot_nav(self,

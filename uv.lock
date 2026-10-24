@@ -3126,7 +3126,7 @@ wheels = [
 
 [[package]]
 name = "qis"
-version = "5.44.2"
+version = "5.44.3"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
