@@ -440,10 +440,18 @@ answer what the realised layer return histories explain.
 
 The weights entering the sum are those in force on each beta date, selected as of that date (the
 last weight row at or before it), so a calendar month-end that falls on a weekend uses the
-Friday weights. The portfolio beta is missing during the warm-up, before the first weight row,
-and wherever an instrument with a non-zero weight has no beta; a missing weight means the
-instrument is not held. A genuinely zero exposure, for example a portfolio fully in cash, is
-reported as zero. Until the handbook follow-up, weights were matched to beta dates exactly, zero
+Friday weights. Benchmark-beta reporting sums the contributions of held instruments whose
+betas are finite and warmed up, at their actual weights, without renormalising the covered
+holdings. A young instrument therefore does not erase the mature holdings' exposure history.
+Partial coverage emits a warning identifying the affected dates, instruments and maximum
+excluded gross weight as a percentage of NAV. The result is a partial-coverage exposure estimate,
+not an estimate of the omitted holdings' betas. This aggregation policy is introduced in
+5.44.4; generic `LinearModel` risk aggregation remains strict.
+
+Before the first weight row, or when none of the held instruments has an available beta, the
+portfolio beta remains missing. A missing weight means the instrument is not held. A genuinely
+zero exposure, for example a portfolio fully in cash, is reported as zero. Until the handbook
+follow-up, weights were matched to beta dates exactly, zero
 betas were treated as holidays and replaced by the previous value, and the warm-up showed zero.
 `PortfolioData.compute_portfolio_benchmark_betas` passes native-date realised weights through
 `PortfolioData.get_weights(freq=None)` before selecting weights as of each beta date. It does
@@ -542,9 +550,12 @@ Alpha is zero through $t_0$. Its EWMA starts from the first valid residual stric
 (`InitType.X0`), without carrying pre-start alpha into the measured performance. The zero
 baseline is not an extra zero observation in that EWMA.
 
-If the lagged beta is still warming up after $t_0$, alpha is missing for those periods. There is
-no unity-beta fallback and the entire portfolio return is not booked as alpha. Missing later
-held-instrument betas also leave gaps. An all-cash portfolio can have a genuine beta of zero.
+If none of the held instruments has a usable lagged beta after $t_0$, alpha is missing for those
+periods. There is no unity-beta fallback and the entire portfolio return is not booked as alpha.
+With partial beta coverage, alpha is available but also contains the unestimated holdings'
+returns: it must not be interpreted as fully beta-adjusted manager alpha. A new holding's warm-up
+does not restart or erase the mature holdings' history. An all-cash portfolio can have a genuine
+beta of zero.
 
 The upper panel is a **rolling annualised alpha estimate**, not cumulative alpha. A cumulative
 log-alpha path instead sums $a_t$ strictly after $t_0$ with a zero baseline there; it is not
@@ -873,8 +884,11 @@ Sources:
   `ALPHA`; `BENCHMARK_TABLE_COLUMNS` selects `ALPHA_AN`.
 - **Cumulated attribution is a sum.** Factsheets plot the cumulative sum of $A_{q,t}$ and
   $\eta_t$. The sum is additive across components but is not the compounded return.
-- **Missing is not zero.** Portfolio betas and attribution rows are missing during the warm-up and
-  wherever a held instrument has no beta; a zero portfolio beta is a genuine zero exposure.
+- **Missing and partial coverage differ.** No available held-instrument beta leaves the portfolio
+  beta and lagged attribution unavailable. Partial coverage uses actual covered weights without
+  renormalisation and emits a warning; its residual includes unestimated holdings' returns.
+  A zero estimate can be a genuine zero exposure or a partial covered contribution, not evidence
+  that an unestimated holding has zero beta.
 
 ## See also
 

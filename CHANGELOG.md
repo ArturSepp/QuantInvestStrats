@@ -9,6 +9,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [5.44.4] - 2026-10-24
 
+### Fixed
+
+- Aggregate available, warmed-up instrument benchmark betas at their actual portfolio weights
+  without renormalisation. A young holding or numerical dust no longer suppresses mature
+  holdings' beta history and the associated rolling alpha. Warn on partial coverage; retain
+  NaN when no held beta is available, zero for all-cash weights, span-length instrument warm-up
+  and lagged alpha. Generic factor-risk aggregation remains strict. Partial-coverage residual
+  alpha includes the returns of unestimated holdings; no missing beta is replaced by a prior.
+
 ### Changed
 
 - In 5.44.4, align rolling AR and joint-unsmoothing defaults for quarterly

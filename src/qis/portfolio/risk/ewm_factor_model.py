@@ -14,6 +14,9 @@ and meaningless. Every estimate is point in time: the loadings dated t use retur
 betas and a residual. The base class is in ``qis/portfolio/risk/factor_model.py``.
 """
 # packages
+import warnings
+
+import numpy as np
 import pandas as pd
 from typing import Optional, Union
 
@@ -24,7 +27,9 @@ import qis.utils.df_ops as dfo
 import qis.perfstats.returns as ret
 import qis.models.linear.ewm as ewm
 from qis.models.linear.ewm import MeanAdjType, InitType
-from qis.portfolio.risk.factor_model import LinearModel, compute_benchmarks_beta_attribution_from_prices
+from qis.portfolio.risk.factor_model import (
+    LinearModel, compute_benchmarks_beta_attribution_from_prices,
+)
 
 
 class EwmLinearModel(LinearModel):
@@ -95,7 +100,7 @@ class EwmLinearModel(LinearModel):
                                              ewm_lambda=ewm_lambda,
                                              init_type=init_type)
 
-        # compute list of betas using ewm numba recursion for cross product of x y and covariance of x
+        # Compute betas from the EWM cross product of x and y and the covariance of x.
         # output is tensor of betas per date = [t, factors, assets]
         betas_ts = ewm.compute_ewm_xy_beta_tensor(x=x.to_numpy(),
                                                   y=y.to_numpy(),
@@ -125,6 +130,57 @@ def _get_instrument_beta_estimation_start(instrument_prices: pd.DataFrame,
     return pd.Timestamp(paired.index[paired][0])
 
 
+def _aggregate_available_benchmark_betas(loadings: dict[str, pd.DataFrame],
+                                         weights: pd.DataFrame) -> pd.DataFrame:
+    """Sum available benchmark loadings at actual holdings, warning on partial coverage.
+
+    This reporting policy is deliberately separate from LinearModel's strict aggregation
+    for risk calculations. Missing instrument betas are not estimated or filled, and the
+    surviving weights are not renormalised. No usable held loading means an unknown beta,
+    not zero; genuinely all-cash weight rows have beta zero.
+    """
+    weights = weights.sort_index()
+    exposures = {}
+    coverage_messages = []
+    for factor, loading in loadings.items():
+        assets = weights.columns.union(loading.columns, sort=False)
+        aligned = weights.reindex(index=loading.index, method='ffill').reindex(columns=assets)
+        no_portfolio = aligned.isna().all(axis=1)
+        aligned = aligned.fillna(0.0)
+        held = aligned.ne(0.0)
+        loading = loading.reindex(columns=assets)
+        available = held & np.isfinite(loading)
+        contributions = loading.where(available).multiply(aligned)
+        total = contributions.sum(axis=1, min_count=1)
+        total = total.mask(~held.any(axis=1), 0.0).where(~no_portfolio)
+        exposures[factor] = total
+
+        missing = held & ~available
+        partial = available.any(axis=1) & missing.any(axis=1) & ~no_portfolio
+        if partial.any():
+            excluded = aligned.abs().where(missing, 0.0).sum(axis=1).loc[partial]
+            affected = missing.loc[partial].any(axis=0)
+            names = [str(asset) for asset in assets[affected]]
+            shown = ', '.join(names[:5])
+            if len(names) > 5:
+                shown += f', ... ({len(names)} instruments)'
+            coverage_messages.append(
+                f'{factor}: {int(partial.sum())} dates '
+                f'({excluded.index[0]:%d%b%Y}-{excluded.index[-1]:%d%b%Y}), '
+                f'maximum excluded gross weight {100 * excluded.max():.3g}% of NAV; '
+                f'instruments: {shown}'
+            )
+    if coverage_messages:
+        warnings.warn(
+            'Partial benchmark beta coverage: summing available instrument betas at actual '
+            'weights; weights are not renormalised. Unavailable instruments remain unestimated '
+            'and their returns remain in residual alpha. ' + '; '.join(coverage_messages),
+            UserWarning,
+            stacklevel=2,
+        )
+    return pd.DataFrame(exposures)
+
+
 def compute_portfolio_ewm_benchmark_betas(instrument_prices: pd.DataFrame,
                                           weights: pd.DataFrame,
                                           benchmark_prices: pd.DataFrame,
@@ -138,7 +194,10 @@ def compute_portfolio_ewm_benchmark_betas(instrument_prices: pd.DataFrame,
     Instrument betas to all benchmarks jointly are EWM regressions of instrument log returns on
     benchmark log returns at ``freq_beta``, with a point-in-time mean adjustment seeded by the
     first observation. The portfolio beta to benchmark ``q`` on each beta date is
-    ``sum_i w_i * beta_iq`` with the weights in force on that date, selected as of it.
+    ``sum_i w_i * beta_iq`` over available instrument estimates, with the weights in force on
+    that date, selected as of it. A young instrument does not suppress other holdings' betas.
+    Partial coverage emits a warning: weights are not renormalised, and the unestimated
+    holdings' returns remain in residual alpha rather than receiving an invented beta.
 
     Args:
         instrument_prices: Individual instrument price data.
@@ -151,9 +210,9 @@ def compute_portfolio_ewm_benchmark_betas(instrument_prices: pd.DataFrame,
         mean_adj_type: Mean adjustment method.
 
     Returns:
-        Portfolio benchmark betas, beta dates by benchmarks. Rows are NaN during the estimator
-        warm-up and before the first weight row; a portfolio with zero weights (all cash) has
-        beta zero. Missing estimates are never replaced by a beta prior.
+        Portfolio benchmark betas, beta dates by benchmarks. Rows are NaN before the first
+        weight row or when no held instrument has a finite, warmed-up beta. A portfolio with
+        zero weights (all cash) has beta zero. Missing estimates are never replaced by a prior.
     """
     benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
     ewm_linear_model = EwmLinearModel(
@@ -178,7 +237,8 @@ def compute_portfolio_ewm_benchmark_betas(instrument_prices: pd.DataFrame,
     weights = weights.reindex(index=instrument_prices.index, method='ffill')
     # weights are aligned as of each beta date, so no off-grid date needs filling; a genuine zero
     # beta (for example a portfolio fully in cash) is kept rather than replaced by the last one
-    benchmark_betas = ewm_linear_model.compute_agg_factor_exposures(weights=weights)
+    benchmark_betas = _aggregate_available_benchmark_betas(
+        loadings=ewm_linear_model.loadings, weights=weights)
     if time_period is not None:
         benchmark_betas = time_period.locate(benchmark_betas)
     return benchmark_betas
@@ -214,12 +274,10 @@ def compute_portfolio_benchmark_ewm_beta_alpha_attribution(instrument_prices: pd
         Attribution breakdown including alpha component; rows are NaN while the lagged betas
         are missing.
     """
-    portfolio_benchmark_betas = compute_portfolio_ewm_benchmark_betas(instrument_prices=instrument_prices,
-                                                                      weights=weights,
-                                                                      benchmark_prices=benchmark_prices,
-                                                                      time_period=None,
-                                                                      freq_beta=freq_beta,
-                                                                      factor_beta_span=factor_beta_span)
+    portfolio_benchmark_betas = compute_portfolio_ewm_benchmark_betas(
+        instrument_prices=instrument_prices, weights=weights, benchmark_prices=benchmark_prices,
+        time_period=None, freq_beta=freq_beta, factor_beta_span=factor_beta_span,
+    )
     joint_attrib = compute_benchmarks_beta_attribution_from_prices(portfolio_nav=portfolio_nav,
                                                                    benchmark_prices=benchmark_prices,
                                                                    portfolio_benchmark_betas=portfolio_benchmark_betas,

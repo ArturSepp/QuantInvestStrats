@@ -4,11 +4,11 @@
   "consumers": {
     "optimalportfolios": {
       "url": "https://github.com/ArturSepp/OptimalPortfolios.git",
-      "commit": "db0038f8dad9ef2d45388993ace1cbe993fe0ea1",
-      "distinct_symbols": 136,
-      "call_sites": 1084,
-      "files_scanned": 369,
-      "files_using_qis": 141,
+      "commit": "499bea4b854002bb123dc7d121f19a0a5c5f7869",
+      "distinct_symbols": 137,
+      "call_sites": 1086,
+      "files_scanned": 407,
+      "files_using_qis": 142,
       "symbols": [
         "BenchmarkReturnsQuantilesRegime",
         "CorrMatrixOutput",
@@ -76,6 +76,7 @@
         "compute_te_ir_errors",
         "compute_total_return",
         "covar_to_corr",
+        "create_rebalancing_indicators_from_freqs",
         "create_sampled_returns_with_regime_id",
         "df_boxplot_by_columns",
         "df_dict_boxplot_by_columns",
@@ -150,7 +151,7 @@
     },
     "trendfollowing": {
       "url": "https://github.com/ArturSepp/TrendFollowingSystems.git",
-      "commit": "24019a2fa96e86243eb3e3ac1efcdc800ab06361",
+      "commit": "056ea1fe7f0f2f11b3cdb7b90aef4dc4cd75f781",
       "distinct_symbols": 87,
       "call_sites": 428,
       "files_scanned": 105,
@@ -247,10 +248,10 @@
     },
     "privateassets": {
       "url": "https://github.com/ArturSepp/privateassets.git",
-      "commit": "c1de8c1c2c24c4e6b1f345c30bde5de7a2585b46",
+      "commit": "51767df019d8408118b9642db25f4d01c0a17680",
       "distinct_symbols": 5,
       "call_sites": 9,
-      "files_scanned": 37,
+      "files_scanned": 38,
       "files_using_qis": 5,
       "symbols": [
         "BootstrapType",

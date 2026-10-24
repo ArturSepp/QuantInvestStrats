@@ -1,4 +1,6 @@
 """Holdings beta keeps native allocation dates and warms up each instrument."""
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -152,3 +154,84 @@ def test_beta_estimation_title_uses_paired_instrument_history():
     )
 
     assert start == prices.index[5]
+
+
+@pytest.mark.parametrize('known_weight, young_weight', [
+    (0.8, 0.2), (1.6, 0.4), (-0.6, 0.4), (1.0, 1e-12),
+])
+def test_partial_benchmark_beta_keeps_actual_weights(known_weight, young_weight):
+    """A young holding cannot erase mature holdings or cause renormalisation."""
+    prices, benchmark = _monthly_prices()
+    prices.loc[prices.index[:20], 'Low'] = np.nan
+    weights = pd.DataFrame({'High': known_weight, 'Low': young_weight},
+                           index=prices.index[10:])
+    weights.loc[prices.index[30]:] = 0.0
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        beta = qis.compute_portfolio_ewm_benchmark_betas(
+            instrument_prices=prices, benchmark_prices=benchmark, weights=weights,
+            freq_beta='ME', factor_beta_span=3,
+        )['Benchmark']
+
+    assert beta.iloc[:10].isna().all()  # no allocation yet
+    np.testing.assert_allclose(beta.iloc[10:24], 2.0 * known_weight, atol=1e-12)
+    assert beta.iloc[24:30].notna().all()
+    assert beta.iloc[30:].eq(0.0).all()
+    coverage_warnings = [w for w in caught if 'Partial benchmark beta coverage' in str(w.message)]
+    assert len(coverage_warnings) == 1
+    assert 'Low' in str(coverage_warnings[0].message)
+    assert 'not renormalised' in str(coverage_warnings[0].message)
+
+
+def test_quarterly_alpha_starts_with_backtest_despite_a_young_holding():
+    """Prehistory warms mature instruments before the June 2008 opening allocation."""
+    index = pd.date_range('1999-12-31', periods=60, freq='QE')
+    factor = pd.Series(0.02 * np.sin(np.arange(len(index)) + 0.3) + 0.003, index=index)
+    benchmark = np.exp(factor.cumsum()).rename('Benchmark')
+    prices = pd.DataFrame({'High': np.exp((2.0 * factor).cumsum()),
+                           'Young': np.exp((0.5 * factor).cumsum())})
+    start = pd.Timestamp('2008-06-30')
+    prices.loc[index < '2007-12-31', 'Young'] = np.nan
+    weights = pd.DataFrame({'High': 0.95, 'Young': 0.05}, index=index[index >= start])
+    portfolio = qis.PortfolioData(nav=prices['High'].rename('TAA'),
+                                  prices=prices, weights=weights)
+    multi = qis.MultiPortfolioData(portfolio_datas=[portfolio],
+                                   benchmark_prices=benchmark.to_frame())
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter('always')
+        beta = portfolio.compute_portfolio_benchmark_betas(
+            benchmark_prices=benchmark.to_frame(), freq_beta='QE', factor_beta_span=12,
+        )['Benchmark']
+        alpha = multi.compute_rolling_benchmark_alpha(
+            benchmark_price=benchmark, freq_beta='QE', factor_beta_span=12,
+            time_period=qis.TimePeriod(start=start, end=index[-1]),
+        )['TAA']
+
+    assert beta.loc[start] == pytest.approx(1.9)
+    assert beta.loc[start:].notna().all()
+    assert alpha.loc[start] == 0.0
+    assert alpha.iloc[1:].notna().all()
+    # Independently calculated log residuals and pandas EWMA, on the partial-coverage window.
+    dates = index[(index > start) & (index <= '2010-12-31')]
+    expected = (0.1 * factor.loc[dates]).ewm(span=12, adjust=False).mean() * 4.0
+    np.testing.assert_allclose(alpha.loc[dates], expected, atol=1e-12)
+
+
+def test_partial_benchmark_beta_prefix_is_point_in_time():
+    """Future observations that warm a young asset do not revise past exposures."""
+    prices, benchmark = _monthly_prices()
+    prices.loc[prices.index[:20], 'Low'] = np.nan
+    weights = pd.DataFrame({'High': 0.7, 'Low': 0.3}, index=prices.index)
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter('always')
+        full = qis.compute_portfolio_ewm_benchmark_betas(
+            instrument_prices=prices, benchmark_prices=benchmark, weights=weights,
+            freq_beta='ME', factor_beta_span=3,
+        )
+        prefix = qis.compute_portfolio_ewm_benchmark_betas(
+            instrument_prices=prices.iloc[:23], benchmark_prices=benchmark.iloc[:23],
+            weights=weights.iloc[:23], freq_beta='ME', factor_beta_span=3,
+        )
+    np.testing.assert_allclose(prefix.iloc[4:], 1.4, atol=1e-12)
+    pd.testing.assert_frame_equal(full.iloc[:23], prefix)
