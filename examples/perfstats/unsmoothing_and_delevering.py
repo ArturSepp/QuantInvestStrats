@@ -18,13 +18,14 @@ Demonstrates:
   4. ``qis.unsmooth_returns_glm``   — static AR(q) Getmansky-Lo-Makarov (2004)
                                       unsmoothing with severity diagnostics.
 
-What to look for in the output: on this bundled sample, the annualised
-zero-rate Sharpe ratios computed from quarterly returns are approximately
--1.25 for observed OCSL, -0.74 after de-levering, +2.25 for observed GCF,
-+2.33 after EWMA AR(1) unsmoothing and +2.84 after static GLM AR(3).
-The adjusted estimates do not converge to a tighter band. These vehicles
-have different holdings, valuation methods and listed-market exposures;
-de-levering and unsmoothing do not establish a common underlying return.
+The comparison uses a common quarterly window after model warm-up; the
+example prints that window alongside the computed Sharpe ratios and ranges.
+The zero-rate Sharpe convention is compounded annual return divided by
+annualised sample log-return volatility, with four observations per year.
+Warm-up and initialization determine which observations enter the comparison.
+An adjusted range can widen or narrow with the sample and model specification.
+These vehicles have different holdings, valuation methods and listed-market
+exposures; de-levering and unsmoothing do not establish a common underlying return.
 
 Caveat on the GLM step: with only ~30 quarterly GCF observations, the AR(3)
 fit can produce small or negative ``theta_sum``, in which case the
@@ -67,7 +68,8 @@ def load_data() -> pd.DataFrame:
     return pd.read_parquet(DATA_PATH)
 
 
-def main() -> None:
+def main() -> pd.DataFrame:
+    """Run the walkthrough and return the common quarterly NAV panel used by its table."""
     prices = load_data()
     print(f"Loaded {prices.shape[0]} weekly NAVs from "
           f"{prices.index.min():%Y-%m-%d} to {prices.index.max():%Y-%m-%d}")
@@ -197,6 +199,8 @@ def main() -> None:
     perf = qis.compute_ra_perf_table(prices=summary, perf_params=PERF_PARAMS)
     sharpe_col = PerfStat.SHARPE_RF0.to_str()
     vol_col = PerfStat.VOL.to_str()
+    print(f"Common quarterly evaluation window: {summary.index[0]:%Y-%m-%d} to "
+          f"{summary.index[-1]:%Y-%m-%d} ({len(summary)} NAVs)")
     print("Quarterly Sharpe / vol comparison:")
     for name in summary.columns:
         s = perf.loc[name, sharpe_col]
@@ -211,6 +215,7 @@ def main() -> None:
           f"adjusted range: {adjusted_sharpes.max() - adjusted_sharpes.min():.2f}")
 
     plt.show()
+    return summary
 
 
 if __name__ == '__main__':

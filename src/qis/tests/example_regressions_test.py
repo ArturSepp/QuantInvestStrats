@@ -87,17 +87,27 @@ def test_yahoo_workflow(module, yahoo_panel, monkeypatch, tmp_path):
         assert list(output.glob('*')), 'the YAML output directory was not used'
 
 
-def test_unsmoothing_narrative(yahoo_panel, capsys):
-    """The sample numbers and range printed by the example support its revised interpretation."""
-    pytest.importorskip('pyarrow')
-    namespace = runpy.run_module(
-        'examples.perfstats.unsmoothing_and_delevering', run_name='__main__'
-    )
+def test_unsmoothing_narrative(yahoo_panel, capsys, monkeypatch):
+    """The printed comparison agrees with an independent calculation on frozen synthetic data."""
+    weekly = yahoo_panel.iloc[:, :5].resample('W-FRI').last().copy()
+    weekly.columns = ['OCSL', 'Oaktree GCF', 'SPX', 'US HY', 'US Agg']
+    monkeypatch.setattr(pd, 'read_parquet', lambda *args, **kwargs: weekly)
+    namespace = runpy.run_module('examples.perfstats.unsmoothing_and_delevering')
+    summary = namespace['main']()
     output = capsys.readouterr().out
+    assert 'Common quarterly evaluation window:' in output
     sharpes = [float(value) for value in re.findall(r'Sharpe = ([+-]\d+\.\d+)', output)]
-    np.testing.assert_allclose(sharpes[:5], [-1.25, -0.74, 2.25, 2.33, 2.84], atol=0.005)
-    assert 'Raw Sharpe range: 3.50; adjusted range: 3.58' in output
-    assert 'do not converge to a tighter band' in namespace['__doc__']
+    years = (summary.index[-1] - summary.index[0]).days / 365.25
+    compound_return = (summary.iloc[-1] / summary.iloc[0]) ** (1.0 / years) - 1.0
+    quarterly_log_returns = np.log(summary / summary.shift(1)).iloc[1:]
+    expected = compound_return / (2.0 * quarterly_log_returns.std(ddof=1))
+    np.testing.assert_allclose(sharpes, expected.to_numpy(), atol=0.005)
+    raw = expected.loc[['OCSL (levered)', 'GCF (observed)']]
+    adjusted = expected.loc[['OCSL de-levered', 'GCF unsm. EWMA AR(1)', 'GCF unsm. GLM AR(3)']]
+    assert (f'Raw Sharpe range: {raw.max() - raw.min():.2f}; '
+            f'adjusted range: {adjusted.max() - adjusted.min():.2f}') in output
+    assert (f'{summary.index[0]:%Y-%m-%d} to {summary.index[-1]:%Y-%m-%d} '
+            f'({len(summary)} NAVs)') in output
 
 
 @pytest.mark.parametrize('days', [5, 22, 63])
