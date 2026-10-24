@@ -24,6 +24,11 @@ hedge an unknown future investment gain.
 supplied asset prices. Data acquisition is a separate step. Core calculations require pandas
 inputs and no vendor connection.
 
+For the end-to-end multi-asset workflow, see
+[reference-currency conversion and excess returns](reference_currency_excess_returns.md):
+per-asset hedge ratios, reference-cash subtraction and MATF estimation inputs, with executed
+monthly and quarterly examples.
+
 [Covered interest parity (CIP)](https://www.bis.org/publications/qr-201609/covered-interest-parity-lost-understanding-cross-currency-basis)
 relates spot, forward and matched cash-growth factors under a no-arbitrage funding model.
 The qis getter derives its premium from short rates. Real forward quotes can include a
@@ -65,8 +70,9 @@ missing; future quotes are never carried backward.
 
 The pair calculation aligns and forward-fills asset prices and cross rates. Hedge ratios and
 forward premiums are as-of aligned to its return grid, then lagged one observation. Return $t$
-uses the hedge and premium set at $t-1$. The first output return is initialized to zero so NAV
-starts at one; it is not a realised hedge period.
+uses the hedge and premium set at $t-1$. The standalone payoff kernel initializes its first
+output return to zero. `FxRatesData` masks that synthetic inception return as NaN before
+optional cash subtraction; it is not a realised hedge period or an estimation observation.
 
 ## Methodology
 

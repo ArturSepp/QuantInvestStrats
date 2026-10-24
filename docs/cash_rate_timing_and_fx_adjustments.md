@@ -354,6 +354,7 @@ describes full generation, review and publication.
 
 ## See also
 
+- [Reference-currency conversion and excess returns](reference_currency_excess_returns.md): multi-asset preparation and MATF estimation inputs
 - [Hedged index replication](hedged_index_replication.md): total-return hedge validation, separate from cash subtraction
 - [FX hedging and market-data boundaries](fx_hedging_and_market_data.md)
 - [Returns and NAVs](returns_and_navs.md)

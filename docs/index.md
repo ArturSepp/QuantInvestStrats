@@ -156,6 +156,8 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
   five stocks, ten short VOP-priced options and a four-ETF EWMA risk model.
 - [FX hedging and market data](fx_hedging_and_market_data.md):
   currency conversion, hedging assumptions and data contracts.
+- [Reference-currency conversion and excess returns](reference_currency_excess_returns.md):
+  multi-currency universes, partial hedges and log-excess inputs for MATF estimation.
 - [Cash rate timing and FX adjustments](cash_rate_timing_and_fx_adjustments.md):
   separate spot, hedge-carry and excess-return timing, with an empirical cash-index comparison.
 - [Hedged index replication](hedged_index_replication.md): observed CHF, EUR and GBP index
@@ -283,6 +285,7 @@ Factor stress testing <stress_testing>
 Instrument portfolios and stress reports <portfolio_stress>
 Stress testing with options <stress_testing_with_options>
 FX hedging and market data <fx_hedging_and_market_data>
+Reference-currency conversion and excess returns <reference_currency_excess_returns>
 Cash rate timing and FX adjustments <cash_rate_timing_and_fx_adjustments>
 Hedged index replication <hedged_index_replication>
 Unhedged index replication <unhedged_index_replication>
