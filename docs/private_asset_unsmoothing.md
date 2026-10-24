@@ -44,10 +44,10 @@ Choose the transformation from the economic question:
 | Return basis | Simple returns for de-levering; simple or log returns, retained throughout, for unsmoothing |
 | Sampling grid | The reporting grid of each sleeve, `freq`, for example `QE` |
 | Annualisation | Financing rates are divided by $\mathrm{af}$ periods per year |
-| Mean adjustment | EWMA mean with `InitType.X0` for rolling fits; full-sample fit for the static filter |
+| Mean adjustment | NONE by default for rolling fits; optional EWMA uses `InitType.ZERO`; full-sample fit for the static filter |
 | Timing | Coefficients estimated through $t-1$ are applied to the return at $t$ |
 | Output units | Decimal returns and reconstructed NAV levels |
-| qis default | `compute_ar_unsmoothed_prices(ar_order=2, freq='QE', span=40, warmup_period=8)` on log returns |
+| qis default | `compute_ar_unsmoothed_prices(ar_order=1, freq='QE', span=40, warmup_period=4)` on log returns |
 
 | Symbol or input | Meaning | Units or convention |
 |---|---|---|
@@ -108,25 +108,50 @@ Coefficients use information through $t-1$ when applied to return $t$. Mean adju
 coefficient estimation; inversion uses the raw observed returns in the numerator.
 
 `adjust_returns_with_ar` is the canonical engine for every lag order.
-`unsmooth_returns_ar1_ewma` is its AR(1) wrapper. The default `MeanAdjType.EWMA` uses a
-point-in-time `InitType.X0` mean seed. Appending later observations does not revise an existing
-rolling prefix. `MeanAdjType.INSAMPLE` uses the full-sample mean and is descriptive, not suitable
-for a historical decision path.
+`unsmooth_returns_ar1_ewma` is its AR(1) wrapper. Both return engines and the AR price wrappers
+share defaults intended for **quarterly returns**:
 
-`adjust_returns_with_joint_unsmoothing` uses the same point-in-time seed while estimating its
-own-lag and lagged-factor coefficients together. Its regression moments update only when the
-target, own lag and factor lag are jointly observable, so factor history before a ragged asset's
-inception cannot enter that asset's fit. A masked coefficient pair remains missing until it is
-observable; the one-period application lag does not make future backward fill causal.
+| Setting | AR-only | Joint own-lag and factor-lag |
+|---|---|---|
+| Own-return lag order | 1 | 1 |
+| EWMA estimation span | 40 observations (10 years at QE) | 40 observations (10 years at QE) |
+| Warm-up | 4 eligible coefficient dates | 4 jointly observable coefficient dates |
+| Mean adjustment | `MeanAdjType.NONE` | `MeanAdjType.NONE` |
+| Additional coefficient smoother | Off | Off |
+| Own-lag coefficient bounds | 0 to 0.75 | 0 to 0.75 |
+| Lagged-factor coefficient bounds | Not applicable | 0 to 1.0 |
+| Coefficient application lag | 1 observation | 1 observation |
+| Regression-moment initialization | Zero | Zero |
 
-The price wrapper defaults to coefficient-sum bounds of -0.25 and 0.75. Clipping applies to the
-**sum**, rescaling the coefficient vector, with optional further EWMA coefficient smoothing.
-A positive denominator permits inversion; a cap does not establish that the smoothing model is
-economically correct. Optional non-negativity and its tolerance are separate modelling choices.
+Span and warm-up are observation counts, not calendar-aware durations. Monthly callers must
+explicitly set `span=120, warmup_period=12` for ten years and one year, respectively. Changing
+`freq` alone does not rescale them. For mixed-frequency price panels, a single call shares the
+same counts across groups; call each frequency group separately to use different counts.
 
-Joint unsmoothing masks exactly `warmup_period` jointly observable coefficient dates per asset,
-once, followed by the one-period application lag. Thus `warmup_period=8` makes the ninth jointly
-observable coefficient available and the next observed return is the first corrected return.
+No mean is subtracted by default. If EWMA mean adjustment or the second coefficient smoother is
+explicitly enabled, each uses `InitType.ZERO`; warm-up estimates are excluded before smoothing.
+These unsmoothing-specific choices do not change the general EWMA helpers' `InitType.X0`
+defaults. Appending later observations does not revise an existing rolling prefix.
+`MeanAdjType.INSAMPLE` uses the full-sample mean and is descriptive, not suitable for a
+historical decision path.
+
+`adjust_returns_with_joint_unsmoothing` estimates own-lag and lagged-factor coefficients
+**together under their bounds**. When a bound binds, the other coefficient is re-estimated
+conditional on it. Independent clipping of the two estimates is not equivalent. Its regression
+moments update only when the target, own lag and factor lag are jointly observable, so factor
+history before a ragged asset's inception cannot enter that asset's fit. A masked coefficient
+pair remains missing until it is observable; the application lag does not make backward fill causal.
+
+The AR-only bounds apply to the **sum** of coefficients, rescaling the vector for an explicitly
+requested higher order. For the default AR(1), this is the single coefficient. The zero floor
+treats negative autocorrelation as no smoothing; it is a modelling choice, not a claim that
+negative autocorrelation cannot occur. The 0.75 cap keeps the denominator at or above 0.25.
+It does not cap realised volatility at a prescribed level. Explicit negative or disabled lower
+bounds and higher-order fits remain supported. Optional per-lag non-negativity is separate.
+
+Warm-up is followed by the one-period application lag. With the default `warmup_period=4`,
+the fifth eligible coefficient can be published; it can correct the following return only.
+Joint unsmoothing counts jointly observable dates per asset, once.
 Missing data or an unidentified fit can require more calendar rows. By default, entirely
 unidentified columns stay NaN.
 The policy enum `qis.models.unsmoothing.ar_lag.InsufficientData` supplies the alternatives:
@@ -203,7 +228,9 @@ assert diagnostics.vol_inflation_factor == 2.0
 
 The frozen synthetic `SAL_HF` and `SAL_PE` paths include smoothing. `SAL_PE` reports monthly;
 the example deliberately samples it quarterly to illustrate different estimator calendars,
-while `SAL_HF` is sampled monthly. Dates and seed are fixed.
+while `SAL_HF` is sampled monthly. Dates and seed are fixed. This mixed-calendar
+example explicitly retains its illustrative 20-observation EWMA-mean policy below; it is not
+the quarterly default policy in the table above.
 
 ```python
 import pandas as pd
@@ -219,6 +246,7 @@ unsmoothed_navs, unsmoothed_returns, betas, r_squared = (
     qis.compute_ar_unsmoothed_prices(
         prices=prices, ar_order=1, freq=frequencies, span=20, warmup_period=8,
         mean_adj_type=qis.MeanAdjType.EWMA, is_log_returns=True,
+        min_value_for_beta=-0.25, apply_ewma_mean_smoother=True,
     )
 )
 monthly_vehicle_returns = qis.to_returns(

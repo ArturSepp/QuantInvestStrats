@@ -35,10 +35,13 @@ def test_zero_seeds_and_warmup_precede_smoother(monkeypatch, kind):
     monkeypatch.setattr(module, 'compute_rolling_mean_adj', capture_mean)
     returns = data()
     if kind == 'ar':
-        module.adjust_returns_with_ar(returns, ar_order=1, span=40, warmup_period=4)
+        module.adjust_returns_with_ar(
+            returns, ar_order=1, span=40, warmup_period=4,
+            mean_adj_type=qis.MeanAdjType.EWMA, apply_ewma_mean_smoother=True)
     else:
-        module.adjust_returns_with_joint_unsmoothing(returns, returns.a * .3 + returns.b,
-                                                    span=40, warmup_period=4)
+        module.adjust_returns_with_joint_unsmoothing(
+            returns, returns.a * .3 + returns.b, span=40, warmup_period=4,
+            mean_adj_type=qis.MeanAdjType.EWMA, apply_ewma_mean_smoother=True)
     assert means and all(seed == qis.InitType.ZERO for seed in means)
     assert seen and all(seed == qis.InitType.ZERO for _, seed in seen)
     for coefficients, _ in seen:
@@ -50,7 +53,9 @@ def test_ar1_reference_zero_seed_and_single_warmup():
     returns = data()[['a']]
     span, warmup = 12, 4
     corrected, theta, _ = qis.adjust_returns_with_ar(
-        returns, ar_order=1, span=span, warmup_period=warmup, return_diagnostics=True)
+        returns, ar_order=1, span=span, warmup_period=warmup, return_diagnostics=True,
+        mean_adj_type=qis.MeanAdjType.EWMA, min_value_for_beta=-.25,
+        apply_ewma_mean_smoother=True)
     x = returns.a.to_numpy()
     n = len(x)
     lag = np.r_[np.nan, x[:-1]]

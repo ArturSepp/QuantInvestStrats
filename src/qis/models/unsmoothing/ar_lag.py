@@ -322,13 +322,13 @@ def _rolling_nonneg_betas(x_lags, y_adj, cols, ar_order, span, warmup_period,
 
 
 def adjust_returns_with_ar(returns: pd.DataFrame,
-                           ar_order: int = 2,
-                           span: int = 20,
-                           mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
-                           warmup_period: Optional[int] = 10,
+                           ar_order: int = 1,
+                           span: int = 40,
+                           mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+                           warmup_period: Optional[int] = 4,
                            max_value_for_beta: Optional[float] = 0.75,
-                           min_value_for_beta: Optional[float] = -0.25,
-                           apply_ewma_mean_smoother: bool = True,
+                           min_value_for_beta: Optional[float] = 0.0,
+                           apply_ewma_mean_smoother: bool = False,
                            non_negative: bool = False,
                            non_negative_tol: float = 0.0,
                            return_diagnostics: bool = False,
@@ -367,24 +367,23 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
 
     Args:
         returns: Observed period returns (rows = dates, columns = assets).
-        ar_order: Lag order q (1 = rolling AR(1); 2 = rolling AR(2); q > 2 ok).
-        span: EWMA span for the rolling beta. Default 20. A q >= 2 fit needs
-            more effective observations than AR(1) — for quarterly data use
-            ~40 (10y); for monthly ~24-36.
-        mean_adj_type: How to demean returns/lags before beta estimation. EWMA uses the
+        ar_order: Lag order q (default 1; explicit higher orders remain supported).
+        span: EWMA span in observations. Default 40 is ten years on quarterly
+            returns. For monthly returns, explicitly use 120 and warmup_period=12.
+        mean_adj_type: Default NONE fits raw returns/lags. Explicit EWMA uses the
             point-in-time ``InitType.ZERO`` seed; INSAMPLE intentionally uses the full sample.
         warmup_period: Initial periods masked before the first valid beta. Masked coefficients
             remain missing rather than being filled from the first later estimate.
-            Default 10; raise to ~16 for q >= 2 (the q x q estimate is noisier
-            early). AR(1) counts this warmup once; higher orders retain the tensor warmup.
+            Default 4 eligible coefficient dates, followed by the application lag.
+            AR(1) counts this warmup once; higher orders retain the tensor warmup.
         max_value_for_beta: Upper bound on theta_sum (sum of betas). Bounds the
             inversion denominator away from zero. Pass None to disable. For
             q = 1 this is the upper beta cap (legacy semantics).
-        min_value_for_beta: Lower bound on theta_sum. Permits genuine
-            mean-reversion / symmetric treatment of estimation noise. Pass None
-            to disable; pass 0.0 for one-sided clipping (legacy behaviour).
+        min_value_for_beta: Lower bound on theta_sum, default 0.0. Negative
+            autocorrelation is not treated as smoothing by default. Pass a negative
+            value to retain mean reversion, or None to disable this bound.
         apply_ewma_mean_smoother: If True, apply an extra EWMA smoother to each
-            beta series after the sum-clip.
+            beta series after the sum-clip. Default False.
         non_negative: If True, constrain every lag beta to be non-negative via
             per-period NNLS on the EWMA normal equations (mirrors the GLM
             theta >= 0 smoothing weights). A spurious negative higher-order lag
@@ -547,12 +546,12 @@ def adjust_returns_with_ar(returns: pd.DataFrame,
 
 
 def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
-                              span: int = 20,
-                              mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
-                              warmup_period: Optional[int] = 10,
+                              span: int = 40,
+                              mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+                              warmup_period: Optional[int] = 4,
                               max_value_for_beta: Optional[float] = 0.75,
-                              min_value_for_beta: Optional[float] = -0.25,
-                              apply_ewma_mean_smoother: bool = True,
+                              min_value_for_beta: Optional[float] = 0.0,
+                              apply_ewma_mean_smoother: bool = False,
                               non_negative: bool = False,
                               non_negative_tol: float = 0.0,
                               insufficient_data: InsufficientData = InsufficientData.NAN,
@@ -560,9 +559,9 @@ def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
     """
     rolling AR(1) unsmoother; a shim over ``adjust_returns_with_ar`` with ``ar_order=1``.
 
-    Retained for existing callers and for its AR(1) defaults, which differ from the general engine:
-    ``span=20`` and ``warmup_period=10``. New code should call ``adjust_returns_with_ar`` directly
-    and state the order.
+    Retained for existing callers with the same quarterly defaults as the general engine:
+    span 40, warmup 4, no mean adjustment, beta bounds [0, 0.75] and no second smoother.
+    Monthly callers must explicitly pass span=120 and warmup_period=12.
 
     Args:
         returns: observed returns of the appraisal-based series, one column per fund
@@ -577,8 +576,8 @@ def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
         min_value_for_beta: floor on the estimated beta, below which negative autocorrelation is
             treated as noise rather than smoothing
         apply_ewma_mean_smoother: smooth the estimated beta itself before inverting
-        non_negative: clip the unsmoothed returns at ``non_negative_tol``
-        non_negative_tol: the clipping level used when ``non_negative``
+        non_negative: Constrain lag coefficients to be nonnegative in the fit.
+        non_negative_tol: Tolerance for coefficient nonnegativity; see the canonical engine.
         insufficient_data: what to do with a column that cannot be identified; see
             :class:`InsufficientData`
 
@@ -597,14 +596,14 @@ def unsmooth_returns_ar1_ewma(returns: pd.DataFrame,
 
 
 def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
-                                 ar_order: int = 2,
+                                 ar_order: int = 1,
                                  freq: Union[str, pd.Series] = 'QE',
                                  span: int = 40,
-                                 mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
-                                 warmup_period: Optional[int] = 8,
+                                 mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+                                 warmup_period: Optional[int] = 4,
                                  max_value_for_beta: Optional[float] = 0.75,
-                                 min_value_for_beta: Optional[float] = -0.25,
-                                 apply_ewma_mean_smoother: bool = True,
+                                 min_value_for_beta: Optional[float] = 0.0,
+                                 apply_ewma_mean_smoother: bool = False,
                                  non_negative: bool = False,
                                  non_negative_tol: float = 0.0,
                                  is_log_returns: bool = True,
@@ -618,20 +617,21 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
 
     Args:
         prices: Price level DataFrame.
-        ar_order: Lag order q (1 = AR(1); 2 = AR(2); q > 2 ok).
+        ar_order: Lag order q (default 1; explicit higher orders remain supported).
         freq: Either a single pandas resample frequency string applied to all
             assets, or a Series mapping asset name to frequency for
             mixed-frequency panels (e.g. monthly HFs alongside quarterly PE).
-        span: EWMA span for the rolling beta.
-        mean_adj_type: Mean adjustment type for beta regression. EWMA uses the point-in-time
+        span: EWMA span in observations, default 40 (ten years at QE).
+            Changing freq does not rescale span; use 120 and warmup 12 for ME.
+        mean_adj_type: Default NONE. Explicit EWMA uses the point-in-time
             ``InitType.ZERO`` seed.
         warmup_period: Initial warmup periods to mask. Masked coefficients remain missing rather
             than being filled from the first later estimate.
         max_value_for_beta: Upper bound on theta_sum (default 0.75).
-        min_value_for_beta: Lower bound on theta_sum (default -0.25). See
+        min_value_for_beta: Lower bound on theta_sum (default 0.0). See
             ``adjust_returns_with_ar`` for the rationale behind clipping the sum.
         apply_ewma_mean_smoother: If True, second EWMA pass on the beta series
-            (forwarded to ``adjust_returns_with_ar``).
+            (forwarded to ``adjust_returns_with_ar``). Default False.
         is_log_returns: If True, use log returns for the regression and convert
             back with expm1 at the end. Generally recommended for unsmoothing.
         insufficient_data: Forwarded to ``adjust_returns_with_ar``. Default NAN.
@@ -682,17 +682,17 @@ def compute_ar_unsmoothed_prices(prices: pd.DataFrame,
 def compute_ar1_unsmoothed_prices(prices: pd.DataFrame,
                                   freq: Union[str, pd.Series] = 'QE',
                                   span: int = 40,
-                                  mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
-                                  warmup_period: Optional[int] = 8,
+                                  mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+                                  warmup_period: Optional[int] = 4,
                                   max_value_for_beta: Optional[float] = 0.75,
-                                  min_value_for_beta: Optional[float] = -0.25,
+                                  min_value_for_beta: Optional[float] = 0.0,
                                   non_negative: bool = False,
                                   non_negative_tol: float = 0.0,
                                   is_log_returns: bool = True,
                                   insufficient_data: InsufficientData = InsufficientData.NAN,
                                   ) -> Tuple[pd.DataFrame, pd.DataFrame,
                                              pd.DataFrame, pd.DataFrame]:
-    """Backward-compatible AR(1) price-level unsmoother.
+    """AR(1) price-level shim with the shared quarterly defaults.
 
     This is a shim equivalent to ``compute_ar_unsmoothed_prices(prices, ar_order=1, ...)``.
     Returns (navs, unsmoothed_returns, betas, r2).

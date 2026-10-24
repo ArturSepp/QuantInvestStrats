@@ -7,6 +7,22 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.44.4] - 2026-10-24
+
+### Changed
+
+- In 5.44.4, align rolling AR and joint-unsmoothing defaults for quarterly
+  inputs: AR(1), span 40, warm-up 4, no mean adjustment or additional coefficient smoother,
+  own-lag bounds [0, 0.75] and joint lagged-factor bounds [0, 1]. Align the AR(1) return shim
+  and both price wrappers. Counts are observations: monthly callers must explicitly pass
+  span 120 and warm-up 12. Results change for callers that omit these arguments.
+- Preserve explicit overrides, bounded joint estimation, zero initialization and the
+  one-period application lag. General EWMA helpers, factor-lag-only and static GLM defaults
+  are unchanged. Document the quarterly policy and correct the stale X0 unsmoothing mean
+  description. To reproduce prior results, explicitly pass the former settings; callers
+  needing the old AR(1) price shim's coefficient smoother must use the general price wrapper
+  with ar_order=1 and apply_ewma_mean_smoother=True.
+
 ## [5.44.3] - 2026-10-24
 
 - Preserve native benchmark observations when shading sampled exposure charts; the

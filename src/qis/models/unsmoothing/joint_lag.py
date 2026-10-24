@@ -105,13 +105,13 @@ def _fit_bounded_joint_betas(x: np.ndarray, y: np.ndarray, span: int,
 def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
                                           factor_returns: pd.Series,
                                           span: int = 40,
-                                          mean_adj_type: MeanAdjType = MeanAdjType.EWMA,
-                                          warmup_period: Optional[int] = 16,
-                                          max_ar_coeff: float = 0.9,
-                                          min_ar_coeff: Optional[float] = None,
-                                          max_factor_beta: Optional[float] = None,
-                                          min_factor_beta: Optional[float] = None,
-                                          apply_ewma_mean_smoother: bool = True,
+                                          mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+                                          warmup_period: Optional[int] = 4,
+                                          max_ar_coeff: float = 0.75,
+                                          min_ar_coeff: Optional[float] = 0.0,
+                                          max_factor_beta: Optional[float] = 1.0,
+                                          min_factor_beta: Optional[float] = 0.0,
+                                          apply_ewma_mean_smoother: bool = False,
                                           return_diagnostics: bool = False
                                           ) -> Union[pd.DataFrame,
                                                      Tuple[pd.DataFrame,
@@ -136,23 +136,24 @@ def adjust_returns_with_joint_unsmoothing(returns: pd.DataFrame,
             columns upstream.
         factor_returns: The liquid factor return (e.g. the MATF Equity factor),
             same index and frequency as ``returns``.
-        span: EWMA span for the rolling coefficients, in periods of ``returns``.
-        mean_adj_type: How to demean r_t, r_{t-1}, F_{t-1} for the beta fit. The
-            default EWMA mode uses a point-in-time ``InitType.ZERO`` seed. The inversion
-            uses raw levels and stays mean-preserving regardless.
+        span: EWMA span in observations, default 40 (ten years at QE).
+            Monthly callers must explicitly use span=120 and warmup_period=12.
+        mean_adj_type: Default NONE fits raw r_t, r_{t-1}, F_{t-1}. Explicit
+            EWMA uses a point-in-time ``InitType.ZERO`` seed. Inversion always uses
+            raw returns; time-varying coefficients need not preserve the sample mean.
         warmup_period: Number of jointly observable coefficient dates masked once
             per asset. The application lag then makes the next return the first
-            corrected one. None disables the warmup mask.
+            corrected one. Default 4; None disables the warmup mask.
         max_ar_coeff: Upper cap on phi_1, strictly < 1, bounding the inflation
-            factor 1 / (1 - phi_1). Default 0.9 caps inflation at 10x.
-        min_ar_coeff: Lower cap on phi_1. None disables.
-        max_factor_beta: Upper cap on beta_1. None disables.
-        min_factor_beta: Lower cap on beta_1. Pass 0.0 to floor the lagged-factor
+            factor 1 / (1 - phi_1). Default 0.75 caps this multiplier at 4x.
+        min_ar_coeff: Lower cap on phi_1, default 0.0. None disables.
+        max_factor_beta: Upper cap on beta_1, default 1.0. None disables.
+        min_factor_beta: Lower cap on beta_1. Default 0.0 floors the lagged-factor
             beta at non-negative (the forward-only re-timing the factor-lag engine
             enforces via its sign tie). Bounds are imposed jointly in the weighted
             fit; None disables this bound.
         apply_ewma_mean_smoother: If True, apply an extra EWMA smoother to each
-            coefficient series after the bounded fit.
+            coefficient series after the bounded fit. Default False.
         return_diagnostics: If True, return ``(corrected, phi_1, beta_1)``, the
             unsmoothed returns and the two rolling coefficient panels.
 
