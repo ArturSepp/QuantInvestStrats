@@ -10,6 +10,7 @@ evidence of success.
 import json
 import re
 import runpy
+import socket
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,16 @@ CANONICAL_SOURCE_URL = (
 )
 
 LITERALINCLUDE = re.compile(r'^```\{literalinclude\}\s+([^\n]+)$', flags=re.MULTILINE)
+
+
+def _reject_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make any network connection attempt from the offline quickstart fail."""
+
+    def _blocked(*args: object, **kwargs: object) -> None:
+        raise RuntimeError('offline quickstart attempted a network connection')
+
+    monkeypatch.setattr(socket.socket, 'connect', _blocked)
+    monkeypatch.setattr(socket, 'create_connection', _blocked)
 
 
 def _included_example() -> Path:
@@ -106,10 +117,11 @@ def test_quickstart_executes_and_reports_sane_results(
 
     Args:
         tmp_path: isolated working directory, proving that no repository output is required.
-        monkeypatch: changes the working directory for the script.
+        monkeypatch: changes the working directory and blocks network connections for the script.
         capsys: captures the compact output contract.
     """
     monkeypatch.chdir(tmp_path)
+    _reject_network(monkeypatch)
     namespace = runpy.run_path(str(_included_example()), run_name='__main__')
 
     portfolio_data = namespace['portfolio_data']
@@ -128,3 +140,15 @@ def test_quickstart_executes_and_reports_sane_results(
     assert 'Final NAV: 119.9866' in output
     assert 'TE=0.0299, IR=-0.2899' in output
     assert 'no file is written here' in output
+
+
+def test_quickstart_network_guard_rejects_connections(
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The network guard must reject both socket connection entry points."""
+    _reject_network(monkeypatch)
+    with pytest.raises(RuntimeError, match='offline quickstart attempted a network connection'):
+        socket.create_connection(('example.com', 80))
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        with pytest.raises(RuntimeError, match='offline quickstart attempted a network connection'):
+            sock.connect(('example.com', 80))
