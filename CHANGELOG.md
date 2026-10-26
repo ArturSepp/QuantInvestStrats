@@ -7,6 +7,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.44.5] - 2026-10-26
+
+### Fixed
+
+- Handle an exactly zero OLS effect with zero HAC standard error using p-value one
+  and a zero-width confidence interval, matching the joint EWMA-HAC convention.
+  Preserve undefined R-squared for constant responses without a runtime warning.
+  This restores model-layer attribution when a layer has zero incremental returns.
+
 ## [5.44.4] - 2026-10-24
 
 ### Fixed

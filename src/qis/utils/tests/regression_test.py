@@ -318,3 +318,15 @@ def test_estimate_hac_mean_drops_non_finite_and_rejects_short_samples() -> None:
         estimate_hac_mean(y=np.array([0.01]), hac_lags=1)
     with np.testing.assert_raises(ValueError):
         estimate_hac_mean(y=y, hac_lags=-1)
+
+
+def test_estimate_ols_alpha_beta_hac_exactly_zero_response() -> None:
+    """A deterministic zero effect has a zero interval and no evidence against zero alpha."""
+    x = np.array([-0.03, 0.01, 0.02, -0.01, 0.04, -0.02])
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        result = estimate_ols_alpha_beta_hac(x=x, y=np.zeros_like(x))
+    assert result.alpha == result.beta == result.alpha_hac_se == 0.0
+    assert result.alpha_confidence_interval == (0.0, 0.0)
+    assert result.alpha_pvalue == 1.0
+    assert np.isnan(result.r_squared)

@@ -264,6 +264,8 @@ def estimate_ols_alpha_beta_hac(
     alpha uses statsmodels' heteroskedasticity and autocorrelation-consistent covariance with the
     small-sample correction and a normal reference distribution. The requested lag count is capped
     at one less than the number of retained observations.
+    An exactly zero alpha with zero HAC standard error has p-value one and a zero-width interval,
+    matching the joint EWMA-HAC convention. R-squared remains NaN for a constant response.
 
     Args:
         x: Explanatory variable; non-finite observations are removed jointly with ``y``.
@@ -292,9 +294,11 @@ def estimate_ols_alpha_beta_hac(
         )
         alpha = float(robust_model.params[0])
         beta = float(robust_model.params[1])
-        r_squared = float(reg_model.rsquared)
-        alpha_pvalue = float(robust_model.pvalues[0])
+        r_squared = float(reg_model.rsquared) if reg_model.centered_tss > 0.0 else np.nan
         alpha_hac_se = float(robust_model.bse[0])
+        # Match the joint EWMA-HAC convention for an exactly zero, deterministic effect.
+        alpha_pvalue = (1.0 if alpha == 0.0 and alpha_hac_se == 0.0
+                        else float(robust_model.pvalues[0]))
         alpha_confidence_interval_array = np.asarray(
             robust_model.conf_int(alpha=1.0 - confidence_level),
             dtype=float,
