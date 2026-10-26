@@ -87,6 +87,23 @@ across priced instruments until it becomes available.
 | Information ratio | −0.2899, annualised and rounded to four decimals. |
 | Benchmark | The fixture's synthetic 60/40 reference, `SBM_6040`. |
 
+### Output-to-object map
+
+The printed groups map to the following reusable objects. Target weights and realised holdings are
+different: `weight_schedule` holds each rebalance decision, while `portfolio_data.weights` reflects
+the units held after prices move. See [portfolio backtesting](portfolio_backtesting.md) for the
+timing convention and [performance and Sharpe conventions](performance_analytics_and_sharpe.md)
+for the statistic definitions.
+
+| Printed output | Python object to reuse |
+|---|---|
+| Price panel shape | `prices`, selected as `universe.prices[ASSETS]` |
+| Target schedule shape and final target weights | `weight_schedule` |
+| Final realised weights | `portfolio_data.weights` |
+| Monthly performance table | `performance_table` |
+| Terminal NAV | `portfolio_nav`, or `portfolio_data.get_portfolio_nav()` |
+| `TE` and `IR` | `tracking_error` and `information_ratio` from `compute_te_ir_errors(return_difference)` |
+
 The [quickstart regression test](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/tests/test_quickstart.py)
 checks the schedule, output and terminal NAV against the current source. These values are a
 reproducibility reference for this fixture and cost setup, not a forecast or an assertion that
