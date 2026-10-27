@@ -4,6 +4,42 @@
   "policy": "Enabled, non-forced permanent Read the Docs Page Redirects. Preserve existing archive pages. Documentation mappings do not restore removed Python APIs. Compiled QIS entry points link to their documented handbook contracts.",
   "redirects": [
     {
+      "from_url": "/_included/REMOVED_5_0.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/REMOVED_5_0.html",
+      "description": "Formerly mirrored packaged note; use its current handbook page with the same basename.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/_included/factsheets.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/factsheets.html",
+      "description": "Formerly mirrored packaged note; use its current handbook page with the same basename.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/_included/frequency_convention_note.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/frequency_convention_note.html",
+      "description": "Formerly mirrored packaged note; use its current handbook page with the same basename.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/_included/gallery.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/gallery.html",
+      "description": "Formerly mirrored packaged note; use its current handbook page with the same basename.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
       "from_url": "/api/generated/qis.LastLabel.html",
       "to_url": "https://quantinveststrats.readthedocs.io/en/stable/api/generated/qis.plot_time_series.html#qis.plot_time_series",
       "description": "LastLabel was removed; the current plot_time_series contract describes legend_stats.",

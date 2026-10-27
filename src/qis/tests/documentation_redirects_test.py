@@ -15,7 +15,7 @@ SEO = runpy.run_path(str(EXTENSION))
 
 
 def test_manifest_keeps_reviewed_legacy_and_compiled_entry_points():
-    """Preserve retired APIs and handbook fallbacks for documented compiled kernels."""
+    """Preserve moved package notes, retired APIs and documented compiled-kernel fallbacks."""
     manifest = SEO["read_redirect_manifest"]()
     sources = {r["from_url"] for r in manifest["redirects"]}
     names = {
@@ -41,7 +41,10 @@ def test_manifest_keeps_reviewed_legacy_and_compiled_entry_points():
         "ewm_recursion",
         "limit_weights_to_max_var_limit",
     }
-    assert sources == {f"/api/generated/qis.{name}.html" for name in names}
+    mirrors = {"gallery", "factsheets", "frequency_convention_note", "REMOVED_5_0"}
+    assert sources == {f"/api/generated/qis.{name}.html" for name in names} | {
+        f"/_included/{name}.html" for name in mirrors
+    }
     assert all(r["http_status"] == 301 and r["force"] is False for r in manifest["redirects"])
 
 
