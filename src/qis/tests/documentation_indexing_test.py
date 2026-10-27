@@ -1,6 +1,7 @@
 """Canonical URL, robots and sitemap contracts, without importing optional documentation tools."""
 
 from html.parser import HTMLParser
+import json
 from pathlib import Path
 import runpy
 import subprocess
@@ -108,11 +109,20 @@ def build_sphinx_site(tmp_path, base):
     """Build a three-page site with the extension and return its HTML output directory."""
     source = tmp_path / 'source'
     source.mkdir()
+    # The miniature build validates its own replacement rather than the full handbook.
+    manifest = tmp_path / 'redirects.json'
+    manifest.write_text(json.dumps({
+        'schema_version': 1, 'site': BASE.split('/en/')[0],
+        'redirects': [{'from_url': '/old.html', 'to_url': BASE + 'method.html#method',
+                       'redirect_type': 'page', 'http_status': 301,
+                       'force': False, 'enabled': True}],
+    }), encoding='utf-8')
     (source / 'conf.py').write_text(
         'import sys\n'
         f'sys.path.insert(0, {str(EXTENSION.parent)!r})\n'
         "extensions = ['qis_indexing']\n"
         f'html_baseurl = {base!r}\n'
+        f'qis_redirect_manifest = {str(manifest)!r}\n'
         "project = 'Indexing test'\n", encoding='utf-8')
     (source / 'index.rst').write_text(
         'Home\n====\n\n.. toctree::\n\n   method\n   _included/note\n', encoding='utf-8')

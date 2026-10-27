@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "site": "https://quantinveststrats.readthedocs.io",
+  "policy": "Enabled, non-forced permanent Read the Docs Page Redirects. Preserve existing archive pages. Documentation mappings do not restore removed Python APIs. Compiled QIS entry points link to their documented handbook contracts.",
+  "redirects": [
+    {
+      "from_url": "/api/generated/qis.LastLabel.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/api/generated/qis.plot_time_series.html#qis.plot_time_series",
+      "description": "LastLabel was removed; the current plot_time_series contract describes legend_stats.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.OhlcEstimatorType.html",
+      "to_url": "https://stochvolmodels.readthedocs.io/en/latest/api.html#ohlc-volatility-estimation",
+      "description": "OHLC estimation moved from QIS to stochvolmodels.estimation; see the current API contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.TrainLivePeriod.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/REMOVED_5_0.html#upgrade-checks",
+      "description": "Removed train/live containers; consult the migration guide and changelog for current supported imports.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.TrainLiveSamples.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/REMOVED_5_0.html#upgrade-checks",
+      "description": "Removed train/live containers; consult the migration guide and changelog for current supported imports.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.backtest_rebalanced_portfolio.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/portfolio_backtesting.html#implementation-in-qis",
+      "description": "Public compiled backtest kernel; use the current held-unit calculation and array contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_ewm_covar.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/ewm_estimators.html#implementation-in-qis",
+      "description": "Public compiled EWM kernel; see the documented recursion, seed, missing-data and array contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_ewm_covar_newey_west.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/ewm_estimators.html#implementation-in-qis",
+      "description": "Public compiled EWM kernel; see the documented recursion, seed, missing-data and array contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_ewm_covar_tensor.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/ewm_estimators.html#implementation-in-qis",
+      "description": "Public compiled EWM kernel; see the documented recursion, seed, missing-data and array contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_ewm_covar_tensor_vol_norm_returns.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/ewm_estimators.html#implementation-in-qis",
+      "description": "Public compiled EWM kernel; see the documented recursion, seed, missing-data and array contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_ewm_long_short.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/ewm_estimators.html#implementation-in-qis",
+      "description": "Public compiled EWM kernel; see the documented recursion, seed, missing-data and array contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_ewm_matrix_autocorr.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/serial_dependence.html#implementation-in-qis",
+      "description": "Public compiled serial-dependence kernel; see the documented lag and shape contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_path_autocorr.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/serial_dependence.html#implementation-in-qis",
+      "description": "Public compiled serial-dependence kernel; see the documented lag and shape contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_path_autocorr_given_lags.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/serial_dependence.html#implementation-in-qis",
+      "description": "Public compiled serial-dependence kernel; see the documented lag and shape contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_path_corr.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/covariance_correlation_pca.html#implementation-in-qis",
+      "description": "Public compiled Pearson path-correlation kernel; see the current handbook contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_path_lagged_corr.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/serial_dependence.html#implementation-in-qis",
+      "description": "Public compiled serial-dependence kernel; see the documented lag and shape contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_path_lagged_corr_given_lags.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/serial_dependence.html#implementation-in-qis",
+      "description": "Public compiled serial-dependence kernel; see the documented lag and shape contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.compute_portfolio_var_np.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/risk_contributions.html#implementation-in-qis",
+      "description": "Public compiled risk kernel; the handbook documents its exact array, seed, lag and units contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.estimate_hf_ohlc_vol.html",
+      "to_url": "https://stochvolmodels.readthedocs.io/en/latest/api.html#ohlc-volatility-estimation",
+      "description": "OHLC estimation moved from QIS to stochvolmodels.estimation; see the current API contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.estimate_ohlc_var.html",
+      "to_url": "https://stochvolmodels.readthedocs.io/en/latest/api.html#ohlc-volatility-estimation",
+      "description": "OHLC estimation moved from QIS to stochvolmodels.estimation; see the current API contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.ewm_recursion.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/ewm_estimators.html#implementation-in-qis",
+      "description": "Public compiled EWM kernel; see the documented recursion, seed, missing-data and array contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/api/generated/qis.limit_weights_to_max_var_limit.html",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/risk_contributions.html#implementation-in-qis",
+      "description": "Public compiled risk kernel; the handbook documents its exact array, seed, lag and units contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    }
+  ]
+}
