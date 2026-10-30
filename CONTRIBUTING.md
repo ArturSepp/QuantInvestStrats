@@ -158,17 +158,34 @@ uv sync --python 3.12 --group test --extra data --extra io --locked
 uv run --no-sync pytest --cov=qis --cov-report=term:skip-covered
 ```
 
-The static gates use the locked `lint` group without installing the scientific stack:
+The static CI gates check Ruff findings on added or modified Python lines and production
+docstring coverage. They use the locked `lint` group without installing the scientific stack.
+
+From a clean working tree with committed changes, fetch the target repository's `main` and use
+it as `BASE`. The example below assumes `origin` points to `ArturSepp/QuantInvestStrats`.
+In a fork checkout, use the remote for that repository instead (usually `upstream`) in both
+the fetch command and `BASE`.
 
 ```bash
-uv run --locked --only-group lint ruff check --select TID251,TID253,ICN,F src/qis/
+git fetch origin
+BASE=origin/main
+```
+
+Before running the checks below, incorporate the fetched `$BASE` into your branch by
+rebasing or merging, then ensure all changes are committed and the working tree is clean.
+Fetching alone does not update your branch; otherwise inherited findings already fixed
+on `main` can appear in the lint diff.
+
+```bash
+uv run --locked --only-group lint python .github/lint_changed_lines.py "$BASE" HEAD
 uv run --locked --only-group lint interrogate src/qis
 ```
 
-The bare `ruff check src/qis/` command also selects the legacy `E` and `W` backlog and is not the
-CI gate. CI additionally checks newly added lines with `.github/lint_changed_lines.py`. Running an
-`--only-group lint` command replaces the active project environment; run the first `uv sync`
-command again before returning to tests.
+Whole-tree Ruff output includes the inherited `E`, `F` and `W` backlog and is diagnostic,
+not the CI gate. Findings on added or modified lines still block CI.
+
+Running an `--only-group lint` command replaces the active project environment; run the first
+`uv sync` command again before returning to tests.
 
 Build the documentation with warnings treated as errors:
 

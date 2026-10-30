@@ -418,13 +418,12 @@ are flagged inline.
 ```bash
 uv sync --locked --group test
 uv run --no-sync pytest
-uv run --locked --only-group lint ruff check --select TID251,TID253,ICN,F src/qis/
 ```
 
 `src/qis/tests/test_examples.py` checks every example for symbols and keyword arguments that
 exist and runs the examples that need no data vendor; `test_documentation.py` checks the README
 dependency list and Python blocks. Tests that need an optional extra skip rather than fail, so a
-core install stays green. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the CI-equivalent lint,
+core install stays green. See [`CONTRIBUTING.md`](CONTRIBUTING.md#development-setup) for the CI-equivalent lint,
 documentation, and wheel commands.
 
 ## Changelog <a name="changelog"></a>
