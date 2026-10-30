@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Match component NAV adjustment factors by date when the portfolio and components share
+  unique, non-missing timestamps. Reordering component rows no longer changes their dated
+  adjusted values. Preserve the existing portfolio time origin and other calendar handling.
+
 ## [5.44.5] - 2026-10-26
 
 ### Fixed
