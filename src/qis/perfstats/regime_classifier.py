@@ -275,6 +275,31 @@ def compute_regimes_pa_perf_table_from_sampled_returns(
     return cond_perf_table, regime_datas
 
 
+def _regime_table_kwargs(prices: pd.DataFrame,
+                         benchmark: str,
+                         perf_params: PerfParams,
+                         freq: str) -> Dict[str, Any]:
+    """Build the common table options without resolving classifier-specific regime IDs.
+
+    Return classifiers supply fixed IDs; volatility IDs are known only after classification.
+    Keep that choice and super() delegation in the concrete wrappers.
+    """
+    return dict(
+        regime_id_func_kwargs=dict(
+            prices=prices,
+            benchmark=benchmark,
+            include_start_date=True,
+            include_end_date=True
+        ),
+        prices=prices,
+        benchmark=benchmark,
+        perf_params=perf_params,
+        freq=freq,
+        is_report_pa_returns=True,
+        is_use_benchmark_means=False,
+    )
+
+
 # ============================================================================
 # Abstract base class
 # ============================================================================
@@ -572,21 +597,8 @@ class BenchmarkReturnsQuantilesRegime(RegimeClassifier):
         Returns:
             Tuple of (performance table, regime data dictionary)
         """
-        regime_id_func_kwargs = dict(
-            prices=prices,
-            benchmark=benchmark,
-            include_start_date=True,
-            include_end_date=True
-        )
-
         return super().compute_regimes_pa_perf_table(
-            regime_id_func_kwargs=regime_id_func_kwargs,
-            prices=prices,
-            benchmark=benchmark,
-            perf_params=perf_params,
-            freq=self.freq,
-            is_report_pa_returns=True,
-            is_use_benchmark_means=False,
+            **_regime_table_kwargs(prices, benchmark, perf_params, self.freq),
             regime_ids=self.get_regime_ids(),
             drop_benchmark=drop_benchmark,
             additive_pa_returns_to_pa_total=additive_pa_returns_to_pa_total
@@ -723,21 +735,8 @@ class BenchmarkReturnsPositiveNegativeRegime(RegimeClassifier):
         Returns:
             Tuple of (performance table, regime data dictionary)
         """
-        regime_id_func_kwargs = dict(
-            prices=prices,
-            benchmark=benchmark,
-            include_start_date=True,
-            include_end_date=True
-        )
-
         return super().compute_regimes_pa_perf_table(
-            regime_id_func_kwargs=regime_id_func_kwargs,
-            prices=prices,
-            benchmark=benchmark,
-            perf_params=perf_params,
-            freq=self.freq,
-            is_report_pa_returns=True,
-            is_use_benchmark_means=False,
+            **_regime_table_kwargs(prices, benchmark, perf_params, self.freq),
             regime_ids=self.get_regime_ids(),
             drop_benchmark=drop_benchmark,
             additive_pa_returns_to_pa_total=additive_pa_returns_to_pa_total
@@ -886,22 +885,9 @@ class BenchmarkVolsQuantilesRegime(RegimeClassifier):
         Returns:
             Tuple of (performance table, regime data dictionary)
         """
-        regime_id_func_kwargs = dict(
-            prices=prices,
-            benchmark=benchmark,
-            include_start_date=True,
-            include_end_date=True
-        )
-
         # Defer dynamic volatility IDs until the base method has classified this price panel.
         return super().compute_regimes_pa_perf_table(
-            regime_id_func_kwargs=regime_id_func_kwargs,
-            prices=prices,
-            benchmark=benchmark,
-            perf_params=perf_params,
-            freq=self.freq,
-            is_report_pa_returns=True,
-            is_use_benchmark_means=False,
+            **_regime_table_kwargs(prices, benchmark, perf_params, self.freq),
             # Match the shared table contract while leaving component regime data intact.
             drop_benchmark=drop_benchmark,
             additive_pa_returns_to_pa_total=additive_pa_returns_to_pa_total
