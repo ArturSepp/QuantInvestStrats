@@ -1,4 +1,4 @@
-"""Regression coverage for caller-supplied regime-classifier forwarding.
+"""Regression coverage for regime-classifier table forwarding.
 
 ``compute_bnb_regimes_pa_perf_table`` is a convenience wrapper with a quantile-classifier
 fallback. Plotting and reporting callers also pass a fully configured ``regime_classifier``
@@ -12,10 +12,15 @@ then establish parity with their direct public methods. The sign-regime averages
 independently from twelve literal returns, while omitted and explicit-``None`` controls pin the
 existing quantile fallback. Caller ownership and unrelated compatibility keywords are covered in
 the same narrow matrix.
+
+The concrete classifiers also share fixed table options but differ in when their regime IDs are
+known. Recording the base-method boundary protects that distinction, ignored conflicting options,
+single delegation, return identity, and warning/error propagation without repeating the analytics.
 """
 
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -26,6 +31,8 @@ from qis.perfstats.config import PerfParams, RegimeData, ReturnTypes
 from qis.perfstats.regime_classifier import (
     BenchmarkReturnsPositiveNegativeRegime,
     BenchmarkReturnsQuantilesRegime,
+    BenchmarkVolsQuantilesRegime,
+    RegimeClassifier,
 )
 
 
@@ -389,3 +396,83 @@ def test_supplied_quantile_classifier_preserves_its_configuration() -> None:
     assert classifier.return_type is ReturnTypes.RELATIVE
     assert classifier.get_regime_ids() == ["Low", "Lower middle", "Upper middle", "High"]
     pd.testing.assert_frame_equal(prices, original_prices)
+
+
+@pytest.mark.parametrize(
+    ("classifier_type", "expected_ids"),
+    (
+        (BenchmarkReturnsQuantilesRegime, ["Bear", "Normal", "Bull"]),
+        (BenchmarkReturnsPositiveNegativeRegime, ["Negative", "Positive"]),
+        (BenchmarkVolsQuantilesRegime, None),
+    ),
+)
+@pytest.mark.parametrize(("drop", "additive"), ((False, True), (True, False)))
+@pytest.mark.parametrize("raise_error", (False, True))
+def test_concrete_compute_regimes_pa_perf_table_preserves_delegation(
+    monkeypatch: pytest.MonkeyPatch,
+    classifier_type: type,
+    expected_ids: list[str] | None,
+    drop: bool,
+    additive: bool,
+    raise_error: bool,
+) -> None:
+    """Keep concrete options, ID timing and delegate signals independent of table arithmetic.
+
+    Volatility IDs must be absent from the call, not captured from a fresh empty schema.
+    Conflicting compatibility keywords must not override the concrete wrappers' fixed options.
+    """
+    classifier = classifier_type(freq="QE")
+    prices = _price_panel().astype("Float64")
+    calls: list[dict[str, Any]] = []
+    marker = (pd.DataFrame({"marker": [1.0]}), {})
+    error = ValueError("delegate sentinel")
+
+    def delegate(_self: RegimeClassifier, **options: Any) -> tuple:
+        """Expose delegation count and signals without performing any classification."""
+        assert _self is classifier
+        calls.append(options)
+        warnings.warn("delegate warning", UserWarning)
+        if raise_error:
+            raise error
+        return marker
+
+    monkeypatch.setattr(RegimeClassifier, "compute_regimes_pa_perf_table", delegate)
+    options = dict(
+        prices=prices,
+        benchmark=_BENCHMARK_NAME,
+        perf_params=_PERF_PARAMS,
+        drop_benchmark=drop,
+        additive_pa_returns_to_pa_total=additive,
+        freq="ME",
+        regime_ids=["ignored"],
+        is_report_pa_returns=False,
+        is_use_benchmark_means=True,
+    )
+    with pytest.warns(UserWarning, match="^delegate warning$") as caught:
+        if raise_error:
+            with pytest.raises(ValueError) as raised:
+                classifier.compute_regimes_pa_perf_table(**options)
+            assert raised.value is error
+        else:
+            assert classifier.compute_regimes_pa_perf_table(**options) is marker
+    assert len(caught) == 1
+    assert len(calls) == 1
+    actual = calls[0]
+    assert actual.pop("prices") is prices
+    assert actual.pop("perf_params") is _PERF_PARAMS
+    sampling = actual.pop("regime_id_func_kwargs")
+    assert sampling.pop("prices") is prices
+    assert sampling == dict(
+        benchmark=_BENCHMARK_NAME, include_start_date=True, include_end_date=True
+    )
+    expected = dict(
+        benchmark=_BENCHMARK_NAME,
+        freq="QE",
+        is_report_pa_returns=True,
+        is_use_benchmark_means=False,
+        drop_benchmark=drop,
+        additive_pa_returns_to_pa_total=additive,
+    )
+    if expected_ids is not None:
+        expected["regime_ids"] = expected_ids
+    assert actual == expected
