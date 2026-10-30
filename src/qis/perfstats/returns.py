@@ -808,6 +808,10 @@ def adjust_component_navs_to_portfolio(portfolio_nav: pd.Series,
     near one, so n components sum to about n. Intended use is display /
     stacked-area charting of per-annum contributions, not formal attribution.
 
+    When both inputs have the same unique, non-missing timestamps, adjustment
+    factors are matched by timestamp regardless of component row order. The
+    time origin remains the first stored row of ``portfolio_nav``.
+
     Args:
         portfolio_nav: Portfolio NAV time series.
         component_navs: DataFrame of component NAVs (one column per
@@ -827,6 +831,24 @@ def adjust_component_navs_to_portfolio(portfolio_nav: pd.Series,
     # is small. The small deviation closes the compounding gap.
     t = (portfolio_nav.index - portfolio_nav.index[0]).days.to_numpy() / CALENDAR_DAYS_PER_YEAR_SHARPE
     c_m = ((portfolio_pa / n + 1.0) / (np.nanmean(components_pa) + 1.0)) ** t
+
+    # Each factor belongs to a portfolio timestamp, not a component row position.
+    # Match only an unambiguous shared grid, leaving other calendars and the
+    # existing portfolio time origin untouched rather than choosing a join policy.
+    portfolio_index, component_index = portfolio_nav.index, component_navs.index
+    if (
+        isinstance(portfolio_index, pd.DatetimeIndex)
+        and isinstance(component_index, pd.DatetimeIndex)
+        and len(portfolio_index) == len(component_index)
+        and portfolio_index.is_unique
+        and component_index.is_unique
+        and not portfolio_index.hasnans
+        and not component_index.hasnans
+        and not portfolio_index.equals(component_index)
+    ):
+        positions = portfolio_index.get_indexer(component_index)
+        if np.all(positions >= 0):
+            c_m = c_m[positions]
     ratio = npo.np_array_to_df_columns(a=c_m, ncols=n)
 
     component_navs_adj = component_navs_adj.multiply(ratio)
