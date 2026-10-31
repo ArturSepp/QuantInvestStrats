@@ -137,8 +137,10 @@ def test_adjust_component_navs_to_portfolio_and_wrapper_retain_the_existing_time
         actual, expected.reindex(components.index), rtol=1e-13, atol=1e-12
     )
 
-    # Keep the intended descending input: pandas can otherwise sort during fixture construction.
-    grouped = pd.concat([portfolio.rename("Portfolio"), components], axis=1, sort=False)
+    # pandas 2.x can sort a DatetimeIndex outer join even with sort=False.
+    grouped = pd.concat([portfolio.rename("Portfolio"), components], axis=1, sort=False).reindex(
+        portfolio.index
+    )
     pd.testing.assert_index_equal(grouped.index, portfolio.index)
     original = grouped.copy(deep=True)
     wrapped = portfolio_navs_to_additive(grouped, "Portfolio")
