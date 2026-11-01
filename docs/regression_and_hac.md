@@ -34,6 +34,8 @@ including the defaults that look ahead.
 | Full-sample alpha, beta, $R^2$ and a classical p-value | OLS | `qis.fit_multivariate_ols`; internal `estimate_ols_alpha_beta` |
 | Full-sample alpha with a dependence-robust interval | OLS with Bartlett HAC | internal `estimate_ols_alpha_beta_hac`, `estimate_hac_mean` |
 | Current recency-weighted alphas of related series, jointly | Geometric WLS with stacked HAC | `qis.estimate_ewma_alpha_beta_hac` |
+| Means or multiple-factor coefficients, with equal or geometric weights | Shared stacked HAC | internal `qis.utils.regression.estimate_hac_regression` |
+| The same HAC estimates on historical windows or prefixes | Scheduled calls to the shared estimator | internal `qis.utils.rolling_regression.estimate_rolling_hac_regression` |
 | Exposures at every date | Ratios of EWM moments | `qis.compute_ewm_xy_beta_tensor`, `qis.EwmLinearModel.fit`, `qis.compute_one_factor_ewm_betas` |
 | One-factor EWM alpha and $R^2$ paths | EWM beta, EWM residual mean | `qis.compute_ewm_beta_alpha_forecast`, `qis.compute_ewm_alpha_r2_given_prediction`, `qis.LinearModel` |
 
@@ -54,10 +56,10 @@ Three results carry the chapter:
 | Convention | This article |
 |---|---|
 | Return basis | Any periodic return series supplied by the caller; qis callers pass log returns (model-layer attribution, `qis.estimate_ewm_factor_model`) or simple returns (`qis.compute_ra_perf_table_with_benchmark` by default) |
-| Sampling grid | Rows as supplied; the estimators have no calendar logic and do not sort rows. The examples use month-end (`ME`) log returns |
+| Sampling grid | Endpoint fits use rows as supplied without sorting. Rolling HAC requires a complete declared calendar and ordered dates. The examples use month-end (`ME`) log returns |
 | Annualisation | None inside the estimators. Tables annualise alpha linearly, $\mathrm{af}\,\hat\alpha$; chart legends do the same when `alpha_an_factor` is passed and otherwise print the periodic alpha |
 | Mean adjustment | OLS and WLS fit an intercept, which removes the sample (or weighted) means. EWM betas use moments about zero by default (`MeanAdjType.NONE`) |
-| Timing | OLS/HAC and EWMA-WLS are descriptive endpoint fits over every retained row. An EWM beta dated $t$ uses rows up to and including $t$; lag it one period before applying it |
+| Timing | Endpoint fits use every retained row. Rolling HAC and EWM estimates dated $t$ include the observation ending at $t$ and are available afterwards; the trading caller applies the implementation lag |
 | Output units | Coefficients in the units of the inputs: $\hat\alpha$ per period, $\hat\beta$ dimensionless, $R^2$ a fraction, standard errors per period |
 | qis default | `qis.estimate_ewma_alpha_beta_hac(span=36.0, hac_lags=3, confidence_level=0.95)`; `EwmLinearModel.fit(span=31, is_x_correlated=True, mean_adj_type=MeanAdjType.NONE, init_type=InitType.X0, warmup_period=20)` |
 
@@ -96,9 +98,11 @@ Three results carry the chapter:
 The estimators assume that rows are consecutive observations in time order, that $X$ has full
 column rank, and that the regressors are exogenous, $\mathbb{E}[x_t\varepsilon_t]=0$. The HAC
 covariance also assumes weakly dependent scores whose autocovariances beyond lag $q$ are small.
-OLS and EWMA-WLS drop every row in which any variable is not finite, so two responses with
-different missing patterns are fitted on different samples. The EWM recursions of this chapter
-instead hold their state across a missing value by default (`NanBackfill.FFILL`).
+Endpoint OLS and EWMA-WLS drop non-finite rows. Separate calls with different missing patterns
+can therefore use different samples; a joint call to the shared HAC estimator uses one common
+finite sample across every response and factor. Rolling HAC instead requires a complete finite
+panel on a declared calendar and rejects gaps. The EWM recursions of this chapter hold their
+state across a missing value by default (`NanBackfill.FFILL`).
 
 ## Methodology
 
@@ -416,6 +420,101 @@ and variants of one strategy share most of their residual variation, so their al
 strongly positively correlated and a difference of alphas is far more precise than the sum
 suggests. The integration alpha of model-layer attribution is the contrast $c=(1,-1,-1)$ of the
 full, risk and signal equations. With $\Omega=I_T$ the same argument covers full-sample OLS/HAC.
+
+### One shared estimator for means and regressions
+
+The internal `qis.utils.regression.estimate_hac_regression(y, x=None, span=None,
+hac_lags=3, confidence_level=0.95)` uses the same stacked-score sandwich for every response
+column. Supply a pandas Series or DataFrame for `y`, and optionally one or more factor columns
+in `x` with the same index. Column labels must be unique; `Intercept` is reserved for the
+constant in the design.
+
+| Design | `span=None` | Finite `span > 1` |
+|---|---|---|
+| `x=None` | Sample means with HAC | Geometrically weighted means with HAC |
+| Supplied factors | OLS intercepts and slopes with HAC | Geometric WLS intercepts and slopes with HAC |
+
+For a mean, $X$ is a single column of ones, so $p=1$; there is no artificial zero regressor.
+For $K$ supplied factors, $X$ contains an intercept and those factors, so $p=K+1$.
+`span=None` sets every objective weight to exactly one and reports
+`weighting='equal'`, `span=None` and `effective_nobs=T`. A finite span uses the geometric weights
+defined above and reports `weighting='ewma'`. Both branches fit one endpoint sample.
+
+The WLS formula and stacked covariance above apply with $pJ$ scores, $I_p$ in the contrast
+identity, and the small-sample multiplier $T/(T-p)$. In particular, a weighted mean is
+$\sum_t\omega_ty_t/\sum_t\omega_t$. The raw count must exceed $p$; for geometric weights,
+$T_{\mathrm{eff}}$ must also exceed $p$. Kish effective size remains a separate feasibility
+diagnostic and never replaces $T$ in the multiplier. The weighted design must have full rank.
+
+`HacRegressionResult` contains `coefficients`, `hac_se`, `pvalues`, `confidence_lower` and
+`confidence_upper` tables with parameter rows and response columns. The rows are `Intercept`
+followed by the supplied factor labels; a mean has only `Intercept`. Every coefficient has a
+two-sided normal-reference p-value and a pointwise interval. `parameter_covariance` retains
+the full joint covariance labelled by `(equation, parameter)`, including cross-equation terms.
+The result also records `r_squared`, retained-row `weights`, `nobs`, `effective_nobs`, `span`,
+`weighting`, `ewm_lambda`, the actual capped `hac_lags` and `confidence_level`.
+
+The existing `estimate_hac_mean` and `qis.estimate_ewma_alpha_beta_hac` are compatibility
+wrappers over this core. Their signatures, defaults, result classes, labels and validation
+remain unchanged. The mean wrapper still uses equal weights; the public EWMA wrapper still
+fits one factor with `span=36.0` by default. Neither wrapper produces a rolling path.
+
+> **Pitfall.** With a fixed span $N$, $T_{\mathrm{eff}}$ approaches $N$ as older observations
+> are added. A longer history does not give the precision of an equally weighted full-sample
+> mean. Weighted p-values concern an endpoint-weighted statistic; they do not establish a
+> latent current mean or provide calibrated coverage for arbitrary time variation.
+
+### Rolling and expanding HAC estimates
+
+The internal `qis.utils.rolling_regression.estimate_rolling_hac_regression` selects a historical
+sample and calls `estimate_hac_regression` at each requested endpoint. It neither smooths fitted
+coefficients nor implements a separate HAC recursion. `x=None` selects means in every mode.
+
+| `window` | `span` | Sample and weights at endpoint $t$ |
+|---|---|---|
+| `None` | `None` | All supplied observations through $t$, equal weights |
+| Integer $W$ | `None` | Most recent $W$ observations through $t$, equal weights |
+| `None` | Finite | All supplied observations through $t$, geometric weights ending at one |
+| Integer $W$ | Finite | Most recent $W$ observations through $t$, geometric weights ending at one |
+
+A finite span controls decay rather than a cutoff, so a finite window and a finite span may be
+used together. Both count input observations. Requesting annual output from monthly returns
+does not turn a 60-observation window into a 60-year window.
+
+Inputs must have identical, ordered, unique DatetimeIndexes and finite values. Declare a
+regular calendar with `sampling_frequency`, such as `'ME'`, or with the index's explicitly
+attached `freq` when neither calendar argument is supplied. For a custom trading calendar,
+pass `expected_index` matching the input exactly. Conflicting calendar arguments, undeclared
+calendars and gaps raise `ValueError`. No dropping, sorting, filling or resampling occurs.
+
+`fit_dates=None` requests every input date. An explicit `fit_dates` must be an ordered, unique
+subset of the input dates; unknown dates raise rather than being moved to an observation.
+`time_period` restricts output dates only. All earlier supplied data remain available for
+estimation and warm-up, including the geometric weights of an expanding fit.
+
+For a finite window, `min_periods=None` requires a full window. For an expanding sample it
+requires $\max(24,p+1)$ observations. An explicit `min_periods` must exceed $p$ and cannot exceed
+a finite window; a finite window must itself be an integer greater than $p$. Scheduled dates
+before this threshold remain in the output as NaNs with `RollingHacStatus.WARMUP`. Eligible
+samples still have to pass the core's rank and effective-size guards. Rolling fits also reject
+a constant response when the core reports undefined $R^2$; the endpoint estimator can retain
+such a response for descriptive use. A failed eligible fit raises with its endpoint and reason;
+it is not turned into another warm-up row.
+
+`RollingHacRegressionResult` contains the same five statistic table names as the endpoint
+result, now indexed by output date with `(equation, parameter)` columns. `diagnostics` records
+requested and actual sample bounds, raw and effective observation counts, window, span, actual
+HAC lags and `RollingHacStatus`. `include_covariance=True` additionally stores a mapping from
+successful endpoint dates to their full joint `parameter_covariance`; the default omits this
+mapping. The storage option does not change any statistic.
+
+An estimate dated $t$ includes the observation ending at $t$ and is available afterwards. The
+wrapper inserts no trading lag. Future observations do not enter an earlier fit, and a finite
+window excludes older observations completely.
+
+> **Pitfall.** Rolling p-values and confidence intervals are pointwise diagnostics. Overlapping
+> windows do not provide simultaneous or sequential error control. The wrapper applies no
+> multiple-testing correction across dates and does not turn a selected window into a holdout.
 
 ### Point-in-time EWM regressions
 
@@ -854,6 +953,87 @@ assert round(naive_se, 5) == 0.00743 and round(correlation, 2) == 0.99
 assert round(naive_se / wls.alpha_hac_se['Tilted - Core'], 1) == 5.7
 ```
 
+### Shared HAC means and multiple-factor coefficients
+
+The same synthetic monthly log-return panel also illustrates the shared core. With `x=None`,
+the intercept is the mean; with two supplied factors, the coefficient rows contain the
+intercept and both factor labels. No annualisation or risk-free subtraction occurs inside
+these calls. The equal-weight mean agrees with the existing mean helper, the weighted mean
+agrees with direct summation, and the multiple-factor coefficients agree with a square-root
+weighted least-squares calculation.
+
+```python
+from qis.utils.regression import estimate_hac_regression
+
+shared_y = returns[['SEQ_EU', 'SBD_HY']]
+shared_x = returns[['SEQ_US', 'SBD_TSY']]
+sample_means = estimate_hac_regression(y=shared_y, hac_lags=3)
+weighted_means = estimate_hac_regression(y=shared_y, span=36.0, hac_lags=3)
+np.testing.assert_array_equal(sample_means.weights, np.ones(len(shared_y)))
+assert sample_means.span is None and sample_means.weighting == 'equal'
+assert sample_means.coefficients.index.tolist() == ['Intercept']
+for name in shared_y.columns:
+    legacy_mean = estimate_hac_mean(y=shared_y[name], hac_lags=3)
+    np.testing.assert_allclose(sample_means.coefficients.loc['Intercept', name],
+                               legacy_mean.mean, rtol=1e-10)
+    np.testing.assert_allclose(sample_means.hac_se.loc['Intercept', name],
+                               legacy_mean.hac_se, rtol=1e-10)
+np.testing.assert_allclose(weighted_means.coefficients.loc['Intercept'],
+                           omega @ shared_y.to_numpy() / omega.sum(), rtol=1e-10)
+
+multiple = estimate_hac_regression(y=shared_y, x=shared_x, span=36.0, hac_lags=3)
+shared_design = np.column_stack([np.ones(len(shared_x)), shared_x.to_numpy()])
+reference = np.linalg.lstsq(root * shared_design, root * shared_y.to_numpy(), rcond=None)[0]
+assert multiple.coefficients.index.tolist() == ['Intercept', 'SEQ_US', 'SBD_TSY']
+np.testing.assert_allclose(multiple.coefficients, reference, rtol=1e-9, atol=1e-12)
+```
+
+### Historical windows and expanding prefixes
+
+This example requests the last three monthly endpoints in each of the four modes. A
+60-observation window contains five years of monthly returns. Each reported endpoint equals a
+direct fit on the explicit historical slice, including its standard errors. The comparison
+uses the two-factor panel above; setting `x=None` would give rolling means instead.
+
+```python
+from qis.utils.rolling_regression import estimate_rolling_hac_regression, RollingHacStatus
+
+fit_dates = shared_y.index[-3:]
+for window, span in [(None, None), (60, None), (None, 36.0), (60, 36.0)]:
+    path = estimate_rolling_hac_regression(
+        y=shared_y, x=shared_x, window=window, span=span, min_periods=60,
+        hac_lags=3, fit_dates=fit_dates, sampling_frequency='ME', include_covariance=True)
+    for date in fit_dates:
+        stop = shared_y.index.get_loc(date) + 1
+        start = 0 if window is None else max(0, stop - window)
+        endpoint = estimate_hac_regression(
+            y=shared_y.iloc[start:stop], x=shared_x.iloc[start:stop], span=span, hac_lags=3)
+        for field in ['coefficients', 'hac_se', 'pvalues',
+                      'confidence_lower', 'confidence_upper']:
+            np.testing.assert_allclose(getattr(path, field).loc[date],
+                                       getattr(endpoint, field).to_numpy().T.ravel(),
+                                       rtol=1e-10, atol=1e-12)
+        pd.testing.assert_frame_equal(path.parameter_covariance[date],
+                                      endpoint.parameter_covariance)
+
+# Scheduled warm-up rows are retained; a finite window defaults to full-window warm-up.
+warmup = estimate_rolling_hac_regression(
+    y=shared_y.iloc[:61], window=60, sampling_frequency='ME')
+assert warmup.coefficients.iloc[:59].isna().all().all()
+assert warmup.diagnostics['status'].iloc[0] == RollingHacStatus.WARMUP
+assert warmup.diagnostics['status'].iloc[59] == RollingHacStatus.FITTED
+
+# An output restriction retains all preceding estimation history.
+restricted = estimate_rolling_hac_regression(
+    y=shared_y, x=shared_x, window=60, span=36.0, min_periods=60,
+    fit_dates=fit_dates, time_period=qis.TimePeriod(start=fit_dates[-1]),
+    sampling_frequency='ME')
+pd.testing.assert_frame_equal(restricted.coefficients, path.coefficients.iloc[[-1]])
+```
+
+These intervals and p-values apply to their individual endpoints. Inspecting a path and choosing
+its most favourable date is a further selection step not covered by this calculation.
+
 ### Point-in-time EWM betas
 
 Two factors, US equities `SEQ_US` and Treasuries `SBD_TSY` (full-sample correlation $-0.19$),
@@ -1002,6 +1182,8 @@ assert round(r2_oos['SEQ_EU'].iloc[-1], 3) == 0.410
 | Mean with Bartlett HAC | $\hat\Sigma_{\theta}$ with $p=1$ | internal `qis.utils.regression.estimate_hac_mean(y, hac_lags=3, confidence_level=0.95)`, returns `HacMeanResult` |
 | Lag rule | $\lfloor 4(T/100)^{2/9}\rfloor$ | internal `qis.utils.regression.newey_west_lag_rule(nobs)` |
 | Geometric WLS with stacked HAC | $(X^{\top}\Omega X)^{-1}X^{\top}\Omega y$, $\hat\Sigma_{\Theta}$, $T_{\mathrm{eff}}$ | `qis.estimate_ewma_alpha_beta_hac(x, y, span=36.0, hac_lags=3, confidence_level=0.95)`, returns `qis.EwmaAlphaBetaHacResult` |
+| Shared mean and multiple-factor HAC | Same stacked sandwich with $p=1$ or $K+1$ | internal `qis.utils.regression.estimate_hac_regression(y, x=None, span=None, hac_lags=3, confidence_level=0.95)`, returns `HacRegressionResult` |
+| Rolling or expanding HAC | Shared estimator applied to each selected historical sample | internal `qis.utils.rolling_regression.estimate_rolling_hac_regression(y, x=None, window=None, span=None, ...)`, returns `RollingHacRegressionResult` |
 | Legend annualisation | $\mathrm{af}\,\hat\alpha$ | internal `qis.utils.regression.reg_model_params_to_str(..., alpha_an_factor=None)`, via `qis.plot_scatter` |
 | EWM loadings tensor | $B_t=M_t^{-1}C_t$, NaN where singular | `qis.compute_ewm_xy_beta_tensor(x, y, span=None, ewm_lambda=0.94, warmup_period=20, is_x_correlated=True)` |
 | One-factor EWM betas | $\mathcal{E}_t[xy]/\mathcal{E}_t[x^2]$, zero seeds | `qis.compute_one_factor_ewm_betas(x, y, span=None, ewm_lambda=0.94, warmup_period=20)` |
@@ -1013,6 +1195,8 @@ assert round(r2_oos['SEQ_EU'].iloc[-1], 3) == 0.410
 
 The OLS, HAC and EWMA-WLS code is in
 [regression.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/regression.py);
+the rolling sample selection and result assembly in
+[rolling_regression.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/rolling_regression.py);
 the EWM recursions in
 [ewm.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/models/linear/ewm.py);
 the linear models in
@@ -1021,9 +1205,10 @@ and
 [factor_model.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/factor_model.py).
 Of the regression helpers, only `fit_multivariate_ols`, `estimate_ewma_alpha_beta_hac` and
 `EwmaAlphaBetaHacResult` are exported in `qis.__all__`; the others are internal to
-`qis.utils.regression` and may change without a deprecation cycle.
+`qis.utils.regression` or `qis.utils.rolling_regression` and may change without a deprecation cycle.
 `src/qis/utils/tests/regression_test.py` checks the HAC and EWMA-WLS estimators against
-independent matrix calculations.
+independent matrix calculations. `src/qis/utils/tests/rolling_regression_test.py` checks
+historical sample selection, direct endpoint equivalence, calendar validation and causality.
 
 API pages: {doc}`fit_multivariate_ols <api/generated/qis.fit_multivariate_ols>`,
 {doc}`estimate_ewma_alpha_beta_hac <api/generated/qis.estimate_ewma_alpha_beta_hac>`,
@@ -1046,7 +1231,8 @@ API pages: {doc}`fit_multivariate_ols <api/generated/qis.fit_multivariate_ols>`,
   EWMA-WLS fit whose effective size is about $N$, treat p-values as approximate. The EWMA-WLS
   correction $T/(T-2)$ uses the raw row count, not $T_{\mathrm{eff}}$.
 - **Row order is the caller's responsibility.** `estimate_ewma_alpha_beta_hac` weights rows by
-  position and does not sort them; an unsorted index silently reweights the sample.
+  position and does not sort them; an unsorted index silently reweights the sample. The rolling
+  HAC wrapper instead rejects unordered or incomplete calendars.
 - **Failure modes differ by helper.** `estimate_ols_alpha_beta` warns and returns NaN when a fit
   fails or is not identified, so a table shows a missing value; the HAC helpers raise
   `ValueError`.

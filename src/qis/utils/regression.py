@@ -10,17 +10,20 @@ not vary.
 HAC standard error, p-value and confidence interval for alpha. ``estimate_hac_mean`` is the
 constant-only case: a sample mean with the same Bartlett HAC inference and the one-parameter
 small-sample correction, for a return series that has no regressor.
-``estimate_ewma_alpha_beta_hac`` fits several dependent series on one common regressor using
-exponentially weighted least squares and returns their joint Bartlett-HAC covariance.
+``estimate_hac_regression`` fits one or several responses on an intercept and optional supplied
+factors, with equal or exponentially decaying observation weights. Its joint Bartlett-HAC
+covariance retains cross-equation dependence. The mean and EWMA alpha/beta entry points adapt
+this shared estimator to their established result types.
 ``reg_model_params_to_str`` formats the fitted equation for a chart legend, and annualises the
 intercept linearly as af α, the convention of ``PerfStat.ALPHA_AN``, when ``alpha_an_factor`` is
 passed. ``newey_west_lag_rule`` supplies the opt-in Newey-West rule of thumb
 for callers that do not want to select a fixed Bartlett lag count.
 
-Every fit runs through ``filter_x_y`` first: rows where any of x or y is non-finite are dropped,
-so a prediction is indexed on the surviving rows, not on the full input. ``order`` is a
+Rows where any supplied response or factor is non-finite are dropped jointly; their retained
+order defines the HAC lags and, when requested, EWMA age. ``order`` is a
 polynomial degree in a single x, not a second regressor - ``get_ols_x`` stacks x, x², x³ and x⁴
-up to order 4. These are static, full-sample fits; time-varying betas are in ``ewm.py``.
+up to order 4. Estimates inherit the input units and are not annualised. These are single-sample
+fits; historical sample selection belongs in ``rolling_regression.py``, not in this kernel.
 """
 # packages
 from dataclasses import dataclass
@@ -106,6 +109,264 @@ class HacMeanResult:
     pvalue: float
     confidence_interval: tuple[float, float]
     nobs: int
+
+
+@dataclass(frozen=True)
+class HacRegressionResult:
+    """Joint mean or regression estimates with equal/EWMA Bartlett-HAC inference.
+
+    Attributes:
+        coefficients: Coefficients with parameter rows and equation columns, intercept first.
+        hac_se: Matching coefficient standard errors with the ``T/(T-k)`` correction.
+        pvalues: Matching two-sided, zero-null, normal-reference p-values.
+        confidence_lower: Matching pointwise lower confidence bounds.
+        confidence_upper: Matching pointwise upper confidence bounds.
+        parameter_covariance: Full joint covariance with ``(equation, parameter)`` axes.
+        r_squared: Weighted coefficients of determination; NaN for constant responses.
+        weights: Unnormalised objective weights indexed by the retained observations.
+        span: None for exact equal weights, otherwise the finite EWMA span.
+        weighting: ``'equal'`` or ``'ewma'``.
+        ewm_lambda: EWMA decay, or None for equal weights.
+        nobs: Number of rows in the common finite sample.
+        effective_nobs: Kish effective sample size; exactly ``nobs`` for equal weights.
+        hac_lags: Actual lag count after capping at ``nobs - 1``.
+        confidence_level: Pointwise two-sided confidence level.
+    """
+
+    coefficients: pd.DataFrame
+    hac_se: pd.DataFrame
+    pvalues: pd.DataFrame
+    confidence_lower: pd.DataFrame
+    confidence_upper: pd.DataFrame
+    parameter_covariance: pd.DataFrame
+    r_squared: pd.Series
+    weights: pd.Series
+    span: Optional[float]
+    weighting: str
+    ewm_lambda: Optional[float]
+    nobs: int
+    effective_nobs: float
+    hac_lags: int
+    confidence_level: float
+
+
+def _validate_hac_settings(span: Optional[float], hac_lags: int,
+                           confidence_level: float) -> Optional[float]:
+    """Validate shared settings without fitting or selecting a sample."""
+    if isinstance(hac_lags, (bool, np.bool_)) or not isinstance(
+            hac_lags, (int, np.integer)
+    ):
+        raise TypeError(f'hac_lags must be an integer, got {hac_lags!r}')
+    if hac_lags < 0:
+        raise ValueError(f'hac_lags must be non-negative, got {hac_lags}')
+    if not 0.0 < confidence_level < 1.0:
+        raise ValueError(
+            f'confidence_level must be between zero and one, got {confidence_level}'
+        )
+    if span is None:
+        return None
+    if isinstance(span, (bool, np.bool_)) or not isinstance(
+            span, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f'span must be a finite number greater than one, got {span!r}')
+    span_value = float(span)
+    if not np.isfinite(span_value) or span_value <= 1.0:
+        raise ValueError(f'span must be a finite number greater than one, got {span!r}')
+    return span_value
+
+
+def _prepare_hac_inputs(y: Union[pd.Series, pd.DataFrame],
+                        x: Optional[Union[pd.Series, pd.DataFrame]],
+                        ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+    """Validate labelled inputs and convert numeric values without deleting any rows."""
+    if not isinstance(y, (pd.Series, pd.DataFrame)):
+        raise TypeError(f'y must be a pandas Series or DataFrame, got {type(y).__name__}')
+    y_frame = y.to_frame(name=y.name if y.name is not None else 'y') if isinstance(
+        y, pd.Series
+    ) else y
+    if y_frame.shape[1] == 0 or not y_frame.columns.is_unique:
+        raise ValueError('y must contain at least one dependent series with unique columns')
+    x_frame = None
+    if x is not None:
+        if not isinstance(x, (pd.Series, pd.DataFrame)):
+            raise TypeError(f'x must be a pandas Series or DataFrame, got {type(x).__name__}')
+        if not x.index.equals(y_frame.index):
+            raise ValueError('x and y pandas indexes must be identical')
+        x_frame = x.to_frame(name=x.name if x.name is not None else 'x') if isinstance(
+            x, pd.Series
+        ) else x
+        if not x_frame.columns.is_unique or 'Intercept' in x_frame.columns:
+            raise ValueError('x columns must be unique and must not contain Intercept')
+        if x_frame.shape[1] == 0:
+            x_frame = None
+    try:
+        for frame in (y_frame, x_frame):
+            if frame is not None and any(
+                    pd.api.types.is_complex_dtype(dtype) for dtype in frame.dtypes
+            ):
+                raise ValueError('complex values are not supported')
+        y_frame = pd.DataFrame(
+            y_frame.to_numpy(dtype=float, na_value=np.nan),
+            index=y_frame.index, columns=y_frame.columns,
+        )
+        if x_frame is not None:
+            x_frame = pd.DataFrame(
+                x_frame.to_numpy(dtype=float, na_value=np.nan),
+                index=x_frame.index, columns=x_frame.columns,
+            )
+    except (TypeError, ValueError) as exception:
+        raise ValueError('x and y must contain real numeric values') from exception
+    return y_frame, x_frame
+
+
+def estimate_hac_regression(
+        y: Union[pd.Series, pd.DataFrame],
+        x: Optional[Union[pd.Series, pd.DataFrame]] = None,
+        span: Optional[float] = None,
+        hac_lags: int = 3,
+        confidence_level: float = 0.95,
+) -> HacRegressionResult:
+    """Estimate joint equal-weight or EWMA means/regressions with Bartlett-HAC inference.
+
+    With ``x=None`` the design contains only an intercept. Otherwise the supplied factor
+    columns follow the intercept. Rows non-finite in any response or factor are removed
+    jointly, without sorting. Equal weights are exactly one. Finite-span weights are
+    ``lambda ** (T - 1 - t)`` on the retained rows, with ``lambda=1-2/(span+1)``.
+
+    The joint score for row t is ``w[t] * (residual[t] tensor design[t])``. Its Bartlett
+    sandwich uses ``T/(T-k)`` for k design columns, never Kish effective size in place of T.
+    Normal-reference inference is pointwise and uses the input units without annualisation.
+    A fixed finite span has bounded effective size as older rows accumulate; it does not
+    provide full-sample asymptotic precision or an automatic latent-current-mean estimate.
+
+    Args:
+        y: Labelled response Series or DataFrame; unnamed Series is labelled ``'y'``.
+        x: Optional aligned factor Series or DataFrame, with unique labels other than
+            ``'Intercept'``. An unnamed Series is labelled ``'x'``; zero columns means no factors.
+        span: None for equal weights, otherwise a finite EWMA span greater than one.
+        hac_lags: Nonnegative integer Bartlett lag count, capped at ``T-1``.
+        confidence_level: Pointwise two-sided confidence level strictly between zero and one.
+
+    Returns:
+        Labelled coefficient/inference tables, joint covariance and sample/weight metadata.
+        A zero coefficient with zero standard error has p-value one. Constant responses have
+        undefined (NaN) R-squared, while coefficient inference is retained.
+
+    Raises:
+        TypeError: If containers or the HAC lag type are invalid.
+        ValueError: If inputs/settings are invalid, the common finite sample or effective size
+            is no larger than k, the weighted design is singular, or inference is non-finite.
+    """
+    span_value = _validate_hac_settings(span, hac_lags, confidence_level)
+    y_frame, x_frame = _prepare_hac_inputs(y, x)
+    y_values = y_frame.to_numpy()
+    finite_rows = np.isfinite(y_values).all(axis=1)
+    if x_frame is not None:
+        finite_rows &= np.isfinite(x_frame.to_numpy()).all(axis=1)
+    y_values = y_values[finite_rows]
+    retained_index = y_frame.index[finite_rows]
+    nobs = int(y_values.shape[0])
+    n_parameters = 1 if x_frame is None else 1 + x_frame.shape[1]
+    if nobs <= n_parameters:
+        raise ValueError(
+            f'HAC estimation requires more than {n_parameters} common finite rows, got {nobs}'
+        )
+    ewm_lambda = None if span_value is None else 1.0 - 2.0 / (span_value + 1.0)
+    weights_array = np.ones(nobs, dtype=float) if span_value is None else np.power(
+        ewm_lambda, np.arange(nobs - 1, -1, -1, dtype=float),
+    )
+    weight_sum = float(weights_array.sum())
+    effective_nobs = float(nobs) if span_value is None else float(
+        np.square(weight_sum) / np.square(weights_array).sum()
+    )
+    if not np.isfinite(effective_nobs) or effective_nobs <= n_parameters:
+        raise ValueError(
+            f'Weights must have Kish effective sample size above {n_parameters}, '
+            f'got {effective_nobs:.6g}'
+        )
+    design = np.ones((nobs, 1), dtype=float)
+    if x_frame is not None:
+        design = np.column_stack((design, x_frame.to_numpy()[finite_rows]))
+    weighted_design = np.sqrt(weights_array)[:, None] * design
+    if np.linalg.matrix_rank(weighted_design) < n_parameters:
+        raise ValueError('Weighted design is singular in the retained sample')
+    try:
+        bread = np.linalg.inv(design.T @ (weights_array[:, None] * design))
+        parameters = bread @ design.T @ (weights_array[:, None] * y_values)
+    except np.linalg.LinAlgError as exception:
+        raise ValueError('Weighted HAC estimation failed') from exception
+    residuals = y_values - design @ parameters
+    scores = np.einsum(
+        'ti,tj->tji', weights_array[:, None] * design, residuals,
+    ).reshape(nobs, -1)
+    meat = scores.T @ scores
+    effective_hac_lags = min(int(hac_lags), nobs - 1)
+    for lag in range(1, effective_hac_lags + 1):
+        kernel_weight = 1.0 - lag / (effective_hac_lags + 1.0)
+        lagged_cross_product = scores[lag:].T @ scores[:-lag]
+        meat += kernel_weight * (lagged_cross_product + lagged_cross_product.T)
+    joint_bread = np.kron(np.eye(y_values.shape[1]), bread)
+    parameter_covariance_array = (
+        nobs / (nobs - n_parameters) * joint_bread @ meat @ joint_bread
+    )
+    parameter_covariance_array = 0.5 * (
+        parameter_covariance_array + parameter_covariance_array.T
+    )
+    weighted_mean = np.sum(weights_array[:, None] * y_values, axis=0) / weight_sum
+    weighted_tss = np.sum(weights_array[:, None] * np.square(y_values - weighted_mean), axis=0)
+    r_squared_array = np.full(y_values.shape[1], np.nan)
+    varying = weighted_tss > 0.0
+    r_squared_array[varying] = 1.0 - np.sum(
+        weights_array[:, None] * np.square(residuals), axis=0,
+    )[varying] / weighted_tss[varying]
+    variances = np.diag(parameter_covariance_array)
+    variance_tolerance = 100.0 * np.finfo(float).eps * max(
+        1.0, float(np.max(np.abs(variances))),
+    )
+    if np.any(variances < -variance_tolerance):
+        raise ValueError('HAC estimation produced negative parameter variances')
+    standard_errors = np.sqrt(np.maximum(variances, 0.0)).reshape(-1, n_parameters).T
+    z_scores = np.divide(
+        np.abs(parameters), standard_errors, out=np.full_like(parameters, np.inf),
+        where=standard_errors > 0.0,
+    )
+    z_scores[(standard_errors == 0.0) & (parameters == 0.0)] = 0.0
+    pvalues = 2.0 * norm.sf(z_scores)
+    critical_value = float(norm.ppf(0.5 + 0.5 * confidence_level))
+    lower = parameters - critical_value * standard_errors
+    upper = parameters + critical_value * standard_errors
+    numeric_outputs = np.concatenate((
+        parameters.ravel(), r_squared_array[varying], pvalues.ravel(), standard_errors.ravel(),
+        lower.ravel(), upper.ravel(), parameter_covariance_array.ravel(),
+    ))
+    if not np.isfinite(numeric_outputs).all():
+        raise ValueError('HAC estimation produced non-finite outputs')
+    equation_index = pd.Index(y_frame.columns, name='equation')
+    parameter_index = pd.Index(
+        ['Intercept'] + ([] if x_frame is None else x_frame.columns.tolist()), name='parameter',
+    )
+    joint_index = pd.MultiIndex.from_product(
+        [equation_index, parameter_index], names=['equation', 'parameter'],
+    )
+    return HacRegressionResult(
+        coefficients=pd.DataFrame(parameters, index=parameter_index, columns=equation_index),
+        hac_se=pd.DataFrame(standard_errors, index=parameter_index, columns=equation_index),
+        pvalues=pd.DataFrame(pvalues, index=parameter_index, columns=equation_index),
+        confidence_lower=pd.DataFrame(lower, index=parameter_index, columns=equation_index),
+        confidence_upper=pd.DataFrame(upper, index=parameter_index, columns=equation_index),
+        parameter_covariance=pd.DataFrame(
+            parameter_covariance_array, index=joint_index, columns=joint_index,
+        ),
+        r_squared=pd.Series(r_squared_array, index=equation_index, name='R-squared'),
+        weights=pd.Series(weights_array, index=retained_index, name='Weight'),
+        span=span_value,
+        weighting='equal' if span_value is None else 'ewma',
+        ewm_lambda=ewm_lambda,
+        nobs=nobs,
+        effective_nobs=effective_nobs,
+        hac_lags=effective_hac_lags,
+        confidence_level=confidence_level,
+    )
 
 
 def newey_west_lag_rule(nobs: int) -> int:
@@ -404,140 +665,35 @@ def estimate_ewma_alpha_beta_hac(
             f'{y_values.shape[0]}'
         )
 
-    finite_rows = np.isfinite(x_values) & np.isfinite(y_values).all(axis=1)
-    x_values = x_values[finite_rows]
-    y_values = y_values[finite_rows]
-    retained_index = y.index[finite_rows]
-    nobs = int(x_values.shape[0])
-    n_parameters = 2
-    if nobs <= n_parameters:
-        raise ValueError(
-            f'EWMA-WLS HAC estimation requires at least three common finite rows, got {nobs}'
-        )
-
-    ewm_lambda = 1.0 - 2.0 / (span_value + 1.0)
-    weights_array = np.power(
-        ewm_lambda,
-        np.arange(nobs - 1, -1, -1, dtype=float),
-    )
-    weight_sum = float(weights_array.sum())
-    effective_nobs = float(np.square(weight_sum) / np.square(weights_array).sum())
-    if not np.isfinite(effective_nobs) or effective_nobs <= n_parameters:
-        raise ValueError(
-            'EWMA weights must have Kish effective sample size above two, '
-            f'got {effective_nobs:.6g}'
-        )
-
-    design = np.column_stack((np.ones(nobs, dtype=float), x_values))
-    weighted_design = np.sqrt(weights_array)[:, None] * design
-    if np.linalg.matrix_rank(weighted_design) < n_parameters:
-        raise ValueError('EWMA-WLS design is singular; x must vary in the retained sample')
-    try:
-        bread = np.linalg.inv(design.T @ (weights_array[:, None] * design))
-        parameters = bread @ design.T @ (weights_array[:, None] * y_values)
-    except np.linalg.LinAlgError as exception:
-        raise ValueError('EWMA-WLS estimation failed') from exception
-
-    residuals = y_values - design @ parameters
-    scores = np.einsum(
-        'ti,tj->tji',
-        weights_array[:, None] * design,
-        residuals,
-    ).reshape(nobs, -1)
-    meat = scores.T @ scores
-    effective_hac_lags = min(int(hac_lags), nobs - 1)
-    for lag in range(1, effective_hac_lags + 1):
-        kernel_weight = 1.0 - lag / (effective_hac_lags + 1.0)
-        lagged_cross_product = scores[lag:].T @ scores[:-lag]
-        meat += kernel_weight * (lagged_cross_product + lagged_cross_product.T)
-    joint_bread = np.kron(np.eye(y.shape[1]), bread)
-    parameter_covariance_array = (
-        nobs
-        / (nobs - n_parameters)
-        * joint_bread
-        @ meat
-        @ joint_bread
-    )
-    parameter_covariance_array = 0.5 * (
-        parameter_covariance_array + parameter_covariance_array.T
-    )
-
-    weighted_mean = np.sum(weights_array[:, None] * y_values, axis=0) / weight_sum
-    weighted_tss = np.sum(
-        weights_array[:, None] * np.square(y_values - weighted_mean),
-        axis=0,
-    )
-    if np.any(weighted_tss <= 0.0):
-        constant_columns = y.columns[weighted_tss <= 0.0].tolist()
-        raise ValueError(f'y series must vary in the retained sample, got {constant_columns}')
-    r_squared_array = 1.0 - np.sum(
-        weights_array[:, None] * np.square(residuals),
-        axis=0,
-    ) / weighted_tss
-
-    alpha_array = parameters[0]
-    beta_array = parameters[1]
-    alpha_positions = np.arange(0, 2 * y.shape[1], 2)
-    alpha_variances = np.diag(parameter_covariance_array)[alpha_positions]
-    variance_tolerance = 100.0 * np.finfo(float).eps * max(
-        1.0,
-        float(np.max(np.abs(np.diag(parameter_covariance_array)))),
-    )
-    if np.any(alpha_variances < -variance_tolerance):
-        raise ValueError('EWMA-WLS HAC estimation produced negative alpha variances')
-    alpha_hac_se_array = np.sqrt(np.maximum(alpha_variances, 0.0))
-    alpha_z_scores = np.divide(
-        np.abs(alpha_array),
-        alpha_hac_se_array,
-        out=np.full_like(alpha_array, np.inf),
-        where=alpha_hac_se_array > 0.0,
-    )
-    alpha_z_scores[(alpha_hac_se_array == 0.0) & (alpha_array == 0.0)] = 0.0
-    alpha_pvalue_array = 2.0 * norm.sf(alpha_z_scores)
-    critical_value = float(norm.ppf(0.5 + 0.5 * confidence_level))
-    lower = alpha_array - critical_value * alpha_hac_se_array
-    upper = alpha_array + critical_value * alpha_hac_se_array
-
-    numeric_outputs = np.concatenate((
-        parameters.ravel(),
-        r_squared_array,
-        alpha_pvalue_array,
-        alpha_hac_se_array,
-        lower,
-        upper,
-        parameter_covariance_array.ravel(),
-    ))
-    if not np.isfinite(numeric_outputs).all():
-        raise ValueError('EWMA-WLS HAC estimation produced non-finite outputs')
-
-    equation_index = pd.Index(y.columns, name='equation')
-    parameter_index = pd.MultiIndex.from_product(
-        [equation_index, ['Intercept', 'Beta']],
-        names=['equation', 'parameter'],
-    )
-    return EwmaAlphaBetaHacResult(
-        alpha=pd.Series(alpha_array, index=equation_index, name='Alpha'),
-        beta=pd.Series(beta_array, index=equation_index, name='Beta'),
-        r_squared=pd.Series(r_squared_array, index=equation_index, name='R-squared'),
-        alpha_pvalue=pd.Series(alpha_pvalue_array, index=equation_index, name='Alpha p-value'),
-        alpha_hac_se=pd.Series(alpha_hac_se_array, index=equation_index, name='Alpha HAC SE'),
-        alpha_confidence_interval=pd.DataFrame(
-            {'Lower': lower, 'Upper': upper},
-            index=equation_index,
-        ),
-        parameter_covariance=pd.DataFrame(
-            parameter_covariance_array,
-            index=parameter_index,
-            columns=parameter_index,
-        ),
-        weights=pd.Series(weights_array, index=retained_index, name='EWMA weight'),
-        ewm_lambda=ewm_lambda,
-        nobs=nobs,
-        effective_nobs=effective_nobs,
-        hac_lags=effective_hac_lags,
+    # Preserve the established array/one-column-x contract and the literal Beta label.
+    result = estimate_hac_regression(
+        y=pd.DataFrame(y_values, index=y.index, columns=y.columns),
+        x=pd.Series(x_values, index=y.index, name='Beta'),
+        span=span_value,
+        hac_lags=hac_lags,
         confidence_level=confidence_level,
     )
-
+    if result.r_squared.isna().any():
+        constant_columns = result.r_squared.index[result.r_squared.isna()].tolist()
+        raise ValueError(f'y series must vary in the retained sample, got {constant_columns}')
+    return EwmaAlphaBetaHacResult(
+        alpha=result.coefficients.loc['Intercept'].rename('Alpha'),
+        beta=result.coefficients.loc['Beta'].rename('Beta'),
+        r_squared=result.r_squared,
+        alpha_pvalue=result.pvalues.loc['Intercept'].rename('Alpha p-value'),
+        alpha_hac_se=result.hac_se.loc['Intercept'].rename('Alpha HAC SE'),
+        alpha_confidence_interval=pd.DataFrame({
+            'Lower': result.confidence_lower.loc['Intercept'],
+            'Upper': result.confidence_upper.loc['Intercept'],
+        }),
+        parameter_covariance=result.parameter_covariance,
+        weights=result.weights.rename('EWMA weight'),
+        ewm_lambda=result.ewm_lambda,
+        nobs=result.nobs,
+        effective_nobs=result.effective_nobs,
+        hac_lags=result.hac_lags,
+        confidence_level=result.confidence_level,
+    )
 
 def prediction_r_squared(actual: pd.Series, prediction: pd.Series,
                          benchmark: Union[float, pd.Series, None] = None,
@@ -613,20 +769,25 @@ def estimate_hac_mean(
             f'HAC mean estimation requires at least two finite observations, got {nobs}'
         )
     try:
-        reg_model = sm.OLS(values, np.ones((nobs, 1), dtype=float)).fit()
-        robust_model = reg_model.get_robustcov_results(
-            cov_type='HAC',
-            maxlags=min(hac_lags, nobs - 1),
-            use_correction=True,
-            use_t=False,
+        effective_hac_lags = min(hac_lags, nobs - 1)
+        # The legacy helper accepts bool lags and caps oversized non-integer requests first.
+        if isinstance(effective_hac_lags, (bool, np.bool_)):
+            effective_hac_lags = int(effective_hac_lags)
+        result = estimate_hac_regression(
+            y=pd.Series(values, name='y'),
+            hac_lags=effective_hac_lags,
+            confidence_level=confidence_level,
         )
-        mean = float(robust_model.params[0])
-        hac_se = float(robust_model.bse[0])
-        pvalue = float(robust_model.pvalues[0])
-        interval = np.asarray(robust_model.conf_int(alpha=1.0 - confidence_level), dtype=float)[0]
+        mean = float(result.coefficients.iloc[0, 0])
+        hac_se = float(result.hac_se.iloc[0, 0])
+        pvalue = float(result.pvalues.iloc[0, 0])
+        interval = (float(result.confidence_lower.iloc[0, 0]),
+                    float(result.confidence_upper.iloc[0, 0]))
     except Exception as exception:
         raise ValueError('HAC mean estimation failed') from exception
-    if not np.isfinite([mean, hac_se, pvalue, *interval]).all():
+    # statsmodels reports an undefined 0/0 test for an all-zero mean sample. Preserve this
+    # established rejection although the generic regression uses p=1 for deterministic zero.
+    if (mean == 0.0 and hac_se == 0.0) or not np.isfinite([mean, hac_se, pvalue, *interval]).all():
         raise ValueError('HAC mean estimation produced non-finite outputs')
     return HacMeanResult(
         mean=mean,
