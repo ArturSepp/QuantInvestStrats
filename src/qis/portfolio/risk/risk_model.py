@@ -421,15 +421,21 @@ class RiskModel:
         }
         return pd.DataFrame.from_dict(aligned, orient='index')
 
-    def _align_groups(self, group_data: pd.Series, date: pd.Timestamp) -> pd.Series:
-        """Align ticker-to-group labels and expose missing labels as Unassigned."""
+    def _align_groups(self, group_data: pd.Series, date: pd.Timestamp,
+                      total_column: Optional[str] = None) -> pd.Series:
+        """Align labels and expose missing groups; optionally reserve a total result key."""
         if not isinstance(group_data, pd.Series):
             raise ValueError(f"group_data must be a pd.Series, got {type(group_data).__name__}")
         if group_data.index.has_duplicates:
             duplicates = group_data.index[group_data.index.duplicated()].tolist()
             raise ValueError(f"group_data has duplicate assets {duplicates}")
         assets = self._covar_at_date(date).index
-        return group_data.reindex(assets).fillna(UNASSIGNED_GROUP)
+        groups = group_data.reindex(assets).fillna(UNASSIGNED_GROUP)
+        # Match the actual result keys without coercing labels or rejecting ignored assets.
+        # Otherwise a sleeve silently replaces the whole-portfolio total in the dictionary.
+        if total_column is not None and total_column in dict.fromkeys(pd.unique(groups)):
+            raise ValueError(f"total_column {total_column!r} duplicates a group_data label")
+        return groups
 
     def _align_group_loadings(self,
                               group_loadings: pd.DataFrame,
@@ -489,6 +495,7 @@ class RiskModel:
             group_data: Optional group label per asset. Missing labels become
                 ``'Unassigned'``.
             total_column: Label for total tracking error when groups are returned.
+                Must differ from the aligned group labels, including ``'Unassigned'``.
             strict: If True, reject material weights outside the covariance universe.
 
         Returns:
@@ -497,7 +504,8 @@ class RiskModel:
 
         Raises:
             KeyError: If ``date`` is not an exact covariance-grid date.
-            ValueError: If weights or model data violate the alignment policy.
+            ValueError: If weights or model data violate the alignment policy, or
+                ``total_column`` duplicates an aligned group label.
         """
         covar = self._covar_at_date(date)
         benchmark = self._align_weights(
@@ -515,7 +523,7 @@ class RiskModel:
         if group_data is None:
             return total
 
-        groups = self._align_groups(group_data=group_data, date=date)
+        groups = self._align_groups(group_data=group_data, date=date, total_column=total_column)
         results = {total_column: total}
         for group in pd.unique(groups):
             group_active_weights = active_weights.where(groups == group, other=0.0)
@@ -610,6 +618,7 @@ class RiskModel:
             group_data: Optional group label per asset. Missing labels become
                 ``'Unassigned'``.
             total_column: Label for total tracking error when groups are returned.
+                Must differ from the aligned group labels, including ``'Unassigned'``.
             strict: If True, reject material weights outside the covariance universe.
 
         Returns:
@@ -617,7 +626,8 @@ class RiskModel:
             and standalone group tracking errors.
 
         Raises:
-            ValueError: If weights or model data violate the alignment policy.
+            ValueError: If weights or model data violate the alignment policy, or
+                ``total_column`` duplicates an aligned group label.
         """
         benchmark_history = self._aligned_weight_history(
             weights=benchmark_weights,
@@ -1004,7 +1014,8 @@ class RiskModel:
 
         Raises:
             KeyError: If ``date`` is not an exact covariance-grid date.
-            ValueError: If weights or model data violate the alignment policy.
+            ValueError: If weights or model data violate the alignment policy, or
+                an aligned group label is ``'Total'``.
         """
         covar = self._covar_at_date(date)
         benchmark = self._align_weights(
@@ -1047,7 +1058,7 @@ class RiskModel:
 
         if group_data is None:
             return contributions
-        groups = self._align_groups(group_data=group_data, date=date)
+        groups = self._align_groups(group_data=group_data, date=date, total_column='Total')
         # Unknown tracking error makes every Euler column unknown, including Total.
         grouped = {'Total': contributions.sum(axis=0, skipna=False)}
         for group in pd.unique(groups):
