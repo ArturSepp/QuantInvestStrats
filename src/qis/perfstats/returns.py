@@ -263,7 +263,8 @@ def compute_asset_returns_dict(prices: pd.DataFrame,
                                returns_freqs: Union[str, pd.Series],
                                drop_first: bool = False,
                                is_first_zero: bool = True,
-                               is_log_returns: bool = False
+                               is_log_returns: bool = False,
+                               ffill_nans: bool = True
                                ) -> Dict[str, pd.DataFrame]:
     """Compute returns for assets grouped by frequency.
 
@@ -273,6 +274,9 @@ def compute_asset_returns_dict(prices: pd.DataFrame,
         drop_first: Drop first return observation
         is_first_zero: Set first non-NaN return to zero
         is_log_returns: Use log returns
+        ffill_nans: Forward-fill prices when resampling to a different frequency. False keeps
+            missing sampled prices; input already on the requested grid keeps its missing
+            observations regardless of this option, as in to_returns
 
     Returns:
         Dictionary with frequency keys and return DataFrames as values
@@ -289,6 +293,7 @@ def compute_asset_returns_dict(prices: pd.DataFrame,
         asset_returns_dict[freq] = to_returns(prices=prices[asset_tickers],
                                               is_log_returns=is_log_returns,
                                               is_first_zero=is_first_zero,
+                                              ffill_nans=ffill_nans,
                                               drop_first=drop_first,
                                               freq=freq)
     return asset_returns_dict
