@@ -160,6 +160,14 @@ def test_group_alignment_exposes_missing_labels_as_unassigned() -> None:
     pd.testing.assert_series_equal(actual, expected)
 
 
+def test_group_alignment_without_total_keeps_literal_total_group() -> None:
+    """Alignment alone reserves no output key; categorical public callers opt into the guard."""
+    groups = pd.Series({'A': 'Total', 'B': 'Other'})
+    actual = _model()._align_groups(group_data=groups, date=DATE_1)
+    expected = pd.Series(['Total', 'Other', UNASSIGNED_GROUP], index=ASSETS)
+    pd.testing.assert_series_equal(actual, expected)
+
+
 def test_factor_loading_asset_mismatch_names_date_and_tickers() -> None:
     loadings = _loadings().drop(index='C')
     loadings.loc['OUTSIDE'] = [0.3, 0.4]
@@ -282,6 +290,71 @@ def test_tre_group_mask_matches_covariance_block_reference() -> None:
     expected_group = np.sqrt(active_block @ covar_block @ active_block)
     np.testing.assert_allclose(actual['Group 1'], expected_group, rtol=1e-12, atol=0.0)
     assert actual['Group 1'] + actual['Group 2'] != pytest.approx(actual['Total'])
+
+
+def _total_label_inputs():
+    """Two dated risk snapshots with independently calculable total and sleeve risks."""
+    assets = pd.Index(['A', 'B'])
+    covar = pd.DataFrame([[0.04, 0.006], [0.006, 0.01]], index=assets, columns=assets)
+    model = RiskModel(covar={DATE_1: covar, DATE_2: 4 * covar})
+    return model, pd.Series(0.0, index=assets), pd.Series([0.6, 0.4], index=assets)
+
+
+@pytest.mark.parametrize('total_column', ['Total', '', 2, ('Rates', 'USD'), UNASSIGNED_GROUP])
+def test_compute_tre_at_date_rejects_conflicting_total_labels(total_column) -> None:
+    """A sleeve must not overwrite the portfolio total, including after missing-label fill."""
+    model, benchmark, portfolio = _total_label_inputs()
+    label = None if total_column == UNASSIGNED_GROUP else total_column
+    groups = pd.Series([label, 'Other'], index=portfolio.index, dtype=object)
+
+    with pytest.raises(ValueError, match='total_column.*duplicates'):
+        model.compute_tre_at_date(benchmark, portfolio, DATE_1, groups,
+                                  total_column=total_column)
+
+
+@pytest.mark.parametrize('method', ['compute_tre_history', 'compute_marginal_tre_at_date'])
+def test_categorical_risk_methods_reject_total_collision_without_mutation(method) -> None:
+    """History delegation and the Euler factor branch must enforce the same reserved key."""
+    model = _factor_model()
+    benchmark = pd.Series([0.4, 0.3, 0.3], index=ASSETS)
+    portfolio = pd.Series([0.6, 0.1, 0.4], index=ASSETS)
+    groups = pd.Series(['Total', 'Other', pd.NA], index=ASSETS, dtype='string')
+    inputs = (benchmark, portfolio, groups)
+    snapshots = [value.copy(deep=True) for value in inputs]
+    # Axis metadata is mutable too; a value-only deep copy is not an isolated snapshot.
+    for value, before in zip(inputs, snapshots):
+        before.index = value.index.copy(deep=True)
+    kwargs = dict(benchmark_weights=benchmark, portfolio_weights=portfolio, group_data=groups)
+    if method != 'compute_tre_history':
+        kwargs['date'] = DATE_1
+
+    with pytest.raises(ValueError, match='total_column.*duplicates'):
+        getattr(model, method)(**kwargs)
+
+    for value, before in zip(inputs, snapshots):
+        pd.testing.assert_series_equal(value, before, check_exact=True)
+
+
+@pytest.mark.parametrize('label,total_column', [
+    ('Total', 'Whole'), (2, '2'), ('2', 2), (('Rates', 'USD'), 'Rates'), (None, 'Whole'),
+])
+def test_categorical_risk_totals_preserve_nonconflicting_labels_and_history(
+        label, total_column) -> None:
+    """Only effective dictionary keys conflict; ignored assets and literal neighbors stay valid."""
+    model, benchmark, portfolio = _total_label_inputs()
+    groups = pd.Series([label, 'Other', 'Total'], index=['A', 'B', 'OUT'], dtype=object)
+    group = UNASSIGNED_GROUP if label is None else label
+    # Portfolio variance is .6^2*.04 + 2*.6*.4*.006 + .4^2*.01 = .01888.
+    # Sleeve risks omit the cross-group term and therefore do not add up to the total.
+    expected = pd.Series({total_column: np.sqrt(0.01888), group: 0.12, 'Other': 0.04})
+
+    actual = model.compute_tre_at_date(benchmark, portfolio, DATE_1, groups,
+                                      total_column=total_column)
+    history = model.compute_tre_history(benchmark, portfolio, groups, total_column=total_column)
+
+    pd.testing.assert_series_equal(actual, expected, rtol=1e-14, atol=1e-15)
+    expected_history = pd.DataFrame([expected, 2 * expected], index=[DATE_1, DATE_2])
+    pd.testing.assert_frame_equal(history, expected_history, rtol=1e-14, atol=1e-15)
 
 
 def test_tre_group_loadings_match_independent_fractional_overlapping_reference() -> None:

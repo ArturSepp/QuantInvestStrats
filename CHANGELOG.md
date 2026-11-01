@@ -21,6 +21,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Calculate cash accruals in date order for uniquely dated excess-return inputs while
   preserving their supplied row order. `compute_excess_returns` no longer turns a funding
   charge into a credit or uses a future rate when return rows are shuffled or descending.
+- Reject group labels that would overwrite total tracking error in categorical `RiskModel`
+  snapshots, histories and Euler contributions. Preserve distinct custom total labels and
+  ignore classifications outside the covariance universe.
 - Match component NAV adjustment factors by date when the portfolio and components share
   unique, non-missing timestamps. Reordering component rows no longer changes their dated
   adjusted values. Preserve the existing portfolio time origin and other calendar handling.
