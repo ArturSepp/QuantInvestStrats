@@ -9,13 +9,16 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import email.parser
+import email.utils
 import hashlib
+import http.client
 import json
 import os
 import re
 import shutil
 import subprocess
 import tarfile
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -249,18 +252,40 @@ def inspect_artifacts(dist: Path, project: dict, import_name: str) -> dict[str, 
 
 
 def pypi_files(name: str, version: str) -> list[dict] | None:
-    """A confirmed 404 means new version; every other API error blocks publication."""
+    """Retry bounded read failures; only a confirmed 404 means a new version."""
     request = urllib.request.Request(
         f"https://pypi.org/pypi/{name}/{version}/json",
         headers={"User-Agent": "ArturSepp-release-v1"},
     )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            data = json.load(response)
-    except urllib.error.HTTPError as error:
-        if error.code == 404:
-            return None
-        raise
+    for delay in (2, 5, 10, None):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                data = json.load(response)
+            break
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return None
+            if error.code not in (408, 429, 500, 502, 503, 504) or delay is None:
+                raise
+            retry_after = error.headers.get("Retry-After") if error.headers else None
+            if retry_after is not None:
+                try:
+                    if retry_after.isdigit():
+                        server_delay = int(retry_after)
+                    else:
+                        until = email.utils.parsedate_to_datetime(retry_after)
+                        server_delay = (until - dt.datetime.now(dt.UTC)).total_seconds()
+                    if not 0 <= server_delay <= 30:
+                        raise ValueError("Retry-After exceeds the bounded retry budget")
+                except (ValueError, TypeError, OverflowError):
+                    raise error
+                delay = max(delay, server_delay)
+            error.close()
+        except (urllib.error.URLError, TimeoutError, ConnectionError,
+                http.client.IncompleteRead, json.JSONDecodeError):
+            if delay is None:
+                raise
+        time.sleep(delay)
     if not isinstance(data, dict) or not isinstance(data.get("urls"), list) or not data["urls"]:
         raise ValueError("PyPI returned an unexpected or empty artifact list")
     return data["urls"]

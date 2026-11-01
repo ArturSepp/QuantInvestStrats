@@ -8,6 +8,8 @@ on:
   workflow_call:
 
 env:
+  UV_HTTP_RETRIES: "5"
+  UV_HTTP_TIMEOUT: "60"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   MPLBACKEND: Agg
 
