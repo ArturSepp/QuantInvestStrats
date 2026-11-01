@@ -403,9 +403,28 @@ jobs:
   lowest-dependencies:
     # Floor resolution is compatibility maintenance, not a verdict on an unrelated edit.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    name: lowest direct dependencies (Python 3.11)
+    name: lowest direct dependencies (Python 3.11, ${{ matrix.suite }}, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: numerical
+            shard: 0
+            shards: 2
+          - suite: numerical
+            shard: 1
+            shards: 2
+          - suite: plots
+            shard: 0
+            shards: 1
+          - suite: factsheets
+            shard: 0
+            shards: 2
+          - suite: factsheets
+            shard: 1
+            shards: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
@@ -421,4 +440,7 @@ jobs:
       - name: Check optional dependencies stay outside package-root import
         run: uv run --no-sync python .github/scripts/check_stack_imports.py --check-root
       - name: Test declared dependency floors without live provider credentials
-        run: uv run --no-sync pytest -x
+        run: >-
+          uv run --no-sync pytest -x -p ci_test_suites --ci-suite ${{ matrix.suite }}
+          --ci-shard ${{ matrix.shard }} --ci-shards ${{ matrix.shards }}
+          --durations=20 -o faulthandler_timeout=300

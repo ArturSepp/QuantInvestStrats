@@ -144,6 +144,30 @@ def test_extras_and_installed_wheel_keep_complete_numerical_coverage():
     assert set(jobs['coverage']['needs']) == {'test-extras', 'rendering'}
 
 
+def test_dependency_floor_shards_cover_every_test_once():
+    job = _ci_jobs()['lowest-dependencies']
+    assert job['strategy']['fail-fast'] is False
+    cells = job['strategy']['matrix']['include']
+    assert Counter((cell['suite'], cell['shard'], cell['shards']) for cell in cells) == {
+        ('numerical', 0, 2): 1, ('numerical', 1, 2): 1,
+        ('plots', 0, 1): 1,
+        ('factsheets', 0, 2): 1, ('factsheets', 1, 2): 1,
+    }
+    nodeids = [f'src/qis/perfstats/tests/returns_numpy_test.py::test_return[{n}]'
+               for n in range(200)]
+    nodeids += ['src/qis/plots/tests/plot_smoke_test.py::test_exported_plot_function_draws']
+    nodeids += [f'src/qis/tests/test_reporting_goldens.py::test_multi_asset_report_layout[{n}]'
+                for n in range(20)]
+    parts = [_select(nodeids, cell['suite'], cell['shard'], cell['shards']) for cell in cells]
+    assert all(parts)
+    assert Counter(nodeid for part in parts for nodeid in part) == Counter(nodeids)
+
+    command = next(step['run'] for step in job['steps'] if step.get('name') ==
+                   'Test declared dependency floors without live provider credentials')
+    assert '-p ci_test_suites --ci-suite ${{ matrix.suite }}' in command
+    assert '--ci-shard ${{ matrix.shard }} --ci-shards ${{ matrix.shards }}' in command
+
+
 @pytest.mark.parametrize(('suite', 'shard', 'count'), [
     ('plots', -1, 2), ('factsheets', 2, 2), ('plots', 0, 0),
     ('numerical', 2, 2), ('all', 1, 2),
