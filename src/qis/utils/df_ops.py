@@ -271,7 +271,9 @@ def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
     Args:
         df: Annualised rates on their own ``DatetimeIndex``, which need not match ``dates``
             and is interpreted chronologically. The caller's object is not modified
-        dates: Target grid. None uses the index of ``df``
+        dates: Target grid. Unique dates without missing timestamps are interpreted
+            chronologically, with results returned in the supplied order. None uses the
+            chronologically ordered index of ``df``
         lag: Number of target-grid observations by which the aligned rate is delayed. None or
             0 uses the quote dated on or before each target date itself
         is_actual_calendar_dt: If True, the accrual fraction is the number of calendar days
@@ -299,6 +301,15 @@ def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
     elif isinstance(dates, pd.DatetimeIndex) and df.index.tz is not None:
         df = df.set_axis(df.index.tz_convert(dates.tz), axis=0)
 
+    original_dates = None
+    if (isinstance(dates, pd.DatetimeIndex)
+            and not dates.is_monotonic_increasing
+            and dates.is_unique and not dates.hasnans):
+        # Both the lag and elapsed days belong to dated periods, not storage neighbors.
+        # Leave ambiguous grids on their existing path rather than inventing an ordering.
+        original_dates = dates
+        dates = dates.sort_values()
+
     # Align on the target grid first and lag second, so the lag counts target periods.
     df = df.reindex(index=dates, method='ffill')
     if lag is not None and lag != 0:
@@ -316,6 +327,8 @@ def multiply_df_by_dt(df: Union[pd.DataFrame, pd.Series],
     else:
         df = df.multiply(1.0 / annualization_factor)
 
+    if original_dates is not None:
+        df = df.reindex(original_dates)
     return df
 
 

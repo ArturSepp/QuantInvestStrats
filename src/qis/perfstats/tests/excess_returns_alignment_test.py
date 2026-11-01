@@ -8,6 +8,7 @@ distinct and reordered columns expose any loss of DataFrame shape or positional 
 from typing import cast
 import numpy as np
 import pandas as pd
+import pytest
 from numpy.typing import NDArray
 
 # qis
@@ -140,6 +141,60 @@ def test_compute_excess_returns_matches_series_and_dataframe_paths() -> None:
     assert isinstance(series_result, pd.Series)
     pd.testing.assert_series_equal(frame_result['Asset A'], expected)
     pd.testing.assert_series_equal(series_result, expected)
+
+
+@pytest.mark.parametrize('order', [[0, 2, 1, 3], [3, 2, 1, 0]])
+@pytest.mark.parametrize('dtype', ['float64', 'Float64'])
+@pytest.mark.parametrize('frame', [False, True])
+def test_compute_excess_returns_preserves_dated_cash_charges(order, dtype, frame) -> None:
+    """Unordered supplied returns retain their row layout without borrowing future quotes."""
+    dates = pd.date_range('2024-01-01', periods=4, name='valuation date', tz='UTC')
+    returns = pd.Series([0.0, 0.01, np.nan, -0.02], index=dates.copy(deep=True),
+                        name='asset', dtype=dtype).iloc[order]
+    if frame:
+        returns = pd.DataFrame({'asset': returns, 'zero': 0.0})
+        returns.columns.name = 'asset name'
+    # A quote first observed on Jan 2 cannot fund the period ending on that date.
+    rates = pd.Series([0.073, 0.1095, 0.146], index=dates[1:].copy(deep=True),
+                      name='cash', dtype=dtype)
+    original_returns = returns.copy(deep=True)
+    original_returns.index = returns.index.copy(deep=True)
+    if frame:
+        original_returns.columns = returns.columns.copy(deep=True)
+    original_rates = rates.copy(deep=True)
+    original_rates.index = rates.index.copy(deep=True)
+    expected = pd.Series([0.0, np.nan, np.nan, -0.0203],
+                         index=dates.copy(deep=True), name='asset', dtype=dtype)
+    if frame:
+        expected = pd.DataFrame({'asset': expected, 'zero': [0.0, np.nan, -0.0002, -0.0003]})
+        expected.columns.name = 'asset name'
+
+    result = compute_excess_returns(returns=returns, rates_data=rates)
+
+    compare = pd.testing.assert_frame_equal if frame else pd.testing.assert_series_equal
+    compare(result, expected.iloc[order], check_exact=False, rtol=0.0, atol=1e-15)
+    compare(returns, original_returns)
+    pd.testing.assert_series_equal(rates, original_rates)
+
+
+def test_compute_excess_returns_is_invariant_to_future_quotes_and_truncation() -> None:
+    """A later quote must not alter earlier dated charges, even in a shuffled return grid."""
+    dates = pd.date_range('2024-01-01', periods=4)
+    returns = pd.Series(0.0, index=dates[[0, 2, 1, 3]])
+    rates = pd.Series([0.0365, 0.073, 0.1095, 0.146], index=dates)
+    expected = pd.Series([0.0, -0.0001, -0.0002, -0.0003], index=dates).reindex(returns.index)
+    full = compute_excess_returns(returns, rates)
+    changed_rates = rates.copy()
+    changed_rates.iloc[2:] = 0.365
+    changed = compute_excess_returns(returns, changed_rates)
+    prefix_dates = returns.index[returns.index <= dates[2]]
+    prefix = compute_excess_returns(returns.loc[prefix_dates], rates.iloc[:3])
+
+    pd.testing.assert_series_equal(full, expected, check_exact=False, rtol=0.0, atol=1e-15)
+    pd.testing.assert_series_equal(prefix, expected.loc[prefix_dates],
+                                   check_exact=False, rtol=0.0, atol=1e-15)
+    pd.testing.assert_series_equal(changed.loc[prefix_dates], expected.loc[prefix_dates],
+                                   check_exact=False, rtol=0.0, atol=1e-15)
 
 
 # =============================================================================

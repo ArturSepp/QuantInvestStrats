@@ -3,12 +3,13 @@
 The rate that accrues over the period ``(t-1, t]`` of a target grid is the latest quote dated on
 or before the grid date ``t-1``: the lag counts observations of the target grid, not of the rate
 series. The first grid date has no elapsed period, so its accrual is exactly zero whatever the
-rate. Every expected value below is hand arithmetic on a 36.5% annual rate, which accrues 0.1%
-per calendar day under ACT/365.
+rate. Expected values use short cash ledgers and hand arithmetic under ACT/365, separating
+chronological holding periods from the storage order of the target dates.
 """
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from qis.utils.df_ops import multiply_df_by_dt
 
@@ -82,3 +83,57 @@ def test_caller_rate_series_is_not_modified() -> None:
     multiply_df_by_dt(df=rates, dates=grid, lag=1)
 
     pd.testing.assert_series_equal(rates, original)
+
+
+@pytest.mark.parametrize('order', [[0, 2, 1, 3], [3, 2, 1, 0]])
+@pytest.mark.parametrize('dtype,frame,tz,lag,actual_days', [
+    ('float64', False, None, 1, True),
+    ('Float64', False, None, 1, True),
+    ('float64', True, 'America/New_York', 1, True),
+    ('Float64', True, 'America/New_York', 1, True),
+    ('float64', False, None, 0, True),
+    ('Float64', True, 'UTC', None, True),
+    ('float64', True, None, 1, False),
+    ('Float64', False, 'UTC', 2, True),
+])
+def test_multiply_df_by_dt_uses_chronological_periods(
+    order, dtype, frame, tz, lag, actual_days,
+) -> None:
+    """Storage order cannot select the lagged quote or reverse elapsed calendar days."""
+    dates = pd.DatetimeIndex(['2024-01-01', '2024-01-03', '2024-01-04', '2024-01-08'],
+                             tz=tz, name='valuation date')
+    rates = pd.Series([0.0365, 0.1095, 0.146, 0.1825],
+                      index=dates.copy(deep=True), dtype=dtype, name='cash')
+    if frame:
+        rates = pd.DataFrame({'cash': rates, 'double': 2 * rates})
+        rates.columns.name = 'rate curve'
+    original = rates.copy(deep=True)
+    original.index = rates.index.copy(deep=True)
+    if frame:
+        original.columns = rates.columns.copy(deep=True)
+    grid = dates[order]
+    grid_before = grid.copy(deep=True)
+
+    # Jan 3/4/8 close intervals of 2/1/4 days. A lag counts these boundaries,
+    # not physical rows or the number of quotes. Fixed-period mode has no zero first accrual.
+    if not actual_days:
+        values = [np.nan, 0.0001, 0.0003, 0.0004]
+    elif lag == 1:
+        values = [0.0, 0.0002, 0.0003, 0.0016]
+    elif lag == 2:
+        values = [0.0, np.nan, 0.0001, 0.0012]
+    else:
+        values = [0.0, 0.0006, 0.0004, 0.0020]
+    expected = pd.Series(values, index=dates.copy(deep=True), dtype=dtype, name='cash')
+    if frame:
+        expected = pd.DataFrame({'cash': expected, 'double': 2 * expected})
+        expected.columns.name = 'rate curve'
+    expected = expected.iloc[order]
+
+    result = multiply_df_by_dt(rates, dates=grid, lag=lag,
+                               is_actual_calendar_dt=actual_days)
+
+    compare = pd.testing.assert_frame_equal if frame else pd.testing.assert_series_equal
+    compare(result, expected, check_exact=False, rtol=0.0, atol=1e-15)
+    compare(rates, original)
+    pd.testing.assert_index_equal(grid, grid_before, exact=True)
