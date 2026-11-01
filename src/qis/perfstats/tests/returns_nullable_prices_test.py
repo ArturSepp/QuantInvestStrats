@@ -10,6 +10,8 @@ The downstream backfill control also verifies that nullable conversion retains a
 supplied first-price anchor without changing frequency or fill conventions.
 """
 
+import copy
+import math
 import warnings
 
 import numpy as np
@@ -136,6 +138,146 @@ def _make_expected_mode_returns(return_type: ReturnTypes) -> pd.DataFrame:
 # =============================================================================
 # Return-mode and mixed-panel regressions
 # =============================================================================
+
+
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize(
+    ("dtype", "levels"),
+    [("Int8", (120, -120, 100)), ("Int16", (30000, -30000, 20000)),
+     ("Int32", (2000000000, -2000000000, 1000000000)),
+     *[(dtype, (20, 18, 22)) for dtype in ("UInt8", "UInt16", "UInt32", "UInt64")]],
+)
+def test_to_returns_widens_integer_differences(dtype, levels):
+    """Subtract in signed storage before fixed-width arithmetic can wrap."""
+    prices = pd.Series(levels, dtype=dtype, index=_DATES[:3], name="Index points")
+    expected = pd.Series(
+        [pd.NA, int(levels[1]) - int(levels[0]), int(levels[2]) - int(levels[1])],
+        dtype="Int64", index=_DATES[:3], name="Index points",
+    )
+    actual = to_returns(prices, return_type=ReturnTypes.DIFFERENCE)
+    pd.testing.assert_series_equal(actual, expected, check_exact=True)
+    pd.testing.assert_frame_equal(
+        to_returns(prices.to_frame(), return_type=ReturnTypes.DIFFERENCE),
+        expected.to_frame(), check_exact=True,
+    )
+
+
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("dtype", [
+    "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64",
+    "Int8", "UInt8", "Int16", "UInt16", "Int32", "UInt32", "Int64", "UInt64",
+])
+def test_to_returns_uses_double_precision_for_integer_logs(dtype):
+    """Small integer storage must not select a float16 or float32 logarithm."""
+    prices = pd.Series([20, 18, 22], dtype=dtype, index=_DATES[:3], name="Index")
+    expected = pd.Series(
+        [np.nan, math.log(18 / 20), math.log(22 / 18)],
+        dtype="Float64" if dtype[0].isupper() else "float64",
+        index=_DATES[:3], name="Index",
+    )
+    # Absolute 1e-15 allows double-precision log/subtraction rounding, not the old 5bp error.
+    pd.testing.assert_series_equal(
+        to_returns(prices, return_type=ReturnTypes.LOG), expected, rtol=0.0, atol=1e-15,
+    )
+    pd.testing.assert_frame_equal(
+        to_returns(prices.to_frame(), is_log_returns=True, return_type=ReturnTypes.LEVEL),
+        expected.to_frame(), rtol=0.0, atol=1e-15,
+    )
+
+
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize(
+    ("dtype", "levels", "result_dtype"),
+    [("Int64", (2**60, 2**60 + 1, 2**60 - 1), "Int64"),
+     ("Int64", (0, 2**60 + 1, 0), "Int64"),
+     ("UInt64", (0, 2**63 - 1, 0), "Int64"),
+     ("UInt64", (0, 2**63, 2**63 + 1), "UInt64")],
+)
+def test_to_returns_preserves_exact_wide_integer_differences(dtype, levels, result_dtype):
+    """Keep exact native deltas and leave values outside signed capacity unconverted."""
+    # Mixed small/large Python integers can round during pandas construction, before QIS runs.
+    prices = pd.Series(np.array(levels, dtype=dtype.lower()), dtype=dtype, index=_DATES[:3])
+    assert [int(value) for value in prices] == list(levels)
+    expected = pd.Series(
+        [pd.NA, int(levels[1]) - int(levels[0]), int(levels[2]) - int(levels[1])],
+        dtype=result_dtype, index=_DATES[:3],
+    )
+    pd.testing.assert_series_equal(
+        to_returns(prices, return_type=ReturnTypes.DIFFERENCE), expected, check_exact=True,
+    )
+
+
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("return_type", [ReturnTypes.DIFFERENCE, ReturnTypes.LOG])
+def test_to_returns_keeps_integer_columns_independent_of_float_neighbors(return_type):
+    """Duplicate labels must not merge storage choices, masks or caller-owned metadata."""
+    prices = pd.concat([
+        pd.Series([20, 18, 22, 21], dtype="UInt8"),
+        pd.Series([20, 18, 22, 21], dtype="Float32"),
+        pd.Series([pd.NA, 20, pd.NA, 22], dtype="UInt8"),
+        pd.Series([pd.NA] * 4, dtype="UInt8"),
+        pd.Series([120, -120, 100, 0], dtype="Int8"),
+    ], axis=1)
+    prices.index = _DATES.copy(deep=True).rename("Observation")
+    prices.columns = pd.Index(["same", "same", "ragged", "missing", "signed"], name="Factor")
+    prices.attrs = {"units": {"source": ["index points"]}}
+    before = prices.copy(deep=True)
+    before.index = prices.index.copy(deep=True)
+    before.columns = prices.columns.copy(deep=True)
+    before.attrs = copy.deepcopy(prices.attrs)
+    if return_type == ReturnTypes.DIFFERENCE:
+        common, signed, integer_dtype = [pd.NA, -2, 4, -1], [pd.NA, -240, 220, -100], "Int64"
+    else:
+        common = [pd.NA, math.log(18 / 20), math.log(22 / 18), math.log(21 / 22)]
+        signed, integer_dtype = [pd.NA] * 4, "Float64"
+    expected = pd.concat([
+        pd.Series(common, dtype=integer_dtype), pd.Series(common, dtype="Float32"),
+        pd.Series([pd.NA] * 4, dtype=integer_dtype),
+        pd.Series([pd.NA] * 4, dtype=integer_dtype), pd.Series(signed, dtype=integer_dtype),
+    ], axis=1)
+    expected.index = _DATES.copy(deep=True).rename("Observation")
+    expected.columns = pd.Index(["same", "same", "ragged", "missing", "signed"], name="Factor")
+    pd.testing.assert_frame_equal(prices, before, check_exact=True)
+    actual = to_returns(prices, return_type=return_type, ffill_nans=False)
+    # Only the untouched Float32 neighbor needs its native single-precision rounding allowance.
+    for position in range(prices.shape[1]):
+        pd.testing.assert_series_equal(
+            actual.iloc[:, position], expected.iloc[:, position],
+            rtol=0.0, atol=1e-6 if position == 1 else 1e-15,
+        )
+    pd.testing.assert_frame_equal(prices, before, check_exact=True)
+    assert prices.attrs == before.attrs
+
+
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("dtype", ["int8", "uint8", "int64", "uint64"])
+@pytest.mark.parametrize("return_type", [ReturnTypes.DIFFERENCE, ReturnTypes.LOG])
+def test_to_returns_preserves_sparse_integer_storage(dtype, return_type):
+    """Keep sparse operands sparse, including beside a nullable integer neighbor."""
+    # A unit log fill avoids the native log(0) metadata warning, unrelated to actual observations.
+    fill = 1 if return_type == ReturnTypes.LOG else 0
+    prices = pd.Series([20, 18, 22], dtype=pd.SparseDtype(dtype, fill),
+                       index=_DATES[:3], name="Index")
+    before = prices.copy(deep=True)
+    values = ([np.nan, -2.0, 4.0] if return_type == ReturnTypes.DIFFERENCE
+              else [np.nan, math.log(18 / 20), math.log(22 / 18)])
+    expected = pd.Series(values, dtype=pd.SparseDtype("float64", 0),
+                         index=_DATES[:3], name="Index")
+    actual = to_returns(prices, return_type=return_type, ffill_nans=False)
+    pd.testing.assert_series_equal(actual, expected, rtol=0.0, atol=1e-15)
+    neighbor = pd.Series([20, 18, 22], dtype="UInt8", index=_DATES[:3], name="Neighbor")
+    panel = pd.concat([prices, neighbor], axis=1)
+    panel_before = panel.copy(deep=True)
+    actual_panel = to_returns(panel, return_type=return_type, ffill_nans=False)
+    pd.testing.assert_series_equal(actual_panel["Index"], expected, rtol=0.0, atol=1e-15)
+    neighbor_dtype = "Int64" if return_type == ReturnTypes.DIFFERENCE else "Float64"
+    pd.testing.assert_series_equal(
+        actual_panel["Neighbor"],
+        pd.Series(values, dtype=neighbor_dtype, index=_DATES[:3], name="Neighbor"),
+        rtol=0.0, atol=1e-15,
+    )
+    pd.testing.assert_series_equal(prices, before, check_exact=True)
+    pd.testing.assert_frame_equal(panel, panel_before, check_exact=True)
 
 
 @pytest.mark.parametrize("return_type", tuple(ReturnTypes))

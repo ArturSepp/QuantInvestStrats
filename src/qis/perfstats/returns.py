@@ -129,6 +129,50 @@ def _warn_unused_keywords(function_name: str,
                   f"{', '.join(descriptions)}", UserWarning, stacklevel=3)
 
 
+def _return_calculation_prices(prices: Union[pd.Series, pd.DataFrame],
+                               logarithmic: bool = False
+                               ) -> Union[pd.Series, pd.DataFrame]:
+    """Promote integer operands without changing neighboring floating-point storage.
+
+    Args:
+        prices: Owned working prices after endpoint masking. DataFrame columns may be replaced
+            in place; this must not be called with caller-owned prices.
+        logarithmic: Use double precision instead of NumPy's narrow-integer log dispatch.
+
+    Returns:
+        Calculation operands with integer storage widened where needed and safely representable.
+        Sparse operands retain sparse storage.
+    """
+    if isinstance(prices, pd.DataFrame):
+        # Labels need not be unique, and adjacent columns can require different promotions.
+        for position, dtype in enumerate(prices.dtypes):
+            if pd.api.types.is_integer_dtype(dtype):
+                column = prices.iloc[:, position]
+                converted = _return_calculation_prices(column, logarithmic=logarithmic)
+                if converted is not column:
+                    prices.isetitem(position, converted)
+        return prices
+
+    dtype = prices.dtype
+    if not pd.api.types.is_integer_dtype(dtype):
+        return prices
+    if isinstance(dtype, pd.SparseDtype):
+        # Sparse shift already widens differences. Logs need wider stored values without
+        # densifying the series or reinterpreting its fill value.
+        if logarithmic:
+            return prices.astype(pd.SparseDtype(np.float64, dtype.fill_value))
+        return prices
+    nullable = pd.api.types.is_extension_array_dtype(dtype)
+    if logarithmic:
+        return prices.astype('Float64' if nullable else np.float64)
+    # Casting wide signed levels to float first would erase exact deltas above 2**53.
+    # Narrow integers fit signed64, as do unsigned64 levels wholly inside its capacity.
+    # Leave other wide inputs to native arithmetic rather than choose a new overflow policy.
+    if dtype.itemsize < 8 or (dtype.kind == 'u' and prices.le(2**63 - 1).all()):
+        return prices.astype('Int64' if nullable else np.int64)
+    return prices
+
+
 def to_returns(prices: Union[pd.Series, pd.DataFrame],
                is_log_returns: bool = False,
                return_type: ReturnTypes = ReturnTypes.RELATIVE,
@@ -164,7 +208,9 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
         Return time series matching the input's pandas shape and labels. LOG and RELATIVE are
         missing unless both endpoints are finite and positive. DIFFERENCE is missing unless both
         signed endpoints are finite; LEVEL and LEVEL0 are missing unless their returned level is
-        finite. Nullable floating inputs retain a nullable output dtype
+        finite. Nullable floating inputs retain a nullable output dtype. Integer LOG operands use
+        double precision; DIFFERENCE widens narrower integers and unsigned levels within signed
+        64-bit capacity. Other wide integer differences retain native arithmetic
     """
     if kwargs:
         # An ignored keyword would otherwise go unnoticed: is_log_return=True returns simple
@@ -187,6 +233,7 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
         # Log returns require positive levels at both endpoints of the period.
         valid_prices: Union[pd.Series, pd.DataFrame] = finite_prices & prices.gt(0.0)
         calculation_prices: Union[pd.Series, pd.DataFrame] = prices.where(valid_prices, other=1.0)
+        calculation_prices = _return_calculation_prices(calculation_prices, logarithmic=True)
         log_prices = cast(Union[pd.Series, pd.DataFrame], np.log(calculation_prices))
         returns = log_prices.diff(1)
         valid_returns = valid_prices & valid_prices.shift(1, fill_value=False)
@@ -199,6 +246,7 @@ def to_returns(prices: Union[pd.Series, pd.DataFrame],
     elif return_type == ReturnTypes.DIFFERENCE:
         # Signed rates and spreads may cross zero, so differences require only finite endpoints.
         calculation_prices = prices.where(finite_prices, other=0.0)
+        calculation_prices = _return_calculation_prices(calculation_prices)
         returns = calculation_prices - calculation_prices.shift(1)
         valid_returns = finite_prices & finite_prices.shift(1, fill_value=False)
     elif return_type == ReturnTypes.LEVEL:
