@@ -30,7 +30,7 @@ jobs:
   test:
     name: pytest (core, ${{ matrix.os }}, py${{ matrix.python-version }}, shard ${{ matrix.shard }})
     runs-on: ${{ matrix.os }}
-    # Every interpreter/platform runs both shards, whose union is the entire numerical suite.
+    # Each interpreter/platform's shards cover the entire numerical suite exactly once.
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -39,39 +39,63 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.11"
             shard: 0
+            shards: 2
           - os: ubuntu-latest
             python-version: "3.11"
             shard: 1
+            shards: 2
           - os: ubuntu-latest
             python-version: "3.12"
             shard: 0
+            shards: 2
           - os: ubuntu-latest
             python-version: "3.12"
             shard: 1
+            shards: 2
           - os: ubuntu-latest
             python-version: "3.13"
             shard: 0
+            shards: 2
           - os: ubuntu-latest
             python-version: "3.13"
             shard: 1
+            shards: 2
           - os: ubuntu-latest
             python-version: "3.14"
             shard: 0
+            shards: 2
           - os: ubuntu-latest
             python-version: "3.14"
             shard: 1
+            shards: 2
           - os: windows-latest
             python-version: "3.12"
             shard: 0
+            shards: 5
           - os: windows-latest
             python-version: "3.12"
             shard: 1
+            shards: 5
+          - os: windows-latest
+            python-version: "3.12"
+            shard: 2
+            shards: 5
+          - os: windows-latest
+            python-version: "3.12"
+            shard: 3
+            shards: 5
+          - os: windows-latest
+            python-version: "3.12"
+            shard: 4
+            shards: 5
           - os: macos-latest
             python-version: "3.12"
             shard: 0
+            shards: 2
           - os: macos-latest
             python-version: "3.12"
             shard: 1
+            shards: 2
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,7 +113,7 @@ jobs:
     - name: Run numerical and mixed-contract tests
       run: >-
         uv run --no-sync pytest -p ci_test_suites --ci-suite numerical
-        --ci-shard ${{ matrix.shard }} --ci-shards 2 --durations=20
+        --ci-shard ${{ matrix.shard }} --ci-shards ${{ matrix.shards }} --durations=20
 
   # Optional numeric/IO tests plus coverage; rendering coverage is combined below.
   test-extras:
