@@ -263,6 +263,7 @@ def compute_asset_returns_dict(prices: pd.DataFrame,
                                returns_freqs: Union[str, pd.Series],
                                drop_first: bool = False,
                                is_first_zero: bool = True,
+                               ffill_nans: bool = True,
                                is_log_returns: bool = False
                                ) -> Dict[str, pd.DataFrame]:
     """Compute returns for assets grouped by frequency.
@@ -272,6 +273,7 @@ def compute_asset_returns_dict(prices: pd.DataFrame,
         returns_freqs: Series mapping asset tickers to return frequencies
         drop_first: Drop first return observation
         is_first_zero: Set first non-NaN return to zero
+        ffill_nans: Forward-fill NaN prices before computing returns
         is_log_returns: Use log returns
 
     Returns:
@@ -289,6 +291,7 @@ def compute_asset_returns_dict(prices: pd.DataFrame,
         asset_returns_dict[freq] = to_returns(prices=prices[asset_tickers],
                                               is_log_returns=is_log_returns,
                                               is_first_zero=is_first_zero,
+                                              ffill_nans=ffill_nans,
                                               drop_first=drop_first,
                                               freq=freq)
     return asset_returns_dict
