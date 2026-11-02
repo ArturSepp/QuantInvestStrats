@@ -35,7 +35,7 @@ jobs:
       checks: read
       statuses: read
     steps:
-      - uses: ArturSepp/ArturSepp/.github/actions/dependabot-merge@c215ef63b7bf0ce085e0623b322414a49b2a4e00
+      - uses: ArturSepp/ArturSepp/.github/actions/dependabot-merge@29592db785ada392410f8ca1199244272f0c2c73
         with:
           github-token: ${{ github.token }}
           apply: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
