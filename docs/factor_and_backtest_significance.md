@@ -9,7 +9,7 @@ myst:
 
 # Significance tests for factors and backtests
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-11-03](https://github.com/ArturSepp/QuantInvestStrats/commit/e4c3383d91a24c49d1b78461ee7d60e40127b6e8)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
